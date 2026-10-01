@@ -25,6 +25,29 @@ export function feedUrl(raw: string): string {
     return trimmed;
 }
 
+/**
+ * The id a feed's one calendar is stored under. Not the address: a private
+ * feed's address is the secret that reads it, and is kept sealed.
+ */
+export const FEED_REMOTE_ID = "feed";
+
+/** Characters of a feed's address shown after its host, so two can be told apart. */
+const MASKED_TAIL = 4;
+
+/** A feed's address as it may be shown: its host and the last few characters. */
+export function maskFeedAddress(raw: string): string {
+    const address = feedUrl(raw);
+    let url: URL;
+    try {
+        url = new URL(address);
+    } catch {
+        return `...${address.slice(-MASKED_TAIL)}`;
+    }
+    const rest = `${url.pathname}${url.search}`;
+    if (rest.length <= 1) return `${url.protocol}//${url.host}`;
+    return `${url.protocol}//${url.host}/...${rest.slice(-MASKED_TAIL)}`;
+}
+
 export type FeedResult =
     | { notModified: true }
     | {
@@ -106,7 +129,7 @@ export function createIcsProvider(input: {
             const calendar = result.notModified ? null : result.calendar;
             return [
                 {
-                    remoteId: input.url,
+                    remoteId: FEED_REMOTE_ID,
                     name: calendar?.name ?? input.name ?? "",
                     color: calendar?.color ?? null,
                     description: "",

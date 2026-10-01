@@ -42,6 +42,63 @@ describe("parseRule / formatRule", () => {
         expect(engine.formatRule(engine.parseRule("FREQ=DAILY;BYHOUR=9,17;COUNT=4"))).toBe("FREQ=DAILY;COUNT=4;BYHOUR=9,17");
         expect(engine.formatRule(engine.parseRule("FREQ=WEEKLY;INTERVAL=2;UNTIL=20261231T225959Z;BYDAY=MO,WE"))).toBe("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;UNTIL=20261231T225959Z");
     });
+
+    it("keeps RSCALE, SKIP and X- parts through a change, and leaves such a rule to its summary", () => {
+        const rule = engine.parseRule("RSCALE=HEBREW;FREQ=YEARLY;BYMONTH=5;SKIP=FORWARD;X-NAME=keep;COUNT=5");
+        expect(rule.supported).toBe(false);
+        expect(engine.withRule(rule, { count: 2 }).raw).toBe("FREQ=YEARLY;BYMONTH=5;COUNT=2;RSCALE=HEBREW;SKIP=FORWARD;X-NAME=keep");
+    });
+});
+
+describe("neverRecurs", () => {
+    const monday = engine.parseWall("2026-01-05T09:00:00");
+
+    it("names the rules ical.js would step through forever", () => {
+        for (const raw of [
+            "FREQ=DAILY;BYDAY=1MO",
+            "FREQ=SECONDLY;BYDAY=-1FR",
+            "FREQ=DAILY;BYMONTHDAY=-1",
+            "FREQ=HOURLY;BYMONTHDAY=0",
+            "FREQ=DAILY;INTERVAL=7;BYDAY=TU",
+            "FREQ=DAILY;INTERVAL=14;BYDAY=WE,TH",
+            "FREQ=HOURLY;INTERVAL=168;BYDAY=TU",
+            "FREQ=HOURLY;INTERVAL=84;BYDAY=TU",
+            "FREQ=MINUTELY;INTERVAL=120;BYHOUR=10",
+            "FREQ=SECONDLY;INTERVAL=7200;BYMINUTE=30",
+            "FREQ=SECONDLY;BYSECOND=60",
+            "FREQ=WEEKLY;BYWEEKNO=-1",
+            "FREQ=DAILY;BYMONTH=6;BYWEEKNO=1",
+            "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30,-1",
+            "FREQ=YEARLY;BYMONTH=4,6;BYMONTHDAY=31"
+        ]) {
+            expect(engine.neverRecurs(engine.parseRule(raw), monday), raw).toBe(true);
+        }
+    });
+
+    it("leaves every rule that does repeat to ical.js", () => {
+        for (const raw of [
+            "FREQ=DAILY",
+            "FREQ=DAILY;BYDAY=MO,1TU",
+            "FREQ=DAILY;INTERVAL=7;BYDAY=MO",
+            "FREQ=DAILY;INTERVAL=3;BYDAY=TU",
+            "FREQ=DAILY;BYMONTHDAY=31,-1",
+            "FREQ=DAILY;INTERVAL=7;BYMONTHDAY=6",
+            "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=29",
+            "FREQ=DAILY;BYWEEKNO=1;BYMONTH=1",
+            "FREQ=DAILY;BYWEEKNO=53;BYMONTH=12;BYDAY=TH",
+            "FREQ=HOURLY;INTERVAL=5;BYHOUR=10",
+            "FREQ=HOURLY;INTERVAL=5;BYDAY=SU,MO",
+            "FREQ=HOURLY;INTERVAL=24;BYDAY=TU;BYHOUR=5",
+            "FREQ=MINUTELY;INTERVAL=7;BYHOUR=9",
+            "FREQ=SECONDLY;BYHOUR=8",
+            "FREQ=WEEKLY;BYDAY=1MO",
+            "FREQ=MONTHLY;BYMONTHDAY=-1",
+            "FREQ=MONTHLY;INTERVAL=12;BYMONTH=2",
+            "FREQ=YEARLY;BYWEEKNO=20;BYDAY=MO"
+        ]) {
+            expect(engine.neverRecurs(engine.parseRule(raw), monday), raw).toBe(false);
+        }
+    });
 });
 
 describe("the editor model", () => {

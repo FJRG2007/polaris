@@ -20,6 +20,7 @@ import { prisma } from "@polaris/db";
 import { tryItemOf } from "./objects";
 import { host } from "@polaris/app-host";
 import { calendarTIn, localeOf } from "./i18n";
+import { forReader, publicItem, reachOf, reaches, type Reach } from "./access";
 
 /** How many people one calendar reminds at most - its owner and its sharees. */
 const MAX_RECIPIENTS = 200;
@@ -54,6 +55,12 @@ async function recipientsOf(calendarId: string): Promise<string[]> {
     });
     for (const row of muted) people.delete(row.userId);
     return [...people].slice(0, MAX_RECIPIENTS);
+}
+
+/** Stop reminding these people of a calendar's events. */
+export async function forgetReminders(calendarId: string, userIds: readonly string[]): Promise<void> {
+    if (userIds.length === 0) return;
+    await prisma.calendarReminder.deleteMany({ where: { userId: { in: [...userIds] }, object: { calendarId } } });
 }
 
 /** The zone a floating time is read in when nobody is asking: the calendar's. */
@@ -106,7 +113,7 @@ export async function fireDueReminders(now = new Date()): Promise<{ sent: number
                     calendarId: true,
                     ics: true,
                     deletedAt: true,
-                    calendar: { select: { name: true, alarmsMuted: true, trashedAt: true, timezone: true } }
+                    calendar: { select: { ownerId: true, kind: true, name: true, alarmsMuted: true, trashedAt: true, timezone: true } }
                 }
             }
         }
@@ -114,6 +121,7 @@ export async function fireDueReminders(now = new Date()): Promise<{ sent: number
     let sent = 0;
     let dropped = 0;
     const replan = new Set<string>();
+    const levels = new Map<string, Reach | null>();
     for (const reminder of due) {
         // Claimed before anything is sent: a pass that dies half way must not
         // send this one again on the next.
@@ -128,9 +136,12 @@ export async function fireDueReminders(now = new Date()): Promise<{ sent: number
         }
         const item = tryItemOf(object.ics);
         if (!item) continue;
-        await deliver(reminder.userId, reminder.action, item, reminder.occurrence, reminder.objectId, object.calendar.name, object.calendar.timezone || "UTC")
-            .then(() => {
-                sent += 1;
+        const calendar = { id: object.calendarId, ...object.calendar };
+        const key = `${reminder.userId}:${calendar.id}`;
+        if (!levels.has(key)) levels.set(key, (await reachOf(reminder.userId, [calendar])).get(calendar.id) ?? null);
+        await deliver(reminder.userId, reminder.action, item, reminder.occurrence, reminder.objectId, calendar, levels.get(key)!)
+            .then((delivered) => {
+                if (delivered) sent += 1;
             })
             .catch((caught: unknown) => console.error("polaris: a calendar reminder could not be sent:", caught));
     }
@@ -162,12 +173,14 @@ async function describe(
     userId: string,
     item: engine.CalendarItem,
     occurrence: Date,
-    calendarZone: string
+    calendarZone: string,
+    busyOnly: boolean
 ): Promise<{ title: string; body: string; locale: string }> {
     const locale = await localeOf(userId);
     const t = calendarTIn(locale);
-    const summary =
-        item.component === "VEVENT"
+    const summary = busyOnly
+        ? t("published.busy")
+        : item.component === "VEVENT"
             ? (item.master ?? item.overrides[0])?.summary || t("reminders.untitledEvent")
             : item.todo.summary || t("reminders.untitledTask");
     const start = item.component === "VEVENT" ? (item.master ?? item.overrides[0])?.start : (item.todo.due ?? item.todo.start);
@@ -188,22 +201,27 @@ async function deliver(
     item: engine.CalendarItem,
     occurrence: Date,
     objectId: string,
-    calendarName: string,
-    calendarZone: string
-): Promise<void> {
-    const words = await describe(userId, item, occurrence, calendarZone);
+    calendar: { name: string; timezone: string },
+    level: Reach | null
+): Promise<boolean> {
+    if (!reaches(level, "read")) return false;
+    const full = reaches(level, "write");
+    const shown = full ? item : forReader(item);
+    if (!shown) return false;
+    const busyOnly = !full && !publicItem(shown);
+    const words = await describe(userId, shown, occurrence, calendar.timezone || "UTC", busyOnly);
     const href = `/calendar/e/${objectId}`;
     if (action === "EMAIL") {
         const person = (await host.calendarHost.peopleByIds([userId]))[0];
-        if (!person?.email) return;
+        if (!person?.email) return false;
         const t = calendarTIn(words.locale as never);
         const result = await host.calendarHost.sendCalendarEmail({
             to: person.email,
             subject: t("reminders.mailSubject", { title: words.title }),
-            text: `${words.title}\n${words.body}\n${t("reminders.mailCalendar", { calendar: calendarName })}\n`
+            text: `${words.title}\n${words.body}\n${t("reminders.mailCalendar", { calendar: calendar.name })}\n`
         });
         if (result.error) throw new Error(result.error);
-        return;
+        return true;
     }
     await host.notificationsDispatch.notify({
         userId,
@@ -212,4 +230,5 @@ async function deliver(
         body: words.body,
         href
     });
+    return true;
 }

@@ -154,6 +154,21 @@ describe("calendar actions", () => {
         expect(loaded.ok && loaded.preferences.showWeekends).toBe(false);
     });
 
+    it("refuses saving a task in a zone nobody knows", async () => {
+        const todo = world.storeItem(calendar, engine.todoItem(engine.newTodo({ uid: "todo-1", summary: "Taxes" })));
+        const answer = await tasks.saveTodoAction({
+            objectId: todo.id,
+            version: (todo.updatedAt as Date).toISOString(),
+            summary: "File taxes",
+            due: { date: "2026-10-20" },
+            status: "COMPLETED",
+            zone: "Mars/Olympus"
+        });
+        expect(answer).toEqual(checkInput());
+        const item = world.itemIn(db.byId("calendarObject", String(todo.id)));
+        expect(item.component === "VTODO" && item.todo.summary).toBe("Taxes");
+    });
+
     it("saves a calendar task and schedules a Tasks-app task", async () => {
         const todo = world.storeItem(calendar, engine.todoItem(engine.newTodo({ uid: "todo-1", summary: "Taxes" })));
         const answer = await tasks.saveTodoAction({

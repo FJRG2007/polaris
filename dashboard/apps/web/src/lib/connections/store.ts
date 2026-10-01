@@ -274,6 +274,18 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
             });
             if (held >= limit) throw new ConnectionLimitError(input.provider, limit);
         }
+    } else if (!input.beyondLimit) {
+        // An account linked for the Calendar past the cap stays a calendar link:
+        // authorized again for anything else - storage, mail - it is counted
+        // like any other, the cap holding the first ones linked.
+        const limit = await connectionLimit(input.provider);
+        const linked = await prisma.userConnection.findMany({
+            where: { userId, provider: input.provider },
+            select: { id: true, method: true, linkedAt: true }
+        });
+        const own = linked.find((row) => row.id === claimed.id)?.linkedAt;
+        const ahead = own ? linked.filter((row) => row.method !== "manual" && row.linkedAt < own).length : 0;
+        if (ahead >= limit) throw new ConnectionLimitError(input.provider, limit);
     }
 
     const secret = input.credential ? encryptCredential(input.credential) : undefined;

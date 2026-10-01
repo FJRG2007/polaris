@@ -53,6 +53,16 @@ describe("bookingSlots", () => {
         expect(local(booked)).toEqual(["06-01T09:30", "06-01T10:00", "06-01T10:30"]);
     });
 
+    it("keeps the buffers of an existing booking clear on both sides of it", () => {
+        // Booked 09:30-10:00 local.
+        const bookings = [{ start: new Date("2026-06-01T07:30:00Z"), end: new Date("2026-06-01T08:00:00Z") }];
+        expect(local(engine.bookingSlots(input({ bufferAfter: 15, slotMinutes: 15, bookings })))).toEqual(["06-01T10:15", "06-01T10:30"]);
+        expect(local(engine.bookingSlots(input({ bufferBefore: 15, slotMinutes: 15, bookings })))).toEqual(["06-01T10:15", "06-01T10:30"]);
+        // Busy time that is not a booking only keeps the new slot's own buffers.
+        const busy: engine.BusyInterval[] = [{ start: bookings[0]!.start, end: bookings[0]!.end, type: "BUSY" }];
+        expect(local(engine.bookingSlots(input({ bufferAfter: 15, slotMinutes: 15, busy })))).toEqual(["06-01T10:00", "06-01T10:15", "06-01T10:30"]);
+    });
+
     it("respects the minimum notice and the horizon, both from now", () => {
         const notice = engine.bookingSlots(input({ now: new Date("2026-06-01T06:50:00Z"), noticeMinutes: 60 }));
         // Now is 08:50 local; an hour's notice leaves 10:00 onwards.

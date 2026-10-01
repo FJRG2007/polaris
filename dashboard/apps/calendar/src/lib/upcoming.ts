@@ -7,6 +7,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
+import { displayZone } from "../screens/time";
 import { loadPreferences } from "./preferences-store";
 import { addressesOf, occurrencesIn } from "./occurrences";
 import { reachableCalendars, type SessionUser } from "./access";
@@ -30,7 +32,7 @@ export async function upcomingEvents(userId: string, limit: number, now = new Da
     if (!person) return [];
     const user: SessionUser = { ...person, sessionId: "" };
     const preferences = await loadPreferences(userId);
-    const zone = preferences.timezone === "auto" ? "UTC" : preferences.timezone;
+    const zone = displayZone(preferences.timezone, await host.calendarHost.displayTimeZone(userId).catch(() => null));
     const [calendars, hidden] = await Promise.all([
         reachableCalendars(userId).then((reach) =>
             prisma.calendar.findMany({

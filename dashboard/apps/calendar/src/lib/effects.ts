@@ -1,7 +1,8 @@
 /**
  * What follows a stored object changing, in one place: its reminders are
- * planned again, a provider calendar is told, and the people invited to it hear
- * about it. Called by `objects.writeItem` and the trash, never by a screen.
+ * planned again, a booking made for it follows it, a provider calendar is told,
+ * and the people invited to it hear about it. Called by `objects.writeItem`,
+ * the trash and a pull's removals, never by a screen.
  *
  * Each effect is separate and none can undo the write: the event is saved the
  * moment the row is, and a provider that is down or a mail channel that refuses
@@ -36,6 +37,11 @@ export async function afterObjectChange(change: ObjectChange): Promise<void> {
     await reminders
         .planObject(change.objectId, change.after && !calendar.alarmsMuted ? change.after : null)
         .catch((caught: unknown) => console.error("polaris: calendar reminders were not planned:", caught));
+
+    const booking = await import("./booking");
+    await booking
+        .followEvent(change)
+        .catch((caught: unknown) => console.error("polaris: a booking did not follow its event:", caught));
 
     if (calendar.sourceId && !change.context.fromProvider) {
         const sync = await import("./sync-engine");

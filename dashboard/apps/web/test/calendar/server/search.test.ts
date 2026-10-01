@@ -14,9 +14,10 @@ vi.mock("@polaris/auth", () => ({ userHasPermission: async () => false }));
 
 import { db } from "../fixtures/fake-db";
 import * as world from "../fixtures/world";
-import { addUser } from "../fixtures/fake-host";
+import { addUser, fake } from "../fixtures/fake-host";
 import * as engine from "@polaris-app/calendar/src/engine";
 import { searchEvents } from "@polaris-app/calendar/src/lib/search";
+import { eventTitles } from "@polaris-app/calendar/src/lib/event-titles";
 import * as calendars from "@polaris-app/calendar/src/lib/calendars";
 
 const ZONE = "Europe/Madrid";
@@ -76,6 +77,35 @@ describe("calendar search", () => {
         expect((await search(bob, "budget")).map((hit) => hit.summary).sort()).toEqual(["Lunch", "Quarterly Budget", "Weekly budget sync"]);
         db.rows("calendarShare")[0]!.access = "freebusy";
         expect(await search(bob, "budget")).toEqual([]);
+    });
+
+    it("hides a private task from a read-only sharee and shows it to a writer", async () => {
+        const tasks = world.addCalendar(alice.id, { name: "Chores", components: "VEVENT,VTODO" });
+        const task = engine.newTodo({ uid: "todo-private", summary: "Budget lawyer", due: world.at("2026-10-20T12:00:00") });
+        world.storeItem(tasks, engine.todoItem({ ...task, extra: [{ line: "CLASS:PRIVATE" }] }));
+        world.storeItem(tasks, engine.todoItem(engine.newTodo({ uid: "todo-public", summary: "Budget review", due: world.at("2026-10-21T12:00:00") })));
+        const share = world.addShare(tasks, { userId: bob.id }, "read");
+        expect((await search(bob, "budget")).map((hit) => hit.summary)).toEqual(["Budget review"]);
+        db.byId("calendarShare", share)!.access = "write";
+        expect((await search(bob, "budget")).map((hit) => hit.summary).sort()).toEqual(["Budget lawyer", "Budget review"]);
+    });
+
+    it("names events and tasks for a link only to who may use the Calendar and read them, never from the trash", async () => {
+        const task = engine.newTodo({ uid: "todo-private", summary: "Lawyer", due: world.at("2026-10-20T12:00:00") });
+        const privateTask = String(world.storeItem(calendar, engine.todoItem({ ...task, extra: [{ line: "CLASS:PRIVATE" }] })).id);
+        const ids = db.rows("calendarObject").map((row) => String(row.id));
+        const lunch = String(db.rows("calendarObject").find((row) => row.summary === "Lunch")!.id);
+        world.addShare(calendar, { userId: bob.id }, "read");
+        const named = await eventTitles(bob.id, ids);
+        expect(named[lunch]).toBe("Lunch");
+        expect(named[privateTask]).toBeUndefined();
+        expect(Object.values(named)).not.toContain("Budget therapy");
+        expect((await eventTitles(alice.id, ids))[privateTask]).toBe("Lawyer");
+
+        fake.denied.set(bob.id, new Set(["calendar.use"]));
+        expect(await eventTitles(bob.id, ids)).toEqual({});
+        db.byId("calendar", calendar)!.trashedAt = new Date();
+        expect(await eventTitles(alice.id, ids)).toEqual({});
     });
 
     it("makes a newcomer a calendar of their own, lists what they reach, and keeps their order and colour", async () => {

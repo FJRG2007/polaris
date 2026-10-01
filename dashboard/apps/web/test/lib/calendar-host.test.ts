@@ -40,7 +40,8 @@ vi.mock("@/lib/connections/microsoft", () => {
 });
 vi.mock("@/lib/auth-mail", () => ({ sendAuthEmail: vi.fn() }));
 vi.mock("@/lib/safe-fetch", () => ({ configuredRequest: vi.fn() }));
-vi.mock("@/lib/rich-text/mention-service", () => ({ searchAccounts: vi.fn() }));
+vi.mock("@/lib/rich-text/mention-service", () => ({ accountsByIdInReach: vi.fn(), searchAccounts: vi.fn() }));
+vi.mock("@/lib/display-prefs-service", () => ({ resolveDisplayPreferencesFor: vi.fn() }));
 
 const { calendarAccessToken, CalendarLinkExpiredError } = await import("@/lib/calendar-host");
 

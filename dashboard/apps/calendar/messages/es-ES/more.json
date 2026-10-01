@@ -8,6 +8,8 @@
             "subscribe": "Suscribir",
             "title": "Más calendarios"
         },
+        "addressHint": "La actual nunca se muestra. La nueva se comprueba antes de guardarla.",
+        "addressTitle": "Nueva dirección",
         "back": "Calendario",
         "caldav": {
             "add": "Conectar",
@@ -78,6 +80,7 @@
         "linkedTitle": "Google y Microsoft",
         "loadFailed": "No se pudieron cargar tus calendarios enlazados.",
         "neverSynced": "Sin sincronizar",
+        "newAddress": "Nueva URL",
         "newPassword": "Nueva contraseña de {name}",
         "outcome": {
             "cancelled": "Se canceló el enlace. No ha cambiado nada.",
@@ -96,6 +99,7 @@
         "removeBody": "Sus calendarios salen de Polaris. No se borra nada en el proveedor.",
         "removeConfirm": "Quitar",
         "removeTitle": "¿Quitar {name}?",
+        "replaceAddress": "Nueva dirección de {name}",
         "retry": "Reintentar",
         "save": "Guardar",
         "sourcesEmpty": "Aún no hay nada enlazado. Añade una cuenta, un servidor CalDAV o una suscripción abajo.",
@@ -127,7 +131,7 @@
         "cancelOwnerBody": "El evento sale de tu calendario y se le envía la cancelación.",
         "cancelTitle": "¿Cancelar la reserva con {name}?",
         "cancelYoursTitle": "¿Cancelar tu reserva?",
-        "checkEmailBody": "Hemos enviado un enlace de confirmación a {email}. La hora se guarda durante 60 minutos.",
+        "checkEmailBody": "Hemos enviado un enlace de confirmación a {email}. La hora se guarda durante 15 minutos.",
         "checkEmailHint": "No se reserva nada hasta que abras ese enlace y confirmes.",
         "checkEmailTitle": "Revisa tu correo",
         "confirm": "Confirmar reserva",
@@ -144,10 +148,13 @@
         "linkGone": "Este enlace ya no es válido.",
         "mail": {
             "confirmAction": "Confírmala aquí:",
-            "confirmExpiry": "La hora se guarda durante 60 minutos. Si no la pediste, ignora este correo.",
+            "confirmExpiry": "La hora se guarda durante 15 minutos. Si no la pediste, ignora este correo.",
             "confirmIntro": "Hola {name}, has pedido reservar esta hora:",
             "confirmSubject": "Confirma tu reserva: {title}",
             "confirmedIntro": "Hola {name}, tu reserva está confirmada:",
+            "bookAgain": "Elige otra hora aquí:",
+            "cancelledIntro": "Hola {name}, tu reserva se ha cancelado:",
+            "cancelledSubject": "Cancelada: {title}",
             "confirmedSubject": "Reservado: {title}",
             "manageAction": "Cancélala o muévela aquí:"
         },
@@ -192,6 +199,7 @@
         "statusPending": "Pendiente",
         "takenMeanwhile": "Alguien reservó esa hora antes de que confirmaras. Elige otra.",
         "timesIn": "Horas en {zone}",
+        "tooManyHolds": "Ya tienes horas pendientes de confirmar aquí. Confirma una desde tu correo o espera 15 minutos.",
         "upcoming": "Próximas",
         "validation": {
             "answerNeeded": "Responde esta pregunta.",

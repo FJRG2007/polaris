@@ -46,6 +46,42 @@ describe("mergeBusy", () => {
         expect(merged.map((interval) => `${iso([interval])[0]} ${interval.type}`)).toEqual(["09:00-12:00 BUSY", "13:00-14:00 BUSY-TENTATIVE", "14:00-14:30 BUSY-UNAVAILABLE", "14:30-15:00 BUSY-TENTATIVE"]);
         expect(engine.mergeBusy([])).toEqual([]);
     });
+
+    it("gives what comparing every interval with every stretch gives, for many intervals", () => {
+        const types: engine.BusyInterval["type"][] = ["BUSY-TENTATIVE", "BUSY", "BUSY-UNAVAILABLE"];
+        const rank = (type: engine.BusyInterval["type"]) => types.indexOf(type);
+        // Every interval against every stretch between two boundaries.
+        const reference = (intervals: engine.BusyInterval[]) => {
+            const points = [...new Set(intervals.flatMap((interval) => [interval.start.getTime(), interval.end.getTime()]))].sort((a, b) => a - b);
+            const pieces: engine.BusyInterval[] = [];
+            for (let index = 0; index + 1 < points.length; index++) {
+                const from = points[index] ?? 0;
+                const to = points[index + 1] ?? 0;
+                let type: engine.BusyInterval["type"] | null = null;
+                for (const interval of intervals) if (interval.start.getTime() <= from && interval.end.getTime() >= to && (type === null || rank(interval.type) > rank(type))) type = interval.type;
+                if (!type) continue;
+                const last = pieces[pieces.length - 1];
+                if (last && last.type === type && last.end.getTime() === from) pieces[pieces.length - 1] = { ...last, end: new Date(to) };
+                else pieces.push({ start: new Date(from), end: new Date(to), type });
+            }
+            return pieces;
+        };
+        let seed = 7;
+        const random = (max: number) => {
+            seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+            return seed % max;
+        };
+        const base = new Date("2026-06-01T00:00:00Z").getTime();
+        for (let round = 0; round < 20; round++) {
+            const intervals = Array.from({ length: 60 }, () => {
+                const start = base + random(96) * 900_000;
+                return { start: new Date(start), end: new Date(start + random(12) * 900_000), type: types[random(3)] ?? "BUSY" };
+            });
+            expect(engine.mergeBusy(intervals)).toEqual(reference(intervals));
+        }
+        const many = Array.from({ length: 50_000 }, (_, index) => busy(new Date(base + index * 60_000).toISOString(), new Date(base + index * 60_000 + 90_000).toISOString()));
+        expect(engine.mergeBusy(many)).toEqual([{ start: new Date(base), end: new Date(base + 49_999 * 60_000 + 90_000), type: "BUSY" }]);
+    });
 });
 
 describe("suggestTimes", () => {

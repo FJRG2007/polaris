@@ -170,6 +170,16 @@ describe("the calendar screen", () => {
         expect(savedPreferences).toHaveBeenCalledWith({ view: "month" });
     });
 
+    it("says so when a view holds more events than were drawn", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(JSON.stringify({ from: "", to: "", occurrences: [], tasks: [], unreadable: 0, truncated: true }), { status: 200, headers: { "content-type": "application/json" } }))
+        );
+        render(<CalendarScreen path={["year", "2026-03-14"]} />, { wrapper: MessagesWrapper });
+        await settle();
+        expect(await screen.findByText("Not every event fits in this view. Try a shorter one.")).toBeDefined();
+    });
+
     it("follows the address over the remembered view", async () => {
         render(<CalendarScreen path={["year", "2026-03-14"]} />, { wrapper: MessagesWrapper });
         await settle();

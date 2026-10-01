@@ -85,6 +85,20 @@ function shiftValue(value: DateValue, seconds: number): DateValue {
     return { dateTime: formatWall(addToWall(parseWall(value.dateTime), { seconds })), tzid: value.tzid };
 }
 
+/** Whether two values are of one kind and, timed, in one zone (`zone` false:
+ *  of one kind only). */
+function sameFrame(a: DateValue, b: DateValue, zone = true): boolean {
+    if (isDateOnly(a) || isDateOnly(b)) return isDateOnly(a) && isDateOnly(b);
+    return !zone || a.tzid === b.tzid;
+}
+
+/** A value moved by as much as `from` became `to`, all three of one kind. */
+function movedBy(value: DateValue, from: DateValue, to: DateValue): DateValue {
+    if (isDateOnly(value)) return { date: addDays(value.date, daysBetween(dateOf(from), dateOf(to))) };
+    if (isDateOnly(from) || isDateOnly(to)) return value;
+    return shiftValue(value, wallDifferenceSeconds(parseWall(from.dateTime), parseWall(to.dateTime)));
+}
+
 /** The whole-series edit: the master takes `next`, moved by as much as the
  *  edited occurrence moved. */
 function editAll(item: EventItem, recurrenceKey: string | null, next: CalendarEvent, ctx: expand.ExpandContext): EventItem {
@@ -94,7 +108,16 @@ function editAll(item: EventItem, recurrenceKey: string | null, next: CalendarEv
     let end = next.end;
     if (recurrenceKey !== null) {
         const occurrence = expand.occurrenceFor(item, recurrenceKey, ctx.floatingZone);
-        if (occurrence) {
+        const shown = occurrence?.overridden ? occurrence.event : null;
+        if (!occurrence) {
+            start = master.start;
+            end = master.end;
+        } else if (shown && sameFrame(shown.start, next.start) && sameFrame(shown.end, next.end) && sameFrame(master.start, next.start, false) && sameFrame(master.end, next.end, false)) {
+            // Opened on a moved occurrence: the series moves by what changed
+            // there, not to where that one occurrence was moved.
+            start = movedBy(master.start, shown.start, next.start);
+            end = movedBy(master.end, shown.end, next.end);
+        } else {
             // The editor holds the occurrence; the series moves by the same
             // number of days and takes the new time of day and length.
             const shownDate = isDateOnly(occurrence.event.start) ? (occurrence.startDate ?? "") : formatWall(expand.masterClock(master, ctx).toWall(occurrence.start)).slice(0, 10);
@@ -138,6 +161,7 @@ function editThis(item: EventItem, recurrenceKey: string, next: CalendarEvent, c
     if (!recurrenceId) return item;
     // SEQUENCE goes up when the occurrence moves from where it was drawn.
     const shown = expand.occurrenceFor(item, recurrenceKey, ctx.floatingZone);
+    if (master && !shown) return item;
     const instant = (value: DateValue) => valueToInstant(value, ctx.floatingZone, ctx.timezones).getTime();
     const moved = !shown || instant(next.start) !== shown.start.getTime() || instant(next.end) !== shown.end.getTime();
     const sequence = Math.max(next.sequence, existing?.sequence ?? 0, master?.sequence ?? 0);

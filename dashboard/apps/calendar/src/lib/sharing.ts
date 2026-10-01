@@ -21,7 +21,8 @@ import { host } from "@polaris/app-host";
 import { randomBytes } from "node:crypto";
 import { CalendarRefusal } from "./errors";
 import { calendarT, calendarTFor } from "./i18n";
-import { requireCalendar, type ShareLevel, type SessionUser } from "./access";
+import { forgetReminders } from "./reminders";
+import { reachOf, reaches, requireCalendar, type ShareLevel, type SessionUser } from "./access";
 
 /** Shares one calendar may carry. */
 const MAX_SHARES = 200;
@@ -86,6 +87,23 @@ export async function share(
         update: { access: input.access }
     });
     if (!existing) await announceShare(user, calendar.id, input.target);
+    else if (input.access === "freebusy") {
+        await forgetLostReaders(calendar, input.target.kind === "user" ? { userId: input.target.id } : { teamId: input.target.id });
+    }
+}
+
+/** Stop reminding the people a share reached who no longer read the calendar. */
+async function forgetLostReaders(
+    calendar: { id: string; ownerId: string; kind: string },
+    target: { userId?: string | null; teamId?: string | null }
+): Promise<void> {
+    const people = target.userId ? [target.userId] : target.teamId ? await host.calendarHost.teamMemberIds(target.teamId) : [];
+    const lost: string[] = [];
+    for (const person of people) {
+        const level = (await reachOf(person, [{ ...calendar, trashedAt: null }])).get(calendar.id) ?? null;
+        if (!reaches(level, "read")) lost.push(person);
+    }
+    await forgetReminders(calendar.id, lost);
 }
 
 /** Tell the people a calendar was just shared with. */
@@ -107,13 +125,17 @@ async function announceShare(user: SessionUser, calendarId: string, target: { ki
 
 /** Stop sharing with one person or team. */
 export async function unshare(user: SessionUser, shareId: string): Promise<void> {
-    const row = await prisma.calendarShare.findUnique({ where: { id: shareId }, select: { id: true, calendarId: true, access: true } });
+    const row = await prisma.calendarShare.findUnique({
+        where: { id: shareId },
+        select: { id: true, calendarId: true, access: true, userId: true, teamId: true }
+    });
     if (!row) throw new CalendarRefusal((await calendarT())("sharing.notFound"));
     const calendar = await requireCalendar(user.id, row.calendarId, "manage");
     if (row.access === "manage" && calendar.reach !== "owner") {
         throw new CalendarRefusal((await calendarT())("sharing.onlyOwnerManage"));
     }
     await prisma.calendarShare.delete({ where: { id: row.id } });
+    await forgetLostReaders(calendar, row);
 }
 
 /** Who and which teams this person could share with, for the picker. */

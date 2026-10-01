@@ -254,6 +254,47 @@ describe("createCalDavProvider pull", () => {
     });
 });
 
+describe("createCalDavProvider members listed without an etag", () => {
+    it("keeps and reads a member whose getetag the listing answers 404, removing only the ones not listed", async () => {
+        const { server, personal } = nextcloud({ supportsSync: false });
+        server.write(personal, "a.ics", vevent("a", "A"));
+        const keep = server.write(personal, "b.ics", vevent("b", "B"));
+        const provider = createCalDavProvider({ serverUrl: NEXTCLOUD, username: "alice", password: "app-password", fetcher: server.fetcher });
+        const remoteId = `${NEXTCLOUD}${personal.path}`;
+        server.withoutEtag.add("a.ics");
+        const known = new Map([
+            [`${remoteId}a.ics`, keep],
+            [`${remoteId}b.ics`, keep],
+            [`${remoteId}gone.ics`, "\"old\""]
+        ]);
+        const result = await provider.pull(state(remoteId, "", "", known));
+        expect(result.removed).toEqual([`${remoteId}gone.ics`]);
+        expect(result.changed.map((o) => o.href)).toEqual([`${remoteId}a.ics`]);
+        expect(result.changed[0]!.ics).toContain("SUMMARY:A");
+    });
+
+    it("reads a member a sync report names without an etag instead of skipping it", async () => {
+        const { server, personal } = nextcloud();
+        server.write(personal, "a.ics", vevent("a", "A"));
+        const provider = createCalDavProvider({ serverUrl: NEXTCLOUD, username: "alice", password: "app-password", fetcher: server.fetcher });
+        const remoteId = `${NEXTCLOUD}${personal.path}`;
+        const first = await provider.pull(state(remoteId));
+        const known = new Map(first.changed.map((o) => [o.href, o.etag]));
+        server.write(personal, "a.ics", vevent("a", "A changed"));
+        const fetcher = server.fetcher;
+        const stripped = async (url: string, init: RequestInit & { timeoutMs?: number }) => {
+            const answer = await fetcher(url, init);
+            if ((init.method ?? "GET").toUpperCase() !== "REPORT" || !String(init.body).includes("sync-collection")) return answer;
+            const text = (await answer.text()).replace(/<d:getetag>[^<]*<\/d:getetag>/g, "");
+            return new Response(text, { status: answer.status, headers: answer.headers });
+        };
+        const stripping = createCalDavProvider({ serverUrl: NEXTCLOUD, username: "alice", password: "app-password", fetcher: stripped });
+        const next = await stripping.pull(state(remoteId, first.syncToken, first.ctag, known));
+        expect(next.removed).toEqual([]);
+        expect(next.changed.map((o) => [o.href, o.ics.includes("SUMMARY:A changed")])).toEqual([[`${remoteId}a.ics`, true]]);
+    });
+});
+
 describe("createCalDavProvider writes", () => {
     it("creates with If-None-Match: *, updates with If-Match, and answers 412 as a conflict", async () => {
         const { server, personal } = nextcloud();

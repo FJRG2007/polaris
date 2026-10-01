@@ -182,10 +182,46 @@ describe("occurrences in a window", () => {
         expect((await todoDetail(alice, String(todo.id))).todo.summary).toBe("Taxes");
     });
 
-    it("answers invitations at the account address, proved addresses and linked accounts", async () => {
+    it("reads the earliest objects of an overfull window and says it left some out", async () => {
+        const stored = db.byId("calendarObject", publicId)!;
+        const late = world.storeEvent(calendar, { uid: "late", summary: "Late", start: world.at("2026-10-30T09:00:00"), end: world.at("2026-10-30T10:00:00") });
+        const crowd = Array.from({ length: 5000 }, (_, index) => ({ ...stored, id: `018f2b7a-0000-7000-8000-${String(index).padStart(12, "0")}` }));
+        const findMany = vi.spyOn(db.prisma.calendarObject, "findMany").mockResolvedValueOnce([...crowd, late] as never);
+        const range = await read(alice);
+        expect(findMany.mock.calls[0]?.[0]).toMatchObject({ orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: 5001 });
+        expect(range.truncated).toBe(true);
+        expect(range.occurrences.some((occurrence) => occurrence.objectId === late.id)).toBe(false);
+        findMany.mockRestore();
+        const whole = await read(alice);
+        expect(whole.truncated).toBe(false);
+        expect(whole.occurrences.some((occurrence) => occurrence.objectId === late.id)).toBe(true);
+    });
+
+    it("reads a floating time on the Overview card in the account's zone when the calendar follows it", async () => {
+        const floating = world.storeEvent(calendar, { uid: "floating", summary: "Gym", start: world.at("2026-10-12T10:00:00", null), end: world.at("2026-10-12T11:00:00", null) });
+        fake.timeZones.set(alice.id, "America/New_York");
+        const gym = (await upcomingEvents(alice.id, 50, world.NOW)).find((entry) => entry.id === floating.id);
+        expect(gym?.start).toBe("2026-10-12T14:00:00.000Z");
+    });
+
+    it("answers invitations at the account address and proved addresses only", async () => {
         db.insert("userEmail", { userId: alice.id, email: "a.work@example.test", verifiedAt: new Date() });
         db.insert("userEmail", { userId: alice.id, email: "unproved@example.test", verifiedAt: null });
         db.insert("calendarSource", { userId: alice.id, kind: "caldav", label: "Alice@Cloud.example ", username: "alice" });
-        expect((await addressesOf(alice)).sort()).toEqual(["a.work@example.test", "alice@cloud.example", "alice@example.test"]);
+        expect((await addressesOf(alice)).sort()).toEqual(["a.work@example.test", "alice@example.test"]);
+    });
+
+    it("does not let a source's label or username stand in for an address", async () => {
+        db.insert("calendarSource", { userId: alice.id, kind: "ics", label: "ceo@corp.example", username: "cfo@corp.example" });
+        expect(await addressesOf(alice)).toEqual(["alice@example.test"]);
+        const board = world.storeEvent(calendar, {
+            summary: "Board",
+            organizer: { email: "ceo@corp.example", name: "CEO" },
+            attendees: [{ email: "alice@example.test", name: "", partstat: "NEEDS-ACTION", role: "REQ-PARTICIPANT", rsvp: true, type: "INDIVIDUAL" }],
+            start: world.at("2026-10-12T09:00:00"),
+            end: world.at("2026-10-12T10:00:00")
+        }).id as string;
+        const opened = await eventDetail(alice, { objectId: board, recurrenceKey: null, floatingZone: ZONE, emails: await addressesOf(alice) });
+        expect(opened.isOrganizer).toBe(false);
     });
 });

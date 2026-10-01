@@ -47,7 +47,7 @@ const TABLES: Record<string, Table> = {
         updatedAt: true
     },
     calendarBooking: {
-        defaults: { objectId: null, answers: "{}", timezone: "", status: "pending" },
+        defaults: { objectId: null, answers: "{}", timezone: "", status: "pending", requester: "", locale: "" },
         relations: { page: { model: "calendarBookingPage", kind: "one", foreignKey: "pageId" } }
     },
     calendarProposal: {

@@ -213,11 +213,27 @@ describe("parseCalendarText", () => {
                 "UID:c",
                 "DTSTART:20260101T100000Z",
                 "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:d",
+                "DTSTART;TZID=Europe/Madrid:20260101T100000",
+                "DTEND;TZID=Europe/Madrid:20260101T090000",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:e",
+                "DTSTART;TZID=Europe/Madrid:20260101T100000",
+                "DTEND:20260101T083000Z",
+                "END:VEVENT",
                 "END:VCALENDAR"
             ].join("\r\n")
         );
         const ends = parsed.items.map((item) => item.component === "VEVENT" && item.master?.end);
-        expect(ends).toEqual([{ dateTime: "2026-01-02T00:30:00", tzid: "Europe/Madrid" }, { date: "2026-01-02" }, { dateTime: "2026-01-01T10:00:00", tzid: "UTC" }]);
+        expect(ends).toEqual([
+            { dateTime: "2026-01-02T00:30:00", tzid: "Europe/Madrid" },
+            { date: "2026-01-02" },
+            { dateTime: "2026-01-01T10:00:00", tzid: "UTC" },
+            { dateTime: "2026-01-01T10:00:00", tzid: "Europe/Madrid" },
+            { dateTime: "2026-01-01T10:00:00", tzid: "Europe/Madrid" }
+        ]);
     });
 });
 
@@ -268,6 +284,20 @@ describe("serializeItem", () => {
         expect(back.master.conference).toBe(`https://meet.example.com/room${injected}`);
     });
 
+    it("writes an absolute alarm in UTC, whatever form it was given or read in", () => {
+        const alarm = (at: string): engine.Alarm => ({ action: "DISPLAY", trigger: { kind: "absolute", at }, description: "Wake up" });
+        const event = engine.newEvent({ uid: "alarms", start: { dateTime: "2026-05-01T10:00:00", tzid: "UTC" }, end: { dateTime: "2026-05-01T11:00:00", tzid: "UTC" }, alarms: [alarm("2026-05-01T09:00:00.000Z"), alarm("2026-05-01T09:30:00Z")] });
+        const text = engine.serializeItem(engine.eventItem(event));
+        expect(text).toContain("TRIGGER;VALUE=DATE-TIME:20260501T090000Z");
+        expect(text).toContain("TRIGGER;VALUE=DATE-TIME:20260501T093000Z");
+        const floating = engine.parseCalendarText(
+            ["BEGIN:VCALENDAR", "BEGIN:VEVENT", "UID:f", "DTSTART:20260501T100000Z", "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Wake up", "TRIGGER;VALUE=DATE-TIME:20260501T090000", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n")
+        ).items[0];
+        const read = floating?.component === "VEVENT" ? floating.master?.alarms[0] : undefined;
+        expect(read?.trigger).toEqual({ kind: "absolute", at: "2026-05-01T09:00:00Z" });
+        expect(engine.alarmSchema.safeParse(read).success).toBe(true);
+    });
+
     it("never copies METHOD from the item, and takes a PRODID", () => {
         const item: engine.CalendarItem = { ...engine.eventItem(long), method: "REQUEST" };
         const text = engine.serializeItem(item, { prodId: "-//Other//EN" });
@@ -305,6 +335,19 @@ describe("itemBounds", () => {
         const until = engine.itemBounds(item("DTSTART;VALUE=DATE:20260101", "RRULE:FREQ=DAILY;UNTIL=20260110"), "Europe/Madrid");
         expect(until.endsAt?.toISOString()).toBe("2026-01-10T23:00:00.000Z");
         expect(until.allDay).toBe(true);
+    });
+
+    it("ends a series where a THISANDFUTURE override moved its last occurrence", () => {
+        const [found] = engine.parseCalendarText(
+            [
+                "BEGIN:VCALENDAR",
+                ...["BEGIN:VEVENT", "UID:x", "DTSTART:20260101T100000Z", "DTEND:20260101T110000Z", "RRULE:FREQ=WEEKLY;COUNT=3", "END:VEVENT"],
+                ...["BEGIN:VEVENT", "UID:x", "RECURRENCE-ID;RANGE=THISANDFUTURE:20260108T100000Z", "DTSTART:20260110T150000Z", "DTEND:20260110T160000Z", "END:VEVENT"],
+                "END:VCALENDAR"
+            ].join("\r\n")
+        ).items;
+        if (!found) throw new Error("no item");
+        expect(engine.itemBounds(found, "UTC").endsAt?.toISOString()).toBe("2026-01-17T16:00:00.000Z");
     });
 
     it("marks an endless series, and one past 5000 occurrences, as never ending", () => {

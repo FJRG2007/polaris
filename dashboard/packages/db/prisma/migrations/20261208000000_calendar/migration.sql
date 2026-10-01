@@ -175,6 +175,8 @@ CREATE TABLE IF NOT EXISTS "CalendarBooking" (
     "status" TEXT NOT NULL DEFAULT 'pending',
     "confirmToken" TEXT NOT NULL,
     "manageToken" TEXT NOT NULL,
+    "requester" TEXT NOT NULL DEFAULT '',
+    "locale" TEXT NOT NULL DEFAULT '',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "CalendarBooking_pkey" PRIMARY KEY ("id")
@@ -298,6 +300,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS "CalendarInvitation_token_key" ON "CalendarInv
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "CalendarInvitation_userId_idx" ON "CalendarInvitation"("userId");
 
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "CalendarLease" (
+    "key" TEXT NOT NULL,
+    "until" BIGINT NOT NULL,
+
+    CONSTRAINT "CalendarLease_pkey" PRIMARY KEY ("key")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "CalendarInvitation_objectId_email_key" ON "CalendarInvitation"("objectId", "email");
 
@@ -306,6 +316,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS "CalendarBookingPage_slug_key" ON "CalendarBoo
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "CalendarBookingPage_ownerId_idx" ON "CalendarBookingPage"("ownerId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "CalendarBookingPage_calendarId_idx" ON "CalendarBookingPage"("calendarId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX IF NOT EXISTS "CalendarBooking_confirmToken_key" ON "CalendarBooking"("confirmToken");
@@ -320,7 +333,16 @@ CREATE INDEX IF NOT EXISTS "CalendarBooking_pageId_start_idx" ON "CalendarBookin
 CREATE INDEX IF NOT EXISTS "CalendarBooking_status_createdAt_idx" ON "CalendarBooking"("status", "createdAt");
 
 -- CreateIndex
+CREATE INDEX IF NOT EXISTS "CalendarBooking_objectId_idx" ON "CalendarBooking"("objectId");
+
+-- CreateIndex
 CREATE INDEX IF NOT EXISTS "CalendarProposal_ownerId_idx" ON "CalendarProposal"("ownerId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "CalendarProposal_calendarId_idx" ON "CalendarProposal"("calendarId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "CalendarProposal_objectId_idx" ON "CalendarProposal"("objectId");
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "CalendarProposalDate_proposalId_idx" ON "CalendarProposalDate"("proposalId");
@@ -388,12 +410,28 @@ ALTER TABLE "CalendarBookingPage" DROP CONSTRAINT IF EXISTS "CalendarBookingPage
 ALTER TABLE "CalendarBookingPage" ADD CONSTRAINT "CalendarBookingPage_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "CalendarBookingPage" DROP CONSTRAINT IF EXISTS "CalendarBookingPage_calendarId_fkey";
+ALTER TABLE "CalendarBookingPage" ADD CONSTRAINT "CalendarBookingPage_calendarId_fkey" FOREIGN KEY ("calendarId") REFERENCES "Calendar"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "CalendarBooking" DROP CONSTRAINT IF EXISTS "CalendarBooking_pageId_fkey";
 ALTER TABLE "CalendarBooking" ADD CONSTRAINT "CalendarBooking_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "CalendarBookingPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "CalendarBooking" DROP CONSTRAINT IF EXISTS "CalendarBooking_objectId_fkey";
+ALTER TABLE "CalendarBooking" ADD CONSTRAINT "CalendarBooking_objectId_fkey" FOREIGN KEY ("objectId") REFERENCES "CalendarObject"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "CalendarProposal" DROP CONSTRAINT IF EXISTS "CalendarProposal_ownerId_fkey";
 ALTER TABLE "CalendarProposal" ADD CONSTRAINT "CalendarProposal_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarProposal" DROP CONSTRAINT IF EXISTS "CalendarProposal_calendarId_fkey";
+ALTER TABLE "CalendarProposal" ADD CONSTRAINT "CalendarProposal_calendarId_fkey" FOREIGN KEY ("calendarId") REFERENCES "Calendar"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalendarProposal" DROP CONSTRAINT IF EXISTS "CalendarProposal_objectId_fkey";
+ALTER TABLE "CalendarProposal" ADD CONSTRAINT "CalendarProposal_objectId_fkey" FOREIGN KEY ("objectId") REFERENCES "CalendarObject"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "CalendarProposalDate" DROP CONSTRAINT IF EXISTS "CalendarProposalDate_proposalId_fkey";

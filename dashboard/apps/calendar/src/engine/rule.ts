@@ -9,7 +9,8 @@
  * kept as written until the person replaces it.
  */
 
-import type { DateValue, Frequency, RecurrenceRule, Weekday } from "./types";
+import ICAL from "ical.js";
+import type { DateValue, Frequency, RecurrenceRule, WallTime, Weekday } from "./types";
 import { formatWall, parseWall, resolveZone, wallToInstant, instantToWall } from "./tz";
 
 const FREQUENCIES: readonly Frequency[] = ["SECONDLY", "MINUTELY", "HOURLY", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"];
@@ -20,8 +21,9 @@ export const WEEKDAYS: readonly Weekday[] = ["MO", "TU", "WE", "TH", "FR", "SA",
 const WORKDAYS: readonly Weekday[] = ["MO", "TU", "WE", "TH", "FR"];
 const WEEKEND: readonly Weekday[] = ["SA", "SU"];
 
-/** Parts the editor has no control for: any of them makes a rule unsupported. */
-const UNSUPPORTED_PARTS = ["BYWEEKNO", "BYYEARDAY", "BYHOUR", "BYMINUTE", "BYSECOND"];
+/** Parts the model has a field for; any other (BYWEEKNO, BYHOUR, RSCALE,
+ *  SKIP, X-...) makes a rule unsupported and is written back as it came. */
+const MODELED_PARTS = ["FREQ", "INTERVAL", "BYDAY", "BYMONTHDAY", "BYMONTH", "BYSETPOS", "COUNT", "UNTIL", "WKST"];
 
 /** Ordinals the editor offers, as BYSETPOS / BYDAY prefixes. */
 export type RuleOrdinal = 1 | 2 | 3 | 4 | 5 | -1 | -2;
@@ -119,7 +121,7 @@ export function parseRule(raw: string): RecurrenceRule {
 /** Whether the editor can show a rule exactly as it is. */
 function editable(rule: Omit<RecurrenceRule, "supported">, parts: readonly string[]): boolean {
     if (!["DAILY", "WEEKLY", "MONTHLY", "YEARLY"].includes(rule.frequency)) return false;
-    if (parts.some((part) => UNSUPPORTED_PARTS.includes(part))) return false;
+    if (parts.some((part) => !MODELED_PARTS.includes(part))) return false;
     if (rule.count !== null && rule.until !== null) return false;
     const plainDays = rule.byDay.every((entry) => entry.ordinal === null);
     switch (rule.frequency) {
@@ -160,6 +162,106 @@ function ordinalOf(rule: Pick<RecurrenceRule, "byDay" | "bySetPos">): { ordinal:
     return null;
 }
 
+/** The most days each month can have. */
+const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** The BY parts ical.js 2.2.1 tests each candidate against instead of
+ *  generating from (its `_expandMap` CONTRACT entries), per frequency. */
+const CONTRACTING: Readonly<Record<Frequency, readonly string[]>> = {
+    SECONDLY: ["BYSECOND", "BYMINUTE", "BYHOUR", "BYDAY", "BYMONTHDAY", "BYWEEKNO", "BYMONTH"],
+    MINUTELY: ["BYMINUTE", "BYHOUR", "BYDAY", "BYMONTHDAY", "BYWEEKNO", "BYMONTH"],
+    HOURLY: ["BYHOUR", "BYDAY", "BYMONTHDAY", "BYWEEKNO", "BYMONTH"],
+    DAILY: ["BYDAY", "BYMONTHDAY", "BYWEEKNO", "BYMONTH"],
+    WEEKLY: ["BYWEEKNO", "BYMONTH"],
+    MONTHLY: ["BYMONTH"],
+    YEARLY: []
+};
+
+/** The seconds one step of a frequency moves when no BY part of its own sets
+ *  that field instead. */
+const UNIT_SECONDS: Partial<Record<Frequency, number>> = { SECONDLY: 1, MINUTELY: 60, HOURLY: 3600, DAILY: 86_400 };
+
+/** The BY part that, present, sets the field a frequency steps. */
+const OWN_PART: Partial<Record<Frequency, string>> = { SECONDLY: "BYSECOND", MINUTELY: "BYMINUTE", HOURLY: "BYHOUR" };
+
+const WEEK_SECONDS = 604_800;
+
+function gcd(a: number, b: number): number {
+    return b === 0 ? a : gcd(b, a % b);
+}
+
+/**
+ * Whether a rule can never produce an occurrence after DTSTART, read the way
+ * ical.js 2.2.1 iterates it.
+ *
+ * For SECONDLY to WEEKLY ical.js steps candidate times and tests them against
+ * the contracting BY parts with no bound, so a rule none of whose candidates
+ * can pass - `FREQ=DAILY;BYDAY=1MO` (an ordinal never equals a weekday),
+ * `FREQ=DAILY;BYMONTHDAY=-1` (a negative never equals a day),
+ * `FREQ=DAILY;INTERVAL=7;BYDAY=TU` from a Monday - would never return. Also
+ * true when BYMONTH and BYMONTHDAY name no day that exists. Only rules that
+ * certainly yield nothing are reported; the iterator's own step guard bounds
+ * the rest.
+ */
+export function neverRecurs(rule: RecurrenceRule, start: WallTime): boolean {
+    const parts = new Map<string, number[]>();
+    for (const piece of rule.raw.split(";")) {
+        const cut = piece.indexOf("=");
+        if (cut > 0) parts.set(piece.slice(0, cut).trim().toUpperCase(), numbers(piece.slice(cut + 1)));
+    }
+    const months = rule.byMonth.length > 0 ? rule.byMonth : MONTH_DAYS.map((_, index) => index + 1);
+    const realDays = rule.byMonthDay.filter((day) => months.some((month) => Math.abs(day) <= (MONTH_DAYS[month - 1] ?? 0)));
+    if (rule.byMonthDay.length > 0 && realDays.length === 0) return true;
+    const contracting = new Set(CONTRACTING[rule.frequency].filter((name) => parts.has(name)));
+    const plainDays = rule.byDay.filter((entry) => entry.ordinal === null).map((entry) => WEEKDAYS.indexOf(entry.day));
+    if (contracting.has("BYDAY") && plainDays.length === 0) return true;
+    const monthDays = realDays.filter((day) => day > 0);
+    if (contracting.has("BYMONTHDAY") && monthDays.length === 0) return true;
+    const weeks = (parts.get("BYWEEKNO") ?? []).filter((week) => week >= 1 && week <= 53);
+    if (contracting.has("BYWEEKNO") && weeks.length === 0) return true;
+    const allowed = (name: string, value: number) => !contracting.has(name) || (parts.get(name) ?? []).includes(value);
+    if (contracting.has("BYSECOND") && !(parts.get("BYSECOND") ?? []).some((second) => second >= 0 && second <= 59)) return true;
+    const unit = UNIT_SECONDS[rule.frequency];
+    const own = OWN_PART[rule.frequency];
+    // With no BY part setting the stepped field and no BYMONTH (whose months
+    // ical.js jumps between), candidates sit on a fixed lattice of
+    // `unit * interval` seconds from DTSTART; within a week that lattice is
+    // `gcd(step, week)` apart, and every weekday and time of day it reaches
+    // recurs every week.
+    if (unit !== undefined && (own === undefined || !parts.has(own)) && !parts.has("BYMONTH")) {
+        const step = unit * rule.interval;
+        const weekday = (new Date(Date.UTC(start.year, start.month - 1, start.day)).getUTCDay() + 6) % 7;
+        const origin = Math.floor((weekday * 86_400 + start.hour * 3600 + start.minute * 60 + start.second) / unit) * unit;
+        const spacing = gcd(step, WEEK_SECONDS);
+        const timed = ["BYDAY", "BYHOUR", "BYMINUTE"].some((name) => contracting.has(name));
+        let reached = !timed;
+        for (let offset = 0; !reached && offset < WEEK_SECONDS; offset += spacing) {
+            const at = (origin + offset) % WEEK_SECONDS;
+            const day = Math.floor(at / 86_400);
+            const seconds = at % 86_400;
+            reached = (!contracting.has("BYDAY") || plainDays.includes(day)) && allowed("BYHOUR", Math.floor(seconds / 3600)) && allowed("BYMINUTE", Math.floor(seconds / 60) % 60);
+        }
+        if (!reached) return true;
+    }
+    // A week number pins a candidate to a few days of the year: whether any
+    // real date also has the month, day and weekday asked for. 2001-2028 holds
+    // every kind of year, and every pair of consecutive ones.
+    if (contracting.has("BYWEEKNO") && ["BYMONTH", "BYMONTHDAY", "BYDAY"].some((name) => contracting.has(name))) {
+        const weekStart = ICAL.Recur.icalDayToNumericDay(rule.weekStart ?? "MO") as Parameters<ICAL.Time["weekNumber"]>[0];
+        const day = ICAL.Time.fromData({ year: 2001, month: 1, day: 1, isDate: true });
+        let found = false;
+        for (; !found && day.year < 2029; day.adjust(1, 0, 0, 0)) {
+            found =
+                (!contracting.has("BYMONTH") || rule.byMonth.includes(day.month)) &&
+                (!contracting.has("BYMONTHDAY") || monthDays.includes(day.day)) &&
+                (!contracting.has("BYDAY") || plainDays.includes((day.dayOfWeek() + 5) % 7)) &&
+                weeks.includes(day.weekNumber(weekStart));
+        }
+        if (!found) return true;
+    }
+    return false;
+}
+
 /** Write a rule back as the text after `RRULE:`, in the conventional order. */
 export function formatRule(rule: RecurrenceRule): string {
     const parts: string[] = [`FREQ=${rule.frequency}`];
@@ -171,11 +273,11 @@ export function formatRule(rule: RecurrenceRule): string {
     if (rule.count !== null) parts.push(`COUNT=${rule.count}`);
     if (rule.until !== null) parts.push(`UNTIL=${formatUntil(rule.until)}`);
     if (rule.weekStart !== null) parts.push(`WKST=${rule.weekStart}`);
-    // Parts this model does not carry (BYHOUR, BYWEEKNO...) survive from the
-    // text the rule was read from.
+    // Parts this model does not carry (BYHOUR, RSCALE, X-...) survive from
+    // the text the rule was read from.
     for (const piece of rule.raw.split(";")) {
         const name = piece.split("=")[0]?.trim().toUpperCase() ?? "";
-        if (UNSUPPORTED_PARTS.includes(name)) parts.push(piece.trim());
+        if (name && !MODELED_PARTS.includes(name)) parts.push(piece.trim());
     }
     return parts.join(";");
 }

@@ -79,6 +79,7 @@ export async function eventDetail(
         event: full ? event : busyOnly(event),
         series: full ? series : null,
         writable: writable && full,
+        answerable: !calendar.readOnly,
         isOrganizer: !event.organizer || emails.includes(event.organizer.email),
         myEmails: emails,
         invitations: invitations.map((invitation) => ({

@@ -4,7 +4,8 @@
  * RANGE=THISANDFUTURE.
  */
 
-import { describe, expect, it } from "vitest";
+import ICAL from "ical.js";
+import { describe, expect, it, vi } from "vitest";
 import * as engine from "@polaris-app/calendar/src/engine";
 
 const NY = "America/New_York";
@@ -293,6 +294,88 @@ describe("long-running and impossible rules", () => {
         for (const rule of ["FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30", "FREQ=YEARLY;BYMONTH=4,6;BYMONTHDAY=31", "FREQ=MONTHLY;BYMONTH=2;BYMONTHDAY=-30"]) {
             expect(series("20260101T090000", rule, [], { from: "2026-01-01", to: "2030-01-01" }), rule).toEqual(at9("2026-01-01"));
         }
+    });
+});
+
+describe("rules ical.js would never finish", () => {
+    // 2026-01-05 is a Monday. Each of these passes parseRule, and ical.js's
+    // iterator steps through candidates for them without ever returning.
+    const NEVER = [
+        "FREQ=DAILY;BYDAY=1MO",
+        "FREQ=DAILY;BYMONTHDAY=-1",
+        "FREQ=DAILY;BYMONTHDAY=0",
+        "FREQ=DAILY;INTERVAL=7;BYDAY=TU",
+        "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30,-1",
+        "FREQ=HOURLY;INTERVAL=84;BYDAY=TU",
+        "FREQ=HOURLY;INTERVAL=168;BYDAY=TU",
+        "FREQ=MINUTELY;INTERVAL=120;BYHOUR=10",
+        "FREQ=SECONDLY;INTERVAL=7200;BYMINUTE=30",
+        "FREQ=SECONDLY;BYSECOND=60",
+        "FREQ=WEEKLY;BYWEEKNO=-1",
+        "FREQ=DAILY;BYWEEKNO=0",
+        "FREQ=DAILY;BYMONTH=6;BYWEEKNO=1"
+    ];
+
+    it("draws only DTSTART for each, and returns", { timeout: 10_000 }, () => {
+        for (const rule of NEVER) expect(series("20260105T090000", rule, [], { from: "2026-01-01", to: "2027-01-01" }), rule).toEqual(at9("2026-01-05"));
+    });
+
+    it("bounds a never-matching rule it cannot recognise by the steps ical.js takes", { timeout: 10_000 }, () => {
+        // BYMONTH makes ical.js jump between months, which no lattice predicts.
+        expect(series("20260105T090000", "FREQ=DAILY;INTERVAL=7;BYMONTH=1,2,3;BYDAY=TU", [], { from: "2026-01-01", to: "2027-01-01" })).toEqual(at9("2026-01-05"));
+    });
+
+    it("still draws rules close to them that do repeat", () => {
+        expect(series("20260105T090000", "FREQ=DAILY;BYDAY=MO,1TU", [], { from: "2026-01-01", to: "2026-01-20" })).toEqual(at9("2026-01-05", "2026-01-12", "2026-01-19"));
+        expect(series("20260105T090000", "FREQ=DAILY;BYMONTHDAY=31,-1", [], { from: "2026-01-01", to: "2026-04-01" })).toEqual(at9("2026-01-05", "2026-01-31", "2026-03-31"));
+        expect(series("20260105T090000", "FREQ=DAILY;INTERVAL=7;BYMONTHDAY=6", [], { from: "2026-01-01", to: "2026-08-01" })).toEqual(at9("2026-01-05", "2026-04-06", "2026-07-06"));
+        expect(series("20260105T090000", "FREQ=HOURLY;INTERVAL=5;BYHOUR=9", [], { from: "2026-01-01", to: "2026-01-08" })).toEqual(at9("2026-01-05", "2026-01-06", "2026-01-07"));
+    });
+});
+
+describe("expansion cost", () => {
+    it("stops generating once the limit is drawn", () => {
+        const next = vi.spyOn(ICAL.RecurIterator.prototype, "next");
+        try {
+            for (const [rule, unit] of [["FREQ=SECONDLY", 1000], ["FREQ=MINUTELY", 60_000]] as const) {
+                const item = onlyItem(calendar(...event(`DTSTART;TZID=${NY}:20260101T000000`, "DURATION:PT1S", `RRULE:${rule}`)));
+                next.mockClear();
+                const found = engine.expandItem(item, { from: new Date("2026-03-01T00:00:00Z"), to: new Date("2027-03-01T00:00:00Z") }, { floatingZone: "UTC", limit: 10 });
+                const first = new Date("2026-03-01T00:00:00Z").getTime();
+                expect(found.map((occurrence) => occurrence.start.getTime()), rule).toEqual(Array.from({ length: 10 }, (_, index) => first + index * unit));
+                expect(next.mock.calls.length, rule).toBeLessThan(15_000);
+            }
+        } finally {
+            next.mockRestore();
+        }
+    });
+
+    it("keeps an override moved before the drawn ones when it stops early", () => {
+        const item = onlyItem(
+            calendar(
+                ...event("DTSTART:20260101T100000Z", "DURATION:PT1H", "RRULE:FREQ=DAILY"),
+                ...event("RECURRENCE-ID:20260120T100000Z", "DTSTART:20260109T080000Z", "DURATION:PT1H", "SUMMARY:Moved")
+            )
+        );
+        const found = engine.expandItem(item, { from: new Date("2026-01-08T00:00:00Z"), to: new Date("2026-03-01T00:00:00Z") }, { floatingZone: "UTC", limit: 3 });
+        expect(found.map((occurrence) => occurrence.start.toISOString())).toEqual(["2026-01-08T10:00:00.000Z", "2026-01-09T08:00:00.000Z", "2026-01-09T10:00:00.000Z"]);
+    });
+});
+
+describe("occurrenceFor", () => {
+    const item = onlyItem(calendar(...event("DTSTART:20260105T090000Z", "DURATION:PT1H", "RRULE:FREQ=WEEKLY;COUNT=4", "EXDATE:20260112T090000Z", "RDATE:20260107T150000Z")));
+
+    it("places an occurrence the series has", () => {
+        expect(engine.occurrenceFor(item, "2026-01-19T09:00:00.000Z", "UTC")?.start.toISOString()).toBe("2026-01-19T09:00:00.000Z");
+        expect(engine.occurrenceFor(item, "2026-01-07T15:00:00.000Z", "UTC")?.start.toISOString()).toBe("2026-01-07T15:00:00.000Z");
+        expect(engine.occurrenceFor(item, "2026-01-05T09:00:00.000Z", "UTC")).not.toBeNull();
+    });
+
+    it("is null for a key the series never makes or has taken out", () => {
+        for (const key of ["2026-01-12T09:00:00.000Z", "2026-01-06T09:00:00.000Z", "2026-01-19T10:00:00.000Z", "2026-02-02T09:00:00.000Z"]) expect(engine.occurrenceFor(item, key, "UTC"), key).toBeNull();
+        const single = onlyItem(calendar(...event("DTSTART:20260105T090000Z", "DURATION:PT1H")));
+        expect(engine.occurrenceFor(single, "2026-01-05T09:00:00.000Z", "UTC")).not.toBeNull();
+        expect(engine.occurrenceFor(single, "2026-01-06T09:00:00.000Z", "UTC")).toBeNull();
     });
 });
 

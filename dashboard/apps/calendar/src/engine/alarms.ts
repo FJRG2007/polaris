@@ -32,7 +32,8 @@ export function alarmKey(alarm: Alarm, index: number): string {
     return `${index}:${alarm.action}:${trigger}`;
 }
 
-function absoluteInstant(at: string): Date {
+/** The instant an absolute trigger names; one written without a zone is UTC. */
+export function absoluteInstant(at: string): Date {
     return new Date(at.endsWith("Z") ? at : `${at}Z`);
 }
 

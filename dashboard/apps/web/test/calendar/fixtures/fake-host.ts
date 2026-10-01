@@ -56,6 +56,8 @@ function blankState() {
         /** Team id -> member ids. */
         teams: new Map<string, string[]>(),
         locales: new Map<string, string>(),
+        /** Account display zones by user id; "auto" when unset. */
+        timeZones: new Map<string, string>(),
         requestLocale: "en-US",
         notices: [] as Notice[],
         mails: [] as SentMail[],
@@ -159,6 +161,7 @@ export const host = {
     calendarHost: {
         teamIdsOf: async (userId: string) => [...fake.teams.entries()].filter(([, members]) => members.includes(userId)).map(([id]) => id),
         teamMemberIds: async (teamId: string) => [...(fake.teams.get(teamId) ?? [])],
+        displayTimeZone: async (userId: string) => fake.timeZones.get(userId) ?? "auto",
         teamsOf: async (userId: string) =>
             db
                 .rows("team")
@@ -183,7 +186,12 @@ export const host = {
                 .rows("user")
                 .filter((row) => (row.name as string).toLowerCase().includes(query.toLowerCase()))
                 .map(person),
-        sendCalendarEmail: async (message: SentMail): Promise<{ error?: string }> => {
+        peopleInReach: async (_actor: unknown, ids: readonly string[]) =>
+            db
+                .rows("user")
+                .filter((row) => ids.includes(row.id as string))
+                .map((row) => row.id as string),
+        sendCalendarEmail:async (message: SentMail): Promise<{ error?: string }> => {
             if (fake.mailError) return { error: fake.mailError };
             fake.mails.push(message);
             return {};

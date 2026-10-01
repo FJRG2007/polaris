@@ -65,6 +65,7 @@ let etagCounter = 0;
 export function createFakeCalDav(options: FakeCalDavOptions) {
     const calendars: FakeCalendar[] = [];
     const requests: Recorded[] = [];
+    const withoutEtag = new Set<string>();
     let token = 1;
     const p = options.davPrefix ?? "d";
     const d = (name: string) => (p ? `${p}:${name}` : name);
@@ -165,7 +166,9 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
                 if (depth === "0") return reply(207, multistatus([response(calendar.path, calendarProps(calendar))]));
                 const rows = [response(calendar.path, `<${d("resourcetype")}><${d("collection")}/><C:calendar/></${d("resourcetype")}>`)];
                 for (const [name, object] of calendar.objects) {
-                    rows.push(response(`${calendar.path}${encodeURIComponent(name)}`, `<${d("resourcetype")}/><${d("getetag")}>${object.etag}</${d("getetag")}>`));
+                    const href = `${calendar.path}${encodeURIComponent(name)}`;
+                    if (withoutEtag.has(name)) rows.push(response(href, `<${d("resourcetype")}/>`, `<${d("getetag")}/>`));
+                    else rows.push(response(href, `<${d("resourcetype")}/><${d("getetag")}>${object.etag}</${d("getetag")}>`));
                 }
                 return reply(207, multistatus(rows));
             }
@@ -246,6 +249,8 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
         fetcher,
         calendars,
         requests,
+        /** Members a Depth 1 listing names with their getetag as 404. */
+        withoutEtag,
         addCalendar(calendar: Partial<FakeCalendar> & { path: string; name: string }): FakeCalendar {
             const full: FakeCalendar = { color: null, components: ["VEVENT", "VTODO"], readOnly: false, objects: new Map(), ctag: 1, log: [], ...calendar };
             calendars.push(full);

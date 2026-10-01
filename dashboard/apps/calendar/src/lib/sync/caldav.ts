@@ -272,15 +272,19 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
         return { objects, gone };
     };
 
-    /** Lists every member's etag (Depth 1), the fallback when sync-collection is not there. */
+    /**
+     * Lists every member's etag (Depth 1), the fallback when sync-collection is
+     * not there. A member listed without one is still there: its etag is "",
+     * which is never one held, so its body is read.
+     */
     const listEtags = async (collection: string): Promise<Map<string, string>> => {
         const { multistatus } = await dav.davMultistatus(credentials, "PROPFIND", collection, "1", ETAGS_BODY);
         const self = dav.hrefKey(collection);
         const etags = new Map<string, string>();
         for (const response of multistatus.responses) {
             if (dav.hrefKey(response.href) === self || dav.hasType(response, dav.DAV, "collection")) continue;
-            const etag = dav.propText(response, dav.DAV, "getetag");
-            if (etag !== null) etags.set(response.href, etag);
+            if (response.status === 404 || response.status === 410) continue;
+            etags.set(response.href, dav.propText(response, dav.DAV, "getetag") ?? "");
         }
         return etags;
     };
@@ -296,7 +300,7 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
             const key = dav.hrefKey(href);
             seen.add(key);
             const held = knownByKey.get(key);
-            if (!held || held[1] !== etag) wanted.set(held ? held[0] : href, etag);
+            if (!held || !etag || held[1] !== etag) wanted.set(held ? held[0] : href, etag);
         }
         const removed = [...knownByKey.entries()].filter(([key]) => !seen.has(key)).map(([, [href]]) => href);
         const { objects, gone } = await fetchBodies(collection, wanted);
@@ -330,10 +334,9 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
                     changedEtags.delete(response.href);
                     continue;
                 }
-                const etag = dav.propText(response, dav.DAV, "getetag");
-                if (etag === null || dav.hasType(response, dav.DAV, "collection")) continue;
+                if (dav.hasType(response, dav.DAV, "collection")) continue;
                 removed.delete(response.href);
-                changedEtags.set(response.href, etag);
+                changedEtags.set(response.href, dav.propText(response, dav.DAV, "getetag") ?? "");
             }
             const next = result.multistatus.syncToken;
             if (!next) return null;
@@ -347,7 +350,7 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
         const wanted = new Map<string, string>();
         for (const [href, etag] of changedEtags) {
             const held = knownByKey.get(dav.hrefKey(href));
-            if (!held || held[1] !== etag) wanted.set(held ? held[0] : href, etag);
+            if (!held || !etag || held[1] !== etag) wanted.set(held ? held[0] : href, etag);
         }
         const removedHrefs = [...removed].map((href) => knownByKey.get(dav.hrefKey(href))?.[0] ?? href);
         const { objects, gone } = await fetchBodies(collection, wanted);

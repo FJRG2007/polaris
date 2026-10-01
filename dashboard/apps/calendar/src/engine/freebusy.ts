@@ -22,6 +22,7 @@ export interface HoursRange {
 export type WorkingHours = Readonly<Record<"0" | "1" | "2" | "3" | "4" | "5" | "6", readonly HoursRange[]>>;
 
 const RANK: Readonly<Record<BusyInterval["type"], number>> = { "BUSY-TENTATIVE": 0, BUSY: 1, "BUSY-UNAVAILABLE": 2 };
+const BY_RANK: readonly BusyInterval["type"][] = ["BUSY-TENTATIVE", "BUSY", "BUSY-UNAVAILABLE"];
 
 /** The busy intervals a list of occurrences makes, unmerged. */
 export function busyFromOccurrences(occurrences: readonly Occurrence[], options: { selfEmail?: string } = {}): BusyInterval[] {
@@ -45,15 +46,28 @@ export function busyFromOccurrences(occurrences: readonly Occurrence[], options:
  * and never hides that somebody is away.
  */
 export function mergeBusy(intervals: readonly BusyInterval[]): BusyInterval[] {
-    const points = [...new Set(intervals.flatMap((interval) => [interval.start.getTime(), interval.end.getTime()]))].sort((a, b) => a - b);
+    const changes = new Map<number, number[]>();
+    for (const interval of intervals) {
+        const start = interval.start.getTime();
+        const end = interval.end.getTime();
+        if (!(end > start)) continue;
+        const rank = RANK[interval.type];
+        for (const [at, delta] of [[start, 1], [end, -1]] as const) {
+            const counts = changes.get(at) ?? [0, 0, 0];
+            counts[rank] = (counts[rank] ?? 0) + delta;
+            changes.set(at, counts);
+        }
+    }
+    const points = [...changes.keys()].sort((a, b) => a - b);
+    const active = [0, 0, 0];
     const pieces: BusyInterval[] = [];
     for (let index = 0; index + 1 < points.length; index++) {
         const from = points[index] ?? 0;
         const to = points[index + 1] ?? 0;
+        const counts = changes.get(from) ?? [];
+        for (let rank = 0; rank < active.length; rank++) active[rank] = (active[rank] ?? 0) + (counts[rank] ?? 0);
         let type: BusyInterval["type"] | null = null;
-        for (const interval of intervals) {
-            if (interval.start.getTime() <= from && interval.end.getTime() >= to && (type === null || RANK[interval.type] > RANK[type])) type = interval.type;
-        }
+        for (let rank = active.length - 1; rank >= 0 && type === null; rank--) if ((active[rank] ?? 0) > 0) type = BY_RANK[rank] ?? null;
         if (!type) continue;
         const last = pieces[pieces.length - 1];
         if (last && last.type === type && last.end.getTime() === from) pieces[pieces.length - 1] = { ...last, end: new Date(to) };

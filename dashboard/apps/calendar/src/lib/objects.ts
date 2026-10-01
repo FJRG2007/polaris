@@ -392,7 +392,8 @@ export async function respondToEvent(
         floatingZone: string;
     }
 ): Promise<void> {
-    const { row } = await readableObject(user, input.objectId);
+    const { row, calendar } = await readableObject(user, input.objectId);
+    if (calendar.readOnly) throw new CalendarRefusal((await calendarT())("errors.readOnly"));
     const item = await itemOf(row);
     if (item.component !== "VEVENT") throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
     const events = [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent => Boolean(event));

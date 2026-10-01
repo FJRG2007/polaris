@@ -13,11 +13,12 @@
 
 import ICAL from "ical.js";
 import type * as T from "./types";
+import { absoluteInstant } from "./alarms";
 import { parseRule } from "./rule";
 import { addToWall, formatWall, resolveZone } from "./tz";
 import { vtimezoneFor } from "./vtimezone";
 import { addDays, clockFor, isDateOnly, valueToInstant, valueWall, vtimezoneId } from "./zones";
-import { expandItem, generateStarts, isRecurring, placeEvent, type ExpandContext } from "./expand";
+import { expandItem, generateStarts, isRecurring, placeEvent, thisAndFutureReach, type ExpandContext } from "./expand";
 
 export { valueToInstant } from "./zones";
 
@@ -257,7 +258,8 @@ function readAlarm(raw: RawComponent): T.Alarm | null {
             const value = String(parsed.values[0] ?? "");
             if (parsed.type === "date-time") {
                 if (!DATE_TIME.test(value)) return null;
-                trigger = { kind: "absolute", at: value };
+                // RFC 5545 3.8.6.3: an absolute trigger is in UTC.
+                trigger = { kind: "absolute", at: value.endsWith("Z") ? value : `${value}Z` };
             } else {
                 const seconds = ICAL.Duration.fromString(value).toSeconds();
                 const related = (paramText(parsed.params, "related") ?? "START").toUpperCase() === "END" ? "END" : "START";
@@ -465,7 +467,9 @@ function eventEnd(start: T.DateValue, endLine: ParsedLine | undefined, durationL
         const end = dateValues(endLine, zones)[0];
         if (!end || isDateOnly(end) !== isDateOnly(start)) return fallback;
         if (isDateOnly(end) && isDateOnly(start)) return end.date > start.date ? end : fallback;
-        return end;
+        if (isDateOnly(end) || isDateOnly(start)) return fallback;
+        const before = end.tzid === start.tzid ? end.dateTime < start.dateTime : valueToInstant(end, "UTC") < valueToInstant(start, "UTC");
+        return before ? fallback : end;
     }
     if (durationLine) {
         const duration = ICAL.Duration.fromString(String(durationLine.values[0] ?? ""));
@@ -706,7 +710,7 @@ function attendeeLine(attendee: T.Attendee): string {
 
 function alarmLines(alarm: T.Alarm): string[] {
     const lines = ["BEGIN:VALARM", property("action", {}, "text", alarm.action)];
-    if (alarm.trigger.kind === "absolute") lines.push(property("trigger", {}, "date-time", alarm.trigger.at));
+    if (alarm.trigger.kind === "absolute") lines.push(property("trigger", {}, "date-time", `${absoluteInstant(alarm.trigger.at).toISOString().slice(0, 19)}Z`));
     else {
         const duration = ICAL.Duration.fromSeconds(Math.round(alarm.trigger.minutes * 60)).toString();
         lines.push(property("trigger", alarm.trigger.related === "END" ? { related: "END" } : {}, "duration", duration));
@@ -969,7 +973,10 @@ export function itemBounds(item: T.CalendarItem, floatingZone: string): ItemBoun
             if (starts.length > BOUNDS_CAP || !last) endsAt = null;
             else {
                 const lastStart = clockFor(isDateOnly(master.start) ? null : master.start.tzid, floatingZone, item.timezones).toInstant(last.wall);
-                const occurrences = expandItem(item, { from: new Date(lastStart.getTime() - 1), to: new Date(lastStart.getTime() + 1) }, { floatingZone });
+                // A THISANDFUTURE override may have moved the last ones later,
+                // by up to its wall-clock shift and a clock change.
+                const reach = thisAndFutureReach(item, context) * 1000 + 3_600_000;
+                const occurrences = expandItem(item, { from: new Date(lastStart.getTime() - 1), to: new Date(lastStart.getTime() + reach) }, { floatingZone, limit: BOUNDS_CAP + item.overrides.length + 1 });
                 const lastEnd = Math.max(...occurrences.map((occurrence) => occurrence.end.getTime()), lastStart.getTime());
                 endsAt = new Date(Math.max(lastEnd, endsAt?.getTime() ?? 0));
             }

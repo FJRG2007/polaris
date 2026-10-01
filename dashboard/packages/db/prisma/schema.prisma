@@ -11688,9 +11688,11 @@ model Calendar {
 
     owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     source   CalendarSource?   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-    objects  CalendarObject[]
-    shares   CalendarShare[]
-    displays CalendarDisplay[]
+    objects      CalendarObject[]
+    shares       CalendarShare[]
+    displays     CalendarDisplay[]
+    bookingPages CalendarBookingPage[]
+    proposals    CalendarProposal[]
 
     @@unique([sourceId, remoteId])
     @@index([ownerId])
@@ -11767,6 +11769,8 @@ model CalendarObject {
     calendar    Calendar             @relation(fields: [calendarId], references: [id], onDelete: Cascade)
     reminders   CalendarReminder[]
     invitations CalendarInvitation[]
+    bookings    CalendarBooking[]
+    proposals   CalendarProposal[]
 
     @@unique([calendarId, uid])
     @@index([calendarId, startsAt])
@@ -11845,9 +11849,11 @@ model CalendarBookingPage {
     updatedAt       DateTime @updatedAt
 
     owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    calendar Calendar          @relation(fields: [calendarId], references: [id], onDelete: Cascade)
     bookings CalendarBooking[]
 
     @@index([ownerId])
+    @@index([calendarId])
 }
 
 // One booking made on a page.
@@ -11866,12 +11872,19 @@ model CalendarBooking {
     status       String   @default("pending")
     confirmToken String   @unique
     manageToken  String   @unique
+    // Who asked for it: a SHA-256 of the page and the caller's address, so the
+    // open holds of one visitor can be counted without keeping the address.
+    requester    String   @default("")
+    // The booker's language, for the mail they get with no request around it.
+    locale       String   @default("")
     createdAt    DateTime @default(now())
 
-    page CalendarBookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    page   CalendarBookingPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    object CalendarObject?     @relation(fields: [objectId], references: [id], onDelete: SetNull)
 
     @@index([pageId, start])
     @@index([status, createdAt])
+    @@index([objectId])
 }
 
 // A meeting proposal: candidate times people vote on.
@@ -11892,10 +11905,14 @@ model CalendarProposal {
     updatedAt       DateTime @updatedAt
 
     owner        User                          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    calendar     Calendar?                     @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+    object       CalendarObject?               @relation(fields: [objectId], references: [id], onDelete: SetNull)
     dates        CalendarProposalDate[]
     participants CalendarProposalParticipant[]
 
     @@index([ownerId])
+    @@index([calendarId])
+    @@index([objectId])
 }
 
 model CalendarProposalDate {
@@ -11923,6 +11940,14 @@ model CalendarProposalParticipant {
     proposal CalendarProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
     @@unique([proposalId, email])
+}
+
+// A short lease on one key - a room answering an invitation - so two servers
+// never do the same step at once without either holding a connection while it
+// works. `until` is epoch milliseconds; a lease past it is free to take.
+model CalendarLease {
+    key   String @id
+    until BigInt
 }
 
 // One person's calendar settings, a JSON document read through a schema.

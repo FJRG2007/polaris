@@ -222,6 +222,18 @@ describe("how many accounts one person may link", () => {
         await expect(saveConnection("ana", account("1", "ana"))).rejects.toBeInstanceOf(ConnectionLimitError);
     });
 
+    it("counts a calendar link past the cap once it is authorized again for anything else", async () => {
+        const google = (accountId: string) => ({ provider: "google", accountId, label: accountId, method: "oauth" as const });
+        await saveConnection("ana", google("work"));
+        await saveConnection("ana", { ...google("home"), beyondLimit: true });
+        rows.find((row) => row.accountId === "home")!.linkedAt = new Date(Date.now() + 1000);
+        await saveConnection("ana", { ...google("home"), beyondLimit: true, scope: "calendar" });
+        await expect(saveConnection("ana", { ...google("home"), scope: "calendar drive.file" })).rejects.toBeInstanceOf(ConnectionLimitError);
+        expect(rows.find((row) => row.accountId === "home")?.scope).toBe("calendar");
+        await saveConnection("ana", { ...google("work"), scope: "drive.file" });
+        expect(rows.find((row) => row.accountId === "work")?.scope).toBe("drive.file");
+    });
+
     it("does not spend a slot re-authorizing an account already held", async () => {
         await saveConnection("ana", account("1", "ana"));
         await saveConnection("ana", { ...account("1", "ana-renamed"), scope: "repo" });

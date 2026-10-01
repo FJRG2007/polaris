@@ -82,6 +82,56 @@ describe("calendar sources", () => {
         expect(db.rows("calendar").filter((row) => row.sourceId === id).map((row) => [row.id, row.name, row.color])).toEqual([[calendar.id, "Holidays", "#2ca02c"]]);
     });
 
+    it("seals a feed's address, keeps only its host and tail in the clear, and never answers it whole", async () => {
+        const secret = "https://feeds.example.test/private/0123456789abcdef/basic.ics?token=s3cr3tvalue";
+        fake.fetchHandler = async () => new Response(feed(), { status: 200 });
+        const id = await sources.addFeed(alice, { url: secret.replace("https://", "webcal://"), name: "Private", color: "#2ca02c", refreshMinutes: 60 });
+        const row = db.byId("calendarSource", id)!;
+        expect(Buffer.from(row.encryptedSecret as Uint8Array).toString("utf8")).toBe(secret);
+        expect(row.url).toBe("https://feeds.example.test/...alue");
+        expect(db.rows("calendar").find((calendar) => calendar.sourceId === id)?.remoteId).toBe("feed");
+        await world.settle();
+        expect(fake.fetches.map((request) => request.url)).toEqual([secret, secret]);
+        const [listed] = await sources.listSources(alice);
+        expect(JSON.stringify(listed)).not.toContain("s3cr3t");
+        expect(JSON.stringify(listed)).not.toContain("0123456789abcdef");
+        expect(listed?.url).toBe("https://feeds.example.test/...alue");
+    });
+
+    it("seals a feed subscribed before addresses were, keeping its calendar", async () => {
+        const url = "https://feeds.example.test/private/legacy-token/basic.ics";
+        const id = db.insert("calendarSource", { userId: alice.id, kind: "ics", label: "Old", url }).id as string;
+        const calendarId = db.insert("calendar", { ownerId: alice.id, sourceId: id, kind: "remote", remoteId: url, name: "Old", readOnly: true }).id as string;
+        const [listed] = await sources.listSources(alice);
+        expect(listed?.url).toBe("https://feeds.example.test/....ics");
+        const row = db.byId("calendarSource", id)!;
+        expect(Buffer.from(row.encryptedSecret as Uint8Array).toString("utf8")).toBe(url);
+        expect(row.url).not.toContain("legacy-token");
+        expect(db.byId("calendar", calendarId)?.remoteId).toBe("feed");
+        expect(await sources.subscribedAmong(alice, [url, "https://feeds.example.test/other.ics"])).toEqual([url]);
+    });
+
+    it("replaces a feed's address once the new one answers, and keeps the old one when it does not", async () => {
+        fake.fetchHandler = async () => new Response(feed(), { status: 200, headers: { ETag: "\"v1\"" } });
+        const id = await sources.addFeed(alice, { url: "https://feeds.example.test/old.ics", name: "Feed", color: "#2ca02c", refreshMinutes: 60 });
+        await vi.waitFor(() => expect(db.byId("calendarSource", id)?.lastSyncAt).toBeInstanceOf(Date));
+        const calendar = db.rows("calendar").find((row) => row.sourceId === id)!;
+        expect(calendar.syncToken).toBe("\"v1\"");
+
+        fake.fetchHandler = async () => new Response("<html>no</html>", { status: 200 });
+        await expect(sources.updateSource(alice, id, { url: "https://feeds.example.test/wrong.ics" })).rejects.toThrow(world.en("sources.notACalendar"));
+        expect(Buffer.from(db.byId("calendarSource", id)?.encryptedSecret as Uint8Array).toString("utf8")).toBe("https://feeds.example.test/old.ics");
+
+        fake.fetchHandler = async () => new Response(feed(), { status: 200 });
+        const view = await sources.updateSource(alice, id, { url: "https://feeds.example.test/new.ics" });
+        expect(view).toMatchObject({ id, status: "ok", url: "https://feeds.example.test/....ics" });
+        expect(Buffer.from(db.byId("calendarSource", id)?.encryptedSecret as Uint8Array).toString("utf8")).toBe("https://feeds.example.test/new.ics");
+        expect(db.byId("calendar", String(calendar.id))?.syncToken).toBe("");
+        await vi.waitFor(() => expect(fake.fetches.at(-1)?.url).toBe("https://feeds.example.test/new.ics"));
+        await world.settle();
+        expect(db.rows("calendar").filter((row) => row.sourceId === id).map((row) => row.id)).toEqual([calendar.id]);
+    });
+
     it("refuses a linked account that was not granted calendars, and one that is not theirs", async () => {
         fake.links.push({ id: "018f2b7a-0000-7000-8000-0000000000a1", provider: "google", label: "alice@gmail.example", grantsCalendar: false });
         await expect(sources.addLinkedAccount(alice, "018f2b7a-0000-7000-8000-0000000000a1")).rejects.toThrow(world.en("sources.linkNeedsCalendar"));
@@ -115,7 +165,7 @@ describe("calendar sources", () => {
         const admin = addUser({ name: "Root", email: "root@example.test", isAdmin: true });
         fake.fetchHandler = async () => new Response(feed(), { status: 200 });
         const id = await sources.addFeed(admin, { url: "http://192.168.1.20/calendar.ics", name: "LAN", color: "#2ca02c", refreshMinutes: 60 });
-        expect(db.byId("calendarSource", id)?.url).toBe("http://192.168.1.20/calendar.ics");
+        expect(Buffer.from(db.byId("calendarSource", id)?.encryptedSecret as Uint8Array).toString("utf8")).toBe("http://192.168.1.20/calendar.ics");
         expect(fake.fetches[0]?.allowPrivate).toBe(true);
         await world.settle();
     });

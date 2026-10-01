@@ -198,6 +198,7 @@
         "task": "Task {title}, due {when}",
         "taskDone": "Done task {title}, due {when}",
         "tentative": "maybe",
+        "truncated": "Not every event fits in this view. Try a shorter one.",
         "unreadable": "{count, plural, one {# event could not be read and is not shown.} other {# events could not be read and are not shown.}}",
         "week": "Wk"
     },

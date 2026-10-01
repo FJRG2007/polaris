@@ -3,7 +3,7 @@
  * on the conflict calendars and the holds of other visitors; a hold becomes an
  * event only once its email is confirmed, and the confirmation checks the slot
  * again so of two visitors who raced for it the first keeps it; holds nobody
- * confirmed are swept after an hour.
+ * confirmed let go of their slot after fifteen minutes.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,8 @@ import { db } from "../fixtures/fake-db";
 import * as world from "../fixtures/world";
 import { scheduling } from "./fixtures/scheduling-db";
 import { addUser, fake, host } from "../fixtures/fake-host";
+import * as objects from "@polaris-app/calendar/src/lib/objects";
+import * as effects from "@polaris-app/calendar/src/lib/effects";
 import * as booking from "@polaris-app/calendar/src/lib/booking";
 import type { BookingPageInput } from "@polaris-app/calendar/src/lib/scheduling-schemas";
 
@@ -150,10 +152,10 @@ describe("booking pages", () => {
         expect(moved).toHaveLength(1);
     });
 
-    it("lets a hold go after an hour: the slot is offered again and its link has expired", async () => {
+    it("lets a hold go after fifteen minutes: the slot is offered again and its link has expired", async () => {
         await request("first@outside.test", "09:00");
         const later = new Date(Date.now() + booking.HOLD_MS + 60_000);
-        expect(booking.HOLD_MS).toBe(3_600_000);
+        expect(booking.HOLD_MS).toBe(900_000);
         expect((await booking.publicSlots(slug, day, later))?.map((slot) => slot.start)).toContain(madrid("09:00"));
         expect((await booking.confirmBooking(confirmToken("first@outside.test"), later)).status).toBe("expired");
     });
@@ -172,7 +174,7 @@ describe("booking pages", () => {
         await expect(request("again@outside.test", "09:30")).rejects.toThrow(world.en("booking.slowDown"));
     });
 
-    it("sweeps holds nobody confirmed within an hour, and nothing else", async () => {
+    it("sweeps holds nobody confirmed within fifteen minutes, and nothing else", async () => {
         const pageId = scheduling.rows("calendarBookingPage")[0]!.id;
         const at = (hoursAgo: number, status: string, token: string) =>
             scheduling.insert("calendarBooking", {
@@ -187,7 +189,7 @@ describe("booking pages", () => {
                 createdAt: new Date(world.NOW.getTime() - hoursAgo * 3_600_000)
             });
         at(2, "pending", "a");
-        at(0.5, "pending", "b");
+        at(0.1, "pending", "b");
         at(30, "confirmed", "c");
         expect(await booking.sweepStaleBookings(world.NOW)).toBe(1);
         expect(scheduling.rows("calendarBooking").map((row) => row.email).sort()).toEqual(["b@outside.test", "c@outside.test"]);
@@ -201,5 +203,119 @@ describe("booking pages", () => {
         expect(world.objectsIn(calendar)[0]?.deletedAt).toBeInstanceOf(Date);
         expect(fake.mails.some((mail) => mail.to === "first@outside.test" && mail.calendar?.method === "CANCEL")).toBe(true);
         expect(db.rows("calendarInvitation")).toHaveLength(0);
+    });
+
+    async function confirmed(email: string, time: string) {
+        await request(email, time);
+        const answer = await booking.confirmBooking(confirmToken(email));
+        const row = scheduling.rows("calendarBooking").find((entry) => entry.email === email)!;
+        return { answer, row, object: db.byId("calendarObject", String(row.objectId))! };
+    }
+
+    it("counts the minimum notice from when the slot was held, so a hold near the boundary still confirms", async () => {
+        scheduling.rows("calendarBookingPage")[0]!.noticeMinutes = 60;
+        vi.setSystemTime(new Date(madrid("08:00")));
+        await request("first@outside.test", "09:00");
+        const answer = await booking.confirmBooking(confirmToken("first@outside.test"), new Date(madrid("08:05")));
+        expect(answer.status).toBe("confirmed");
+        expect(world.objectsIn(calendar)).toHaveLength(1);
+    });
+
+    it("keeps at most three open holds per visitor on a page, by address and by email, and expired ones do not count", async () => {
+        for (const time of ["09:00", "09:30", "11:00"]) await request("first@outside.test", time);
+        await expect(request("first@outside.test", "11:30")).rejects.toThrow(world.en("booking.tooManyHolds"));
+        await expect(request("other@outside.test", "11:30")).rejects.toThrow(world.en("booking.tooManyHolds"));
+        const stored = scheduling.rows("calendarBooking");
+        expect(stored).toHaveLength(3);
+        expect(stored.every((row) => typeof row.requester === "string" && row.requester.length === 64 && !String(row.requester).includes("203.0.113.7"))).toBe(true);
+        vi.setSystemTime(new Date(Date.now() + booking.HOLD_MS + 60_000));
+        await request("other@outside.test", "11:30");
+        expect(scheduling.rows("calendarBooking")).toHaveLength(4);
+    });
+
+    it("counts an email against its hourly limit only once the page is found", async () => {
+        await expect(
+            booking.requestBooking({ slug: "no-such-page", start: madrid("09:00"), name: "Visitor", email: "victim@outside.test", note: "", answers: {}, timezone: ZONE })
+        ).rejects.toThrow(world.en("booking.pageGone"));
+        expect(fake.rateKeys).toEqual(["calendar.book:203.0.113.7"]);
+    });
+
+    it("finds a page whatever the case of its address", async () => {
+        expect(await booking.publicBookingPage(slug.toUpperCase())).not.toBeNull();
+        expect(await booking.publicSlots(slug.toUpperCase(), day)).not.toBeNull();
+    });
+
+    it("cancels the booking and tells the visitor, in their language, when the owner deletes its event", async () => {
+        fake.requestLocale = "es-ES";
+        const { row, object } = await confirmed("first@outside.test", "09:00");
+        fake.mails.length = 0;
+        await objects.deleteEvent(alice as never, { objectId: String(object.id), recurrenceKey: null, scope: "all", floatingZone: ZONE });
+        expect(row.status).toBe("cancelled");
+        expect(fake.mails.find((mail) => mail.subject === "Cancelada: Consultation")?.to).toBe("first@outside.test");
+        expect((await booking.publicSlots(slug, day))?.map((slot) => slot.start)).toContain(madrid("09:00"));
+    });
+
+    it("moves the booking with its event", async () => {
+        const { row, object } = await confirmed("first@outside.test", "09:30");
+        await objects.shiftEvent(alice as never, {
+            objectId: String(object.id),
+            recurrenceKey: null,
+            startDeltaMs: 3_600_000,
+            endDeltaMs: 3_600_000,
+            scope: "all",
+            version: null,
+            floatingZone: ZONE
+        });
+        expect(new Date(String(row.start)).toISOString()).toBe(madrid("10:30"));
+        expect(new Date(String(row.end)).toISOString()).toBe(madrid("11:00"));
+        expect(row.status).toBe("confirmed");
+    });
+
+    it("cancels the booking when the owner declines its event or a pull removes it", async () => {
+        const first = await confirmed("first@outside.test", "09:00");
+        const item = world.itemIn(first.object);
+        if (item.component !== "VEVENT" || !item.master) throw new Error("not an event");
+        const declined = {
+            ...item,
+            master: {
+                ...item.master,
+                attendees: [
+                    ...item.master.attendees,
+                    { email: alice.email, name: "Alice", role: "REQ-PARTICIPANT", partstat: "DECLINED", rsvp: false, type: "INDIVIDUAL" } as const
+                ]
+            }
+        };
+        await objects.writeItem(calendar, first.object as never, declined, { actor: null, floatingZone: ZONE, fromProvider: true });
+        expect(first.row.status).toBe("cancelled");
+
+        const second = await confirmed("second@outside.test", "11:00");
+        fake.mails.length = 0;
+        await effects.afterObjectChange({
+            objectId: String(second.object.id),
+            calendarId: calendar,
+            before: world.itemIn(second.object),
+            after: null,
+            context: { actor: null, floatingZone: ZONE, fromProvider: true }
+        });
+        expect(second.row.status).toBe("cancelled");
+        expect(fake.mails.some((mail) => mail.to === "second@outside.test" && mail.subject === world.en("booking.mail.cancelledSubject", { title: "Consultation" }))).toBe(true);
+    });
+
+    it("lists somebody's pages only when they publish one, and never names an account that does not", async () => {
+        const bob = addUser({ name: "Bob", email: "bob@example.test" });
+        expect(await booking.publicPagesOf(bob.id)).toBeNull();
+        const found = await booking.publicPagesOf(alice.id);
+        expect(found?.ownerName).toBe("Alice");
+        expect(found?.pages.map((page) => page.slug)).toEqual([slug]);
+        scheduling.rows("calendarBookingPage")[0]!.visibility = "link";
+        expect(await booking.publicPagesOf(alice.id)).toBeNull();
+    });
+
+    it("takes no bookings on a page whose calendar is in the trash", async () => {
+        db.byId("calendar", calendar)!.trashedAt = new Date();
+        expect(await booking.publicBookingPage(slug)).toBeNull();
+        expect(await booking.publicSlots(slug, day)).toBeNull();
+        expect(await booking.publicPagesOf(alice.id)).toBeNull();
+        await expect(request("first@outside.test", "09:00")).rejects.toThrow(world.en("booking.pageGone"));
     });
 });

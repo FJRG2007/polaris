@@ -4,7 +4,8 @@
  * Availability is weekly hours plus per-date overrides in the page's own time
  * zone (an override of `[]` closes that day). A slot must start after the
  * minimum notice and within the horizon, both counted from now; with its
- * buffers around it, it must not touch a busy time or another booking; and a
+ * buffers around it, it must not touch a busy time, and it keeps the larger
+ * buffer clear on both sides of another booking, whose own buffers count; and a
  * day that already has `maxPerDay` bookings offers nothing. Slots start every
  * `slotMinutes` from the start of each availability window, computed on the
  * zone's wall clock so a clock change moves no slot off its hour.
@@ -52,7 +53,7 @@ export function bookingSlots(input: BookingInput): { start: Date; end: Date }[] 
         const day = localDate(booking.start, input.timezone);
         perDay.set(day, (perDay.get(day) ?? 0) + 1);
     }
-    const blocked = [...input.busy, ...input.bookings];
+    const spacing = Math.max(input.bufferBefore, input.bufferAfter) * MINUTE;
     const found: { start: Date; end: Date }[] = [];
     for (const date of localDays(new Date(earliest), new Date(latest), input.timezone)) {
         if (input.maxPerDay !== null && (perDay.get(date) ?? 0) >= input.maxPerDay) continue;
@@ -67,7 +68,8 @@ export function bookingSlots(input: BookingInput): { start: Date; end: Date }[] 
                 if (start < earliest || start >= latest || end <= start) continue;
                 const guardFrom = start - input.bufferBefore * MINUTE;
                 const guardTo = end + input.bufferAfter * MINUTE;
-                if (blocked.some((interval) => interval.start.getTime() < guardTo && interval.end.getTime() > guardFrom)) continue;
+                if (input.busy.some((interval) => interval.start.getTime() < guardTo && interval.end.getTime() > guardFrom)) continue;
+                if (input.bookings.some((booking) => booking.start.getTime() - spacing < end && booking.end.getTime() + spacing > start)) continue;
                 if (found.some((slot) => slot.start.getTime() === start)) continue;
                 found.push({ start: new Date(start), end: new Date(end) });
             }

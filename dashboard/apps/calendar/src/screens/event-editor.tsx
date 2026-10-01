@@ -715,7 +715,7 @@ export function RespondBar({ detail, zone, onChanged }: { detail: EventDetail; z
     const [reach, setReach] = useState<"this" | "series">("this");
     const [answer, setAnswer] = useState<engine.PartStat | null>(mine?.partstat ?? null);
     const [busy, setBusy] = useState(false);
-    if (!mine) return null;
+    if (!mine || !detail.answerable) return null;
 
     const respond = async (partstat: "ACCEPTED" | "TENTATIVE" | "DECLINED") => {
         if (busy) return;

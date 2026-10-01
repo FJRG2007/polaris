@@ -8,15 +8,21 @@
  */
 
 import { prisma } from "@polaris/db";
-import { reachableCalendars, reaches } from "./access";
+import { host } from "@polaris/app-host";
 import { tryItemOf } from "./objects";
+import { publicItem, reachableCalendars, reaches } from "./access";
 
 export async function eventTitles(userId: string, ids: readonly string[]): Promise<Record<string, string>> {
     const wanted = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 50);
     if (wanted.length === 0) return {};
+    const person = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, isAdmin: true }
+    });
+    if (!person || !(await host.session.sessionCan({ ...person, sessionId: "" }, "calendar.use"))) return {};
     const reach = await reachableCalendars(userId);
     const rows = await prisma.calendarObject.findMany({
-        where: { id: { in: wanted }, deletedAt: null, calendarId: { in: [...reach.keys()] } },
+        where: { id: { in: wanted }, deletedAt: null, calendarId: { in: [...reach.keys()] }, calendar: { trashedAt: null } },
         select: { id: true, calendarId: true, ics: true, summary: true }
     });
     const titles: Record<string, string> = {};
@@ -25,8 +31,7 @@ export async function eventTitles(userId: string, ids: readonly string[]): Promi
         if (!reaches(level, "read")) continue;
         if (!reaches(level, "write")) {
             const item = tryItemOf(row.ics);
-            const event = item?.component === "VEVENT" ? (item.master ?? item.overrides[0]) : null;
-            if (event && event.classification !== "PUBLIC") continue;
+            if (!item || !publicItem(item)) continue;
         }
         if (row.summary) titles[row.id] = row.summary;
     }

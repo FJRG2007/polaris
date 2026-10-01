@@ -10,9 +10,10 @@
  */
 
 import Link from "next/link";
-import { GroupHeading } from "../ui";
 import { useCalendarT } from "../i18n";
-import { StatusNote } from "../public/kit";
+import { FieldRow, GroupHeading } from "../ui";
+import { addressSchema } from "../../lib/schemas";
+import { StatusNote, useIssueText } from "../public/kit";
 import { useEffect, useState } from "react";
 import type { SourceView } from "../../lib/wire";
 import * as sources from "../../actions/sources";
@@ -21,7 +22,7 @@ import { loadInstanceSettingsAction } from "../../actions/instance";
 import type { InstanceSettings } from "../../lib/instance-settings";
 import { cacheKey, dropCached, unwrap, useCachedRead } from "../cached-read";
 import { CalDavForm, FeedForm, HolidayPicker, refreshOptions, REFRESH_CHOICES, SuggestedCalendars } from "./forms";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, KeyRound, Loader2, RefreshCw, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, KeyRound, Link2, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, Skeleton } from "@polaris/ui";
 
 type Accounts = Extract<Awaited<ReturnType<typeof sources.loadAccountsAction>>, { ok: true }>["accounts"];
@@ -90,7 +91,7 @@ export function AccountsView({ linked, provider = "" }: { linked: string | null;
 
     const data = accounts.data;
     const allow = instance.data?.settings.allowSubscriptions ?? true;
-    const subscribed = data?.sources.map((source) => source.url) ?? [];
+    const subscribed = data?.subscribed ?? [];
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -298,6 +299,7 @@ function SourceRow({
     const [syncing, setSyncing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [passwordOpen, setPasswordOpen] = useState(false);
+    const [addressOpen, setAddressOpen] = useState(false);
     const name = source.label || t(`accounts.kinds.${source.kind}`);
     const tone = statusTone(source.status);
     const chip = {
@@ -375,12 +377,22 @@ function SourceRow({
                         </span>
                         <span>{t("accounts.calendarCount", { count: source.calendarCount })}</span>
                     </p>
+                    {source.kind === "ics" && source.url ? (
+                        <p className="mt-0.5 truncate text-xs text-foreground-subtle" title={source.url}>
+                            {source.url}
+                        </p>
+                    ) : null}
                     {source.status === "error" && source.lastError ? <p className="mt-0.5 text-xs text-foreground-subtle">{source.lastError}</p> : null}
                 </div>
                 <div className="flex items-center gap-1">
                     {source.status === "auth" && reconnectUrl ? (
                         <Button size="sm" variant="outline" asChild>
                             <a href={reconnectUrl}>{t("accounts.reconnect")}</a>
+                        </Button>
+                    ) : null}
+                    {source.status === "auth" && source.kind === "ics" ? (
+                        <Button size="sm" variant="outline" onClick={() => setAddressOpen(true)}>
+                            {t("accounts.newAddress")}
                         </Button>
                     ) : null}
                     <Select
@@ -412,6 +424,17 @@ function SourceRow({
                             <KeyRound aria-hidden />
                         </Button>
                     ) : null}
+                    {source.kind === "ics" ? (
+                        <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            onClick={() => setAddressOpen(true)}
+                            aria-label={t("accounts.replaceAddress", { name })}
+                            title={t("accounts.replaceAddress", { name })}
+                        >
+                            <Link2 aria-hidden />
+                        </Button>
+                    ) : null}
                     <Button
                         size="icon-sm"
                         variant="ghost"
@@ -432,6 +455,9 @@ function SourceRow({
                     onSaved={() => onReplace({ ...source, status: "ok", lastError: null })}
                     sourceId={source.id}
                 />
+            ) : null}
+            {source.kind === "ics" ? (
+                <AddressDialog open={addressOpen} onOpenChange={setAddressOpen} name={name} sourceId={source.id} onSaved={onReplace} />
             ) : null}
         </li>
     );
@@ -507,6 +533,99 @@ function PasswordDialog({
                             {t("accounts.cancel")}
                         </Button>
                         <Button type="submit" disabled={busy} aria-disabled={!password}>
+                            {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
+                            {t("accounts.save")}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/** A feed's address is never read back: a new one replaces it, checked as it is
+ *  typed with the schema the action checks. */
+function AddressDialog({
+    open,
+    onOpenChange,
+    name,
+    sourceId,
+    onSaved
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    name: string;
+    sourceId: string;
+    onSaved: (next: SourceView) => void;
+}) {
+    const t = useCalendarT();
+    const issueText = useIssueText();
+    const [url, setUrl] = useState("");
+    const [touched, setTouched] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (open) {
+            setUrl("");
+            setTouched(false);
+            setError(null);
+        }
+    }, [open]);
+
+    const result = addressSchema.safeParse(url);
+    const issue = touched && url.trim() !== "" && !result.success ? issueText(result.error.issues) : null;
+
+    async function save(): Promise<void> {
+        setTouched(true);
+        if (!result.success || busy) return;
+        const address = result.data;
+        setBusy(true);
+        setError(null);
+        try {
+            const answer = await unwrap(() => sources.updateSourceAction({ id: sourceId, url: address }), t("errors.generic"));
+            onSaved(answer.source);
+            onOpenChange(false);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : t("errors.generic"));
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t("accounts.addressTitle")}</DialogTitle>
+                    <DialogDescription>{name}</DialogDescription>
+                </DialogHeader>
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        void save();
+                    }}
+                    className="flex flex-col gap-3"
+                    noValidate
+                >
+                    <FieldRow label={`${t("accounts.feed.url")} *`} htmlFor={`${sourceId}-address`} error={issue} hint={t("accounts.addressHint")}>
+                        <Input
+                            id={`${sourceId}-address`}
+                            type="url"
+                            inputMode="url"
+                            autoComplete="off"
+                            placeholder="https://"
+                            value={url}
+                            onChange={(event) => setUrl(event.target.value)}
+                            onBlur={() => setTouched(true)}
+                        />
+                    </FieldRow>
+                    {error ? <StatusNote tone="danger">{error}</StatusNote> : null}
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                            {t("accounts.cancel")}
+                        </Button>
+                        <Button type="submit" disabled={busy} aria-disabled={!result.success}>
                             {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
                             {t("accounts.save")}
                         </Button>

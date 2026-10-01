@@ -8,6 +8,8 @@
             "subscribe": "Subscribe",
             "title": "Add calendars"
         },
+        "addressHint": "The current one is never shown. The new one is checked before it is saved.",
+        "addressTitle": "New calendar address",
         "back": "Calendar",
         "caldav": {
             "add": "Add server",
@@ -78,6 +80,7 @@
         "linkedTitle": "Google and Microsoft",
         "loadFailed": "Your linked calendars could not be loaded.",
         "neverSynced": "Not synced yet",
+        "newAddress": "New address",
         "newPassword": "New password for {name}",
         "outcome": {
             "cancelled": "Linking was canceled. Nothing changed.",
@@ -96,6 +99,7 @@
         "removeBody": "Its calendars leave Polaris. Nothing is deleted at the provider.",
         "removeConfirm": "Remove",
         "removeTitle": "Remove {name}?",
+        "replaceAddress": "New address for {name}",
         "retry": "Try again",
         "save": "Save",
         "sourcesEmpty": "Nothing linked yet. Add an account, a CalDAV server or a subscription below.",
@@ -127,7 +131,7 @@
         "cancelOwnerBody": "The event leaves your calendar and they are sent the cancellation.",
         "cancelTitle": "Cancel the booking with {name}?",
         "cancelYoursTitle": "Cancel your booking?",
-        "checkEmailBody": "We sent a confirmation link to {email}. The time is held for you for an hour.",
+        "checkEmailBody": "We sent a confirmation link to {email}. The time is held for you for 15 minutes.",
         "checkEmailHint": "Nothing is booked until you open that link and confirm.",
         "checkEmailTitle": "Check your email",
         "confirm": "Confirm booking",
@@ -144,10 +148,13 @@
         "linkGone": "This link is not valid any more.",
         "mail": {
             "confirmAction": "Confirm it here:",
-            "confirmExpiry": "The time is held for an hour. If you did not ask for it, ignore this email.",
+            "confirmExpiry": "The time is held for 15 minutes. If you did not ask for it, ignore this email.",
             "confirmIntro": "Hello {name}, you asked to book this time:",
             "confirmSubject": "Confirm your booking: {title}",
             "confirmedIntro": "Hello {name}, your booking is confirmed:",
+            "bookAgain": "Pick another time here:",
+            "cancelledIntro": "Hello {name}, your booking was canceled:",
+            "cancelledSubject": "Canceled: {title}",
             "confirmedSubject": "Booked: {title}",
             "manageAction": "Cancel or move it here:"
         },
@@ -192,6 +199,7 @@
         "statusPending": "Waiting",
         "takenMeanwhile": "Somebody booked that time before you confirmed. Pick another one.",
         "timesIn": "Times in {zone}",
+        "tooManyHolds": "You already have times waiting for confirmation here. Confirm one from your email, or wait 15 minutes.",
         "upcoming": "Upcoming",
         "validation": {
             "answerNeeded": "Answer this question.",

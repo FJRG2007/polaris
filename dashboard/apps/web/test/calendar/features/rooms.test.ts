@@ -27,14 +27,39 @@ describe("rooms", () => {
     let calendar: string;
     let room: Awaited<ReturnType<typeof resources.createRoom>>;
     const locks: string[] = [];
+    // The CalendarLease table, as the two statements a lease is made of see it.
+    const leases = new Map<string, bigint>();
+    let transactions = 0;
 
     beforeEach(async () => {
         world.resetWorld();
         locks.length = 0;
+        leases.clear();
+        transactions = 0;
         // What Postgres is asked for; the fake has no raw SQL of its own.
-        (db.prisma as unknown as Record<string, unknown>).$executeRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
-            locks.push(`${parts.join("?")} ${values.join(" ")}`);
-            return 0;
+        const client = db.prisma as unknown as Record<string, unknown>;
+        client.$executeRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
+            const sql = parts.join("?");
+            locks.push(`${sql} ${values.join(" ")}`);
+            if (sql.startsWith("INSERT INTO \"CalendarLease\"")) {
+                const [key, until, now] = values as [string, bigint, bigint];
+                const held = leases.get(key);
+                if (held !== undefined && held >= now) return 0;
+                leases.set(key, until);
+                return 1;
+            }
+            if (sql.startsWith("DELETE FROM \"CalendarLease\"")) {
+                const [key, until] = values as [string, bigint];
+                if (leases.get(key) !== until) return 0;
+                leases.delete(key);
+                return 1;
+            }
+            throw new Error(`unexpected raw SQL: ${sql}`);
+        };
+        const transaction = db.prisma.$transaction.bind(db.prisma);
+        client.$transaction = async (work: unknown) => {
+            transactions += 1;
+            return transaction(work as never);
         };
         admin = addUser({ name: "Admin", email: "admin@example.test", isAdmin: true });
         alice = addUser({ name: "Alice", email: "alice@example.test" });
@@ -123,7 +148,25 @@ describe("rooms", () => {
         expect([roomAnswer(first), roomAnswer(second)].sort()).toEqual(["ACCEPTED", "DECLINED"]);
         expect(world.objectsIn(room.id).filter((row) => !row.deletedAt)).toHaveLength(1);
         expect(locks.length).toBeGreaterThan(0);
-        expect(locks.every((lock) => lock.includes("pg_advisory_xact_lock") && lock.includes(room.id))).toBe(true);
+        expect(locks.every((lock) => lock.includes("CalendarLease") && lock.includes(room.id))).toBe(true);
+        expect(leases.size).toBe(0);
+    });
+
+    it("answers holding no transaction open, so answers for many rooms at once cannot drain the connection pool", async () => {
+        const id = await book("2026-10-06T10:00:00", "2026-10-06T11:00:00");
+        expect(roomAnswer(id)).toBe("ACCEPTED");
+        expect(transactions).toBe(0);
+        expect(locks.filter((lock) => lock.startsWith("INSERT"))).toHaveLength(1);
+        expect(locks.filter((lock) => lock.startsWith("DELETE"))).toHaveLength(1);
+    });
+
+    it("waits for a lease another server holds, and takes it once it has run out", async () => {
+        leases.set(`polaris.calendar.room:${room.id}`, BigInt(Date.now() + 5_000));
+        setTimeout(() => vi.setSystemTime(Date.now() + 10_000), 300);
+        const id = await book("2026-10-06T10:00:00", "2026-10-06T11:00:00");
+        expect(roomAnswer(id)).toBe("ACCEPTED");
+        expect(locks.filter((lock) => lock.startsWith("INSERT")).length).toBeGreaterThan(1);
+        expect(leases.size).toBe(0);
     });
 
     it("keeps only the time and the organizer of a booking, and the title only when it is public", async () => {

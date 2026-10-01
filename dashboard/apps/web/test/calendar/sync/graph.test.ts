@@ -20,6 +20,7 @@ import {
     type ChangeSet
 } from "@polaris-app/calendar/src/lib/sync";
 import { GRAPH, createFakeGraph } from "./fixtures/fake-graph";
+import { WINDOW_REOPEN_DAYS } from "@polaris-app/calendar/src/lib/sync/graph";
 
 type Fake = ReturnType<typeof createFakeGraph>;
 
@@ -152,20 +153,47 @@ describe("createGraphProvider", () => {
 
     it("reports @removed entries from the next round", async () => {
         const known = new Map(first.changed.map((o) => [o.href, o.etag]));
-        const next = await provider.pull({ remoteId: "cal-1", syncToken: first.syncToken, ctag: "", known });
+        fake.events.delete("s1");
+        const next = await provider.pull({ remoteId: "cal-1", syncToken: first.syncToken, ctag: first.ctag, known });
         expect(next.full).toBe(false);
         expect(next.removed).toEqual(["s1"]);
         expect(next.changed).toEqual([]);
         expect(next.syncToken).toBe(`${GRAPH}/me/calendars/cal-1/calendarView/delta?$deltatoken=d2`);
     });
 
+    it("keeps an event the delta reports removed when Graph still has it, moved out of the window", async () => {
+        const known = new Map(first.changed.map((o) => [o.href, o.etag]));
+        const next = await provider.pull({ remoteId: "cal-1", syncToken: first.syncToken, ctag: first.ctag, known });
+        expect(next.removed).toEqual([]);
+        expect(next.changed).toEqual([]);
+    });
+
+    it("opens a fresh window once the one being followed is a week old", async () => {
+        expect(Number.isFinite(Date.parse(first.ctag))).toBe(true);
+        const stale = new Date(Date.parse(first.ctag) - (WINDOW_REOPEN_DAYS + 1) * 86_400_000).toISOString();
+        const before = fake.requests.length;
+        const again = await provider.pull({ remoteId: "cal-1", syncToken: first.syncToken, ctag: stale, known: new Map() });
+        const delta = fake.requests.slice(before).find((r) => r.url.pathname.endsWith("/calendarView/delta"))!;
+        expect(delta.url.searchParams.get("$deltatoken")).toBeNull();
+        expect(delta.url.searchParams.get("startDateTime")).toBeTruthy();
+        expect(again.full).toBe(true);
+        expect(again.window).toBeDefined();
+        expect(Date.parse(again.ctag)).toBeGreaterThan(Date.parse(stale));
+    });
+
+    it("opens a fresh window for a link stored before the window was dated", async () => {
+        const again = await provider.pull({ remoteId: "cal-1", syncToken: first.syncToken, ctag: "", known: new Map() });
+        expect(again.full).toBe(true);
+        expect(again.changed.map((o) => o.href).sort()).toEqual(["m1", "s1"]);
+    });
+
     it("throws SyncGoneError when Graph lost the sync state", async () => {
-        await expect(provider.pull({ remoteId: "cal-1", syncToken: `${GRAPH}/me/calendars/cal-1/calendarView/delta?$deltatoken=expired`, ctag: "", known: new Map() })).rejects.toBeInstanceOf(SyncGoneError);
+        await expect(provider.pull({ remoteId: "cal-1", syncToken: `${GRAPH}/me/calendars/cal-1/calendarView/delta?$deltatoken=expired`, ctag: first.ctag, known: new Map() })).rejects.toBeInstanceOf(SyncGoneError);
     });
 
     it("never sends the token to a stored link outside Graph", async () => {
         const before = fake.requests.length;
-        await expect(provider.pull({ remoteId: "cal-1", syncToken: "https://attacker.example/delta", ctag: "", known: new Map() })).rejects.toBeInstanceOf(SyncGoneError);
+        await expect(provider.pull({ remoteId: "cal-1", syncToken: "https://attacker.example/delta", ctag: first.ctag, known: new Map() })).rejects.toBeInstanceOf(SyncGoneError);
         expect(fake.requests.length).toBe(before);
     });
 

@@ -12,6 +12,7 @@ vi.mock("@polaris/db", async () => (await import("../fixtures/fake-db")).dbModul
 vi.mock("@polaris/app-host", async () => (await import("../fixtures/fake-host")).hostModule);
 vi.mock("@polaris/auth", () => ({ userHasPermission: async () => false }));
 
+import { db } from "../fixtures/fake-db";
 import * as world from "../fixtures/world";
 import { addUser, host } from "../fixtures/fake-host";
 import * as freebusy from "@polaris-app/calendar/src/lib/freebusy";
@@ -34,10 +35,7 @@ describe("free/busy", () => {
         // Bob and not Carol, whatever she types.
         reachable.clear();
         reachable.add(bob.id);
-        host.calendarHost.searchPeople = async (_actor: unknown, query: string) =>
-            [bob, carol]
-                .filter((person) => reachable.has(person.id) && (person.email.includes(query) || person.name.includes(query)))
-                .map((person) => ({ id: person.id, name: person.name, email: person.email, username: null }));
+        host.calendarHost.peopleInReach = async (_actor: unknown, ids: readonly string[]) => ids.filter((id) => reachable.has(id));
 
         const work = world.addCalendar(bob.id, { timezone: ZONE });
         world.storeEvent(work, { summary: "Secret launch", location: "HQ", start: world.at("2026-10-06T10:00:00"), end: world.at("2026-10-06T11:00:00") });
@@ -103,5 +101,34 @@ describe("free/busy", () => {
             status: "unavailable",
             until: null
         });
+    });
+
+    it("asks who the reader may look up by id, once for everybody, never by searching an address", async () => {
+        const asked: string[][] = [];
+        host.calendarHost.searchPeople = async () => {
+            throw new Error("searched by address");
+        };
+        host.calendarHost.peopleInReach = async (_actor: unknown, ids: readonly string[]) => {
+            asked.push([...ids]);
+            return ids.filter((id) => reachable.has(id));
+        };
+        // Addresses that contain Bob's: a search for his would find them all.
+        for (let index = 0; index < 8; index++) reachable.add(addUser({ name: `Bob ${index}`, email: `${index}bob@example.test` }).id);
+        const view = await freebusy.freeBusy(alice as never, { emails: [bob.email, carol.email], userIds: [alice.id], ...window, zone: ZONE });
+        expect(view.people.map((person) => person.status)).toEqual(["ok", "unavailable", "ok"]);
+        expect(asked).toHaveLength(1);
+        expect(asked[0]!.sort()).toEqual([bob.id, carol.id].sort());
+    });
+
+    it("reads every event reaching the window, however many there are, so no booking is dropped", async () => {
+        const room = world.addCalendar(carol.id, { kind: "resource" });
+        const filler = world.storeEvent(room, { uid: "filler-0", summary: "", start: world.at("2026-10-06T08:00:00"), end: world.at("2026-10-06T08:30:00") });
+        const ics = String(filler.ics);
+        for (let index = 1; index < 3001; index++) {
+            db.insert("calendarObject", { ...filler, id: undefined, uid: `filler-${index}`, ics: ics.replace("UID:filler-0", `UID:filler-${index}`) });
+        }
+        world.storeEvent(room, { uid: "last", summary: "", start: world.at("2026-10-06T15:00:00"), end: world.at("2026-10-06T16:00:00") });
+        const busy = await freebusy.calendarBusy([room], window, { floatingZone: ZONE });
+        expect(busy.some((interval) => interval.start.toISOString() === "2026-10-06T13:00:00.000Z")).toBe(true);
     });
 });

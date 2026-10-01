@@ -97,7 +97,7 @@ export async function occurrencesIn(
     const ids = calendars.map((calendar) => calendar.id);
     const emails = new Set(options.emails.map((email) => email.toLowerCase()));
 
-    const rows =
+    const found =
         ids.length === 0
             ? []
             : await prisma.calendarObject.findMany({
@@ -107,8 +107,11 @@ export async function occurrencesIn(
                       ...reachingWindow(window)
                   },
                   select: { id: true, calendarId: true, uid: true, ics: true, updatedAt: true, component: true },
-                  take: MAX_OBJECTS
+                  orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+                  take: MAX_OBJECTS + 1
               });
+    const truncated = found.length > MAX_OBJECTS;
+    const rows = found.slice(0, MAX_OBJECTS);
 
     const occurrences: OccurrenceView[] = [];
     const tasks: TaskItemView[] = [];
@@ -204,22 +207,22 @@ export async function occurrencesIn(
         to: window.to.toISOString(),
         occurrences,
         tasks,
-        unreadable
+        unreadable,
+        truncated
     };
 }
 
-/** Every address this person answers invitations at: their account address and
- *  the ones they added and proved, plus the addresses of the outside accounts
- *  their calendars sync from. */
+/** Every address somebody answers invitations at, lowercased: their account
+ *  address and the ones they added and proved. */
+export async function verifiedAddresses(userId: string, primary: string): Promise<string[]> {
+    const extra = await prisma.userEmail.findMany({
+        where: { userId, verifiedAt: { not: null } },
+        select: { email: true }
+    });
+    return [...new Set([primary, ...extra.map((row) => row.email)].map((email) => email.trim().toLowerCase()).filter(Boolean))];
+}
+
+/** Every address this person answers invitations at. */
 export async function addressesOf(user: SessionUser): Promise<string[]> {
-    const [emails, sources] = await Promise.all([
-        prisma.userEmail.findMany({ where: { userId: user.id, verifiedAt: { not: null } }, select: { email: true } }),
-        prisma.calendarSource.findMany({ where: { userId: user.id }, select: { label: true, username: true } })
-    ]);
-    const all = [
-        user.email,
-        ...emails.map((row) => row.email),
-        ...sources.flatMap((row) => [row.label, row.username])
-    ];
-    return [...new Set(all.map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@")))];
+    return verifiedAddresses(user.id, user.email);
 }

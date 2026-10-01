@@ -19,9 +19,9 @@ import { host } from "@polaris/app-host";
 import { calendarBusy } from "./freebusy";
 import { CalendarRefusal } from "./errors";
 import { readResource } from "./calendars";
-import { busyBlock, type SessionUser } from "./access";
 import { resourceAddress } from "./resource-address";
 import type { RoomInput } from "./scheduling-schemas";
+import { busyBlock, type SessionUser } from "./access";
 import type { RoomAvailability, RoomView } from "./scheduling-wire";
 import { trashObject, tryItemOf, writeItem, type StoredObject } from "./objects";
 
@@ -178,23 +178,47 @@ function bookingOf(item: Extract<engine.CalendarItem, { component: "VEVENT" }>, 
 /** Room answers in progress, by room. */
 const answering = new Map<string, Promise<unknown>>();
 
+/** How long one room's answer may keep its lease, and wait for it. */
+const LEASE_MS = 60_000;
+
+/** How often a waiting answer asks for the lease again. */
+const LEASE_POLL_MS = 100;
+
+/**
+ * Run `work` holding the lease on `key`: a row in `CalendarLease` taken by one
+ * statement and given back by another, so no connection is held while the
+ * work runs and asks the pool for its own. A lease left by a process that died
+ * is free again once it runs out.
+ */
+async function withLease<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const deadline = Date.now() + LEASE_MS;
+    let until = 0;
+    for (;;) {
+        const now = Date.now();
+        until = now + LEASE_MS;
+        const taken = await prisma.$executeRaw`INSERT INTO "CalendarLease" ("key", "until") VALUES (${key}, ${BigInt(until)}) ON CONFLICT ("key") DO UPDATE SET "until" = EXCLUDED."until" WHERE "CalendarLease"."until" < ${BigInt(now)}`;
+        if (taken > 0) break;
+        if (now >= deadline) throw new Error(`polaris: the lease on ${key} was not free in time`);
+        await new Promise((resolve) => setTimeout(resolve, LEASE_POLL_MS));
+    }
+    try {
+        return await work();
+    } finally {
+        await prisma.$executeRaw`DELETE FROM "CalendarLease" WHERE "key" = ${key} AND "until" = ${BigInt(until)}`.catch((caught: unknown) =>
+            console.error("polaris: a calendar lease was not given back:", caught)
+        );
+    }
+}
+
 /**
  * Run one room's answer alone: checking that the room is free and holding the
  * time are one step, so two invitations into the same slot cannot both be
  * accepted. In this process by a queue per room, and across processes by a
- * lock Postgres holds until the answer is written.
+ * lease on the room in the database.
  */
 async function oneAtATime<T>(roomId: string, work: () => Promise<T>): Promise<T> {
     const locked = () =>
-        process.env.POLARIS_DB_PROVIDER === "sqlite"
-            ? work()
-            : prisma.$transaction(
-                  async (tx) => {
-                      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`polaris.calendar.room:${roomId}`}))`;
-                      return work();
-                  },
-                  { maxWait: 60_000, timeout: 60_000 }
-              );
+        process.env.POLARIS_DB_PROVIDER === "sqlite" ? work() : withLease(`polaris.calendar.room:${roomId}`, work);
     const run = (answering.get(roomId) ?? Promise.resolve()).catch(() => undefined).then(locked);
     answering.set(roomId, run);
     try {

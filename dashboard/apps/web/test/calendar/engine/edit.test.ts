@@ -132,12 +132,47 @@ describe("applyEdit - all occurrences", () => {
         ]);
     });
 
+    it("keeps the series' time when edited from a moved occurrence whose time stays", () => {
+        const item = series();
+        // The editor holds the moved occurrence's own values and the series' rule.
+        const moved = { ...occurrence(item, MAR_16).event, rule: master(item).rule };
+        const renamed = engine.applyEdit(item, MAR_16, { ...moved, summary: "Renamed" }, "all");
+        expect(master(renamed.item).summary).toBe("Renamed");
+        expect(master(renamed.item).start).toEqual(master(item).start);
+        expect(master(renamed.item).end).toEqual(master(item).end);
+        expect(master(renamed.item).sequence).toBe(1);
+        const later = engine.applyEdit(item, MAR_16, { ...moved, start: { dateTime: "2026-03-16T12:00:00", tzid: MADRID }, end: { dateTime: "2026-03-16T13:30:00", tzid: MADRID } }, "all");
+        expect(master(later.item).start).toEqual({ dateTime: "2026-03-02T10:00:00", tzid: MADRID });
+        expect(master(later.item).end).toEqual({ dateTime: "2026-03-02T11:30:00", tzid: MADRID });
+    });
+
     it("changes only the details when the time stays, without bumping SEQUENCE", () => {
         const item = series();
         const edited = engine.applyEdit(item, null, { ...master(item), location: "Room 2" }, "all");
         expect(master(edited.item).location).toBe("Room 2");
         expect(master(edited.item).sequence).toBe(1);
         expect(overrides(edited.item)).toEqual(overrides(item));
+    });
+});
+
+describe("an occurrence the series does not have", () => {
+    const EXDATED = "2026-03-23T08:00:00.000Z";
+    const NOWHERE = "2026-03-10T08:00:00.000Z";
+
+    it("is not given an override by an edit or an answer", () => {
+        const item = series();
+        for (const key of [EXDATED, NOWHERE]) {
+            expect(engine.occurrenceFor(item, key, "UTC"), key).toBeNull();
+            expect(engine.applyEdit(item, key, { ...master(item), summary: "Ghost" }, "this").item, key).toEqual(item);
+            expect(engine.setAttendeeStatus(item, "guest@example.com", "ACCEPTED", key), key).toEqual(item);
+        }
+    });
+
+    it("leaves the series' time alone when an 'all' edit is opened on it", () => {
+        const item = series();
+        const edited = engine.applyEdit(item, NOWHERE, { ...master(item), summary: "Renamed", start: { dateTime: "2026-03-10T09:00:00", tzid: MADRID }, end: { dateTime: "2026-03-10T10:00:00", tzid: MADRID } }, "all");
+        expect(master(edited.item).summary).toBe("Renamed");
+        expect(master(edited.item).start).toEqual(master(item).start);
     });
 });
 

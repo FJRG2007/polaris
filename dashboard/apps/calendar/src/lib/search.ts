@@ -15,7 +15,7 @@ import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { tryItemOf } from "./objects";
 import type { SearchHit } from "./wire";
-import { reachableCalendars, reaches, type SessionUser } from "./access";
+import { publicItem, reachableCalendars, reaches, type SessionUser } from "./access";
 
 const LIMIT = 50;
 const YEAR = 365 * 86_400_000;
@@ -59,10 +59,8 @@ export async function searchEvents(
     for (const row of rows) {
         const item = tryItemOf(row.ics);
         const event = item?.component === "VEVENT" ? (item.master ?? item.overrides[0]) : null;
-        // What a read-only sharee may not see (a private event) is not a hit.
-        if (event && !reaches(reach.get(row.calendarId) ?? null, "write") && event.classification !== "PUBLIC") {
-            continue;
-        }
+        // What a read-only sharee may not see (a private event or task) is not a hit.
+        if (!reaches(reach.get(row.calendarId) ?? null, "write") && !(item && publicItem(item))) continue;
         let start = row.startsAt;
         if (item && row.recurring) {
             const next = engine.expandItem(

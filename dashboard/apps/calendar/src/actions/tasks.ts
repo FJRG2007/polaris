@@ -9,7 +9,7 @@
 import { z } from "zod";
 import * as engine from "../engine";
 import { host } from "@polaris/app-host";
-import { uuidSchema } from "../lib/schemas";
+import { isKnownZone, uuidSchema } from "../lib/schemas";
 import type { TaskItemView } from "../lib/wire";
 import { requireCalendarUser } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
@@ -60,7 +60,7 @@ const todoInput = z.object({
     summary: z.string().trim().min(1).max(500),
     due: engine.dateValueSchema.nullable(),
     status: z.enum(["NEEDS-ACTION", "IN-PROCESS", "COMPLETED", "CANCELLED"]),
-    zone: z.string().max(64)
+    zone: z.string().max(64).refine(isKnownZone)
 });
 
 /** Change a task that lives in a calendar: its title, when it is due, whether it is done. */

@@ -19,7 +19,7 @@ import { host } from "@polaris/app-host";
 import type { SourceView } from "./wire";
 import { CalendarRefusal } from "./errors";
 import type { SessionUser } from "./access";
-import { fetcherFor, ownerMayReachLan, syncSource } from "./sync-engine";
+import { feedAddressOf, fetcherFor, ownerMayReachLan, sealFeedAddress, syncSource } from "./sync-engine";
 
 /** Sources one person may link. More than anybody reads; a bound all the same. */
 const MAX_SOURCES = 50;
@@ -66,7 +66,29 @@ function view(row: {
     };
 }
 
+const FEED_SECRET = { id: true, url: true, encryptedSecret: true, secretNonce: true, secretKeyId: true } as const;
+
+/** The addresses of this person's feeds, opened. A feed subscribed before
+ *  addresses were sealed is sealed on the way. */
+async function feedAddresses(user: SessionUser): Promise<string[]> {
+    const feeds = await prisma.calendarSource.findMany({ where: { userId: user.id, kind: "ics" }, select: FEED_SECRET });
+    const addresses: string[] = [];
+    for (const feed of feeds) {
+        const address = await feedAddressOf(feed);
+        if (address) addresses.push(address);
+    }
+    return addresses;
+}
+
+/** Which of these public addresses - the holiday list, the operator's
+ *  suggestions - this person already subscribes to. */
+export async function subscribedAmong(user: SessionUser, catalog: readonly string[]): Promise<string[]> {
+    const held = new Set(await feedAddresses(user));
+    return catalog.filter((address) => held.has(sync.feedUrl(address)));
+}
+
 export async function listSources(user: SessionUser): Promise<SourceView[]> {
+    await feedAddresses(user);
     const rows = await prisma.calendarSource.findMany({
         where: { userId: user.id },
         select: VIEW,
@@ -118,29 +140,37 @@ async function refusalFor(caught: unknown, refusedAddress = false): Promise<Cale
     return new CalendarRefusal(t("sources.unreachable"));
 }
 
-/** Subscribe to one ICS address. Read-only; the feed decides what is in it. */
-export async function addFeed(
-    user: SessionUser,
-    input: { url: string; name: string; color: string; refreshMinutes: number }
-): Promise<string> {
-    await roomForAnother(user);
+/** One fetch of a feed's address, refused in a sentence when it is not a calendar
+ *  or the operator turned subscriptions off. */
+async function checkFeed(user: SessionUser, url: string): Promise<void> {
     const { readInstanceSettings } = await import("./instance-settings");
     if (!(await readInstanceSettings()).allowSubscriptions) {
         throw new CalendarRefusal((await calendarT())("instance.subscriptionsOff"));
     }
     const check = await checkingFetcher(user);
     try {
-        const first = await sync.fetchIcsFeed({ url: input.url, etag: null, lastModified: null, fetcher: check.fetcher });
+        const first = await sync.fetchIcsFeed({ url, etag: null, lastModified: null, fetcher: check.fetcher });
         if (first.notModified) throw new sync.SyncRefusedError("empty", null);
     } catch (caught) {
         throw await refusalFor(caught, check.refusedAddress());
     }
+}
+
+/** Subscribe to one ICS address. Read-only; the feed decides what is in it. */
+export async function addFeed(
+    user: SessionUser,
+    input: { url: string; name: string; color: string; refreshMinutes: number }
+): Promise<string> {
+    await roomForAnother(user);
+    await checkFeed(user, input.url);
+    const sealed = await host.calendarHost.sealCalendarSecret(sync.feedUrl(input.url));
     const source = await prisma.calendarSource.create({
         data: {
             userId: user.id,
             kind: "ics",
             label: input.name,
-            url: sync.feedUrl(input.url),
+            url: sync.maskFeedAddress(input.url),
+            ...sealed,
             refreshMinutes: input.refreshMinutes
         },
         select: { id: true }
@@ -150,7 +180,7 @@ export async function addFeed(
             ownerId: user.id,
             sourceId: source.id,
             kind: "remote",
-            remoteId: sync.feedUrl(input.url),
+            remoteId: sync.FEED_REMOTE_ID,
             name: input.name,
             color: input.color,
             readOnly: true
@@ -234,16 +264,23 @@ export async function refreshSource(user: SessionUser, id: string): Promise<Sour
     return view(row);
 }
 
-/** Change how often a source is pulled, or give a CalDAV server a new password
- *  (checked against the server before it is stored). */
+/** Change how often a source is pulled, give a CalDAV server a new password, or
+ *  a feed a new address (each checked before it is stored). */
 export async function updateSource(
     user: SessionUser,
     id: string,
-    patch: { refreshMinutes?: number; password?: string }
-): Promise<void> {
+    patch: { refreshMinutes?: number; password?: string; url?: string }
+): Promise<SourceView> {
     const source = await ownSource(user, id);
     const data: Record<string, unknown> = {};
     if (patch.refreshMinutes !== undefined) data.refreshMinutes = patch.refreshMinutes;
+    if (patch.url !== undefined && source.kind === "ics") {
+        await checkFeed(user, patch.url);
+        await sealFeedAddress(id, patch.url);
+        // The validators belong to the old address.
+        await prisma.calendar.updateMany({ where: { sourceId: id }, data: { syncToken: "", ctag: "" } });
+        Object.assign(data, { status: "ok", lastError: null, nextSyncAt: new Date() });
+    }
     if (patch.password !== undefined && source.kind === "caldav") {
         const row = await prisma.calendarSource.findUniqueOrThrow({ where: { id }, select: { url: true, username: true } });
         const check = await checkingFetcher(user);
@@ -261,6 +298,8 @@ export async function updateSource(
         Object.assign(data, sealed, { status: "ok", lastError: null, nextSyncAt: new Date() });
     }
     if (Object.keys(data).length > 0) await prisma.calendarSource.update({ where: { id }, data });
+    if (patch.url !== undefined && source.kind === "ics") firstPull(id);
+    return view(await prisma.calendarSource.findUniqueOrThrow({ where: { id }, select: VIEW }));
 }
 
 /** Stop syncing a source. Its calendars leave Polaris; nothing is deleted at

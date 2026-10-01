@@ -117,18 +117,16 @@ export const publishInputSchema = z.object({
 });
 
 /**
- * An address typed for a feed or a server. `webcal://` is the feed form of
- * http; a bare host gets https. The result must still be a real http(s) URL
- * whose host has a dot or is an IP - `https://asdf` is not an address.
+ * An address typed for a feed or a server. `webcal://` and `webcals://` are
+ * read as https, as a bare host is. The result must still be a real http(s)
+ * URL whose host has a dot or is an IP - `https://asdf` is not an address.
  */
 export const addressSchema = z
     .string()
     .trim()
     .max(2000)
     .transform((value) => {
-        const swapped = value.replace(/^webcals?:\/\//i, (scheme) =>
-            scheme.toLowerCase() === "webcals://" ? "https://" : "http://"
-        );
+        const swapped = value.replace(/^webcals?:\/\//i, "https://");
         return /^[a-z][a-z0-9+.-]*:\/\//i.test(swapped) ? swapped : `https://${swapped}`;
     })
     .pipe(

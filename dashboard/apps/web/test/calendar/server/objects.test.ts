@@ -275,6 +275,22 @@ describe("calendar objects", () => {
         ).rejects.toThrow(world.en("errors.notInvited"));
     });
 
+    it("refuses an answer on a read-only calendar instead of leaving it waiting forever", async () => {
+        const feed = world.addCalendar(bob.id, { name: "Feed", readOnly: true });
+        const row = world.storeEvent(feed, {
+            start: world.at("2026-10-09T10:00:00"),
+            end: world.at("2026-10-09T11:00:00"),
+            organizer: { email: "carol@example.test", name: "Carol" },
+            attendees: [{ email: bob.email, name: "Bob", role: "REQ-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "INDIVIDUAL" }]
+        });
+        const before = String(row.ics);
+        await expect(
+            objects.respondToEvent(bob, { objectId: String(row.id), recurrenceKey: null, partstat: "ACCEPTED", emails: [bob.email], floatingZone: ZONE })
+        ).rejects.toThrow(world.en("errors.readOnly"));
+        expect(db.byId("calendarObject", String(row.id))?.ics).toBe(before);
+        expect(db.byId("calendarObject", String(row.id))?.pendingPush ?? "").toBe("");
+    });
+
     it("refuses writing to a calendar shared read-only", async () => {
         const shared = world.addCalendar(alice.id, { name: "Team" });
         world.addShare(shared, { userId: bob.id }, "read");

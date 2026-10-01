@@ -18,17 +18,46 @@
 import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { tryItemOf } from "./objects";
-import { reachingWindow } from "./occurrences";
 import { host } from "@polaris/app-host";
 import type { SessionUser } from "./access";
+import { reachingWindow, verifiedAddresses } from "./occurrences";
 import { loadPreferences } from "./preferences-store";
 import type { FreeBusyPerson, FreeBusyView } from "./scheduling-wire";
 
-/** Objects read for one person's window at most. */
-const MAX_OBJECTS = 3000;
+/** Objects read per query while walking a window; every one is read. */
+const PAGE_SIZE = 1000;
 
 /** Occurrences of one recurring series taken into account per window. */
 const MAX_PER_SERIES = 500;
+
+/** Every live event on these calendars that reaches into a window, in id
+ *  order, a page at a time - none is left out, so a busy room is never read as
+ *  free. */
+async function* objectsReaching(
+    calendarIds: readonly string[],
+    window: { from: Date; to: Date },
+    skipUid: string | undefined
+): AsyncGenerator<{ id: string; ics: string }> {
+    let after: string | null = null;
+    for (;;) {
+        const page: { id: string; ics: string }[] = await prisma.calendarObject.findMany({
+            where: {
+                calendarId: { in: [...calendarIds] },
+                deletedAt: null,
+                component: "VEVENT",
+                ...(skipUid ? { uid: { not: skipUid } } : {}),
+                ...(after ? { id: { gt: after } } : {}),
+                ...reachingWindow(window)
+            },
+            select: { id: true, ics: true },
+            orderBy: { id: "asc" },
+            take: PAGE_SIZE
+        });
+        yield* page;
+        if (page.length < PAGE_SIZE) return;
+        after = page[page.length - 1]!.id;
+    }
+}
 
 /**
  * The busy intervals the events on these calendars make inside a window,
@@ -46,20 +75,9 @@ export async function calendarBusy(
         select: { id: true }
     });
     if (calendars.length === 0) return [];
-    const rows = await prisma.calendarObject.findMany({
-        where: {
-            calendarId: { in: calendars.map((calendar) => calendar.id) },
-            deletedAt: null,
-            component: "VEVENT",
-            ...reachingWindow(window)
-        },
-        select: { uid: true, ics: true },
-        take: MAX_OBJECTS
-    });
     const self = new Set((options.selfEmails ?? []).map((email) => email.toLowerCase()));
     const occurrences: engine.Occurrence[] = [];
-    for (const row of rows) {
-        if (options.skipUid && row.uid === options.skipUid) continue;
+    for await (const row of objectsReaching(calendars.map((calendar) => calendar.id), window, options.skipUid)) {
         const item = tryItemOf(row.ics);
         if (!item) continue;
         try {
@@ -79,15 +97,6 @@ export async function calendarBusy(
     return engine.busyFromOccurrences(occurrences);
 }
 
-/** Every address somebody answers invitations at, lowercased. */
-async function addressesOfPerson(userId: string, primary: string): Promise<string[]> {
-    const extra = await prisma.userEmail.findMany({
-        where: { userId, verifiedAt: { not: null } },
-        select: { email: true }
-    });
-    return [...new Set([primary, ...extra.map((row) => row.email)].map((email) => email.toLowerCase()).filter(Boolean))];
-}
-
 /** One person's busy time: the calendars they own, rooms and birthdays aside. */
 export async function personBusy(
     person: { id: string; email: string },
@@ -99,7 +108,7 @@ export async function personBusy(
             where: { ownerId: person.id, trashedAt: null, transparent: false, kind: { in: ["local", "remote"] } },
             select: { id: true }
         }),
-        addressesOfPerson(person.id, person.email)
+        verifiedAddresses(person.id, person.email)
     ]);
     return engine.mergeBusy(
         await calendarBusy(
@@ -141,23 +150,16 @@ export function awayIntervals(
 
 /**
  * Which of these accounts the reader may look up: the ones the directory would
- * let them pick, and themselves. Asked of the host's people search - the one
- * rule every picker uses - by each account's own address, so nothing here
- * re-derives who reaches whom.
+ * let them pick, and themselves. Asked of the host by id, in one question, by
+ * the rule every picker uses - so nothing here re-derives who reaches whom.
  */
 export async function reachablePeople(
     actor: SessionUser,
     people: readonly { id: string; email: string }[]
 ): Promise<Set<string>> {
-    const allowed = new Set<string>();
-    for (const person of people) {
-        if (person.id === actor.id) {
-            allowed.add(person.id);
-            continue;
-        }
-        const found = await host.calendarHost.searchPeople({ id: actor.id, isAdmin: actor.isAdmin }, person.email);
-        if (found.some((candidate) => candidate.id === person.id)) allowed.add(person.id);
-    }
+    const others = people.map((person) => person.id).filter((id) => id !== actor.id);
+    const allowed = new Set(others.length > 0 ? await host.calendarHost.peopleInReach({ id: actor.id, isAdmin: actor.isAdmin }, others) : []);
+    if (people.some((person) => person.id === actor.id)) allowed.add(actor.id);
     return allowed;
 }
 

@@ -19,9 +19,9 @@ import { host } from "@polaris/app-host";
 import { CalendarRefusal } from "./errors";
 import { requireWritableCalendar, type SessionUser } from "./access";
 import { calendarT, calendarTFor, calendarTIn, localeOf } from "./i18n";
-import { callerAddress, mayMailOutside, newLinkToken, throttle } from "./scheduling-guard";
 import { VOTES, type ProposalInput, type Vote } from "./scheduling-schemas";
 import type { ProposalSummary, ProposalView, VotePageView } from "./scheduling-wire";
+import { callerAddress, mayMailOutside, newLinkToken, throttle } from "./scheduling-guard";
 
 /** Open proposals one person may keep. */
 const MAX_OPEN = 50;
@@ -314,11 +314,19 @@ export async function chooseDate(
             }))
         })
     );
-    const objectId = await writeItem(calendar.id, null, item, { actor: user, floatingZone: zone });
-    await prisma.calendarProposal.update({
-        where: { id: row.id },
-        data: { status: "closed", objectId, calendarId: calendar.id }
+    const claimed = await prisma.calendarProposal.updateMany({
+        where: { id: row.id, status: "open" },
+        data: { status: "closed", calendarId: calendar.id }
     });
+    if (claimed.count === 0) throw new CalendarRefusal(t("proposals.closed"));
+    let objectId: string;
+    try {
+        objectId = await writeItem(calendar.id, null, item, { actor: user, floatingZone: zone });
+    } catch (caught) {
+        await prisma.calendarProposal.update({ where: { id: row.id }, data: { status: "open", calendarId: row.calendarId } });
+        throw caught;
+    }
+    await prisma.calendarProposal.update({ where: { id: row.id }, data: { objectId } });
     return { objectId };
 }
 

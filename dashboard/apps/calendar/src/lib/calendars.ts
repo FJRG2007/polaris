@@ -15,6 +15,7 @@ import { ensurePersonalCalendarFor } from "./personal";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { CalendarRefusal } from "./errors";
+import { forgetReminders } from "./reminders";
 import type { CalendarInput, CalendarPatch } from "./schemas";
 import type { CalendarSummary, DefaultAlarms, ResourceInfo, SourceKind } from "./wire";
 import { reachableCalendars, requireCalendar, reaches, type Reach, type SessionUser } from "./access";
@@ -263,7 +264,7 @@ export async function leaveCalendar(user: SessionUser, calendarId: string): Prom
     const removed = await prisma.calendarShare.deleteMany({ where: { calendarId, userId: user.id } });
     const still = await reachableCalendars(user.id);
     if (removed.count === 0 || still.has(calendarId)) await setDisplay(user, calendarId, { hidden: true });
-    await prisma.calendarReminder.deleteMany({ where: { userId: user.id, object: { calendarId } } });
+    await forgetReminders(calendarId, [user.id]);
 }
 
 /** The zone new events in a calendar are written in: its own, else the reader's. */

@@ -11,6 +11,7 @@ vi.mock("@polaris/db", async () => (await import("./fixtures/scheduling-db")).db
 vi.mock("@polaris/app-host", async () => (await import("../fixtures/fake-host")).hostModule);
 vi.mock("@polaris/auth", () => ({ userHasPermission: async () => false }));
 
+import { db } from "../fixtures/fake-db";
 import * as world from "../fixtures/world";
 import { scheduling } from "./fixtures/scheduling-db";
 import { addUser, fake } from "../fixtures/fake-host";
@@ -115,5 +116,31 @@ describe("meeting proposals", () => {
     it("keeps someone else from opening or choosing on a proposal that is not theirs", async () => {
         const made = await create();
         await expect(proposals.proposal(bob as never, made.id)).rejects.toThrow(world.en("proposals.notFound"));
+    });
+
+    it("writes one event when the same date is chosen twice at once", async () => {
+        const made = await create();
+        const choice = { proposalId: made.id, dateId: made.dates[0]!.id, calendarId: calendar };
+        const answers = await Promise.allSettled([proposals.chooseDate(alice as never, choice), proposals.chooseDate(alice as never, choice)]);
+        expect(answers.map((answer) => answer.status).sort()).toEqual(["fulfilled", "rejected"]);
+        expect(answers.find((answer) => answer.status === "rejected")).toMatchObject({ reason: { message: world.en("proposals.closed") } });
+        expect(world.objectsIn(calendar)).toHaveLength(1);
+    });
+
+    it("opens the proposal again when the chosen event could not be written", async () => {
+        const made = await create();
+        const objects = db.prisma.calendarObject as unknown as { create: (args: unknown) => Promise<unknown> };
+        const original = objects.create;
+        objects.create = async () => {
+            throw new Error("database down");
+        };
+        try {
+            await expect(proposals.chooseDate(alice as never, { proposalId: made.id, dateId: made.dates[0]!.id, calendarId: calendar })).rejects.toThrow("database down");
+        } finally {
+            objects.create = original;
+        }
+        const view = await proposals.proposal(alice as never, made.id);
+        expect(view.status).toBe("open");
+        expect(view.objectId).toBeNull();
     });
 });

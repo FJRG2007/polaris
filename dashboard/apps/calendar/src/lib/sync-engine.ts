@@ -85,6 +85,32 @@ export function fetcherFor(allowPrivate: boolean): sync.Fetcher {
     return (url, init) => host.calendarHost.calendarFetch(url, init, { allowPrivate });
 }
 
+/**
+ * Seal a feed's address like a CalDAV password, keeping only its masked form in
+ * the clear. Its calendar is renamed off the address first, so a pass between
+ * the two finds it under the id the provider lists.
+ */
+export async function sealFeedAddress(sourceId: string, address: string): Promise<void> {
+    await prisma.calendar.updateMany({
+        where: { sourceId, remoteId: { not: sync.FEED_REMOTE_ID } },
+        data: { remoteId: sync.FEED_REMOTE_ID }
+    });
+    const sealed = await host.calendarHost.sealCalendarSecret(sync.feedUrl(address));
+    await prisma.calendarSource.update({ where: { id: sourceId }, data: { ...sealed, url: sync.maskFeedAddress(address) } });
+}
+
+/**
+ * The address a feed is read from, or null when it needs entering again. One
+ * subscribed before addresses were sealed holds it in the clear, and is sealed
+ * the first time it is read.
+ */
+export async function feedAddressOf(source: Pick<SourceRow, "id" | "url" | "encryptedSecret" | "secretNonce" | "secretKeyId">): Promise<string | null> {
+    if (source.encryptedSecret) return host.calendarHost.openCalendarSecret(source);
+    if (!source.url) return null;
+    await sealFeedAddress(source.id, source.url);
+    return sync.feedUrl(source.url);
+}
+
 /** The protocol client for one source. */
 export async function providerFor(source: SourceRow): Promise<sync.CalendarProvider> {
     const fetcher = fetcherFor(await ownerMayReachLan(source.userId));
@@ -113,9 +139,11 @@ export async function providerFor(source: SourceRow): Promise<sync.CalendarProvi
             return sync.createCalDavProvider({ serverUrl: source.url, username: source.username, password, fetcher });
         }
         default: {
+            const address = await feedAddressOf(source);
+            if (!address) throw new sync.SyncAuthError("The address needs entering again", null);
             const held = await prisma.calendar.findFirst({ where: { sourceId: source.id }, select: { syncToken: true, ctag: true } });
             const validators = held ? { etag: held.syncToken, lastModified: held.ctag } : undefined;
-            return sync.createIcsProvider({ url: source.url, fetcher, name: source.label, validators });
+            return sync.createIcsProvider({ url: address, fetcher, name: source.label, validators });
         }
     }
 }
@@ -257,7 +285,13 @@ export async function pullCalendar(
             const pending = await prisma.calendarObject.findUnique({ where: { id: row.id }, select: { pendingPush: true } });
             if (pending?.pendingPush === "put") continue;
             await prisma.calendarObject.update({ where: { id: row.id }, data: { deletedAt: new Date(), pendingPush: "" } });
-            await (await import("./reminders")).planObject(row.id, null);
+            await (await import("./effects")).afterObjectChange({
+                objectId: row.id,
+                calendarId: row.calendarId,
+                before: tryItemOf(row.ics),
+                after: null,
+                context: { actor: null, floatingZone: zone, fromProvider: true }
+            });
             removed += 1;
         }
     }
@@ -348,22 +382,67 @@ export async function pushChange(objectId: string, sourceId: string, removed: bo
     );
 }
 
-/** Send one pending change now. */
-export async function pushNow(objectId: string, sourceId: string): Promise<void> {
+/** The push running per object: the next one for the same row waits for it, so
+ *  two never send one row with the same `If-Match`. */
+const pushing = new Map<string, Promise<void>>();
+
+/** Sends one push makes at most while the row keeps changing under it. */
+const PUSH_ATTEMPTS = 3;
+
+/** Send one pending change now, after any push of the same object still running. */
+export function pushNow(objectId: string, sourceId: string): Promise<void> {
+    const previous = pushing.get(objectId) ?? Promise.resolve();
+    const run = previous.then(() => pushPending(objectId, sourceId));
+    const settled = run.catch(() => undefined);
+    pushing.set(objectId, settled);
+    void settled.then(() => {
+        if (pushing.get(objectId) === settled) pushing.delete(objectId);
+    });
+    return run;
+}
+
+async function pushPending(objectId: string, sourceId: string): Promise<void> {
+    for (let attempt = 0; attempt < PUSH_ATTEMPTS; attempt += 1) {
+        if (await pushOnce(objectId, sourceId)) return;
+    }
+}
+
+type PushedRow = { id: string; calendarId: string; ics: string; pendingPush: string };
+
+/**
+ * Record what the provider now holds. The mark is cleared only while the row is
+ * still the version that was sent; one changed meanwhile keeps its mark with
+ * the new href and etag, so the next send replaces it with `If-Match` on them.
+ * Answers whether the row was still that version.
+ */
+async function settlePush(row: PushedRow, held: { href: string; etag: string }, extra: { conflictIcs?: null } = {}): Promise<boolean> {
+    const settled = await prisma.calendarObject.updateMany({
+        where: { id: row.id, calendarId: row.calendarId, ics: row.ics, pendingPush: row.pendingPush },
+        data: { ...held, ...extra, pendingPush: "" }
+    });
+    if (settled.count > 0) return true;
+    await prisma.calendarObject.updateMany({
+        where: { id: row.id, calendarId: row.calendarId, pendingPush: { not: "" } },
+        data: held
+    });
+    return false;
+}
+
+/** One send of a pending change. Answers whether nothing is left to send. */
+async function pushOnce(objectId: string, sourceId: string): Promise<boolean> {
     const row = await prisma.calendarObject.findUnique({
         where: { id: objectId },
         select: { ...STORED, pendingPush: true, calendar: { select: { id: true, remoteId: true, timezone: true } } }
     });
-    if (!row || !row.pendingPush) return;
+    if (!row || !row.pendingPush) return true;
     const source = await prisma.calendarSource.findUnique({ where: { id: sourceId }, select: SOURCE_COLUMNS });
-    if (!source) return;
+    if (!source) return true;
     const provider = await providerFor(source);
     const target = { remoteId: row.calendar.remoteId };
     try {
         if (row.pendingPush === "delete") {
             if (row.href) await provider.remove(target, { href: row.href, etag: row.etag || null });
-            await prisma.calendarObject.update({ where: { id: row.id }, data: { pendingPush: "", href: "", etag: "" } });
-            return;
+            return await settlePush(row, { href: "", etag: "" });
         }
         const written = await provider.put(target, {
             href: row.href || null,
@@ -371,14 +450,10 @@ export async function pushNow(objectId: string, sourceId: string): Promise<void>
             ics: row.ics,
             uid: row.uid
         });
-        await prisma.calendarObject.update({
-            where: { id: row.id },
-            data: { pendingPush: "", href: written.href, etag: written.etag, conflictIcs: null }
-        });
+        return await settlePush(row, { href: written.href, etag: written.etag }, { conflictIcs: null });
     } catch (caught) {
         if (caught instanceof sync.SyncNotFoundError && row.pendingPush === "delete") {
-            await prisma.calendarObject.update({ where: { id: row.id }, data: { pendingPush: "", href: "", etag: "" } });
-            return;
+            return await settlePush(row, { href: "", etag: "" });
         }
         if (caught instanceof sync.SyncConflictError) {
             // It changed there first. The pull that follows stores the
@@ -390,7 +465,7 @@ export async function pushNow(objectId: string, sourceId: string): Promise<void>
                 ctag: "",
                 timezone: row.calendar.timezone
             });
-            return;
+            return true;
         }
         if (caught instanceof sync.SyncAuthError) await recordFailure(source, caught);
         throw caught;

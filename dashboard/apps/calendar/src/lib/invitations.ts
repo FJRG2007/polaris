@@ -29,6 +29,7 @@ import { tryItemOf, writeItem, type StoredObject } from "./objects";
 import { resourceIdOf } from "./resource-address";
 import { loadPreferences } from "./preferences-store";
 import { ensurePersonalCalendarFor } from "./personal";
+import { verifiedAddresses } from "./occurrences";
 import { mayMailOutside } from "./scheduling-guard";
 
 type EventItem = Extract<engine.CalendarItem, { component: "VEVENT" }>;
@@ -122,13 +123,8 @@ export async function afterChange(change: ObjectChange, ownerId: string): Promis
 
 /** The addresses an owner organizes events as. */
 export async function ownerAddresses(userId: string): Promise<Set<string>> {
-    const [person, extra] = await Promise.all([
-        host.calendarHost.peopleByIds([userId]),
-        prisma.userEmail.findMany({ where: { userId, verifiedAt: { not: null } }, select: { email: true } })
-    ]);
-    return new Set(
-        [person[0]?.email ?? "", ...extra.map((row) => row.email)].map((email) => email.toLowerCase()).filter(Boolean)
-    );
+    const [person] = await host.calendarHost.peopleByIds([userId]);
+    return new Set(await verifiedAddresses(userId, person?.email ?? ""));
 }
 
 /** Send (or deliver) the event to these invitees. */

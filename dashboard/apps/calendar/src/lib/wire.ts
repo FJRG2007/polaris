@@ -124,6 +124,8 @@ export interface RangeView {
     readonly tasks: readonly TaskItemView[];
     /** Objects whose rule could not be expanded, named so the screen can say so. */
     readonly unreadable: number;
+    /** More objects reach the window than are read for one; some are not drawn. */
+    readonly truncated: boolean;
 }
 
 /** One invitation as the organizer tracks it. */
@@ -147,6 +149,8 @@ export interface EventDetail {
     readonly event: CalendarEvent;
     readonly series: CalendarEvent | null;
     readonly writable: boolean;
+    /** Whether the reader may answer it here: not on a read-only calendar. */
+    readonly answerable: boolean;
     readonly isOrganizer: boolean;
     /** The reader's own addresses, to find themselves among the attendees. */
     readonly myEmails: readonly string[];

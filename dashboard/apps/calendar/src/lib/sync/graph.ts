@@ -26,6 +26,13 @@ const GRAPH_ORIGIN = "https://graph.microsoft.com";
 /** How far back and ahead the delta window reaches by default. */
 export const DEFAULT_WINDOW = { pastDays: 365, futureDays: 730 };
 
+/**
+ * How long one delta window is followed before a fresh one is opened. Its span
+ * is fixed when it is opened, so without this the far end stops moving and the
+ * events that come into reach past it are never seen.
+ */
+export const WINDOW_REOPEN_DAYS = 7;
+
 const PREFER = "odata.maxpagesize=200, outlook.timezone=\"UTC\"";
 
 /**
@@ -613,7 +620,10 @@ export function createGraphProvider(input: {
             const now = Date.now();
             const start = new Date(now - window.pastDays * 86_400_000).toISOString();
             const end = new Date(now + window.futureDays * 86_400_000).toISOString();
-            let url: string | undefined = state.syncToken
+            // The ctag holds when the window being followed was opened.
+            const opened = Date.parse(state.ctag);
+            const following = Boolean(state.syncToken) && Number.isFinite(opened) && now - opened < WINDOW_REOPEN_DAYS * 86_400_000;
+            let url: string | undefined = following
                 ? state.syncToken
                 : `${GRAPH_API}/me/calendars/${encodeURIComponent(state.remoteId)}/calendarView/delta?startDateTime=${start}&endDateTime=${end}`;
             const items: GraphEventJson[] = [];
@@ -649,6 +659,19 @@ export function createGraphProvider(input: {
                 const object = seriesToObject(item);
                 if (object) changed.push(object);
             }
+            // A delta reports an event moved out of its window as removed; one
+            // held here is read back, and only one that is gone leaves.
+            for (const id of removed) {
+                if (series.has(id) || !state.known.has(id)) continue;
+                const event = await readSeries(id);
+                if (!event || event.isCancelled) continue;
+                if (event.type === "seriesMaster") series.add(id);
+                else if (event.type !== "occurrence" && event.type !== "exception") {
+                    const object = seriesToObject(event);
+                    if (object) changed.push(object);
+                }
+                removed.delete(id);
+            }
             for (const id of series) {
                 const master = await readSeries(id);
                 const object = master ? seriesToObject(master) : null;
@@ -657,13 +680,13 @@ export function createGraphProvider(input: {
                     removed.delete(id);
                 } else removed.add(id);
             }
-            const full = !state.syncToken;
+            const full = !following;
             const reported = full ? changed : changed.filter((object) => state.known.get(object.href) !== object.etag);
             return {
                 changed: reported,
                 removed: full ? [] : [...removed],
                 syncToken: deltaLink || state.syncToken,
-                ctag: "",
+                ctag: full ? new Date(now).toISOString() : state.ctag,
                 full,
                 ...(full ? { window: { start: new Date(start), end: new Date(end) } } : {})
             };

@@ -31,7 +31,8 @@ import {
 import { sendAuthEmail } from "@/lib/auth-mail";
 import { configuredRequest } from "@/lib/safe-fetch";
 import type { EmailMessage } from "@/lib/mail/types";
-import { searchAccounts, type AccountCandidate } from "@/lib/rich-text/mention-service";
+import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
+import { accountsByIdInReach, searchAccounts, type AccountCandidate } from "@/lib/rich-text/mention-service";
 
 /** The providers a calendar can be linked from through a linked account. */
 export type CalendarLinkProvider = "google" | "microsoft";
@@ -230,6 +231,15 @@ export async function searchPeople(
     return searchAccounts(actor, query);
 }
 
+/** Which of these accounts this one may pick, by the same reach as the search
+ *  above, asked by id in one question. */
+export async function peopleInReach(
+    actor: { id: string; isAdmin: boolean },
+    ids: readonly string[]
+): Promise<string[]> {
+    return (await accountsByIdInReach(actor, ids)).map((candidate) => candidate.id);
+}
+
 /** One team, as a share target. */
 export interface CalendarTeam {
     readonly id: string;
@@ -256,6 +266,12 @@ export async function teamMemberIds(teamId: string): Promise<string[]> {
 export async function teamIdsOf(userId: string): Promise<string[]> {
     const rows = await prisma.teamMember.findMany({ where: { userId }, select: { teamId: true } });
     return rows.map((row) => row.teamId);
+}
+
+/** The zone an account's dates are drawn in: the one it chose, else the one its
+ *  browser last reported, else "auto". */
+export async function displayTimeZone(userId: string): Promise<string> {
+    return (await resolveDisplayPreferencesFor(userId)).timeZone;
 }
 
 /**

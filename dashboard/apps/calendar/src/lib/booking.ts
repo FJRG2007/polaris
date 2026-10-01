@@ -7,22 +7,30 @@
  * cap, buffers, the busy time of the booking calendar and the conflict
  * calendars, and the other bookings - and a slot they pick is held for them
  * until they confirm their address from the email this sends. A hold nobody
- * confirms is dropped after an hour by `sweepStaleBookings`.
+ * confirms lets go of its slot after fifteen minutes and is dropped by
+ * `sweepStaleBookings`; one visitor keeps at most three open on a page.
  *
  * Confirming checks the slot again (somebody may have taken it since), then
  * writes the event into the booking calendar through `writeItem` with the
  * visitor as its attendee - so the ordinary invitation path mails them the
  * event - and tells the owner. The visitor's manage link cancels or moves it.
  *
+ * Once written, the booking follows its event (`followEvent`): deleted,
+ * cancelled or declined by the owner, the booking is cancelled and the visitor
+ * told; moved, the booking moves with it.
+ *
  * Server-only.
  */
 
 import * as engine from "../engine";
 import { prisma } from "@polaris/db";
+import { createHash } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { calendarBusy } from "./freebusy";
 import { CalendarRefusal } from "./errors";
 import type { SessionUser } from "./access";
+import type { ObjectChange } from "./effects";
+import { DEFAULT_LOCALE, isLocale } from "@polaris/core";
 import { readInstanceSettings } from "./instance-settings";
 import { calendarT, calendarTFor, calendarTIn, localeOf } from "./i18n";
 import { callerAddress, newLinkToken, throttle } from "./scheduling-guard";
@@ -42,7 +50,11 @@ const HOUR = 3_600_000;
 const DAY = 86_400_000;
 
 /** How long an unconfirmed booking holds its slot. */
-export const HOLD_MS = HOUR;
+export const HOLD_MS = 15 * 60_000;
+
+/** Unconfirmed holds one visitor - by address, and by email - may keep open on
+ *  one page at once. */
+export const MAX_OPEN_HOLDS = 3;
 
 /** Pages one person may keep. */
 const MAX_PAGES = 50;
@@ -337,7 +349,7 @@ function holdingWhere(now: Date) {
     return { OR: [{ status: "confirmed" }, { status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } }] };
 }
 
-type SlotIgnore = { bookingId?: string; uid?: string; holdsBefore?: Date };
+type SlotIgnore = { bookingId?: string; uid?: string; holdsBefore?: Date; noticeFrom?: Date };
 
 type Client = Pick<typeof prisma, "calendarBooking" | "calendarBookingPage">;
 
@@ -345,7 +357,8 @@ type Client = Pick<typeof prisma, "calendarBooking" | "calendarBookingPage">;
  * The slots a page offers inside a window. `ignore` leaves out one booking and
  * its event - the one being confirmed or moved, which must not block itself;
  * `holdsBefore` counts only holds made before that instant, so of two visitors
- * who raced for one slot the first to ask keeps it.
+ * who raced for one slot the first to ask keeps it; `noticeFrom` counts the
+ * minimum notice from that instant rather than from now.
  */
 async function slotsFor(
     page: PageRow,
@@ -422,12 +435,26 @@ function slotsAmong(
     });
 }
 
+/** The calendars among these that are not in the trash: a page whose booking
+ *  calendar is there takes no bookings. */
+async function liveCalendarIds(ids: readonly string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await prisma.calendar.findMany({ where: { id: { in: [...new Set(ids)] }, trashedAt: null }, select: { id: true } });
+    return new Set(rows.map((row) => row.id));
+}
+
+/** Whether a page takes bookings: switched on, its calendar not in the trash,
+ *  and booking pages on for the whole instance. */
+async function takesBookings(page: PageRow): Promise<boolean> {
+    if (!page.enabled || !(await liveCalendarIds([page.calendarId])).has(page.calendarId)) return false;
+    return bookingAllowed();
+}
+
 async function openPage(slug: string): Promise<PageRow | null> {
-    if (!slugSchema.safeParse(slug).success) return null;
-    const row = await prisma.calendarBookingPage.findUnique({ where: { slug } });
-    if (!row || !row.enabled) return null;
-    // Switched off for the whole instance: every public surface finds no page.
-    return (await bookingAllowed()) ? row : null;
+    const parsed = slugSchema.safeParse(slug);
+    if (!parsed.success) return null;
+    const row = await prisma.calendarBookingPage.findUnique({ where: { slug: parsed.data } });
+    return row && (await takesBookings(row)) ? row : null;
 }
 
 /** A page as a visitor sees it, or null when there is none or it is off. */
@@ -463,7 +490,7 @@ async function claimSlot<T>(
         // Writing the page's row locks it until the transaction ends.
         const locked = await tx.calendarBookingPage.updateMany({ where: { id: page.id }, data: { updatedAt: new Date() } });
         if (locked.count === 0) return null;
-        const slots = slotsAmong(page, window, now, busy, await holdsFor(tx, page, window, now, ignore));
+        const slots = slotsAmong(page, window, ignore.noticeFrom ?? now, busy, await holdsFor(tx, page, window, now, ignore));
         if (!slots.some((slot) => slot.start.getTime() === start.getTime())) return null;
         return write(tx);
     });
@@ -485,6 +512,24 @@ async function mail(to: string, subject: string, lines: readonly string[]): Prom
 
 // ---------------------------------------------------------------- the visitor's side
 
+/** Who asked for a hold, as the hold keeps it: a hash of the page and the
+ *  caller's address. Blank when the address cannot be read, so visitors behind
+ *  one unreadable address do not share three holds between them. */
+function requesterOf(pageId: string, address: string): string {
+    if (address === "unknown") return "";
+    return createHash("sha256").update(`${pageId}:${address}`).digest("hex");
+}
+
+/** Refuse a new hold when this visitor already keeps `MAX_OPEN_HOLDS` open on
+ *  the page, counted by their address and by their email. Expired holds do not
+ *  count. Run inside the page's lock, so two requests at once cannot both pass. */
+async function refuseExcessHolds(client: Client, pageId: string, requester: string, email: string, now: Date): Promise<void> {
+    const open = { pageId, status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } };
+    const byRequester = requester ? await client.calendarBooking.count({ where: { ...open, requester } }) : 0;
+    const byEmail = await client.calendarBooking.count({ where: { ...open, email } });
+    if (byRequester >= MAX_OPEN_HOLDS || byEmail >= MAX_OPEN_HOLDS) throw new CalendarRefusal((await calendarT())("booking.tooManyHolds"));
+}
+
 /**
  * Hold a slot for a visitor and mail them the link that confirms it. Refused
  * when the slot is no longer offered, the answers do not fit the questions, or
@@ -492,10 +537,11 @@ async function mail(to: string, subject: string, lines: readonly string[]): Prom
  */
 export async function requestBooking(input: BookingRequest, now = new Date()): Promise<{ email: string }> {
     const t = await calendarT();
-    await throttle(`calendar.book:${await callerAddress()}`, 10, HOUR);
-    await throttle(`calendar.book-email:${input.email}`, 5, HOUR);
+    const address = await callerAddress();
+    await throttle(`calendar.book:${address}`, 10, HOUR);
     const page = await openPage(input.slug);
     if (!page) throw new CalendarRefusal(t("booking.pageGone"));
+    await throttle(`calendar.book-email:${input.email}`, 5, HOUR);
     const answers = answersSchemaFor(readQuestions(page.questions)).safeParse(input.answers);
     if (!answers.success) throw new CalendarRefusal(t("booking.validation.answerNeeded"));
     const start = new Date(input.start);
@@ -509,10 +555,13 @@ export async function requestBooking(input: BookingRequest, now = new Date()): P
     });
 
     const stored = { ...answers.data, ...(input.note ? { [NOTE_KEY]: input.note } : {}) };
+    const locale = await host.i18nRequest.getLocale();
+    const requester = requesterOf(page.id, address);
     const booking =
         own ??
-        (await claimSlot(page, start, now, {}, (client) =>
-            client.calendarBooking.create({
+        (await claimSlot(page, start, now, {}, async (client) => {
+            await refuseExcessHolds(client, page.id, requester, input.email, now);
+            return client.calendarBooking.create({
                 data: {
                     pageId: page.id,
                     name: input.name,
@@ -522,14 +571,15 @@ export async function requestBooking(input: BookingRequest, now = new Date()): P
                     start,
                     end,
                     confirmToken: newLinkToken(),
-                    manageToken: newLinkToken()
+                    manageToken: newLinkToken(),
+                    requester,
+                    locale
                 },
                 select: { id: true, confirmToken: true }
-            })
-        ));
+            });
+        }));
     if (!booking) throw new CalendarRefusal(t("booking.slotTaken"));
 
-    const locale = await host.i18nRequest.getLocale();
     const base = await host.domainService.appBaseUrl();
     const sent = await mail(input.email, t("booking.mail.confirmSubject", { title: page.title }), [
         t("booking.mail.confirmIntro", { name: input.name }),
@@ -670,14 +720,21 @@ export async function confirmBooking(
     const page = booking.page;
     if (booking.status === "confirmed") return { status: "confirmed", manageToken: booking.manageToken };
     if (booking.status === "cancelled") return { status: "cancelled", manageToken: null };
-    if (booking.createdAt.getTime() < now.getTime() - HOLD_MS) return { status: "expired", manageToken: null };
-    if (!page.enabled || !(await bookingAllowed())) throw new CalendarRefusal(t("booking.pageGone"));
+    if (booking.createdAt.getTime() < now.getTime() - HOLD_MS || booking.start.getTime() <= now.getTime()) {
+        return { status: "expired", manageToken: null };
+    }
+    if (!(await takesBookings(page))) throw new CalendarRefusal(t("booking.pageGone"));
 
-    const claimed = await claimSlot(page, booking.start, now, { bookingId: booking.id, holdsBefore: booking.createdAt }, (client) =>
-        client.calendarBooking.updateMany({
-            where: { id: booking.id, status: "pending" },
-            data: { status: "confirmed" }
-        })
+    const claimed = await claimSlot(
+        page,
+        booking.start,
+        now,
+        { bookingId: booking.id, holdsBefore: booking.createdAt, noticeFrom: booking.createdAt },
+        (client) =>
+            client.calendarBooking.updateMany({
+                where: { id: booking.id, status: "pending" },
+                data: { status: "confirmed" }
+            })
     );
     if (!claimed) {
         await prisma.calendarBooking.updateMany({ where: { id: booking.id, status: "pending" }, data: { status: "cancelled" } });
@@ -758,7 +815,7 @@ export async function rescheduleBooking(manageToken: string, startIso: string, n
     const t = await calendarT();
     const booking = await managedRow(manageToken, now);
     const page = booking.page;
-    if (!page.enabled || !(await bookingAllowed())) throw new CalendarRefusal(t("booking.pageGone"));
+    if (!(await takesBookings(page))) throw new CalendarRefusal(t("booking.pageGone"));
     const row = await eventRow(booking.objectId);
     const start = new Date(startIso);
     const end = new Date(start.getTime() + page.durationMinutes * 60_000);
@@ -798,17 +855,80 @@ export async function cancelBookingAsOwner(user: SessionUser, bookingId: string)
     await cancelConfirmed(booking, true);
 }
 
-/** Somebody's public booking pages, for their overview page. */
+/** Tell a visitor their booking was cancelled from the owner's side, in the
+ *  language they booked in, with the page's link when it still takes bookings. */
+async function mailCancelled(booking: BookingRow): Promise<void> {
+    const page = booking.page;
+    const locale = isLocale(booking.locale) ? booking.locale : DEFAULT_LOCALE;
+    const t = calendarTIn(locale);
+    const again = (await takesBookings(page)) ? [`${await host.domainService.appBaseUrl()}/cal/book/${page.slug}`] : [];
+    await mail(booking.email, t("booking.mail.cancelledSubject", { title: page.title }), [
+        t("booking.mail.cancelledIntro", { name: booking.name }),
+        "",
+        page.title,
+        whenLine(booking.start, booking.end, booking.timezone || page.timezone, locale),
+        ...(again.length > 0 ? ["", t("booking.mail.bookAgain"), ...again] : [])
+    ]);
+}
+
+/** Whether the owner of a page declined this event on their own copy. */
+async function declinedByOwner(ownerId: string, event: engine.CalendarEvent): Promise<boolean> {
+    const invitations = await import("./invitations");
+    const owner = await invitations.ownerAddresses(ownerId);
+    return event.attendees.some((attendee) => owner.has(attendee.email.toLowerCase()) && attendee.partstat === "DECLINED");
+}
+
+/**
+ * Keep the bookings an event was written for in step with it, whichever way it
+ * changed - an edit here, the trash, or a pull from the owner's provider. An
+ * event deleted, cancelled or declined by the owner cancels its booking, which
+ * frees the slot and tells the visitor; an event moved moves its booking.
+ * Bookings that already took place are left as they were.
+ */
+export async function followEvent(change: ObjectChange, now = new Date()): Promise<void> {
+    if (change.context.moving) return;
+    const bookings = await prisma.calendarBooking.findMany({
+        where: { objectId: change.objectId, status: "confirmed", end: { gt: now } },
+        include: { page: true }
+    });
+    for (const booking of bookings) {
+        const item = change.after;
+        const event = item?.component === "VEVENT" ? item.master : null;
+        if (item && !event) continue;
+        if (!item || !event || event.status === "CANCELLED" || (await declinedByOwner(booking.page.ownerId, event))) {
+            const cancelled = await prisma.calendarBooking.updateMany({
+                where: { id: booking.id, status: "confirmed" },
+                data: { status: "cancelled" }
+            });
+            if (cancelled.count > 0) await mailCancelled(booking);
+            continue;
+        }
+        const bounds = engine.itemBounds(item, booking.page.timezone);
+        if (bounds.recurring || !bounds.startsAt || !bounds.endsAt) continue;
+        if (bounds.startsAt.getTime() === booking.start.getTime() && bounds.endsAt.getTime() === booking.end.getTime()) continue;
+        await prisma.calendarBooking.updateMany({
+            where: { id: booking.id, status: "confirmed" },
+            data: { start: bounds.startsAt, end: bounds.endsAt }
+        });
+    }
+}
+
+/** Somebody's public booking pages, for their overview page. Null - nobody
+ *  there - unless they have at least one page taking bookings, so the address
+ *  says nothing about an account that publishes none. */
 export async function publicPagesOf(userId: string): Promise<{ ownerName: string; pages: PublicBookingPage[] } | null> {
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return null;
-    const [owner] = await host.calendarHost.peopleByIds([userId]);
-    if (!owner) return null;
-    if (!(await bookingAllowed())) return { ownerName: owner.name, pages: [] };
-    const rows = await prisma.calendarBookingPage.findMany({
-        where: { ownerId: owner.id, visibility: "public", enabled: true },
+    if (!(await bookingAllowed())) return null;
+    const listed = await prisma.calendarBookingPage.findMany({
+        where: { ownerId: userId, visibility: "public", enabled: true },
         orderBy: { title: "asc" },
         take: MAX_PAGES
     });
+    const live = await liveCalendarIds(listed.map((row) => row.calendarId));
+    const rows = listed.filter((row) => live.has(row.calendarId));
+    if (rows.length === 0) return null;
+    const [owner] = await host.calendarHost.peopleByIds([userId]);
+    if (!owner) return null;
     return {
         ownerName: owner.name,
         pages: rows.map((row) => ({

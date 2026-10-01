@@ -53,6 +53,7 @@ const detail: EventDetail = {
     event,
     series: event,
     writable: true,
+    answerable: true,
     isOrganizer: true,
     myEmails: [],
     invitations: [],

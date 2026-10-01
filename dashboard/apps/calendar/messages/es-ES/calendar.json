@@ -198,6 +198,7 @@
         "task": "Tarea {title}, vence {when}",
         "taskDone": "Tarea hecha {title}, vence {when}",
         "tentative": "quizá",
+        "truncated": "No caben todos los eventos en esta vista. Prueba una más corta.",
         "unreadable": "{count, plural, one {# evento no se ha podido leer y no se muestra.} other {# eventos no se han podido leer y no se muestran.}}",
         "week": "Sem"
     },

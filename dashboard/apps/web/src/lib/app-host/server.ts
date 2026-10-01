@@ -17,21 +17,21 @@
  * answers.
  */
 
-import { provideAppHost } from "@polaris/app-host";
+import * as mime from "@/lib/mime";
+import { portKey } from "@/lib/apps/port-key";
 import * as appsCatalog from "@/lib/apps/catalog";
-import * as appsInstallDefaults from "@/lib/apps/install-defaults";
-import * as appsPortAdvice from "@/lib/apps/port-advice";
+import * as hostAddress from "@/lib/host-address";
+import { provideAppHost } from "@polaris/app-host";
+import type { LiveGrant } from "@/lib/access/grants";
+import * as metricsShared from "@/lib/metrics-shared";
 import * as appsPortBlock from "@/lib/apps/port-block";
 import * as backupsSchemas from "@/lib/backups/schemas";
-import * as backupsSourcesTypes from "@/lib/backups/sources/types";
-import * as hostAddress from "@/lib/host-address";
-import * as metricsShared from "@/lib/metrics-shared";
-import * as mime from "@/lib/mime";
 import { hostPortForApp } from "@/lib/deploy/host-port";
-import { portKey } from "@/lib/apps/port-key";
+import * as appsPortAdvice from "@/lib/apps/port-advice";
+import * as appsInstallDefaults from "@/lib/apps/install-defaults";
+import * as backupsSourcesTypes from "@/lib/backups/sources/types";
 import { readInstallConfig } from "@/lib/apps/install-config-value";
 import type { InstalledSlotHost } from "@/components/app-extensions/installed-client";
-import type { LiveGrant } from "@/lib/access/grants";
 import type {
     AppExtension,
     AppJob,
@@ -39,8 +39,8 @@ import type {
     ChatGameLink,
     RelayedChannelMessage
 } from "@/lib/app-extensions/types";
-import type { LinkableConversations } from "@/lib/chat/game-links";
 import type { InstallConfig } from "@/lib/apps/install-config";
+import type { LinkableConversations } from "@/lib/chat/game-links";
 import type { InstallSeed, InstalledAppSetting } from "@/lib/apps/install-service";
 import type { InstallAccessEntry, InstallAccessView } from "@/lib/apps/install-sharing";
 import type {
@@ -56,8 +56,8 @@ import type {
     SourceResource,
     StagedArtifact
 } from "@/lib/backups/sources/types";
-import type { TargetRow } from "@/lib/deploy/runtime";
 import type { SessionUser } from "@/lib/session";
+import type { TargetRow } from "@/lib/deploy/runtime";
 import type {
     CalendarLink,
     CalendarPerson,
@@ -248,9 +248,11 @@ export const serverHost = {
         calendarFetch: later(load.calendarHost, "calendarFetch"),
         calendarLinkUrl: later(load.calendarHost, "calendarLinkUrl"),
         createMeetingLink: later(load.calendarHost, "createMeetingLink"),
+        displayTimeZone: later(load.calendarHost, "displayTimeZone"),
         listCalendarLinks: later(load.calendarHost, "listCalendarLinks"),
         openCalendarSecret: later(load.calendarHost, "openCalendarSecret"),
         peopleByIds: later(load.calendarHost, "peopleByIds"),
+        peopleInReach: later(load.calendarHost, "peopleInReach"),
         scheduleTask: later(load.calendarHost, "scheduleTask"),
         sealCalendarSecret: later(load.calendarHost, "sealCalendarSecret"),
         searchPeople: later(load.calendarHost, "searchPeople"),

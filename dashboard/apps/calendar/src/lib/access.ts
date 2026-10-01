@@ -194,6 +194,13 @@ export function todoClassification(todo: engine.CalendarTodo): engine.Classifica
     return value === "PUBLIC" || value === "CONFIDENTIAL" ? value : "PRIVATE";
 }
 
+/** Whether a reader below `write` may see this item's details: a public event
+ *  or a public task. */
+export function publicItem(item: engine.CalendarItem): boolean {
+    if (item.component === "VTODO") return todoClassification(item.todo) === "PUBLIC";
+    return (item.master ?? item.overrides[0])?.classification === "PUBLIC";
+}
+
 /**
  * An item as a reader below `write` may see it: public events in full, every
  * other event as a busy block, a task only when it is public. Null when nothing

@@ -729,6 +729,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             {t("grid.unreadable", { count: rangeRead.data.unreadable })}
                         </p>
                     ) : null}
+                    {rangeRead.data?.truncated ? (
+                        <p role="status" className="border-b border-border px-3 py-1 text-xs text-muted-foreground">
+                            {t("grid.truncated")}
+                        </p>
+                    ) : null}
                     {calendars && calendars.length === 0 ? (
                         <EmptyState
                             className="m-4"
