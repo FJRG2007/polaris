@@ -29,7 +29,7 @@
  */
 
 import * as auto from "./automation-kinds";
-import type { DeviceAction } from "./device-kinds";
+import type { ClimateCommand, DeviceAction } from "./device-kinds";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { wallClock, zonedInstant } from "@polaris/core";
 
@@ -91,6 +91,9 @@ export interface Observation {
     readonly doorSince: Date;
     readonly reading: string;
     readonly readingSince: Date;
+    /** An air conditioner's mode, or empty for anything else. */
+    readonly mode: string;
+    readonly modeSince: Date;
     /** Counts every change, so each one has a name of its own even when two
      *  land in the same millisecond - and so the swap has one field to compare. */
     readonly version: number;
@@ -104,6 +107,8 @@ export interface DeviceReadout {
     readonly state: string;
     readonly door: string;
     readonly reading: string;
+    /** An air conditioner's mode, or empty for anything else. */
+    readonly mode: string;
     readonly online: boolean;
 }
 
@@ -159,7 +164,9 @@ export interface EnginePorts {
             installedAppId: string,
             deviceId: string,
             action: DeviceAction,
-            by: { ownerId: string; automationId: string; automationName: string }
+            by: { ownerId: string; automationId: string; automationName: string },
+            /** What to set, for a step that sets something. */
+            setting?: ClimateCommand
         ): Promise<void>;
     };
     /** Whether the owner still holds a right: "run" is keeping automations at
@@ -188,11 +195,12 @@ function iso(date: Date): string {
 
 /** The value of one attribute, as triggers and conditions compare it. */
 function attributeOf(
-    source: { state: string; door: string; reading: string },
+    source: { state: string; door: string; reading: string; mode: string },
     attribute: auto.AutomationAttribute
 ): string {
     if (attribute === "door") return source.door;
     if (attribute === "reading") return source.reading;
+    if (attribute === "mode") return source.mode;
     return source.state;
 }
 
@@ -339,6 +347,8 @@ export function createEngine(ports: EnginePorts) {
                 doorSince: now,
                 reading: device.reading,
                 readingSince: now,
+                mode: device.mode,
+                modeSince: now,
                 version: 0
             });
             return [];
@@ -351,6 +361,8 @@ export function createEngine(ports: EnginePorts) {
             doorSince: previous.doorSince,
             reading: previous.reading,
             readingSince: previous.readingSince,
+            mode: previous.mode,
+            modeSince: previous.modeSince,
             version: previous.version + 1
         };
         const version = next.version;
@@ -389,6 +401,20 @@ export function createEngine(ports: EnginePorts) {
             });
             next.reading = device.reading;
             next.readingSince = now;
+        }
+        // A unit that is off reports no mode worth reacting to; its last one is
+        // kept, so switching it on in the same mode is not a change of mode.
+        if (device.mode && device.mode !== previous.mode) {
+            changed.push({
+                deviceId: device.id,
+                attribute: "mode",
+                from: previous.mode,
+                to: device.mode,
+                at: now,
+                version
+            });
+            next.mode = device.mode;
+            next.modeSince = now;
         }
         if (changed.length === 0) return [];
         if (!(await store.swapObservation(device.id, previous, next))) return [];
@@ -508,7 +534,9 @@ export function createEngine(ports: EnginePorts) {
                     ? seen.doorSince
                     : trigger.attribute === "reading"
                       ? seen.readingSince
-                      : seen.stateSince;
+                      : trigger.attribute === "mode"
+                        ? seen.modeSince
+                        : seen.stateSince;
             // Measured from when it was switched on here, not from when the
             // device got there: a light already on for three hours when "off
             // after 30 minutes" is written goes off 30 minutes later, not now.
@@ -802,11 +830,17 @@ export function createEngine(ports: EnginePorts) {
         }
         try {
             await causeContext.run({ depth: run.depth }, () =>
-                ports.devices.act(automation.installedAppId, step.deviceId, action, {
-                    ownerId: automation.ownerId,
-                    automationId: automation.id,
-                    automationName: automation.name
-                })
+                ports.devices.act(
+                    automation.installedAppId,
+                    step.deviceId,
+                    action,
+                    {
+                        ownerId: automation.ownerId,
+                        automationId: automation.id,
+                        automationName: automation.name
+                    },
+                    step.setting
+                )
             );
             return { outcome: "ok" };
         } catch (error) {

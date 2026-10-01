@@ -1367,7 +1367,8 @@
         "attributes": {
             "state": "Su estado",
             "door": "Su puerta",
-            "reading": "Su lectura"
+            "reading": "Su lectura",
+            "mode": "Su modo"
         },
         "triggers": {
             "change": "Un aparato cambia",
@@ -1419,7 +1420,8 @@
             "delay": "Esperar {span}",
             "wait": "Esperar a que {device} esté {value}, hasta {span}",
             "notify": "Avisar: {message}",
-            "run": "Lanzar {name}"
+            "run": "Lanzar {name}",
+            "set": "Poner {device} en {value}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -1496,14 +1498,15 @@
             "place": "Ese sitio ya no está.",
             "deviceGone": "Ese dispositivo ya no está en este sitio.",
             "attribute": "Ese dispositivo no tiene nada así que vigilar.",
-            "notSensor": "Elige un sensor.",
+            "notSensor": "Elige un sensor o un aire acondicionado.",
             "watchOnly": "Ese dispositivo está para verse, no para usarse.",
             "cannotDo": "Ese dispositivo no puede hacer eso.",
             "runSelf": "Una automatización no puede lanzarse a sí misma.",
             "automationGone": "Esa automatización ya no está.",
             "fix": "Hay tarjetas que corregir antes de poder guardarla.",
             "noControl": "No puedes usar los dispositivos de aquí, así que una automatización que guardes tampoco podría.",
-            "noAutoOff": "Ese dispositivo no tiene nada que apagar solo."
+            "noAutoOff": "Ese dispositivo no tiene nada que apagar solo.",
+            "setting": "Elige un valor que admita este aparato."
         },
         "notice": {
             "title": "Automatización: {name}"
@@ -1617,7 +1620,12 @@
                 "seconds": "Segundos",
                 "minutes": "Minutos",
                 "hours": "Horas"
-            }
+            },
+            "mode": "Modo",
+            "target": "Temperatura",
+            "fan": "Ventilador",
+            "option": "Ajuste",
+            "optionTo": "Ponerlo"
         },
         "log": {
             "title": "Qué hizo",
@@ -1649,6 +1657,8 @@
             "follow": {
                 "title": "Si cambia uno, ajustar otro"
             }
-        }
+        },
+        "settingOn": "{option} activado",
+        "settingOff": "{option} desactivado"
     }
 }

@@ -1367,7 +1367,8 @@
         "attributes": {
             "state": "Its state",
             "door": "Its door",
-            "reading": "Its reading"
+            "reading": "Its reading",
+            "mode": "Its mode"
         },
         "triggers": {
             "change": "A device changes",
@@ -1419,7 +1420,8 @@
             "delay": "Wait {span}",
             "wait": "Wait until {device} is {value}, up to {span}",
             "notify": "Notify: {message}",
-            "run": "Run {name}"
+            "run": "Run {name}",
+            "set": "Set {device} to {value}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -1496,14 +1498,15 @@
             "place": "That place is no longer here.",
             "deviceGone": "That device is no longer at this place.",
             "attribute": "That device has nothing like that to watch.",
-            "notSensor": "Choose a sensor.",
+            "notSensor": "Choose a sensor or an air conditioner.",
             "watchOnly": "That device is set to be watched, not operated.",
             "cannotDo": "That device cannot do that.",
             "runSelf": "An automation cannot start itself.",
             "automationGone": "That automation is no longer here.",
             "fix": "Some cards need fixing before it can be saved.",
             "noControl": "You cannot operate the devices here, so an automation you save could not either.",
-            "noAutoOff": "That device has nothing to switch off by itself."
+            "noAutoOff": "That device has nothing to switch off by itself.",
+            "setting": "Choose a value this device accepts."
         },
         "notice": {
             "title": "Automation: {name}"
@@ -1617,7 +1620,12 @@
                 "seconds": "Seconds",
                 "minutes": "Minutes",
                 "hours": "Hours"
-            }
+            },
+            "mode": "Mode",
+            "target": "Temperature",
+            "fan": "Fan speed",
+            "option": "Setting",
+            "optionTo": "Turn it"
         },
         "log": {
             "title": "What it did",
@@ -1649,6 +1657,8 @@
             "follow": {
                 "title": "When one device changes, set another"
             }
-        }
+        },
+        "settingOn": "{option} on",
+        "settingOff": "{option} off"
     }
 }

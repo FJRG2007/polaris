@@ -137,7 +137,7 @@ class MemoryStore implements AutomationStore {
 let now: Date;
 let store: MemoryStore;
 let devices: Map<string, DeviceReadout>;
-let acted: { deviceId: string; action: DeviceAction }[];
+let acted: { deviceId: string; action: DeviceAction; setting?: unknown }[];
 let notified: string[];
 let faults: string[];
 let woken: number[];
@@ -154,12 +154,18 @@ function boot(): AutomationEngine {
             async read(_install, deviceId) {
                 return devices.get(deviceId) ?? null;
             },
-            async act(_install, deviceId, action) {
+            async act(_install, deviceId, action, _by, setting) {
                 const refusal = refuse.get(deviceId);
                 if (refusal) throw refusal;
-                acted.push({ deviceId, action });
+                acted.push({ deviceId, action, ...(setting ? { setting } : {}) });
                 const device = devices.get(deviceId);
                 if (!device) throw new StepRefusal("That device is not here");
+                if (setting) {
+                    if (setting.action === "set-mode")
+                        devices.set(deviceId, { ...device, mode: setting.mode });
+                    await made.observe(INSTALL, devices.get(deviceId)!);
+                    return;
+                }
                 const state =
                     action === "turn-on"
                         ? "on"
@@ -196,6 +202,7 @@ function readout(
         state,
         door: "none",
         reading: "",
+        mode: "",
         online: true,
         ...extra
     };
@@ -925,5 +932,140 @@ describe("a device that refuses", () => {
         expect(JSON.stringify(run.steps)).not.toContain("ECONNRESET");
         expect(run.steps[0]).toMatchObject({ outcome: "failed", code: "failed" });
         expect(faults.length).toBeGreaterThan(0);
+    });
+});
+
+describe("an air conditioner", () => {
+    const unit = (extra: Partial<DeviceReadout> = {}) =>
+        readout("ac", "climate", "on", { mode: "cool", reading: "24", ...extra });
+
+    it("fires on a change of mode, and not on the power with the mode unchanged", async () => {
+        automation("heating", {
+            triggers: [
+                {
+                    id: "trigmode",
+                    kind: "change",
+                    deviceId: "ac",
+                    attribute: "mode",
+                    from: "",
+                    to: "heat"
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "heating" }]
+        });
+        await reads(unit());
+        later(MINUTE);
+        await reads(unit({ state: "off" }));
+        later(MINUTE);
+        // Off reports no mode; on again in the same one is not a change of mode.
+        await reads(unit({ state: "off", mode: "" }));
+        later(MINUTE);
+        await reads(unit());
+        expect(store.runsOf("heating")).toHaveLength(0);
+        later(MINUTE);
+        await reads(unit({ mode: "heat" }));
+        expect(store.runsOf("heating")).toHaveLength(1);
+    });
+
+    it("fires when the room crosses a temperature", async () => {
+        automation("warm", {
+            triggers: [
+                { id: "trigwarm", kind: "threshold", deviceId: "ac", direction: "above", value: 26 }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "warm" }]
+        });
+        await reads(unit({ reading: "25" }));
+        later(MINUTE);
+        await reads(unit({ reading: "26.5" }));
+        expect(store.runsOf("warm")).toHaveLength(1);
+    });
+
+    it("counts how long it has been in a mode from when the mode began", async () => {
+        automation("long", {
+            triggers: [
+                {
+                    id: "triglong",
+                    kind: "stays",
+                    deviceId: "ac",
+                    attribute: "mode",
+                    is: "heat",
+                    minutes: 30
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "long" }]
+        });
+        await reads(unit());
+        later(10 * MINUTE);
+        await reads(unit({ mode: "heat" }));
+        later(20 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("long")).toHaveLength(0);
+        later(11 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("long")).toHaveLength(1);
+    });
+
+    it("holds a condition on its mode and on its room temperature", async () => {
+        devices.set("ac", unit({ mode: "heat", reading: "19" }));
+        automation("guarded", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "groupone",
+                        match: "all",
+                        items: [
+                            {
+                                id: "condmode",
+                                kind: "device",
+                                deviceId: "ac",
+                                attribute: "mode",
+                                is: "heat",
+                                negate: false
+                            },
+                            { id: "condtemp", kind: "reading", deviceId: "ac", op: "lt", value: 20 }
+                        ]
+                    }
+                ]
+            }
+        });
+        const record = store.automations.get("guarded")!;
+        expect(await engine.conditionsHold(record, now)).toBe(true);
+        devices.set("ac", unit({ mode: "cool", reading: "19" }));
+        expect(await engine.conditionsHold(record, now)).toBe(false);
+    });
+
+    it("is set by a step, with what the step says to set", async () => {
+        devices.set("ac", unit());
+        automation("evening", {
+            actions: [
+                { id: "stepon", kind: "device", deviceId: "ac", do: "turn-on" },
+                {
+                    id: "stepmode",
+                    kind: "device",
+                    deviceId: "ac",
+                    do: "set-mode",
+                    setting: { action: "set-mode", mode: "heat" }
+                },
+                {
+                    id: "steptemp",
+                    kind: "device",
+                    deviceId: "ac",
+                    do: "set-temperature",
+                    setting: { action: "set-temperature", target: 22 }
+                }
+            ]
+        });
+        await engine.runNow(store.automations.get("evening")!, "Fixture user", "press-1");
+        await engine.drain();
+        expect(acted).toEqual([
+            { deviceId: "ac", action: "turn-on" },
+            { deviceId: "ac", action: "set-mode", setting: { action: "set-mode", mode: "heat" } },
+            {
+                deviceId: "ac",
+                action: "set-temperature",
+                setting: { action: "set-temperature", target: 22 }
+            }
+        ]);
     });
 });

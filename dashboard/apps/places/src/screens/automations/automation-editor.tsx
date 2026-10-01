@@ -368,7 +368,8 @@ export function AutomationEditor({
 
     const definition = draft.definition;
     const watchedDevices = devices.filter(fields.watchable);
-    const sensors = devices.filter((device) => device.kind === "sensor");
+    // What has a number to compare: a sensor, or an air conditioner's room.
+    const sensors = devices.filter((device) => auto.measures(device.kind));
     const operableDevices = canControl ? devices.filter(fields.operable) : [];
     const blocked = issues.length > 0 || !dirty;
 
@@ -1400,10 +1401,14 @@ function StepCard({
                         }
                         onChange={(next) => {
                             const offered = auto.stepActionsFor(next.kind);
+                            const action = offered.includes(step.do)
+                                ? step.do
+                                : (offered[0] ?? step.do);
                             onChange({
                                 ...step,
                                 deviceId: next.id,
-                                do: offered.includes(step.do) ? step.do : (offered[0] ?? step.do)
+                                do: action,
+                                setting: auto.blankSetting(action, next.climate)
                             });
                         }}
                     />
@@ -1421,12 +1426,26 @@ function StepCard({
                                     value: action,
                                     label: words.stepActionText(action, t)
                                 }))}
-                                onValueChange={(next) =>
-                                    onChange({ ...step, do: next as auto.StepDeviceAction })
-                                }
+                                onValueChange={(next) => {
+                                    const action = next as auto.StepDeviceAction;
+                                    onChange({
+                                        ...step,
+                                        do: action,
+                                        setting: auto.blankSetting(action, device?.climate)
+                                    });
+                                }}
                             />
                         )}
                     </fields.Field>
+                    {step.setting && (
+                        <fields.SettingFields
+                            device={device}
+                            setting={step.setting}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(setting) => onChange({ ...step, setting })}
+                        />
+                    )}
                 </>
             )}
             {step.kind === "delay" && (

@@ -460,3 +460,167 @@ describe("the templates", () => {
         );
     });
 });
+
+describe("an air conditioner in an automation", () => {
+    const ac = device("ac", "climate", {
+        state: "on",
+        reading: { value: "24", unit: "\u00b0C" },
+        climate: {
+            mode: "cool",
+            modes: ["cool", "heat", "fan"],
+            target: 24,
+            min: 16,
+            max: 30,
+            step: 1,
+            unit: "C",
+            fan: "auto",
+            fans: ["auto", "low", "high"],
+            options: { swing: false },
+            current: 24
+        }
+    });
+    const issues = (definition: Partial<auto.AutomationDefinition>) => {
+        const parsed = parse(input(definition));
+        if (!parsed.success) throw new Error(JSON.stringify(parsed.error.issues));
+        return auto
+            .deviceIssues(parsed.data.definition, [...DEVICES, ac], {
+                automationIds: [],
+                selfId: null
+            })
+            .map((issue) => issue.message);
+    };
+
+    it("watches its power and its mode, and can be a threshold's sensor", () => {
+        expect(auto.attributesFor("climate")).toEqual(["state", "mode"]);
+        expect(auto.measures("climate")).toBe(true);
+        expect(
+            issues({
+                triggers: [
+                    { id: "trig01", kind: "threshold", deviceId: "ac", direction: "above", value: 27 },
+                    {
+                        id: "trig02",
+                        kind: "change",
+                        deviceId: "ac",
+                        attribute: "mode",
+                        from: "",
+                        to: "heat"
+                    }
+                ]
+            })
+        ).toEqual([]);
+    });
+
+    it("refuses a mode word that is not a mode", () => {
+        expect(
+            messages(
+                input({
+                    triggers: [
+                        {
+                            id: "trig01",
+                            kind: "change",
+                            deviceId: "ac",
+                            attribute: "mode",
+                            from: "",
+                            to: "freezing"
+                        }
+                    ]
+                })
+            )
+        ).toContain("automations.errors.state");
+    });
+
+    it("takes a setting with the action that sets it, and only there", () => {
+        const step = (extra: Record<string, unknown>) =>
+            input({ actions: [{ id: "step01", kind: "device", deviceId: "ac", ...extra } as never] });
+        expect(messages(step({ do: "set-mode" }))).toContain("automations.errors.setting");
+        expect(
+            messages(step({ do: "turn-off", setting: { action: "set-mode", mode: "heat" } }))
+        ).toContain("automations.errors.setting");
+        expect(
+            messages(step({ do: "set-fan", setting: { action: "set-mode", mode: "heat" } }))
+        ).toContain("automations.errors.setting");
+        expect(
+            messages(step({ do: "set-mode", setting: { action: "set-mode", mode: "heat" } }))
+        ).toEqual([]);
+    });
+
+    it("reads a typed temperature as a number, and an empty one as missing", () => {
+        const parsed = parse(
+            input({
+                actions: [
+                    {
+                        id: "step01",
+                        kind: "device",
+                        deviceId: "ac",
+                        do: "set-temperature",
+                        setting: { action: "set-temperature", target: " 22,5 " as unknown as number }
+                    }
+                ]
+            })
+        );
+        expect(parsed.success && parsed.data.definition.actions[0]).toMatchObject({
+            setting: { target: 22.5 }
+        });
+        expect(
+            messages(
+                input({
+                    actions: [
+                        {
+                            id: "step01",
+                            kind: "device",
+                            deviceId: "ac",
+                            do: "set-temperature",
+                            setting: { action: "set-temperature", target: "" as unknown as number }
+                        }
+                    ]
+                })
+            )
+        ).toContain("automations.errors.number");
+    });
+
+    it("refuses at the save what the unit does not accept", () => {
+        const set = (setting: auto.StepSetting) =>
+            issues({
+                actions: [
+                    { id: "step01", kind: "device", deviceId: "ac", do: setting.action, setting }
+                ]
+            });
+        expect(set({ action: "set-temperature", target: 31 })).toEqual(["automations.errors.setting"]);
+        expect(set({ action: "set-mode", mode: "dry" })).toEqual(["automations.errors.setting"]);
+        expect(set({ action: "set-option", option: "eco", on: true })).toEqual([
+            "automations.errors.setting"
+        ]);
+        expect(set({ action: "set-temperature", target: 22 })).toEqual([]);
+    });
+
+    it("starts a new setting where the unit already is", () => {
+        expect(auto.blankSetting("set-temperature", ac.climate)).toEqual({
+            action: "set-temperature",
+            target: 24
+        });
+        expect(auto.blankSetting("set-option", ac.climate)).toEqual({
+            action: "set-option",
+            option: "swing",
+            on: true
+        });
+        expect(auto.blankSetting("turn-on", ac.climate)).toBeUndefined();
+    });
+
+    it("says a setting in words, in both languages", () => {
+        const es = placesCatalogs.translator("es-ES", "places");
+        const en = placesCatalogs.translator("en-US", "places");
+        const step: auto.Step = {
+            id: "step01",
+            kind: "device",
+            deviceId: "ac",
+            do: "set-mode",
+            setting: { action: "set-mode", mode: "heat" }
+        };
+        const lookup = (id: string) => (id === "ac" ? { name: "Bedroom AC", kind: "climate" } : undefined);
+        expect(words.describeStep(step, lookup, () => undefined, en)).toBe("Set Bedroom AC to Heat");
+        expect(words.describeStep(step, lookup, () => undefined, es)).toBe("Poner Bedroom AC en Calor");
+        expect(
+            words.valueText("mode", "climate", "fan", en)
+        ).toBe("Fan only");
+    });
+});

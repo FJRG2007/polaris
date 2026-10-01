@@ -52,7 +52,29 @@ export function valueText(
     if (!value) return t("automations.anyValue");
     if (attribute === "state") return kinds.stateLabel(kind, kinds.deviceState(value), t);
     if (attribute === "door") return kinds.doorText(kinds.doorState(value), t) || value;
+    if (attribute === "mode") {
+        const mode = kinds.CLIMATE_MODES.find((entry) => entry === value);
+        return mode ? kinds.climateModeText(mode, t) : value;
+    }
     return kinds.readingLine({ value, unit: "" }, t);
+}
+
+/** What a step sets a unit to: "Cool", "24\u00b0", "High", "Swing on". */
+export function settingText(setting: auto.StepSetting, t: PlacesTranslator): string {
+    switch (setting.action) {
+        case "set-mode":
+            return kinds.climateModeText(setting.mode, t);
+        case "set-temperature":
+            return Number.isFinite(setting.target) ? `${setting.target}\u00b0` : "?";
+        case "set-fan":
+            return kinds.climateFanText(setting.fan, t);
+        case "set-option": {
+            const option = kinds.climateOptionText(setting.option, t);
+            return setting.on
+                ? t("automations.settingOn", { option })
+                : t("automations.settingOff", { option });
+        }
+    }
 }
 
 /** A span of minutes or seconds in the shortest words that say it exactly. */
@@ -188,6 +210,12 @@ export function describeStep(
     switch (step.kind) {
         case "device": {
             const device = deviceName(lookup, step.deviceId, t);
+            if (step.setting) {
+                return t("automations.say.set", {
+                    device: device.name,
+                    value: settingText(step.setting, t)
+                });
+            }
             return t("automations.say.act", {
                 action: stepActionText(step.do, t),
                 device: device.name

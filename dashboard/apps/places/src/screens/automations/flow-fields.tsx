@@ -268,7 +268,9 @@ export function ValuePicker({
             ? [...auto.watchedStates(kind)]
             : attribute === "door"
               ? [...auto.DOOR_WORDS]
-              : [...auto.readingWordsFor(reading)];
+              : attribute === "mode"
+                ? [...(device?.climate?.modes ?? kinds.CLIMATE_MODES)]
+                : [...auto.readingWordsFor(reading)];
     if (value && !offered.includes(value) && attribute === "reading" && offered.length > 0)
         offered.push(value);
 
@@ -530,6 +532,135 @@ export function DurationField({
             )}
         </Field>
     );
+}
+
+/**
+ * What a step that sets something sets it to, offered from what the unit has:
+ * its own modes and fan speeds, a temperature in its own range and step, the
+ * extras it was built with. A unit that has not said yet is offered everything,
+ * and the save checks it once it has.
+ */
+export function SettingFields({
+    device,
+    setting,
+    onChange,
+    path,
+    disabled
+}: {
+    device: DeviceView | undefined;
+    setting: auto.StepSetting;
+    onChange: (setting: auto.StepSetting) => void;
+    path: readonly (string | number)[];
+    disabled?: boolean;
+}) {
+    const t = usePlacesT();
+    const climate = device?.climate ?? null;
+    const at = [...path, "setting"];
+    switch (setting.action) {
+        case "set-mode":
+            return (
+                <Field label={t("automations.fields.mode")} path={[...at, "mode"]} required>
+                    {(id, invalid) => (
+                        <Select
+                            id={id}
+                            value={setting.mode}
+                            disabled={disabled}
+                            className={invalid ? "border-danger-edge" : undefined}
+                            options={(climate?.modes ?? kinds.CLIMATE_MODES).map((mode) => ({
+                                value: mode,
+                                label: kinds.climateModeText(mode, t)
+                            }))}
+                            onValueChange={(next) => {
+                                const mode = kinds.CLIMATE_MODES.find((entry) => entry === next);
+                                if (mode) onChange({ ...setting, mode });
+                            }}
+                        />
+                    )}
+                </Field>
+            );
+        case "set-temperature":
+            return (
+                <NumberField
+                    label={t("automations.fields.target")}
+                    path={at}
+                    field="target"
+                    value={setting.target}
+                    min={climate?.min}
+                    step={climate?.step ?? "any"}
+                    suffix={climate ? `\u00b0${climate.unit}` : "\u00b0"}
+                    disabled={disabled}
+                    onChange={(target) => onChange({ ...setting, target })}
+                />
+            );
+        case "set-fan":
+            return (
+                <Field label={t("automations.fields.fan")} path={[...at, "fan"]} required>
+                    {(id, invalid) => (
+                        <Select
+                            id={id}
+                            value={setting.fan}
+                            disabled={disabled}
+                            className={invalid ? "border-danger-edge" : undefined}
+                            options={(climate?.fans ?? kinds.CLIMATE_FANS).map((fan) => ({
+                                value: fan,
+                                label: kinds.climateFanText(fan, t)
+                            }))}
+                            onValueChange={(next) => {
+                                const fan = kinds.CLIMATE_FANS.find((entry) => entry === next);
+                                if (fan) onChange({ ...setting, fan });
+                            }}
+                        />
+                    )}
+                </Field>
+            );
+        case "set-option": {
+            const offered = climate
+                ? kinds.CLIMATE_OPTIONS.filter((option) => climate.options[option] !== undefined)
+                : kinds.CLIMATE_OPTIONS;
+            return (
+                <>
+                    <Field
+                        label={t("automations.fields.option")}
+                        path={[...at, "option"]}
+                        required
+                    >
+                        {(id, invalid) => (
+                            <Select
+                                id={id}
+                                value={setting.option}
+                                disabled={disabled}
+                                className={invalid ? "border-danger-edge" : undefined}
+                                options={offered.map((option) => ({
+                                    value: option,
+                                    label: kinds.climateOptionText(option, t)
+                                }))}
+                                onValueChange={(next) => {
+                                    const option = kinds.CLIMATE_OPTIONS.find(
+                                        (entry) => entry === next
+                                    );
+                                    if (option) onChange({ ...setting, option });
+                                }}
+                            />
+                        )}
+                    </Field>
+                    <Field label={t("automations.fields.optionTo")} path={[...at, "on"]}>
+                        {(id) => (
+                            <Select
+                                id={id}
+                                value={setting.on ? "on" : "off"}
+                                disabled={disabled}
+                                options={[
+                                    { value: "on", label: kinds.stateLabel("switch", "on", t) },
+                                    { value: "off", label: kinds.stateLabel("switch", "off", t) }
+                                ]}
+                                onValueChange={(next) => onChange({ ...setting, on: next === "on" })}
+                            />
+                        )}
+                    </Field>
+                </>
+            );
+        }
+    }
 }
 
 /** Whether a device can be told to do anything a step could ask. */

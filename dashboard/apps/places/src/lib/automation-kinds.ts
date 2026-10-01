@@ -21,8 +21,9 @@ import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
 
 /** What about a device a trigger, a condition or a wait looks at. A lock has a
  *  bolt and often a door sensor beside it, and "the door opened" is not "the
- *  lock opened"; a sensor has neither and is its reading. */
-export const AUTOMATION_ATTRIBUTES = ["state", "door", "reading"] as const;
+ *  lock opened"; a sensor has neither and is its reading. An air conditioner
+ *  is on or off, and separately cooling or heating - its mode. */
+export const AUTOMATION_ATTRIBUTES = ["state", "door", "reading", "mode"] as const;
 export type AutomationAttribute = (typeof AUTOMATION_ATTRIBUTES)[number];
 
 /** The door sensor's words that can be waited for. `unknown` and `none` are not
@@ -50,7 +51,16 @@ export function attributesFor(kind: string): readonly AutomationAttribute[] {
     const which = kinds.deviceKind(kind);
     if (which === "sensor") return ["reading"];
     if (which === "lock" || which === "opener") return ["state", "door"];
+    if (which === "climate") return ["state", "mode"];
     return ["state"];
+}
+
+/** Whether a kind of device has a number to compare - a sensor's reading, or
+ *  the room temperature an air conditioner reads. What a threshold trigger and
+ *  a reading condition can watch. */
+export function measures(kind: string): boolean {
+    const which = kinds.deviceKind(kind);
+    return which === "sensor" || which === "climate";
 }
 
 /** A step may flip something rather than name where it should end up. Only for
@@ -147,6 +157,38 @@ const amount = z
     .min(-1e9, "automations.errors.tooSmall")
     .max(1e9, "automations.errors.tooBig");
 
+/**
+ * What a step that sets something sets it to. The same shape as a device
+ * command (`climateCommandSchema`), with this editor's own messages; whether the
+ * unit has it is for `deviceIssues` to say, against the unit itself.
+ */
+const settingError = { errorMap: () => ({ message: "automations.errors.setting" }) };
+const settingSchema = z.discriminatedUnion(
+    "action",
+    [
+        z.object({ action: z.literal("set-mode"), mode: z.enum(kinds.CLIMATE_MODES, settingError) }),
+        z.object({ action: z.literal("set-temperature"), target: amount }),
+        z.object({ action: z.literal("set-fan"), fan: z.enum(kinds.CLIMATE_FANS, settingError) }),
+        z.object({
+            action: z.literal("set-option"),
+            option: z.enum(kinds.CLIMATE_OPTIONS, settingError),
+            on: z.boolean(settingError)
+        })
+    ],
+    settingError
+);
+
+export type StepSetting = z.infer<typeof settingSchema>;
+
+/** The field of a setting its value is in, which is where a complaint about it
+ *  is drawn. */
+export const SETTING_FIELDS: Readonly<Record<StepSetting["action"], string>> = {
+    "set-mode": "mode",
+    "set-temperature": "target",
+    "set-fan": "fan",
+    "set-option": "option"
+};
+
 export const triggerSchema = z.discriminatedUnion("kind", [
     z.object({ id: nodeId, kind: z.literal("time"), at: clock, days }),
     z.object({ id: nodeId, kind: z.literal("interval"), minutes: count(1, LIMITS.minutes) }),
@@ -214,7 +256,9 @@ export const actionSchema = z.discriminatedUnion("kind", [
         deviceId: deviceRef,
         do: z.enum(STEP_DEVICE_ACTIONS, {
             errorMap: () => ({ message: "automations.errors.action" })
-        })
+        }),
+        /** What to set, for the actions that set something. */
+        setting: settingSchema.optional()
     }),
     z.object({ id: nodeId, kind: z.literal("delay"), seconds: count(1, LIMITS.delaySeconds) }),
     z.object({
@@ -330,6 +374,19 @@ export const definitionSchema = z
             if (action.kind === "wait") {
                 checkWord(context, action.attribute, action.is, ["actions", index, "is"], false);
             }
+            if (action.kind === "device") {
+                const needs = action.do !== TOGGLE && kinds.needsCommand(action.do);
+                // A setting goes with the action that sets it, and only there:
+                // "set the mode" with no mode, or a temperature riding on "turn
+                // off", is a step that cannot say what it does.
+                if (needs ? action.setting?.action !== action.do : action.setting !== undefined) {
+                    context.addIssue({
+                        code: "custom",
+                        path: ["actions", index, "setting"],
+                        message: "automations.errors.setting"
+                    });
+                }
+            }
         });
     });
 
@@ -352,7 +409,9 @@ function checkWord(
             ? (kinds.DEVICE_STATES as readonly string[]).includes(value)
             : attribute === "door"
               ? (DOOR_WORDS as readonly string[]).includes(value)
-              : true;
+              : attribute === "mode"
+                ? (kinds.CLIMATE_MODES as readonly string[]).includes(value)
+                : true;
     if (!known) context.addIssue({ code: "custom", path, message: "automations.errors.state" });
 }
 
@@ -435,6 +494,13 @@ function normalizeNode(node: unknown, clocks: boolean): unknown {
     for (const field of NUMBER_FIELDS)
         if (field in value) value[field] = normalizeNumber(value[field]);
     if ("days" in value) value.days = normalizeDays(value.days);
+    const setting = value.setting;
+    if (setting && typeof setting === "object" && !Array.isArray(setting) && "target" in setting) {
+        value.setting = {
+            ...setting,
+            target: normalizeNumber((setting as { target: unknown }).target)
+        };
+    }
     return value;
 }
 
@@ -497,7 +563,10 @@ export interface AutomationIssue {
 }
 
 /** What the device checks need to know about a device. */
-export type AutomationDevice = Pick<DeviceView, "id" | "kind" | "name" | "controllable">;
+export type AutomationDevice = Pick<DeviceView, "id" | "kind" | "name" | "controllable"> & {
+    /** What an air conditioner accepts, where it is known. */
+    readonly climate?: kinds.ClimateSettings | null;
+};
 
 /**
  * What the schema cannot know: whether the devices named are here, and whether
@@ -527,7 +596,7 @@ export function deviceIssues(
         const device = byId.get(deviceId);
         if (!device)
             issues.push({ path: [...path, "deviceId"], message: "automations.errors.deviceGone" });
-        else if (kinds.deviceKind(device.kind) !== "sensor") {
+        else if (!measures(device.kind)) {
             issues.push({ path: [...path, "deviceId"], message: "automations.errors.notSensor" });
         }
     };
@@ -560,6 +629,16 @@ export function deviceIssues(
                 issues.push({ path: [...at, "deviceId"], message: "automations.errors.watchOnly" });
             } else if (!stepActionsFor(device.kind).includes(step.do)) {
                 issues.push({ path: [...at, "do"], message: "automations.errors.cannotDo" });
+            } else if (step.setting && device.climate) {
+                // Checked against the unit as it was last read: a mode it does
+                // not have, or a target past its range, is refused at the save
+                // rather than at seven in the morning.
+                if (kinds.climateCommandIssue(device.climate, step.setting)) {
+                    issues.push({
+                        path: [...at, "setting", SETTING_FIELDS[step.setting.action]],
+                        message: "automations.errors.setting"
+                    });
+                }
             }
         }
         if (step.kind === "run") {
@@ -641,6 +720,30 @@ export function blankCondition(kind: ConditionKind): Condition {
     }
 }
 
+/** What a step that sets something starts as, for this unit: where it is now,
+ *  which is a value it is known to accept. */
+export function blankSetting(
+    action: StepDeviceAction,
+    climate: kinds.ClimateSettings | null | undefined
+): StepSetting | undefined {
+    switch (action) {
+        case "set-mode":
+            return { action, mode: climate?.mode ?? climate?.modes[0] ?? "cool" };
+        case "set-temperature":
+            return { action, target: climate?.target ?? climate?.min ?? Number.NaN };
+        case "set-fan":
+            return { action, fan: climate?.fan ?? climate?.fans[0] ?? "auto" };
+        case "set-option": {
+            const option =
+                kinds.CLIMATE_OPTIONS.find((entry) => climate?.options[entry] !== undefined) ??
+                "swing";
+            return { action, option, on: true };
+        }
+        default:
+            return undefined;
+    }
+}
+
 export function blankStep(kind: StepKind): Step {
     const id = nodeIdOf();
     switch (kind) {
@@ -695,7 +798,7 @@ export type TemplateId = (typeof TEMPLATES)[number];
  *  light left on is switched off, a door left unlocked is locked. */
 export function autoOffPlan(kind: string): { is: kinds.DeviceState; do: DeviceAction } | null {
     const which = kinds.deviceKind(kind);
-    if (which === "switch" || which === "outlet" || which === "light")
+    if (which === "switch" || which === "outlet" || which === "light" || which === "climate")
         return { is: "on", do: "turn-off" };
     if (which === "lock") return { is: "unlocked", do: "lock" };
     return null;
