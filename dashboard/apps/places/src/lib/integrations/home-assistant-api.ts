@@ -124,7 +124,9 @@ export async function homeAssistantTemperatureUnit(home: HomeAssistant): Promise
         .object({ unit_system: z.object({ temperature: z.string() }).passthrough() })
         .passthrough()
         .safeParse(jsonOf(response));
-    return response.status === 200 && parsed.success && parsed.data.unit_system.temperature.includes("F")
+    return response.status === 200 &&
+        parsed.success &&
+        parsed.data.unit_system.temperature.includes("F")
         ? "F"
         : "C";
 }

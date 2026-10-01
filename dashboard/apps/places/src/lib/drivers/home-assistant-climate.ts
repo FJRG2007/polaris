@@ -52,7 +52,9 @@ const FANS: Readonly<Record<string, ClimateFan>> = {
 };
 
 function strings(value: unknown): string[] {
-    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+    return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === "string")
+        : [];
 }
 
 function numberOf(value: unknown): number | null {

@@ -28,7 +28,13 @@ function spec(scale = 0): TuyaSpec {
             {
                 code: "temp_set",
                 type: "Integer",
-                values: JSON.stringify({ min: 16 * tenths, max: 31 * tenths, scale, step: scale ? 5 : 1, unit: "℃" })
+                values: JSON.stringify({
+                    min: 16 * tenths,
+                    max: 31 * tenths,
+                    scale,
+                    step: scale ? 5 : 1,
+                    unit: "℃"
+                })
             },
             {
                 code: "mode",
@@ -116,8 +122,16 @@ describe("a Tuya air conditioner", () => {
         ["turn-on", undefined, [{ code: "switch", value: true }]],
         ["set-mode", { action: "set-mode", mode: "heat" }, [{ code: "mode", value: "hot" }]],
         ["set-mode", { action: "set-mode", mode: "fan" }, [{ code: "mode", value: "wind" }]],
-        ["set-fan", { action: "set-fan", fan: "medium" }, [{ code: "fan_speed_enum", value: "mid" }]],
-        ["set-temperature", { action: "set-temperature", target: 22 }, [{ code: "temp_set", value: 22 }]],
+        [
+            "set-fan",
+            { action: "set-fan", fan: "medium" },
+            [{ code: "fan_speed_enum", value: "mid" }]
+        ],
+        [
+            "set-temperature",
+            { action: "set-temperature", target: 22 },
+            [{ code: "temp_set", value: 22 }]
+        ],
         [
             "set-option",
             { action: "set-option", option: "swing", on: true },
@@ -129,7 +143,11 @@ describe("a Tuya air conditioner", () => {
 
     it("sends a target scaled to the unit's tenths", () => {
         expect(
-            tuyaClimateCommands("set-temperature", { action: "set-temperature", target: 22.5 }, spec(1))
+            tuyaClimateCommands(
+                "set-temperature",
+                { action: "set-temperature", target: 22.5 },
+                spec(1)
+            )
         ).toEqual([{ code: "temp_set", value: 225 }]);
     });
 
@@ -138,10 +156,18 @@ describe("a Tuya air conditioner", () => {
             tuyaClimateCommands("set-fan", { action: "set-fan", fan: "medium-low" }, spec())
         ).toThrow("That fan speed is not one this device has");
         expect(() =>
-            tuyaClimateCommands("set-temperature", { action: "set-temperature", target: 40 }, spec())
+            tuyaClimateCommands(
+                "set-temperature",
+                { action: "set-temperature", target: 40 },
+                spec()
+            )
         ).toThrow("That temperature is not one this device accepts");
         expect(() =>
-            tuyaClimateCommands("set-option", { action: "set-option", option: "turbo", on: true }, spec())
+            tuyaClimateCommands(
+                "set-option",
+                { action: "set-option", option: "turbo", on: true },
+                spec()
+            )
         ).toThrow("That setting is not one this device has");
     });
 
@@ -156,7 +182,12 @@ describe("a Tuya air conditioner", () => {
         const second = await tuyaActionFor(device, "turn-off", undefined, fetch);
         expect(asked).toBe(1);
         expect(second.commands).toEqual([{ code: "switch", value: false }]);
-        const plug = await tuyaActionFor({ externalId: "plug#switch_1", kind: "outlet" }, "turn-on", undefined, fetch);
+        const plug = await tuyaActionFor(
+            { externalId: "plug#switch_1", kind: "outlet" },
+            "turn-on",
+            undefined,
+            fetch
+        );
         expect(plug).toEqual({ deviceId: "plug", commands: [{ code: "switch_1", value: true }] });
         expect(asked).toBe(1);
     });

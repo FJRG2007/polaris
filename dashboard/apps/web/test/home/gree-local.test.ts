@@ -157,13 +157,23 @@ function answer(unit: FakeUnit, message: Record<string, unknown>) {
     if (message.t === "scan") {
         // A scan is always answered in V1 by the generic key (`discovery.py`).
         const sealed = sealGree(
-            { t: "dev", cid: unit.mac, mac: unit.mac, name: unit.name, brand: "gree", model: "gree", ver: "V1.1.13" },
+            {
+                t: "dev",
+                cid: unit.mac,
+                mac: unit.mac,
+                name: unit.name,
+                brand: "gree",
+                model: "gree",
+                ver: "V1.1.13"
+            },
             GREE_GENERIC_KEYS.v1,
             "v1"
         );
         return {
             address: unit.address,
-            data: Buffer.from(JSON.stringify({ t: "pack", i: 1, uid: 0, cid: unit.mac, pack: sealed.pack }))
+            data: Buffer.from(
+                JSON.stringify({ t: "pack", i: 1, uid: 0, cid: unit.mac, pack: sealed.pack })
+            )
         };
     }
     if (typeof message.pack !== "string") return null;
@@ -172,7 +182,11 @@ function answer(unit: FakeUnit, message: Record<string, unknown>) {
             t?: string;
         } | null;
         if (inner?.t !== "bind") return null;
-        return reply(unit, { t: "bindok", mac: unit.mac, key: unit.key, r: 200 }, GREE_GENERIC_KEYS[unit.cipher]);
+        return reply(
+            unit,
+            { t: "bindok", mac: unit.mac, key: unit.key, r: 200 },
+            GREE_GENERIC_KEYS[unit.cipher]
+        );
     }
     const inner = openGree(message.pack, unit.key, unit.cipher) as {
         t?: string;
@@ -184,7 +198,13 @@ function answer(unit: FakeUnit, message: Record<string, unknown>) {
         const cols = inner.cols ?? [];
         return reply(
             unit,
-            { t: "dat", mac: unit.mac, r: 200, cols, dat: cols.map((col) => unit.status[col] ?? 0) },
+            {
+                t: "dat",
+                mac: unit.mac,
+                r: 200,
+                cols,
+                dat: cols.map((col) => unit.status[col] ?? 0)
+            },
             unit.key
         );
     }
@@ -192,7 +212,11 @@ function answer(unit: FakeUnit, message: Record<string, unknown>) {
         (inner.opt ?? []).forEach((col, index) => {
             unit.status[col] = inner.p?.[index] ?? 0;
         });
-        return reply(unit, { t: "res", mac: unit.mac, r: 200, opt: inner.opt, val: inner.p }, unit.key);
+        return reply(
+            unit,
+            { t: "res", mac: unit.mac, r: 200, opt: inner.opt, val: inner.p },
+            unit.key
+        );
     }
     return null;
 }
@@ -207,7 +231,10 @@ vi.mock("@polaris-app/places/src/lib/integrations/gree-udp", async (original) =>
             payload: Buffer;
             until?: (reply: { address: string; data: Buffer }) => boolean;
         }) => {
-            const message = JSON.parse(exchange.payload.toString("utf8")) as Record<string, unknown>;
+            const message = JSON.parse(exchange.payload.toString("utf8")) as Record<
+                string,
+                unknown
+            >;
             sent.push({ targets: exchange.targets, message });
             const broadcast = exchange.targets.includes(actual.GREE_BROADCAST);
             const replies = [];
@@ -282,18 +309,32 @@ describe("the messages", () => {
     });
 
     it("carries the GCM tag beside a V2 pack, and i 0 under a unit's key", () => {
-        const message = api.greeMessage("aabbcc112233", { t: "status" }, "FixtureKey000001", "v2", false);
+        const message = api.greeMessage(
+            "aabbcc112233",
+            { t: "status" },
+            "FixtureKey000001",
+            "v2",
+            false
+        );
         expect(message.i).toBe(0);
         expect(typeof message.tag).toBe("string");
     });
 
     it("reads a scan answer, MAC from cid where there is no mac", () => {
-        const sealed = sealGree({ t: "dev", cid: "AABBCC112233", name: "fake unit", ver: "V1.1.13" }, GREE_GENERIC_KEYS.v1, "v1");
+        const sealed = sealGree(
+            { t: "dev", cid: "AABBCC112233", name: "fake unit", ver: "V1.1.13" },
+            GREE_GENERIC_KEYS.v1,
+            "v1"
+        );
         const found = api.readScanReply({
             address: "192.168.1.40",
             data: Buffer.from(JSON.stringify({ t: "pack", i: 1, pack: sealed.pack }))
         });
-        expect(found).toMatchObject({ address: "192.168.1.40", mac: "aabbcc112233", name: "fake unit" });
+        expect(found).toMatchObject({
+            address: "192.168.1.40",
+            mac: "aabbcc112233",
+            name: "fake unit"
+        });
     });
 });
 
@@ -328,7 +369,10 @@ describe("connecting", () => {
     });
 
     it("looks on the network when no address is typed, broadcast included", async () => {
-        units = [fakeUnit(), fakeUnit({ address: "192.168.1.41", mac: "aabbcc445566", name: "Lounge" })];
+        units = [
+            fakeUnit(),
+            fakeUnit({ address: "192.168.1.41", mac: "aabbcc445566", name: "Lounge" })
+        ];
         const stored = await gree.greeLocalDriver.verify({});
         expect(sent[0]!.targets).toContain("255.255.255.255");
         expect(JSON.parse((stored as Record<string, string>).units!)).toHaveLength(2);
@@ -349,7 +393,10 @@ describe("connecting", () => {
 
 async function connected(unit = fakeUnit()) {
     units = [unit];
-    const stored = (await gree.greeLocalDriver.verify({ host: unit.address })) as Record<string, string>;
+    const stored = (await gree.greeLocalDriver.verify({ host: unit.address })) as Record<
+        string,
+        string
+    >;
     sent.length = 0;
     return stored;
 }
@@ -393,7 +440,11 @@ describe("telling a unit what to do", () => {
     it("switches it, with the column the library uses", async () => {
         const unit = fakeUnit({ status: { ...fakeUnit().status, Pow: 0 } });
         const credentials = await connected(unit);
-        await gree.greeLocalDriver.act(credentials, { externalId: unit.mac, kind: "climate" }, "turn-on");
+        await gree.greeLocalDriver.act(
+            credentials,
+            { externalId: unit.mac, kind: "climate" },
+            "turn-on"
+        );
         expect(unit.status.Pow).toBe(1);
     });
 
@@ -401,20 +452,39 @@ describe("telling a unit what to do", () => {
         const unit = fakeUnit();
         const credentials = await connected(unit);
         const device = { externalId: unit.mac, kind: "climate" };
-        await gree.greeLocalDriver.act(credentials, device, "set-mode", { action: "set-mode", mode: "heat" });
-        await gree.greeLocalDriver.act(credentials, device, "set-fan", { action: "set-fan", fan: "high" });
-        await gree.greeLocalDriver.act(credentials, device, "set-option", { action: "set-option", option: "quiet", on: true });
-        await gree.greeLocalDriver.act(credentials, device, "set-option", { action: "set-option", option: "swing", on: true });
+        await gree.greeLocalDriver.act(credentials, device, "set-mode", {
+            action: "set-mode",
+            mode: "heat"
+        });
+        await gree.greeLocalDriver.act(credentials, device, "set-fan", {
+            action: "set-fan",
+            fan: "high"
+        });
+        await gree.greeLocalDriver.act(credentials, device, "set-option", {
+            action: "set-option",
+            option: "quiet",
+            on: true
+        });
+        await gree.greeLocalDriver.act(credentials, device, "set-option", {
+            action: "set-option",
+            option: "swing",
+            on: true
+        });
         expect(unit.status).toMatchObject({ Mod: 4, WdSpd: 5, Quiet: 2, SwUpDn: 1 });
     });
 
     it("sends a Celsius target with its unit and record bit", async () => {
         const unit = fakeUnit();
         const credentials = await connected(unit);
-        await gree.greeLocalDriver.act(credentials, { externalId: unit.mac, kind: "climate" }, "set-temperature", {
-            action: "set-temperature",
-            target: 21
-        });
+        await gree.greeLocalDriver.act(
+            credentials,
+            { externalId: unit.mac, kind: "climate" },
+            "set-temperature",
+            {
+                action: "set-temperature",
+                target: 21
+            }
+        );
         const command = sent.find((entry) => {
             const opened = openGree(entry.message.pack as string, unit.key, "v1") as { t?: string };
             return opened?.t === "cmd";
@@ -455,13 +525,19 @@ describe("temperatures, as greeclimate's own tests have them", () => {
     });
 
     it("has no reading at 0 on earlier firmware, rather than borrowing the target", () => {
-        expect(gree.greeCurrent({ TemSen: 0, hid: "362001000762+U-CS532AE(LT)V3.31.bin" }, "C")).toBeNull();
+        expect(
+            gree.greeCurrent({ TemSen: 0, hid: "362001000762+U-CS532AE(LT)V3.31.bin" }, "C")
+        ).toBeNull();
     });
 
     it.each([60, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 86])(
         "sets and reads %i F through the record bit",
         (f) => {
-            const values = gree.greeValues("set-temperature", { action: "set-temperature", target: f }, "F");
+            const values = gree.greeValues(
+                "set-temperature",
+                { action: "set-temperature", target: f },
+                "F"
+            );
             const { temSet, temRec } = gree.fahrenheitRecord(f);
             expect(values).toEqual({ SetTem: temSet, TemUn: 1, TemRec: temRec });
             expect(gree.greeCurrent({ TemSen: temSet + 40, TemRec: temRec }, "F")).toBe(f);

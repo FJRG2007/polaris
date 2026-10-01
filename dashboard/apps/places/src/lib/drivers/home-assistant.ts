@@ -109,7 +109,11 @@ function toSnapshot(entity: ha.HomeAssistantState, unit: "C" | "F" = "C"): Devic
     // "unavailable" is Home Assistant saying it cannot reach the device.
     const online = entity.state !== "unavailable";
     const reading =
-        kind === "sensor" ? readingOf(entity) : kind === "climate" ? climateReading(entity, unit) : null;
+        kind === "sensor"
+            ? readingOf(entity)
+            : kind === "climate"
+              ? climateReading(entity, unit)
+              : null;
     return {
         externalId: entity.entity_id,
         kind,

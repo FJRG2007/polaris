@@ -223,7 +223,12 @@ export function ClimateControls({
 
     return (
         <div className={cn("flex flex-col gap-3", className)}>
-            <div className={cn("flex flex-wrap gap-x-3 gap-y-2", detailed ? "items-end" : "items-center")}>
+            <div
+                className={cn(
+                    "flex flex-wrap gap-x-3 gap-y-2",
+                    detailed ? "items-end" : "items-center"
+                )}
+            >
                 <DeviceSwitch
                     device={device}
                     canControl={canControl}

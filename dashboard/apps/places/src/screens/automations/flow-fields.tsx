@@ -619,11 +619,7 @@ export function SettingFields({
                 : kinds.CLIMATE_OPTIONS;
             return (
                 <>
-                    <Field
-                        label={t("automations.fields.option")}
-                        path={[...at, "option"]}
-                        required
-                    >
+                    <Field label={t("automations.fields.option")} path={[...at, "option"]} required>
                         {(id, invalid) => (
                             <Select
                                 id={id}
@@ -653,7 +649,9 @@ export function SettingFields({
                                     { value: "on", label: kinds.stateLabel("switch", "on", t) },
                                     { value: "off", label: kinds.stateLabel("switch", "off", t) }
                                 ]}
-                                onValueChange={(next) => onChange({ ...setting, on: next === "on" })}
+                                onValueChange={(next) =>
+                                    onChange({ ...setting, on: next === "on" })
+                                }
                             />
                         )}
                     </Field>

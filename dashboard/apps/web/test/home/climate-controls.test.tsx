@@ -112,9 +112,9 @@ describe("an air conditioner's row", () => {
         expect(
             screen.getByRole("combobox", { name: "Fan speed of Bedroom AC" }).textContent
         ).toContain("Auto");
-        expect(screen.getByRole("group", { name: "Target temperature of Bedroom AC" }).textContent).toContain(
-            "24°C"
-        );
+        expect(
+            screen.getByRole("group", { name: "Target temperature of Bedroom AC" }).textContent
+        ).toContain("24°C");
         expect(screen.getByText("27°C")).toBeTruthy();
         // On, the badge says what it is doing rather than "On".
         expect(screen.getAllByText("Cool").length).toBeGreaterThan(1);
@@ -126,9 +126,9 @@ describe("an air conditioner's row", () => {
         const raise = screen.getByRole("button", { name: "Raise the target on Bedroom AC" });
         fireEvent.click(raise);
         fireEvent.click(raise);
-        expect(screen.getByRole("group", { name: "Target temperature of Bedroom AC" }).textContent).toContain(
-            "26°C"
-        );
+        expect(
+            screen.getByRole("group", { name: "Target temperature of Bedroom AC" }).textContent
+        ).toContain("26°C");
         expect(pressed).toEqual([]);
         await act(async () => {
             vi.advanceTimersByTime(800);
@@ -174,9 +174,9 @@ describe("an air conditioner's row", () => {
     it("is off limits, saying why, when it is not answering", async () => {
         await drawn([unit({ online: false, state: "unknown" })]);
         expect(
-            screen.getByRole("button", { name: "Raise the target on Bedroom AC" }).hasAttribute(
-                "disabled"
-            )
+            screen
+                .getByRole("button", { name: "Raise the target on Bedroom AC" })
+                .hasAttribute("disabled")
         ).toBe(true);
         expect(
             (screen.getByRole("combobox", { name: "Mode of Bedroom AC" }) as HTMLButtonElement)
@@ -207,9 +207,9 @@ describe("what an air conditioner accepts", () => {
         expect(kinds.climateCommandIssue(settings, { action: "set-temperature", target: 22 })).toBe(
             null
         );
-        expect(
-            kinds.climateCommandIssue(settings, { action: "set-temperature", target: 31 })
-        ).toBe("That temperature is not one this device accepts");
+        expect(kinds.climateCommandIssue(settings, { action: "set-temperature", target: 31 })).toBe(
+            "That temperature is not one this device accepts"
+        );
         expect(
             kinds.climateCommandIssue(settings, { action: "set-temperature", target: 22.5 })
         ).toBe("That temperature is not one this device accepts");

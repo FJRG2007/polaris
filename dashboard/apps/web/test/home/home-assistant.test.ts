@@ -213,15 +213,30 @@ describe("an air conditioner", () => {
     it.each([
         ["turn-on", undefined, "turn_on", {}],
         ["turn-off", undefined, "turn_off", {}],
-        ["set-mode", { action: "set-mode", mode: "auto" }, "set_hvac_mode", { hvac_mode: "heat_cool" }],
-        ["set-mode", { action: "set-mode", mode: "fan" }, "set_hvac_mode", { hvac_mode: "fan_only" }],
+        [
+            "set-mode",
+            { action: "set-mode", mode: "auto" },
+            "set_hvac_mode",
+            { hvac_mode: "heat_cool" }
+        ],
+        [
+            "set-mode",
+            { action: "set-mode", mode: "fan" },
+            "set_hvac_mode",
+            { hvac_mode: "fan_only" }
+        ],
         [
             "set-temperature",
             { action: "set-temperature", target: 23.5 },
             "set_temperature",
             { temperature: 23.5 }
         ],
-        ["set-fan", { action: "set-fan", fan: "medium-low" }, "set_fan_mode", { fan_mode: "medium low" }],
+        [
+            "set-fan",
+            { action: "set-fan", fan: "medium-low" },
+            "set_fan_mode",
+            { fan_mode: "medium low" }
+        ],
         [
             "set-option",
             { action: "set-option", option: "swing", on: true },
@@ -270,9 +285,9 @@ describe("an air conditioner", () => {
 
     it("refuses one temperature on an entity that only takes a range", async () => {
         const before = sent.length;
-        const attributes = (states as { entity_id: string; attributes: Record<string, unknown> }[]).find(
-            (entity) => entity.entity_id === "climate.living_room"
-        )!.attributes;
+        const attributes = (
+            states as { entity_id: string; attributes: Record<string, unknown> }[]
+        ).find((entity) => entity.entity_id === "climate.living_room")!.attributes;
         delete attributes.temperature;
         attributes.target_temp_low = 20;
         attributes.target_temp_high = 24;

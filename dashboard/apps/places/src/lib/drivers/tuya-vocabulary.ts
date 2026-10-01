@@ -304,8 +304,7 @@ export function tuyaClimate(
 ): { settings: ClimateSettings | null; current: number | null; unit: ClimateUnit } {
     if (!spec) return { settings: null, current: null, unit: "C" };
     const fn = (code: string) => spec.functions.find((point) => point.code === code);
-    const st = (code: string) =>
-        spec.status.find((point) => point.code === code) ?? fn(code);
+    const st = (code: string) => spec.status.find((point) => point.code === code) ?? fn(code);
     const target = targetPoint(spec);
     const unit = target?.unit ?? "C";
     const range = target ? integerOf(fn(target.code)) : null;
@@ -351,8 +350,11 @@ export function tuyaClimateCommands(
         return [{ code: "switch", value: action === "turn-on" }];
     if (!command || command.action !== action) throw new HomeError("Say what to set it to");
     if (!spec) throw new HomeError("That device has not said what it can be set to yet");
-    const back = <T extends string>(table: Readonly<Record<string, T>>, ours: T, offered: string[]) =>
-        offered.find((word) => table[word] === ours);
+    const back = <T extends string>(
+        table: Readonly<Record<string, T>>,
+        ours: T,
+        offered: string[]
+    ) => offered.find((word) => table[word] === ours);
     const fn = (code: string) => spec.functions.find((point) => point.code === code);
     switch (command.action) {
         case "set-mode": {

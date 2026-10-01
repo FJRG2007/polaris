@@ -166,7 +166,10 @@ const settingError = { errorMap: () => ({ message: "automations.errors.setting" 
 const settingSchema = z.discriminatedUnion(
     "action",
     [
-        z.object({ action: z.literal("set-mode"), mode: z.enum(kinds.CLIMATE_MODES, settingError) }),
+        z.object({
+            action: z.literal("set-mode"),
+            mode: z.enum(kinds.CLIMATE_MODES, settingError)
+        }),
         z.object({ action: z.literal("set-temperature"), target: amount }),
         z.object({ action: z.literal("set-fan"), fan: z.enum(kinds.CLIMATE_FANS, settingError) }),
         z.object({

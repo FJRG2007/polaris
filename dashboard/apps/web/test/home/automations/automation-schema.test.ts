@@ -496,7 +496,13 @@ describe("an air conditioner in an automation", () => {
         expect(
             issues({
                 triggers: [
-                    { id: "trig01", kind: "threshold", deviceId: "ac", direction: "above", value: 27 },
+                    {
+                        id: "trig01",
+                        kind: "threshold",
+                        deviceId: "ac",
+                        direction: "above",
+                        value: 27
+                    },
                     {
                         id: "trig02",
                         kind: "change",
@@ -531,7 +537,9 @@ describe("an air conditioner in an automation", () => {
 
     it("takes a setting with the action that sets it, and only there", () => {
         const step = (extra: Record<string, unknown>) =>
-            input({ actions: [{ id: "step01", kind: "device", deviceId: "ac", ...extra } as never] });
+            input({
+                actions: [{ id: "step01", kind: "device", deviceId: "ac", ...extra } as never]
+            });
         expect(messages(step({ do: "set-mode" }))).toContain("automations.errors.setting");
         expect(
             messages(step({ do: "turn-off", setting: { action: "set-mode", mode: "heat" } }))
@@ -553,7 +561,10 @@ describe("an air conditioner in an automation", () => {
                         kind: "device",
                         deviceId: "ac",
                         do: "set-temperature",
-                        setting: { action: "set-temperature", target: " 22,5 " as unknown as number }
+                        setting: {
+                            action: "set-temperature",
+                            target: " 22,5 " as unknown as number
+                        }
                     }
                 ]
             })
@@ -585,7 +596,9 @@ describe("an air conditioner in an automation", () => {
                     { id: "step01", kind: "device", deviceId: "ac", do: setting.action, setting }
                 ]
             });
-        expect(set({ action: "set-temperature", target: 31 })).toEqual(["automations.errors.setting"]);
+        expect(set({ action: "set-temperature", target: 31 })).toEqual([
+            "automations.errors.setting"
+        ]);
         expect(set({ action: "set-mode", mode: "dry" })).toEqual(["automations.errors.setting"]);
         expect(set({ action: "set-option", option: "eco", on: true })).toEqual([
             "automations.errors.setting"
@@ -616,11 +629,14 @@ describe("an air conditioner in an automation", () => {
             do: "set-mode",
             setting: { action: "set-mode", mode: "heat" }
         };
-        const lookup = (id: string) => (id === "ac" ? { name: "Bedroom AC", kind: "climate" } : undefined);
-        expect(words.describeStep(step, lookup, () => undefined, en)).toBe("Set Bedroom AC to Heat");
-        expect(words.describeStep(step, lookup, () => undefined, es)).toBe("Poner Bedroom AC en Calor");
-        expect(
-            words.valueText("mode", "climate", "fan", en)
-        ).toBe("Fan only");
+        const lookup = (id: string) =>
+            id === "ac" ? { name: "Bedroom AC", kind: "climate" } : undefined;
+        expect(words.describeStep(step, lookup, () => undefined, en)).toBe(
+            "Set Bedroom AC to Heat"
+        );
+        expect(words.describeStep(step, lookup, () => undefined, es)).toBe(
+            "Poner Bedroom AC en Calor"
+        );
+        expect(words.valueText("mode", "climate", "fan", en)).toBe("Fan only");
     });
 });

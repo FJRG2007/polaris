@@ -116,11 +116,7 @@ export function greeSettings(status: gree.GreeStatus): ClimateSettings {
     const unit = numberOf(status.TemUn) === 1 ? "F" : "C";
     const set = numberOf(status.SetTem);
     const target =
-        set === null
-            ? null
-            : unit === "F"
-              ? fahrenheitOf(set, numberOf(status.TemRec) ?? 0)
-              : set;
+        set === null ? null : unit === "F" ? fahrenheitOf(set, numberOf(status.TemRec) ?? 0) : set;
     const mode = numberOf(status.Mod);
     const fan = numberOf(status.WdSpd);
     const options: ClimateSettings["options"] = {};
@@ -192,10 +188,7 @@ export function greeValues(
 }
 
 /** One unit, as a row. */
-export function greeSnapshot(
-    unit: gree.GreeUnit,
-    status: gree.GreeStatus | null
-): DeviceSnapshot {
+export function greeSnapshot(unit: gree.GreeUnit, status: gree.GreeStatus | null): DeviceSnapshot {
     const name = unit.name || `Gree ${unit.mac.slice(-4)}`;
     if (!status) {
         return {
