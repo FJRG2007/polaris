@@ -32,8 +32,8 @@
  * bridge's address) rather than the credential itself. The rest is generic and
  * no make needs a screen of its own for it:
  *
- * - The registry says what the reader is shown (`kind`: a code to scan, or a
- *   button to press), how often to ask whether it has happened (`pollMs`) and
+ * - The registry says what the reader is shown (`kind`: a code to scan, a
+ *   button to press, or a box for a code sent by email), how often to ask whether it has happened (`pollMs`) and
  *   how long one attempt is given before a new one is offered (`lifetimeMs`).
  *   Its words are `connections.<id>.pairing.prompt` in the catalogs: the one
  *   line under the code or beside the wait.
@@ -79,6 +79,8 @@ export interface ConnectionField {
      */
     readonly secret?: boolean;
     readonly optional?: boolean;
+    /** A shape the value has to have, checked as it is typed. */
+    readonly format?: "email";
     readonly minLength?: number;
     readonly maxLength?: number;
     /** A fixed set to pick from, where there is one. */
@@ -100,8 +102,12 @@ export const REACH_LABELS: Readonly<Record<ConnectionReach, string>> = {
  * file header for the whole of it.
  */
 export interface ConnectionPairing {
-    /** What the reader is shown: a code to scan, or a wait for a button. */
-    readonly kind: "qr" | "press";
+    /**
+     * What the reader is shown: a code to scan, a wait for a button, or a box
+     * for a code the maker sent them. A `code` pairing is not polled: the code
+     * typed rides in the state of the one `poll` that answers it.
+     */
+    readonly kind: "qr" | "press" | "code";
     /** How often the dialog asks whether it has happened. */
     readonly pollMs: number;
     /** How long one attempt is waited on before the dialog stops asking and
@@ -604,9 +610,10 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "local"
         ]
     },
-    // Philips air purifiers and humidifiers: local, like Home Assistant's
-    // Philips integration - Philips' cloud API is not public. Units are found on
-    // the network, or at an address; nothing is paired and no key is kept.
+    // Philips air purifiers and humidifiers. Local stays the recommended way in:
+    // it covers every model Home Assistant's Philips integration lists, needs no
+    // account, and keeps working when Philips' servers do not. Units are found
+    // on the network, or at an address; nothing is paired and no key is kept.
     {
         id: "philips-coap",
         brand: "Philips",
@@ -638,6 +645,51 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "humidifier",
             "air quality",
             "local"
+        ]
+    },
+    // The Philips account, the way the Air+ app reaches its purifiers: for a unit
+    // on another network, and for the models whose firmware has no local
+    // control. Second, not recommended: Philips publishes no API for it, so it
+    // is the less reliable of the two over time, and it covers only the units
+    // the community integrations have mapped (AC0650, AC0651, AC1715, AC3221).
+    {
+        id: "philips-cloud",
+        brand: "Philips",
+        logo: "philips",
+        label: en("connections.philips-cloud.label"),
+        reach: "anywhere",
+        summary: en("connections.philips-cloud.summary"),
+        note: en("connections.philips-cloud.note"),
+        steps: [
+            en("connections.philips-cloud.steps.s0"),
+            en("connections.philips-cloud.steps.s1"),
+            en("connections.philips-cloud.steps.s2")
+        ],
+        fields: [
+            {
+                key: "email",
+                label: en("connections.philips-cloud.fields.email.label"),
+                hint: en("connections.philips-cloud.fields.email.hint"),
+                placeholder: en("connections.philips-cloud.fields.email.placeholder"),
+                format: "email",
+                maxLength: 254
+            }
+        ],
+        // Philips says nothing about how long its emailed code lasts. Ten
+        // minutes is Polaris' own bound: time to find the email, not a box left
+        // waiting for ever. Nothing is polled; the code is sent once typed.
+        pairing: { kind: "code", pollMs: 3_000, lifetimeMs: 600_000 },
+        kinds: ["air"],
+        search: [
+            "philips",
+            "air+",
+            "air plus",
+            "versuni",
+            "air purifier",
+            "purifier",
+            "air quality",
+            "cloud",
+            "account"
         ]
     },
     {
@@ -892,6 +944,10 @@ export function shownFields(connection: DeviceConnection): readonly ConnectionFi
     return connection.fields.filter((field) => field.secret !== true);
 }
 
+/** An address with something on each side of one @ and a dot in its domain:
+ *  enough to catch a slip, not a claim that the mailbox exists. */
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * What is wrong with one field, or nothing.
  *
@@ -917,6 +973,7 @@ export function fieldIssue(
     if (field.choices && !field.choices.some((choice) => choice.value === trimmed)) {
         return t("connections.pickListed");
     }
+    if (field.format === "email" && !EMAIL.test(trimmed)) return t("connections.notEmail");
     return null;
 }
 

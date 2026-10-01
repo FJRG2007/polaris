@@ -215,6 +215,27 @@ export function philipsAir(status: Status, model: PhilipsModel | null): kinds.Ai
         }
     }
 
+    return {
+        mode: presets.find(([, pattern]) => holds(status, pattern))?.[0] ?? null,
+        modes: presets.map(([mode]) => mode),
+        speed: speeds.find(([, pattern]) => holds(status, pattern))?.[0] ?? null,
+        speeds: speeds.map(([speed]) => speed),
+        humidity,
+        options,
+        ...philipsMeasures(status, model)
+    };
+}
+
+/**
+ * What a status measures and how worn its filters are, by the keys Philips
+ * uses. The same keys travel over the cloud (`D03221` is PM2.5 there too,
+ * `D0540E` the NanoProtect filter's hours), so the cloud driver reads its
+ * statuses through this rather than a table of its own.
+ */
+export function philipsMeasures(
+    status: Status,
+    model: PhilipsModel | null
+): Pick<kinds.AirSettings, "readings" | "filters"> {
     const readings: kinds.AirSettings["readings"] = {};
     for (const sensor of SENSORS) {
         if (
@@ -228,17 +249,7 @@ export function philipsAir(status: Status, model: PhilipsModel | null): kinds.Ai
         if (sensor.measure === "humidity" && (read < 0 || read > 100)) continue;
         readings[sensor.measure] = read;
     }
-
-    return {
-        mode: presets.find(([, pattern]) => holds(status, pattern))?.[0] ?? null,
-        modes: presets.map(([mode]) => mode),
-        speed: speeds.find(([, pattern]) => holds(status, pattern))?.[0] ?? null,
-        speeds: speeds.map(([speed]) => speed),
-        humidity,
-        options,
-        readings,
-        filters: filtersOf(status, model)
-    };
+    return { readings, filters: filtersOf(status, model) };
 }
 
 /** What to write for one action, in the unit's own keys. */

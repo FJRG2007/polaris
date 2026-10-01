@@ -376,7 +376,9 @@ export type DeviceAccountInput = z.infer<typeof deviceAccountSchema>;
  * driver itself - it has been through a browser.
  */
 export const devicePairingSchema = deviceAccountSchema.extend({
-    state: z.record(z.string().max(64), z.string().max(500)).default({}),
+    // A Philips sign-in token is longer than a scanned code; nothing in the
+    // state is a secret either way (`drivers/contract.ts`).
+    state: z.record(z.string().max(64), z.string().max(4000)).default({}),
     accountId: z.string().trim().max(64).optional()
 });
 

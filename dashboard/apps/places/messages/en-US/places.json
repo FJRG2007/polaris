@@ -536,13 +536,25 @@
         "airNoHumidity": "That device does not humidify",
         "airHumidity": "That humidity is not one this device accepts",
         "philipsQuiet": "The air purifier did not answer.",
-        "philipsLocalOff": "This model's firmware does not allow local control. It answers on your network but not to the local protocol Polaris uses, so it can only be operated from the Philips Air+ app.",
+        "philipsLocalOff": "This model's firmware does not allow local control. It answers on your network but not to the local protocol Polaris uses. Try connecting it with a Philips Air+ account instead.",
         "philipsGarbled": "The air purifier answered in a way Polaris could not read.",
         "philipsRefused": "The air purifier refused that.",
         "philipsLost": "Polaris has lost track of these air purifiers. Connect them again.",
         "philipsNoneThere": "No Philips air purifier answered at that address. Check it is switched on and on the same network as Polaris.",
         "philipsNoneFound": "No Philips air purifier answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
-        "philipsNoRead": "The air purifiers on this network said who they are but would not answer a read. Switch them off and on again and try once more."
+        "philipsNoRead": "The air purifiers on this network said who they are but would not answer a read. Switch them off and on again and try once more.",
+        "philipsCloudUnreachable": "Philips' cloud could not be reached.",
+        "philipsCloudGarbled": "Philips' cloud answered in a way Polaris could not read.",
+        "philipsCloudSignedOut": "Philips no longer accepts this sign-in. Connect the account again.",
+        "philipsCloudNoCode": "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with.",
+        "philipsCloudUnfinished": "That address is not a finished Philips account yet. Sign in once in the Philips Air+ app, then try again.",
+        "philipsCloudBadCode": "That code is not right or has expired. Ask for a new one.",
+        "philipsCloudEmpty": "There is no air purifier on this Philips account. Add it in the Air+ app first.",
+        "philipsCloudQuiet": "The air purifier did not answer through Philips' cloud.",
+        "philipsCloudBusy": "The air purifier is busy. Try again in a moment.",
+        "philipsCloudLinkRefused": "Philips' cloud would not let Polaris reach this air purifier. Connect the account again.",
+        "philipsCloudNotOnAccount": "That device is not on this Philips account.",
+        "philipsCloudEnterCode": "Enter the code from the email"
     },
     "connections": {
         "nuki-web": {
@@ -853,7 +865,7 @@
         "philips-coap": {
             "label": "Philips Air+ (local network)",
             "summary": "The air purifiers and humidifiers you use with the Philips Air+ app, straight over your network. No account, nothing through the cloud.",
-            "note": "Polaris finds the units on your network and reads them the way Home Assistant does. They have to be set up in the Philips Air+ app first, and on the same network as Polaris. Some newer firmware switches local control off; such a unit can only be used from the app, and Polaris says so.",
+            "note": "Polaris finds the units on your network and reads them the way Home Assistant does. They have to be set up in the Philips Air+ app first, and on the same network as Polaris. Some newer firmware switches local control off; such a unit may work through a Philips Air+ account instead, and Polaris says so.",
             "steps": {
                 "s0": "Set the purifier up in the Philips Air+ app, on the same Wi-Fi network as Polaris.",
                 "s1": "Select Connect. Leave the address empty to look for every unit, or type one to add just that unit."
@@ -865,7 +877,28 @@
                     "placeholder": "192.168.1.40"
                 }
             }
-        }
+        },
+        "philips-cloud": {
+            "label": "Philips Air+ account",
+            "summary": "The purifiers on your Philips Air+ account, through Philips' cloud like the app. Works from any network.",
+            "note": "Unofficial: Philips publishes no API for this, so it could stop working if Philips changes its cloud. It signs in with a code Philips emails you, and no password is kept. Models it knows: AC0650, AC0651, AC1715 and AC3221; others show their readings and power only. If the unit is on the same network as Polaris, the local connection does not depend on Philips.",
+            "steps": {
+                "s0": "Set the purifier up in the Philips Air+ app and sign in there with your email.",
+                "s1": "Type that email and select Email me a code. Philips sends you a one-time code.",
+                "s2": "Type the code here. Polaris lists the purifiers on the account."
+            },
+            "fields": {
+                "email": {
+                    "label": "Email",
+                    "hint": "The one you sign in to the Philips Air+ app with.",
+                    "placeholder": "you@example.com"
+                }
+            },
+            "pairing": {
+                "prompt": "Philips has emailed a one-time code to that address. It can take a minute to arrive; check spam too."
+            }
+        },
+        "notEmail": "Type a whole email address, like name@example.com."
     },
     "actions": {
         "defaultStorage": "Wherever this Polaris keeps footage ({name})",
@@ -1441,7 +1474,11 @@
             "expired": "This code has expired.",
             "newCode": "New code",
             "codeLabel": "Code to scan with the app",
-            "back": "Back"
+            "back": "Back",
+            "getCode": "Email me a code",
+            "codeField": "Code from the email",
+            "resend": "Send a new code",
+            "codeExpired": "This code has expired. Ask for a new one."
         }
     },
     "discover": {

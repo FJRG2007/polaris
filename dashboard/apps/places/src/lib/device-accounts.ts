@@ -32,6 +32,7 @@ import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
 import { SHELLY_LOCAL, shellyLocalDriver } from "./drivers/shelly-local";
 import { GREE_LOCAL, greeLocalDriver } from "./drivers/gree-local";
 import { PHILIPS_COAP, philipsCoapDriver } from "./drivers/philips-coap";
+import { PHILIPS_CLOUD, philipsCloudDriver } from "./drivers/philips-cloud";
 import { KASA_LOCAL, TAPO_LOCAL, kasaLocalDriver, tapoLocalDriver } from "./drivers/tplink-local";
 import {
     DriverError,
@@ -62,7 +63,8 @@ const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [HOME_ASSISTANT]: homeAssistantDriver,
     [SWITCHBOT_CLOUD]: switchBotCloudDriver,
     [GREE_LOCAL]: greeLocalDriver,
-    [PHILIPS_COAP]: philipsCoapDriver
+    [PHILIPS_COAP]: philipsCoapDriver,
+    [PHILIPS_CLOUD]: philipsCloudDriver
 };
 
 export function driverFor(connection: string): DeviceDriver {

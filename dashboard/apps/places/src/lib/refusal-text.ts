@@ -279,7 +279,43 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     [
         "The air purifiers on this network said who they are but would not answer a read. Switch them off and on again and try once more.",
         "refusals.philipsNoRead"
-    ]
+    ],
+    ["Philips' cloud could not be reached.", "refusals.philipsCloudUnreachable"],
+    [
+        "Philips' cloud answered in a way Polaris could not read.",
+        "refusals.philipsCloudGarbled"
+    ],
+    [
+        "Philips no longer accepts this sign-in. Connect the account again.",
+        "refusals.philipsCloudSignedOut"
+    ],
+    [
+        "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with.",
+        "refusals.philipsCloudNoCode"
+    ],
+    [
+        "That address is not a finished Philips account yet. Sign in once in the Philips Air+ app, then try again.",
+        "refusals.philipsCloudUnfinished"
+    ],
+    [
+        "That code is not right or has expired. Ask for a new one.",
+        "refusals.philipsCloudBadCode"
+    ],
+    [
+        "There is no air purifier on this Philips account. Add it in the Air+ app first.",
+        "refusals.philipsCloudEmpty"
+    ],
+    [
+        "The air purifier did not answer through Philips' cloud.",
+        "refusals.philipsCloudQuiet"
+    ],
+    ["The air purifier is busy. Try again in a moment.", "refusals.philipsCloudBusy"],
+    [
+        "Philips' cloud would not let Polaris reach this air purifier. Connect the account again.",
+        "refusals.philipsCloudLinkRefused"
+    ],
+    ["That device is not on this Philips account.", "refusals.philipsCloudNotOnAccount"],
+    ["Enter the code from the email", "refusals.philipsCloudEnterCode"]
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */
