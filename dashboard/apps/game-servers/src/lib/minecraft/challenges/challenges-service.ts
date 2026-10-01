@@ -26,20 +26,22 @@
  */
 
 import { z } from "zod";
-import { randomUUID } from "node:crypto";
 import * as draw from "./draw";
 import * as play from "./play";
 import * as stored from "./state";
 import { readXray } from "../xray";
 import * as period from "./period";
 import * as season from "./season";
+import * as speech from "../speech";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
-import * as progress from "./progress";
-import * as speech from "../speech";
 import * as written from "./messages";
+import * as service from "../service";
+import * as progress from "./progress";
 import * as commands from "./commands";
 import * as playing from "../activity";
+import * as delivery from "../delivery";
+import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "../schedule";
 import { parseProperties } from "../parse";
@@ -47,13 +49,11 @@ import type * as plan from "../events/plan";
 import * as settingsModule from "./settings";
 import * as replies from "../events/replies";
 import { readEventState } from "../events/state";
+import * as speechService from "../speech-service";
+import * as eventMessages from "../events/messages";
+import { editionOf, type ServerContainer } from "../service";
 import { chosenLanguage as chosenEventsLanguage, readEventsConfig } from "../events/catalog";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
-import * as speechService from "../speech-service";
-import * as delivery from "../delivery";
-import * as eventMessages from "../events/messages";
-import * as service from "../service";
-import { editionOf, type ServerContainer } from "../service";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -2388,6 +2388,7 @@ export async function sweepChallenges(
                     sweep.state.card?.key
                 ]);
                 await rotate({ ...sweep, seen: playing.seenOn(row.id) ?? new Map() });
+                idle.delete(row.id);
                 if (
                     JSON.stringify([
                         sweep.state.daily?.key,

@@ -64,7 +64,10 @@ vi.mock("@polaris/app-host", () => ({
             patchInstallConfig: async () => undefined
         },
         rateLimitService: { rateLimit: async () => ({ ok: true, retryAfterMs: 0 }) },
-        i18nLocaleService: { getUserLocale: async (id: string) => fake.locales.get(id) ?? "en-US" }
+        i18nLocaleService: {
+            getUserLocale: async (id: string) => fake.locales.get(id) ?? "en-US",
+            storedLocale: async (id: string) => fake.locales.get(id) ?? null
+        }
     }
 }));
 

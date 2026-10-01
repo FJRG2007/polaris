@@ -15,12 +15,12 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { Locale } from "@polaris/core";
 import { SOFTWARE_KEY } from "./join-guard";
-import { homeLanguage } from "./speech-service";
+import { accountLanguage, homeLanguage } from "./speech-service";
 import * as moderation from "./chat-moderation";
 import { gameCatalogs } from "../../../messages";
 import { chosenLanguage } from "./events/catalog";
 import { timeoutPlayer } from "./timeout-service";
-import { gameLanguage, type Language } from "./speech";
+import type { Language } from "./speech";
 import { MODS_KEY, URL_KEY, hasMod, loginOn } from "./polaris-login";
 import { anticheatBuildFor, anticheatOn } from "./polaris-anticheat";
 
@@ -87,12 +87,7 @@ async function playerLanguage(
             select: { userId: true }
         })
         .catch(() => null);
-    if (!link) return home;
-    try {
-        return gameLanguage(await host.i18nLocaleService.getUserLocale(link.userId));
-    } catch {
-        return home;
-    }
+    return link ? accountLanguage(link.userId, home) : home;
 }
 
 /** The rules the server applies, and a note that it asked. */

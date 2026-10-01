@@ -55,6 +55,15 @@ async function localeOf(userId: string): Promise<string | null> {
     }
 }
 
+/** What a linked account reads in the game: its own language, or the server's. */
+export async function accountLanguage(
+    userId: string,
+    home: speech.Language
+): Promise<speech.Language> {
+    const locale = await localeOf(userId);
+    return locale ? speech.gameLanguage(locale) : home;
+}
+
 /**
  * Who is on and what each reads, looked at again when the last look is older
  * than a few seconds (or `force`); each player whose language is new or changed
@@ -88,8 +97,7 @@ export async function hear(
         const userId = links.get(name.toLowerCase());
         let language = home;
         if (userId) {
-            const locale = locales.has(userId) ? null : await localeOf(userId);
-            language = locales.get(userId) ?? (locale ? speech.gameLanguage(locale) : home);
+            language = locales.get(userId) ?? (await accountLanguage(userId, home));
             locales.set(userId, language);
         }
         of.set(name.toLowerCase(), language);
