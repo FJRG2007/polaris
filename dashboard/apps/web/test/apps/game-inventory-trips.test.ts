@@ -10,8 +10,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { sayEachReplies, sayEachScript } from "@polaris-app/game-servers/src/lib/minecraft/say-each";
-import { readLiveInventories, readLiveInventory } from "@polaris-app/game-servers/src/lib/minecraft/inventory-service";
+import {
+    sayEachReplies,
+    sayEachScript
+} from "@polaris-app/game-servers/src/lib/minecraft/say-each";
+import {
+    readLiveInventories,
+    readLiveInventory
+} from "@polaris-app/game-servers/src/lib/minecraft/inventory-service";
 
 const RCON_PACKET = 4096;
 const TRIP_CAP = 16 * 1024;
@@ -48,11 +54,15 @@ function server(bags: Record<string, string[]>) {
         trips += 1;
         return answer(argv);
     };
-    const sayEach = async (commands: readonly (readonly string[])[]): Promise<(string | null)[]> => {
+    const sayEach = async (
+        commands: readonly (readonly string[])[]
+    ): Promise<(string | null)[]> => {
         trips += 1;
         // What the shell script prints, cut at what one trip hands back.
         expect(sayEachScript(commands)).toContain("rcon-cli");
-        const printed = commands.map((argv, index) => `${answer(argv)}\n@@polaris-end ${index} 0\n`).join("");
+        const printed = commands
+            .map((argv, index) => `${answer(argv)}\n@@polaris-end ${index} 0\n`)
+            .join("");
         return sayEachReplies(printed.slice(0, TRIP_CAP), commands.length);
     };
     return { say, sayEach, trips: () => trips };
@@ -81,7 +91,10 @@ describe("reading bags", () => {
         const old = [];
         for (const name of Object.keys(bags)) old.push(await readLiveInventory(before.say, name));
         const after = server(bags);
-        const now = await readLiveInventories({ ask: after.say, askEach: after.sayEach }, Object.keys(bags));
+        const now = await readLiveInventories(
+            { ask: after.say, askEach: after.sayEach },
+            Object.keys(bags)
+        );
 
         expect(now.map((reading) => reading?.items)).toEqual(old.map((reading) => reading.items));
         expect(before.trips()).toBe(42 + 42 + 1);
@@ -109,7 +122,9 @@ describe("reading bags", () => {
                 return live.say(argv);
             },
             askEach: async (commands: readonly (readonly string[])[]) =>
-                (await live.sayEach(commands)).map((answer, index) => (commands[index]![3] === "Bob" ? null : answer))
+                (await live.sayEach(commands)).map((answer, index) =>
+                    commands[index]![3] === "Bob" ? null : answer
+                )
         };
         const readings = await readLiveInventories(flaky, Object.keys(bags));
         expect(readings[0]?.items).toHaveLength(1);
@@ -145,7 +160,8 @@ describe("reading bags", () => {
 
 describe("sayEachReplies", () => {
     it("hands back each answer, and nothing for one whose end did not arrive", () => {
-        const output = "first answer\n@@polaris-end 0 0\nsecond\r\nspans lines\n@@polaris-end 1 0\nthird, cut off";
+        const output =
+            "first answer\n@@polaris-end 0 0\nsecond\r\nspans lines\n@@polaris-end 1 0\nthird, cut off";
         expect(sayEachReplies(output, 3)).toEqual(["first answer", "second\nspans lines", null]);
     });
 

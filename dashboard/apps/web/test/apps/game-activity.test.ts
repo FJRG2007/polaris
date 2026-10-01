@@ -42,7 +42,13 @@ describe("what changed since the last look", () => {
         expect(change.arrived).toEqual([{ name: "Bob", id: null }]);
         expect(change.left).toEqual([]);
 
-        const after = rosterChange(open([["s1", "Alice"], ["s2", "Bob"]]), named("Bob"));
+        const after = rosterChange(
+            open([
+                ["s1", "Alice"],
+                ["s2", "Bob"]
+            ]),
+            named("Bob")
+        );
         expect(after.arrived).toEqual([]);
         expect(after.left).toEqual(["s1"]);
     });
@@ -65,13 +71,27 @@ describe("what changed since the last look", () => {
     it("heals a duplicate left behind by an interrupted sweep", () => {
         // Two open sessions for one player means a pass died between writing and
         // committing. One is the visit; the rest are closed rather than kept.
-        const change = rosterChange(open([["s1", "Alice"], ["s2", "Alice"]]), named("Alice"));
+        const change = rosterChange(
+            open([
+                ["s1", "Alice"],
+                ["s2", "Alice"]
+            ]),
+            named("Alice")
+        );
         expect(change.arrived).toEqual([]);
         expect(change.left).toEqual(["s2"]);
     });
 
     it("closes everything when the server empties", () => {
-        expect(rosterChange(open([["s1", "Alice"], ["s2", "Bob"]]), []).left).toEqual(["s1", "s2"]);
+        expect(
+            rosterChange(
+                open([
+                    ["s1", "Alice"],
+                    ["s2", "Bob"]
+                ]),
+                []
+            ).left
+        ).toEqual(["s1", "s2"]);
     });
 
     it("ignores a blank name rather than opening a session for nobody", () => {
@@ -89,7 +109,9 @@ describe("what changed since the last look", () => {
     it("tells two survivors who picked the same name apart", () => {
         // The name is decoration on ARK: two people can both call themselves
         // Survivor, and the one who left has to be the one whose visit closes.
-        const change = rosterChange(open([["s1", "Survivor"]], "111"), [survivor("Survivor", "222")]);
+        const change = rosterChange(open([["s1", "Survivor"]], "111"), [
+            survivor("Survivor", "222")
+        ]);
         expect(change.left).toEqual(["s1"]);
         expect(change.arrived).toEqual([survivor("Survivor", "222")]);
     });
@@ -114,7 +136,10 @@ describe("what somebody's visits add up to", () => {
     it("counts the visit in progress up to now", () => {
         // A total that only moves when somebody leaves reads as broken to whoever
         // is watching it move.
-        const history = historyOf([{ joinedAt: at("2026-08-13T20:00:00.000Z"), leftAt: null }], NOW);
+        const history = historyOf(
+            [{ joinedAt: at("2026-08-13T20:00:00.000Z"), leftAt: null }],
+            NOW
+        );
         expect(history.playedMs).toBe(60 * 60 * 1000);
         expect(history.online).toBe(true);
         expect(history.lastSeen).toEqual(NOW);
@@ -125,7 +150,10 @@ describe("what somebody's visits add up to", () => {
     it("adds up every visit and remembers the first", () => {
         const history = historyOf(
             [
-                { joinedAt: at("2026-08-01T10:00:00.000Z"), leftAt: at("2026-08-01T12:00:00.000Z") },
+                {
+                    joinedAt: at("2026-08-01T10:00:00.000Z"),
+                    leftAt: at("2026-08-01T12:00:00.000Z")
+                },
                 { joinedAt: at("2026-08-13T19:00:00.000Z"), leftAt: at("2026-08-13T19:30:00.000Z") }
             ],
             NOW
@@ -175,7 +203,9 @@ describe("the readings behind the chart", () => {
     });
 
     it("does not break the line for a sweep that merely ran late", () => {
-        expect(fillGaps([reading(0, 4), reading(2, 4)], step).map((point) => point.players)).toEqual([4, 4]);
+        expect(
+            fillGaps([reading(0, 4), reading(2, 4)], step).map((point) => point.players)
+        ).toEqual([4, 4]);
     });
 
     it("puts the readings in order before reading them", () => {
@@ -215,7 +245,9 @@ describe("the game's own figures for a player", () => {
     it("reads the flat file from before 1.13", () => {
         // Lucky blocks is a 1.13 map and skyblock a 1.16 one, so a server here can
         // genuinely be old enough to have written either of the older shapes.
-        const stats = readPlayerStats(JSON.stringify({ "stat.playOneMinute": 1200, "stat.deaths": 7 }));
+        const stats = readPlayerStats(
+            JSON.stringify({ "stat.playOneMinute": 1200, "stat.deaths": 7 })
+        );
         expect(stats?.playedMs).toBe(60_000);
         expect(stats?.deaths).toBe(7);
     });
@@ -228,7 +260,9 @@ describe("the game's own figures for a player", () => {
     it("survives a file that is not what it says it is", () => {
         expect(readPlayerStats("not json at all")).toBeNull();
         expect(readPlayerStats("null")).toBeNull();
-        expect(readPlayerStats('{"stats":{"minecraft:custom":{"minecraft:play_time":"lots"}}}')).toBeNull();
+        expect(
+            readPlayerStats('{"stats":{"minecraft:custom":{"minecraft:play_time":"lots"}}}')
+        ).toBeNull();
     });
 });
 
@@ -261,7 +295,11 @@ describe("presenceLine", () => {
         // A server stopped while somebody was playing leaves their visit open, and
         // "last on when they arrived" beats saying nothing.
         expect(
-            presenceLine({ online: false, seen: { since: seen.since, lastSeen: null }, addedAt: added })
+            presenceLine({
+                online: false,
+                seen: { since: seen.since, lastSeen: null },
+                addedAt: added
+            })
         ).toEqual({ kind: "last-on", iso: seen.since });
     });
 

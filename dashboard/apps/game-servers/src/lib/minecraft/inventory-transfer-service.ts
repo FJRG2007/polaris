@@ -34,7 +34,11 @@ interface Bag {
 }
 
 /** A player who is on: the reading just taken, kept as their snapshot, or the kept copy when it could not be read whole. */
-async function bagOf(installedAppId: string, name: string, reading: LiveReading | null): Promise<Bag | null> {
+async function bagOf(
+    installedAppId: string,
+    name: string,
+    reading: LiveReading | null
+): Promise<Bag | null> {
     if (reading?.answered && reading.unreadable === 0) {
         const takenAt = new Date();
         await writeSnapshot(installedAppId, name, reading.items, takenAt).catch(() => undefined);

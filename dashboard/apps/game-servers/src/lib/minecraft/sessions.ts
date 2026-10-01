@@ -40,7 +40,11 @@ const EVENT_PATTERNS: readonly {
     /** Which capture holds the address, when the line carries one. */
     readonly address?: number;
 }[] = [
-    { kind: "login", pattern: /([A-Za-z0-9_]{1,16})\[\/((?:\d{1,3}\.){3}\d{1,3}):\d+\]\s+logged in/, address: 2 },
+    {
+        kind: "login",
+        pattern: /([A-Za-z0-9_]{1,16})\[\/((?:\d{1,3}\.){3}\d{1,3}):\d+\]\s+logged in/,
+        address: 2
+    },
     { kind: "join", pattern: /([A-Za-z0-9_ ]{1,32}) joined the game/ },
     { kind: "join", pattern: /Player connected:\s*([^,]{1,32})/ },
     // After the logger's own "]: ", so a connection dropped before it had a name -
@@ -130,7 +134,12 @@ export function parsePlayerSessions(log: string): PlayerSessionEvent[] {
             if (entry.kind === "login" || entry.kind === "join") {
                 // The join line after its own login is the same arrival. It
                 // carries no address, so the login's is kept, and so is its time.
-                if (entry.kind === "join" && previous?.line === "login" && held && sameMoment(held.at, at)) {
+                if (
+                    entry.kind === "join" &&
+                    previous?.line === "login" &&
+                    held &&
+                    sameMoment(held.at, at)
+                ) {
                     events[previous.index] = { ...held, at: held.at ?? at };
                     last.set(key, { index: previous.index, line: "join" });
                     break;
@@ -244,14 +253,17 @@ export function playerActivity(
     if (events.length === 0) return { presence: "never", lastSeen: null };
     if (last?.kind === "join") {
         const at = last.at ? Date.parse(last.at) : Number.NaN;
-        if (Number.isNaN(at) || now - at < CONNECTING_MS) return { presence: "connecting", lastSeen };
+        if (Number.isNaN(at) || now - at < CONNECTING_MS)
+            return { presence: "connecting", lastSeen };
     }
     return { presence: "offline", lastSeen };
 }
 
 /** Each player's events, keyed by the lowercase name the rest of the panel folds
  *  its lists on. */
-export function sessionsByPlayer(events: readonly PlayerSessionEvent[]): Map<string, PlayerSessionEvent[]> {
+export function sessionsByPlayer(
+    events: readonly PlayerSessionEvent[]
+): Map<string, PlayerSessionEvent[]> {
     const byPlayer = new Map<string, PlayerSessionEvent[]>();
     for (const event of events) {
         const key = event.name.toLowerCase();

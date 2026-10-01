@@ -38,7 +38,9 @@ export function Figure({ label, value }: { label: string; value: string }) {
     return (
         <div className="rounded-md border border-border bg-muted/40 px-3 py-2">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="truncate text-sm font-medium" title={value}>{value}</p>
+            <p className="truncate text-sm font-medium" title={value}>
+                {value}
+            </p>
         </div>
     );
 }
@@ -76,7 +78,10 @@ export function PlayerRecordPanel({
                 <div className="grid grid-cols-2 gap-2">
                     <Figure label={t("history.played")} value={playedFor(t, history.playedMs)} />
                     <Figure label={t("history.visits")} value={String(history.visits)} />
-                    <Figure label={t("history.firstSeen")} value={history.firstSeen ? format.date(history.firstSeen) : "-"} />
+                    <Figure
+                        label={t("history.firstSeen")}
+                        value={history.firstSeen ? format.date(history.firstSeen) : "-"}
+                    />
                     <Figure
                         label={history.online ? t("history.onSince") : t("history.lastSeen")}
                         value={latest ? format.dateTime(latest) : "-"}
@@ -87,7 +92,10 @@ export function PlayerRecordPanel({
                 <div className="grid grid-cols-3 gap-2">
                     {/* Counted by the server rather than by Polaris, so it covers
                         the whole life of the world. */}
-                    <Figure label={t("history.playtimeAllTime")} value={playedFor(t, stats.playedMs)} />
+                    <Figure
+                        label={t("history.playtimeAllTime")}
+                        value={playedFor(t, stats.playedMs)}
+                    />
                     <Figure label={t("history.deaths")} value={String(stats.deaths)} />
                     <Figure label={t("history.mobsKilled")} value={String(stats.mobKills)} />
                 </div>

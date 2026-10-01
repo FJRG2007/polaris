@@ -67,7 +67,10 @@ export interface RosterChange {
  * one player means an earlier sweep was interrupted, and closing all but one is how
  * that heals rather than something to refuse.
  */
-export function rosterChange(open: readonly OpenSession[], roster: readonly RosterPlayer[]): RosterChange {
+export function rosterChange(
+    open: readonly OpenSession[],
+    roster: readonly RosterPlayer[]
+): RosterChange {
     const here = new Map<string, RosterPlayer>();
     /** Lowercased name to whoever holds it, for the sessions with no id to match on. */
     const byName = new Map<string, string>();
@@ -174,7 +177,8 @@ export function sessionWrites(
         const session = byId.get(id);
         const log = session ? logOf(session.name) : null;
         const left = log && !log.online ? log.lastLeft : null;
-        const valid = left && session && left.getTime() >= session.joinedAt.getTime() && left.getTime() <= at;
+        const valid =
+            left && session && left.getTime() >= session.joinedAt.getTime() && left.getTime() <= at;
         close.push({ id, leftAt: valid ? left : now });
     }
 
@@ -196,9 +200,9 @@ export function sessionWrites(
         const left = log?.lastLeft?.getTime() ?? Number.NaN;
         if (Number.isNaN(left) || left < start || left > since.getTime()) continue;
         const end = new Date(left);
-        const player =
-            roster.find((entry) => entry.name.trim().toLowerCase() === session.name.trim().toLowerCase()) ??
-            { name: session.name, id: session.playerId };
+        const player = roster.find(
+            (entry) => entry.name.trim().toLowerCase() === session.name.trim().toLowerCase()
+        ) ?? { name: session.name, id: session.playerId };
         close.push({ id: session.id, leftAt: end });
         opened.push({ player, joinedAt: since });
     }
@@ -245,7 +249,9 @@ export function seenFor(
 ): PlayerSeen | null {
     const keys = [
         ...(player.id ? [seenKey({ name: "", id: player.id })] : []),
-        ...player.names.filter((name) => name.trim().length > 0).map((name) => seenKey({ name, id: null }))
+        ...player.names
+            .filter((name) => name.trim().length > 0)
+            .map((name) => seenKey({ name, id: null }))
     ];
     for (const key of keys) {
         const found = seen[key];
@@ -263,7 +269,11 @@ export function seenFor(
  */
 export function withLiveSince(
     seen: Readonly<Record<string, PlayerSeen>>,
-    players: readonly { readonly name: string; readonly id: string | null; readonly since?: string | null }[]
+    players: readonly {
+        readonly name: string;
+        readonly id: string | null;
+        readonly since?: string | null;
+    }[]
 ): Readonly<Record<string, PlayerSeen>> {
     const live = players.filter((player) => player.since);
     if (live.length === 0) return seen;
@@ -446,13 +456,14 @@ export function readPlayerStats(json: string): PlayerStats | null {
     if (typeof root !== "object" || root === null) return null;
 
     const record = root as Record<string, unknown>;
-    const stats = (typeof record.stats === "object" && record.stats !== null ? record.stats : record) as Record<
-        string,
-        unknown
-    >;
-    const custom = (typeof stats["minecraft:custom"] === "object" && stats["minecraft:custom"] !== null
-        ? stats["minecraft:custom"]
-        : {}) as Record<string, unknown>;
+    const stats = (
+        typeof record.stats === "object" && record.stats !== null ? record.stats : record
+    ) as Record<string, unknown>;
+    const custom = (
+        typeof stats["minecraft:custom"] === "object" && stats["minecraft:custom"] !== null
+            ? stats["minecraft:custom"]
+            : {}
+    ) as Record<string, unknown>;
 
     const modern = (...names: string[]): number => {
         for (const name of names) {

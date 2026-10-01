@@ -1228,7 +1228,12 @@ function StatusCell({
                     title={t("playersTab.historyOf", { name: player.name })}
                 >
                     {t(player.presence === "playing" ? "playersTab.since" : "playersTab.lastOn", {
-                        when: relativeTime(player.lastSeen, format, t("players.timeNotLogged"), clock)
+                        when: relativeTime(
+                            player.lastSeen,
+                            format,
+                            t("players.timeNotLogged"),
+                            clock
+                        )
                     })}
                 </button>
             )}

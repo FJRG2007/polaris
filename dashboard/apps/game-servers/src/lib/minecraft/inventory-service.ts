@@ -151,9 +151,9 @@ export async function readLiveInventories(
     for (let start = 0; start < players.length; start += BAGS_PER_TRIP) {
         const some = players.slice(start, start + BAGS_PER_TRIP);
         const commands = some.map((player) => ["data", "get", "entity", player, "Inventory"]);
-        const answers = await eachAnswered(how, commands, (argv) => how.ask(argv).catch(() => null)).catch(
-            () => commands.map(() => null)
-        );
+        const answers = await eachAnswered(how, commands, (argv) =>
+            how.ask(argv).catch(() => null)
+        ).catch(() => commands.map(() => null));
         wholes.push(...answers);
     }
     const readings: (LiveReading | null)[] = [];
@@ -162,7 +162,9 @@ export async function readLiveInventories(
         readings.push(
             whole == null
                 ? null
-                : await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole).catch(() => null)
+                : await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole).catch(
+                      () => null
+                  )
         );
     }
     return readings;
@@ -195,7 +197,8 @@ async function fromWhole(
     answer: string
 ): Promise<LiveReading> {
     const whole = stripFormatting(answer);
-    if (!isDataReply(whole)) return { items: [], answered: false, chunked: false, unreadable: 0, said: whole };
+    if (!isDataReply(whole))
+        return { items: [], answered: false, chunked: false, unreadable: 0, said: whole };
 
     const items = parseInventory(whole);
     // A reply that closed is the whole answer, empty or not. One that did not is a
@@ -221,7 +224,9 @@ async function fromWhole(
         const batch = asker.askEach ? await eachAnswered(asker, commands) : null;
         for (const [position, index] of indexes.entries()) {
             const reply = stripFormatting(
-                batch ? batch[position]! : await asker.ask(["data", "get", ...target, `${path}[${index}]`])
+                batch
+                    ? batch[position]!
+                    : await asker.ask(["data", "get", ...target, `${path}[${index}]`])
             );
             // "Found no elements matching Inventory[7]" - the list ended.
             if (!isDataReply(reply)) {
@@ -340,7 +345,9 @@ export async function sweepInventorySnapshots(
     const recent = new Set(fresh.map((row) => row.username.toLowerCase()));
     const due = online.filter((player) => !recent.has(player.toLowerCase()));
     if (due.length === 0) return 0;
-    return withServerContainer(ownerId, installedAppId, (server) => snapshotOnlinePlayers(server, due));
+    return withServerContainer(ownerId, installedAppId, (server) =>
+        snapshotOnlinePlayers(server, due)
+    );
 }
 
 /** Forget every snapshot for a server. Called when the server itself goes. */

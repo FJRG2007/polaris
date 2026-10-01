@@ -700,8 +700,8 @@ export function MinecraftPanel({
                             <ModpacksCard
                                 installedAppId={installedAppId}
                                 modpack={
-                                    settings.find((entry) => entry.key === "MODRINTH_MODPACK")?.value ??
-                                    ""
+                                    settings.find((entry) => entry.key === "MODRINTH_MODPACK")
+                                        ?.value ?? ""
                                 }
                                 onSaved={reloadSettings}
                             />
@@ -709,7 +709,9 @@ export function MinecraftPanel({
                         {isPluginLoader(loaderForType(software) ?? "") && (
                             <SpigotPluginsCard
                                 installedAppId={installedAppId}
-                                value={settings.find((entry) => entry.key === SPIGET_KEY)?.value ?? ""}
+                                value={
+                                    settings.find((entry) => entry.key === SPIGET_KEY)?.value ?? ""
+                                }
                                 onSaved={reloadSettings}
                             />
                         )}
@@ -719,7 +721,9 @@ export function MinecraftPanel({
                     <div className="flex flex-col gap-4">
                         <MinecraftSettings
                             installedAppId={installedAppId}
-                            settings={settings.filter((setting) => setting.group === SECURITY_GROUP)}
+                            settings={settings.filter(
+                                (setting) => setting.group === SECURITY_GROUP
+                            )}
                             playersOnline={status?.players.online ?? 0}
                             running={isRunning}
                             onSaved={reloadSettings}
@@ -731,10 +735,12 @@ export function MinecraftPanel({
                             installedAppId={installedAppId}
                             edition={game?.edition ?? status?.edition ?? "java"}
                             projects={
-                                settings.find((setting) => setting.key === PROJECTS_KEY)?.value ?? ""
+                                settings.find((setting) => setting.key === PROJECTS_KEY)?.value ??
+                                ""
                             }
                             software={
-                                settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? ""
+                                settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ??
+                                ""
                             }
                             playersOnline={status?.players.online ?? 0}
                             login={login}
@@ -773,7 +779,10 @@ export function MinecraftPanel({
                             <MinecraftAppearance
                                 installedAppId={installedAppId}
                                 name={name}
-                                motd={settings.find((setting) => setting.key === MOTD_KEY)?.value ?? ""}
+                                motd={
+                                    settings.find((setting) => setting.key === MOTD_KEY)?.value ??
+                                    ""
+                                }
                                 iconSetAt={game?.iconSetAt ?? null}
                                 playersOnline={status?.players.online ?? 0}
                                 onSaved={reloadSettings}

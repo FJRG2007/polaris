@@ -58,7 +58,8 @@ vi.mock("@polaris/db", () => ({
                 return { count };
             },
             createMany: async ({ data }: { data: Omit<Row, "id" | "leftAt">[] }) => {
-                for (const row of data) fake.rows.push({ ...row, id: `v${++fake.next}`, leftAt: null });
+                for (const row of data)
+                    fake.rows.push({ ...row, id: `v${++fake.next}`, leftAt: null });
                 return { count: data.length };
             }
         },
@@ -73,7 +74,9 @@ vi.mock("@/lib/presence-activity/live", () => ({
 }));
 
 const { recordRoster } = await import("@polaris-app/game-servers/src/lib/games-activity-service");
-const { parsePlayerSessions } = await import("@polaris-app/game-servers/src/lib/minecraft/sessions");
+const { parsePlayerSessions } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/sessions"
+);
 
 const SERVER = "aaaaaaaa-1111-4111-8111-111111111111";
 const FJ = [{ name: "FJRG2007", id: null }];
@@ -99,21 +102,40 @@ beforeEach(() => {
 describe("recordRoster", () => {
     it("opens a visit at the log's arrival, and splits it at a reconnect no look saw", async () => {
         const firstLog = logOf(
-            line("2026-09-29T08:00:00.000000000Z", "PlayerList", "FJRG2007[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"),
+            line(
+                "2026-09-29T08:00:00.000000000Z",
+                "PlayerList",
+                "FJRG2007[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
+            ),
             line("2026-09-29T08:00:00.500000000Z", "MinecraftServer", "FJRG2007 joined the game")
         );
-        await recordRoster(SERVER, FJ, at("2026-09-29T08:00:40.000Z"), { log: "always", readLog: firstLog });
+        await recordRoster(SERVER, FJ, at("2026-09-29T08:00:40.000Z"), {
+            log: "always",
+            readLog: firstLog
+        });
         expect(fake.rows).toMatchObject([
             { name: "FJRG2007", joinedAt: at("2026-09-29T08:00:00.000Z"), leftAt: null }
         ]);
 
         // Between two looks a minute apart he dropped and came back.
         const secondLog = logOf(
-            line("2026-09-29T08:00:00.000000000Z", "PlayerList", "FJRG2007[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"),
+            line(
+                "2026-09-29T08:00:00.000000000Z",
+                "PlayerList",
+                "FJRG2007[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
+            ),
             line("2026-09-29T08:00:00.500000000Z", "MinecraftServer", "FJRG2007 joined the game"),
-            line("2026-09-29T08:30:10.000000000Z", "ServerGamePacketListenerImpl", "FJRG2007 lost connection: Timed out"),
+            line(
+                "2026-09-29T08:30:10.000000000Z",
+                "ServerGamePacketListenerImpl",
+                "FJRG2007 lost connection: Timed out"
+            ),
             line("2026-09-29T08:30:10.100000000Z", "MinecraftServer", "FJRG2007 left the game"),
-            line("2026-09-29T08:30:30.000000000Z", "PlayerList", "FJRG2007[/203.0.113.9:51002] logged in with entity id 2 at (0.5, 64.0, 0.5)"),
+            line(
+                "2026-09-29T08:30:30.000000000Z",
+                "PlayerList",
+                "FJRG2007[/203.0.113.9:51002] logged in with entity id 2 at (0.5, 64.0, 0.5)"
+            ),
             line("2026-09-29T08:30:30.400000000Z", "MinecraftServer", "FJRG2007 joined the game")
         );
         const record = await recordRoster(SERVER, FJ, at("2026-09-29T08:30:40.000Z"), {
@@ -127,7 +149,10 @@ describe("recordRoster", () => {
         expect(record.since.get("@fjrg2007")).toEqual(at("2026-09-29T08:30:30.000Z"));
 
         // The next look, with nothing new in the log, changes nothing.
-        await recordRoster(SERVER, FJ, at("2026-09-29T08:31:40.000Z"), { log: "always", readLog: secondLog });
+        await recordRoster(SERVER, FJ, at("2026-09-29T08:31:40.000Z"), {
+            log: "always",
+            readLog: secondLog
+        });
         expect(fake.rows).toHaveLength(2);
     });
 

@@ -90,7 +90,7 @@ export function playerLogScript(cursor: LogCursor | null): string {
     const offset = count(cursor?.offset ?? 0);
     return [
         `f=${LATEST}`,
-        "[ -f \"$f\" ] || exit 0",
+        '[ -f "$f" ] || exit 0',
         `echo "@clock $(date +%z) $(date +%F)"`,
         `set -- $(stat -c '%i %s %Y' "$f")`,
         `i=$1; s=$2`,
@@ -186,7 +186,12 @@ function stamped(lines: readonly string[], lastWrite: number, offset: number): s
                 Number(dated[3]),
                 monthIndex,
                 Number(dated[1]),
-                [Number(dated[4]), Number(dated[5]), Number(dated[6]), Number((dated[7] ?? "0").padEnd(3, "0"))],
+                [
+                    Number(dated[4]),
+                    Number(dated[5]),
+                    Number(dated[6]),
+                    Number((dated[7] ?? "0").padEnd(3, "0"))
+                ],
                 offset
             );
             ceiling = at;

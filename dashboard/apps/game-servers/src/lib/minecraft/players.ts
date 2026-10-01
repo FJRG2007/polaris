@@ -182,7 +182,11 @@ export const GAME_MODES = ["survival", "creative", "adventure", "spectator"] as 
  * the later wins: both are the start of the same connection when both are right,
  * and the only way the record is later is a reconnect the log did not show.
  */
-function watched(activity: PlayerActivity, seen: PlayerSeen | null, online: boolean): PlayerActivity {
+function watched(
+    activity: PlayerActivity,
+    seen: PlayerSeen | null,
+    online: boolean
+): PlayerActivity {
     if (online) {
         const open = seen?.open ?? null;
         return { ...activity, lastSeen: laterOf(activity.lastSeen, open) };

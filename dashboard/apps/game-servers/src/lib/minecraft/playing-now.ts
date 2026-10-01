@@ -35,9 +35,7 @@ export interface MinecraftVisit {
     readonly imageUrl: string;
 }
 
-export async function playingMinecraftNow(
-    userIds: readonly string[]
-): Promise<MinecraftVisit[]> {
+export async function playingMinecraftNow(userIds: readonly string[]): Promise<MinecraftVisit[]> {
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return [];
     const links = await prisma.gamePlayerLink.findMany({

@@ -234,7 +234,10 @@ async function writeRoster(
     }
     for (const [time, ids] of byTime) {
         await prisma.gamePlayerSession
-            .updateMany({ where: { id: { in: ids }, leftAt: null }, data: { leftAt: new Date(time) } })
+            .updateMany({
+                where: { id: { in: ids }, leftAt: null },
+                data: { leftAt: new Date(time) }
+            })
             .catch(() => undefined);
     }
     if (writes.open.length > 0) {
@@ -351,7 +354,9 @@ const VISIT_LIMIT = 50;
  * opens, can afford the other comparison and does.
  */
 function visitsOf(players: readonly RosterPlayer[]): Prisma.GamePlayerSessionWhereInput[] {
-    const ids = [...new Set(players.map((player) => player.id?.trim()).filter((id): id is string => !!id))];
+    const ids = [
+        ...new Set(players.map((player) => player.id?.trim()).filter((id): id is string => !!id))
+    ];
     const names = [
         ...new Set(players.map((player) => player.name.trim()).filter((name) => name.length > 0))
     ];
@@ -404,7 +409,12 @@ export async function readLastSeen(
     ]);
 
     const found: Record<string, PlayerSeen> = {};
-    const file = (key: string, since: Date | null, lastSeen: Date | null, current: Date | null): void => {
+    const file = (
+        key: string,
+        since: Date | null,
+        lastSeen: Date | null,
+        current: Date | null
+    ): void => {
         // A player has one row per name they have played under, so the newest of
         // them is the answer rather than whichever the database returned last.
         const held = found[key];
@@ -506,7 +516,10 @@ async function closeOpenSessions(installedAppId: string, at: Date): Promise<void
     await prisma.gamePlayerSession
         .updateMany({ where: { id: { in: open.map((row) => row.id) } }, data: { leftAt: at } })
         .catch(() => undefined);
-    await announcePlayers(installedAppId, open.map((row) => row.name));
+    await announcePlayers(
+        installedAppId,
+        open.map((row) => row.name)
+    );
 }
 
 /** What every one of these servers was last seen doing, in one read. */

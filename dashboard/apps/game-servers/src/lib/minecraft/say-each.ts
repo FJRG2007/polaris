@@ -28,7 +28,10 @@ function quoted(argument: string): string {
  *  with the tool's exit status. */
 export function sayEachScript(commands: readonly (readonly string[])[]): string {
     return commands
-        .map((argv, index) => `rcon-cli ${argv.map(quoted).join(" ")}; printf '\\n${END} %d %d\\n' ${index} $?`)
+        .map(
+            (argv, index) =>
+                `rcon-cli ${argv.map(quoted).join(" ")}; printf '\\n${END} %d %d\\n' ${index} $?`
+        )
         .join("; ");
 }
 
@@ -49,7 +52,8 @@ export function sayEachReplies(output: string, count: number): (string | null)[]
             continue;
         }
         const index = Number(end[1]);
-        if (index >= 0 && index < count && end[2] === "0") replies[index] = held.join("\n").replace(/\n+$/, "");
+        if (index >= 0 && index < count && end[2] === "0")
+            replies[index] = held.join("\n").replace(/\n+$/, "");
         held = [];
     }
     return replies;

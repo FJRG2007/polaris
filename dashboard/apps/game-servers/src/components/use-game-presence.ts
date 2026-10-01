@@ -89,7 +89,9 @@ export function useGamePresence(servers?: readonly string[]): GamePresence {
     const [presence, setPresence] = useState<GamePresence>(NOTHING);
 
     useEffect(() => {
-        const path = only ? `${STREAM_PATH}?${new URLSearchParams({ server: only }).toString()}` : STREAM_PATH;
+        const path = only
+            ? `${STREAM_PATH}?${new URLSearchParams({ server: only }).toString()}`
+            : STREAM_PATH;
         return subscribeSharedStream(path, scope, ({ data }) => {
             let parsed: unknown;
             try {

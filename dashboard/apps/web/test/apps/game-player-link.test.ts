@@ -151,7 +151,9 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 }));
 
 vi.mock("@/lib/deploy-service", () => ({ readAppRuntimeLog: async () => joinLog }));
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/reach", () => ({ noteReachedFrom: async () => false }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/reach", () => ({
+    noteReachedFrom: async () => false
+}));
 vi.mock("@/lib/apps/install-config", () => ({
     readInstallConfig: (raw: string | null) => (raw ? JSON.parse(raw) : {}),
     patchInstallConfig: async (_id: string, patch: Record<string, unknown>) => {
@@ -226,9 +228,9 @@ describe("a linked player's addresses", () => {
                 })
             )
         ).toMatch(/Polaris account/);
-        expect(await rejection(service.revokePlayerAddress(OWNER, SERVER, "AdaMC", "1.1.1.1"))).toMatch(
-            /Unlink/
-        );
+        expect(
+            await rejection(service.revokePlayerAddress(OWNER, SERVER, "AdaMC", "1.1.1.1"))
+        ).toMatch(/Unlink/);
     });
 });
 
