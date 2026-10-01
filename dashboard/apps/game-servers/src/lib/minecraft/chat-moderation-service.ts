@@ -164,7 +164,9 @@ export async function recordBlock(
         }
     });
     await prisma.minecraftChatBlock
-        .deleteMany({ where: { installedAppId, at: { lt: new Date(now - moderation.LOG_KEEP_MS) } } })
+        .deleteMany({
+            where: { installedAppId, at: { lt: new Date(now - moderation.LOG_KEEP_MS) } }
+        })
         .catch(() => undefined);
 
     const home = await serverLanguage(ownerId, config);
@@ -175,9 +177,17 @@ export async function recordBlock(
         // Not awaited: the ban goes through the console, and the answer the
         // player is waiting on should not wait on it. A failure is logged; the
         // next stop tries again.
-        void timeoutPlayer(ownerId, installedAppId, block.player, rules.timeoutMinutes, reason).catch(
-            (caught) =>
-                console.error(`[minecraft-chat] could not time out ${block.player} on ${installedAppId}:`, caught)
+        void timeoutPlayer(
+            ownerId,
+            installedAppId,
+            block.player,
+            rules.timeoutMinutes,
+            reason
+        ).catch((caught) =>
+            console.error(
+                `[minecraft-chat] could not time out ${block.player} on ${installedAppId}:`,
+                caught
+            )
         );
         return { warn: reason, action: "timeout" };
     }
