@@ -549,12 +549,13 @@
         "philipsCloudNoCode": "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with.",
         "philipsCloudUnfinished": "That address is not a finished Philips account yet. Sign in once in the Philips Air+ app, then try again.",
         "philipsCloudBadCode": "That code is not right or has expired. Ask for a new one.",
-        "philipsCloudEmpty": "There is no air purifier on this Philips account. Add it in the Air+ app first.",
         "philipsCloudQuiet": "The air purifier did not answer through Philips' cloud.",
         "philipsCloudBusy": "The air purifier is busy. Try again in a moment.",
         "philipsCloudLinkRefused": "Philips' cloud would not let Polaris reach this air purifier. Connect the account again.",
         "philipsCloudNotOnAccount": "That device is not on this Philips account.",
-        "philipsCloudEnterCode": "Enter the code from the email"
+        "philipsCloudEnterCode": "Enter the code from the email",
+        "philipsCloudOnlyOthers": "Polaris found appliances on this Philips account, but no air purifier. What it saw: {summary}.",
+        "philipsCloudNothing": "Polaris found no air purifier on this Philips account. What it saw: {summary}. Check that the purifier is in the Air+ app under this same email."
     },
     "connections": {
         "nuki-web": {
@@ -1479,7 +1480,9 @@
             "codeField": "Code from the email",
             "resend": "Send a new code",
             "codeExpired": "This code has expired. Ask for a new one."
-        }
+        },
+        "unsupported": "Connected. {count, plural, one {This model is} other {These models are}} not supported yet ({models}): listed with power and what {count, plural, one {it reports} other {they report}}, but modes cannot be set from Polaris yet.",
+        "done": "Done"
     },
     "discover": {
         "intro": "Polaris asks the network first. Give it an address range as well if your cameras sit behind a repeater or an access point that blocks that.",
