@@ -229,4 +229,9 @@ describe("one pass, one verdict", () => {
         expect(rules.observe([], true)).toEqual({ up: true, via: rules.BACK_VIA_INTERNET });
         expect(rules.observe([], null)).toBeNull();
     });
+
+    it("gives no verdict when addresses were listed but none produced a result", () => {
+        expect(rules.observe([], true, 2)).toBeNull();
+        expect(rules.observe([], false, 2)).toMatchObject({ up: false, kind: "line", detectedBy: null });
+    });
 });

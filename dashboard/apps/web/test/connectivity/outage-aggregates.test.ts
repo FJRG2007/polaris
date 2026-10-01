@@ -73,6 +73,14 @@ describe("downtime per day", () => {
         expect(days.find((day) => day.downMs > 0)?.day).toBe("2026-10-10");
     });
 
+    it("ends a day at the next midnight in the zone, 23 hours on when the clocks go forward", () => {
+        const now = Date.UTC(2026, 2, 30, 12);
+        const days = rules.dailyDowntime([], now, 2, STALE, "Europe/Madrid");
+        expect(days[0]?.day).toBe("2026-03-29");
+        expect(days[0]!.end - days[0]!.start).toBe(23 * HOUR);
+        expect(days[0]?.end).toBe(days[1]?.start);
+    });
+
     it("steps a day's shade by thresholds a reader can name", () => {
         expect([0, 4 * MINUTE, 20 * MINUTE, 2 * HOUR, 5 * HOUR].map(rules.dayStep)).toEqual([0, 1, 2, 3, 4]);
     });

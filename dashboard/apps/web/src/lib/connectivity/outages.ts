@@ -74,8 +74,14 @@ export type Observation =
  *
  * `internet` is the resolvers' answer, asked only when nothing else answered;
  * null means it was not asked, and with no address to go on that is no verdict.
+ * `listed` is how many addresses the pass set out to check: when some were listed
+ * but none produced a result, a working line says nothing about them either.
  */
-export function observe(results: readonly ProbeResult[], internet: boolean | null): Observation | null {
+export function observe(
+    results: readonly ProbeResult[],
+    internet: boolean | null,
+    listed: number = results.length
+): Observation | null {
     const answered = results.find((result) => result.up);
     if (answered) return { up: true, via: answered.host };
     if (internet === null) return null;
@@ -83,7 +89,7 @@ export function observe(results: readonly ProbeResult[], internet: boolean | nul
     if (!internet) {
         return { up: false, kind: "line", detectedBy: first?.host ?? null, detail: first?.detail ?? null };
     }
-    if (!first) return { up: true, via: BACK_VIA_INTERNET };
+    if (!first) return listed > 0 ? null : { up: true, via: BACK_VIA_INTERNET };
     const unresolved = results.every((result) => result.code !== null && NAME_FAILURES.has(result.code));
     return {
         up: false,
@@ -342,6 +348,8 @@ export interface DayDowntime {
     /** The calendar date in the reader's zone, YYYY-MM-DD. */
     readonly day: string;
     readonly start: number;
+    /** The next midnight in the same zone: 23 or 25 hours on, on a clock change. */
+    readonly end: number;
     readonly downMs: number;
     readonly count: number;
 }
@@ -377,7 +385,7 @@ export function dailyDowntime(
             ).getTime()
         };
     };
-    const result: { day: string; start: number; end: number; downMs: number; count: number }[] = [];
+    const result: { -readonly [K in keyof DayDowntime]: DayDowntime[K] }[] = [];
     for (let back = days - 1; back >= 0; back -= 1) {
         const start = midnight(back);
         result.push({ day: start.label, start: start.at, end: midnight(back - 1).at, downMs: 0, count: 0 });
@@ -392,7 +400,7 @@ export function dailyDowntime(
             }
         }
     }
-    return result.map(({ day, start, downMs, count }) => ({ day, start, downMs, count }));
+    return result;
 }
 
 /**

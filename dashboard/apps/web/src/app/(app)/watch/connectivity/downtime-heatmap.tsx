@@ -56,7 +56,7 @@ export function DowntimeHeatmap({
     // Blank cells before the first day, so each row is one weekday.
     const lead = first ? (new Date(first.start).getDay() - format.weekStartsOn + 7) % 7 : 0;
     const columns = Math.ceil((lead + days.length) / 7);
-    const tracked = (day: DayDowntime) => since !== null && day.start + 86_400_000 > since;
+    const tracked = (day: DayDowntime) => since !== null && day.end > since;
     const describe = (day: DayDowntime) => {
         const date = format.date(day.start);
         if (!tracked(day)) return t("connectivity.days.untracked", { date });

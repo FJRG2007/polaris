@@ -111,7 +111,7 @@ vi.mock("@/lib/connectivity/outage-tracker", () => ({
 // Settling the public tunnel is its own concern (share-tunnel.test.ts).
 vi.mock("@/lib/public-reach", () => ({ settleShareTunnel: async () => "unchanged" }));
 
-const { checkedAddresses, sweepAddresses } = await import("../../src/lib/address-health");
+const { checkConnectivityNow, checkedAddresses, sweepAddresses } = await import("../../src/lib/address-health");
 
 /** A sweep, with the retry's wait fast-forwarded rather than waited out. */
 async function sweep(): Promise<void> {
@@ -258,6 +258,32 @@ describe("what a pass tells the outage record", () => {
         answering.clear();
         await sweep();
         expect(recordPass).toHaveBeenLastCalledWith(expect.objectContaining({ up: false, kind: "address" }));
+    });
+});
+
+describe("a pass that never finishes", () => {
+    it("is given up on, so the next pass still runs", async () => {
+        checkDomain.mockImplementationOnce(() => new Promise(() => {}));
+        const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+        const stuck = checkConnectivityNow();
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+        await stuck;
+        errors.mockRestore();
+
+        recordPass.mockClear();
+        const next = checkConnectivityNow();
+        await vi.advanceTimersByTimeAsync(10_000);
+        await next;
+        expect(recordPass).toHaveBeenCalledTimes(1);
+    });
+
+    it("gives no verdict when every listed address failed to be checked", async () => {
+        checkDomain.mockRejectedValue(new Error("boom"));
+        const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+        await sweep();
+        errors.mockRestore();
+        checkDomain.mockReset();
+        expect(recordPass).not.toHaveBeenCalled();
     });
 });
 

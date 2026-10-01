@@ -175,7 +175,7 @@ export function ConnectivityView() {
                                 onSelect={(day) =>
                                     filters.set({
                                         ...filters.value,
-                                        day: day ? { label: day.day, start: day.start, end: day.start + 86_400_000 } : null
+                                        day: day ? { label: day.day, start: day.start, end: day.end } : null
                                     })
                                 }
                                 span={span}
@@ -222,7 +222,7 @@ function useFilters(days: readonly rules.DayDowntime[] | null) {
                 (key) => params.get(key),
                 (label) => {
                     const day = days?.find((entry) => entry.day === label);
-                    return day ? { start: day.start, end: day.start + 86_400_000 } : null;
+                    return day ? { start: day.start, end: day.end } : null;
                 }
             ),
         [params, days]

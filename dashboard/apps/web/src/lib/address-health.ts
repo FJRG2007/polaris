@@ -63,6 +63,9 @@ const FIRST_PASS_MS = 60_000;
 /** A second opinion before calling an address down, since one alert is worth more
  *  than two and a single timeout is not an outage. */
 const RETRY_MS = 3000;
+/** The longest a pass may take before the watcher stops waiting on it. Well past a
+ *  pass full of timeouts, so only a pass that hangs ever reaches it. */
+const PASS_LIMIT_MS = 5 * 60_000;
 
 /** How much of a failure reason is kept. It goes in a settings value, one line. */
 const DETAIL_LIMIT = 120;
@@ -424,7 +427,7 @@ export async function sweepAddresses(): Promise<PassOutcome | null> {
     const internet = results.some((result) => result.up)
         ? null
         : await hasInternet().catch(() => null);
-    const observation = observe(results, internet);
+    const observation = observe(results, internet, addresses.length);
     if (!observation) return null;
     return recordPass(observation).catch((error) => {
         console.error("polaris: recording the connection's state failed:", error);
@@ -434,15 +437,25 @@ export async function sweepAddresses(): Promise<PassOutcome | null> {
 
 /** Run a pass unless one is already running, in which case wait for that one. */
 function runPass(): Promise<PassOutcome | null> {
-    inFlight ??= sweepAddresses()
-        .catch((error) => {
-            console.error("polaris: address health sweep failed:", error);
-            return null;
-        })
-        .finally(() => {
-            inFlight = null;
-        });
-    return inFlight;
+    if (inFlight) return inFlight;
+    let limit: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<null>((resolve) => {
+        limit = setTimeout(() => {
+            console.error(`polaris: an address health sweep took over ${PASS_LIMIT_MS / 1000}s, moving on`);
+            resolve(null);
+        }, PASS_LIMIT_MS);
+        limit.unref();
+    });
+    const pass = sweepAddresses().catch((error) => {
+        console.error("polaris: address health sweep failed:", error);
+        return null;
+    });
+    const current: Promise<PassOutcome | null> = Promise.race([pass, expired]).finally(() => {
+        clearTimeout(limit);
+        if (inFlight === current) inFlight = null;
+    });
+    inFlight = current;
+    return current;
 }
 
 /** Set the next tick: soon while something is down or settling, at the usual pace otherwise. */
