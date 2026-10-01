@@ -15,7 +15,7 @@
 import { HomeError } from "../home-error";
 import * as tuya from "../integrations/tuya-api";
 import type { Credentials, DeviceDriver } from "./contract";
-import { tuyaCommandFor, tuyaSnapshots, tuyaSpeaking } from "./tuya-vocabulary";
+import { tuyaActionFor, tuyaSnapshots, tuyaSpecsFor, tuyaSpeaking } from "./tuya-vocabulary";
 
 export const TUYA_CLOUD = "tuya-cloud";
 
@@ -43,12 +43,21 @@ export const tuyaCloudDriver: DeviceDriver = {
     },
 
     async list(credentials) {
-        const devices = await tuyaSpeaking(() => tuya.listTuyaDevices(credentialsOf(credentials)));
-        return tuyaSnapshots(devices);
+        const keys = credentialsOf(credentials);
+        return tuyaSpeaking(async () => {
+            const devices = await tuya.listTuyaDevices(keys);
+            const specs = await tuyaSpecsFor(devices, (id) => tuya.tuyaSpecification(keys, id));
+            return tuyaSnapshots(devices, specs);
+        });
     },
 
-    async act(credentials, device, action) {
-        const { deviceId, commands } = tuyaCommandFor(device.externalId, action);
-        await tuyaSpeaking(() => tuya.tuyaCommand(credentialsOf(credentials), deviceId, commands));
+    async act(credentials, device, action, command) {
+        const keys = credentialsOf(credentials);
+        await tuyaSpeaking(async () => {
+            const { deviceId, commands } = await tuyaActionFor(device, action, command, (id) =>
+                tuya.tuyaSpecification(keys, id)
+            );
+            await tuya.tuyaCommand(keys, deviceId, commands);
+        });
     }
 };

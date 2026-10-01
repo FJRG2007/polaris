@@ -518,6 +518,21 @@ export async function listTuyaHomeDevices(
     });
 }
 
+/** What a device accepts and reports, with each data point's range - the
+ *  device-sharing SDK's `update_device_specification`. Unchecked here: the
+ *  vocabulary that reads it validates it. */
+export async function tuyaSharedSpecification(
+    session: TuyaSession,
+    deviceId: string
+): Promise<unknown> {
+    const { result } = await call(
+        session,
+        "GET",
+        `/v1.1/m/life/${encodeURIComponent(deviceId)}/specifications`
+    );
+    return result;
+}
+
 export async function sendTuyaCommands(
     session: TuyaSession,
     deviceId: string,
