@@ -549,12 +549,13 @@
         "philipsCloudNoCode": "Philips no ha enviado un código a esa dirección. Comprueba que es la que usas en la app Air+.",
         "philipsCloudUnfinished": "Esa dirección aún no es una cuenta Philips completa. Entra una vez en la app Philips Air+ y vuelve a intentarlo.",
         "philipsCloudBadCode": "Ese código no es correcto o ha caducado. Pide otro.",
-        "philipsCloudEmpty": "No hay ningún purificador en esta cuenta Philips. Añádelo antes en la app Air+.",
         "philipsCloudQuiet": "El purificador no ha respondido a través de la nube de Philips.",
         "philipsCloudBusy": "El purificador está ocupado. Vuelve a intentarlo en un momento.",
         "philipsCloudLinkRefused": "La nube de Philips no deja a Polaris llegar a este purificador. Vuelve a conectar la cuenta.",
         "philipsCloudNotOnAccount": "Ese dispositivo no está en esta cuenta Philips.",
-        "philipsCloudEnterCode": "Escribe el código del email"
+        "philipsCloudEnterCode": "Escribe el código del email",
+        "philipsCloudOnlyOthers": "Polaris ha encontrado aparatos en esta cuenta Philips, pero ningún purificador. Lo que vio: {summary}.",
+        "philipsCloudNothing": "Polaris no ha encontrado ningún purificador en esta cuenta Philips. Lo que vio: {summary}. Comprueba que el purificador está en la app Air+ con este mismo email."
     },
     "connections": {
         "nuki-web": {
@@ -1479,7 +1480,9 @@
             "codeField": "Código del email",
             "resend": "Pedir otro código",
             "codeExpired": "Este código ha caducado. Pide otro."
-        }
+        },
+        "unsupported": "Conectado. {count, plural, one {Este modelo aún no es compatible} other {Estos modelos aún no son compatibles}} ({models}): se muestran con encendido y lo que {count, plural, one {informa} other {informan}}, pero sus modos aún no se pueden cambiar desde Polaris.",
+        "done": "Listo"
     },
     "discover": {
         "intro": "Polaris pregunta primero a la red. Dale también un rango de direcciones si tus cámaras están tras un repetidor o un punto de acceso que lo bloquee.",

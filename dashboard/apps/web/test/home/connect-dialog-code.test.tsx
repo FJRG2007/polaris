@@ -17,7 +17,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const started: unknown[] = [];
 const polled: { state: Record<string, string> }[] = [];
-let pollAnswer: { error?: string; devices?: unknown[]; accounts?: unknown[] } = {};
+let pollAnswer: {
+    error?: string;
+    devices?: unknown[];
+    accounts?: unknown[];
+    unsupported?: string[];
+} = {};
 
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
     startDevicePairingAction: async (input: unknown) => {
@@ -99,6 +104,25 @@ describe("a Philips Air+ account", () => {
         fireEvent.click(screen.getByRole("button", { name: "Connect" }));
         await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
         expect(onConnected.mock.calls[0]![0]).toEqual({ devices: [{ id: "d1" }], accounts: [] });
+    });
+
+    it("names a model it cannot fully operate yet before it closes", async () => {
+        const onConnected = drawn();
+        fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
+            target: { value: "owner@example.com" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+        const box = await screen.findByRole("textbox", { name: "Code from the email" });
+        pollAnswer = { devices: [{ id: "d1" }], accounts: [], unsupported: ["AC2959/10"] };
+        fireEvent.change(box, { target: { value: "123456" } });
+        fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+        const notice = await screen.findByRole("status");
+        expect(notice.textContent).toBe(
+            "Connected. This model is not supported yet (AC2959/10): listed with power and what it reports, but modes cannot be set from Polaris yet."
+        );
+        expect(onConnected).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "Done" }));
+        expect(onConnected).toHaveBeenCalledWith({ devices: [{ id: "d1" }], accounts: [] });
     });
 
     it("sends a new code on request", async () => {

@@ -295,10 +295,6 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.philipsCloudUnfinished"
     ],
     ["That code is not right or has expired. Ask for a new one.", "refusals.philipsCloudBadCode"],
-    [
-        "There is no air purifier on this Philips account. Add it in the Air+ app first.",
-        "refusals.philipsCloudEmpty"
-    ],
     ["The air purifier did not answer through Philips' cloud.", "refusals.philipsCloudQuiet"],
     ["The air purifier is busy. Try again in a moment.", "refusals.philipsCloudBusy"],
     [
@@ -324,6 +320,18 @@ const SHAPED: readonly {
     readonly params: readonly string[];
 }[] = [
     { pattern: /^(.+) has to be connected again$/s, key: "refusals.reconnect", params: ["name"] },
+    {
+        pattern:
+            /^Polaris found appliances on this Philips account, but no air purifier\. What it saw: (.+)\.$/s,
+        key: "refusals.philipsCloudOnlyOthers",
+        params: ["summary"]
+    },
+    {
+        pattern:
+            /^Polaris found no air purifier on this Philips account\. What it saw: (.+)\. Check that the purifier is in the Air\+ app under this same email\.$/s,
+        key: "refusals.philipsCloudNothing",
+        params: ["summary"]
+    },
     {
         pattern: /^(.+) is set to be watched, not operated$/s,
         key: "refusals.watchOnly",

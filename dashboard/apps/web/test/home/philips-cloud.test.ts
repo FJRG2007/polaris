@@ -126,7 +126,17 @@ function redirect(location: string): Response {
 const at = (path: string) => (url: URL) => url.pathname.endsWith(path);
 
 /** A whole Philips: Gigya, the OIDC issuer and the IoT API, for one account. */
-function philips(options: { airplusDevices?: unknown[]; homeidDevices?: unknown[] } = {}) {
+function philips(
+    options: {
+        airplusDevices?: unknown[];
+        homeidDevices?: unknown[];
+        /** The device list's whole body, where a test needs a shape of its own. */
+        deviceBody?: (client: "airplus" | "homeid") => unknown;
+        /** The HomeID backend's appliances, served the way the profile embeds
+         *  them or behind its link; absent, the backend is not there. */
+        homeIdApp?: { appliances: unknown[]; embedded?: boolean };
+    } = {}
+) {
     const issued = new Map<string, string>();
     route(at("/accounts.auth.otp.email.sendCode"), () =>
         jsonReply({ errorCode: 0, vToken: "vt-1" })
@@ -170,13 +180,46 @@ function philips(options: { airplusDevices?: unknown[]; homeidDevices?: unknown[
     });
     route(at("/user/self/device"), (_url, init) => {
         const token = new Headers(init.headers).get("authorization");
+        const client =
+            token === `Bearer access-${cloud.PHILIPS_CLIENTS.homeid.id}` ? "homeid" : "airplus";
+        if (options.deviceBody) return jsonReply(options.deviceBody(client));
         return jsonReply({
             devices:
-                token === `Bearer access-${cloud.PHILIPS_CLIENTS.homeid.id}`
-                    ? (options.homeidDevices ?? [])
-                    : (options.airplusDevices ?? [])
+                client === "homeid" ? (options.homeidDevices ?? []) : (options.airplusDevices ?? [])
         });
     });
+    const app = options.homeIdApp;
+    if (app) {
+        // The HAL chain of `get_appliances_via_homeid`, in its recorded shapes.
+        route(
+            (url) => url.pathname === "/.well-known/tenant/oneka",
+            () => jsonReply({ profileUrl: "/user/self/profile", spaces: [] })
+        );
+        route(
+            (url) => url.pathname === "/api/user/self/profile",
+            () =>
+                jsonReply(
+                    app.embedded
+                        ? {
+                              _embedded: {
+                                  userAppliances: { _embedded: { item: app.appliances } }
+                              }
+                          }
+                        : {
+                              _links: {
+                                  userAppliances: {
+                                      href: "/user/self/appliances{?page,size}",
+                                      templated: true
+                                  }
+                              }
+                          }
+                )
+        );
+        route(
+            (url) => url.pathname === "/api/user/self/appliances",
+            () => jsonReply({ _embedded: { item: app.appliances }, page: { totalElements: 1 } })
+        );
+    }
     route(at("/user/self/signature"), () => jsonReply({ signature: "sig-1" }));
     route(at("/user/self"), () => jsonReply({ id: "0123456789abcdef0123456789abcdef" }));
 }
@@ -282,14 +325,16 @@ describe("signing in with an emailed code", () => {
         expect(answer.done && answer.credentials.client).toBe("homeid");
     });
 
-    it("refuses an account with nothing on it", async () => {
-        philips();
+    it("refuses an account with nothing on it, saying what it saw in each place", async () => {
+        philips({ homeIdApp: { appliances: [] } });
         await expect(
             driver.philipsCloudDriver.pair!.poll(
                 { email: "owner@example.com" },
                 { vToken: "vt-1", code: "123456" }
             )
-        ).rejects.toThrow(/no air purifier on this Philips account/);
+        ).rejects.toThrow(
+            "Polaris found no air purifier on this Philips account. What it saw: Air+: 0; HomeID: 0; HomeID app: 0. Check that the purifier is in the Air+ app under this same email."
+        );
     });
 
     it("calls a wrong code a wrong code, and asks for one that is missing", async () => {
@@ -412,6 +457,224 @@ describe("the device list", () => {
     });
 });
 
+// --- finding the purifiers --------------------------------------------------------
+
+describe("finding the purifiers on an account", () => {
+    const sign = () =>
+        driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com" },
+            { vToken: "vt-1", code: "123456" }
+        );
+
+    it("keeps a device whose other fields are null, numbers or objects", async () => {
+        // The shape that lost a real purifier: one odd field used to drop the
+        // whole item, and an account with a purifier read as an empty one.
+        philips({
+            airplusDevices: [
+                {
+                    uuid: PURIFIER.uuid,
+                    thingName: null,
+                    name: null,
+                    friendlyName: "Living room",
+                    deviceName: { localized: "x" },
+                    ctn: "AC0651/10",
+                    type: 5,
+                    firmwareVersion: null
+                }
+            ]
+        });
+        const answer = await sign();
+        expect(answer.done).toBe(true);
+        expect(cloud.philipsCloudDevice({ id: 42, name: null, deviceType: 3 })).toEqual({
+            id: "42",
+            thing: "da-42",
+            name: "",
+            model: "3"
+        });
+    });
+
+    it.each([
+        ["a bare list", [PURIFIER]],
+        ["devices", { devices: [PURIFIER] }],
+        ["data", { data: [PURIFIER] }],
+        ["items", { items: [PURIFIER] }],
+        ["any key holding devices", { content: [PURIFIER], page: { size: 20 } }]
+    ])("reads the list as %s", (_shape, body) => {
+        expect(cloud.deviceItems(body).map(cloud.philipsCloudDevice)).toEqual([
+            cloud.philipsCloudDevice(PURIFIER)
+        ]);
+    });
+
+    it("draws a model nobody has mapped, and names it once connected", async () => {
+        philips({ airplusDevices: [{ uuid: "u-1", name: null, ctn: "AC2959/10" }] });
+        const answer = await sign();
+        expect(answer).toMatchObject({ done: true, unsupported: ["AC2959/10"] });
+    });
+
+    it("says nothing about a model it knows", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        const answer = await sign();
+        expect(answer.done && "unsupported" in answer).toBe(false);
+    });
+
+    it("finds a purifier the HomeID backend embeds in the profile", async () => {
+        philips({
+            homeIdApp: {
+                embedded: true,
+                appliances: [
+                    {
+                        name: "Bedroom",
+                        macAddress: "aa:bb:cc:dd:ee:ff",
+                        externalDeviceId: "ext-1",
+                        ctn: "AC0650/10",
+                        clientId: "",
+                        clientSecret: "",
+                        registeredIn: "FUSION"
+                    }
+                ]
+            }
+        });
+        const answer = await sign();
+        expect(answer).toMatchObject({
+            done: true,
+            credentials: { client: "homeid", source: "homeid-app" }
+        });
+    });
+
+    it("follows the profile's appliance link, templated, with skipped pairings", async () => {
+        philips({
+            homeIdApp: {
+                appliances: [{ name: "Hall", externalDeviceId: "ext-2", ctn: "AC1715/11" }]
+            }
+        });
+        expect((await sign()).done).toBe(true);
+        const appliances = calls.find((call) => call.url.pathname === "/api/user/self/appliances")!;
+        expect(appliances.url.searchParams.get("includeSkippedPairing")).toBe("true");
+        expect(new Headers(appliances.init.headers).get("accept")).toBe(
+            "application/vnd.oneka.v2.0+json"
+        );
+        const discovery = calls.find((call) => call.url.pathname === "/.well-known/tenant/oneka")!;
+        expect(new Headers(discovery.init.headers).get("content-type")).toBeNull();
+    });
+
+    it("lists a HomeID backend purifier again from the same place on every sync", async () => {
+        philips({
+            homeIdApp: {
+                appliances: [{ name: "Hall", externalDeviceId: "ext-2", ctn: "AC1715/11" }]
+            }
+        });
+        broker.connect = new Error("connect ETIMEDOUT");
+        const answer = await sign();
+        if (!answer.done) throw new Error("not signed in");
+        const [snapshot] = await driver.philipsCloudDriver.list(answer.credentials);
+        expect(snapshot).toMatchObject({ externalId: "ext-2", name: "Hall", model: "AC1715/11" });
+    });
+
+    it("leaves a kitchen appliance out, and says that is all there was", async () => {
+        philips({
+            homeIdApp: {
+                appliances: [{ name: "Fryer", externalDeviceId: "ext-3", ctn: "HD9880/90" }]
+            }
+        });
+        await expect(sign()).rejects.toThrow(
+            "Polaris found appliances on this Philips account, but no air purifier. What it saw: Air+: 0; HomeID: 0; HomeID app: 1 (HD9880/90)."
+        );
+    });
+
+    it("notes a list that failed and still tries the next", async () => {
+        philips({
+            homeIdApp: { appliances: [{ externalDeviceId: "ext-4", deviceType: "AC0651" }] }
+        });
+        routes.unshift({
+            match: (url, init) =>
+                url.pathname.endsWith("/user/self/device") &&
+                new Headers(init.headers).get("authorization") ===
+                    `Bearer access-${cloud.PHILIPS_CLIENTS.airplus.id}`,
+            reply: () => jsonReply({ message: "Forbidden" }, 403)
+        });
+        const answer = await sign();
+        expect(answer).toMatchObject({ done: true, credentials: { source: "homeid-app" } });
+    });
+
+    it("says what it saw when the HomeID sign-in finds a purifier it may not control", async () => {
+        philips({
+            homeIdApp: { appliances: [{ externalDeviceId: "ext-5", ctn: "AC0850/11" }] }
+        });
+        const homeid = `Bearer access-${cloud.PHILIPS_CLIENTS.homeid.id}`;
+        routes.unshift({
+            match: (url, init) =>
+                (url.pathname.endsWith("/user/self") ||
+                    url.pathname.endsWith("/user/self/device")) &&
+                new Headers(init.headers).get("authorization") === homeid,
+            reply: () => jsonReply({ message: "Forbidden" }, 403)
+        });
+        await expect(sign()).rejects.toThrow(
+            "Polaris found an air purifier on this Philips account, but Philips does not let this sign-in control it. What it saw: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0850/11); HomeID account: HTTP 401/403."
+        );
+        expect(logged).toHaveLength(1);
+    });
+
+    it("adds its own query to a backend link that already carries one", async () => {
+        philips({ homeIdApp: { appliances: [{ externalDeviceId: "ext-6", ctn: "AC1715/11" }] } });
+        routes.unshift({
+            match: (url) => url.pathname === "/.well-known/tenant/oneka",
+            reply: () => jsonReply({ profileUrl: "/user/self/profile?lang=en" })
+        });
+        expect(await cloud.listHomeIdAppliances("t")).toHaveLength(1);
+        const profile = calls.find((call) => call.url.pathname === "/api/user/self/profile")!;
+        expect(profile.url.searchParams.get("lang")).toBe("en");
+        expect(profile.url.searchParams.get("ts")).toMatch(/^\d+$/);
+    });
+
+    it("logs what it saw once, with no token, id, email or code in it", async () => {
+        philips({ airplusDevices: [{ uuid: "secret-uuid", ctn: "HD9280/90" }] });
+        await expect(sign()).rejects.toThrow(
+            "What it saw: Air+: 1 (HD9280/90); HomeID: 0; HomeID app: network."
+        );
+        expect(logged).toHaveLength(1);
+        const line = JSON.stringify(logged);
+        for (const secret of [
+            "secret-uuid",
+            "owner@example.com",
+            "123456",
+            "vt-1",
+            "gigya-session",
+            "access-",
+            "refresh-"
+        ]) {
+            expect(line).not.toContain(secret);
+        }
+    });
+
+    it("tells a kitchen appliance from an air device by its code, as the HomeID integration does", () => {
+        expect(cloud.philipsApplianceKind("AC0651/10")).toBe("air");
+        expect(cloud.philipsApplianceKind("HU5710/10")).toBe("air");
+        expect(cloud.philipsApplianceKind(null)).toBe("air");
+        expect(cloud.philipsApplianceKind("HD9255/90")).toBe("kitchen");
+        expect(cloud.philipsApplianceKind("NX0960")).toBe("kitchen");
+        expect(cloud.philipsApplianceKind("Flash_Entry_P EP2520")).toBe("kitchen");
+    });
+
+    it("never follows a link off Philips' backend with the token", async () => {
+        philips();
+        routes.unshift({
+            match: (url) => url.pathname === "/.well-known/tenant/oneka",
+            reply: () => jsonReply({ profileUrl: "https://elsewhere.example/profile" })
+        });
+        await expect(cloud.listHomeIdAppliances("t")).rejects.toBeInstanceOf(DriverError);
+        expect(calls.some((call) => call.url.hostname === "elsewhere.example")).toBe(false);
+    });
+
+    it("says what each place answered, in words with nothing private", () => {
+        expect(
+            cloud.philipsLookupSummary([
+                { where: "Air+", count: 0, models: [] },
+                { where: "HomeID", count: null, models: [], failure: "HTTP 403" },
+                { where: "HomeID app", count: 2, models: ["AC0651/10", "?"] }
+            ])
+        ).toBe("Air+: 0; HomeID: HTTP 403; HomeID app: 2 (AC0651/10, ?)");
+    });
+});
 // --- what a unit says -------------------------------------------------------------
 
 describe("a unit's status", () => {

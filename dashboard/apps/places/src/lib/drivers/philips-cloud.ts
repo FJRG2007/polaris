@@ -188,6 +188,31 @@ function toCredentials(email: string, session: cloud.PhilipsSession, userId: str
     };
 }
 
+/** Where the connection's devices are listed. A connection made before there
+ *  was a choice read the IoT registry, and still does. */
+function sourceOf(credentials: Credentials): cloud.PhilipsSource {
+    return credentials.source === "homeid-app" ? "homeid-app" : "iot";
+}
+
+function devicesOf(credentials: Credentials): Promise<cloud.PhilipsCloudDevice[]> {
+    return cloud.listPhilipsSource(sessionOf(credentials).accessToken, sourceOf(credentials));
+}
+
+/**
+ * The models found that Polaris cannot set the modes of yet: drawn all the same,
+ * with their power and what they report, and named to whoever connected them so
+ * "not supported yet" is said once rather than discovered row by row.
+ */
+export function unsupportedModels(devices: readonly cloud.PhilipsCloudDevice[]): string[] {
+    return [
+        ...new Set(
+            devices
+                .map((device) => device.model)
+                .filter((model): model is string => model !== null && !philipsCloudModel(model))
+        )
+    ];
+}
+
 /** The address as Philips knows it: one account, however it was typed. */
 export function philipsEmail(fields: Credentials): string {
     const email = (fields.email ?? "").trim().toLowerCase();
@@ -234,7 +259,7 @@ async function deviceOf(
 ): Promise<cloud.PhilipsCloudDevice | undefined> {
     const known = listed.get(account)?.find((entry) => entry.id === id);
     if (known) return known;
-    const devices = await cloud.listPhilipsDevices(sessionOf(credentials).accessToken);
+    const devices = await devicesOf(credentials);
     listed.set(account, devices);
     return devices.find((entry) => entry.id === id);
 }
@@ -284,9 +309,16 @@ export const philipsCloudDriver: DeviceDriver = {
                 parsed.data.code,
                 parsed.data.vToken
             );
-            const signedIn = await cloud.signedInWithDevices(gigyaSession, session);
-            const userId = await cloud.philipsUserId(signedIn.session.accessToken);
-            return { done: true, credentials: toCredentials(email, signedIn.session, userId) };
+            const found = await cloud.discoverPhilipsDevices(gigyaSession, session);
+            const unsupported = unsupportedModels(found.devices);
+            return {
+                done: true,
+                credentials: {
+                    ...toCredentials(email, found.session, found.userId),
+                    source: found.source
+                },
+                ...(unsupported.length > 0 ? { unsupported } : {})
+            };
         }
     },
 
@@ -316,12 +348,11 @@ export const philipsCloudDriver: DeviceDriver = {
     /** Whether the sign-in works: the account's device list is what every read
      *  starts with. */
     async verify(credentials) {
-        await cloud.listPhilipsDevices(sessionOf(credentials).accessToken);
+        await devicesOf(credentials);
     },
 
     async list(credentials) {
-        const session = sessionOf(credentials);
-        const devices = await cloud.listPhilipsDevices(session.accessToken);
+        const devices = await devicesOf(credentials);
         const account = credentials.email ?? credentials.userId ?? "";
         listed.set(account, devices);
         return Promise.all(

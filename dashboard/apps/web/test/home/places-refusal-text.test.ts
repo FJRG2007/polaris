@@ -68,7 +68,20 @@ describe("a refusal from Places", () => {
         expect(placesRefusalText(es, "Front door has to be connected again")).toBe(
             "Hay que volver a conectar Front door"
         );
-        expect(placesRefusalText(es, "A lock cannot be told to turn on")).toContain("una cerradura");
+        expect(placesRefusalText(es, "A lock cannot be told to turn on")).toContain(
+            "una cerradura"
+        );
+    });
+
+    it("keeps what a Philips sign-in saw, in Spanish around it", () => {
+        expect(
+            placesRefusalText(
+                es,
+                "Polaris found no air purifier on this Philips account. What it saw: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10). Check that the purifier is in the Air+ app under this same email."
+            )
+        ).toBe(
+            "Polaris no ha encontrado ningún purificador en esta cuenta Philips. Lo que vio: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10). Comprueba que el purificador está en la app Air+ con este mismo email."
+        );
     });
 
     it("passes a camera's own words through", () => {
@@ -88,7 +101,9 @@ describe("an outage, stored in English and read in Spanish", () => {
             [1, 1, "Home"]
         ] as const) {
             const stored = outageHeadline("Front door", place, down, total);
-            expect(placesRefusalText(es, stored)).toBe(outageHeadline("Front door", place, down, total, es));
+            expect(placesRefusalText(es, stored)).toBe(
+                outageHeadline("Front door", place, down, total, es)
+            );
         }
     });
 

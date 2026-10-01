@@ -171,6 +171,12 @@ export function ConnectDialog({
     const [expired, setExpired] = useState(false);
     /** The code typed for a pairing that is emailed one. */
     const [code, setCode] = useState("");
+    /** A connection made with models it cannot fully operate yet: said once,
+     *  before the dialog closes, rather than left to be found row by row. */
+    const [finished, setFinished] = useState<{
+        readonly result: Connected;
+        readonly unsupported: readonly string[];
+    } | null>(null);
 
     const connectionId = reconnect ? reconnect.connection : chosen;
     const connection = registry.deviceConnection(connectionId);
@@ -197,6 +203,7 @@ export function ConnectDialog({
         setPairing(null);
         setExpired(false);
         setCode("");
+        setFinished(null);
     }, [open]);
 
     // Ask whether the other side has agreed, every few seconds, until it has, it
@@ -328,7 +335,12 @@ export function ConnectDialog({
         setCode("");
         setFields({});
         setLabel("");
-        onConnected({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
+        const connected = { devices: result.devices ?? [], accounts: result.accounts ?? [] };
+        if (result.unsupported && result.unsupported.length > 0) {
+            setFinished({ result: connected, unsupported: result.unsupported });
+            return;
+        }
+        onConnected(connected);
     };
 
     const submit = async () => {
@@ -355,7 +367,21 @@ export function ConnectDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (next) return;
+                // Closed on the notice: the account is connected all the same,
+                // so the screen behind is told, not left without it.
+                if (finished) {
+                    const done = finished.result;
+                    setFinished(null);
+                    onConnected(done);
+                    return;
+                }
+                onClose();
+            }}
+        >
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
@@ -368,324 +394,361 @@ export function ConnectDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex flex-col gap-4">
-                    {!reconnect && !pairing && (
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">
-                                {t("connect.make")}
-                            </span>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {brands.map((entry) => (
-                                    <button
-                                        key={entry.brand}
-                                        type="button"
-                                        onClick={() => pickBrand(entry.brand)}
-                                        aria-pressed={entry.brand === brand}
-                                        className={cn(
-                                            "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
-                                            entry.brand === brand
-                                                ? "border-accent bg-accent/10"
-                                                : "border-border bg-card hover:border-border-strong"
-                                        )}
-                                    >
-                                        <IntegrationLogo
-                                            slug={entry.logo}
-                                            className="size-6 w-8 shrink-0 object-contain"
-                                        />
-                                        <span className="flex min-w-0 flex-col">
-                                            <span
-                                                className="truncate text-sm font-medium"
-                                                title={brandWords(entry.brand, t)}
-                                            >
-                                                {brandWords(entry.brand, t)}
-                                            </span>
-                                            <span
-                                                className="truncate text-[0.6875rem] text-foreground-subtle"
-                                                title={kindsOf(entry, t)}
-                                            >
-                                                {kindsOf(entry, t)}
-                                            </span>
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {!reconnect && !pairing && ofBrand.length > 1 && (
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">
-                                {t("connect.how")}
-                            </span>
-                            <div className="flex flex-col gap-2">
-                                {ofBrand.map((entry) => (
-                                    <button
-                                        key={entry.id}
-                                        type="button"
-                                        onClick={() => pickConnection(entry.id)}
-                                        aria-pressed={entry.id === chosen}
-                                        className={cn(
-                                            "flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
-                                            entry.id === chosen
-                                                ? "border-accent bg-accent/10"
-                                                : "border-border bg-card hover:border-border-strong"
-                                        )}
-                                    >
-                                        <Check
-                                            className={cn(
-                                                "mt-0.5 size-4 shrink-0",
-                                                entry.id === chosen
-                                                    ? "text-accent"
-                                                    : "text-transparent"
-                                            )}
-                                        />
-                                        <span className="flex min-w-0 flex-col gap-0.5">
-                                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
-                                                {registry.connectionWords(t, entry).label}
-                                                {entry.recommended === true && (
-                                                    <Badge className="border-accent/30 bg-accent/10 text-accent">
-                                                        {t("connect.recommended")}
-                                                    </Badge>
-                                                )}
-                                            </span>
-                                            <span className="text-[0.6875rem] text-muted-foreground">
-                                                {registry.connectionWords(t, entry).reach} -{" "}
-                                                {registry.connectionWords(t, entry).summary}
-                                            </span>
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {connection && !pairing && (
-                        <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                            <span className="flex items-center gap-2 text-xs font-medium">
-                                <IntegrationLogo
-                                    slug={connection.logo}
-                                    className="size-4 w-6 shrink-0 object-contain"
-                                />
-                                {said?.label} - {said?.reach}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{said?.summary}</span>
-                            {said?.note && (
-                                <span className="text-xs text-foreground-subtle">{said.note}</span>
-                            )}
-                        </div>
-                    )}
-
-                    {!pairing && said && said.steps.length > 0 && (
-                        <ol className="flex list-decimal flex-col gap-1 pl-4 text-xs text-muted-foreground">
-                            {said.steps.map((step, index) => (
-                                <li key={step}>
-                                    {index === 0 && said.link && step.includes(said.link.label) ? (
-                                        <>
-                                            {step.split(said.link.label)[0]}
-                                            <Link
-                                                href={said.link.href}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="inline-flex items-center gap-1 text-foreground underline"
-                                            >
-                                                {said.link.label}
-                                                <ExternalLink className="size-3" />
-                                            </Link>
-                                            {step.split(said.link.label)[1]}
-                                        </>
-                                    ) : (
-                                        step
-                                    )}
-                                </li>
-                            ))}
-                        </ol>
-                    )}
-
-                    {pairing && connection?.pairing?.kind === "code" && (
-                        <div className="flex flex-col gap-3">
-                            {said?.pairingPrompt && (
-                                <p className="text-xs text-muted-foreground">
-                                    {said.pairingPrompt}
-                                </p>
-                            )}
-                            <label className="flex flex-col gap-1.5">
-                                <span className="text-xs text-muted-foreground">
-                                    {t("connect.pair.codeField")}
-                                    <span className="text-danger"> *</span>
-                                </span>
-                                <Input
-                                    value={code}
-                                    maxLength={32}
-                                    spellCheck={false}
-                                    autoComplete="one-time-code"
-                                    autoFocus
-                                    disabled={expired}
-                                    onChange={(event) => setCode(event.target.value)}
-                                    onKeyDown={(event) => {
-                                        if (event.key === "Enter") void sendCode();
-                                    }}
-                                    aria-label={t("connect.pair.codeField")}
-                                />
-                            </label>
-                            {expired && (
-                                <p className="text-xs text-muted-foreground">
-                                    {t("connect.pair.codeExpired")}
-                                </p>
-                            )}
+                {finished ? (
+                    <>
+                        <p role="status" className="text-sm text-muted-foreground">
+                            {t("connect.unsupported", {
+                                models: finished.unsupported.join(", "),
+                                count: finished.unsupported.length
+                            })}
+                        </p>
+                        <DialogFooter>
                             <Button
-                                size="sm"
-                                variant="outline"
-                                className="self-start"
-                                onClick={() => void startPairing()}
-                                disabled={saving}
+                                onClick={() => {
+                                    const done = finished.result;
+                                    setFinished(null);
+                                    onConnected(done);
+                                }}
                             >
-                                <RefreshCw className="size-4" />
-                                {t("connect.pair.resend")}
+                                {t("connect.done")}
                             </Button>
-                        </div>
-                    )}
+                        </DialogFooter>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex flex-col gap-4">
+                            {!reconnect && !pairing && (
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("connect.make")}
+                                    </span>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {brands.map((entry) => (
+                                            <button
+                                                key={entry.brand}
+                                                type="button"
+                                                onClick={() => pickBrand(entry.brand)}
+                                                aria-pressed={entry.brand === brand}
+                                                className={cn(
+                                                    "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
+                                                    entry.brand === brand
+                                                        ? "border-accent bg-accent/10"
+                                                        : "border-border bg-card hover:border-border-strong"
+                                                )}
+                                            >
+                                                <IntegrationLogo
+                                                    slug={entry.logo}
+                                                    className="size-6 w-8 shrink-0 object-contain"
+                                                />
+                                                <span className="flex min-w-0 flex-col">
+                                                    <span
+                                                        className="truncate text-sm font-medium"
+                                                        title={brandWords(entry.brand, t)}
+                                                    >
+                                                        {brandWords(entry.brand, t)}
+                                                    </span>
+                                                    <span
+                                                        className="truncate text-[0.6875rem] text-foreground-subtle"
+                                                        title={kindsOf(entry, t)}
+                                                    >
+                                                        {kindsOf(entry, t)}
+                                                    </span>
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-                    {pairing && connection?.pairing && connection.pairing.kind !== "code" && (
-                        <div className="flex flex-col items-center gap-3 text-center">
-                            {connection.pairing.kind === "qr" && pairing.qr && (
-                                <div
-                                    role="img"
-                                    aria-label={t("connect.pair.codeLabel")}
-                                    className="relative rounded-lg bg-white p-3"
-                                >
-                                    <QRCodeSVG
-                                        value={pairing.qr}
-                                        size={168}
-                                        level="Q"
-                                        bgColor="#ffffff"
-                                        fgColor="#000000"
-                                    />
-                                    {expired && (
-                                        <div className="absolute inset-0 grid place-items-center rounded-lg bg-background/90 p-2">
-                                            <p className="text-xs text-muted-foreground">
-                                                {t("connect.pair.expired")}
-                                            </p>
-                                        </div>
+                            {!reconnect && !pairing && ofBrand.length > 1 && (
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("connect.how")}
+                                    </span>
+                                    <div className="flex flex-col gap-2">
+                                        {ofBrand.map((entry) => (
+                                            <button
+                                                key={entry.id}
+                                                type="button"
+                                                onClick={() => pickConnection(entry.id)}
+                                                aria-pressed={entry.id === chosen}
+                                                className={cn(
+                                                    "flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
+                                                    entry.id === chosen
+                                                        ? "border-accent bg-accent/10"
+                                                        : "border-border bg-card hover:border-border-strong"
+                                                )}
+                                            >
+                                                <Check
+                                                    className={cn(
+                                                        "mt-0.5 size-4 shrink-0",
+                                                        entry.id === chosen
+                                                            ? "text-accent"
+                                                            : "text-transparent"
+                                                    )}
+                                                />
+                                                <span className="flex min-w-0 flex-col gap-0.5">
+                                                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+                                                        {registry.connectionWords(t, entry).label}
+                                                        {entry.recommended === true && (
+                                                            <Badge className="border-accent/30 bg-accent/10 text-accent">
+                                                                {t("connect.recommended")}
+                                                            </Badge>
+                                                        )}
+                                                    </span>
+                                                    <span className="text-[0.6875rem] text-muted-foreground">
+                                                        {registry.connectionWords(t, entry).reach} -{" "}
+                                                        {registry.connectionWords(t, entry).summary}
+                                                    </span>
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {connection && !pairing && (
+                                <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                                    <span className="flex items-center gap-2 text-xs font-medium">
+                                        <IntegrationLogo
+                                            slug={connection.logo}
+                                            className="size-4 w-6 shrink-0 object-contain"
+                                        />
+                                        {said?.label} - {said?.reach}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {said?.summary}
+                                    </span>
+                                    {said?.note && (
+                                        <span className="text-xs text-foreground-subtle">
+                                            {said.note}
+                                        </span>
                                     )}
                                 </div>
                             )}
-                            {said?.pairingPrompt && (
-                                <p className="max-w-sm text-xs text-muted-foreground">
-                                    {said.pairingPrompt}
-                                </p>
+
+                            {!pairing && said && said.steps.length > 0 && (
+                                <ol className="flex list-decimal flex-col gap-1 pl-4 text-xs text-muted-foreground">
+                                    {said.steps.map((step, index) => (
+                                        <li key={step}>
+                                            {index === 0 &&
+                                            said.link &&
+                                            step.includes(said.link.label) ? (
+                                                <>
+                                                    {step.split(said.link.label)[0]}
+                                                    <Link
+                                                        href={said.link.href}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center gap-1 text-foreground underline"
+                                                    >
+                                                        {said.link.label}
+                                                        <ExternalLink className="size-3" />
+                                                    </Link>
+                                                    {step.split(said.link.label)[1]}
+                                                </>
+                                            ) : (
+                                                step
+                                            )}
+                                        </li>
+                                    ))}
+                                </ol>
                             )}
-                            {expired ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => void startPairing()}
-                                    disabled={saving}
-                                >
-                                    {saving ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <RefreshCw className="size-4" />
+
+                            {pairing && connection?.pairing?.kind === "code" && (
+                                <div className="flex flex-col gap-3">
+                                    {said?.pairingPrompt && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {said.pairingPrompt}
+                                        </p>
                                     )}
-                                    {t("connect.pair.newCode")}
-                                </Button>
-                            ) : (
+                                    <label className="flex flex-col gap-1.5">
+                                        <span className="text-xs text-muted-foreground">
+                                            {t("connect.pair.codeField")}
+                                            <span className="text-danger"> *</span>
+                                        </span>
+                                        <Input
+                                            value={code}
+                                            maxLength={32}
+                                            spellCheck={false}
+                                            autoComplete="one-time-code"
+                                            autoFocus
+                                            disabled={expired}
+                                            onChange={(event) => setCode(event.target.value)}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") void sendCode();
+                                            }}
+                                            aria-label={t("connect.pair.codeField")}
+                                        />
+                                    </label>
+                                    {expired && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {t("connect.pair.codeExpired")}
+                                        </p>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="self-start"
+                                        onClick={() => void startPairing()}
+                                        disabled={saving}
+                                    >
+                                        <RefreshCw className="size-4" />
+                                        {t("connect.pair.resend")}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {pairing &&
+                                connection?.pairing &&
+                                connection.pairing.kind !== "code" && (
+                                    <div className="flex flex-col items-center gap-3 text-center">
+                                        {connection.pairing.kind === "qr" && pairing.qr && (
+                                            <div
+                                                role="img"
+                                                aria-label={t("connect.pair.codeLabel")}
+                                                className="relative rounded-lg bg-white p-3"
+                                            >
+                                                <QRCodeSVG
+                                                    value={pairing.qr}
+                                                    size={168}
+                                                    level="Q"
+                                                    bgColor="#ffffff"
+                                                    fgColor="#000000"
+                                                />
+                                                {expired && (
+                                                    <div className="absolute inset-0 grid place-items-center rounded-lg bg-background/90 p-2">
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {t("connect.pair.expired")}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {said?.pairingPrompt && (
+                                            <p className="max-w-sm text-xs text-muted-foreground">
+                                                {said.pairingPrompt}
+                                            </p>
+                                        )}
+                                        {expired ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => void startPairing()}
+                                                disabled={saving}
+                                            >
+                                                {saving ? (
+                                                    <Loader2 className="size-4 animate-spin" />
+                                                ) : (
+                                                    <RefreshCw className="size-4" />
+                                                )}
+                                                {t("connect.pair.newCode")}
+                                            </Button>
+                                        ) : (
+                                            <p
+                                                className="flex items-center gap-2 text-xs text-foreground-subtle"
+                                                aria-live="polite"
+                                            >
+                                                <Loader2 className="size-3.5 animate-spin" />
+                                                {connection.pairing.kind === "qr"
+                                                    ? t("connect.pair.waiting")
+                                                    : t("connect.pair.waitingPress")}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                            {!pairing &&
+                                connection &&
+                                connection.fields.map((field) => (
+                                    <Field
+                                        key={field.key}
+                                        connection={connection}
+                                        field={field}
+                                        value={fields[field.key] ?? ""}
+                                        onChange={(value) =>
+                                            setFields((current) => ({
+                                                ...current,
+                                                [field.key]: value
+                                            }))
+                                        }
+                                    />
+                                ))}
+
+                            {!pairing && (
+                                <label className="flex flex-col gap-1.5">
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("connect.label")}{" "}
+                                        <span className="text-foreground-subtle">
+                                            {t("deviceDialog.optional")}
+                                        </span>
+                                    </span>
+                                    <Input
+                                        value={label}
+                                        maxLength={60}
+                                        placeholder={
+                                            reconnect?.label ??
+                                            (connection ? brandWords(connection.brand, t) : "")
+                                        }
+                                        onChange={(event) => setLabel(event.target.value)}
+                                        aria-label={t("connect.label")}
+                                    />
+                                </label>
+                            )}
+
+                            {error && (
                                 <p
-                                    className="flex items-center gap-2 text-xs text-foreground-subtle"
-                                    aria-live="polite"
+                                    role="alert"
+                                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
                                 >
-                                    <Loader2 className="size-3.5 animate-spin" />
-                                    {connection.pairing.kind === "qr"
-                                        ? t("connect.pair.waiting")
-                                        : t("connect.pair.waitingPress")}
+                                    {error}
                                 </p>
                             )}
                         </div>
-                    )}
 
-                    {!pairing &&
-                        connection &&
-                        connection.fields.map((field) => (
-                            <Field
-                                key={field.key}
-                                connection={connection}
-                                field={field}
-                                value={fields[field.key] ?? ""}
-                                onChange={(value) =>
-                                    setFields((current) => ({ ...current, [field.key]: value }))
-                                }
-                            />
-                        ))}
-
-                    {!pairing && (
-                        <label className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">
-                                {t("connect.label")}{" "}
-                                <span className="text-foreground-subtle">
-                                    {t("deviceDialog.optional")}
-                                </span>
-                            </span>
-                            <Input
-                                value={label}
-                                maxLength={60}
-                                placeholder={
-                                    reconnect?.label ??
-                                    (connection ? brandWords(connection.brand, t) : "")
-                                }
-                                onChange={(event) => setLabel(event.target.value)}
-                                aria-label={t("connect.label")}
-                            />
-                        </label>
-                    )}
-
-                    {error && (
-                        <p
-                            role="alert"
-                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                        >
-                            {error}
-                        </p>
-                    )}
-                </div>
-
-                <DialogFooter>
-                    <Button variant="ghost" onClick={onClose} disabled={saving}>
-                        {t("common.cancel")}
-                    </Button>
-                    {pairing ? (
-                        <>
-                            <Button variant="outline" onClick={() => setPairing(null)}>
-                                {t("connect.pair.back")}
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={onClose} disabled={saving}>
+                                {t("common.cancel")}
                             </Button>
-                            {connection?.pairing?.kind === "code" && (
+                            {pairing ? (
+                                <>
+                                    <Button variant="outline" onClick={() => setPairing(null)}>
+                                        {t("connect.pair.back")}
+                                    </Button>
+                                    {connection?.pairing?.kind === "code" && (
+                                        <Button
+                                            onClick={() => void sendCode()}
+                                            disabled={!code.trim() || saving || expired}
+                                            aria-disabled={!code.trim() || saving || expired}
+                                        >
+                                            {saving && <Loader2 className="size-4 animate-spin" />}
+                                            {saving ? t("connect.checking") : t("connect.connect")}
+                                        </Button>
+                                    )}
+                                </>
+                            ) : (
                                 <Button
-                                    onClick={() => void sendCode()}
-                                    disabled={!code.trim() || saving || expired}
-                                    aria-disabled={!code.trim() || saving || expired}
+                                    onClick={() =>
+                                        void (connection?.pairing ? startPairing() : submit())
+                                    }
+                                    disabled={!complete || saving}
+                                    aria-disabled={!complete || saving}
                                 >
                                     {saving && <Loader2 className="size-4 animate-spin" />}
-                                    {saving ? t("connect.checking") : t("connect.connect")}
+                                    {saving
+                                        ? t("connect.checking")
+                                        : connection?.pairing
+                                          ? connection.pairing.kind === "qr"
+                                              ? t("connect.pair.showCode")
+                                              : connection.pairing.kind === "code"
+                                                ? t("connect.pair.getCode")
+                                                : t("connect.pair.start")
+                                          : t("connect.connect")}
                                 </Button>
                             )}
-                        </>
-                    ) : (
-                        <Button
-                            onClick={() => void (connection?.pairing ? startPairing() : submit())}
-                            disabled={!complete || saving}
-                            aria-disabled={!complete || saving}
-                        >
-                            {saving && <Loader2 className="size-4 animate-spin" />}
-                            {saving
-                                ? t("connect.checking")
-                                : connection?.pairing
-                                  ? connection.pairing.kind === "qr"
-                                      ? t("connect.pair.showCode")
-                                      : connection.pairing.kind === "code"
-                                        ? t("connect.pair.getCode")
-                                        : t("connect.pair.start")
-                                  : t("connect.connect")}
-                        </Button>
-                    )}
-                </DialogFooter>
+                        </DialogFooter>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     );

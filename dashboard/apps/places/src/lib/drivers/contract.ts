@@ -105,7 +105,13 @@ export interface PairingStart {
  *  again a few seconds later until the attempt runs out. */
 export type PairingPoll =
     | { readonly done: false }
-    | { readonly done: true; readonly credentials: Credentials };
+    | {
+          readonly done: true;
+          readonly credentials: Credentials;
+          /** Model codes found that are listed but cannot be fully operated
+           *  yet, for the dialog to name rather than leave to be discovered. */
+          readonly unsupported?: readonly string[];
+      };
 
 /**
  * Connecting by something somebody does rather than something they type: a code

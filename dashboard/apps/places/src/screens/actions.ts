@@ -1458,6 +1458,8 @@ export async function startDevicePairingAction(input: unknown): Promise<{
  */
 export async function pollDevicePairingAction(input: unknown): Promise<{
     waiting?: boolean;
+    /** Model codes connected that cannot be fully operated yet. */
+    unsupported?: string[];
     devices?: DeviceView[];
     accounts?: deviceAccounts.DeviceAccountView[];
     error?: string;
@@ -1487,7 +1489,8 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
         const { current } = await currentPlace(install.id);
         return {
             list: await devices.listDevices(install.id, current.id),
-            connected: await deviceAccounts.listAccounts(install.id)
+            connected: await deviceAccounts.listAccounts(install.id),
+            unsupported: [...(answer.unsupported ?? [])]
         };
     });
     if (result.error) return { error: result.error };
@@ -1501,7 +1504,11 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
         targetId: install.id,
         metadata: { connection: connection.id, paired: true }
     });
-    return { devices: result.value.list, accounts: result.value.connected };
+    return {
+        devices: result.value.list,
+        accounts: result.value.connected,
+        ...(result.value.unsupported.length > 0 ? { unsupported: result.value.unsupported } : {})
+    };
 }
 
 /** Take one connection away, and the devices and their history with it. */
