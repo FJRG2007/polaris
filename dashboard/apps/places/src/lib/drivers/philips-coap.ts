@@ -471,6 +471,9 @@ async function readUnit(unit: PhilipsUnit): Promise<Status | null> {
 const moved = new Map<string, string>();
 const looked = new Map<string, number>();
 
+/** The key scheme each unit the table does not list was last read with. */
+const generations = new Map<string, PhilipsModel["generation"]>();
+
 function located(unit: PhilipsUnit): PhilipsUnit {
     const address = moved.get(unit.deviceId);
     return address ? { ...unit, address } : unit;
@@ -560,15 +563,16 @@ export const philipsCoapDriver: DeviceDriver = {
                 "unreachable"
             );
         }
+        const reads = await Promise.allSettled(found.map((unit) => firstRead(unit.address, unit)));
         const units: PhilipsUnit[] = [];
         let localOff = false;
-        for (const unit of found) {
-            try {
-                units.push(await firstRead(unit.address, unit));
-            } catch (error) {
-                if (!(error instanceof DriverError)) throw error;
-                if (error.message === philips.PHILIPS_LOCAL_OFF) localOff = true;
+        for (const read of reads) {
+            if (read.status === "fulfilled") {
+                units.push(read.value);
+                continue;
             }
+            if (!(read.reason instanceof DriverError)) throw read.reason;
+            if (read.reason.message === philips.PHILIPS_LOCAL_OFF) localOff = true;
         }
         if (units.length === 0) {
             throw new DriverError(
@@ -594,6 +598,10 @@ export const philipsCoapDriver: DeviceDriver = {
                 );
             }
         }
+        units.forEach((unit, index) => {
+            const status = statuses[index];
+            if (status && !modelOfUnit(unit)) generations.set(unit.deviceId, generationOf(status, null));
+        });
         return units.map((unit, index) => philipsSnapshot(located(unit), statuses[index] ?? null));
     },
 
@@ -603,7 +611,11 @@ export const philipsCoapDriver: DeviceDriver = {
         const here = located(unit);
         const model = modelOfUnit(here);
         const watch = watches.get(here.address);
-        const generation = generationOf(watch?.status ?? {}, model);
+        const generation = model
+            ? model.generation
+            : watch?.status
+              ? generationOf(watch.status, null)
+              : (generations.get(here.deviceId) ?? generationOf(await philips.readPhilips(here.address), null));
         const values = philipsValues(model, generation, action, command);
         // A push-only unit serves one client: its command goes on the link
         // already open to it, and the push that follows is its new state.
@@ -652,4 +664,5 @@ export function resetPhilipsState(): void {
     health.clear();
     moved.clear();
     looked.clear();
+    generations.clear();
 }

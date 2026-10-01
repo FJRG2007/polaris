@@ -108,7 +108,8 @@ function airOf(row: Pick<DeviceRow, "kind" | "air">): kinds.AirSettings | null {
 function airColumn(
     settings: kinds.AirSettings | null | undefined
 ): Prisma.InputJsonValue | typeof Prisma.DbNull {
-    return settings ? (settings as Prisma.InputJsonValue) : Prisma.DbNull;
+    const storable = kinds.storableAir(settings);
+    return storable ? (storable as Prisma.InputJsonValue) : Prisma.DbNull;
 }
 
 /** An air conditioner's settings with its room temperature beside them. */

@@ -113,6 +113,8 @@ const filterSchema = z.object({
 
 export type AirFilterReading = z.infer<typeof filterSchema>;
 
+const MAX_FILTERS = AIR_FILTERS.length + 1;
+
 /**
  * How a purifier is set, what it can be set to, and what it last read.
  *
@@ -146,7 +148,7 @@ export const airSettingsSchema = z.object({
         humidity: percent.optional(),
         temperature: z.number().finite().min(-50).max(100).optional()
     }),
-    filters: z.array(filterSchema).max(AIR_FILTERS.length + 1)
+    filters: z.array(filterSchema).max(MAX_FILTERS)
 });
 
 export type AirSettings = z.infer<typeof airSettingsSchema>;
@@ -155,6 +157,26 @@ export type AirSettings = z.infer<typeof airSettingsSchema>;
 export function airSettings(value: unknown): AirSettings | null {
     const parsed = airSettingsSchema.safeParse(value);
     return parsed.success ? parsed.data : null;
+}
+
+const readingsShape = airSettingsSchema.shape.readings.shape;
+
+/**
+ * Settings as a driver reported them, made fit to store: a reading or a filter
+ * outside what the schema takes is dropped rather than losing the whole
+ * document, and the filters are cut to as many as it holds.
+ */
+export function storableAir(settings: AirSettings | null | undefined): AirSettings | null {
+    if (!settings) return null;
+    const readings: AirSettings["readings"] = {};
+    for (const measure of AIR_MEASURES) {
+        const parsed = readingsShape[measure].safeParse(settings.readings[measure]);
+        if (parsed.success && parsed.data !== undefined) readings[measure] = parsed.data;
+    }
+    const filters = settings.filters
+        .filter((filter) => filterSchema.safeParse(filter).success)
+        .slice(0, MAX_FILTERS);
+    return airSettings({ ...settings, readings, filters });
 }
 
 /**

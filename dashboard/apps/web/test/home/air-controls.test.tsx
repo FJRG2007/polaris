@@ -268,4 +268,17 @@ describe("what an air purifier accepts", () => {
         expect(kinds.airSettings({ ...AIR, humidity: { target: 50, min: 70, max: 40, step: 10 } })).toBeNull();
         expect(kinds.airSettings(null)).toBeNull();
     });
+
+    it("stores a document with an impossible reading or too many filters by dropping those, not the rest", () => {
+        const filter = AIR.filters[0]!;
+        const stored = kinds.storableAir({
+            ...AIR,
+            readings: { pm25: 20_000, allergen: 3, temperature: 400 },
+            filters: [...Array.from({ length: 8 }, () => filter), { ...filter, hours: -1 }]
+        });
+        expect(stored?.mode).toBe(AIR.mode);
+        expect(stored?.readings).toEqual({ allergen: 3 });
+        expect(stored?.filters).toHaveLength(6);
+        expect(kinds.storableAir(null)).toBeNull();
+    });
 });

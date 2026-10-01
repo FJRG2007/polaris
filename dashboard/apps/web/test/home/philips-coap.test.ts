@@ -59,6 +59,8 @@ interface FakeUnit {
 }
 
 const units = new Map<string, FakeUnit>();
+/** Every address a link was opened to, in order. */
+const opened: string[] = [];
 
 function unit(address: string, overrides: Partial<FakeUnit> = {}): FakeUnit {
     const made: FakeUnit = {
@@ -139,6 +141,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/philips-udp", () => ({
         const observers: Buffer[] = [];
         let unclaimed: ((message: CoapMessage) => void) | null = null;
         if (fake) fake.links += 1;
+        opened.push(address);
         return {
             send(message: CoapMessage) {
                 // Every message goes through the real encoder and decoder.
@@ -194,6 +197,7 @@ function ac3829(): Record<string, unknown> {
 
 beforeEach(() => {
     units.clear();
+    opened.length = 0;
     subnet.addresses = [];
     driver.resetPhilipsState();
 });
@@ -386,6 +390,15 @@ describe("connecting", () => {
         expect(JSON.parse(stored!.units!).map((entry: { deviceId: string }) => entry.deviceId)).toEqual(["abc123", "def456"]);
     });
 
+    it("reads the units it finds at the same time", async () => {
+        subnet.addresses = ["192.168.1.40", "192.168.1.41"];
+        unit("192.168.1.40", { status: ac3829(), deafSyncs: 1, info: { modelid: "AC3829/10", name: "Bedroom", device_id: "info-1" } });
+        unit("192.168.1.41", { status: { ...ac3829(), DeviceId: "def456" }, deafSyncs: 1, info: { modelid: "AC3829/10", name: "Hall", device_id: "info-2" } });
+        const stored = await driver.philipsCoapDriver.verify({ host: "" });
+        expect(JSON.parse(stored!.units!)).toHaveLength(2);
+        expect(opened.slice(0, 2).sort()).toEqual(["192.168.1.40", "192.168.1.41"]);
+    });
+
     it("says so when nothing on the network is a Philips", async () => {
         subnet.addresses = ["192.168.1.10"];
         await expect(driver.philipsCoapDriver.verify({ host: "" })).rejects.toThrow("No Philips air purifier answered on this network");
@@ -469,6 +482,16 @@ describe("operating", () => {
         expect(fake.told).toEqual([{ pwr: "1", mode: "P" }]);
         const [row] = await driver.philipsCoapDriver.list(STORED());
         expect(row!.air?.mode).toBe("auto");
+    });
+
+    it("switches a model the table does not list with the key scheme its status uses", async () => {
+        const fake = unit("192.168.1.40", { status: { "D03-02": "ON", DeviceId: "abc123", modelid: "AC9999/10" } });
+        await driver.philipsCoapDriver.act(STORED("abc123", "AC9999/10"), { externalId: "abc123", kind: "air" }, "turn-off", undefined);
+        expect(fake.told).toEqual([{ "D03-02": "OFF" }]);
+        const [row] = await driver.philipsCoapDriver.list(STORED("abc123", "AC9999/10"));
+        expect(row!.state).toBe("off");
+        await driver.philipsCoapDriver.act(STORED("abc123", "AC9999/10"), { externalId: "abc123", kind: "air" }, "turn-on", undefined);
+        expect(fake.told.at(-1)).toEqual({ "D03-02": "ON" });
     });
 
     it("says the unit refused when it never says success", async () => {
