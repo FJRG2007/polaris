@@ -70,6 +70,7 @@ vi.mock("@polaris-app/game-servers/src/lib/game-sign-in-addresses", () => ({
 vi.mock("@/lib/deploy-service", () => ({ readAppRuntimeLog: async () => fake.joinLog }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     editionOf: (catalogId: string) => (catalogId === "minecraft-bedrock" ? "bedrock" : "java"),
+    readPlayerLog: async () => fake.joinLog,
     withServerContainer: async (
         _owner: string,
         installedAppId: string,

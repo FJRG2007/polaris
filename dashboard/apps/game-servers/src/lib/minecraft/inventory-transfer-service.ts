@@ -16,7 +16,14 @@ import * as transfer from "./inventory-transfer";
 import { AIR, itemArgument } from "./item-argument";
 import { readSlot, sameStack, writeSlot } from "./item-service";
 import { withServerContainer, type ServerContainer } from "./service";
-import { readLiveInventory, readSnapshot, writeSnapshot } from "./inventory-service";
+import {
+    askerOf,
+    readLiveInventories,
+    readLiveInventory,
+    readSnapshot,
+    writeSnapshot,
+    type LiveReading
+} from "./inventory-service";
 
 /** One player's bag as an export takes it: live when they are on, the kept copy when not. */
 interface Bag {
@@ -26,12 +33,12 @@ interface Bag {
     readonly items: InventoryItem[];
 }
 
+/** A player who is on: the reading just taken, kept as their snapshot, or the kept copy when it could not be read whole. */
 async function bagOf(
     installedAppId: string,
-    server: ServerContainer,
-    name: string
+    name: string,
+    reading: LiveReading | null
 ): Promise<Bag | null> {
-    const reading = await readLiveInventory(server.say, name).catch(() => null);
     if (reading?.answered && reading.unreadable === 0) {
         const takenAt = new Date();
         await writeSnapshot(installedAppId, name, reading.items, takenAt).catch(() => undefined);
@@ -85,11 +92,16 @@ export async function exportBags(
         names === "all" ? await everyKnownPlayer(installedAppId, online) : [...new Set(names)];
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const onlineSet = new Set(online.map((name) => name.toLowerCase()));
+        // Every bag that is on read together, in as few trips as they fit,
+        // rather than a trip per player and one per stack of every big bag.
+        const live = wanted.filter((name) => onlineSet.has(name.toLowerCase()));
+        const readings = await readLiveInventories(askerOf(server), live).catch(() => null);
+        const readingOf = new Map(live.map((name, index) => [name, readings?.[index] ?? null]));
         const bags: Bag[] = [];
         const missing: string[] = [];
         for (const name of wanted) {
             const bag = onlineSet.has(name.toLowerCase())
-                ? await bagOf(installedAppId, server, name)
+                ? await bagOf(installedAppId, name, readingOf.get(name) ?? null)
                 : await readSnapshot(installedAppId, name).then((kept) =>
                       kept ? { name, live: false, takenAt: kept.takenAt, items: kept.items } : null
                   );
@@ -157,7 +169,7 @@ export async function previewImport(
         for (const target of targets) {
             const isOn = onlineSet.has(target.player.toLowerCase());
             const live = isOn
-                ? await readLiveInventory(server.say, target.player).catch(() => null)
+                ? await readLiveInventory(askerOf(server), target.player).catch(() => null)
                 : null;
             const kept = live?.answered ? null : await readSnapshot(installedAppId, target.player);
             const current = live?.answered ? live.items : (kept?.items ?? []);
@@ -245,7 +257,7 @@ export async function applyQueuedImport(
         const era = await serverEra(server, player);
         if (era === null || !transfer.eraFits(fileEra, era)) throw new Error("era");
     }
-    const reading = await readLiveInventory(server.say, player);
+    const reading = await readLiveInventory(askerOf(server), player);
     if (!reading.answered || reading.unreadable > 0) throw new Error("unread");
     return applyPlanNow(
         server,

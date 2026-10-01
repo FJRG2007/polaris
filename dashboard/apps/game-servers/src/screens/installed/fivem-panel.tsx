@@ -37,7 +37,7 @@ import type { PlayerSeen } from "../../lib/games-activity";
 import { timeoutRemaining } from "../../lib/player-timeout";
 import type { ServerPresence } from "../../lib/games-service";
 import { useGamePresence } from "../../components/use-game-presence";
-import { presenceLine, seenFor } from "../../lib/games-activity";
+import { presenceLine, seenFor, withLiveSince } from "../../lib/games-activity";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import type { FivemAccessView, FivemStatus } from "../../lib/fivem/service";
@@ -45,7 +45,15 @@ import { PlayerIconAction, PlayersTable } from "../../components/game-players-ta
 import { IDENTIFIER_LABEL, isIdentifier, kindOf } from "../../lib/fivem/players";
 import { PlayerFormDialog, PlayerFormField } from "../../components/player-form-dialog";
 import { isLicenseKey, KEYMASTER_URL, LICENSE_KEY_HINT } from "../../lib/fivem/config";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ReactNode
+} from "react";
 import {
     foldFivemPlayers,
     matchesFivemFilter,
@@ -103,7 +111,8 @@ type GameReachAdvice = AppHostTypes["GameReachAdvice"];
 const { CopyButton } = hostUi.copyButton;
 const { useConfirm } = hostUi.confirmDialog;
 const { RelativeTime } = hostUi.relativeTime;
-const { canOpenGameTab, gameTabHref, gameTabLabel, isGameTab, visibleGameTabs } = hostUi.appAppsInstalledIdTabs;
+const { canOpenGameTab, gameTabHref, gameTabLabel, isGameTab, visibleGameTabs } =
+    hostUi.appAppsInstalledIdTabs;
 const { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } = hostUi.metricsHistory;
 
 /**
@@ -157,7 +166,9 @@ export function FivemPanel({
     const pathname = usePathname();
     const tab = useMemo(() => {
         const base = `/apps/installed/${installedAppId}`;
-        const slug = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, "") : "";
+        const slug = pathname.startsWith(base)
+            ? pathname.slice(base.length).replace(/^\//, "")
+            : "";
         return isGameTab(slug, "fivem") && canOpenGameTab(slug, held, "fivem") ? slug : "";
     }, [pathname, installedAppId, held]);
     const tabs = useMemo(() => visibleGameTabs(held, "fivem"), [held]);
@@ -258,10 +269,22 @@ export function FivemPanel({
         [reading.status, streamed, presence.at, game?.gamePort, running]
     );
     const isRunning = status?.running ?? running;
+    // When each player on began the visit they are on, from the stream as soon as
+    // it has it rather than a poll late.
+    const liveSeen = useMemo(
+        () =>
+            streamed && Date.now() - presence.at < PRESENCE_STALE_MS
+                ? withLiveSince(reading.seen, streamed.players)
+                : reading.seen,
+        [reading.seen, streamed, presence.at]
+    );
 
     useEffect(() => {
         const state = statusState(status, isRunning);
-        onStatus?.(state === null ? null : t(STATE_LABEL[state]), state === "notRunning" ? "danger" : undefined);
+        onStatus?.(
+            state === null ? null : t(STATE_LABEL[state]),
+            state === "notRunning" ? "danger" : undefined
+        );
     }, [onStatus, status, isRunning, t]);
 
     return (
@@ -278,7 +301,10 @@ export function FivemPanel({
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <ScrollRow as="nav" className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm">
+            <ScrollRow
+                as="nav"
+                className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm"
+            >
                 {tabs.map((entry) => (
                     <a
                         key={entry.slug}
@@ -318,7 +344,7 @@ export function FivemPanel({
                     installedAppId={installedAppId}
                     status={status}
                     access={reading.access}
-                    seen={reading.seen}
+                    seen={liveSeen}
                     canModerate={held.includes("games.moderate")}
                     canManage={held.includes("games.manage")}
                     onChanged={(next) => {
@@ -402,7 +428,10 @@ export function FivemPanel({
                         suffix={game?.suffix ?? null}
                         address={reading.address}
                     />
-                    <ServerKeyCard installedAppId={installedAppId} canManage={held.includes("games.manage")} />
+                    <ServerKeyCard
+                        installedAppId={installedAppId}
+                        canManage={held.includes("games.manage")}
+                    />
                 </div>
             )}
         </div>
@@ -445,7 +474,11 @@ function withPresence(
         // against a slot the newcomer now holds, with Kick offered on it.
         const same = sameRoster(presence.players, status.players);
         return same && status.answering
-            ? { ...status, answering: presence.answering, containerRunning: presence.containerRunning }
+            ? {
+                  ...status,
+                  answering: presence.answering,
+                  containerRunning: presence.containerRunning
+              }
             : { ...status, ...live };
     }
     return {
@@ -489,7 +522,8 @@ function StatusBadge({ status, running }: { status: FivemStatus | null; running:
     if (state === null) return <Skeleton className="h-6 w-20" />;
     if (state === "crashLoop") return <Badge variant="danger">{t("panel.crashLoop")}</Badge>;
     if (state === "notRunning") return <Badge variant="danger">{t("panel.notRunning")}</Badge>;
-    if (state === "starting") return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
+    if (state === "starting")
+        return <Badge className="border-warning-edge text-warning">{t("panel.starting")}</Badge>;
     if (state === "stopped") return <Badge>{t("panel.stopped")}</Badge>;
     return <Badge className="border-success-edge text-success">{t("panel.online")}</Badge>;
 }
@@ -545,11 +579,16 @@ function ConnectCard({
                                     {/* i18n-ignore: the console command, typed as it is */}
                                     connect {joined}
                                 </code>
-                                <CopyButton value={`connect ${joined}`} label={t("panel.theConnectCommand")} />
+                                <CopyButton
+                                    value={`connect ${joined}`}
+                                    label={t("panel.theConnectCommand")}
+                                />
                             </span>
                         </div>
                     )}
-                    {status?.build && <span className="text-xs text-muted-foreground">{status.build}</span>}
+                    {status?.build && (
+                        <span className="text-xs text-muted-foreground">{status.build}</span>
+                    )}
                     {/* Only when there is something the operator can actually do
                         about it: a probe that proved nothing is not a warning. */}
                     {reach && !reach.ok && reach.actionable && (
@@ -657,13 +696,19 @@ function PlayersTab({
 
     const rows = useMemo(
         () =>
-            foldFivemPlayers(status?.players ?? [], access ?? { allowList: [], bans: [], admins: [] })
+            foldFivemPlayers(
+                status?.players ?? [],
+                access ?? { allowList: [], bans: [], admins: [] }
+            )
                 .filter((entry) => matchesFivemPlayer(entry, query))
                 .filter((entry) => matchesFivemFilter(entry, filter)),
         [status?.players, access, query, filter]
     );
 
-    async function run(key: string, work: () => Promise<{ access?: FivemAccessView; error?: string }>): Promise<void> {
+    async function run(
+        key: string,
+        work: () => Promise<{ access?: FivemAccessView; error?: string }>
+    ): Promise<void> {
         setBusy(key);
         setError(null);
         const result = await work();
@@ -691,7 +736,11 @@ function PlayersTab({
                 toolbar={
                     canModerate ? (
                         <div className="flex items-center gap-1">
-                            <Button size="sm" variant="secondary" onClick={() => setBroadcasting(true)}>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setBroadcasting(true)}
+                            >
                                 <Megaphone className="size-4" /> {t("panel.announce")}
                             </Button>
                             <Button size="sm" onClick={() => setAdding(true)}>
@@ -719,13 +768,24 @@ function PlayersTab({
                         onAllow={() =>
                             entry.identifier &&
                             void run(entry.identifier, () =>
-                                actions.addFivemPlayerAction(installedAppId, entry.identifier!, entry.name)
+                                actions.addFivemPlayerAction(
+                                    installedAppId,
+                                    entry.identifier!,
+                                    entry.name
+                                )
                             )
                         }
                         onDisallow={async () => {
                             if (!entry.identifier) return;
                             const question = playerConfirm.remove(entry.name);
-                            if (!(await confirm({ ...question, confirmLabel: t("panel.remove"), danger: true }))) return;
+                            if (
+                                !(await confirm({
+                                    ...question,
+                                    confirmLabel: t("panel.remove"),
+                                    danger: true
+                                }))
+                            )
+                                return;
                             void run(entry.identifier, () =>
                                 actions.removeFivemPlayerAction(installedAppId, entry.identifier!)
                             );
@@ -733,7 +793,14 @@ function PlayersTab({
                         onKick={async () => {
                             if (entry.playerId === null) return;
                             const question = playerConfirm.kick(entry.name);
-                            if (!(await confirm({ ...question, confirmLabel: t("panel.kick"), danger: true }))) return;
+                            if (
+                                !(await confirm({
+                                    ...question,
+                                    confirmLabel: t("panel.kick"),
+                                    danger: true
+                                }))
+                            )
+                                return;
                             void run(entry.identifier ?? entry.name, async () =>
                                 actions.kickFivemPlayerAction(
                                     installedAppId,
@@ -746,7 +813,14 @@ function PlayersTab({
                         onBan={async () => {
                             if (!entry.identifier) return;
                             const question = playerConfirm.ban(entry.name);
-                            if (!(await confirm({ ...question, confirmLabel: t("panel.ban"), danger: true }))) return;
+                            if (
+                                !(await confirm({
+                                    ...question,
+                                    confirmLabel: t("panel.ban"),
+                                    danger: true
+                                }))
+                            )
+                                return;
                             void run(entry.identifier, () =>
                                 actions.banFivemPlayerAction(
                                     installedAppId,
@@ -767,23 +841,28 @@ function PlayersTab({
                         onAdmin={(isAdmin) =>
                             entry.identifier &&
                             void run(entry.identifier, () =>
-                                actions.setFivemAdminAction(installedAppId, entry.identifier!, entry.name, isAdmin)
+                                actions.setFivemAdminAction(
+                                    installedAppId,
+                                    entry.identifier!,
+                                    entry.name,
+                                    isAdmin
+                                )
                             )
                         }
                     />
                 ))}
             />
 
-            <p className="text-xs text-muted-foreground">
-                {t("panel.aPlayerIsMatchedBy")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("panel.aPlayerIsMatchedBy")}</p>
 
             {adding && (
                 <AddPlayerDialog
                     onClose={() => setAdding(false)}
                     onAdd={(identifier, label) => {
                         setAdding(false);
-                        void run(identifier, () => actions.addFivemPlayerAction(installedAppId, identifier, label));
+                        void run(identifier, () =>
+                            actions.addFivemPlayerAction(installedAppId, identifier, label)
+                        );
                     }}
                 />
             )}
@@ -796,7 +875,11 @@ function PlayersTab({
                         setMessaging(null);
                         if (target.playerId === null) return;
                         void run(target.identifier ?? target.name, async () =>
-                            actions.messageFivemPlayerAction(installedAppId, target.playerId!, message)
+                            actions.messageFivemPlayerAction(
+                                installedAppId,
+                                target.playerId!,
+                                message
+                            )
                         );
                     }}
                 />
@@ -807,7 +890,9 @@ function PlayersTab({
                     onClose={() => setBroadcasting(false)}
                     onSend={(message) => {
                         setBroadcasting(false);
-                        void run("broadcast", async () => actions.broadcastFivemAction(installedAppId, message));
+                        void run("broadcast", async () =>
+                            actions.broadcastFivemAction(installedAppId, message)
+                        );
                     }}
                 />
             )}
@@ -885,8 +970,14 @@ function PlayerRow({
         <tr className="border-t border-border">
             <td className="px-3 py-2">
                 <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate font-medium" title={entry.name}>{entry.name}</span>
-                    {entry.admin && <Badge className="shrink-0 text-[0.6875rem]">{playerStanding.operator}</Badge>}
+                    <span className="truncate font-medium" title={entry.name}>
+                        {entry.name}
+                    </span>
+                    {entry.admin && (
+                        <Badge className="shrink-0 text-[0.6875rem]">
+                            {playerStanding.operator}
+                        </Badge>
+                    )}
                 </span>
                 <span className="text-xs text-muted-foreground">
                     {entry.online
@@ -914,7 +1005,11 @@ function PlayerRow({
                 <span
                     className={cn(
                         "text-xs",
-                        entry.banned ? "text-danger" : entry.waiting ? "text-warning" : "text-muted-foreground"
+                        entry.banned
+                            ? "text-danger"
+                            : entry.waiting
+                              ? "text-warning"
+                              : "text-muted-foreground"
                     )}
                 >
                     {standing}
@@ -928,15 +1023,18 @@ function PlayerRow({
             <td className="hidden px-3 py-2 text-xs text-muted-foreground sm:table-cell">
                 {/* Which of the three things a row can say - see `presenceLine`,
                     where the cases are settled and tested. */}
-                {line === null ? (
-                    playerPresence.never
-                ) : line.kind === "added" ? (
-                    t.rich<ReactNode>("panel.addedAt", { time: () => <RelativeTime key="time" iso={line.iso} /> })
-                ) : (
-                    t.rich<ReactNode>(line.kind === "since" ? "panel.playingSince" : "panel.lastOn", {
-                        time: () => <RelativeTime key="time" iso={line.iso} />
-                    })
-                )}
+                {line === null
+                    ? playerPresence.never
+                    : line.kind === "added"
+                      ? t.rich<ReactNode>("panel.addedAt", {
+                            time: () => <RelativeTime key="time" iso={line.iso} />
+                        })
+                      : t.rich<ReactNode>(
+                            line.kind === "since" ? "panel.playingSince" : "panel.lastOn",
+                            {
+                                time: () => <RelativeTime key="time" iso={line.iso} />
+                            }
+                        )}
             </td>
             <td className="px-3 py-2">
                 <div className="flex items-center justify-end gap-0.5">
@@ -983,7 +1081,8 @@ function PlayerRow({
                                 <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
                                 {entry.online && entry.playerId !== null && (
                                     <DropdownMenuItem onSelect={onMessage}>
-                                        <MessageSquare className="size-4" /> {playerMenuItem.message}
+                                        <MessageSquare className="size-4" />{" "}
+                                        {playerMenuItem.message}
                                     </DropdownMenuItem>
                                 )}
                                 {entry.banned ? (
@@ -996,7 +1095,8 @@ function PlayerRow({
                                             <Timer className="size-4" /> {playerMenuItem.timeout}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onSelect={onBan}>
-                                            <Ban className="size-4" /> {playerAction.ban(entry.name)}
+                                            <Ban className="size-4" />{" "}
+                                            {playerAction.ban(entry.name)}
                                         </DropdownMenuItem>
                                     </>
                                 )}
@@ -1006,11 +1106,13 @@ function PlayerRow({
                                         <DropdownMenuItem onSelect={() => onAdmin(!entry.admin)}>
                                             {entry.admin ? (
                                                 <>
-                                                    <ShieldMinus className="size-4" /> {t("panel.stopThemAdministeringIt")}
+                                                    <ShieldMinus className="size-4" />{" "}
+                                                    {t("panel.stopThemAdministeringIt")}
                                                 </>
                                             ) : (
                                                 <>
-                                                    <ShieldPlus className="size-4" /> {t("panel.letThemAdministerIt")}
+                                                    <ShieldPlus className="size-4" />{" "}
+                                                    {t("panel.letThemAdministerIt")}
                                                 </>
                                             )}
                                         </DropdownMenuItem>
@@ -1059,13 +1161,15 @@ function AddPlayerDialog({
                     spellCheck={false}
                 />
                 <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
-                    {invalid
-                        ? t("panel.pasteItWholeAsThe")
-                        : t("panel.whateverTheGameHandsOver")}
+                    {invalid ? t("panel.pasteItWholeAsThe") : t("panel.whateverTheGameHandsOver")}
                 </span>
             </PlayerFormField>
             <PlayerFormField label={t("panel.nameOnTheList")}>
-                <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("panel.optional")} />
+                <Input
+                    value={label}
+                    onChange={(event) => setLabel(event.target.value)}
+                    placeholder={t("panel.optional")}
+                />
             </PlayerFormField>
         </PlayerFormDialog>
     );
@@ -1095,7 +1199,11 @@ function MessageDialog({
             onConfirm={() => onSend(message.trim())}
         >
             <PlayerFormField label={t("panel.message")}>
-                <Input value={message} onChange={(event) => setMessage(event.target.value)} maxLength={200} />
+                <Input
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    maxLength={200}
+                />
                 {invalid && <span className="text-xs text-danger">{schemaText(REASON_HINT)}</span>}
             </PlayerFormField>
         </PlayerFormDialog>
@@ -1141,7 +1249,10 @@ function ClosedServerCard({
                         onChange={(next: boolean) =>
                             startTransition(async () => {
                                 setError(null);
-                                const result = await actions.setFivemExclusiveJoinAction(installedAppId, next);
+                                const result = await actions.setFivemExclusiveJoinAction(
+                                    installedAppId,
+                                    next
+                                );
                                 if (result.error) {
                                     setError(result.error);
                                     return;
@@ -1159,16 +1270,21 @@ function ClosedServerCard({
                 {closed && guardRunning === false && (
                     <p className="flex items-start gap-2 text-sm text-warning">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                        <span>
-                            {t("panel.theServerIsNotRunning")}
-                        </span>
+                        <span>{t("panel.theServerIsNotRunning")}</span>
                     </p>
                 )}
                 <p className="text-xs text-muted-foreground">
                     {access === null
                         ? t("panel.readingTheList")
-                        : t("panel.listCounts", { listed: access.allowList.length, banned: access.bans.length })}{" "}
-                    <button type="button" onClick={onOpenPlayers} className="text-primary hover:underline">
+                        : t("panel.listCounts", {
+                              listed: access.allowList.length,
+                              banned: access.bans.length
+                          })}{" "}
+                    <button
+                        type="button"
+                        onClick={onOpenPlayers}
+                        className="text-primary hover:underline"
+                    >
                         {t("panel.openThePlayersScreen")}
                     </button>
                     .
@@ -1217,7 +1333,8 @@ function ConsolePasswordCard({
                             onClick={() =>
                                 startTransition(async () => {
                                     setError(null);
-                                    const result = await actions.revealFivemPasswordAction(installedAppId);
+                                    const result =
+                                        await actions.revealFivemPasswordAction(installedAppId);
                                     if (result.error) {
                                         setError(result.error);
                                         return;
@@ -1233,7 +1350,9 @@ function ConsolePasswordCard({
                             <code className="min-w-0 truncate rounded bg-surface px-2 py-1 font-mono text-sm">
                                 {shown || t("panel.thereIsNoneRecorded")}
                             </code>
-                            {shown && <CopyButton value={shown} label={t("panel.theConsolePassword")} />}
+                            {shown && (
+                                <CopyButton value={shown} label={t("panel.theConsolePassword")} />
+                            )}
                         </span>
                     )}
                 </div>
@@ -1266,8 +1385,15 @@ function ConsolePasswordCard({
                                     <RefreshCw className="size-4" />
                                 </Button>
                             </div>
-                            <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
-                                {invalid ? schemaText(CONSOLE_PASSWORD_HINT) : t("panel.itTakesEffectAtOnce")}
+                            <span
+                                className={cn(
+                                    "text-xs",
+                                    invalid ? "text-danger" : "text-muted-foreground"
+                                )}
+                            >
+                                {invalid
+                                    ? schemaText(CONSOLE_PASSWORD_HINT)
+                                    : t("panel.itTakesEffectAtOnce")}
                             </span>
                         </label>
                         <Button
@@ -1277,7 +1403,10 @@ function ConsolePasswordCard({
                                 startTransition(async () => {
                                     setError(null);
                                     setNote(null);
-                                    const result = await actions.setFivemPasswordAction(installedAppId, draft);
+                                    const result = await actions.setFivemPasswordAction(
+                                        installedAppId,
+                                        draft
+                                    );
                                     if (result.error) {
                                         setError(result.error);
                                         return;
@@ -1294,9 +1423,7 @@ function ConsolePasswordCard({
                     </div>
                 )}
                 {!running && canManage && (
-                    <p className="text-xs text-muted-foreground">
-                        {t("panel.theServerHasToBe")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("panel.theServerHasToBe")}</p>
                 )}
                 {note && <p className="text-sm text-success">{note}</p>}
                 {error && <p className="text-sm text-danger">{error}</p>}
@@ -1305,7 +1432,13 @@ function ConsolePasswordCard({
     );
 }
 
-function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; canManage: boolean }) {
+function ServerKeyCard({
+    installedAppId,
+    canManage
+}: {
+    installedAppId: string;
+    canManage: boolean;
+}) {
     const t = useGameText("fivem");
     const schemaText = useSchemaText();
     const [draft, setDraft] = useState("");
@@ -1322,7 +1455,13 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
                     <p className="text-xs text-muted-foreground">
                         {t.rich<ReactNode>("panel.keyHelp", {
                             link: (chunks) => (
-                                <Link key="keymaster" href={KEYMASTER_URL} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                                <Link
+                                    key="keymaster"
+                                    href={KEYMASTER_URL}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-primary hover:underline"
+                                >
                                     {chunks}
                                 </Link>
                             )
@@ -1341,8 +1480,15 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
                                 autoComplete="off"
                                 spellCheck={false}
                             />
-                            <span className={cn("text-xs", invalid ? "text-danger" : "text-muted-foreground")}>
-                                {invalid ? schemaText(LICENSE_KEY_HINT) : t("panel.theServerPicksItUp")}
+                            <span
+                                className={cn(
+                                    "text-xs",
+                                    invalid ? "text-danger" : "text-muted-foreground"
+                                )}
+                            >
+                                {invalid
+                                    ? schemaText(LICENSE_KEY_HINT)
+                                    : t("panel.theServerPicksItUp")}
                             </span>
                         </label>
                         <Button
@@ -1352,7 +1498,10 @@ function ServerKeyCard({ installedAppId, canManage }: { installedAppId: string; 
                                 startTransition(async () => {
                                     setError(null);
                                     setNote(null);
-                                    const result = await actions.setFivemLicenseKeyAction(installedAppId, draft.trim());
+                                    const result = await actions.setFivemLicenseKeyAction(
+                                        installedAppId,
+                                        draft.trim()
+                                    );
                                     if (result.error) {
                                         setError(result.error);
                                         return;

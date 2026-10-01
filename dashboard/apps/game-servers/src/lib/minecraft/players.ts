@@ -13,7 +13,7 @@
  */
 
 import type { PlayerAccessView } from "./player-access";
-import { seenFor, type PlayerSeen } from "../games-activity";
+import { laterOf, seenFor, type PlayerSeen } from "../games-activity";
 import type { MinecraftRoster, MinecraftStatus } from "./service";
 import {
     playerActivity,
@@ -142,7 +142,7 @@ export function foldPlayers(
         const activity = playerActivity(own, entry.online, now);
         byKey.set(key, {
             ...entry,
-            ...watched(activity, seenFor(seen, { id: null, names: [entry.name] })),
+            ...watched(activity, seenFor(seen, { id: null, names: [entry.name] }), entry.online),
             sessions: own
         });
     }
@@ -174,8 +174,23 @@ export const GAME_MODES = ["survival", "creative", "adventure", "spectator"] as 
  * again every time the container is replaced. So a player whose joins have scrolled
  * off had nothing under their row at all, and was badged as never having played
  * here, which is a different claim entirely from "the log no longer says".
+ *
+ * For somebody playing, the only thing either source may fill in is when the visit
+ * they are on began. The record's newest departure used to stand in for it, which
+ * drew "playing since" at the end of yesterday's last visit for somebody who had
+ * reconnected a dozen times since. Of the log's arrival and the record's open visit
+ * the later wins: both are the start of the same connection when both are right,
+ * and the only way the record is later is a reconnect the log did not show.
  */
-function watched(activity: PlayerActivity, seen: PlayerSeen | null): PlayerActivity {
+function watched(
+    activity: PlayerActivity,
+    seen: PlayerSeen | null,
+    online: boolean
+): PlayerActivity {
+    if (online) {
+        const open = seen?.open ?? null;
+        return { ...activity, lastSeen: laterOf(activity.lastSeen, open) };
+    }
     if (activity.lastSeen) return activity;
     const last = seen?.lastSeen ?? seen?.since ?? null;
     if (!last) return activity;

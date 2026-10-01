@@ -72,6 +72,7 @@ import {
     wantsLatest
 } from "../../lib/minecraft/blueprint-version";
 import {
+    askerOf,
     readLiveInventory,
     readSnapshot,
     writeSnapshot
@@ -570,7 +571,7 @@ export async function readPlayerInventoryAction(
         const reading = await withServerContainer(
             access.ownerId,
             parsed.data.installedAppId,
-            (server) => readLiveInventory(server.say, parsed.data.player)
+            (server) => readLiveInventory(askerOf(server), parsed.data.player)
         );
         // An empty bag and a reply that was never an inventory both read as no
         // items, and they are not the same thing to tell somebody checking what a
