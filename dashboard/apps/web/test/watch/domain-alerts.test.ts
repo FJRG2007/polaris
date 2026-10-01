@@ -134,13 +134,25 @@ describe("a recovery says how long it was down", () => {
     });
 
     it("for a sweep, the longest of them", () => {
-        const said = domainHealthMessage("up", LABELS.slice(0, 2), null, undefined, 2 * 3_600_000 + 5 * 60_000);
+        const said = domainHealthMessage(
+            "up",
+            LABELS.slice(0, 2),
+            null,
+            undefined,
+            2 * 3_600_000 + 5 * 60_000
+        );
         expect(said.body).toContain("The longest had been down for at least 2 h 5 min.");
     });
 
     it("in the reader's language", async () => {
         const { translatorFor } = await import("@/lib/i18n/translate");
-        const said = domainHealthMessage("up", [LABELS[0]!], null, translatorFor("es-ES", "notices"), 90_000);
+        const said = domainHealthMessage(
+            "up",
+            [LABELS[0]!],
+            null,
+            translatorFor("es-ES", "notices"),
+            90_000
+        );
         expect(said.body).toBe("Vuelve a responder, tras al menos 1 min 30 s caído.");
     });
 

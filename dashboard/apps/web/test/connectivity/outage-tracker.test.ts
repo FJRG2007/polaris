@@ -23,7 +23,13 @@ interface Row {
 }
 
 let rows: Row[] = [];
-let months: { month: string; kind: string; count: number; downtimeSeconds: number; longestSeconds: number }[] = [];
+let months: {
+    month: string;
+    kind: string;
+    count: number;
+    downtimeSeconds: number;
+    longestSeconds: number;
+}[] = [];
 const settings = new Map<string, string>();
 let nextId = 1;
 
@@ -33,7 +39,8 @@ function matches(row: Row, where: Where): boolean {
     if (typeof where.id === "string" && row.id !== where.id) return false;
     if (typeof where.id === "object" && !where.id.in.includes(row.id)) return false;
     if (where.endedAt === null && row.endedAt !== null) return false;
-    if (where.endedAt instanceof Date && row.endedAt?.getTime() !== where.endedAt.getTime()) return false;
+    if (where.endedAt instanceof Date && row.endedAt?.getTime() !== where.endedAt.getTime())
+        return false;
     if (where.endedAt && !(where.endedAt instanceof Date)) {
         if (row.endedAt === null) return false;
         if (where.endedAt.lt && !(row.endedAt < where.endedAt.lt)) return false;
@@ -54,20 +61,30 @@ function applyData(row: Row, data: Record<string, unknown>): Row {
 const uniqueClash = () => Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
 
 const connectivityOutage = {
-    findUnique: vi.fn(async ({ where }: { where: { openSlot: string } }) => rows.find((row) => row.openSlot === where.openSlot) ?? null),
-    findFirst: vi.fn(async () =>
-        [...rows].filter((row) => row.endedAt !== null).sort((a, b) => b.endedAt!.getTime() - a.endedAt!.getTime())[0] ?? null
+    findUnique: vi.fn(
+        async ({ where }: { where: { openSlot: string } }) =>
+            rows.find((row) => row.openSlot === where.openSlot) ?? null
     ),
-    findMany: vi.fn(async ({ where, take }: { where?: Where & { OR?: unknown }; take?: number }) => {
-        let found = where && !("OR" in where) ? rows.filter((row) => matches(row, where)) : [...rows];
-        found = found.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
-        if (where && "endedAt" in where && where.endedAt && !(where.endedAt instanceof Date)) {
-            found = found.reverse();
+    findFirst: vi.fn(
+        async () =>
+            [...rows]
+                .filter((row) => row.endedAt !== null)
+                .sort((a, b) => b.endedAt!.getTime() - a.endedAt!.getTime())[0] ?? null
+    ),
+    findMany: vi.fn(
+        async ({ where, take }: { where?: Where & { OR?: unknown }; take?: number }) => {
+            let found =
+                where && !("OR" in where) ? rows.filter((row) => matches(row, where)) : [...rows];
+            found = found.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+            if (where && "endedAt" in where && where.endedAt && !(where.endedAt instanceof Date)) {
+                found = found.reverse();
+            }
+            return found.slice(0, take ?? found.length);
         }
-        return found.slice(0, take ?? found.length);
-    }),
+    ),
     create: vi.fn(async ({ data }: { data: Partial<Row> }) => {
-        if (data.openSlot && rows.some((row) => row.openSlot === data.openSlot)) throw uniqueClash();
+        if (data.openSlot && rows.some((row) => row.openSlot === data.openSlot))
+            throw uniqueClash();
         const row: Row = {
             id: String(nextId++),
             kind: "address",
@@ -89,7 +106,11 @@ const connectivityOutage = {
     }),
     updateMany: vi.fn(async ({ where, data }: { where: Where; data: Record<string, unknown> }) => {
         const hit = rows.filter((row) => matches(row, where));
-        if (data.openSlot && rows.some((row) => row.openSlot === data.openSlot && !hit.includes(row))) throw uniqueClash();
+        if (
+            data.openSlot &&
+            rows.some((row) => row.openSlot === data.openSlot && !hit.includes(row))
+        )
+            throw uniqueClash();
         rows = rows.map((row) => (hit.includes(row) ? applyData(row, data) : row));
         return { count: hit.length };
     }),
@@ -102,12 +123,23 @@ const connectivityOutage = {
 
 const connectivityOutageMonth = {
     findMany: vi.fn(async () => months),
-    findUnique: vi.fn(async ({ where }: { where: { month_kind: { month: string; kind: string } } }) =>
-        months.find((m) => m.month === where.month_kind.month && m.kind === where.month_kind.kind) ?? null
+    findUnique: vi.fn(
+        async ({ where }: { where: { month_kind: { month: string; kind: string } } }) =>
+            months.find(
+                (m) => m.month === where.month_kind.month && m.kind === where.month_kind.kind
+            ) ?? null
     ),
     update: vi.fn(
-        async ({ where, data }: { where: { month_kind: { month: string; kind: string } }; data: Record<string, unknown> }) => {
-            const index = months.findIndex((m) => m.month === where.month_kind.month && m.kind === where.month_kind.kind);
+        async ({
+            where,
+            data
+        }: {
+            where: { month_kind: { month: string; kind: string } };
+            data: Record<string, unknown>;
+        }) => {
+            const index = months.findIndex(
+                (m) => m.month === where.month_kind.month && m.kind === where.month_kind.kind
+            );
             months[index] = applyData(months[index] as never, data) as never;
             return months[index];
         }
@@ -147,7 +179,12 @@ const { STALE_AFTER_MS } = await import("@/lib/connectivity/cadence");
 
 const T0 = Date.UTC(2026, 9, 1, 12);
 const MINUTE = 60_000;
-const lineDown = { up: false as const, kind: "line" as const, detectedBy: "polaris.example.com", detail: "Timed out" };
+const lineDown = {
+    up: false as const,
+    kind: "line" as const,
+    detectedBy: "polaris.example.com",
+    detail: "Timed out"
+};
 const up = { up: true as const, via: "polaris.example.com" };
 
 beforeEach(() => {
@@ -190,7 +227,10 @@ describe("recording passes", () => {
 
         await tracker.recordPass(up, T0 + 5 * MINUTE + STALE_AFTER_MS + 1);
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ endedAt: new Date(T0 + 5 * MINUTE), closedBy: "unobserved" });
+        expect(rows[0]).toMatchObject({
+            endedAt: new Date(T0 + 5 * MINUTE),
+            closedBy: "unobserved"
+        });
     });
 
     it("reopens an outage that comes back within the merge gap, and honours a gap set to zero", async () => {
@@ -216,7 +256,10 @@ describe("the report", () => {
 
         const report = await tracker.connectivityReport(T0 + 40 * MINUTE);
         expect(report.open?.kind).toBe("line");
-        expect(report.lastPass).toEqual({ at: new Date(T0 + 30 * MINUTE).toISOString(), up: false });
+        expect(report.lastPass).toEqual({
+            at: new Date(T0 + 30 * MINUTE).toISOString(),
+            up: false
+        });
         expect(report.since).toBe(new Date(T0).toISOString());
         const day = report.periods.find((period) => period.key === "24h");
         expect(day).toMatchObject({ count: 2, downMs: 20 * MINUTE, longestMs: 10 * MINUTE });
@@ -252,7 +295,15 @@ describe("keeping a year", () => {
 
         expect(await tracker.compactOutages(T0)).toBe(2);
         expect(await tracker.compactOutages(T0)).toBe(0);
-        expect(months).toEqual([{ month: "2025-03", kind: "line", count: 2, downtimeSeconds: 2400, longestSeconds: 1800 }]);
+        expect(months).toEqual([
+            {
+                month: "2025-03",
+                kind: "line",
+                count: 2,
+                downtimeSeconds: 2400,
+                longestSeconds: 1800
+            }
+        ]);
         // The ongoing outage is never touched.
         expect(rows).toHaveLength(1);
         expect(rows[0]?.endedAt).toBeNull();

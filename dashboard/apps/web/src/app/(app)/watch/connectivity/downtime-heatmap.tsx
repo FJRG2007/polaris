@@ -49,7 +49,12 @@ export function DowntimeHeatmap({
     const [focused, setFocused] = useState<DayDowntime | null>(null);
 
     if (!days) {
-        return <div className="h-[11.5rem] w-full max-w-md animate-pulse rounded-md bg-muted" aria-hidden="true" />;
+        return (
+            <div
+                className="h-[11.5rem] w-full max-w-md animate-pulse rounded-md bg-muted"
+                aria-hidden="true"
+            />
+        );
     }
 
     const first = days[0];
@@ -99,7 +104,11 @@ export function DowntimeHeatmap({
                                 measured && step === 0 && "bg-muted",
                                 active && "ring-2 ring-foreground ring-offset-1 ring-offset-card"
                             )}
-                            style={measured && step > 0 ? { backgroundColor: stepColor(step as 1 | 2 | 3 | 4) } : undefined}
+                            style={
+                                measured && step > 0
+                                    ? { backgroundColor: stepColor(step as 1 | 2 | 3 | 4) }
+                                    : undefined
+                            }
                         />
                     );
                 })}
@@ -108,7 +117,11 @@ export function DowntimeHeatmap({
                 {focused ? describe(focused) : t("connectivity.days.hint")}
             </p>
             <ul className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-                <Legend swatch={<span className="size-3 rounded-[3px] border border-dashed border-border" />}>
+                <Legend
+                    swatch={
+                        <span className="size-3 rounded-[3px] border border-dashed border-border" />
+                    }
+                >
                     {t("connectivity.days.legend.untracked")}
                 </Legend>
                 <Legend swatch={<span className="size-3 rounded-[3px] bg-muted" />}>
@@ -117,7 +130,12 @@ export function DowntimeHeatmap({
                 {([1, 2, 3, 4] as const).map((step) => (
                     <Legend
                         key={step}
-                        swatch={<span className="size-3 rounded-[3px]" style={{ backgroundColor: stepColor(step) }} />}
+                        swatch={
+                            <span
+                                className="size-3 rounded-[3px]"
+                                style={{ backgroundColor: stepColor(step) }}
+                            />
+                        }
                     >
                         {t(
                             step === 1

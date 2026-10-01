@@ -29,7 +29,17 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { ConnectivityReport, OutageView } from "@/lib/connectivity/outage-tracker";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, EmptyState, PageHeader, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    EmptyState,
+    PageHeader,
+    Skeleton
+} from "@polaris/ui";
 
 /** The watcher looks every half-minute while something is down, so asking more
  *  often than that would redraw the same answer. */
@@ -48,7 +58,10 @@ export function kindLabel(t: Words, kind: rules.OutageKind): string {
 }
 
 /** Uptime as a share, never rounded up to a perfect score it did not earn. */
-function uptimeText(uptime: number | null, format: ReturnType<typeof useDisplayFormat>): string | null {
+function uptimeText(
+    uptime: number | null,
+    format: ReturnType<typeof useDisplayFormat>
+): string | null {
     if (uptime === null) return null;
     const floored = Math.floor(uptime * 10_000) / 100;
     return `${format.number(floored, { minimumFractionDigits: floored === 100 ? 0 : 2, maximumFractionDigits: 2 })}%`;
@@ -98,7 +111,13 @@ export function ConnectivityView() {
     const days = useMemo(
         () =>
             data
-                ? rules.dailyDowntime(spans, now, HEATMAP_DAYS, staleMs, format.preferences.timeZone)
+                ? rules.dailyDowntime(
+                      spans,
+                      now,
+                      HEATMAP_DAYS,
+                      staleMs,
+                      format.preferences.timeZone
+                  )
                 : null,
         // Re-cut once a minute, not on every five-second tick.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,7 +141,10 @@ export function ConnectivityView() {
                         title={t("connectivity.checkNow")}
                         aria-label={t("connectivity.checkNow")}
                     >
-                        <RefreshCw className={checking ? "animate-spin" : undefined} aria-hidden="true" />
+                        <RefreshCw
+                            className={checking ? "animate-spin" : undefined}
+                            aria-hidden="true"
+                        />
                         <span className="hidden sm:inline">
                             {checking ? t("connectivity.checking") : t("connectivity.checkNow")}
                         </span>
@@ -132,7 +154,10 @@ export function ConnectivityView() {
             {checkError ? <p className="mb-3 text-sm text-danger">{checkError}</p> : null}
 
             {error && !data ? (
-                <EmptyState title={t("connectivity.errors.load")} description={t("connectivity.errors.loadHint")} />
+                <EmptyState
+                    title={t("connectivity.errors.load")}
+                    description={t("connectivity.errors.loadHint")}
+                />
             ) : (
                 <div className="flex flex-col gap-5">
                     <CurrentState report={data} now={now} span={span} />
@@ -153,7 +178,9 @@ export function ConnectivityView() {
                                 <PeriodTile
                                     key={key}
                                     title={t(`connectivity.periods.${key}`)}
-                                    summary={data?.periods.find((period) => period.key === key) ?? null}
+                                    summary={
+                                        data?.periods.find((period) => period.key === key) ?? null
+                                    }
                                     loading={loading && !data}
                                     span={span}
                                     uptime={(value) => uptimeText(value, format)}
@@ -165,7 +192,9 @@ export function ConnectivityView() {
                     <Card>
                         <CardHeader>
                             <CardTitle>{t("connectivity.days.title")}</CardTitle>
-                            <p className="text-xs text-muted-foreground">{t("connectivity.days.description")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("connectivity.days.description")}
+                            </p>
                         </CardHeader>
                         <CardBody className="overflow-x-auto">
                             <DowntimeHeatmap
@@ -175,7 +204,9 @@ export function ConnectivityView() {
                                 onSelect={(day) =>
                                     filters.set({
                                         ...filters.value,
-                                        day: day ? { label: day.day, start: day.start, end: day.end } : null
+                                        day: day
+                                            ? { label: day.day, start: day.start, end: day.end }
+                                            : null
                                     })
                                 }
                                 span={span}
@@ -193,7 +224,9 @@ export function ConnectivityView() {
                         span={span}
                     />
 
-                    {data && data.months.length > 0 ? <OlderMonths report={data} span={span} /> : null}
+                    {data && data.months.length > 0 ? (
+                        <OlderMonths report={data} span={span} />
+                    ) : null}
 
                     <MergeGapForm
                         seconds={data?.mergeGapSeconds ?? null}
@@ -287,14 +320,27 @@ function CurrentState({
                     {t("connectivity.state.title")}
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={state === "online" ? "success" : state === "offline" ? "danger" : "neutral"}>
+                    <Badge
+                        variant={
+                            state === "online"
+                                ? "success"
+                                : state === "offline"
+                                  ? "danger"
+                                  : "neutral"
+                        }
+                    >
                         {t(`connectivity.state.${state}`)}
                     </Badge>
                     {open ? <Badge>{kindLabel(t, open.kind)}</Badge> : null}
                 </div>
                 <div className="flex flex-col gap-1 text-[0.8125rem] text-muted-foreground">
                     {open ? (
-                        <OpenOutage outage={open} now={now} staleMs={report.staleAfterMs} span={span} />
+                        <OpenOutage
+                            outage={open}
+                            now={now}
+                            staleMs={report.staleAfterMs}
+                            span={span}
+                        />
                     ) : lastPass === null ? (
                         <p>{t("connectivity.state.never")}</p>
                     ) : (
@@ -306,7 +352,9 @@ function CurrentState({
                     )}
                     {unwatched && lastPass ? (
                         <p className="text-warning-ink">
-                            {t("connectivity.state.unwatched", { time: format.dateTime(lastPass.at) })}
+                            {t("connectivity.state.unwatched", {
+                                time: format.dateTime(lastPass.at)
+                            })}
                         </p>
                     ) : null}
                     <p className="text-xs text-foreground-subtle">{cadence}</p>
@@ -342,7 +390,10 @@ function OpenOutage({
             {outage.detectedBy ? (
                 <p className="break-words [overflow-wrap:anywhere]">
                     {outage.detail
-                        ? t("connectivity.state.detected", { host: outage.detectedBy, detail: outage.detail })
+                        ? t("connectivity.state.detected", {
+                              host: outage.detectedBy,
+                              detail: outage.detail
+                          })
                         : t("connectivity.state.detectedHost", { host: outage.detectedBy })}
                 </p>
             ) : null}
@@ -400,7 +451,15 @@ function PeriodTile({
     );
 }
 
-function Figure({ label, loading, children }: { label: string; loading: boolean; children: React.ReactNode }) {
+function Figure({
+    label,
+    loading,
+    children
+}: {
+    label: string;
+    loading: boolean;
+    children: React.ReactNode;
+}) {
     return (
         <div className="flex min-w-0 flex-col">
             <dt className="truncate text-foreground-subtle" title={label}>
@@ -413,13 +472,21 @@ function Figure({ label, loading, children }: { label: string; loading: boolean;
     );
 }
 
-function OlderMonths({ report, span }: { report: ConnectivityReport; span: (ms: number) => string }) {
+function OlderMonths({
+    report,
+    span
+}: {
+    report: ConnectivityReport;
+    span: (ms: number) => string;
+}) {
     const t = useTranslations("watch");
     return (
         <Card>
             <CardHeader>
                 <CardTitle>{t("connectivity.older.title")}</CardTitle>
-                <p className="text-xs text-muted-foreground">{t("connectivity.older.description")}</p>
+                <p className="text-xs text-muted-foreground">
+                    {t("connectivity.older.description")}
+                </p>
             </CardHeader>
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[28rem] text-[0.8125rem]">
@@ -427,19 +494,32 @@ function OlderMonths({ report, span }: { report: ConnectivityReport; span: (ms: 
                         <tr className="border-b border-border text-left">
                             <th className="px-4 py-2">{t("connectivity.older.month")}</th>
                             <th className="px-4 py-2">{t("connectivity.list.kind")}</th>
-                            <th className="px-4 py-2 text-right">{t("connectivity.periods.outages")}</th>
-                            <th className="px-4 py-2 text-right">{t("connectivity.periods.down")}</th>
-                            <th className="px-4 py-2 text-right">{t("connectivity.periods.longest")}</th>
+                            <th className="px-4 py-2 text-right">
+                                {t("connectivity.periods.outages")}
+                            </th>
+                            <th className="px-4 py-2 text-right">
+                                {t("connectivity.periods.down")}
+                            </th>
+                            <th className="px-4 py-2 text-right">
+                                {t("connectivity.periods.longest")}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
                         {report.months.map((month) => (
-                            <tr key={`${month.month}-${month.kind}`} className="border-b border-border last:border-0">
+                            <tr
+                                key={`${month.month}-${month.kind}`}
+                                className="border-b border-border last:border-0"
+                            >
                                 <td className="px-4 py-2 tabular">{month.month}</td>
                                 <td className="px-4 py-2">{kindLabel(t, month.kind)}</td>
                                 <td className="px-4 py-2 text-right tabular">{month.count}</td>
-                                <td className="px-4 py-2 text-right tabular">{span(month.downtimeSeconds * 1000)}</td>
-                                <td className="px-4 py-2 text-right tabular">{span(month.longestSeconds * 1000)}</td>
+                                <td className="px-4 py-2 text-right tabular">
+                                    {span(month.downtimeSeconds * 1000)}
+                                </td>
+                                <td className="px-4 py-2 text-right tabular">
+                                    {span(month.longestSeconds * 1000)}
+                                </td>
                             </tr>
                         ))}
                     </tbody>

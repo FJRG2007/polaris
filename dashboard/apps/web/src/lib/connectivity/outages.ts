@@ -87,10 +87,17 @@ export function observe(
     if (internet === null) return null;
     const first = results[0] ?? null;
     if (!internet) {
-        return { up: false, kind: "line", detectedBy: first?.host ?? null, detail: first?.detail ?? null };
+        return {
+            up: false,
+            kind: "line",
+            detectedBy: first?.host ?? null,
+            detail: first?.detail ?? null
+        };
     }
     if (!first) return listed > 0 ? null : { up: true, via: BACK_VIA_INTERNET };
-    const unresolved = results.every((result) => result.code !== null && NAME_FAILURES.has(result.code));
+    const unresolved = results.every(
+        (result) => result.code !== null && NAME_FAILURES.has(result.code)
+    );
     return {
         up: false,
         kind: unresolved ? "dns" : "address",
@@ -388,7 +395,13 @@ export function dailyDowntime(
     const result: { -readonly [K in keyof DayDowntime]: DayDowntime[K] }[] = [];
     for (let back = days - 1; back >= 0; back -= 1) {
         const start = midnight(back);
-        result.push({ day: start.label, start: start.at, end: midnight(back - 1).at, downMs: 0, count: 0 });
+        result.push({
+            day: start.label,
+            start: start.at,
+            end: midnight(back - 1).at,
+            downMs: 0,
+            count: 0
+        });
     }
     for (const outage of outages) {
         const outageEnd = Math.min(effectiveEnd(outage, now, staleMs), now);
@@ -420,7 +433,14 @@ export function dayStep(downMs: number): 0 | 1 | 2 | 3 | 4 {
 
 /** How a length of time is said, unit by unit, in whichever catalog the caller has. */
 export type SpanWords = (
-    form: "seconds" | "minutes" | "minutesSeconds" | "hours" | "hoursMinutes" | "days" | "daysHours",
+    form:
+        | "seconds"
+        | "minutes"
+        | "minutesSeconds"
+        | "hours"
+        | "hoursMinutes"
+        | "days"
+        | "daysHours",
     values: { days?: number; hours?: number; minutes?: number; seconds?: number }
 ) => string;
 

@@ -17,8 +17,18 @@ const GAP = 60_000;
 const STALE = 22 * MINUTE;
 const T0 = Date.UTC(2026, 9, 1, 12, 0, 0);
 
-const lineDown: rules.Observation = { up: false, kind: "line", detectedBy: "polaris.example.com", detail: "Timed out" };
-const addressDown: rules.Observation = { up: false, kind: "address", detectedBy: "polaris.example.com", detail: "HTTP 502" };
+const lineDown: rules.Observation = {
+    up: false,
+    kind: "line",
+    detectedBy: "polaris.example.com",
+    detail: "Timed out"
+};
+const addressDown: rules.Observation = {
+    up: false,
+    kind: "address",
+    detectedBy: "polaris.example.com",
+    detail: "HTTP 502"
+};
 const up: rules.Observation = { up: true, via: "polaris.example.com" };
 
 /** A tiny in-memory record the steps are applied to, the way the tracker writes them. */
@@ -28,8 +38,19 @@ function simulate() {
     let next = 1;
     const pass = (observation: rules.Observation, now: number) => {
         const open = rows.find((row) => row.endedAt === null) ?? null;
-        const last = [...rows].filter((row) => row.endedAt !== null).sort((a, b) => b.endedAt! - a.endedAt!)[0] ?? null;
-        const steps = rules.nextSteps({ open, last, observation, now, mergeGapMs: GAP, staleMs: STALE, lastUpAt });
+        const last =
+            [...rows]
+                .filter((row) => row.endedAt !== null)
+                .sort((a, b) => b.endedAt! - a.endedAt!)[0] ?? null;
+        const steps = rules.nextSteps({
+            open,
+            last,
+            observation,
+            now,
+            mergeGapMs: GAP,
+            staleMs: STALE,
+            lastUpAt
+        });
         for (const step of steps) {
             if (step.do === "open") {
                 rows.push({
@@ -45,11 +66,30 @@ function simulate() {
             } else {
                 rows = rows.map((row) => {
                     if (row.id !== step.id) return row;
-                    if (step.do === "continue") return { ...row, kind: step.kind, lastSeenAt: step.at, firstBack: step.firstBack };
+                    if (step.do === "continue")
+                        return {
+                            ...row,
+                            kind: step.kind,
+                            lastSeenAt: step.at,
+                            firstBack: step.firstBack
+                        };
                     if (step.do === "close") {
-                        return { ...row, endedAt: step.at, closedBy: step.closedBy, firstBack: step.firstBack };
+                        return {
+                            ...row,
+                            endedAt: step.at,
+                            closedBy: step.closedBy,
+                            firstBack: step.firstBack
+                        };
                     }
-                    return { ...row, endedAt: null, closedBy: null, kind: step.kind, lastSeenAt: step.at, firstBack: null, blips: row.blips + 1 };
+                    return {
+                        ...row,
+                        endedAt: null,
+                        closedBy: null,
+                        kind: step.kind,
+                        lastSeenAt: step.at,
+                        firstBack: null,
+                        blips: row.blips + 1
+                    };
                 });
             }
         }
@@ -106,7 +146,12 @@ describe("an outage's life", () => {
             lastUpAt: T0
         });
         expect(steps).toEqual([
-            expect.objectContaining({ do: "open", at: T0 + 10 * MINUTE, lastUpAt: T0, detectedBy: "polaris.example.com" })
+            expect.objectContaining({
+                do: "open",
+                at: T0 + 10 * MINUTE,
+                lastUpAt: T0,
+                detectedBy: "polaris.example.com"
+            })
         ]);
     });
 });
@@ -172,7 +217,15 @@ describe("flapping", () => {
     it("merges nothing when the gap is zero", () => {
         const steps = rules.nextSteps({
             open: null,
-            last: { id: "1", kind: "line", startedAt: T0, endedAt: T0 + 1000, lastSeenAt: T0, firstBack: null, closedBy: "recovered" },
+            last: {
+                id: "1",
+                kind: "line",
+                startedAt: T0,
+                endedAt: T0 + 1000,
+                lastSeenAt: T0,
+                firstBack: null,
+                closedBy: "recovered"
+            },
             observation: lineDown,
             now: T0 + 2000,
             mergeGapMs: 0,
@@ -199,14 +252,19 @@ describe("one pass, one verdict", () => {
     });
 
     it("is up when any address answered, whatever the others did", () => {
-        expect(rules.observe([probe("a.example.com", false), probe("b.example.com", true)], null)).toEqual({
+        expect(
+            rules.observe([probe("a.example.com", false), probe("b.example.com", true)], null)
+        ).toEqual({
             up: true,
             via: "b.example.com"
         });
     });
 
     it("is the line when the resolvers are silent too", () => {
-        expect(rules.observe([probe("a.example.com", false)], false)).toMatchObject({ up: false, kind: "line" });
+        expect(rules.observe([probe("a.example.com", false)], false)).toMatchObject({
+            up: false,
+            kind: "line"
+        });
     });
 
     it("is DNS when every failure was a name that did not resolve", () => {
@@ -225,13 +283,21 @@ describe("one pass, one verdict", () => {
     });
 
     it("with no public address, asks only whether the line is up", () => {
-        expect(rules.observe([], false)).toMatchObject({ up: false, kind: "line", detectedBy: null });
+        expect(rules.observe([], false)).toMatchObject({
+            up: false,
+            kind: "line",
+            detectedBy: null
+        });
         expect(rules.observe([], true)).toEqual({ up: true, via: rules.BACK_VIA_INTERNET });
         expect(rules.observe([], null)).toBeNull();
     });
 
     it("gives no verdict when addresses were listed but none produced a result", () => {
         expect(rules.observe([], true, 2)).toBeNull();
-        expect(rules.observe([], false, 2)).toMatchObject({ up: false, kind: "line", detectedBy: null });
+        expect(rules.observe([], false, 2)).toMatchObject({
+            up: false,
+            kind: "line",
+            detectedBy: null
+        });
     });
 });

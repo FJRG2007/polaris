@@ -75,15 +75,17 @@ const SNAPSHOT_SELECT = {
     closedBy: true
 } as const;
 
-function snapshot(row: {
-    id: string;
-    kind: string;
-    startedAt: Date;
-    endedAt: Date | null;
-    lastSeenAt: Date;
-    firstBack: string | null;
-    closedBy: string | null;
-} | null): rules.OutageSnapshot | null {
+function snapshot(
+    row: {
+        id: string;
+        kind: string;
+        startedAt: Date;
+        endedAt: Date | null;
+        lastSeenAt: Date;
+        firstBack: string | null;
+        closedBy: string | null;
+    } | null
+): rules.OutageSnapshot | null {
     if (!row) return null;
     return {
         id: row.id,
@@ -132,7 +134,9 @@ async function apply(step: rules.TrackerStep, open: rules.OutageSnapshot | null)
                 data: {
                     kind: step.kind,
                     lastSeenAt: new Date(step.at),
-                    ...(backNow ? { firstBack: step.firstBack, firstBackAt: new Date(step.at) } : {})
+                    ...(backNow
+                        ? { firstBack: step.firstBack, firstBackAt: new Date(step.at) }
+                        : {})
                 }
             });
             return;
@@ -145,7 +149,9 @@ async function apply(step: rules.TrackerStep, open: rules.OutageSnapshot | null)
                     endedAt: new Date(step.at),
                     closedBy: step.closedBy,
                     openSlot: null,
-                    ...(backNow ? { firstBack: step.firstBack, firstBackAt: new Date(step.at) } : {})
+                    ...(backNow
+                        ? { firstBack: step.firstBack, firstBackAt: new Date(step.at) }
+                        : {})
                 }
             });
             return;
@@ -182,9 +188,15 @@ export interface PassOutcome {
  * Never the reason a pass fails: the watcher calls this after it has probed and
  * alerted, and a database hiccup here costs one pass of history, not an alert.
  */
-export async function recordPass(observation: rules.Observation, now = Date.now()): Promise<PassOutcome> {
+export async function recordPass(
+    observation: rules.Observation,
+    now = Date.now()
+): Promise<PassOutcome> {
     const [openRow, lastRow, lastPassValue, gapSeconds] = await Promise.all([
-        prisma.connectivityOutage.findUnique({ where: { openSlot: OPEN }, select: SNAPSHOT_SELECT }),
+        prisma.connectivityOutage.findUnique({
+            where: { openSlot: OPEN },
+            select: SNAPSHOT_SELECT
+        }),
         prisma.connectivityOutage.findFirst({
             where: { endedAt: { not: null } },
             orderBy: { endedAt: "desc" },
@@ -219,9 +231,7 @@ export async function recordPass(observation: rules.Observation, now = Date.now(
 
     if (!observation.up) return { closely: true };
     const closed = steps.find((step) => step.do === "close" && step.closedBy === "recovered");
-    const settling = closed
-        ? { endedAt: now, closedBy: "recovered" as const }
-        : last;
+    const settling = closed ? { endedAt: now, closedBy: "recovered" as const } : last;
     return { closely: rules.watchClosely(null, settling, now, mergeGapMs) };
 }
 
@@ -337,7 +347,13 @@ export async function connectivityReport(now = Date.now()): Promise<Connectivity
         prisma.connectivityOutageMonth.findMany({
             orderBy: [{ month: "desc" }, { kind: "asc" }],
             take: 240,
-            select: { month: true, kind: true, count: true, downtimeSeconds: true, longestSeconds: true }
+            select: {
+                month: true,
+                kind: true,
+                count: true,
+                downtimeSeconds: true,
+                longestSeconds: true
+            }
         }),
         getSetting(LAST_PASS_KEY),
         getSetting(SINCE_KEY),
@@ -399,9 +415,15 @@ export async function compactOutages(now = Date.now()): Promise<number> {
     });
     if (rows.length === 0) return 0;
 
-    const totals = new Map<string, { month: string; kind: string; count: number; down: number; longest: number }>();
+    const totals = new Map<
+        string,
+        { month: string; kind: string; count: number; down: number; longest: number }
+    >();
     for (const row of rows) {
-        const seconds = Math.max(0, Math.round(((row.endedAt?.getTime() ?? 0) - row.startedAt.getTime()) / 1000));
+        const seconds = Math.max(
+            0,
+            Math.round(((row.endedAt?.getTime() ?? 0) - row.startedAt.getTime()) / 1000)
+        );
         const month = rules.monthOf(row.startedAt.getTime());
         const kind = rules.isOutageKind(row.kind) ? row.kind : "address";
         const key = `${month} ${kind}`;
@@ -416,7 +438,8 @@ export async function compactOutages(now = Date.now()): Promise<number> {
         const removed = await tx.connectivityOutage.deleteMany({
             where: { id: { in: rows.map((row) => row.id) } }
         });
-        if (removed.count !== rows.length) throw new Error("outage rows were compacted concurrently");
+        if (removed.count !== rows.length)
+            throw new Error("outage rows were compacted concurrently");
         for (const total of totals.values()) {
             const existing = await tx.connectivityOutageMonth.findUnique({
                 where: { month_kind: { month: total.month, kind: total.kind } },

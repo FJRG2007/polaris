@@ -45,7 +45,10 @@ export interface DomainHealthChange {
 }
 
 /** How long the longest of these had been down, from the alert to now. */
-function longestDown(changes: readonly Pick<DomainHealthChange, "downSince">[], now = Date.now()): number | null {
+function longestDown(
+    changes: readonly Pick<DomainHealthChange, "downSince">[],
+    now = Date.now()
+): number | null {
     const starts = changes
         .map((change) => change.downSince?.getTime())
         .filter((at): at is number => typeof at === "number" && Number.isFinite(at));
@@ -58,7 +61,10 @@ const NAMES_SHOWN = 3;
 
 function listNames(labels: readonly string[], t: NamespaceTranslator<"notices">): string {
     if (labels.length <= NAMES_SHOWN) return labels.join(", ");
-    return t("domains.andMore", { names: labels.slice(0, NAMES_SHOWN).join(", "), count: labels.length - NAMES_SHOWN });
+    return t("domains.andMore", {
+        names: labels.slice(0, NAMES_SHOWN).join(", "),
+        count: labels.length - NAMES_SHOWN
+    });
 }
 
 /**
@@ -84,7 +90,10 @@ export function domainHealthMessage(
     downForMs: number | null = null
 ): { title: string; body: string } {
     const down = status === "down";
-    const duration = downForMs === null ? null : formatSpan(downForMs, (form, values) => t(`span.${form}`, values));
+    const duration =
+        downForMs === null
+            ? null
+            : formatSpan(downForMs, (form, values) => t(`span.${form}`, values));
     if (labels.length === 1) {
         const name = labels[0] ?? "";
         return {
@@ -97,7 +106,9 @@ export function domainHealthMessage(
         };
     }
     return {
-        title: down ? t("domains.downMany", { count: labels.length }) : t("domains.upMany", { count: labels.length }),
+        title: down
+            ? t("domains.downMany", { count: labels.length })
+            : t("domains.upMany", { count: labels.length }),
         body: down
             ? t("domains.downManyBody", { names: listNames(labels, t) })
             : duration === null
@@ -152,9 +163,7 @@ async function answerableForMany(
     return new Map([...byProject].map(([id, recipients]) => [id, [...recipients]]));
 }
 
-async function describeDomains(
-    domainIds: readonly string[]
-): Promise<Map<string, DomainContext>> {
+async function describeDomains(domainIds: readonly string[]): Promise<Map<string, DomainContext>> {
     const domains = await prisma.domain.findMany({
         where: { id: { in: [...domainIds] } },
         select: {
@@ -165,7 +174,11 @@ async function describeDomains(
                     id: true,
                     name: true,
                     environment: {
-                        select: { project: { select: { id: true, name: true, ownerId: true, orgId: true } } }
+                        select: {
+                            project: {
+                                select: { id: true, name: true, ownerId: true, orgId: true }
+                            }
+                        }
                     }
                 }
             }
@@ -215,7 +228,13 @@ export async function notifyDomainHealthChanged(input: DomainHealthChange): Prom
         const down = input.status === "down";
         const event = down ? "domain.down" : "domain.up";
         const downFor = input.status === "up" ? longestDown([input]) : null;
-        const { title, body } = domainHealthMessage(input.status, [context.label], input.detail, undefined, downFor);
+        const { title, body } = domainHealthMessage(
+            input.status,
+            [context.label],
+            input.detail,
+            undefined,
+            downFor
+        );
 
         for (const userId of context.recipients) {
             // Each recipient reads it in their own language.

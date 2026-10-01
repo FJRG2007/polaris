@@ -338,7 +338,10 @@ async function sweepAddress(address: DeploymentAddress): Promise<ProbeResult | n
                     body:
                         downFor === null
                             ? t("address.backBody", { url: address.url })
-                            : t("address.backBodyAfter", { url: address.url, duration: spanIn(t, downFor) })
+                            : t("address.backBodyAfter", {
+                                  url: address.url,
+                                  duration: spanIn(t, downFor)
+                              })
                 })),
                 href: "/admin/settings",
                 level: "success"
@@ -441,7 +444,9 @@ function runPass(): Promise<PassOutcome | null> {
     let limit: ReturnType<typeof setTimeout> | undefined;
     const expired = new Promise<null>((resolve) => {
         limit = setTimeout(() => {
-            console.error(`polaris: an address health sweep took over ${PASS_LIMIT_MS / 1000}s, moving on`);
+            console.error(
+                `polaris: an address health sweep took over ${PASS_LIMIT_MS / 1000}s, moving on`
+            );
             resolve(null);
         }, PASS_LIMIT_MS);
         limit.unref();

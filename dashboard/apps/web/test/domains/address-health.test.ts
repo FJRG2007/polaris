@@ -17,9 +17,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const rows = new Map<string, string>();
 
 interface KeyWhere {
-    key?: string | { startsWith?: string; in?: string[]; };
-    value?: { startsWith: string; };
-    NOT?: { value?: { startsWith: string; }; key?: { in: string[]; }; };
+    key?: string | { startsWith?: string; in?: string[] };
+    value?: { startsWith: string };
+    NOT?: { value?: { startsWith: string }; key?: { in: string[] } };
 }
 
 function matches(key: string, where: KeyWhere): boolean {
@@ -36,27 +36,37 @@ function matches(key: string, where: KeyWhere): boolean {
 }
 
 const setting = {
-    findUnique: vi.fn(async ({ where }: { where: { key: string; }; }) =>
+    findUnique: vi.fn(async ({ where }: { where: { key: string } }) =>
         rows.has(where.key) ? { value: rows.get(where.key) } : null
     ),
-    upsert: vi.fn(async ({ where, create, update }: { where: { key: string; }; create: { value: string; }; update: { value: string; }; }) => {
-        rows.set(where.key, rows.has(where.key) ? update.value : create.value);
-        return {};
-    }),
-    findMany: vi.fn(async ({ where }: { where: KeyWhere; }) =>
+    upsert: vi.fn(
+        async ({
+            where,
+            create,
+            update
+        }: {
+            where: { key: string };
+            create: { value: string };
+            update: { value: string };
+        }) => {
+            rows.set(where.key, rows.has(where.key) ? update.value : create.value);
+            return {};
+        }
+    ),
+    findMany: vi.fn(async ({ where }: { where: KeyWhere }) =>
         [...rows].filter(([key]) => matches(key, where)).map(([key, value]) => ({ key, value }))
     ),
-    create: vi.fn(async ({ data }: { data: { key: string; value: string; }; }) => {
+    create: vi.fn(async ({ data }: { data: { key: string; value: string } }) => {
         if (rows.has(data.key)) throw new Error("Unique constraint failed on the fields: (`key`)");
         rows.set(data.key, data.value);
         return data;
     }),
-    updateMany: vi.fn(async ({ where, data }: { where: KeyWhere; data: { value: string; }; }) => {
+    updateMany: vi.fn(async ({ where, data }: { where: KeyWhere; data: { value: string } }) => {
         const keys = [...rows.keys()].filter((key) => matches(key, where));
         for (const key of keys) rows.set(key, data.value);
         return { count: keys.length };
     }),
-    deleteMany: vi.fn(async ({ where }: { where: KeyWhere; }) => {
+    deleteMany: vi.fn(async ({ where }: { where: KeyWhere }) => {
         const keys = [...rows.keys()].filter((key) => matches(key, where));
         for (const key of keys) rows.delete(key);
         return { count: keys.length };
@@ -82,7 +92,7 @@ const stopPolarisTunnel = vi.fn(async () => {
     rows.delete("polaris.ptunnel.url");
     addresses = addresses.filter((address) => address.kind !== "tunnel");
 });
-const checkDomain = vi.fn(async ({ hostname }: { hostname: string; }) =>
+const checkDomain = vi.fn(async ({ hostname }: { hostname: string }) =>
     answering.has(hostname)
         ? { status: "up" as const, code: 200, latencyMs: 5, detail: null }
         : { status: "down" as const, code: null, latencyMs: 6000, detail: "Timed out" }
@@ -90,11 +100,18 @@ const checkDomain = vi.fn(async ({ hostname }: { hostname: string; }) =>
 
 vi.mock("@polaris/db", () => ({ prisma: { setting } }));
 vi.mock("@polaris/auth", () => ({ usersWithPermission: async () => ["user-1", "user-2"] }));
-vi.mock("@/lib/notifications/dispatch", () => ({ notify: (input: unknown) => notify(input as never) }));
+vi.mock("@/lib/notifications/dispatch", () => ({
+    notify: (input: unknown) => notify(input as never)
+}));
 vi.mock("@/lib/deployment-addresses", () => ({ reachableAddresses: async () => addresses }));
-vi.mock("@/lib/watch/health-probe", () => ({ checkDomain: (target: { hostname: string; }) => checkDomain(target) }));
+vi.mock("@/lib/watch/health-probe", () => ({
+    checkDomain: (target: { hostname: string }) => checkDomain(target)
+}));
 vi.mock("@/lib/polaris-tunnel-service", () => ({
-    getPolarisTunnelStatus: async () => ({ running: tunnelRunning, url: tunnelRunning ? TUNNEL : null }),
+    getPolarisTunnelStatus: async () => ({
+        running: tunnelRunning,
+        url: tunnelRunning ? TUNNEL : null
+    }),
     stopPolarisTunnel: () => stopPolarisTunnel()
 }));
 
@@ -111,7 +128,9 @@ vi.mock("@/lib/connectivity/outage-tracker", () => ({
 // Settling the public tunnel is its own concern (share-tunnel.test.ts).
 vi.mock("@/lib/public-reach", () => ({ settleShareTunnel: async () => "unchanged" }));
 
-const { checkConnectivityNow, checkedAddresses, sweepAddresses } = await import("../../src/lib/address-health");
+const { checkConnectivityNow, checkedAddresses, sweepAddresses } = await import(
+    "../../src/lib/address-health"
+);
 
 /** A sweep, with the retry's wait fast-forwarded rather than waited out. */
 async function sweep(): Promise<void> {
@@ -121,8 +140,8 @@ async function sweep(): Promise<void> {
 }
 
 /** Every alert raised so far. */
-function alerts(): { title: string; body: string; }[] {
-    return notify.mock.calls.map(([input]) => input as unknown as { title: string; body: string; });
+function alerts(): { title: string; body: string }[] {
+    return notify.mock.calls.map(([input]) => input as unknown as { title: string; body: string });
 }
 
 beforeEach(() => {
@@ -151,7 +170,9 @@ describe("probing what a deployment answers on", () => {
 
     it("leaves the local names alone, which only resolve on the operator's machine", async () => {
         await sweep();
-        expect(checkDomain.mock.calls.map(([target]) => target.hostname)).not.toContain("polaris.local");
+        expect(checkDomain.mock.calls.map(([target]) => target.hostname)).not.toContain(
+            "polaris.local"
+        );
     });
 
     it("reports an address that stopped answering, once, however many passes run", async () => {
@@ -176,7 +197,9 @@ describe("probing what a deployment answers on", () => {
         }));
         await sweep();
         expect(notify).not.toHaveBeenCalled();
-        expect((await checkedAddresses()).find((address) => address.kind === "domain")?.health.state).toBe("up");
+        expect(
+            (await checkedAddresses()).find((address) => address.kind === "domain")?.health.state
+        ).toBe("up");
     });
 
     it("says when an address comes back", async () => {
@@ -257,7 +280,9 @@ describe("what a pass tells the outage record", () => {
     it("says it is the address when the line works", async () => {
         answering.clear();
         await sweep();
-        expect(recordPass).toHaveBeenLastCalledWith(expect.objectContaining({ up: false, kind: "address" }));
+        expect(recordPass).toHaveBeenLastCalledWith(
+            expect.objectContaining({ up: false, kind: "address" })
+        );
     });
 });
 

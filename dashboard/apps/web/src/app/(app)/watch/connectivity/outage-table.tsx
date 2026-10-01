@@ -20,7 +20,17 @@ import * as list from "@/lib/connectivity/outage-list";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OutageView } from "@/lib/connectivity/outage-tracker";
-import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, SegmentedControl, Select, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardHeader,
+    CardTitle,
+    EmptyState,
+    SegmentedControl,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 
 const PAGE = 50;
 
@@ -72,13 +82,18 @@ export function OutageTable({
                 kind: kindName,
                 firstBack: firstBackName,
                 closedBy: (value) =>
-                    value === "unobserved" ? t("connectivity.csv.unobserved") : t("connectivity.csv.recovered"),
+                    value === "unobserved"
+                        ? t("connectivity.csv.unobserved")
+                        : t("connectivity.csv.recovered"),
                 ongoing: t("connectivity.list.ongoing")
             },
             now,
             staleMs
         );
-        downloadBytes(new Blob([csv], { type: "text/csv;charset=utf-8" }), list.csvFileName(kept, filters));
+        downloadBytes(
+            new Blob([csv], { type: "text/csv;charset=utf-8" }),
+            list.csvFileName(kept, filters)
+        );
     };
 
     const toggleKind = (kind: rules.OutageKind) => {
@@ -96,7 +111,10 @@ export function OutageTable({
                     <CardTitle>{t("connectivity.list.title")}</CardTitle>
                     {kept && outages ? (
                         <span className="text-xs text-muted-foreground tabular">
-                            {t("connectivity.list.shown", { shown: kept.length, total: outages.length })}
+                            {t("connectivity.list.shown", {
+                                shown: kept.length,
+                                total: outages.length
+                            })}
                         </span>
                     ) : null}
                 </div>
@@ -114,7 +132,11 @@ export function OutageTable({
 
             <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
-                    <div role="group" aria-label={t("connectivity.filters.kind")} className="flex flex-wrap gap-1">
+                    <div
+                        role="group"
+                        aria-label={t("connectivity.filters.kind")}
+                        className="flex flex-wrap gap-1"
+                    >
                         {rules.OUTAGE_KINDS.map((kind) => {
                             const active = filters.kinds.includes(kind);
                             return (
@@ -162,13 +184,20 @@ export function OutageTable({
                     <div className="flex flex-wrap items-center gap-1.5">
                         {filters.day ? (
                             <Chip
-                                label={t("connectivity.filters.day", { date: format.date(filters.day.start) })}
+                                label={t("connectivity.filters.day", {
+                                    date: format.date(filters.day.start)
+                                })}
                                 remove={t("connectivity.filters.removeDay")}
                                 onRemove={() => onFilters({ ...filters, day: null })}
                             />
                         ) : null}
                         {filters.kinds.map((kind) => (
-                            <Chip key={kind} label={kindName(kind)} remove={kindName(kind)} onRemove={() => toggleKind(kind)} />
+                            <Chip
+                                key={kind}
+                                label={kindName(kind)}
+                                remove={kindName(kind)}
+                                onRemove={() => toggleKind(kind)}
+                            />
                         ))}
                         {filters.min !== "any" ? (
                             <Chip
@@ -177,7 +206,11 @@ export function OutageTable({
                                 onRemove={() => onFilters({ ...filters, min: "any" })}
                             />
                         ) : null}
-                        <Button variant="ghost" size="xs" onClick={() => onFilters(list.DEFAULT_FILTERS)}>
+                        <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => onFilters(list.DEFAULT_FILTERS)}
+                        >
                             {t("connectivity.list.clear")}
                         </Button>
                     </div>
@@ -189,11 +222,21 @@ export function OutageTable({
                     <thead>
                         <tr className="border-b border-border text-left">
                             <th className="px-4 py-2">{t("connectivity.list.started")}</th>
-                            <th className="hidden px-4 py-2 lg:table-cell">{t("connectivity.list.ended")}</th>
-                            <th className="px-4 py-2 text-right">{t("connectivity.list.duration")}</th>
-                            <th className="hidden px-4 py-2 sm:table-cell">{t("connectivity.list.kind")}</th>
-                            <th className="hidden px-4 py-2 xl:table-cell">{t("connectivity.list.detectedBy")}</th>
-                            <th className="hidden px-4 py-2 xl:table-cell">{t("connectivity.list.firstBack")}</th>
+                            <th className="hidden px-4 py-2 lg:table-cell">
+                                {t("connectivity.list.ended")}
+                            </th>
+                            <th className="px-4 py-2 text-right">
+                                {t("connectivity.list.duration")}
+                            </th>
+                            <th className="hidden px-4 py-2 sm:table-cell">
+                                {t("connectivity.list.kind")}
+                            </th>
+                            <th className="hidden px-4 py-2 xl:table-cell">
+                                {t("connectivity.list.detectedBy")}
+                            </th>
+                            <th className="hidden px-4 py-2 xl:table-cell">
+                                {t("connectivity.list.firstBack")}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -205,16 +248,18 @@ export function OutageTable({
                                       </td>
                                   </tr>
                               ))
-                            : kept.slice(0, shown).map((outage) => (
-                                  <OutageRow
-                                      key={outage.id}
-                                      outage={outage}
-                                      length={list.outageLength(outage, now, staleMs)}
-                                      span={span}
-                                      kindName={kindName}
-                                      firstBackName={firstBackName}
-                                  />
-                              ))}
+                            : kept
+                                  .slice(0, shown)
+                                  .map((outage) => (
+                                      <OutageRow
+                                          key={outage.id}
+                                          outage={outage}
+                                          length={list.outageLength(outage, now, staleMs)}
+                                          span={span}
+                                          kindName={kindName}
+                                          firstBackName={firstBackName}
+                                      />
+                                  ))}
                     </tbody>
                 </table>
             </div>
@@ -225,19 +270,31 @@ export function OutageTable({
                         bare
                         title={t("connectivity.list.emptyFiltered")}
                         action={
-                            <Button variant="outline" size="sm" onClick={() => onFilters(list.DEFAULT_FILTERS)}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onFilters(list.DEFAULT_FILTERS)}
+                            >
                                 {t("connectivity.list.clear")}
                             </Button>
                         }
                     />
                 ) : (
-                    <EmptyState bare title={t("connectivity.list.empty")} description={t("connectivity.list.emptyHint")} />
+                    <EmptyState
+                        bare
+                        title={t("connectivity.list.empty")}
+                        description={t("connectivity.list.emptyHint")}
+                    />
                 )
             ) : null}
 
             {kept && kept.length > shown ? (
                 <div className="flex justify-center border-t border-border p-2">
-                    <Button variant="ghost" size="sm" onClick={() => setShown((count) => count + PAGE)}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShown((count) => count + PAGE)}
+                    >
                         {t("connectivity.list.showMore")}
                     </Button>
                 </div>
@@ -285,15 +342,25 @@ function OutageRow({
                     {outage.detectedBy ? ` - ${outage.detectedBy}` : ""}
                 </span>
                 {outage.detail ? (
-                    <span className="block truncate text-xs text-foreground-subtle" title={outage.detail}>
+                    <span
+                        className="block truncate text-xs text-foreground-subtle"
+                        title={outage.detail}
+                    >
                         {outage.detail}
                     </span>
                 ) : null}
             </td>
             <td className="hidden whitespace-nowrap px-4 py-2 tabular lg:table-cell">
-                {ongoing ? <Badge variant="danger">{t("connectivity.list.ongoing")}</Badge> : format.dateTime(outage.endedAt)}
+                {ongoing ? (
+                    <Badge variant="danger">{t("connectivity.list.ongoing")}</Badge>
+                ) : (
+                    format.dateTime(outage.endedAt)
+                )}
                 {outage.closedBy === "unobserved" ? (
-                    <span className="block text-xs text-warning-ink" title={t("connectivity.list.unobserved")}>
+                    <span
+                        className="block text-xs text-warning-ink"
+                        title={t("connectivity.list.unobserved")}
+                    >
                         {t("connectivity.csv.unobserved")}
                     </span>
                 ) : null}
@@ -301,7 +368,9 @@ function OutageRow({
             <td className="whitespace-nowrap px-4 py-2 text-right tabular">
                 {span(length)}
                 {ongoing ? (
-                    <span className="block text-xs text-danger-ink lg:hidden">{t("connectivity.list.ongoing")}</span>
+                    <span className="block text-xs text-danger-ink lg:hidden">
+                        {t("connectivity.list.ongoing")}
+                    </span>
                 ) : null}
                 {outage.blips > 0 ? (
                     <span className="block text-xs text-muted-foreground">
@@ -310,7 +379,9 @@ function OutageRow({
                 ) : null}
             </td>
             <td className="hidden px-4 py-2 sm:table-cell">
-                <span title={t(`connectivity.kindHints.${outage.kind}`)}>{kindName(outage.kind)}</span>
+                <span title={t(`connectivity.kindHints.${outage.kind}`)}>
+                    {kindName(outage.kind)}
+                </span>
             </td>
             <td className="hidden max-w-[14rem] px-4 py-2 xl:table-cell">
                 <span className="block truncate" title={outage.detectedBy ?? undefined}>
@@ -319,7 +390,10 @@ function OutageRow({
             </td>
             <td className="hidden max-w-[14rem] px-4 py-2 xl:table-cell">
                 {outage.firstBack ? (
-                    <span className="block truncate" title={outage.firstBackAt ? format.dateTime(outage.firstBackAt) : undefined}>
+                    <span
+                        className="block truncate"
+                        title={outage.firstBackAt ? format.dateTime(outage.firstBackAt) : undefined}
+                    >
                         {firstBackName(outage.firstBack)}
                     </span>
                 ) : (
@@ -330,7 +404,15 @@ function OutageRow({
     );
 }
 
-function Chip({ label, remove, onRemove }: { label: string; remove: string; onRemove: () => void }) {
+function Chip({
+    label,
+    remove,
+    onRemove
+}: {
+    label: string;
+    remove: string;
+    onRemove: () => void;
+}) {
     return (
         <span className="inline-flex items-center gap-1 rounded border border-border bg-muted py-px pl-1.5 pr-0.5 text-xs">
             {label}

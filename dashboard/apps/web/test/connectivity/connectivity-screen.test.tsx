@@ -37,8 +37,10 @@ vi.mock("@/components/display-format", () => ({
         preferences: { timeZone: "UTC", language: "en-US" },
         date: (value: string | number) => new Date(value).toISOString().slice(0, 10),
         time: (value: string | number) => new Date(value).toISOString().slice(11, 16),
-        dateTime: (value: string | number) => new Date(value).toISOString().slice(0, 16).replace("T", " "),
-        number: (value: number, options?: Intl.NumberFormatOptions) => new Intl.NumberFormat("en-US", options).format(value)
+        dateTime: (value: string | number) =>
+            new Date(value).toISOString().slice(0, 16).replace("T", " "),
+        number: (value: number, options?: Intl.NumberFormatOptions) =>
+            new Intl.NumberFormat("en-US", options).format(value)
     })
 }));
 vi.mock("@/app/(app)/watch/connectivity/actions", () => ({
@@ -98,7 +100,17 @@ beforeEach(() => {
 describe("the first paint", () => {
     it("draws the chrome with nothing loaded, and skeletons only where the figures go", () => {
         const html = renderToStaticMarkup(withMessages(<ConnectivityView />));
-        for (const words of ["Connectivity", "Right now", "Availability", "Last 24 hours", "Downtime per day", "Outages", "Started", "Duration", "Merging blips"]) {
+        for (const words of [
+            "Connectivity",
+            "Right now",
+            "Availability",
+            "Last 24 hours",
+            "Downtime per day",
+            "Outages",
+            "Started",
+            "Duration",
+            "Merging blips"
+        ]) {
             expect(html).toContain(words);
         }
         expect(html).toContain("animate-pulse");
@@ -132,7 +144,13 @@ describe("with the record in", () => {
 
     it("says how long an ongoing outage has lasted", () => {
         const base = sample();
-        const open = { ...base.outages[0]!, endedAt: null, lastSeenAt: iso(NOW - 10_000), closedBy: null, firstBack: null };
+        const open = {
+            ...base.outages[0]!,
+            endedAt: null,
+            lastSeenAt: iso(NOW - 10_000),
+            closedBy: null,
+            firstBack: null
+        };
         report = { ...base, open, outages: [open], lastPass: { at: iso(NOW - 10_000), up: false } };
         const html = renderToStaticMarkup(withMessages(<ConnectivityView />));
         expect(html).toContain("Offline");

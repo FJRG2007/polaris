@@ -43,7 +43,8 @@ export function MergeGapForm({
     const empty = value === null;
     const valid = value !== null && mergeGapSchema.safeParse(value).success;
     const dirty = valid && value !== seconds;
-    const error = !empty && !valid ? t("connectivity.merge.invalid", { max: MAX_MERGE_GAP_SECONDS }) : null;
+    const error =
+        !empty && !valid ? t("connectivity.merge.invalid", { max: MAX_MERGE_GAP_SECONDS }) : null;
 
     const save = () => {
         if (!dirty || saving || value === null) return;
@@ -54,7 +55,9 @@ export function MergeGapForm({
             // the save does not land.
             onSaved(value);
             const result = await setMergeGapAction(value).catch(
-                (): { seconds?: number; error?: string } => ({ error: t("connectivity.merge.failed") })
+                (): { seconds?: number; error?: string } => ({
+                    error: t("connectivity.merge.failed")
+                })
             );
             if (result.error || result.seconds === undefined) {
                 if (previous !== null) onSaved(previous);
@@ -100,10 +103,16 @@ export function MergeGapForm({
                                     setMessage(null);
                                     setText(event.target.value);
                                 }}
-                                onBlur={() => setText((current) => (current === null ? current : current.trim()))}
+                                onBlur={() =>
+                                    setText((current) =>
+                                        current === null ? current : current.trim()
+                                    )
+                                }
                             />
                         )}
-                        <span className="text-[0.8125rem] text-muted-foreground">{t("connectivity.merge.unit")}</span>
+                        <span className="text-[0.8125rem] text-muted-foreground">
+                            {t("connectivity.merge.unit")}
+                        </span>
                         <Button
                             type="submit"
                             size="sm"
@@ -118,7 +127,14 @@ export function MergeGapForm({
                             {error}
                         </p>
                     ) : message ? (
-                        <p className={message.tone === "ok" ? "text-xs text-success-ink" : "text-xs text-danger"} aria-live="polite">
+                        <p
+                            className={
+                                message.tone === "ok"
+                                    ? "text-xs text-success-ink"
+                                    : "text-xs text-danger"
+                            }
+                            aria-live="polite"
+                        >
                             {message.text}
                         </p>
                     ) : null}

@@ -24,11 +24,17 @@ export async function checkConnectivityAction(): Promise<{ error?: string }> {
     }
 }
 
-export async function setMergeGapAction(input: unknown): Promise<{ seconds?: number; error?: string }> {
+export async function setMergeGapAction(
+    input: unknown
+): Promise<{ seconds?: number; error?: string }> {
     await requireAdmin();
     const parsed = mergeGapSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: (await getTranslations("watch"))("connectivity.merge.invalid", { max: MAX_MERGE_GAP_SECONDS }) };
+        return {
+            error: (await getTranslations("watch"))("connectivity.merge.invalid", {
+                max: MAX_MERGE_GAP_SECONDS
+            })
+        };
     }
     await setMergeGapSeconds(parsed.data);
     return { seconds: parsed.data };

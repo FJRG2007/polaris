@@ -110,8 +110,12 @@ export function filtersFromQuery(
     const placed = dayLabel && /^\d{4}-\d{2}-\d{2}$/.test(dayLabel) ? placeDay(dayLabel) : null;
     return {
         kinds: OUTAGE_KINDS.filter((kind) => kinds.includes(kind)),
-        range: (RANGES as readonly string[]).includes(range ?? "") ? (range as Range) : DEFAULT_FILTERS.range,
-        min: (MIN_LENGTHS as readonly string[]).includes(min ?? "") ? (min as MinLength) : DEFAULT_FILTERS.min,
+        range: (RANGES as readonly string[]).includes(range ?? "")
+            ? (range as Range)
+            : DEFAULT_FILTERS.range,
+        min: (MIN_LENGTHS as readonly string[]).includes(min ?? "")
+            ? (min as MinLength)
+            : DEFAULT_FILTERS.min,
         day: placed && dayLabel ? { label: dayLabel, ...placed } : null
     };
 }
