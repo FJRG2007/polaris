@@ -79,6 +79,7 @@ export function DevicesView() {
             <MicrophoneCard
                 threshold={voice.activityThreshold}
                 showThreshold={voice.inputMode === "activity"}
+                gateHearsFiltered={voice.advancedActivity}
             />
             <CameraCard />
             <InputModeCard voice={voice} setVoice={setVoice} />
@@ -91,10 +92,12 @@ export function DevicesView() {
  *  it is working at all. */
 function MicrophoneCard({
     threshold,
-    showThreshold
+    showThreshold,
+    gateHearsFiltered
 }: {
     threshold: number;
     showThreshold: boolean;
+    gateHearsFiltered: boolean;
 }) {
     const { devices, chosenId, choose } = useMicrophones();
     const t = useTranslations("account");
@@ -117,9 +120,9 @@ function MicrophoneCard({
     // What the call sends rather than the device behind it: the noise model and
     // the volume both sit between the two, and a device that reads healthy while
     // the voice leaves quiet is the case this screen exists to show.
-    const inCall = held?.session
-        ? (held.call.outgoing ?? held.call.localStream?.getAudioTracks()[0] ?? null)
-        : null;
+    const inCallDevice = held?.session ? (held.call.localStream?.getAudioTracks()[0] ?? null) : null;
+    const inCall = held?.session ? (held.call.outgoing ?? inCallDevice) : null;
+    const rawForGate = showThreshold && !gateHearsFiltered;
 
     const stop = useCallback(() => {
         // The graph goes before the device does: it holds an audio context, and
@@ -249,7 +252,11 @@ function MicrophoneCard({
                     {/* Drawn whether or not anything is being measured: an empty
                         row is what says the test is the thing that fills it. */}
                     <MicLevelMeter
-                        track={filterState?.track ?? tested ?? inCall}
+                        track={
+                            rawForGate
+                                ? (tested ?? inCallDevice)
+                                : (filterState?.track ?? tested ?? inCall)
+                        }
                         listen
                         deviceId={chosenId}
                         threshold={showThreshold ? threshold : undefined}
