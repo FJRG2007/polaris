@@ -54,25 +54,54 @@ export function valueText(
     if (attribute === "door") return kinds.doorText(kinds.doorState(value), t) || value;
     if (attribute === "mode") {
         const mode = kinds.CLIMATE_MODES.find((entry) => entry === value);
-        return mode ? kinds.climateModeText(mode, t) : value;
+        if (mode && kinds.deviceKind(kind) !== "air") return kinds.climateModeText(mode, t);
+        const preset = kinds.AIR_MODES.find((entry) => entry === value);
+        return preset ? kinds.airModeText(preset, t) : mode ? kinds.climateModeText(mode, t) : value;
+    }
+    if (attribute === "filter") {
+        const state = kinds.FILTER_STATES.find((entry) => entry === value);
+        return state ? kinds.filterStateText(state, t) : value;
     }
     return kinds.readingLine({ value, unit: "" }, t);
 }
 
+/** One of a purifier's figures, in the reader's words: "PM2.5", "Filter life". */
+export function measureText(measure: auto.ReadingMeasure, t: PlacesTranslator): string {
+    return measure === "filter" ? t("automations.measures.filter") : kinds.airMeasureText(measure, t);
+}
+
+/** A device, or one of its figures: "Bedroom purifier" or "PM2.5 of Bedroom
+ *  purifier". */
+function figureOf(device: string, measure: auto.ReadingMeasure | undefined, t: PlacesTranslator): string {
+    return measure ? t("automations.say.figure", { measure: measureText(measure, t), device }) : device;
+}
+
 /** What a step sets a unit to: "Cool", "24\u00b0", "High", "Swing on". */
 export function settingText(setting: auto.StepSetting, t: PlacesTranslator): string {
+    const switched = (option: string, on: boolean) =>
+        on ? t("automations.settingOn", { option }) : t("automations.settingOff", { option });
+    // A purifier's settings first: they are told apart by what they carry.
+    if (setting.action === "set-humidity")
+        return Number.isFinite(setting.target) ? `${setting.target}%` : "?";
+    if ("speed" in setting) return kinds.airSpeedText(setting.speed, t);
+    if (setting.action === "set-option" && kinds.AIR_OPTIONS.some((entry) => entry === setting.option)) {
+        const option = kinds.AIR_OPTIONS.find((entry) => entry === setting.option)!;
+        return switched(kinds.airOptionText(option, t), setting.on);
+    }
+    if (setting.action === "set-mode") {
+        const climate = kinds.CLIMATE_MODES.find((entry) => entry === setting.mode);
+        if (climate) return kinds.climateModeText(climate, t);
+        const preset = kinds.AIR_MODES.find((entry) => entry === setting.mode);
+        return preset ? kinds.airModeText(preset, t) : setting.mode;
+    }
     switch (setting.action) {
-        case "set-mode":
-            return kinds.climateModeText(setting.mode, t);
         case "set-temperature":
             return Number.isFinite(setting.target) ? `${setting.target}\u00b0` : "?";
         case "set-fan":
-            return kinds.climateFanText(setting.fan, t);
+            return "fan" in setting ? kinds.climateFanText(setting.fan, t) : "?";
         case "set-option": {
-            const option = kinds.climateOptionText(setting.option, t);
-            return setting.on
-                ? t("automations.settingOn", { option })
-                : t("automations.settingOff", { option });
+            const option = kinds.CLIMATE_OPTIONS.find((entry) => entry === setting.option);
+            return option ? switched(kinds.climateOptionText(option, t), setting.on) : "?";
         }
     }
 }
@@ -145,7 +174,7 @@ export function describeTrigger(
         case "threshold": {
             const device = deviceName(lookup, trigger.deviceId, t);
             return t("automations.say.threshold", {
-                device: device.name,
+                device: figureOf(device.name, trigger.measure, t),
                 direction: trigger.direction,
                 value: Number.isFinite(trigger.value) ? String(trigger.value) : "?"
             });
@@ -189,7 +218,7 @@ export function describeCondition(
         case "reading": {
             const device = deviceName(lookup, condition.deviceId, t);
             return t("automations.say.reading", {
-                device: device.name,
+                device: figureOf(device.name, condition.measure, t),
                 compare: comparisonText(condition.op, t),
                 value: Number.isFinite(condition.value) ? String(condition.value) : "?"
             });
@@ -261,7 +290,7 @@ export function describeCause(
         });
     }
     return t("automations.cause.change", {
-        device: device.name,
+        device: figureOf(device.name, cause.measure, t),
         from: valueText(attribute, device.kind, cause.from ?? "", t),
         to: valueText(attribute, device.kind, cause.to ?? "", t)
     });

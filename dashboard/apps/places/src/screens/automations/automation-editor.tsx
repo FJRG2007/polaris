@@ -1018,7 +1018,18 @@ function TriggerCard({
                         path={path}
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
-                        onChange={(next) => onChange({ ...trigger, deviceId: next.id })}
+                        onChange={(next) => {
+                            const { measure: _was, ...rest } = trigger;
+                            const measure = auto.measuresFor(next.kind)[0];
+                            onChange({ ...rest, deviceId: next.id, ...(measure ? { measure } : {}) });
+                        }}
+                    />
+                    <fields.MeasurePicker
+                        kind={device?.kind ?? ""}
+                        value={trigger.measure}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(measure) => onChange({ ...trigger, measure })}
                     />
                     <fields.Field
                         label={t("automations.fields.direction")}
@@ -1048,7 +1059,7 @@ function TriggerCard({
                         field="value"
                         value={trigger.value}
                         step="any"
-                        suffix={device?.reading?.unit || undefined}
+                        suffix={fields.measureSuffix(trigger.measure, device?.reading?.unit)}
                         disabled={disabled}
                         onChange={(value) => onChange({ ...trigger, value })}
                     />
@@ -1272,7 +1283,18 @@ function ConditionCard({
                         path={path}
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
-                        onChange={(next) => onChange({ ...condition, deviceId: next.id })}
+                        onChange={(next) => {
+                            const { measure: _was, ...rest } = condition;
+                            const measure = auto.measuresFor(next.kind)[0];
+                            onChange({ ...rest, deviceId: next.id, ...(measure ? { measure } : {}) });
+                        }}
+                    />
+                    <fields.MeasurePicker
+                        kind={device?.kind ?? ""}
+                        value={condition.measure}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(measure) => onChange({ ...condition, measure })}
                     />
                     <fields.Field label={t("automations.fields.compare")} path={[...path, "op"]}>
                         {(id) => (
@@ -1296,7 +1318,7 @@ function ConditionCard({
                         field="value"
                         value={condition.value}
                         step="any"
-                        suffix={device?.reading?.unit || undefined}
+                        suffix={fields.measureSuffix(condition.measure, device?.reading?.unit)}
                         disabled={disabled}
                         onChange={(value) => onChange({ ...condition, value })}
                     />
@@ -1408,7 +1430,10 @@ function StepCard({
                                 ...step,
                                 deviceId: next.id,
                                 do: action,
-                                setting: auto.blankSetting(action, next.climate)
+                                setting: auto.blankSetting(action, next.climate, {
+                                    kind: next.kind,
+                                    settings: next.air
+                                })
                             });
                         }}
                     />
@@ -1431,7 +1456,10 @@ function StepCard({
                                     onChange({
                                         ...step,
                                         do: action,
-                                        setting: auto.blankSetting(action, device?.climate)
+                                        setting: auto.blankSetting(action, device?.climate, {
+                                            kind: device?.kind ?? "",
+                                            settings: device?.air
+                                        })
                                     });
                                 }}
                             />

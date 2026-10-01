@@ -1487,7 +1487,8 @@
             "state": "Its state",
             "door": "Its door",
             "reading": "Its reading",
-            "mode": "Its mode"
+            "mode": "Its mode",
+            "filter": "Its filters"
         },
         "triggers": {
             "change": "A device changes",
@@ -1540,7 +1541,8 @@
             "wait": "Wait until {device} is {value}, up to {span}",
             "notify": "Notify: {message}",
             "run": "Run {name}",
-            "set": "Set {device} to {value}"
+            "set": "Set {device} to {value}",
+            "figure": "{measure} of {device}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -1617,7 +1619,7 @@
             "place": "That place is no longer here.",
             "deviceGone": "That device is no longer at this place.",
             "attribute": "That device has nothing like that to watch.",
-            "notSensor": "Choose a sensor or an air conditioner.",
+            "notSensor": "Choose a sensor, an air conditioner or an air purifier.",
             "watchOnly": "That device is set to be watched, not operated.",
             "cannotDo": "That device cannot do that.",
             "runSelf": "An automation cannot start itself.",
@@ -1625,7 +1627,8 @@
             "fix": "Some cards need fixing before it can be saved.",
             "noControl": "You cannot operate the devices here, so an automation you save could not either.",
             "noAutoOff": "That device has nothing to switch off by itself.",
-            "setting": "Choose a value this device accepts."
+            "setting": "Choose a value this device accepts.",
+            "measure": "That device does not report that."
         },
         "notice": {
             "title": "Automation: {name}"
@@ -1744,7 +1747,10 @@
             "target": "Temperature",
             "fan": "Fan speed",
             "option": "Setting",
-            "optionTo": "Turn it"
+            "optionTo": "Turn it",
+            "measure": "Reading",
+            "speed": "Fan speed",
+            "humidity": "Humidity"
         },
         "log": {
             "title": "What it did",
@@ -1778,6 +1784,9 @@
             }
         },
         "settingOn": "{option} on",
-        "settingOff": "{option} off"
+        "settingOff": "{option} off",
+        "measures": {
+            "filter": "Filter life left"
+        }
     }
 }

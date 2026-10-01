@@ -29,7 +29,7 @@
  */
 
 import * as auto from "./automation-kinds";
-import type { ClimateCommand, DeviceAction } from "./device-kinds";
+import type { DeviceAction, DeviceCommand } from "./device-kinds";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { wallClock, zonedInstant } from "@polaris/core";
 
@@ -94,9 +94,22 @@ export interface Observation {
     /** An air conditioner's mode, or empty for anything else. */
     readonly mode: string;
     readonly modeSince: Date;
+    /** A purifier's most worn filter (ok, soon, now), or absent for anything
+     *  else. */
+    readonly filter?: string;
+    readonly filterSince?: Date;
+    /** A purifier's figures by measure - the dust, the humidity, the filter
+     *  life - each with when it last changed. Absent for anything else. */
+    readonly figures?: Readonly<Record<string, Figure>>;
     /** Counts every change, so each one has a name of its own even when two
      *  land in the same millisecond - and so the swap has one field to compare. */
     readonly version: number;
+}
+
+/** One figure as last seen, and since when. */
+export interface Figure {
+    readonly value: string;
+    readonly since: Date;
 }
 
 /** A device as the engine reads it. */
@@ -109,6 +122,9 @@ export interface DeviceReadout {
     readonly reading: string;
     /** An air conditioner's mode, or empty for anything else. */
     readonly mode: string;
+    /** A purifier's most worn filter's state, and its figures by measure. */
+    readonly filter?: string;
+    readonly figures?: Readonly<Record<string, string>>;
     readonly online: boolean;
 }
 
@@ -166,7 +182,7 @@ export interface EnginePorts {
             action: DeviceAction,
             by: { ownerId: string; automationId: string; automationName: string },
             /** What to set, for a step that sets something. */
-            setting?: ClimateCommand
+            setting?: DeviceCommand
         ): Promise<void>;
     };
     /** Whether the owner still holds a right: "run" is keeping automations at
@@ -195,12 +211,13 @@ function iso(date: Date): string {
 
 /** The value of one attribute, as triggers and conditions compare it. */
 function attributeOf(
-    source: { state: string; door: string; reading: string; mode: string },
+    source: { state: string; door: string; reading: string; mode: string; filter?: string },
     attribute: auto.AutomationAttribute
 ): string {
     if (attribute === "door") return source.door;
     if (attribute === "reading") return source.reading;
     if (attribute === "mode") return source.mode;
+    if (attribute === "filter") return source.filter ?? "";
     return source.state;
 }
 
@@ -244,6 +261,8 @@ function minutesOf(clock: string): number {
 export interface Transition {
     readonly deviceId: string;
     readonly attribute: auto.AutomationAttribute;
+    /** Which of a purifier's figures changed, for a reading that is one. */
+    readonly measure?: auto.ReadingMeasure;
     readonly from: string;
     readonly to: string;
     readonly at: Date;
@@ -339,6 +358,8 @@ export function createEngine(ports: EnginePorts) {
         const previous = await store.observation(device.id);
         const passing = device.state === "moving" || device.state === "unknown";
         const state = passing ? (previous?.state ?? device.state) : device.state;
+        const seenFigures = (figures: Readonly<Record<string, string>> | undefined) =>
+            Object.fromEntries(Object.entries(figures ?? {}).map(([key, value]) => [key, { value, since: now }]));
         if (!previous) {
             await store.swapObservation(device.id, null, {
                 state,
@@ -349,6 +370,8 @@ export function createEngine(ports: EnginePorts) {
                 readingSince: now,
                 mode: device.mode,
                 modeSince: now,
+                ...(device.filter ? { filter: device.filter, filterSince: now } : {}),
+                ...(device.figures ? { figures: seenFigures(device.figures) } : {}),
                 version: 0
             });
             return [];
@@ -363,6 +386,9 @@ export function createEngine(ports: EnginePorts) {
             readingSince: previous.readingSince,
             mode: previous.mode,
             modeSince: previous.modeSince,
+            filter: previous.filter,
+            filterSince: previous.filterSince,
+            figures: previous.figures ? { ...previous.figures } : undefined,
             version: previous.version + 1
         };
         const version = next.version;
@@ -416,7 +442,47 @@ export function createEngine(ports: EnginePorts) {
             next.mode = device.mode;
             next.modeSince = now;
         }
-        if (changed.length === 0) return [];
+        // A purifier's figures, each its own change: the dust crossing a line is
+        // not the humidity crossing one. A figure the device stopped reporting
+        // keeps its last value rather than reading as a change to nothing.
+        for (const [measure, value] of Object.entries(device.figures ?? {})) {
+            const before = next.figures?.[measure];
+            if (before && before.value === value) continue;
+            next.figures = { ...(next.figures ?? {}), [measure]: { value, since: now } };
+            if (!before) continue;
+            changed.push({
+                deviceId: device.id,
+                attribute: "reading",
+                measure: measure as auto.ReadingMeasure,
+                from: before.value,
+                to: value,
+                at: now,
+                version
+            });
+        }
+        if (device.filter && device.filter !== previous.filter) {
+            if (previous.filter) {
+                changed.push({
+                    deviceId: device.id,
+                    attribute: "filter",
+                    from: previous.filter,
+                    to: device.filter,
+                    at: now,
+                    version
+                });
+            }
+            next.filter = device.filter;
+            next.filterSince = now;
+        }
+        if (changed.length === 0) {
+            // A figure seen for the first time is not a change, but it is kept,
+            // so the next one has something to be compared with.
+            const learned =
+                (device.filter && !previous.filter) ||
+                Object.keys(device.figures ?? {}).some((measure) => !previous.figures?.[measure]);
+            if (learned) await store.swapObservation(device.id, previous, next);
+            return [];
+        }
         if (!(await store.swapObservation(device.id, previous, next))) return [];
 
         const depth = (causeContext.getStore()?.depth ?? -1) + 1;
@@ -430,11 +496,12 @@ export function createEngine(ports: EnginePorts) {
                         triggerId: trigger.id,
                         deviceId: change.deviceId,
                         attribute: change.attribute,
+                        ...(change.measure ? { measure: change.measure } : {}),
                         from: change.from,
                         to: change.to,
                         at: iso(change.at)
                     };
-                    const key = `${trigger.kind}:${trigger.id}:${change.attribute}:${change.version}`;
+                    const key = `${trigger.kind}:${trigger.id}:${change.attribute}${change.measure ? `:${change.measure}` : ""}:${change.version}`;
                     try {
                         await fire(automation, key, cause, depth);
                     } catch (error) {
@@ -454,12 +521,19 @@ export function createEngine(ports: EnginePorts) {
         if (trigger.kind === "change") {
             if (trigger.deviceId !== change.deviceId || trigger.attribute !== change.attribute)
                 return false;
+            // A change of reading is the device's one reading, never one of a
+            // purifier's figures: those are crossed, with a threshold.
+            if (change.measure !== undefined) return false;
             if (trigger.from && !same(trigger.from, change.from)) return false;
             if (trigger.to && !same(trigger.to, change.to)) return false;
             return true;
         }
         if (trigger.kind === "threshold") {
-            if (trigger.deviceId !== change.deviceId || change.attribute !== "reading")
+            if (
+                trigger.deviceId !== change.deviceId ||
+                change.attribute !== "reading" ||
+                trigger.measure !== change.measure
+            )
                 return false;
             const before = numberOf(change.from);
             const after = numberOf(change.to);
@@ -536,7 +610,9 @@ export function createEngine(ports: EnginePorts) {
                       ? seen.readingSince
                       : trigger.attribute === "mode"
                         ? seen.modeSince
-                        : seen.stateSince;
+                        : trigger.attribute === "filter"
+                          ? (seen.filterSince ?? seen.stateSince)
+                          : seen.stateSince;
             // Measured from when it was switched on here, not from when the
             // device got there: a light already on for three hours when "off
             // after 30 minutes" is written goes off 30 minutes later, not now.
@@ -881,7 +957,9 @@ export function createEngine(ports: EnginePorts) {
         if (condition.kind === "reading") {
             const device = await ports.devices.read(automation.installedAppId, condition.deviceId);
             if (!device || !device.online) return false;
-            const value = numberOf(device.reading);
+            const value = numberOf(
+                condition.measure ? (device.figures?.[condition.measure] ?? "") : device.reading
+            );
             return value !== null && compare(value, condition.op, condition.value);
         }
         const clock = wallClock(now, timeZone);

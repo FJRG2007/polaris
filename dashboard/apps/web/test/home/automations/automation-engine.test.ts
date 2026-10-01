@@ -1069,3 +1069,115 @@ describe("an air conditioner", () => {
         ]);
     });
 });
+describe("an air purifier", () => {
+    const purifier = (figures: Record<string, string> = {}, extra: Partial<DeviceReadout> = {}) =>
+        readout("air", "air", "on", {
+            mode: "auto",
+            reading: figures.pm25 ?? "8",
+            filter: "ok",
+            figures: { pm25: "8", humidity: "45", filter: "40", ...figures },
+            ...extra
+        });
+
+    it("fires when the dust crosses a line, and not when the humidity does", async () => {
+        automation("dusty", {
+            triggers: [{ id: "trigdust", kind: "threshold", deviceId: "air", direction: "above", value: 35, measure: "pm25" }],
+            actions: [{ id: "stepturbo", kind: "device", deviceId: "air", do: "set-mode", setting: { action: "set-mode", mode: "turbo" } }]
+        });
+        await reads(purifier());
+        later(MINUTE);
+        await reads(purifier({ humidity: "80" }));
+        expect(store.runsOf("dusty")).toHaveLength(0);
+        later(MINUTE);
+        await reads(purifier({ pm25: "41", humidity: "80" }));
+        expect(store.runsOf("dusty")).toHaveLength(1);
+        expect(store.runsOf("dusty")[0]?.cause).toMatchObject({ measure: "pm25", from: "8", to: "41" });
+        // Staying above is not crossing again.
+        later(MINUTE);
+        await reads(purifier({ pm25: "52", humidity: "80" }));
+        expect(store.runsOf("dusty")).toHaveLength(1);
+        await engine.drain();
+        expect(acted).toEqual([{ deviceId: "air", action: "set-mode", setting: { action: "set-mode", mode: "turbo" } }]);
+    });
+
+    it("fires when the humidity drops below a line", async () => {
+        automation("dry", {
+            triggers: [{ id: "trigdry", kind: "threshold", deviceId: "air", direction: "below", value: 40, measure: "humidity" }],
+            actions: [{ id: "stepon", kind: "device", deviceId: "air", do: "set-humidity", setting: { action: "set-humidity", target: 50 } }]
+        });
+        await reads(purifier());
+        later(MINUTE);
+        await reads(purifier({ humidity: "38" }));
+        expect(store.runsOf("dry")).toHaveLength(1);
+    });
+
+    it("fires when a filter's life runs low, and when a filter needs changing", async () => {
+        automation("worn", {
+            triggers: [
+                { id: "triglife", kind: "threshold", deviceId: "air", direction: "below", value: 10, measure: "filter" },
+                { id: "trigstate", kind: "change", deviceId: "air", attribute: "filter", from: "", to: "now" }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "Change the filter" }]
+        });
+        await reads(purifier());
+        later(MINUTE);
+        await reads(purifier({ filter: "12" }, { filter: "soon" }));
+        expect(store.runsOf("worn")).toHaveLength(0);
+        later(MINUTE);
+        await reads(purifier({ filter: "4" }, { filter: "now" }));
+        expect(store.runsOf("worn").map((run) => run.cause.triggerId).sort()).toEqual(["triglife", "trigstate"]);
+    });
+
+    it("does not take a figure it has just learned of for a change", async () => {
+        automation("dusty", {
+            triggers: [{ id: "trigdust", kind: "threshold", deviceId: "air", direction: "above", value: 35, measure: "pm25" }]
+        });
+        await reads(readout("air", "air", "on", { mode: "auto", figures: { humidity: "45" } }));
+        later(MINUTE);
+        await reads(readout("air", "air", "on", { mode: "auto", figures: { humidity: "45", pm25: "60" } }));
+        expect(store.runsOf("dusty")).toHaveLength(0);
+        later(MINUTE);
+        await reads(readout("air", "air", "on", { mode: "auto", figures: { humidity: "45", pm25: "20" } }));
+        later(MINUTE);
+        await reads(readout("air", "air", "on", { mode: "auto", figures: { humidity: "45", pm25: "40" } }));
+        expect(store.runsOf("dusty")).toHaveLength(1);
+    });
+
+    it("holds a condition on one of its figures", async () => {
+        devices.set("air", purifier({ humidity: "65" }));
+        automation("humid", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "groupone",
+                        match: "all",
+                        items: [{ id: "condhum", kind: "reading", deviceId: "air", op: "gt", value: 60, measure: "humidity" }]
+                    }
+                ]
+            }
+        });
+        const record = store.automations.get("humid")!;
+        expect(await engine.conditionsHold(record, now)).toBe(true);
+        devices.set("air", purifier({ humidity: "55" }));
+        expect(await engine.conditionsHold(record, now)).toBe(false);
+    });
+
+    it("is switched, put on a preset and on a speed by steps", async () => {
+        devices.set("air", purifier());
+        automation("night", {
+            actions: [
+                { id: "stepon", kind: "device", deviceId: "air", do: "turn-on" },
+                { id: "stepmode", kind: "device", deviceId: "air", do: "set-mode", setting: { action: "set-mode", mode: "sleep" } },
+                { id: "stepfan", kind: "device", deviceId: "air", do: "set-fan", setting: { action: "set-fan", speed: "speed_1" } }
+            ]
+        });
+        await engine.runNow(store.automations.get("night")!, "Fixture user", "press-1");
+        await engine.drain();
+        expect(acted).toEqual([
+            { deviceId: "air", action: "turn-on" },
+            { deviceId: "air", action: "set-mode", setting: { action: "set-mode", mode: "sleep" } },
+            { deviceId: "air", action: "set-fan", setting: { action: "set-fan", speed: "speed_1" } }
+        ]);
+    });
+});

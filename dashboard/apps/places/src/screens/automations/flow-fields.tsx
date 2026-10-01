@@ -230,6 +230,51 @@ export function AttributePicker({
     );
 }
 
+/** Which of a purifier's figures a threshold or a reading compares. Nothing is
+ *  drawn for a device with one reading. */
+export function MeasurePicker({
+    kind,
+    value,
+    onChange,
+    path,
+    disabled
+}: {
+    kind: string;
+    value: auto.ReadingMeasure | undefined;
+    onChange: (measure: auto.ReadingMeasure) => void;
+    path: readonly (string | number)[];
+    disabled?: boolean;
+}) {
+    const t = usePlacesT();
+    const offered = auto.measuresFor(kind);
+    if (offered.length === 0) return null;
+    return (
+        <Field label={t("automations.fields.measure")} path={[...path, "measure"]} required>
+            {(id, invalid) => (
+                <Select
+                    id={id}
+                    value={value ?? ""}
+                    disabled={disabled}
+                    placeholder={t("automations.fields.chooseValue")}
+                    className={invalid ? "border-danger-edge" : undefined}
+                    options={offered.map((measure) => ({ value: measure, label: words.measureText(measure, t) }))}
+                    onValueChange={(next) => {
+                        const measure = offered.find((entry) => entry === next);
+                        if (measure) onChange(measure);
+                    }}
+                />
+            )}
+        </Field>
+    );
+}
+
+/** What a figure is counted in, for the field beside it. */
+export function measureSuffix(measure: auto.ReadingMeasure | undefined, fallback: string | undefined): string | undefined {
+    if (!measure) return fallback || undefined;
+    if (measure === "filter") return "%";
+    return kinds.MEASURE_UNITS[measure] || undefined;
+}
+
 /** Radix will not take an empty value, so "any" travels as this and is stored
  *  as the empty string the schema reads as "any". */
 const ANY = "__any";
@@ -269,8 +314,12 @@ export function ValuePicker({
             : attribute === "door"
               ? [...auto.DOOR_WORDS]
               : attribute === "mode"
-                ? [...(device?.climate?.modes ?? kinds.CLIMATE_MODES)]
-                : [...auto.readingWordsFor(reading)];
+                ? kinds.deviceKind(kind) === "air"
+                    ? [...(device?.air?.modes ?? kinds.AIR_MODES)]
+                    : [...(device?.climate?.modes ?? kinds.CLIMATE_MODES)]
+                : attribute === "filter"
+                  ? [...kinds.FILTER_STATES]
+                  : [...auto.readingWordsFor(reading)];
     if (value && !offered.includes(value) && attribute === "reading" && offered.length > 0)
         offered.push(value);
 
@@ -556,6 +605,10 @@ export function SettingFields({
     const t = usePlacesT();
     const climate = device?.climate ?? null;
     const at = [...path, "setting"];
+    if (device && kinds.deviceKind(device.kind) === "air") {
+        return <AirSettingFields device={device} setting={setting} onChange={onChange} at={at} disabled={disabled} />;
+    }
+    if ("speed" in setting || setting.action === "set-humidity") return null;
     switch (setting.action) {
         case "set-mode":
             return (
@@ -598,7 +651,7 @@ export function SettingFields({
                     {(id, invalid) => (
                         <Select
                             id={id}
-                            value={setting.fan}
+                            value={"fan" in setting ? setting.fan : ""}
                             disabled={disabled}
                             className={invalid ? "border-danger-edge" : undefined}
                             options={(climate?.fans ?? kinds.CLIMATE_FANS).map((fan) => ({
@@ -634,7 +687,7 @@ export function SettingFields({
                                     const option = kinds.CLIMATE_OPTIONS.find(
                                         (entry) => entry === next
                                     );
-                                    if (option) onChange({ ...setting, option });
+                                    if (option) onChange({ action: "set-option", option, on: setting.on });
                                 }}
                             />
                         )}
@@ -659,6 +712,122 @@ export function SettingFields({
             );
         }
     }
+}
+
+/** What a step sets a purifier to, offered from what it has: its presets and
+ *  speeds, a humidity in its own range and step, the switches it was built
+ *  with. */
+function AirSettingFields({
+    device,
+    setting,
+    onChange,
+    at,
+    disabled
+}: {
+    device: DeviceView;
+    setting: auto.StepSetting;
+    onChange: (setting: auto.StepSetting) => void;
+    at: readonly (string | number)[];
+    disabled?: boolean;
+}) {
+    const t = usePlacesT();
+    const air = device.air ?? null;
+    if (setting.action === "set-mode") {
+        return (
+            <Field label={t("automations.fields.mode")} path={[...at, "mode"]} required>
+                {(id, invalid) => (
+                    <Select
+                        id={id}
+                        value={setting.mode}
+                        disabled={disabled}
+                        className={invalid ? "border-danger-edge" : undefined}
+                        options={(air?.modes ?? kinds.AIR_MODES).map((mode) => ({
+                            value: mode,
+                            label: kinds.airModeText(mode, t)
+                        }))}
+                        onValueChange={(next) => {
+                            const mode = kinds.AIR_MODES.find((entry) => entry === next);
+                            if (mode) onChange({ action: "set-mode", mode });
+                        }}
+                    />
+                )}
+            </Field>
+        );
+    }
+    if (setting.action === "set-fan") {
+        return (
+            <Field label={t("automations.fields.speed")} path={[...at, "speed"]} required>
+                {(id, invalid) => (
+                    <Select
+                        id={id}
+                        value={"speed" in setting ? setting.speed : ""}
+                        disabled={disabled}
+                        className={invalid ? "border-danger-edge" : undefined}
+                        options={(air?.speeds ?? kinds.AIR_SPEEDS).map((speed) => ({
+                            value: speed,
+                            label: kinds.airSpeedText(speed, t)
+                        }))}
+                        onValueChange={(next) => {
+                            const speed = kinds.AIR_SPEEDS.find((entry) => entry === next);
+                            if (speed) onChange({ action: "set-fan", speed });
+                        }}
+                    />
+                )}
+            </Field>
+        );
+    }
+    if (setting.action === "set-humidity") {
+        return (
+            <NumberField
+                label={t("automations.fields.humidity")}
+                path={at}
+                field="target"
+                value={setting.target}
+                min={air?.humidity?.min}
+                step={air?.humidity?.step ?? "any"}
+                suffix="%"
+                disabled={disabled}
+                onChange={(target) => onChange({ action: "set-humidity", target })}
+            />
+        );
+    }
+    if (setting.action !== "set-option") return null;
+    const offered = air ? kinds.AIR_OPTIONS.filter((option) => air.options[option] !== undefined) : kinds.AIR_OPTIONS;
+    const current = kinds.AIR_OPTIONS.find((entry) => entry === setting.option) ?? "";
+    return (
+        <>
+            <Field label={t("automations.fields.option")} path={[...at, "option"]} required>
+                {(id, invalid) => (
+                    <Select
+                        id={id}
+                        value={current}
+                        disabled={disabled}
+                        placeholder={t("automations.fields.chooseValue")}
+                        className={invalid ? "border-danger-edge" : undefined}
+                        options={offered.map((option) => ({ value: option, label: kinds.airOptionText(option, t) }))}
+                        onValueChange={(next) => {
+                            const option = kinds.AIR_OPTIONS.find((entry) => entry === next);
+                            if (option) onChange({ action: "set-option", option, on: setting.on });
+                        }}
+                    />
+                )}
+            </Field>
+            <Field label={t("automations.fields.optionTo")} path={[...at, "on"]}>
+                {(id) => (
+                    <Select
+                        id={id}
+                        value={setting.on ? "on" : "off"}
+                        disabled={disabled}
+                        options={[
+                            { value: "on", label: kinds.stateLabel("switch", "on", t) },
+                            { value: "off", label: kinds.stateLabel("switch", "off", t) }
+                        ]}
+                        onValueChange={(next) => onChange({ ...setting, on: next === "on" })}
+                    />
+                )}
+            </Field>
+        </>
+    );
 }
 
 /** Whether a device can be told to do anything a step could ask. */
