@@ -58,6 +58,13 @@ import type {
 } from "@/lib/backups/sources/types";
 import type { TargetRow } from "@/lib/deploy/runtime";
 import type { SessionUser } from "@/lib/session";
+import type {
+    CalendarLink,
+    CalendarPerson,
+    CalendarTask,
+    CalendarTeam,
+    SealedSecret
+} from "@/lib/calendar-host";
 
 /** A service that is loaded when it is first called, so it always answers later. */
 type Later<F> = F extends (...args: infer A) => infer R
@@ -92,6 +99,7 @@ const load = {
     appsPortRegistry: once(() => import("@/lib/apps/port-registry")),
     auditService: once(() => import("@/lib/audit-service")),
     backupsManage: once(() => import("@/lib/backups/manage")),
+    calendarHost: once(() => import("@/lib/calendar-host")),
     chatGameLinks: once(() => import("@/lib/chat/game-links")),
     chatLive: once(() => import("@/lib/chat/live")),
     chatMeetingEvents: once(() => import("@/lib/chat/meeting-events")),
@@ -228,6 +236,28 @@ export const serverHost = {
         shellQuote: backupsSourcesTypes.shellQuote,
         stageDir: backupsSourcesTypes.stageDir,
         stagedFrom: backupsSourcesTypes.stagedFrom
+    },
+    // What the Calendar app reaches beyond the other apps: the accounts people
+    // link for it, a sealed server password, a fetch safe to point at an address
+    // somebody configured, the people and teams it shares with and invites, the
+    // Tasks work it draws, and mail that carries an invitation.
+    calendarHost: {
+        accountsByEmail: later(load.calendarHost, "accountsByEmail"),
+        assignedTasks: later(load.calendarHost, "assignedTasks"),
+        calendarAccessToken: later(load.calendarHost, "calendarAccessToken"),
+        calendarFetch: later(load.calendarHost, "calendarFetch"),
+        calendarLinkUrl: later(load.calendarHost, "calendarLinkUrl"),
+        createMeetingLink: later(load.calendarHost, "createMeetingLink"),
+        listCalendarLinks: later(load.calendarHost, "listCalendarLinks"),
+        openCalendarSecret: later(load.calendarHost, "openCalendarSecret"),
+        peopleByIds: later(load.calendarHost, "peopleByIds"),
+        scheduleTask: later(load.calendarHost, "scheduleTask"),
+        sealCalendarSecret: later(load.calendarHost, "sealCalendarSecret"),
+        searchPeople: later(load.calendarHost, "searchPeople"),
+        sendCalendarEmail: later(load.calendarHost, "sendCalendarEmail"),
+        teamIdsOf: later(load.calendarHost, "teamIdsOf"),
+        teamMemberIds: later(load.calendarHost, "teamMemberIds"),
+        teamsOf: later(load.calendarHost, "teamsOf")
     },
     // What a game server may be linked to in Chat, and the line it writes into
     // the linked channel when an announcement is repeated there.
@@ -393,6 +423,10 @@ declare module "@polaris/app-host" {
         AppJob: AppJob;
         AppSlot: AppSlot;
         BackupSource: BackupSource;
+        CalendarLink: CalendarLink;
+        CalendarPerson: CalendarPerson;
+        CalendarTask: CalendarTask;
+        CalendarTeam: CalendarTeam;
         ChatGameLink: ChatGameLink;
         DiscoveredTarget: DiscoveredTarget;
         GamePort: GamePort;
@@ -409,6 +443,7 @@ declare module "@polaris/app-host" {
         LinkableConversations: LinkableConversations;
         LiveGrant: LiveGrant;
         RelayedChannelMessage: RelayedChannelMessage;
+        SealedSecret: SealedSecret;
         SessionUser: SessionUser;
         SourceResource: SourceResource;
         StagedArtifact: StagedArtifact;

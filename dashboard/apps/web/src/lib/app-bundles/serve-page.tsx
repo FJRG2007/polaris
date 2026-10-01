@@ -35,8 +35,20 @@ type PageComponent = ComponentType<{
     searchParams: AppPageProps["searchParams"];
 }>;
 
-/** Draw the page of `app` that answers `<surface>/<path...>`. */
-export async function renderAppPage(surface: string, app: string, { params, searchParams }: AppPageProps) {
+/**
+ * Draw the page of `app` that answers `<surface>/<path...>`.
+ *
+ * A `public` surface is read by people who are not signed in, so an app that is
+ * not installed, or not here yet, is simply not found there: sending a visitor
+ * to the marketplace or naming the app's state would be a page about this
+ * Polaris that nobody outside it should be shown.
+ */
+export async function renderAppPage(
+    surface: string,
+    app: string,
+    { params, searchParams }: AppPageProps,
+    options: { readonly public?: boolean } = {}
+) {
     const { path = [] } = await params;
     const url = [surface, ...path.map((part) => encodeURIComponent(part))].join("/");
     const hit = findAppRoute("page", url);
@@ -45,7 +57,7 @@ export async function renderAppPage(surface: string, app: string, { params, sear
         if (!Page) notFound();
         return <Page params={Promise.resolve(hit.params)} searchParams={searchParams} />;
     }
-    if (!knownApps().includes(app)) notFound();
+    if (!knownApps().includes(app) || options.public) notFound();
     // Not installed here: where it is installed from.
     if (!(await isAppInstalled(app))) redirect(`/apps/marketplace?app=${encodeURIComponent(app)}`);
     if (loadedBundle(app)) notFound();

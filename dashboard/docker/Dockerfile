@@ -25,6 +25,7 @@ WORKDIR /build
 # The npm cache mount avoids re-downloading even when the layer does rebuild.
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/calendar/package.json ./apps/calendar/
 COPY apps/game-servers/package.json ./apps/game-servers/
 COPY apps/places/package.json ./apps/places/
 # Every workspace manifest, one line each and all of them: a package missing here

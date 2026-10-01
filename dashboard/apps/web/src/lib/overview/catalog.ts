@@ -17,6 +17,7 @@ import type { OverviewWidgetId, OverviewWidgetSize } from "@polaris/core";
 import {
     Activity,
     Bell,
+    CalendarDays,
     Clock,
     Gamepad2,
     HardDrive,
@@ -61,7 +62,7 @@ export interface OverviewWidgetEntry {
 }
 
 /** The things a card can depend on being present, answered once on the server. */
-export type OverviewFeature = "games";
+export type OverviewFeature = "games" | "calendar";
 
 /** Which of those this account actually has. A feature absent from the record is
  *  treated as absent, so a new one is off until something answers for it. */
@@ -181,6 +182,17 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         // offered it in the customize panel is being told to go and find out what
         // it would show.
         requires: "games"
+    },
+    {
+        id: "calendar",
+        label: "Coming up", // i18n-ignore
+        description: "Your next events from every calendar you show.", // i18n-ignore
+        icon: CalendarDays,
+        permission: "calendar.use",
+        href: "/calendar",
+        sizes: ALL_SIZES,
+        // Drawn by the Calendar app, so only where it is installed.
+        requires: "calendar"
     },
     {
         id: "sessions",

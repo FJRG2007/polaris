@@ -104,6 +104,9 @@
         "mail": {
             "description": "Tus buzones, leídos y respondidos aquí"
         },
+        "calendar": {
+            "description": "Tus calendarios y los que enlaces, en un solo sitio"
+        },
         "notes": {
             "description": "Apunta cosas, anidadas como en un cuaderno"
         },
@@ -143,6 +146,7 @@
         "Away message": "Respuesta automática",
         "Backups": "Copias",
         "Billing": "Facturación",
+        "Calendar": "Calendario",
         "Cameras": "Cámaras",
         "Challenges": "Retos",
         "Channels": "Canales",

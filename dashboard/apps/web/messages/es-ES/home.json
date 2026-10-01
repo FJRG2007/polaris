@@ -77,6 +77,10 @@
             "label": "Juegos",
             "description": "Qué servidores tuyos están en marcha y lo llenos que están."
         },
+        "calendar": {
+            "label": "Próximo",
+            "description": "Tus próximos eventos de cada calendario que muestras."
+        },
         "sessions": {
             "label": "Sesiones",
             "description": "Los dispositivos en los que tu cuenta está abierta ahora mismo."
@@ -156,6 +160,14 @@
         "slots": "{count} plazas",
         "up": "En marcha",
         "stopped": "Parado"
+    },
+    "calendar": {
+        "unavailable": "No se pudieron leer tus calendarios ahora.",
+        "empty": "Nada en las dos próximas semanas.",
+        "open": "Abrir Calendario",
+        "today": "Hoy",
+        "tomorrow": "Mañana",
+        "untitled": "Evento sin título"
     },
     "tasks": {
         "unavailable": "Ahora mismo no se ha podido leer tu trabajo.",

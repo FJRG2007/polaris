@@ -77,6 +77,10 @@
             "label": "Game servers",
             "description": "Which of your servers are up, and how full they are."
         },
+        "calendar": {
+            "label": "Coming up",
+            "description": "Your next events from every calendar you show."
+        },
         "sessions": {
             "label": "Signed in",
             "description": "The devices your account is open on right now."
@@ -156,6 +160,14 @@
         "slots": "{count} slots",
         "up": "Up",
         "stopped": "Stopped"
+    },
+    "calendar": {
+        "unavailable": "Your calendars could not be read just now.",
+        "empty": "Nothing in the next two weeks.",
+        "open": "Open Calendar",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "untitled": "Untitled event"
     },
     "tasks": {
         "unavailable": "Your work could not be read just now.",

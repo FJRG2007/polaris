@@ -12,7 +12,8 @@ const config: Config = {
         "./src/**/*.{ts,tsx}",
         "../../packages/ui/src/**/*.{ts,tsx}",
         "../places/src/**/*.{ts,tsx}",
-        "../game-servers/src/**/*.{ts,tsx}"
+        "../game-servers/src/**/*.{ts,tsx}",
+        "../calendar/src/**/*.{ts,tsx}"
     ]
 };
 

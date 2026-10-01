@@ -21,7 +21,8 @@ export const REFERENCE_KINDS = [
     "doc",
     "note",
     "channel",
-    "message"
+    "message",
+    "event"
 ] as const;
 
 export type ReferenceKind = (typeof REFERENCE_KINDS)[number];
@@ -39,7 +40,7 @@ export interface PolarisReference {
 /** Ids are uuids. Anything else in the address is somebody else's link. */
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const ADDRESS = /^polaris:(user|team|task|doc|note|channel|message)\/([0-9a-f-]{36})$/i;
+const ADDRESS = /^polaris:(user|team|task|doc|note|channel|message|event)\/([0-9a-f-]{36})$/i;
 
 /**
  * In-app paths a pasted link can carry, in the order they are tried.
@@ -55,6 +56,8 @@ const ROUTES: readonly { readonly kind: ReferenceKind; readonly match: RegExp }[
     { kind: "message", match: /^\/chat\/c\/[0-9a-f-]{36}\/([0-9a-f-]{36})/i },
     { kind: "channel", match: /^\/chat\/c\/([0-9a-f-]{36})/i },
     { kind: "task", match: /^\/tasks\/t\/([0-9a-f-]{36})/i },
+    // A calendar event, named by the Calendar app for whoever may read it.
+    { kind: "event", match: /^\/calendar\/e\/([0-9a-f-]{36})/i },
     { kind: "doc", match: /^\/tasks\/docs\?(?:.*&)?doc=([0-9a-f-]{36})/i },
     { kind: "note", match: /^\/notes\?(?:.*&)?note=([0-9a-f-]{36})/i },
     // Where notes lived before they were an app of their own. Kept because the
@@ -85,6 +88,7 @@ export function referenceHref(kind: ReferenceKind, id: string): string | null {
     if (kind === "doc") return `/tasks/docs?doc=${id}`;
     if (kind === "note") return `/notes?note=${id}`;
     if (kind === "channel") return `/chat/c/${id}`;
+    if (kind === "event") return `/calendar/e/${id}`;
     // A message deliberately has none. Its address needs the conversation it
     // lives in, which this function is not given and which is not the link's to
     // assert anyway - whoever resolves the reference for a particular reader

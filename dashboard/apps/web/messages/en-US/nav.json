@@ -104,6 +104,9 @@
         "mail": {
             "description": "Your mailboxes, read and answered here"
         },
+        "calendar": {
+            "description": "Your calendars and the ones you link, in one place"
+        },
         "notes": {
             "description": "Write things down, nested the way a notebook is"
         },
@@ -143,6 +146,7 @@
         "Away message": "Away message",
         "Backups": "Backups",
         "Billing": "Billing",
+        "Calendar": "Calendar",
         "Cameras": "Cameras",
         "Challenges": "Challenges",
         "Channels": "Channels",

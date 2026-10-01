@@ -28,6 +28,7 @@ import { useShelfScope } from "@/components/shelf-scope";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { overviewRequestGroups } from "@/lib/overview/request-groups";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
+import { CalendarWidget } from "./widgets/calendar";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
@@ -641,6 +642,8 @@ function WidgetBody({
             );
         case "games":
             return <GamesWidget data={data === undefined ? undefined : (data.games ?? null)} />;
+        case "calendar":
+            return <CalendarWidget data={data === undefined ? undefined : (data.calendar ?? null)} />;
     }
 }
 

@@ -82,6 +82,7 @@
     },
     "categories": {
         "Messaging": "Messaging",
+        "Productivity": "Productivity",
         "AI": "AI",
         "Home": "Home"
     },
@@ -94,6 +95,10 @@
         "tools": {
             "summary": "Convert, resize, optimize, trim and translate - without leaving Polaris.",
             "description": "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize pictures, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already."
+        },
+        "calendar": {
+            "summary": "Your calendars and the ones you link, with invitations and booking pages.",
+            "description": "Keep calendars in Polaris and see Google, Outlook, iCloud and any CalDAV calendar beside them, synced both ways. Day, week, month, year and agenda views, repeating events, reminders, invitations people answer from their inbox, finding a time that suits everybody, sharing with people and teams, public links, and booking pages for anybody outside Polaris."
         },
         "mail-server": {
             "summary": "Mail at your own domains, with its DNS written and checked for you.",

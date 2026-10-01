@@ -377,6 +377,15 @@ export async function resolveReferences(
     for (const task of tasks) labels[`task/${task.id}`] = task.name;
     for (const doc of docs) labels[`doc/${doc.id}`] = doc.title;
     for (const note of notes) labels[`note/${note.id}`] = note.title;
+    // Events belong to the Calendar app, which names the ones this reader may
+    // read and says nothing about the rest.
+    const events = idsOf("event");
+    if (events.length > 0) {
+        const { eventTitlesFor } = await import("@/lib/app-extensions/registry");
+        for (const [id, title] of Object.entries(await eventTitlesFor(actor.id, events))) {
+            labels[`event/${id}`] = title;
+        }
+    }
     return labels;
 }
 
