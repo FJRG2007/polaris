@@ -1623,7 +1623,7 @@
             },
             "world-boss": {
                 "label": "Jefe mundial",
-                "summary": "Aparece cerca de los jugadores un jefe elegido al azar, en una arena aérea o en terreno abierto. Lucha en tres fases, con ataques avisados y un escudo de esbirros, y crece con cada jugador. Cuenta el daño hecho cerca de él; si cae, el podio va por daño, se premia a todos los que le golpearon y el golpe final gana un trofeo.",
+                "summary": "Aparece cerca de los jugadores un jefe elegido al azar, en una arena aérea o en terreno abierto. Lucha en tres fases, con ataques avisados y un escudo de esbirros, y crece con cada jugador. Si cae, gana quien más daño hizo - o el golpe final, si se elige -, se premia a todos los que le golpearon y el ganador se lleva un trofeo.",
                 "unit": "daño"
             },
             "fishing": {
@@ -1652,13 +1652,13 @@
             },
             "treasure-hunt": {
                 "label": "Caza del tesoro",
-                "summary": "Se esconden cofres con botín en terreno abierto alrededor de los jugadores, anunciados con pistas cada vez más precisas. Gana quien más abra, y se queda lo que hay dentro.",
+                "summary": "Se esconden cofres con botín en terreno abierto alrededor de los jugadores, cada uno bajo una columna de luz, y la barra de acción señala el más cercano. Gana quien más abra, y se queda lo que hay dentro.",
                 "unit": "cofres"
             },
             "gathering": {
                 "label": "Recolección",
-                "summary": "Se anuncia un material - trigo, troncos, roca, hierro... Gana quien más reúna. No se le quita nada a nadie.",
-                "unit": "objetos"
+                "summary": "Unas rondas cortas, cada una con un material que se anuncia al empezar - trigo, troncos, roca, hierro... Cada objeto vale puntos según lo que cuesta conseguirlo, y gana quien más sume en todas. No se le quita nada a nadie.",
+                "unit": "puntos"
             },
             "rare-catch": {
                 "label": "Pesca rara",
@@ -1670,7 +1670,7 @@
             },
             "waves": {
                 "label": "Defensa de horda",
-                "summary": "Se marca un punto de defensa lejos de todos los hogares y llegan oleadas de monstruos a por él, cada una más grande y fuerte que la anterior. Se premia a todos los que lo defienden; el podio es para quien más mate.",
+                "summary": "Se marca un punto de defensa lejos de todos los hogares y llegan oleadas de monstruos a por él, cada una más grande y mejor armada que la anterior, con jinetes en las últimas. Se premia a todos los que lo defienden; el podio es para quien más mate, o quien más daño haga si se elige.",
                 "unit": "muertes"
             },
             "meteor-shower": {
@@ -1731,9 +1731,9 @@
             "regeneration": "Regeneración (la salud vuelve sola)",
             "happyHour": "Todos los conectados reciben {effects} hasta que termine, también quien entre mientras.",
             "chestsHidden": "{count} {count, plural, one {cofre escondido} other {cofres escondidos}} a hasta {distance} bloques de los jugadores, en terreno natural abierto bien lejos de la cama de nadie.",
-            "clues": "Las pistas llegan en tres pasos: a qué distancia y hacia dónde, luego la zona, luego el sitio exacto; un haz de luz marca los que quedan en los últimos minutos. Un jugador cerca de uno ve el camino en su barra de acción.",
-            "chestsCleared": "Un cofre solo se pone donde hay aire, y el que nadie abrió se retira al final. Un cofre abierto se queda: lo de dentro es de quien lo encontró.",
-            "materialRandom": "El material se sortea de la lista cada vez y se anuncia al empezar la cuenta atrás.",
+            "clues": "Una columna de luz marca cada cofre sin abrir desde el principio, y la barra de acción de cada jugador muestra a qué distancia está el más cercano y hacia dónde. El chat solo dice cuántos hay y quién abre cada uno.",
+            "chestsCleared": "Los cofres se reparten alrededor de los jugadores, cada uno en su dirección y separados. Un cofre solo se pone donde hay aire o una planta silvestre pequeña, que se repone; el que nadie abrió se retira al final. Un cofre abierto se queda: lo de dentro es de quien lo encontró.",
+            "materialRandom": "El material de cada ronda se sortea de la lista, sin repetir uno de una ronda anterior, y se anuncia solo al empezar la ronda.",
             "material": "El material: {material}.",
             "gatheringScore": "Puntúa lo que cada jugador tiene al final menos lo que tenía al empezar, y nunca más de lo que recogió durante el evento - un montón sacado de un cofre no cuenta. No se le quita nada a nadie.",
             "rareCatch": "El primer jugador en pescar {treasure} gana, y se lo queda. Sacarlo de un cofre, o tirarlo y recogerlo, no cuenta.",
@@ -1744,8 +1744,8 @@
             "waves": "{waves} oleadas, {minutes} minutos como mucho. Una oleada termina cuando se la mata entera, o a los dos minutos.",
             "wavesPoint": "El punto está en terreno llano y abierto generado por el mundo, a al menos 96 bloques de la cama de cualquier jugador conectado. Solo llegan monstruos que no pueden romper bloques - ni creepers, ni endermen, ni devastadores - y todos se retiran al terminar.",
             "keepInventory": "Conservar inventario está activo mientras dura, así que morir no cuesta nada; el ajuste propio del servidor vuelve después. Java 1.17 o posterior.",
-            "meteors": "{meteors} meteoritos de {size} bloques de mena cada uno, cayendo durante las tres primeras cuartas partes. Cada bloque minado cerca de un meteorito puntúa 1; la mena colocada cerca de uno resta.",
-            "meteorsLand": "Los meteoritos caen en terreno llano y abierto generado por el mundo, a al menos 48 bloques de la cama de cualquier jugador conectado, y la mena solo se pone donde había aire. Lo que nadie minó se retira al final - solo los bloques que siguen siendo exactamente la mena del meteorito - y no se toca nada más.",
+            "meteors": "{meteors} meteoritos de {size} bloques de mena cada uno, uno cada {seconds} segundos desde el principio. Cada bloque minado cerca de un meteorito puntúa 1; la mena colocada cerca de uno resta.",
+            "meteorsLand": "Los meteoritos caen en terreno llano y abierto generado por el mundo, lejos de la cama de cualquier jugador conectado - en una isla, en la propia isla -, y la mena solo se pone donde había aire. Lo que nadie minó se retira al final - solo los bloques que siguen siendo exactamente la mena del meteorito - y no se toca nada más.",
             "pickaxes": "La mena de diamante y esmeralda necesita un pico de hierro, los escombros ancestrales uno de diamante.",
             "parkour": "{jumps} saltos, {difficulty}, construido a unos {height} bloques de altura. Una caída cae en una red y vuelve al último punto de control.",
             "spleef": "Un suelo de nieve de {size} por {size} a unos {height} bloques de altura. Caer a través queda fuera; el último en él gana.",
@@ -1786,7 +1786,14 @@
             "bossGround": "Se lucha en terreno abierto lejos de cualquier cama. Nada de lo que hace rompe ni coloca un bloque, y no se le puede encerrar: va a por quien no alcanza.",
             "bossKeeps": "Mientras dura se conserva el inventario, así que morir no cuesta nada, y las mascotas, caballos y aldeanos cercanos no reciben daño. El ajuste del servidor vuelve después, incluso tras un reinicio.",
             "bossGriefing": "El vandalismo de mobs se apaga mientras lucha {bosses}, así que no cambia ningún bloque. El ajuste del servidor vuelve después, incluso tras un reinicio.",
-            "bossPrizes": "Los premios se multiplican por {times} en esta dificultad, y el golpe final gana un trofeo con nombre."
+            "bossPrizes": "Los premios se multiplican por {times} en esta dificultad.",
+            "bossWinnerDamage": "Gana quien más daño le haga. Cada jugador ve su daño durante el combate, y el de todos se lista al final.",
+            "bossWinnerFinalBlow": "Gana quien dé el golpe final; el resto se ordena por el daño hecho, que cada jugador ve durante el combate.",
+            "bossTrophy": "El ganador se lleva además un trofeo: una estrella del Nether con el nombre del jefe.",
+            "bossBeam": "El haz de luz que sube a la arena se anuncia con sus coordenadas, y quien aún no ha subido ve a qué distancia está y hacia dónde.",
+            "wavesScaling": "Cada oleada trae el tamaño de la primera, la mitad más por cada oleada anterior y por cada defensor en el punto después del primero (hasta 5), como mucho 60. Cada defensor después del primero da a cada monstruo 4 de vida más (hasta 16), y desde 3 defensores golpean más fuerte.",
+            "wavesGear": "La armadura crece oleada a oleada, de nada a cuero, cota de malla, hierro y diamante en la última, con arcos y espadas encantados en las dos últimas. Los jinetes arácnidos llegan desde el 40% de las oleadas, los jinetes de pollo desde el 60% y los jinetes a caballo desde el 80%. Nada de lo que llevan o montan se suelta nunca, y todo se retira.",
+            "gatheringRounds": "{rounds} {rounds, plural, one {ronda} other {rondas}} de {minutes} {minutes, plural, one {minuto} other {minutos}}. Cada objeto vale puntos según lo que cuesta conseguirlo - una piedra 1, un tronco 4, un lingote de hierro 12 - y gana quien más puntos sume en todas las rondas."
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -1920,7 +1927,8 @@
             "entry": "{place} {reward}",
             "everyone": "El resto: {reward}",
             "everybody": "Todos: {reward}",
-            "none": "Sin premios"
+            "none": "Sin premios",
+            "trophy": "Trofeo"
         }
     },
     "editor": {
@@ -2076,6 +2084,14 @@
                 "normal": "Normal",
                 "hard": "Difícil",
                 "epic": "Épico"
+            },
+            "bossWinner": {
+                "damage": "Más daño",
+                "final-blow": "Golpe final"
+            },
+            "wavesWinner": {
+                "kills": "Más muertes",
+                "damage": "Más daño"
             }
         },
         "place": {
@@ -2106,7 +2122,7 @@
         "themesPlaceholder": "Nuestro pueblo\nUn dragón",
         "builtInThemes": "Uno de 30 temas incluidos, en el idioma de los jugadores.",
         "material": "Material",
-        "materialHint": "Se anuncia al empezar la cuenta atrás. Solo cuenta lo que se reúna durante el evento.",
+        "materialHint": "Se sortea en cada ronda, sin repetir uno de una ronda anterior, y se anuncia al empezarla. Solo cuenta lo que se reúna durante la ronda.",
         "theCatch": "La captura",
         "catchHint": "Un tesoro concreto sale más o menos una vez cada 120 capturas, cualquiera de ellos una vez cada 25 - en aguas abiertas, más a menudo con Suerte marina. Dale 20 minutos o más.",
         "chests": "Cofres",
@@ -2129,7 +2145,13 @@
         "bossPoolEmpty": "Deja al menos un jefe que pueda luchar aquí.",
         "witherNeedsArena": "El Wither solo lucha en la arena aérea.",
         "baseHealth": "Vida base",
-        "baseHealthHint": "De 100 a 1024: su vida para un solo jugador en Normal. Los niveles más difíciles y cada jugador que se une la aumentan."
+        "baseHealthHint": "De 100 a 1024: su vida para un solo jugador en Normal. Los niveles más difíciles y cada jugador que se une la aumentan.",
+        "bossWinner": "Cómo se decide el ganador",
+        "bossWinnerHint": "Más daño cuenta cada golpe cuerpo a cuerpo y reparte lo que el jefe pierde por flechas, tridentes y magia entre quienes le disparan. Golpe final: gana quien lo derriba, y el resto va por daño.",
+        "bossTrophy": "Trofeo para el ganador",
+        "bossTrophyHint": "Una estrella del Nether con el nombre del jefe, brillo y su dificultad, además de los premios. Solo si el jefe cae.",
+        "wavesWinner": "Cómo se decide el ganador",
+        "roundMinutes": "Minutos por ronda"
     },
     "moderation": {
         "announcements": {

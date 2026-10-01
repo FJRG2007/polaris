@@ -70,7 +70,7 @@ export const QUESTIONS: Readonly<Record<Language, readonly TriviaQuestion[]>> = 
             answers: ["turtle shell", "turtle helmet"]
         },
         {
-            question: "How many ingots make a full set of iron armour?",
+            question: "How many ingots make a full set of iron armor?",
             answers: ["24", "twenty four", "twenty-four"]
         },
         {
@@ -140,7 +140,7 @@ export const QUESTIONS: Readonly<Record<Language, readonly TriviaQuestion[]>> = 
         },
         {
             question:
-                "For every block travelled in the Nether, how many do you cover in the Overworld?",
+                "For every block traveled in the Nether, how many do you cover in the Overworld?",
             answers: ["8", "eight"]
         },
         {

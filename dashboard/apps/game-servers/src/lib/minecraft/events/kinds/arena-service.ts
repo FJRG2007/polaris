@@ -176,7 +176,7 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
     // Nothing hostile reaches it once it stands - a phantom least of all.
     if (ctx.run.arena) lines.push(...commands.hostilesOut(ctx.run.arena.box));
     if (ctx.run.readyAt === null) {
-        if (!ctx.run.enrolled) await enrol(ctx, lines);
+        if (!ctx.run.enrolled) await enroll(ctx, lines);
         else if (!ctx.run.arena) await raise(ctx);
         else await bringIn(ctx);
         return null;
@@ -189,7 +189,7 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
 }
 
 /** Who takes part: who joined, is on, and is not still owed a trip back. */
-async function enrol(ctx: KindContext, lines: string[]): Promise<void> {
+async function enroll(ctx: KindContext, lines: string[]): Promise<void> {
     lines.push(...(await joinTick(ctx)));
     const language = ctx.language;
     const online = new Set(

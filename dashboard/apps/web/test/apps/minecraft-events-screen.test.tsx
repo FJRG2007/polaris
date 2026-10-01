@@ -141,16 +141,18 @@ describe("the Events tab", () => {
         fireEvent.click(screen.getByLabelText("What Fishing contest is"));
         expect(screen.getByText(/Most catches with a fishing rod wins/)).toBeTruthy();
         expect(screen.getByText(/Ranked from 3 catches/)).toBeTruthy();
-        expect(screen.getByText(/Prizes - 1st: 5 diamond, 15 levels/)).toBeTruthy();
+        expect(
+            screen.getByText(/Prizes - 1st: 1 diamond, 8 experience bottle, 3 levels/)
+        ).toBeTruthy();
     });
 
     it("lists every prize of an event on its row, whole in the tooltip", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({ view });
         const line =
-            "1st 5 diamond + 15 levels · 2nd 3 diamond + 10 levels · 3rd 1 diamond + 5 levels · Everybody else: 8 experience bottle";
-        const row = await screen.findAllByTitle(`Fishing contest - 10 min - ${line}`);
-        expect(row[0]?.textContent).toBe(`Fishing contest - 10 min - ${line}`);
+            "1st 1 diamond + 8 experience bottle + 3 levels · 2nd 4 gold ingot + 4 experience bottle + 2 levels · 3rd 4 iron ingot + 2 experience bottle + 1 level · Everybody else: 3 experience bottle";
+        const row = await screen.findAllByTitle(`Fishing contest - 8 min - ${line}`);
+        expect(row[0]?.textContent).toBe(`Fishing contest - 8 min - ${line}`);
         expect(row[0]?.className).toContain("truncate");
     });
 
@@ -292,7 +294,9 @@ describe("the treasure hunt, gathering, rare catch and experience boost", () => 
             fireEvent.click(screen.getByLabelText(`What ${name} is`));
         expect(screen.getByText(/5 chests hidden up to 300 blocks from the players/)).toBeTruthy();
         expect(screen.getByText(/one nobody opened is taken away at the end/)).toBeTruthy();
-        expect(screen.getByText(/The material is drawn from the list each time/)).toBeTruthy();
+        expect(screen.getByText(/3 rounds of 2 minutes/)).toBeTruthy();
+        expect(screen.getByText(/Each round's material is drawn from the list/)).toBeTruthy();
+        expect(screen.getByText(/A column of light stands over every chest/)).toBeTruthy();
         expect(screen.getByText(/never more than they picked up during it/)).toBeTruthy();
         expect(screen.getByText(/fish up any fishing treasure wins, and keeps it/)).toBeTruthy();
         expect(
@@ -328,7 +332,7 @@ describe("the treasure hunt, gathering, rare catch and experience boost", () => 
     });
 });
 
-describe("setting up a horde defence", () => {
+describe("setting up a horde defense", () => {
     it("asks for waves, their size and the monsters, and not for minutes", () => {
         const preset = catalog.newPreset("waves", "waves");
         render(
@@ -372,6 +376,12 @@ describe("setting up a world boss", () => {
         // Every boss in the pool, the Wither too while the arena is on.
         expect(screen.getByLabelText("The Blight (Wither)")).toBeTruthy();
         fireEvent.click(screen.getByText("Hard"));
+        // Who wins, and the trophy: most damage and on, unless chosen otherwise.
+        expect(screen.getByText("How the winner is decided")).toBeTruthy();
+        fireEvent.click(screen.getByText("Final blow"));
+        const trophy = screen.getByLabelText("Trophy for the winner") as HTMLButtonElement;
+        expect(trophy.getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(trophy);
         fireEvent.click(screen.getByLabelText("The Captain (pillager)"));
         // Off the arena: the Wither cannot be drawn.
         fireEvent.click(screen.getByLabelText("Sky arena"));
@@ -384,6 +394,8 @@ describe("setting up a world boss", () => {
         expect(options.arena).toBe(false);
         expect(options.choice).toBe("random");
         expect(options.pool).not.toContain("captain");
+        expect(options.winner).toBe("final-blow");
+        expect(options.trophy).toBe(false);
     });
 
     it("explains the fight, the arena, the rules it holds and what it pays", async () => {
@@ -403,6 +415,9 @@ describe("setting up a world boss", () => {
             screen.getByText(/Mob griefing is off while The Blight \(Wither\) fights/)
         ).toBeTruthy();
         expect(screen.getByText(/multiplied by 2 on this difficulty/)).toBeTruthy();
+        expect(screen.getByText(/The most damage dealt to it wins/)).toBeTruthy();
+        expect(screen.getByText(/a Nether Star named after the boss/)).toBeTruthy();
+        expect(screen.getAllByText(/· Trophy$/).length).toBeGreaterThan(0);
     });
 });
 
@@ -420,9 +435,9 @@ describe("setting up a meteor shower", () => {
         expect(screen.getByText("Meteor shower")).toBeTruthy();
         expect(screen.getByLabelText("Made of")).toBeTruthy();
         const count = screen.getByLabelText(/^Meteors/) as HTMLInputElement;
-        expect(count.value).toBe("4");
-        fireEvent.change(count, { target: { value: "20" } });
-        expect(screen.getAllByText("At most 8").length).toBeGreaterThan(0);
+        expect(count.value).toBe("10");
+        fireEvent.change(count, { target: { value: "40" } });
+        expect(screen.getAllByText("At most 30").length).toBeGreaterThan(0);
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
     });
 });

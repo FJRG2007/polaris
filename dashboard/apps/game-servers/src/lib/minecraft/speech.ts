@@ -166,6 +166,17 @@ export function formatted(line: string, prefix = false): string {
     return `{"polaris":"${encode(each)}","text":""}`;
 }
 
+/**
+ * The game's JSON written by hand, one per language - for what `formatted`
+ * cannot write, such as a player's own score inside the line - carried the
+ * same way a formatted line in every language is, for `localize` to split.
+ */
+export function perLanguage(each: Readonly<Record<Language, string>>): string {
+    const first = each[LANGUAGES[0]];
+    if (LANGUAGES.every((language) => each[language] === first)) return first;
+    return `{"polaris":"${encode(each)}","text":""}`;
+}
+
 // ------------------------------------------------------------------ who reads what
 
 /** The tag every online player carries for the language they read. */

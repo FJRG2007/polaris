@@ -52,7 +52,7 @@ const HALF_X = 8;
 const HALF_Z = 11;
 const HEIGHT = 7;
 
-/** How far from its centre the ground under it is judged. */
+/** How far from its center the ground under it is judged. */
 export const DUEL_REACH = HALF_Z;
 
 /** How many can play: eight a side. */
@@ -70,14 +70,14 @@ export const FLOOR_BLOCKS = [
 /** Every kind of block the arena is built of. */
 export const DUEL_BLOCKS = ["minecraft:barrier", ...FLOOR_BLOCKS];
 
-export function duelBox(centre: { x: number; z: number }, floorY: number): Box {
+export function duelBox(center: { x: number; z: number }, floorY: number): Box {
     return {
-        x1: centre.x - HALF_X,
+        x1: center.x - HALF_X,
         y1: floorY,
-        z1: centre.z - HALF_Z,
-        x2: centre.x + HALF_X,
+        z1: center.z - HALF_Z,
+        x2: center.x + HALF_X,
         y2: floorY + HEIGHT,
-        z2: centre.z + HALF_Z
+        z2: center.z + HALF_Z
     };
 }
 
@@ -161,7 +161,7 @@ export function duelTeardown(): string[] {
 
 /**
  * Onto a side's team, only if they are on no team at all: a player whose server
- * put them on one of its own keeps it, and plays uncoloured rather than lose it.
+ * put them on one of its own keeps it, and plays uncolored rather than lose it.
  */
 export function joinTeam(name: string, side: number): string {
     return `execute if entity @a[name=${name},team=] run team join ${TEAMS[side]} ${name}`;

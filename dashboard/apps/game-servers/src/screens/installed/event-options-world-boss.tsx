@@ -3,7 +3,8 @@
 /**
  * A world boss's settings: how hard it is, which boss - one drawn each time
  * from a pool, or always the same - whether it fights in the sky arena, its
- * health and where it appears. And what the panel says about it.
+ * health, where it appears, how its winner is decided and whether the winner
+ * takes its trophy. And what the panel says about it.
  */
 
 import type { GameKey } from "../../../messages";
@@ -29,6 +30,11 @@ const DIFFICULTY_LABELS: Readonly<Record<catalog.BossDifficulty, GameKey<"minecr
     normal: "editor.labels.bossDifficulty.normal",
     hard: "editor.labels.bossDifficulty.hard",
     epic: "editor.labels.bossDifficulty.epic"
+};
+
+const WINNER_LABELS: Readonly<Record<catalog.BossWinner, GameKey<"minecraft">>> = {
+    damage: "editor.labels.bossWinner.damage",
+    "final-blow": "editor.labels.bossWinner.final-blow"
 };
 
 const RANDOM = "random";
@@ -65,6 +71,29 @@ export function WorldBossOptions({
                     aria-label={t("editor.bossDifficulty")}
                 />
             </Field>
+            <Field label={t("editor.bossWinner")} hint={t("editor.bossWinnerHint")}>
+                <SegmentedControl
+                    value={value.winner}
+                    onValueChange={(winner) =>
+                        onChange({ ...value, winner: winner as Value["winner"] })
+                    }
+                    options={options(t, WINNER_LABELS)}
+                    aria-label={t("editor.bossWinner")}
+                />
+            </Field>
+            <label className="flex items-center justify-between gap-3 text-sm">
+                <span>
+                    <span className="font-medium">{t("editor.bossTrophy")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                        {t("editor.bossTrophyHint")}
+                    </span>
+                </span>
+                <Switch
+                    checked={value.trophy}
+                    onChange={(trophy) => onChange({ ...value, trophy })}
+                    aria-label={t("editor.bossTrophy")}
+                />
+            </label>
             <label className="flex items-center justify-between gap-3 text-sm">
                 <span>
                     <span className="font-medium">{t("editor.skyArena")}</span>
@@ -181,6 +210,15 @@ export function worldBossFacts(t: GameText<"minecraft">, value: Value): string[]
     ];
     if (griefing.length > 0)
         facts.push(t("events.facts.bossGriefing", { bosses: names(griefing) }));
-    facts.push(t("events.facts.bossPrizes", { times: catalog.BOSS_PRIZE_TIMES[value.difficulty] }));
+    if (value.arena) facts.push(t("events.facts.bossBeam"));
+    facts.push(
+        t(
+            value.winner === "final-blow"
+                ? "events.facts.bossWinnerFinalBlow"
+                : "events.facts.bossWinnerDamage"
+        ),
+        t("events.facts.bossPrizes", { times: catalog.BOSS_PRIZE_TIMES[value.difficulty] })
+    );
+    if (value.trophy) facts.push(t("events.facts.bossTrophy"));
     return facts;
 }

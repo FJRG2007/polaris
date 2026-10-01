@@ -107,8 +107,10 @@ function podiumPrizes(t: GameText<"minecraft">, rewards: catalog.Rewards) {
 }
 
 /** Every prize of an event on one line: "1st 5 diamond + 15 levels · 2nd ... ·
- *  Everybody else: 8 ...", or "Everybody: ..." when no place pays its own. */
-function prizesLine(t: GameText<"minecraft">, rewards: catalog.Rewards): string {
+ *  Everybody else: 8 ...", or "Everybody: ..." when no place pays its own - and
+ *  a world boss's trophy, when it gives one. */
+function prizesLine(t: GameText<"minecraft">, preset: catalog.EventPreset): string {
+    const { rewards } = preset;
     const places = podiumPrizes(t, rewards);
     const parts = places.map(([place, reward]) =>
         t("events.prizes.entry", { place, reward: rewardText(t, reward, " + ") })
@@ -121,6 +123,11 @@ function prizesLine(t: GameText<"minecraft">, rewards: catalog.Rewards): string 
                 : t("events.prizes.everybody", { reward })
         );
     }
+    if (
+        preset.kind === "world-boss" &&
+        (preset.options as catalog.EventOptions<"world-boss">).trophy
+    )
+        parts.push(t("events.prizes.trophy"));
     return parts.join(" · ") || t("events.prizes.none");
 }
 
@@ -162,15 +169,15 @@ function newId(): string {
 function PresetDetail({ preset }: { preset: catalog.EventPreset }) {
     const t = useGameText("minecraft");
     const length =
-        preset.kind === "trivia"
+        preset.kind === "trivia" || preset.kind === "gathering"
             ? t("events.rounds", {
-                  count: (preset.options as catalog.EventOptions<"trivia">).rounds
+                  count: (preset.options as catalog.EventOptions<"trivia" | "gathering">).rounds
               })
             : t("events.minutes", { count: preset.minutes });
     const detail = [
         kindLabel(t, preset.kind),
         length,
-        catalog.KIND_INFO[preset.kind].competitive ? prizesLine(t, preset.rewards) : null
+        catalog.KIND_INFO[preset.kind].competitive ? prizesLine(t, preset) : null
     ]
         .filter(Boolean)
         .join(" - ");
@@ -275,6 +282,10 @@ function EventExplained({
     if (preset.kind === "gathering") {
         const options = preset.options as catalog.EventOptions<"gathering">;
         facts.push(
+            t("events.facts.gatheringRounds", {
+                rounds: options.rounds,
+                minutes: options.roundMinutes
+            }),
             options.material === "random"
                 ? t("events.facts.materialRandom")
                 : t("events.facts.material", {
@@ -305,12 +316,23 @@ function EventExplained({
             waves: options.waves,
             minutes: catalog.runMinutes(preset)
         });
-        facts.push(t("events.facts.wavesPoint"), t("events.facts.keepInventory"));
+        facts.push(
+            t("events.facts.wavesScaling"),
+            t("events.facts.wavesGear"),
+            t("events.facts.wavesPoint"),
+            t("events.facts.keepInventory")
+        );
     }
     if (preset.kind === "meteor-shower") {
         const options = preset.options as catalog.EventOptions<"meteor-shower">;
         facts.push(
-            t("events.facts.meteors", { meteors: options.meteors, size: options.size }),
+            t("events.facts.meteors", {
+                meteors: options.meteors,
+                size: options.size,
+                seconds: Math.round(
+                    catalog.meteorGap(catalog.runMinutes(preset) * 60_000, options.meteors) / 1000
+                )
+            }),
             t("events.facts.meteorsLand"),
             t("events.facts.pickaxes")
         );

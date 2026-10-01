@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import * as boss from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/boss";
 import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/catalog";
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
+import * as written from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/boss-messages";
 
 type Options = catalog.EventOptions<"world-boss">;
 
@@ -115,10 +116,10 @@ describe("its phases", () => {
         expect(boss.phaseFor(330, 1000)).toBe(3);
     });
 
-    it("colour the bar", () => {
-        expect(boss.barColourLine(1)).toBe("bossbar set polaris:event color yellow");
-        expect(boss.barColourLine(2)).toBe("bossbar set polaris:event color purple");
-        expect(boss.barColourLine(3)).toBe("bossbar set polaris:event color red");
+    it("color the bar", () => {
+        expect(boss.barColorLine(1)).toBe("bossbar set polaris:event color yellow");
+        expect(boss.barColorLine(2)).toBe("bossbar set polaris:event color purple");
+        expect(boss.barColorLine(3)).toBe("bossbar set polaris:event color red");
     });
 
     it("bring more minions for harder levels and more fighters, never past ten", () => {
@@ -490,7 +491,7 @@ describe("the sky arena", () => {
             expect(Math.abs(spot.z - (origin.z + 0.5))).toBeLessThan(boss.ARENA_HALF);
             expect(boss.insideArena(origin, spot)).toBe(true);
         }
-        expect(boss.insideArena(origin, boss.arenaCentre(origin))).toBe(true);
+        expect(boss.insideArena(origin, boss.arenaCenter(origin))).toBe(true);
     });
 
     it("catches a fall under its floor, and lets go of whoever is back on the ground", () => {
@@ -532,20 +533,45 @@ describe("the sky arena", () => {
     });
 });
 
+const bossScaled = (rewards: catalog.Rewards, difficulty: catalog.BossDifficulty) =>
+    boss.scaledRewards(rewards, difficulty);
+
 describe("the prizes", () => {
     it("are multiplied for the difficulty", () => {
-        const scaled = boss.scaledRewards(catalog.DEFAULT_REWARDS, "epic");
+        const prizes = catalog.DEFAULT_PRIZES["world-boss"];
+        const scaled = boss.scaledRewards(prizes, "epic");
         expect(scaled.first).toEqual({
-            items: [{ id: "minecraft:diamond", count: 10 }],
-            levels: 30
+            items: [
+                { id: "minecraft:diamond", count: 6 },
+                { id: "minecraft:golden_apple", count: 4 }
+            ],
+            levels: 16
         });
-        expect(boss.scaledRewards(catalog.DEFAULT_REWARDS, "hard").third).toEqual({
+        expect(boss.scaledRewards(prizes, "hard").third).toEqual({
             items: [{ id: "minecraft:diamond", count: 2 }],
-            levels: 8
+            levels: 5
         });
-        expect(boss.scaledRewards(catalog.DEFAULT_REWARDS, "normal")).toEqual(
-            catalog.DEFAULT_REWARDS
+        expect(boss.scaledRewards(prizes, "normal")).toEqual(prizes);
+    });
+
+    it("pay a world boss on its default difficulty more than any other kind's first place", () => {
+        const worth = (reward: catalog.Reward) =>
+            reward.items.reduce(
+                (sum, item) =>
+                    sum + (item.id === "minecraft:diamond" ? item.count * 10 : item.count),
+                0
+            ) + reward.levels;
+        const boss = catalog.newPreset("world-boss", "b");
+        const epic = worth(
+            bossScaled(
+                boss.rewards,
+                (boss.options as catalog.EventOptions<"world-boss">).difficulty
+            ).first
         );
+        for (const kind of catalog.EVENT_KINDS) {
+            if (kind === "world-boss") continue;
+            expect(worth(catalog.newPreset(kind, kind).rewards.first)).toBeLessThan(epic);
+        }
     });
 
     it("name the trophy the way each version reads a name, its own spelling first", () => {
@@ -589,5 +615,135 @@ describe("the end", () => {
             "execute as @e[tag=pe_boss] at @s run tp @s ~ -1000 ~",
             "kill @e[tag=pe_boss]"
         ]);
+    });
+});
+describe("what the fight's creatures hold", () => {
+    it("arms every boss that fights with a weapon, and takes the weapon's damage off its own", () => {
+        expect(boss.bossWeapon("wither-skeleton")).toBe("minecraft:stone_sword");
+        expect(boss.bossWeapon("vindicator")).toBe("minecraft:iron_axe");
+        expect(boss.bossWeapon("captain")).toBe("minecraft:crossbow");
+        expect(boss.bossWeapon("ravager")).toBeNull();
+        expect(boss.bossEquipLines("wither-skeleton")).toContain(
+            "item replace entity @e[tag=pe_boss,limit=1] weapon.mainhand with minecraft:stone_sword"
+        );
+        // What it deals is still the difficulty's: a stone sword adds 4, taken off.
+        expect(boss.bossAttack("wither-skeleton", "epic")).toBe(boss.DIFFICULTY.epic.attack - 4);
+        expect(boss.bossAttack("husk", "epic")).toBe(boss.DIFFICULTY.epic.attack);
+        expect(boss.attributeLines("wither-skeleton", "normal", 500, true)).toContain(
+            `attribute @e[tag=pe_boss,limit=1] minecraft:attack_damage base set ${boss.DIFFICULTY.normal.attack - 4}`
+        );
+    });
+
+    it("arms the minions of every boss, a wither skeleton's with its stone sword", () => {
+        const withered = boss.minionLines("wither", 3, true);
+        expect(withered).toContain(
+            "item replace entity @e[tag=pe_bnew,type=minecraft:wither_skeleton] weapon.mainhand with minecraft:stone_sword"
+        );
+        const skeletons = boss.minionLines("wither-skeleton", 3, true);
+        expect(skeletons).toContain(
+            "item replace entity @e[tag=pe_bnew,type=minecraft:skeleton] weapon.mainhand with minecraft:bow"
+        );
+        // Armed before the tag that finds them comes off.
+        const armed = withered.findIndex((line) => line.includes("weapon.mainhand"));
+        expect(armed).toBeLessThan(withered.indexOf("tag @e[tag=pe_bnew] remove pe_bnew"));
+    });
+
+    it("hands the vexes of a burst on the land their iron swords", () => {
+        const planned = boss.abilityLines("burst", {
+            arena: false,
+            difficulty: "epic",
+            damage: true,
+            target: null,
+            warning: "Vexes!",
+            markers: true
+        });
+        const summons = planned.act.filter((line) => line.includes("summon minecraft:vex"));
+        expect(summons).toHaveLength(3);
+        for (const line of summons) expect(line).toContain('"pe_bnew"');
+        expect(planned.act).toContain(
+            "item replace entity @e[tag=pe_bnew,type=minecraft:vex] weapon.mainhand with minecraft:iron_sword"
+        );
+        expect(planned.act).toContain("tag @e[tag=pe_bnew] remove pe_bnew");
+    });
+});
+
+describe("finding the way up", () => {
+    it("draws a tall column of light from the ground to the arena, and a glow where to step in", () => {
+        const [column, foot] = boss.liftBeam({ x: 10, y: 64, z: -5 });
+        const half = (boss.ARENA_HEIGHT + boss.ARENA_ROOM) / 2;
+        expect(column).toBe(
+            `execute in minecraft:overworld run particle minecraft:end_rod 10.5 ${64 + half} -4.5 0.15 ${half} 0.15 0.005 240 force`
+        );
+        expect(foot).toContain("particle minecraft:glow 10.5 65 -4.5");
+    });
+
+    it("shows each fighter their own damage, read by the game itself, in their language", () => {
+        const line = boss.damageBarLine(true, { en: "Your damage: ", es: "Tu daño: " });
+        expect(line).toMatch(
+            /^execute as @e\[tag=pe_boss,limit=1\] at @s as @a\[tag=pe_in,gamemode=!creative,gamemode=!spectator\] run title @s actionbar /
+        );
+        expect(line).toContain('{"polaris":"');
+    });
+});
+
+describe("who wins a boss", () => {
+    const fought = (
+        options: Partial<catalog.EventOptions<"world-boss">>,
+        decidedBy: string | null
+    ) =>
+        ({
+            preset: {
+                ...catalog.newPreset("world-boss", "b"),
+                options: { ...catalog.newPreset("world-boss", "b").options, ...options }
+            },
+            decidedBy
+        }) as unknown as boss.Decided;
+    const scores = new Map([
+        ["Ana", 120],
+        ["Ben", 300],
+        ["Cai", 40],
+        ["Dee", 5]
+    ]);
+
+    it("goes by the most damage by default, the final blow only taking part", () => {
+        const run = fought({}, "Cai");
+        const placed = boss.podiumOf(run, scores, new Set(), 20);
+        expect(placed.map((one) => one.name)).toEqual(["Ben", "Ana", "Cai"]);
+        expect(boss.trophyWinner(run, placed)).toBe("Ben");
+    });
+
+    it("puts the final blow first when that decides it, the rest by damage", () => {
+        const run = fought({ winner: "final-blow" }, "Cai");
+        const placed = boss.podiumOf(run, scores, new Set(), 20);
+        expect(placed).toEqual([
+            { place: 1, name: "Cai", score: 40 },
+            { place: 2, name: "Ben", score: 300 },
+            { place: 3, name: "Ana", score: 120 }
+        ]);
+        expect(boss.trophyWinner(run, placed)).toBe("Cai");
+    });
+
+    it("gives no trophy when it is switched off, or when the boss got away", () => {
+        const off = fought({ trophy: false }, "Cai");
+        expect(boss.trophyWinner(off, boss.podiumOf(off, scores, new Set(), 20))).toBeNull();
+        const away = fought({}, null);
+        expect(boss.trophyWinner(away, [{ place: 1, name: "Ben", score: 300 }])).toBeNull();
+    });
+
+    it("lists everybody's damage at the end, most first, leaving out whoever was disqualified", () => {
+        const ranked = boss.ranking(scores, new Set(["ana"]), 10);
+        expect(ranked).toEqual([
+            { name: "Ben", damage: 300 },
+            { name: "Cai", damage: 40 },
+            { name: "Dee", damage: 5 }
+        ]);
+        const bare = written.damageRanking(ranked, "en").replace(/&[0-9a-fk-or]/g, "");
+        expect(bare).toBe("Damage dealt: 1. Ben 300, 2. Cai 40, 3. Dee 5");
+        expect(boss.ranking(new Map([["Ana", 0]]), new Set(), 10)).toEqual([]);
+    });
+
+    it("names the trophy for how it was won", () => {
+        expect(written.trophyLore("epic", "damage", "en")).toBe("Most damage - Epic");
+        expect(written.trophyLore("epic", "final-blow", "es")).toBe("Golpe final - Épico");
     });
 });

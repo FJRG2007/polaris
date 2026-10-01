@@ -32,7 +32,9 @@ const chestSchema = z.object({
     y: z.number(),
     z: z.number(),
     opened: z.boolean().default(false),
-    by: z.string().nullable().default(null)
+    by: z.string().nullable().default(null),
+    /** The small plant it took the place of, put back when it is taken away unopened. */
+    was: z.string().nullable().default(null)
 });
 export type HiddenChest = z.infer<typeof chestSchema>;
 
@@ -154,9 +156,12 @@ export const runSchema = z.object({
     /** Treasure hunt: where the players were when the chests were hidden, which
      *  the first clue is told from. */
     origin: z.object({ x: z.number(), z: z.number() }).nullable().default(null),
-    /** Gathering: the material this one is for, drawn when it was set off. */
+    /** Gathering: the material of the round being played, drawn as it began;
+     *  its number is `round` (from 0), and it ends at `roundEndsAt`. */
     material: z.string().nullable().default(null),
-    /** Horde defence: the waves each player was at the point for when they
+    /** Gathering: every round's material so far, so no two rounds ask for the same. */
+    materials: z.array(z.string()).default([]),
+    /** Horde defense: the waves each player was at the point for when they
      *  ended, by name. The wave itself is `round` (from 0), open until
      *  `roundEndsAt`, and the last one closed at `closedAt`. */
     survived: z.record(z.number()).default({}),

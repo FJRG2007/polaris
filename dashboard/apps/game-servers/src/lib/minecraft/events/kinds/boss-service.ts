@@ -46,6 +46,10 @@ const STUCK_TICKS = 3;
 const HEAL_SHARE = 0.02;
 /** Between the warning of an attack and the attack. */
 const WARNING_MS = 1_000;
+/** How often everybody not up in the arena yet is told again where the beam is. */
+const REMIND_EVERY_MS = 15_000;
+/** How many fighters the damage ranking at the end names. */
+const RANKED = 10;
 
 const lower = (name: string) => name.toLowerCase();
 
@@ -74,6 +78,8 @@ interface Memory {
     still: number;
     alone: boolean;
     waits: number;
+    /** When everybody not up yet was last told where the beam is. */
+    remindedAt: number;
 }
 
 const memories = new Map<string, Memory>();
@@ -89,7 +95,8 @@ function memoryOf(runId: string): Memory {
             lastAny: 0,
             still: 0,
             alone: false,
-            waits: 0
+            waits: 0,
+            remindedAt: 0
         };
         memories.set(runId, memory);
     }
@@ -217,7 +224,14 @@ export async function tick(ctx: KindContext, lines: string[]): Promise<string | 
             await creditUnseen(server, memory.health === null ? 0 : memory.health - health, null);
             memory.health = health;
         }
-        lines.push(commands.BOSS_KILLS_RESET);
+        lines.push(
+            commands.BOSS_KILLS_RESET,
+            boss.damageBarLine(state.arena, {
+                en: written.yourDamage("en"),
+                es: written.yourDamage("es")
+            })
+        );
+        await guide(ctx, memory, lines);
         if (at && health !== null) await fight(ctx, memory, { at, previous, health }, lines);
         return null;
     }
@@ -368,7 +382,7 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
         await ctx.persist();
         if (!whole) throw new stageService.CalledOff("Its arena could not be built whole");
     }
-    if (!(await summon(ctx, memory, boss.arenaCentre(origin), []))) {
+    if (!(await summon(ctx, memory, boss.arenaCenter(origin), []))) {
         throw new stageService.CalledOff("The boss could not be summoned in its arena");
     }
     const lift = stateOf(ctx).lift ?? { x: origin.x, y: origin.y - boss.ARENA_HEIGHT, z: origin.z };
@@ -471,7 +485,7 @@ async function summon(
             : []),
         commands.CLEAR_MARK,
         `bossbar set ${commands.BAR} max ${split.health}`,
-        boss.barColourLine(1)
+        boss.barColorLine(1)
     ]);
     // Its first look sets where its health is counted from, as it always has.
     memory.health = null;
@@ -497,8 +511,63 @@ async function announce(ctx: KindContext, where: stored.Point, arena: boolean): 
                     ? say.inArena(name, where.x, where.y, where.z, language)
                     : messages.bossAppeared(name, where.x, where.y, where.z, language))
         ),
+        // On everybody's screen too, where the beam up is: a line in the chat
+        // scrolls away, and nobody knew to walk into the light.
+        ...(arena
+            ? commands.titleCommands(
+                  `&c${name}`,
+                  say.beamSubtitle(where.x, where.y, where.z, language)
+              )
+            : []),
         commands.sound(commands.SOUNDS.boss)
     ]);
+    memoryOf(ctx.run.id).remindedAt = ctx.now;
+}
+
+/**
+ * Everybody in the Overworld who is not fighting yet shown the way: in the
+ * arena's case the beam up - how far, and an arrow from where they look - with
+ * the beam's place said again in the chat every `REMIND_EVERY_MS`; on the
+ * land, the boss itself, for whoever is out of its reach.
+ */
+async function guide(ctx: KindContext, memory: Memory, lines: string[]): Promise<void> {
+    const state = stateOf(ctx);
+    const target = state.arena ? state.lift : memory.at;
+    if (!target) return;
+    const players = commands
+        .readWhere(await ctx.server.say([commands.IN_OVERWORLD]))
+        .filter((one) => boss.isPlayer(one.name));
+    const up = new Set(stageOf(ctx).saved.map((one) => lower(one.name)));
+    const away = players.filter((one) =>
+        state.arena
+            ? !up.has(lower(one.name))
+            : Math.hypot(one.x - target.x, one.y - target.y, one.z - target.z) >
+              commands.BOSS_FIGHT_REACH
+    );
+    if (away.length === 0) return;
+    const facing = commands.readFacing(await ctx.server.say([commands.FACING]));
+    const name = say.bossName(state.kind, ctx.home);
+    const center = { x: target.x + 0.5, z: target.z + 0.5 };
+    for (const one of away) {
+        const meters = Math.round(Math.hypot(one.x - center.x, one.z - center.z));
+        const arrow = commands.arrowTo(one, facing.get(one.name)?.yaw ?? 0, center);
+        lines.push(
+            commands.actionbarFor(
+                one.name,
+                state.arena
+                    ? say.beamGuide(meters, arrow, speech.EVERY)
+                    : say.bossGuide(name, meters, arrow)
+            )
+        );
+    }
+    if (state.arena && ctx.now - memory.remindedAt >= REMIND_EVERY_MS) {
+        memory.remindedAt = ctx.now;
+        const line = commands.text(
+            messages.tag(speech.EVERY) +
+                say.beamReminder(target.x, target.y, target.z, speech.EVERY)
+        );
+        for (const one of away) lines.push(`tellraw ${one.name} ${line}`);
+    }
 }
 
 // ------------------------------------------------------------------ the fight
@@ -576,7 +645,7 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
                     Math.max(1, state.fighters.length)
                 );
                 lines.push(
-                    boss.barColourLine(2),
+                    boss.barColorLine(2),
                     ...boss.titleToFighters(
                         state.arena,
                         say.phaseTitle(2, language),
@@ -588,7 +657,7 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
                 );
             } else {
                 lines.push(
-                    boss.barColourLine(3),
+                    boss.barColorLine(3),
                     ...boss.titleToFighters(
                         state.arena,
                         say.phaseTitle(3, language),
@@ -639,8 +708,8 @@ async function fight(ctx: KindContext, memory: Memory, seen: Seen, lines: string
     const nearest = distances[0] ?? null;
     const farthest = distances[distances.length - 1] ?? null;
     if (origin && !boss.insideArena(origin, seen.at)) {
-        const centre = boss.arenaCentre(origin);
-        lines.push(boss.homeLine(centre));
+        const center = boss.arenaCenter(origin);
+        lines.push(boss.homeLine(center));
     } else if (!nearest) {
         // Every fighter has gone: it heals, slowly, and keeps to its lair.
         if (health < state.max) {
@@ -727,7 +796,7 @@ async function arenaTick(
     const state = stateOf(ctx);
     const lift = state.lift;
     if (lift) {
-        lines.push(boss.liftBeam(lift));
+        lines.push(...boss.liftBeam(lift));
         const stepping = commands
             .readWhere(await server.say([boss.inLift(lift)]))
             .map((one) => one.name);
@@ -830,37 +899,50 @@ export function mobsGone(): string[] {
     return boss.bossCleanup();
 }
 
+/** Who wins and who takes the trophy, by the rule the event was set to (`boss.ts`). */
+export const podiumOf = boss.podiumOf;
+export const trophyWinner = boss.trophyWinner;
+
+/** Everybody's damage at the end, most first, as one line; null when nobody dealt any. */
+export function rankingLine(
+    scores: ReadonlyMap<string, number>,
+    disqualified: ReadonlySet<string>,
+    language: speech.Speech
+): string | null {
+    const entries = boss.ranking(scores, disqualified, RANKED);
+    return entries.length > 0 ? say.damageRanking(entries, language) : null;
+}
+
 /**
- * The final blow's trophy handed to whoever landed it: counted on them before
- * and after, like every prize, so what fell at their feet is known. Answers
- * what reached them, or null when nothing was given.
+ * The trophy handed to its winner (`trophyWinner`): counted on them before and
+ * after, like every prize, so what fell at their feet is known. Answers what
+ * reached them, or null when nothing was given.
  */
 export async function awardTrophy(
     server: ServerContainer,
     run: stored.EventRun,
     home: catalog.Language,
-    spelling: boss.NameSpelling
+    spelling: boss.NameSpelling,
+    to: string
 ): Promise<delivery.DeliveredItem | null> {
-    const killer = run.decidedBy;
-    if (!run.boss || !killer || !boss.isPlayer(killer)) return null;
+    if (!run.boss || !boss.isPlayer(to)) return null;
+    const winner = optionsOf(run).winner;
     const args = boss.trophyArguments(
         written.trophyName(run.boss.kind, home),
-        written.trophyLore(run.boss.difficulty, home),
+        written.trophyLore(run.boss.difficulty, winner, home),
         spelling
     );
-    const before = delivery.readCount(
-        await server.say([delivery.countLine(killer, boss.TROPHY_ITEM)])
-    );
+    const before = delivery.readCount(await server.say([delivery.countLine(to, boss.TROPHY_ITEM)]));
     for (const argument of args) {
-        const answer = await server.say([`give ${killer} ${argument} 1`]);
+        const answer = await server.say([`give ${to} ${argument} 1`]);
         if (!commands.gaveIt(answer)) continue;
         const after = delivery.readCount(
-            await server.say([delivery.countLine(killer, boss.TROPHY_ITEM)])
+            await server.say([delivery.countLine(to, boss.TROPHY_ITEM)])
         );
         const kept =
             before !== null && after !== null ? Math.min(1, Math.max(0, after - before)) : 1;
         await server.sayAll([
-            `tellraw ${killer} ${commands.text(messages.tag(speech.EVERY) + say.trophyGiven(speech.EVERY))}`
+            `tellraw ${to} ${commands.text(messages.tag(speech.EVERY) + say.trophyGiven(winner, speech.EVERY))}`
         ]);
         return {
             id: boss.TROPHY_ITEM,

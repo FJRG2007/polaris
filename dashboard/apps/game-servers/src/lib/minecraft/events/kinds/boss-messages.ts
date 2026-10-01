@@ -1,12 +1,12 @@
 /**
  * What the players read during a world boss fight, in each reader's language.
  *
- * Written with `&` colour codes, never braces, like the rest of the events'
+ * Written with `&` color codes, never braces, like the rest of the events'
  * lines (`../messages.ts`).
  */
 
 import type { Ability } from "./boss";
-import type { BossDifficulty, BossKind, Language } from "../catalog";
+import type { BossDifficulty, BossKind, BossWinner, Language } from "../catalog";
 
 type Text = Readonly<Record<Language, string>>;
 
@@ -42,8 +42,51 @@ export function barTitle(kind: BossKind, difficulty: BossDifficulty, language: L
 
 export function inArena(boss: string, x: number, y: number, z: number, language: Language): string {
     return language === "es"
-        ? `&c${boss}&f espera en una arena en el cielo sobre &eX ${x} Y ${y} Z ${z}&f. Entra en el haz de luz para subir.`
-        : `&c${boss}&f awaits in a sky arena over &eX ${x} Y ${y} Z ${z}&f. Step into the beam of light to go up.`;
+        ? `&c${boss}&f espera en una arena en el cielo sobre &eX ${x} Y ${y} Z ${z}&f. Camina hasta el haz de luz y entra en él para subir.`
+        : `&c${boss}&f awaits in a sky arena over &eX ${x} Y ${y} Z ${z}&f. Walk into the beam of light to go up.`;
+}
+
+/** The subtitle when the arena is ready, under the boss's name: where the beam up is. */
+export function beamSubtitle(x: number, y: number, z: number, language: Language): string {
+    return language === "es"
+        ? `&eEntra en el haz de luz: &fX ${x} Y ${y} Z ${z}`
+        : `&eWalk into the beam of light: &fX ${x} Y ${y} Z ${z}`;
+}
+
+/** Above the hotbar of everybody not up yet: how far the beam is, and an arrow
+ *  pointing at it from where they look. */
+export function beamGuide(meters: number, arrow: string, language: Language): string {
+    return language === "es"
+        ? `&eHaz de luz hacia el jefe: &f${meters} m &e${arrow}`
+        : `&eBeam of light to the boss: &f${meters} m &e${arrow}`;
+}
+
+/** The same on the land, in any language: how far the boss is, and which way. */
+export function bossGuide(boss: string, meters: number, arrow: string): string {
+    return `&c${boss}&e: &f${meters} m &e${arrow}`;
+}
+
+/** Said again every few seconds to everybody not up yet. */
+export function beamReminder(x: number, y: number, z: number, language: Language): string {
+    return language === "es"
+        ? `&eLa pelea es en el cielo. Entra en el haz de luz de &fX ${x} Y ${y} Z ${z}&e para subir.`
+        : `&eThe fight is up in the sky. Walk into the beam of light at &fX ${x} Y ${y} Z ${z}&e to go up.`;
+}
+
+/** Above a fighter's hotbar: the damage they have dealt so far, before the score. */
+export function yourDamage(language: Language): string {
+    return language === "es" ? "Tu daño: " : "Your damage: ";
+}
+
+/** At the end: everybody's damage, most first. */
+export function damageRanking(
+    entries: readonly { name: string; damage: number }[],
+    language: Language
+): string {
+    const list = entries
+        .map((one, index) => `&f${index + 1}. &b${one.name} &f${one.damage}`)
+        .join("&7, ");
+    return language === "es" ? `&7Daño hecho: ${list}` : `&7Damage dealt: ${list}`;
 }
 
 export function enteredTitle(language: Language): string {
@@ -117,14 +160,26 @@ export function trophyName(kind: BossKind, language: Language): string {
     return language === "es" ? `Trofeo: ${NAMES[kind].es}` : `Trophy: ${NAMES[kind].en}`;
 }
 
-export function trophyLore(difficulty: BossDifficulty, language: Language): string {
+export function trophyLore(
+    difficulty: BossDifficulty,
+    winner: BossWinner,
+    language: Language
+): string {
+    if (winner === "final-blow")
+        return language === "es"
+            ? `Golpe final - ${DIFFICULTIES[difficulty].es}`
+            : `Final blow - ${DIFFICULTIES[difficulty].en}`;
     return language === "es"
-        ? `Golpe final - ${DIFFICULTIES[difficulty].es}`
-        : `Final blow - ${DIFFICULTIES[difficulty].en}`;
+        ? `Más daño - ${DIFFICULTIES[difficulty].es}`
+        : `Most damage - ${DIFFICULTIES[difficulty].en}`;
 }
 
-export function trophyGiven(language: Language): string {
+export function trophyGiven(winner: BossWinner, language: Language): string {
+    if (winner === "final-blow")
+        return language === "es"
+            ? "&6Por el golpe final te llevas su trofeo."
+            : "&6For the final blow you take its trophy.";
     return language === "es"
-        ? "&6Por el golpe final te llevas su trofeo."
-        : "&6For the final blow you take its trophy.";
+        ? "&6Por hacerle más daño que nadie te llevas su trofeo."
+        : "&6For dealing it the most damage you take its trophy.";
 }

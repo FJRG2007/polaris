@@ -1,14 +1,20 @@
 /**
  * What the players read during an event, in the language the server chose.
  *
- * Written with `&` colour codes, which the announcement writer turns into the
+ * Written with `&` color codes, which the announcement writer turns into the
  * game's own formatting (`javaComponent`). No braces anywhere: `{player}` and its
  * kind are game variables to that writer, and a line must never ask for one by
  * accident.
  */
 
 import type { Heading } from "./commands";
-import { KIND_NAMES, type EventKind, type GatherMaterial, type Language, type RareCatch } from "./catalog";
+import {
+    KIND_NAMES,
+    type EventKind,
+    type GatherMaterial,
+    type Language,
+    type RareCatch
+} from "./catalog";
 
 type Text = Readonly<Record<Language, string>>;
 
@@ -21,7 +27,7 @@ const pick = (text: Text, language: Language): string => text[language];
  * a win or a thing done in green; what to do next, a countdown or a warning in
  * yellow; the rest in gray. The values a player looks for - names, numbers,
  * places, the event's name, what was won - stand out in bold aqua whatever the
- * line's colour. Shared with the challenges (`challenges/messages`).
+ * line's color. Shared with the challenges (`challenges/messages`).
  */
 export const PALETTE = {
     tag: "&6&l",
@@ -33,14 +39,13 @@ export const PALETTE = {
     mark: "&b&l"
 } as const;
 
-/** A value picked out of a line, then the line's own colour again (a colour code
+/** A value picked out of a line, then the line's own color again (a color code
  *  also ends the bold, as the game reads it). */
 export function mark(value: string | number, back: string): string {
     return `${PALETTE.mark}${value}${back}`;
 }
 
 const { bad: BAD, reason: REASON, good: GOOD, warn: WARN, info: INFO } = PALETTE;
-
 
 /** What to do, in one line, said when the countdown starts and again at the start. */
 const RULES: Readonly<Record<EventKind, Text>> = {
@@ -89,8 +94,8 @@ const RULES: Readonly<Record<EventKind, Text>> = {
         es: "Hay cofres escondidos a tu alrededor. Sigue las pistas; gana quien abra más."
     },
     gathering: {
-        en: "Gather as much of the material announced as you can. Only what you gather now counts.",
-        es: "Consigue todo lo que puedas del material anunciado. Solo cuenta lo que recojas ahora."
+        en: "Each round names a material: gather as much as you can. Rarer ones score more.",
+        es: "Cada ronda pide un material: consigue todo lo que puedas. Los raros puntúan más."
     },
     "rare-catch": {
         en: "Fish for the treasure announced. The first to catch it wins, and keeps it.",
@@ -137,11 +142,40 @@ export function kindName(kind: EventKind, language: Language): string {
     return pick(KIND_NAMES[kind], language);
 }
 
-export function rules(kind: EventKind, language: Language, race = false): string {
-    if (kind === "explorer" && race) {
-        return language === "es"
+/** What decides an event and how it is played, when an option of it changes that. */
+export interface RulesVariant {
+    /** An explorer race rather than a distance. */
+    readonly race?: boolean;
+    /** A world boss in the sky arena, reached through a beam of light. */
+    readonly arena?: boolean;
+    /** A world boss won by the final blow rather than the most damage. */
+    readonly finalBlow?: boolean;
+    /** A horde defense won by damage dealt rather than kills. */
+    readonly byDamage?: boolean;
+}
+
+export function rules(kind: EventKind, language: Language, variant: RulesVariant = {}): string {
+    const es = language === "es";
+    if (kind === "explorer" && variant.race) {
+        return es
             ? "Llega el primero a las coordenadas anunciadas."
             : "Be the first to reach the coordinates announced.";
+    }
+    if (kind === "world-boss") {
+        const goal = variant.finalBlow
+            ? es
+                ? "Derribad al jefe entre todos. Gana quien dé el golpe final."
+                : "Bring the boss down together. The final blow wins."
+            : es
+              ? "Derribad al jefe entre todos. Gana quien más daño le haga."
+              : "Bring the boss down together. The most damage wins.";
+        if (!variant.arena) return goal;
+        return `${goal} ${es ? "Camina hasta el haz de luz para subir a la arena." : "Walk into the beam of light to go up to the arena."}`;
+    }
+    if (kind === "waves" && variant.byDamage) {
+        return es
+            ? "Defiende el punto de cada oleada. Gana quien más daño haga. Si mueres no pierdes nada."
+            : "Hold the point against every wave. The most damage wins. Nothing is lost if you die.";
     }
     return pick(RULES[kind], language);
 }
@@ -245,7 +279,8 @@ export function endedTitle(language: Language): string {
 export function cancelledLine(name: string, language: Language, reason?: string): string {
     const why = reason ? cancelReason(reason, language) : null;
     const event = mark(name, BAD);
-    if (language === "es") return `${BAD}${event} se ha cancelado${why ? `: ${REASON}${why}` : "."}`;
+    if (language === "es")
+        return `${BAD}${event} se ha cancelado${why ? `: ${REASON}${why}` : "."}`;
     return `${BAD}${event} was called off${why ? `: ${REASON}${why}` : "."}`;
 }
 
@@ -467,10 +502,10 @@ const HEADING_ES: Readonly<Record<Heading, string>> = {
 };
 
 /** How far the circle is from a player, and which way. */
-export function hillGuide(metres: number, heading: Heading, language: Language): string {
+export function hillGuide(meters: number, heading: Heading, language: Language): string {
     return language === "es"
-        ? `&eCírculo: &f${metres} m &eal &f${HEADING_ES[heading]}`
-        : `&eCircle: &f${metres} m &e${heading}`;
+        ? `&eCírculo: &f${meters} m &eal &f${HEADING_ES[heading]}`
+        : `&eCircle: &f${meters} m &e${heading}`;
 }
 
 export function hillInside(language: Language): string {
@@ -483,7 +518,7 @@ export function happyHourOver(language: Language): string {
     return language === "es" ? `${INFO}La hora feliz ha terminado.` : `${INFO}Happy hour is over.`;
 }
 
-// ------------------------------------------------------------------ horde defence
+// ------------------------------------------------------------------ horde defense
 
 export function wavesPointAt(x: number, y: number, z: number, language: Language): string {
     return language === "es"
@@ -496,10 +531,10 @@ export function wavesPointTitle(language: Language): string {
 }
 
 /** How far the point is from a player, and which way. */
-export function wavesGuide(metres: number, heading: Heading, language: Language): string {
+export function wavesGuide(meters: number, heading: Heading, language: Language): string {
     return language === "es"
-        ? `&ePunto a defender: &f${metres} m &eal &f${HEADING_ES[heading]}`
-        : `&ePoint to hold: &f${metres} m &e${heading}`;
+        ? `&ePunto a defender: &f${meters} m &eal &f${HEADING_ES[heading]}`
+        : `&ePoint to hold: &f${meters} m &e${heading}`;
 }
 
 export function waveTitle(wave: number, waves: number, language: Language): string {
@@ -560,7 +595,7 @@ export function waveHeldBy(count: number, language: Language): string {
         : `&f${count} ${count === 1 ? "defender" : "defenders"} at the point`;
 }
 
-/** At the end: how far the defence got. */
+/** At the end: how far the defense got. */
 export function wavesHeld(fought: number, waves: number, language: Language): string {
     return language === "es"
         ? `${WARN}Se han defendido ${mark(fought, WARN)} de ${mark(waves, WARN)} oleadas.`
@@ -587,14 +622,14 @@ export function meteorAt(
 
 /** How far the latest meteor still unmined is from a player, and which way. */
 export function meteorGuide(
-    metres: number,
+    meters: number,
     heading: Heading,
     left: number,
     language: Language
 ): string {
     return language === "es"
-        ? `&6Meteorito: &f${metres} m &eal &f${HEADING_ES[heading]}&e, quedan &f${left}&e bloques`
-        : `&6Meteor: &f${metres} m &e${heading}&e, &f${left}&e blocks left`;
+        ? `&6Meteorito: &f${meters} m &eal &f${HEADING_ES[heading]}&e, quedan &f${left}&e bloques`
+        : `&6Meteor: &f${meters} m &e${heading}&e, &f${left}&e blocks left`;
 }
 
 export function meteorWaiting(language: Language): string {
@@ -623,50 +658,21 @@ export function bossName(boss: string, language: Language): string {
 // ------------------------------------------------------------------ treasure hunt
 
 export function huntHiding(language: Language): string {
-    return language === "es" ? `${INFO}Escondiendo los tesoros...` : `${INFO}Hiding the treasures...`;
+    return language === "es"
+        ? `${INFO}Escondiendo los tesoros...`
+        : `${INFO}Hiding the treasures...`;
 }
 
-/** The first clue: how far and which way from where everybody was. */
-export function huntClueFar(
-    number: number,
-    metres: number,
-    heading: Heading,
-    from: { x: number; z: number },
-    language: Language
-): string {
-    return language === "es"
-        ? `${WARN}Tesoro ${mark(number, WARN)}: a unos ${mark(`${metres} m`, WARN)} al ${HEADING_ES[heading]} de X ${from.x}, Z ${from.z}.`
-        : `${WARN}Treasure ${mark(number, WARN)}: about ${mark(`${metres} m`, WARN)} ${heading} of X ${from.x}, Z ${from.z}.`;
-}
-
-export function huntClueArea(
-    number: number,
-    x: number,
-    z: number,
-    within: number,
-    language: Language
-): string {
-    return language === "es"
-        ? `${WARN}Tesoro ${mark(number, WARN)}: cerca de ${mark(`X ${x}, Z ${z}`, WARN)} (a menos de ${within} bloques).`
-        : `${WARN}Treasure ${mark(number, WARN)}: near ${mark(`X ${x}, Z ${z}`, WARN)} (within ${within} blocks).`;
-}
-
-export function huntClueExact(
-    number: number,
-    x: number,
-    y: number,
-    z: number,
-    language: Language
-): string {
-    return language === "es"
-        ? `${WARN}Tesoro ${mark(number, WARN)}: ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}`
-        : `${WARN}Treasure ${mark(number, WARN)}: ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}`;
-}
-
-export function huntBeams(language: Language): string {
-    return language === "es"
-        ? `${WARN}Últimos minutos: los tesoros que quedan tienen un haz de luz.`
-        : `${WARN}Last minutes: the treasures left are marked by a beam of light.`;
+/** Once every chest is down: how many, and how to find them - the one line the
+ *  hunt says before the first is opened. */
+export function huntStart(count: number, language: Language): string {
+    if (language === "es")
+        return count === 1
+            ? `${WARN}Hay ${mark(1, WARN)} tesoro escondido. Busca la columna de luz: tu barra de acción marca la distancia y la dirección.`
+            : `${WARN}Hay ${mark(count, WARN)} tesoros escondidos. Busca las columnas de luz: tu barra de acción marca el más cercano.`;
+    return count === 1
+        ? `${WARN}${mark(1, WARN)} treasure is hidden. Look for the column of light: your action bar shows how far and which way.`
+        : `${WARN}${mark(count, WARN)} treasures are hidden. Look for the columns of light: your action bar points to the nearest.`;
 }
 
 export function huntOpened(name: string, left: number, language: Language): string {
@@ -680,11 +686,18 @@ export function huntOpened(name: string, left: number, language: Language): stri
         : `${GOOD}${who} opened the last treasure.`;
 }
 
-/** Above the hotbar when a chest is close: how far and which way. */
-export function huntNear(metres: number, heading: Heading, language: Language): string {
+/** Above the hotbar all through the hunt: the nearest chest nobody has opened,
+ *  how far and which way, and how many are left. */
+export function huntGuide(
+    meters: number,
+    heading: Heading,
+    left: number,
+    total: number,
+    language: Language
+): string {
     return language === "es"
-        ? `&eTesoro cerca: &f${metres} m &eal &f${HEADING_ES[heading]}`
-        : `&eTreasure nearby: &f${metres} m &e${heading}`;
+        ? `&eTesoro: &f${meters} m &eal &f${HEADING_ES[heading]} &7(${left}/${total})`
+        : `&eTreasure: &f${meters} m &e${heading} &7(${left}/${total})`;
 }
 
 export function huntLeftBar(left: number, total: number, language: Language): string {
@@ -728,6 +741,38 @@ export function gatherTarget(material: GatherMaterial, language: Language): stri
     return language === "es"
         ? `${WARN}A recoger: ${mark(materialName(material, language), WARN)}`
         : `${WARN}Gather: ${mark(materialName(material, language), WARN)}`;
+}
+
+/** A gathering's round starting, as a title. */
+export function gatherRoundTitle(round: number, rounds: number, language: Language): string {
+    return language === "es" ? `&6Ronda ${round}/${rounds}` : `&6Round ${round}/${rounds}`;
+}
+
+/** A gathering's round starting, in the chat: what, and what one is worth. */
+export function gatherRoundLine(
+    round: number,
+    rounds: number,
+    material: GatherMaterial,
+    worth: number,
+    language: Language
+): string {
+    const what = mark(materialName(material, language), WARN);
+    if (language === "es")
+        return `${WARN}Ronda ${mark(`${round}/${rounds}`, WARN)}: recoge ${what}. Cada uno vale ${mark(worth, WARN)} ${worth === 1 ? "punto" : "puntos"}.`;
+    return `${WARN}Round ${mark(`${round}/${rounds}`, WARN)}: gather ${what}. Each is worth ${mark(worth, WARN)} ${worth === 1 ? "point" : "points"}.`;
+}
+
+/** The boss bar through a gathering: the round, its material and its clock. */
+export function gatherRoundBar(
+    round: number,
+    rounds: number,
+    material: GatherMaterial,
+    secondsLeft: number,
+    language: Language
+): string {
+    return language === "es"
+        ? `Ronda ${round}/${rounds}: ${materialName(material, language)} - ${clock(secondsLeft)}`
+        : `Round ${round}/${rounds}: ${materialName(material, language)} - ${clock(secondsLeft)}`;
 }
 
 /** Above the hotbar: what to gather and how much of it so far. */
@@ -777,7 +822,9 @@ export function catchWon(name: string, language: Language): string {
 }
 
 export function catchMissed(language: Language): string {
-    return language === "es" ? `${INFO}Nadie lo pescó a tiempo.` : `${INFO}Nobody fished it up in time.`;
+    return language === "es"
+        ? `${INFO}Nadie lo pescó a tiempo.`
+        : `${INFO}Nobody fished it up in time.`;
 }
 
 // ------------------------------------------------------------------ experience boost
@@ -816,14 +863,20 @@ export function joinButtonsText(language: Language): {
         ? {
               lead: `${WARN}Pulsa para participar (o escribe ${mark("unirse", WARN)}):`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
-              join: { label: "[Unirse]", hover: "Te llevamos al empezar y te devolvemos a donde estabas" },
+              join: {
+                  label: "[Unirse]",
+                  hover: "Te llevamos al empezar y te devolvemos a donde estabas"
+              },
               // i18n-ignore: in-game button, both languages here (speech picks one)
               leave: { label: "[Salir]", hover: "Retirarte del evento" }
           }
         : {
               lead: `${WARN}Click to take part (or type ${mark("join", WARN)}):`,
               // i18n-ignore: in-game button, both languages here (speech picks one)
-              join: { label: "[Join]", hover: "You are taken there when it starts and brought back after" },
+              join: {
+                  label: "[Join]",
+                  hover: "You are taken there when it starts and brought back after"
+              },
               // i18n-ignore: in-game button, both languages here (speech picks one)
               leave: { label: "[Leave]", hover: "Drop out of the event" }
           };
@@ -871,7 +924,9 @@ export function notEnoughJoined(joined: number, needed: number, language: Langua
 }
 
 export function backWhereYouWere(language: Language): string {
-    return language === "es" ? `${INFO}Has vuelto a donde estabas.` : `${INFO}You are back where you were.`;
+    return language === "es"
+        ? `${INFO}Has vuelto a donde estabas.`
+        : `${INFO}You are back where you were.`;
 }
 
 export function goTitle(language: Language): string {
@@ -1028,7 +1083,8 @@ export function duelStatus(side: number, eliminations: number, language: Languag
 
 export function duelDown(name: string, by: string | null, language: Language): string {
     const who = mark(name, BAD);
-    if (language === "es") return by ? `${BAD}${who} cae ante ${REASON}${by}` : `${BAD}${who} ha caído`;
+    if (language === "es")
+        return by ? `${BAD}${who} cae ante ${REASON}${by}` : `${BAD}${who} ha caído`;
     return by ? `${BAD}${who} is out - ${REASON}${by}` : `${BAD}${who} is out`;
 }
 
@@ -1046,7 +1102,9 @@ export function themeTitle(language: Language): string {
 }
 
 export function themeLine(theme: string, language: Language): string {
-    return language === "es" ? `${WARN}Tema: ${mark(theme, WARN)}` : `${WARN}Theme: ${mark(theme, WARN)}`;
+    return language === "es"
+        ? `${WARN}Tema: ${mark(theme, WARN)}`
+        : `${WARN}Theme: ${mark(theme, WARN)}`;
 }
 
 export function plotBar(
@@ -1156,5 +1214,7 @@ export function voteNoPlot(plot: number, language: Language): string {
 }
 
 export function themeWas(theme: string, language: Language): string {
-    return language === "es" ? `${INFO}El tema era ${mark(theme, INFO)}` : `${INFO}The theme was ${mark(theme, INFO)}`;
+    return language === "es"
+        ? `${INFO}El tema era ${mark(theme, INFO)}`
+        : `${INFO}The theme was ${mark(theme, INFO)}`;
 }

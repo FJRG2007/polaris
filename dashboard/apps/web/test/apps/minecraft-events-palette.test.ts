@@ -1,5 +1,5 @@
 /**
- * The colours of what events and challenges say in the chat: one palette, the
+ * The colors of what events and challenges say in the chat: one palette, the
  * values a player looks for picked out, and every line still one command the
  * console tool will send.
  */
@@ -8,7 +8,10 @@ import { describe, expect, it } from "vitest";
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
 import * as challengeMessages from "@polaris-app/game-servers/src/lib/minecraft/challenges/messages";
-import { COMMAND_BYTES_MAX, commandBytes } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import {
+    COMMAND_BYTES_MAX,
+    commandBytes
+} from "@polaris-app/game-servers/src/lib/minecraft/command-size";
 
 type Part = { text?: string; color?: string; bold?: boolean; underlined?: boolean };
 
@@ -32,9 +35,18 @@ const PLAYER = "Maximilian_1234";
 function chatLines(language: "en" | "es"): string[] {
     const tag = messages.tag(language);
     return [
-        messages.startsInWithRules(LONG_NAME, 3599, messages.rules("build-battle", language), language),
+        messages.startsInWithRules(
+            LONG_NAME,
+            3599,
+            messages.rules("build-battle", language),
+            language
+        ),
         messages.startLine(LONG_NAME, messages.rules("team-duel", language), 60, language),
-        messages.cancelledLine(LONG_NAME, language, "No dry ground was found for it near the players"),
+        messages.cancelledLine(
+            LONG_NAME,
+            language,
+            "No dry ground was found for it near the players"
+        ),
         messages.cancelledLine(LONG_NAME, language, "Only 1 joined; it needs 2"),
         messages.podiumLine(1, PLAYER, "1234 points", language),
         messages.disqualifiedLine([PLAYER, PLAYER, PLAYER, PLAYER], language),
@@ -48,7 +60,7 @@ function chatLines(language: "en" | "es"): string[] {
         messages.circleAt(-29999984, 319, 29999984, language),
         messages.wavesPointAt(-29999984, 319, 29999984, language),
         messages.meteorAt(-29999984, 319, 29999984, 99, language),
-        messages.huntClueFar(10, 1000, "north-west", { x: -29999984, z: 29999984 }, language),
+        messages.huntGuide(9999, "north-west", 10, 10, language),
         messages.huntOpened(PLAYER, 9, language),
         messages.joinHint(language),
         messages.notEnoughJoined(1, 50, language),
@@ -63,11 +75,19 @@ function chatLines(language: "en" | "es"): string[] {
 describe("the chat's palette", () => {
     it("says a call-off in red with the reason in white, and the event's name picked out", () => {
         const parts = partsOf(
-            commands.say(messages.tag("en") + messages.cancelledLine("Spleef", "en", "Only 1 joined; it needs 2"))
+            commands.say(
+                messages.tag("en") +
+                    messages.cancelledLine("Spleef", "en", "Only 1 joined; it needs 2")
+            )
         );
         expect(parts[0]).toMatchObject({ text: "[Event]", color: "gold", bold: true });
-        expect(parts.find((part) => part.text === "Spleef")).toMatchObject({ color: "aqua", bold: true });
-        expect(parts.find((part) => part.text === " was called off: ")).toMatchObject({ color: "red" });
+        expect(parts.find((part) => part.text === "Spleef")).toMatchObject({
+            color: "aqua",
+            bold: true
+        });
+        expect(parts.find((part) => part.text === " was called off: ")).toMatchObject({
+            color: "red"
+        });
         expect(parts.find((part) => part.text?.startsWith("Only 1 joined"))?.color).toBeUndefined();
         expect(parts.find((part) => part.text === " was called off: ")?.bold).toBeUndefined();
     });
@@ -85,13 +105,25 @@ describe("the chat's palette", () => {
     it("draws every button bold and underlined", () => {
         const offer = messages.doneOffer("es");
         const button = partsOf(
-            commands.buttonsLine("Ana", offer.lead, [{ ...offer.done, color: "green", value: commands.DONE_VALUE }])
+            commands.buttonsLine("Ana", offer.lead, [
+                { ...offer.done, color: "green", value: commands.DONE_VALUE }
+            ])
         ).find((part) => part.text === "[Terminado]");
-        expect(button).toMatchObject({ text: "[Terminado]", color: "green", bold: true, underlined: true });
+        expect(button).toMatchObject({
+            text: "[Terminado]",
+            color: "green",
+            bold: true,
+            underlined: true
+        });
     });
 
     it("keeps the countdown to one line with its rules", () => {
-        const line = messages.startsInWithRules("Parkour race", 30, messages.rules("parkour", "en"), "en");
+        const line = messages.startsInWithRules(
+            "Parkour race",
+            30,
+            messages.rules("parkour", "en"),
+            "en"
+        );
         expect(line).not.toContain("\n");
         expect(line.replace(/&[0-9a-fk-or]/g, "")).toBe(
             "Parkour race starts in 0:30. Fastest to the finish wins; a fall only sends you back to your checkpoint."
@@ -102,17 +134,29 @@ describe("the chat's palette", () => {
         for (const language of ["en", "es"] as const) {
             for (const line of chatLines(language)) {
                 expect(line).not.toContain("\n");
-                expect(commandBytes(line), line.slice(0, 120)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+                expect(commandBytes(line), line.slice(0, 120)).toBeLessThanOrEqual(
+                    COMMAND_BYTES_MAX
+                );
             }
             const buttons = messages.joinButtonsText(language);
-            const join = commands.joinButtons(messages.tag(language) + buttons.lead, buttons.join, buttons.leave);
+            const join = commands.joinButtons(
+                messages.tag(language) + buttons.lead,
+                buttons.join,
+                buttons.leave
+            );
             expect(commandBytes(join)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
         }
     });
 
     it("is the challenges' palette too", () => {
         expect(challengeMessages.tag("en")).toBe(messages.TAG.replace("[Event]", "[Challenges]"));
-        const done = challengeMessages.completedLine("Mine 32 diamond ore", "+20 pts, 3 diamond", "es");
-        expect(done).toContain(`${messages.PALETTE.good}¡Completado! ${messages.PALETTE.mark}Mine 32 diamond ore`);
+        const done = challengeMessages.completedLine(
+            "Mine 32 diamond ore",
+            "+20 pts, 3 diamond",
+            "es"
+        );
+        expect(done).toContain(
+            `${messages.PALETTE.good}¡Completado! ${messages.PALETTE.mark}Mine 32 diamond ore`
+        );
     });
 });

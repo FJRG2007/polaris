@@ -1,12 +1,14 @@
 /**
- * A treasure hunt: loot chests hidden on open ground around the players, told
- * in clues that sharpen as it goes, and a point for every one a player opens.
+ * A treasure hunt: loot chests hidden on open ground around the players, each
+ * under a column of light, every player's action bar pointing at the nearest
+ * one, and a point for every one a player opens.
  *
  * Pure, like the rest of the commands. What it guarantees about the world:
  *
- * - A chest is only ever put into air (`if block ... air` and `setblock ... keep`
- *   in the same command), on a place `findPlace` chose - dry, flat, the world's
- *   own ground, clear of every bed online.
+ * - A chest only ever goes where there is air, or one of the few small wild
+ *   plants that grow on open ground (`PLANTS`), in the same command that checks
+ *   it; on a place `findPlace` chose - dry, flat, the world's own ground, clear
+ *   of every bed online. The plant it stood in is written down and put back.
  * - One is only ever taken away while it is still exactly what was put there: a
  *   chest nobody has opened, with its loot table unrolled. An opened one is the
  *   finder's and stays.
@@ -14,26 +16,31 @@
  *   restart still takes the unopened ones away and lets the chunks go.
  */
 
-import * as commands from "../commands";
 import * as speech from "../../speech";
 import * as written from "../messages";
+import * as commands from "../commands";
 import type { HiddenChest } from "../state";
 import type { EventOptions } from "../catalog";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
 
-/** How close a chest must be before a player's action bar points at it. */
-export const GUIDE_RANGE = 48;
-/** How far apart two chests must be, so one find is not two. */
+/** How far apart two chests must be, so they are found one by one and not as a heap. */
 export const CHEST_GAP = 16;
-/** How precisely the second clue tells where a chest is. */
-export const AREA_STEP = 50;
+/** How near they may come once no place that far apart can be found: a small island. */
+export const CHEST_GAP_NEAR = 8;
 /** How close a player must be to a chest found open to be the one who opened it. */
 export const OPENER_REACH = 8;
-/** The beams come on for the last this-many seconds - or the last quarter of a
- *  short hunt, whichever is less. */
-export const BEAM_SECONDS = 120;
+
+/**
+ * The small wild plants a chest may take the place of, newest name first: a
+ * meadow is short grass all over, and a chest that would only go into air found
+ * nowhere on one - every chest of a hunt on an island ended up on its one path.
+ * Put back when an unopened chest is taken away. A name a version does not know
+ * answers nothing, and is passed over.
+ */
+export const PLANTS = ["short_grass", "grass", "fern", "snow"] as const;
+export type Plant = (typeof PLANTS)[number];
 
 type Spot = { x: number; y: number; z: number };
 
@@ -43,10 +50,23 @@ export function airAt(point: Spot): string {
     return `execute in minecraft:overworld if block ${point.x} ${point.y} ${point.z} minecraft:air`;
 }
 
-/** A chest with its loot, put down only where there is nothing but air. */
-export function hideChest(point: Spot, loot: EventOptions<"treasure-hunt">["loot"]): string {
+/** `Test passed` when a spot is that plant. */
+export function plantAt(point: Spot, plant: Plant): string {
+    return `execute in minecraft:overworld if block ${point.x} ${point.y} ${point.z} minecraft:${plant}`;
+}
+
+/** A chest with its loot, put down only where there is nothing but air - or,
+ *  given `was`, only where that plant still is. */
+export function hideChest(
+    point: Spot,
+    loot: EventOptions<"treasure-hunt">["loot"],
+    was: Plant | null = null
+): string {
     const at = `${point.x} ${point.y} ${point.z}`;
-    return `execute in minecraft:overworld if block ${at} minecraft:air run setblock ${at} minecraft:chest{LootTable:"${commands.LOOT[loot]}"} keep`;
+    const chest = `minecraft:chest{LootTable:"${commands.LOOT[loot]}"}`;
+    return was
+        ? `execute in minecraft:overworld if block ${at} minecraft:${was} run setblock ${at} ${chest} replace`
+        : `execute in minecraft:overworld if block ${at} minecraft:air run setblock ${at} ${chest} keep`;
 }
 
 /** How far out the next chest is looked for: spread between a third of the
@@ -55,74 +75,60 @@ export function huntDistance(options: EventOptions<"treasure-hunt">, random: () 
     return Math.max(24, Math.round(options.distance * (0.35 + 0.65 * random())));
 }
 
-/** Whether a place is too near a chest already down. */
-export function tooClose(point: Spot, chests: readonly HiddenChest[]): boolean {
-    return chests.some((one) => Math.hypot(one.x - point.x, one.z - point.z) < CHEST_GAP);
+/**
+ * The way chest number `index` of `count` is looked for, in radians from north:
+ * each its own share of the circle, turned by an angle drawn from the run - so
+ * no two chests are sought the same way, and a restart seeks the same ways.
+ */
+export function chestBearing(runId: string, index: number, count: number): number {
+    let hash = 0;
+    for (const char of runId) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    const turn = ((hash % 360) * Math.PI) / 180;
+    return turn + (index * 2 * Math.PI) / Math.max(1, count);
 }
 
-/** Where everybody in the Overworld is, on average: what the first clue is told from. */
-export function centreOf(
+/** Whether a place is too near a chest already down, `gap` apart at least. */
+export function tooClose(point: Spot, chests: readonly HiddenChest[], gap = CHEST_GAP): boolean {
+    return chests.some((one) => Math.hypot(one.x - point.x, one.z - point.z) < gap);
+}
+
+/** How far apart players can be and still be one group (`centerOf`). */
+export const GROUP_REACH = 128;
+
+/** Where the most players in the Overworld are together, on average: where the
+ *  chests are spread round. Players far apart are not averaged into ground
+ *  nobody is near - the largest group is, or one player when none are close. */
+export function centerOf(
     players: readonly { x: number; z: number }[]
 ): { x: number; z: number } | null {
     if (players.length === 0) return null;
-    const sum = players.reduce((total, one) => ({ x: total.x + one.x, z: total.z + one.z }), {
+    const groups = players.map((one) =>
+        players.filter((other) => Math.hypot(other.x - one.x, other.z - one.z) <= GROUP_REACH)
+    );
+    const group = groups.reduce((best, next) => (next.length > best.length ? next : best));
+    const sum = group.reduce((total, one) => ({ x: total.x + one.x, z: total.z + one.z }), {
         x: 0,
         z: 0
     });
-    return { x: Math.round(sum.x / players.length), z: Math.round(sum.z / players.length) };
-}
-
-/** Which clue is due: the first as soon as the chests are down, the area a
- *  third of the way in, the exact spot two thirds in. */
-export function clueDue(share: number): 1 | 2 | 3 {
-    return share >= 2 / 3 ? 3 : share >= 1 / 3 ? 2 : 1;
-}
-
-/** Whether the beams are on: the last minutes only. */
-export function beamsOn(secondsLeft: number, totalSeconds: number): boolean {
-    return secondsLeft <= Math.min(BEAM_SECONDS, totalSeconds / 4);
-}
-
-/** One clue for every chest nobody has opened yet, numbered as they were hidden. */
-export function clues(
-    chests: readonly HiddenChest[],
-    step: 1 | 2 | 3,
-    origin: { x: number; z: number },
-    language: speech.Speech
-): string[] {
-    return chests.flatMap((chest, index) => {
-        if (chest.opened) return [];
-        const number = index + 1;
-        if (step === 1) {
-            const away = Math.hypot(chest.x - origin.x, chest.z - origin.z);
-            return [
-                messages.huntClueFar(
-                    number,
-                    Math.max(AREA_STEP, commands.roughly(away, AREA_STEP)),
-                    commands.headingTo(origin, chest),
-                    origin,
-                    language
-                )
-            ];
-        }
-        if (step === 2) {
-            return [
-                messages.huntClueArea(
-                    number,
-                    commands.roughly(chest.x, AREA_STEP),
-                    commands.roughly(chest.z, AREA_STEP),
-                    AREA_STEP,
-                    language
-                )
-            ];
-        }
-        return [messages.huntClueExact(number, chest.x, chest.y, chest.z, language)];
-    });
+    return { x: Math.round(sum.x / group.length), z: Math.round(sum.z / group.length) };
 }
 
 /**
- * What each player's action bar says: the way to the nearest chest nobody has
- * opened once they are close to one, and how many are left otherwise.
+ * Every chest nobody has opened yet shown from afar: a column of light over it,
+ * and a glow round the chest itself.
+ */
+export function marks(chests: readonly HiddenChest[]): string[] {
+    return chests
+        .filter((one) => !one.opened)
+        .flatMap((one) => [
+            commands.beam(one),
+            `execute in minecraft:overworld run particle minecraft:glow ${one.x + 0.5} ${one.y + 0.8} ${one.z + 0.5} 0.4 0.4 0.4 0 6 force`
+        ]);
+}
+
+/**
+ * What each player's action bar says: how far the nearest chest nobody has
+ * opened is and which way, and how many are left - always, however far.
  */
 export function guides(
     players: readonly { name: string; x: number; z: number }[],
@@ -136,14 +142,15 @@ export function guides(
             const away = Math.hypot(chest.x + 0.5 - player.x, chest.z + 0.5 - player.z);
             if (!best || away < best.away) best = { chest, away };
         }
-        const line =
-            best && best.away <= GUIDE_RANGE
-                ? messages.huntNear(
-                      Math.round(best.away),
-                      commands.headingTo(player, { x: best.chest.x + 0.5, z: best.chest.z + 0.5 }),
-                      language
-                  )
-                : messages.huntLeftBar(open.length, chests.length, language);
+        const line = best
+            ? messages.huntGuide(
+                  Math.round(best.away),
+                  commands.headingTo(player, { x: best.chest.x + 0.5, z: best.chest.z + 0.5 }),
+                  open.length,
+                  chests.length,
+                  language
+              )
+            : messages.huntLeftBar(open.length, chests.length, language);
         return commands.actionbarFor(player.name, line);
     });
 }
@@ -152,6 +159,21 @@ export function guides(
  *  said again every tick, since finding the next place lets go of an area. */
 export function holdChests(held: readonly { x: number; z: number }[]): string[] {
     return chunks(held).map((point) => commands.forceload(point.x, point.z));
+}
+
+/** A chest nobody opened taken away, the plant it stood in put back: only while
+ *  it is still that chest, with its loot unrolled. */
+export function removeLines(chest: HiddenChest): string[] {
+    const at = `${chest.x} ${chest.y} ${chest.z}`;
+    const was = PLANTS.find((one) => one === chest.was);
+    return [
+        ...(was
+            ? [
+                  `execute in minecraft:overworld if block ${at} minecraft:chest if data block ${at} LootTable run setblock ${at} minecraft:${was} replace`
+              ]
+            : []),
+        ...commands.removeChestLines(chest)
+    ];
 }
 
 /**
@@ -164,7 +186,7 @@ export function huntCleanup(
     held: readonly { x: number; z: number }[]
 ): string[] {
     return [
-        ...chests.filter((one) => !one.opened).flatMap((one) => commands.removeChestLines(one)),
+        ...chests.filter((one) => !one.opened).flatMap(removeLines),
         ...chunks([...held, ...chests]).map((point) => commands.forceloadRemove(point.x, point.z))
     ];
 }

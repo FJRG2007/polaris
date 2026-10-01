@@ -188,8 +188,13 @@ export const RARE_CATCHES = [
     "bow"
 ] as const;
 export type RareCatch = (typeof RARE_CATCHES)[number];
-/** Which monsters a horde defence sends: only ones that cannot break a block. */
+/** Which monsters a horde defense sends: only ones that cannot break a block. */
 export const WAVE_MIXES = ["classic", "undead", "mixed"] as const;
+/** What decides a horde defense: kills near the point, or damage dealt there. */
+export const WAVE_WINNERS = ["kills", "damage"] as const;
+/** What decides a world boss: the most damage dealt to it, or the blow that fells it. */
+export const BOSS_WINNERS = ["damage", "final-blow"] as const;
+export type BossWinner = (typeof BOSS_WINNERS)[number];
 /** What a meteor is made of. */
 export const METEOR_ORES = ["common", "precious", "diamond", "debris"] as const;
 export const PARKOUR_DIFFICULTIES = ["easy", "medium", "hard"] as const;
@@ -248,7 +253,11 @@ export const optionsSchemas = {
                 /** Its health for one fighter on Normal; harder levels and more
                  *  fighters raise it. */
                 health: z.number().int().min(100).max(1024).default(400),
-                place: placeSchema.default({ mode: "players" })
+                place: placeSchema.default({ mode: "players" }),
+                /** Who wins: whoever dealt it the most damage, or whoever felled it. */
+                winner: z.enum(BOSS_WINNERS).default("damage"),
+                /** A named Nether Star for the winner, once it is felled. */
+                trophy: z.boolean().default(true)
             })
             .refine(
                 (value) =>
@@ -306,8 +315,21 @@ export const optionsSchemas = {
         loot: z.enum(LOOT_TABLES).default("dungeon")
     }),
     gathering: z.object({
-        /** Drawn when the event is set off, from the list, when `random`. */
-        material: z.enum([...GATHER_MATERIALS, "random"]).default("random")
+        /** Drawn at the start of each round, from the list, when `random`. */
+        material: z.enum([...GATHER_MATERIALS, "random"]).default("random"),
+        /** Short rounds, each for its own material. */
+        rounds: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(6, problem("atMost", { count: 6 }))
+            .default(3),
+        roundMinutes: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(5, problem("atMost", { count: 5 }))
+            .default(2)
     }),
     "rare-catch": z.object({
         treasure: z.enum([...RARE_CATCHES, "any"]).default("any")
@@ -348,7 +370,8 @@ export const optionsSchemas = {
             .min(2, problem("atLeast", { count: 2 }))
             .max(12, problem("atMost", { count: 12 }))
             .default(4),
-        mix: z.enum(WAVE_MIXES).default("classic")
+        mix: z.enum(WAVE_MIXES).default("classic"),
+        winner: z.enum(WAVE_WINNERS).default("kills")
     }),
     "meteor-shower": z.object({
         place: placeSchema.default({ mode: "players" }),
@@ -362,15 +385,15 @@ export const optionsSchemas = {
             .number()
             .int()
             .min(2, problem("atLeast", { count: 2 }))
-            .max(8, problem("atMost", { count: 8 }))
-            .default(4),
+            .max(30, problem("atMost", { count: 30 }))
+            .default(10),
         /** Ore blocks in each meteor. */
         size: z
             .number()
             .int()
             .min(3, problem("atLeast", { count: 3 }))
             .max(12, problem("atMost", { count: 12 }))
-            .default(6),
+            .default(4),
         ores: z.enum(METEOR_ORES).default("precious")
     }),
     parkour: z.object({
@@ -452,6 +475,8 @@ export interface EventPreset<K extends EventKind = EventKind> {
     readonly minutes: number;
     /** The least to be ranked; absent reads the kind's default (`minScoreOf`). */
     readonly minScore?: number;
+    /** The fewest players it goes ahead with; absent reads the kind's default (`minPlayersOf`). */
+    readonly minPlayers?: number;
     readonly options: EventOptions<K>;
     readonly rewards: Rewards;
 }
@@ -585,7 +610,17 @@ export const randomSchema = z
 
 export type RandomEvents = z.infer<typeof randomSchema>;
 
+/**
+ * Which defaults a server's events were last saved with. Events saved before
+ * the defaults were set by kind carry no number, and are brought up to them
+ * once (`toKindDefaults`) - never again after the screen has saved them, so a
+ * value an operator chooses later, even one that happens to be an old default,
+ * is theirs.
+ */
+export const DEFAULTS_VERSION = 2;
+
 export const settingsSchema = z.object({
+    defaults: z.number().int().min(1).max(1000).default(DEFAULTS_VERSION),
     /** What the players read. The screen itself is in English, like the rest. */
     language: z.enum(LANGUAGES).default("en"),
     /** An automatic event waits for at least this many players who are playing,
@@ -651,7 +686,7 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     gathering: { en: "Gathering", es: "Recolección" },
     "rare-catch": { en: "Rare catch", es: "Pesca rara" },
     "xp-boost": { en: "Experience boost", es: "Experiencia extra" },
-    waves: { en: "Horde defence", es: "Oleadas" },
+    waves: { en: "Horde defense", es: "Oleadas" },
     "meteor-shower": { en: "Meteor shower", es: "Lluvia de meteoritos" },
     parkour: { en: "Parkour race", es: "Carrera de parkour" },
     spleef: { en: "Spleef", es: "El suelo es lava" },
@@ -698,7 +733,7 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
         competitive: true
     },
     explorer: {
-        unit: "metres",
+        unit: "meters",
         competitive: true
     },
     "happy-hour": {
@@ -714,7 +749,7 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
         competitive: true
     },
     gathering: {
-        unit: "items",
+        unit: "points",
         competitive: true
     },
     "rare-catch": {
@@ -751,16 +786,149 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     }
 };
 
-/** Rewards a new event starts with: something worth playing for, easy to change. */
-export const DEFAULT_REWARDS: Rewards = {
+/** What decides who wins, in the words the podium uses: the kind's own, or a
+ *  horde defense's damage when that decides it. */
+export function unitOf(preset: EventPreset): string {
+    if (preset.kind === "waves" && (preset.options as EventOptions<"waves">).winner === "damage")
+        return "damage";
+    return KIND_INFO[preset.kind].unit;
+}
+
+/** What every new competition paid before the prizes were set by kind: an event
+ *  still on exactly these is taken to be on its default (`toKindDefaults`). */
+export const OLD_DEFAULT_REWARDS: Rewards = {
     first: { items: [{ id: "minecraft:diamond", count: 5 }], levels: 15 },
     second: { items: [{ id: "minecraft:diamond", count: 3 }], levels: 10 },
     third: { items: [{ id: "minecraft:diamond", count: 1 }], levels: 5 },
     everyone: { items: [{ id: "minecraft:experience_bottle", count: 8 }], levels: 0 }
 };
 
+const prize = (levels: number, ...items: readonly (readonly [string, number])[]): Reward => ({
+    items: items.map(([id, count]) => ({ id: `minecraft:${id}`, count })),
+    levels
+});
+
+const NO_REWARDS: Rewards = {
+    first: NO_REWARD,
+    second: NO_REWARD,
+    third: NO_REWARD,
+    everyone: NO_REWARD
+};
+
+/** One winner, who keeps what they found besides: a little experience on top. */
+const FOUND_IT: Rewards = {
+    first: prize(3, ["experience_bottle", 12]),
+    second: NO_REWARD,
+    third: NO_REWARD,
+    everyone: NO_REWARD
+};
+
+/** A few minutes of one skill, or a question game. */
+const QUICK: Rewards = {
+    first: prize(3, ["diamond", 1], ["experience_bottle", 8]),
+    second: prize(2, ["gold_ingot", 4], ["experience_bottle", 4]),
+    third: prize(1, ["iron_ingot", 4], ["experience_bottle", 2]),
+    everyone: prize(0, ["experience_bottle", 3])
+};
+
+/** Several minutes of steady work: mining, hunting, gathering, searching. */
+const STANDARD: Rewards = {
+    first: prize(5, ["diamond", 2], ["experience_bottle", 12]),
+    second: prize(3, ["diamond", 1], ["experience_bottle", 8]),
+    third: prize(2, ["gold_ingot", 6], ["experience_bottle", 4]),
+    everyone: prize(0, ["experience_bottle", 4])
+};
+
+/** A fight: a night out among monsters, a duel. */
+const HARD: Rewards = {
+    first: prize(8, ["diamond", 3], ["golden_apple", 2]),
+    second: prize(5, ["diamond", 2], ["golden_apple", 1]),
+    third: prize(3, ["diamond", 1], ["experience_bottle", 8]),
+    everyone: prize(0, ["experience_bottle", 6])
+};
+
+/** The longest and hardest: a horde held off wave after wave, a build and its vote. */
+const EPIC: Rewards = {
+    first: prize(12, ["diamond", 5], ["golden_apple", 3]),
+    second: prize(8, ["diamond", 3], ["golden_apple", 2]),
+    third: prize(5, ["diamond", 2], ["golden_apple", 1]),
+    everyone: prize(0, ["experience_bottle", 8])
+};
+
+/** A world boss on Normal. Its difficulty multiplies it (`BOSS_PRIZE_TIMES`), so
+ *  on Epic - the default - it pays the most of all, and its trophy besides. */
+const BOSS: Rewards = {
+    first: prize(8, ["diamond", 3], ["golden_apple", 2]),
+    second: prize(5, ["diamond", 2], ["golden_apple", 1]),
+    third: prize(3, ["diamond", 1]),
+    everyone: prize(0, ["experience_bottle", 6])
+};
+
+/**
+ * What each kind pays when it is made, by how hard, how long and how much work
+ * it is: a quick race or a question game little, a night of fighting more, a
+ * horde defense, a build battle and a world boss the most.
+ */
+export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
+    "mining-rush": STANDARD,
+    "mob-hunt": STANDARD,
+    "supply-drop": FOUND_IT,
+    "blood-moon": HARD,
+    "world-boss": BOSS,
+    fishing: QUICK,
+    trivia: QUICK,
+    explorer: STANDARD,
+    "happy-hour": NO_REWARDS,
+    "king-of-the-hill": STANDARD,
+    "treasure-hunt": STANDARD,
+    gathering: STANDARD,
+    "rare-catch": FOUND_IT,
+    "xp-boost": NO_REWARDS,
+    waves: EPIC,
+    "meteor-shower": STANDARD,
+    parkour: QUICK,
+    spleef: QUICK,
+    "team-duel": HARD,
+    "build-battle": EPIC
+};
+
 /** A king of the hill's length: a few minutes of pushing is plenty. */
 export const HILL_MINUTES = 4;
+
+/**
+ * How long each kind runs when it is made, in minutes: what fits it. A trivia
+ * game, a gathering and a horde defense run for their rounds and waves
+ * (`runMinutes`), whatever this says.
+ */
+export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
+    "mining-rush": 5,
+    "mob-hunt": 5,
+    "supply-drop": 5,
+    "blood-moon": 8,
+    "world-boss": 10,
+    fishing: 8,
+    trivia: 5,
+    explorer: 6,
+    "happy-hour": 20,
+    "king-of-the-hill": HILL_MINUTES,
+    "treasure-hunt": 8,
+    gathering: 6,
+    "rare-catch": 8,
+    "xp-boost": 20,
+    waves: 10,
+    "meteor-shower": 6,
+    parkour: 4,
+    spleef: 4,
+    "team-duel": 5,
+    "build-battle": 8
+};
+
+/** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
+ *  this is taken to be on its default (`toKindDefaults`). */
+export function oldDefaultMinutes(kind: EventKind): number {
+    if (kind === "happy-hour" || kind === "xp-boost" || kind === "rare-catch") return 20;
+    return kind === "trivia" ? 5 : 10;
+}
 
 /**
  * A king of the hill saved before "fists only" existed, and still on the ten
@@ -785,21 +953,49 @@ export function newPreset(kind: EventKind, id: string, name = KIND_NAMES[kind].e
         kind,
         name,
         enabled: true,
-        minutes:
-            kind === "happy-hour" || kind === "xp-boost" || kind === "rare-catch"
-                ? 20
-                : kind === "trivia"
-                  ? 5
-                  : kind === "king-of-the-hill"
-                    ? HILL_MINUTES
-                    : 10,
+        minutes: DEFAULT_MINUTES[kind],
         minScore: DEFAULT_MIN_SCORE[kind],
         minPlayers: defaultMinPlayers(kind),
         options,
-        rewards: KIND_INFO[kind].competitive
-            ? DEFAULT_REWARDS
-            : { first: NO_REWARD, second: NO_REWARD, third: NO_REWARD, everyone: NO_REWARD }
+        rewards: KIND_INFO[kind].competitive ? DEFAULT_PRIZES[kind] : NO_REWARDS
     };
+}
+
+/** The name the first events gave a horde defense. */
+const BRITISH_HORDE_NAME = "Horde defence";
+
+const same = (left: unknown, right: unknown): boolean =>
+    JSON.stringify(left) === JSON.stringify(right);
+
+/**
+ * An event saved before its defaults were set by kind, brought up to them where
+ * it never left the old ones - an operator who changed a value keeps it: prizes
+ * still exactly the old five diamonds and fifteen levels, a duration still the
+ * old default, a meteor shower still on four meteors or six blocks, and the
+ * name the first events gave a horde defense, spelled the British way.
+ */
+export function toKindDefaults(preset: EventPreset): EventPreset {
+    let next = preset;
+    if (KIND_INFO[preset.kind].competitive && same(preset.rewards, OLD_DEFAULT_REWARDS))
+        next = { ...next, rewards: DEFAULT_PRIZES[preset.kind] };
+    // A king of the hill's length is `migratePreset`'s, which runs first.
+    if (preset.kind !== "king-of-the-hill" && preset.minutes === oldDefaultMinutes(preset.kind))
+        next = { ...next, minutes: DEFAULT_MINUTES[preset.kind] };
+    if (preset.kind === "waves" && preset.name === BRITISH_HORDE_NAME)
+        next = { ...next, name: KIND_NAMES.waves.en };
+    if (preset.kind === "meteor-shower") {
+        const options = preset.options as EventOptions<"meteor-shower">;
+        const fresh = optionsSchemas["meteor-shower"].parse({});
+        next = {
+            ...next,
+            options: {
+                ...options,
+                meteors: options.meteors === 4 ? fresh.meteors : options.meteors,
+                size: options.size === 6 ? fresh.size : options.size
+            }
+        } as EventPreset;
+    }
+    return next;
 }
 
 /** Every kind once, which is what a server that never opened this screen has. */
@@ -845,9 +1041,14 @@ export function readEventsConfig(
         return { ...fresh, settings: { ...fresh.settings, timezone } };
     }
     const value = raw as Record<string, unknown>;
+    const saved = (value.settings as { defaults?: unknown } | undefined)?.defaults;
+    const old = typeof saved !== "number" || saved < DEFAULTS_VERSION;
     const presets = (Array.isArray(value.presets) ? value.presets : []).flatMap((entry) => {
+        // A king of the hill's own length first (`migratePreset`), then every
+        // kind's defaults, which leave a king of the hill's length to it.
         const parsed = presetSchema.safeParse(migratePreset(entry));
-        return parsed.success ? [parsed.data] : [];
+        if (!parsed.success) return [];
+        return [old ? toKindDefaults(parsed.data) : parsed.data];
     });
     const ids = new Set(presets.map((preset) => preset.id));
     const schedules = (Array.isArray(value.schedules) ? value.schedules : []).flatMap((entry) => {
@@ -859,6 +1060,8 @@ export function readEventsConfig(
     return {
         settings: {
             ...read,
+            // Read as brought up to date: saving it from here writes that down.
+            defaults: DEFAULTS_VERSION,
             random: {
                 ...read.random,
                 pool: read.random.pool.filter((entry) => ids.has(entry.presetId))
@@ -1022,6 +1225,7 @@ export function readyToPlay(run: {
     readonly preset: EventPreset;
     readonly place: unknown;
     readonly hidden: boolean;
+    readonly chests: readonly unknown[];
     readonly meteors: readonly unknown[];
     readonly round: number;
     readonly stage: { readonly racers: readonly unknown[] } | null;
@@ -1041,7 +1245,8 @@ export function readyToPlay(run: {
                 (preset.options as EventOptions<"explorer">).mode !== "race" || run.place !== null
             );
         case "treasure-hunt":
-            return run.hidden;
+            // Once the first chest is down: the rest are hidden while it is hunted.
+            return run.chests.length > 0;
         case "meteor-shower":
             return run.meteors.length > 0;
         case "trivia":
@@ -1077,12 +1282,33 @@ export function runMinutes(preset: EventPreset): number {
         const options = preset.options as EventOptions<"build-battle">;
         return preset.minutes + Math.ceil(options.voteSeconds / 60);
     }
+    if (preset.kind === "gathering") {
+        const options = preset.options as EventOptions<"gathering">;
+        return options.rounds * options.roundMinutes;
+    }
     return preset.minutes;
 }
 
-/** A horde defence's clock: how long before the first wave, how long a wave
+/** A horde defense's clock: how long before the first wave, how long a wave
  *  may last before it is called over, and the breath between two. */
 export const WAVE_TIMING = { firstSeconds: 45, limitSeconds: 120, pauseSeconds: 20 } as const;
+
+/** The least and the most time between two meteors of a shower: one a few
+ *  seconds after the last feels like a shower, one minutes after it felt like
+ *  nothing was falling. */
+export const METEOR_GAP_MS = { least: 12_000, most: 40_000 } as const;
+
+/**
+ * The time between two meteors: `count` of them spread over the first three
+ * quarters of an event of `totalMs`, never nearer than `METEOR_GAP_MS.least`
+ * nor further apart than `METEOR_GAP_MS.most` - so a long event with few
+ * meteors has them all down early and left to mine, rather than one every two
+ * minutes.
+ */
+export function meteorGap(totalMs: number, count: number): number {
+    const spread = (Math.max(0, totalMs) * 0.75) / Math.max(1, count);
+    return Math.min(METEOR_GAP_MS.most, Math.max(METEOR_GAP_MS.least, Math.round(spread)));
+}
 
 /** The breath between one trivia round and the next. */
 export const ROUND_PAUSE_SECONDS = 6;

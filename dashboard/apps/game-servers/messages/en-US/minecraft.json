@@ -1623,7 +1623,7 @@
             },
             "world-boss": {
                 "label": "World boss",
-                "summary": "A boss drawn at random appears near the players, in a sky arena or on open ground. It fights in three phases, with warned attacks and a shield of minions, and grows with every fighter. Damage dealt close to it is counted; if it falls, the podium goes by damage, everybody who hit it is rewarded and the final blow earns a trophy.",
+                "summary": "A boss drawn at random appears near the players, in a sky arena or on open ground. It fights in three phases, with warned attacks and a shield of minions, and grows with every fighter. If it falls, the most damage wins - or the final blow, if chosen - everybody who hit it is rewarded, and the winner earns a trophy.",
                 "unit": "damage"
             },
             "fishing": {
@@ -1652,13 +1652,13 @@
             },
             "treasure-hunt": {
                 "label": "Treasure hunt",
-                "summary": "Loot chests are hidden on open ground around the players, told in clues that get sharper as it goes. Whoever opens the most wins, and keeps what is inside.",
+                "summary": "Loot chests are hidden on open ground around the players, each under a column of light, and everybody's action bar points to the nearest. Whoever opens the most wins, and keeps what is inside.",
                 "unit": "chests"
             },
             "gathering": {
                 "label": "Gathering",
-                "summary": "One material is announced - wheat, logs, cobblestone, iron... Whoever gathers the most of it wins. Nothing is taken from anybody.",
-                "unit": "items"
+                "summary": "A few short rounds, each for one material announced as it starts - wheat, logs, cobblestone, iron... Every item is worth points by how hard it is to get, and the most points over all rounds wins. Nothing is taken from anybody.",
+                "unit": "points"
             },
             "rare-catch": {
                 "label": "Rare catch",
@@ -1670,7 +1670,7 @@
             },
             "waves": {
                 "label": "Horde defense",
-                "summary": "A defense point is marked away from every home and waves of monsters come for it, each bigger and stronger than the last. Everybody who holds the point is rewarded; the podium goes to the most kills.",
+                "summary": "A defense point is marked away from every home and waves of monsters come for it, each bigger and better armored than the last, with jockeys among the last ones. Everybody who holds the point is rewarded; the podium goes to the most kills, or the most damage if chosen.",
                 "unit": "kills"
             },
             "meteor-shower": {
@@ -1731,9 +1731,9 @@
             "regeneration": "Regeneration (health comes back on its own)",
             "happyHour": "Everybody on gets {effects} until it ends, including whoever joins meanwhile.",
             "chestsHidden": "{count} {count, plural, one {chest} other {chests}} hidden up to {distance} blocks from the players, on open natural ground well away from anybody's bed.",
-            "clues": "Clues come in three steps: how far and which way, then the area, then the exact spot; a beam of light marks the ones left in the last minutes. A player close to one sees the way in their action bar.",
-            "chestsCleared": "A chest is only put where there is air, and one nobody opened is taken away at the end. An opened chest stays: what is inside is the finder's.",
-            "materialRandom": "The material is drawn from the list each time and announced when the countdown starts.",
+            "clues": "A column of light stands over every chest nobody has opened, from the start, and every player's action bar shows how far the nearest one is and which way. The chat says only how many there are and who opens each.",
+            "chestsCleared": "Chests are spread round the players, each sought its own way and kept apart. A chest is only put where there is air or a small wild plant, which is put back; one nobody opened is taken away at the end. An opened chest stays: what is inside is the finder's.",
+            "materialRandom": "Each round's material is drawn from the list, never one an earlier round had, and announced only as the round starts.",
             "material": "The material: {material}.",
             "gatheringScore": "Scored by what each player holds at the end minus what they held when it began, and never more than they picked up during it - a stack taken out of a chest does not count. Nothing is taken from anybody.",
             "rareCatch": "The first player to fish up {treasure} wins, and keeps it. Taking one out of a chest, or dropping one and picking it up, does not count.",
@@ -1744,8 +1744,8 @@
             "waves": "{waves} waves, {minutes} minutes at most. A wave ends when all of it is killed, or after two minutes.",
             "wavesPoint": "The point is on open, flat ground the world made, at least 96 blocks from any online player's bed. Only monsters that cannot break blocks come - no creepers, endermen or ravagers - and every one of them is removed when it ends.",
             "keepInventory": "Keep inventory is on while it runs, so dying costs nothing; the server's own setting comes back afterwards. Java 1.17 or later.",
-            "meteors": "{meteors} meteors of {size} ore blocks each, landing over the first three quarters of it. Each block mined near a meteor scores 1; ore placed near one is taken off.",
-            "meteorsLand": "Meteors land on open, flat ground the world made, at least 48 blocks from any online player's bed, and ore is only ever put where there was air. What nobody mined is taken away at the end - only blocks still exactly the meteor's ore - and nothing else is touched.",
+            "meteors": "{meteors} meteors of {size} ore blocks each, one every {seconds} seconds from the start. Each block mined near a meteor scores 1; ore placed near one is taken off.",
+            "meteorsLand": "Meteors land on open, flat ground the world made, away from every online player's bed - on an island, on the island itself - and ore is only ever put where there was air. What nobody mined is taken away at the end - only blocks still exactly the meteor's ore - and nothing else is touched.",
             "pickaxes": "Diamond and emerald ore need an iron pickaxe, ancient debris a diamond one.",
             "parkour": "{jumps} jumps, {difficulty}, built about {height} blocks up. A fall lands on a net and goes back to the last checkpoint.",
             "spleef": "A {size} by {size} snow floor about {height} blocks up. Falling through it is being out; the last one on it wins.",
@@ -1786,7 +1786,14 @@
             "bossGround": "Fought on open ground away from every bed. Nothing it does breaks or places a block, and it cannot be trapped: it comes to whoever it cannot reach.",
             "bossKeeps": "Keep inventory is on while it runs, so dying costs nothing, and pets, horses and villagers near it take no damage. The server setting comes back afterwards, even after a restart.",
             "bossGriefing": "Mob griefing is off while {bosses} fights, so no block is changed. The server setting comes back afterwards, even after a restart.",
-            "bossPrizes": "Prizes are multiplied by {times} on this difficulty, and the final blow earns a named trophy."
+            "bossPrizes": "Prizes are multiplied by {times} on this difficulty.",
+            "bossWinnerDamage": "The most damage dealt to it wins. Every fighter sees their own damage during the fight, and everybody's is listed at the end.",
+            "bossWinnerFinalBlow": "Whoever lands the final blow wins; the rest are placed by the damage they dealt, which each fighter sees during the fight.",
+            "bossTrophy": "The winner also gets a trophy: a Nether Star named after the boss.",
+            "bossBeam": "The beam of light up to the arena is announced with its coordinates, and everybody not up yet sees how far it is and which way.",
+            "wavesScaling": "Each wave brings the first wave's size, half as many again for every wave before it and for every defender at the point past the first (up to 5), at most 60. Every defender past the first gives each monster 4 more health (up to 16), and from 3 defenders they hit harder.",
+            "wavesGear": "Armor grows wave by wave, from none to leather, chainmail, iron and diamond on the last, with enchanted bows and swords on the last two. Spider jockeys come from 40% of the waves, chicken jockeys from 60% and horsemen from 80%. Nothing they wear or ride is ever dropped, and all of it is removed.",
+            "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins."
         },
         "errors": {
             "read": "The events could not be read",
@@ -1920,7 +1927,8 @@
             "entry": "{place} {reward}",
             "everyone": "Everybody else: {reward}",
             "everybody": "Everybody: {reward}",
-            "none": "No prizes"
+            "none": "No prizes",
+            "trophy": "Trophy"
         }
     },
     "editor": {
@@ -2076,6 +2084,14 @@
                 "normal": "Normal",
                 "hard": "Hard",
                 "epic": "Epic"
+            },
+            "bossWinner": {
+                "damage": "Most damage",
+                "final-blow": "Final blow"
+            },
+            "wavesWinner": {
+                "kills": "Most kills",
+                "damage": "Most damage"
             }
         },
         "place": {
@@ -2106,7 +2122,7 @@
         "themesPlaceholder": "Our spawn town\nA dragon",
         "builtInThemes": "One of 30 built-in themes, in the players' language.",
         "material": "Material",
-        "materialHint": "Announced when the countdown starts. Only what is gathered during the event counts.",
+        "materialHint": "Drawn anew for each round, never one an earlier round had, and announced as the round starts. Only what is gathered during the round counts.",
         "theCatch": "The catch",
         "catchHint": "One treasure comes up about once in 120 catches, any of them about once in 25 - in open water, more often with Luck of the Sea. Give it 20 minutes or more.",
         "chests": "Chests",
@@ -2129,7 +2145,13 @@
         "bossPoolEmpty": "Keep at least one boss that can fight here.",
         "witherNeedsArena": "The Wither fights only in the sky arena.",
         "baseHealth": "Base health",
-        "baseHealthHint": "100 to 1024: its health for one fighter on Normal. Harder levels and every fighter who joins raise it."
+        "baseHealthHint": "100 to 1024: its health for one fighter on Normal. Harder levels and every fighter who joins raise it.",
+        "bossWinner": "How the winner is decided",
+        "bossWinnerHint": "Most damage counts every hit by hand, and shares what the boss loses to arrows, tridents and magic among whoever is shooting it. Final blow: whoever fells it wins, and the rest go by damage.",
+        "bossTrophy": "Trophy for the winner",
+        "bossTrophyHint": "A Nether Star named after the boss, with a glint and its difficulty, on top of the prizes. Only when the boss is defeated.",
+        "wavesWinner": "How the winner is decided",
+        "roundMinutes": "Minutes a round"
     },
     "moderation": {
         "announcements": {
