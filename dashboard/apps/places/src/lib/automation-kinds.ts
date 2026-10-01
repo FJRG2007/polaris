@@ -41,7 +41,9 @@ const WATCHED_STATES: Readonly<Record<DeviceKind, readonly kinds.DeviceState[]>>
     switch: ["on", "off"],
     outlet: ["on", "off"],
     light: ["on", "off"],
-    sensor: []
+    sensor: [],
+    // On while it is cooking, set or paused; off in standby.
+    appliance: ["on", "off"]
 };
 
 export function watchedStates(kind: string): readonly kinds.DeviceState[] {

@@ -43,7 +43,9 @@ export const AIR_MODES = [
     "speed_3",
     "turbo",
     "natural",
-    "ventilation"
+    "ventilation",
+    "eco",
+    "pet_hair"
 ] as const;
 export type AirMode = (typeof AIR_MODES)[number];
 
@@ -73,8 +75,9 @@ export const AIR_SPEEDS = [
 export type AirSpeed = (typeof AIR_SPEEDS)[number];
 
 /** The switches some units have: the lock on the buttons, the light of the
- *  display, and - on a purifier that also humidifies - whether it humidifies. */
-export const AIR_OPTIONS = ["childLock", "light", "humidify"] as const;
+ *  display, on a purifier that also humidifies whether it humidifies, and on a
+ *  fan whether it swings from side to side. */
+export const AIR_OPTIONS = ["childLock", "light", "humidify", "oscillate"] as const;
 export type AirOption = (typeof AIR_OPTIONS)[number];
 
 /** The filters a unit reports. A combined unit has three; a humidifier has a
@@ -140,7 +143,8 @@ export const airSettingsSchema = z.object({
     options: z.object({
         childLock: z.boolean().optional(),
         light: z.boolean().optional(),
-        humidify: z.boolean().optional()
+        humidify: z.boolean().optional(),
+        oscillate: z.boolean().optional()
     }),
     readings: z.object({
         pm25: z.number().finite().min(0).max(10_000).optional(),

@@ -27,7 +27,10 @@ import {
     type AirSettings
 } from "./air-kinds";
 
+import { applianceStatusText, type ApplianceView } from "./appliance-kinds";
+
 export * from "./air-kinds";
+export * from "./appliance-kinds";
 
 /** What a device does, which is what decides the buttons it gets. */
 export const DEVICE_KINDS = [
@@ -38,7 +41,8 @@ export const DEVICE_KINDS = [
     "switch",
     "outlet",
     "light",
-    "sensor"
+    "sensor",
+    "appliance"
 ] as const;
 
 export type DeviceKind = (typeof DEVICE_KINDS)[number];
@@ -51,7 +55,8 @@ export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
     switch: en("devices.kinds.switch"),
     outlet: en("devices.kinds.outlet"),
     light: en("devices.kinds.light"),
-    sensor: en("devices.kinds.sensor")
+    sensor: en("devices.kinds.sensor"),
+    appliance: en("devices.kinds.appliance")
 };
 
 /** Devices of the same sort, listed together. A place has a handful of doors and
@@ -64,7 +69,8 @@ export const DEVICE_GROUP_LABELS: Readonly<Record<DeviceKind, string>> = {
     switch: en("devices.groups.switch"),
     outlet: en("devices.groups.outlet"),
     light: en("devices.groups.light"),
-    sensor: en("devices.groups.sensor")
+    sensor: en("devices.groups.sensor"),
+    appliance: en("devices.groups.appliance")
 };
 
 /** Whether a word off a device row is a kind this build knows. A device synced by
@@ -265,7 +271,8 @@ export const DEVICE_ACTIONS = [
     "set-temperature",
     "set-fan",
     "set-option",
-    "set-humidity"
+    "set-humidity",
+    "stop"
 ] as const;
 
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
@@ -280,7 +287,8 @@ export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
     "set-temperature": en("devices.actions.set-temperature"),
     "set-fan": en("devices.actions.set-fan"),
     "set-option": en("devices.actions.set-option"),
-    "set-humidity": en("devices.actions.set-humidity")
+    "set-humidity": en("devices.actions.set-humidity"),
+    stop: en("devices.actions.stop")
 };
 
 /** The same actions as something a sentence can be built out of. The label on a
@@ -296,7 +304,8 @@ export const DEVICE_ACTION_VERBS: Readonly<Record<DeviceAction, string>> = {
     "set-temperature": "change temperature",
     "set-fan": "change fan speed",
     "set-option": "change a setting",
-    "set-humidity": "change humidity"
+    "set-humidity": "change humidity",
+    stop: "stop"
 };
 
 /**
@@ -323,7 +332,11 @@ const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
     light: ["turn-on", "turn-off"],
     // A sensor is not done, it is read. Nothing to press, and a row that offered
     // something would be offering to change the weather.
-    sensor: []
+    sensor: [],
+    // A kitchen appliance is watched, and may be stopped from here. Nothing that
+    // starts it is offered: it would be heating with nobody there to see it.
+    // Whether one can be stopped at all is the unit's (`stoppable`).
+    appliance: ["stop"]
 };
 
 export function actionsFor(kind: string): readonly DeviceAction[] {
@@ -612,6 +625,10 @@ export function badgeText(device: DeviceView, t: PlacesTranslator = en): string 
     if (!device.online) return t("devices.states.unknown");
     const kind = deviceKind(device.kind);
     if (kind === "sensor") return readingLine(device.reading, t) || t("devicesView.nothingRead");
+    // An appliance says what it is doing: "Cooking" rather than "On".
+    if (kind === "appliance" && device.appliance?.status) {
+        return applianceStatusText(device.appliance.status, t);
+    }
     if (kind === "climate" && device.state === "on" && device.climate?.mode) {
         return climateModeText(device.climate.mode, t);
     }
@@ -662,6 +679,8 @@ export interface DeviceView {
     /** How a purifier or humidifier is set and what it last read. Null, or
      *  absent, for every other kind. */
     readonly air?: AirSettings | null;
+    /** What a kitchen appliance is doing. Null, or absent, for every other kind. */
+    readonly appliance?: ApplianceView | null;
 }
 
 /** How something came to happen. `polaris` is the one that carries weight: it is

@@ -443,6 +443,18 @@ export async function pollPairing(
     return speaking(() => pairing.poll(fields, state));
 }
 
+/** Read a file uploaded at a pairing's file step: what to add to its state. The
+ *  file is the caller's to delete. */
+export async function readPairingFile(
+    connection: string,
+    path: string
+): Promise<Readonly<Record<string, string>>> {
+    const pairing = pairingOf(connection);
+    if (!pairing.file) throw new HomeError("Polaris cannot connect that yet");
+    const read = pairing.file.bind(pairing);
+    return speaking(() => read(path));
+}
+
 /** A driver's refusal, as one this app is willing to show. `DriverError` is
  *  already written for a person and names no host, path or credential, so the
  *  sentence passes through; anything else is a fault and is left alone to be

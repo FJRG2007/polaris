@@ -95,19 +95,16 @@ interface Reply {
 }
 
 function quiet(): DriverError {
-    return new DriverError(
-        "The air purifier did not answer through Philips' cloud.",
-        "unreachable"
-    );
+    return new DriverError("The device did not answer through Philips' cloud.", "unreachable");
 }
 
 function busy(): DriverError {
-    return new DriverError("The air purifier is busy. Try again in a moment.", "refused");
+    return new DriverError("The device is busy. Try again in a moment.", "refused");
 }
 
 function refusedLink(): DriverError {
     return new DriverError(
-        "Philips' cloud would not let Polaris reach this air purifier. Connect the account again.",
+        "Philips' cloud would not let Polaris reach this device. Connect the account again.",
         "unauthorized"
     );
 }
@@ -515,30 +512,48 @@ export class CloudLink {
      * What the unit is doing now: its status read afresh, the slow ports and the
      * shadow when they are due, and whether it answered. A unit whose read is
      * lost but was heard from a moment ago is still online.
+     *
+     * A purifier reports on `Status` and its filters on `filtRd`; a kitchen
+     * appliance names its own status port (`venusaf_s` on a Venus 2 airfryer)
+     * and has no filters, so both are the caller's to say.
      */
-    async read(auth: CloudAuth): Promise<{ state: CloudState; online: boolean }> {
+    async read(
+        auth: CloudAuth,
+        ports: { readonly status: string; readonly slow: readonly string[] } = {
+            status: "Status",
+            slow: ["filtRd"]
+        }
+    ): Promise<{ state: CloudState; online: boolean }> {
         await this.ensure(auth);
         const slow = Date.now() - this.slowReadAt > SLOW_PORTS_MS || !this.current.model;
         if (this.shadowGranted && (slow || this.current.powerOn === null)) {
             await this.publish(this.shadow("get"), "{}", 0).catch(() => {});
         }
-        const answered = await this.readPort("Status");
+        const answered = await this.readPort(ports.status);
         if (answered && slow) {
             this.slowReadAt = Date.now();
-            await this.readPort("filtRd");
+            for (const port of ports.slow) await this.readPort(port);
             if (!this.current.model) await this.readPort("Config");
         }
         const online = answered || Date.now() - this.current.heardAt < HEARD_RECENTLY_MS;
         return { state: this.state, online };
     }
 
-    /** Set values on the `Control` port, asking again on busy as the app does:
-     *  up to three times, each after 300 to 1000 ms. */
-    async write(auth: CloudAuth, properties: Readonly<Record<string, CloudValue>>): Promise<void> {
+    /** Set values on a port - `Control` unless the unit names another - asking
+     *  again on busy as the app does: up to three times, each after 300 to
+     *  1000 ms. The status port is read again afterwards. */
+    async write(
+        auth: CloudAuth,
+        properties: Readonly<Record<string, CloudValue>>,
+        ports: { readonly control: string; readonly status: string } = {
+            control: "Control",
+            status: "Status"
+        }
+    ): Promise<void> {
         await this.ensure(auth);
         await this.queued(async () => {
             for (let attempt = 0; attempt <= WRITE_RETRIES; attempt++) {
-                const reply = await this.ask("setPort", "Control", properties);
+                const reply = await this.ask("setPort", ports.control, properties);
                 if (!reply) throw quiet();
                 if (reply.status === NCP_OK || reply.status === null) {
                     this.current.properties = { ...this.current.properties, ...properties };
@@ -549,7 +564,7 @@ export class CloudLink {
             }
             throw busy();
         });
-        await this.readPort("Status").catch(() => false);
+        await this.readPort(ports.status).catch(() => false);
     }
 
     /** Switch it on or off: a desired `powerOn` on the shadow. */

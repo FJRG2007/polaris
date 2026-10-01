@@ -295,14 +295,32 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.philipsCloudUnfinished"
     ],
     ["That code is not right or has expired. Ask for a new one.", "refusals.philipsCloudBadCode"],
-    ["The air purifier did not answer through Philips' cloud.", "refusals.philipsCloudQuiet"],
-    ["The air purifier is busy. Try again in a moment.", "refusals.philipsCloudBusy"],
+    ["The device did not answer through Philips' cloud.", "refusals.philipsCloudQuiet"],
+    ["The device is busy. Try again in a moment.", "refusals.philipsCloudBusy"],
     [
-        "Philips' cloud would not let Polaris reach this air purifier. Connect the account again.",
+        "Philips' cloud would not let Polaris reach this device. Connect the account again.",
         "refusals.philipsCloudLinkRefused"
     ],
     ["That device is not on this Philips account.", "refusals.philipsCloudNotOnAccount"],
-    ["Enter the code from the email", "refusals.philipsCloudEnterCode"]
+    ["Enter the code from the email", "refusals.philipsCloudEnterCode"],
+    [
+        "Philips' fan and heater cloud refused the sign-in. Upload the Philips Air+ app again.",
+        "refusals.airMattersRefused"
+    ],
+    [
+        "That file is not an app file. Upload the Philips Air+ app as an .apk, .apkm or .xapk file.",
+        "refusals.apkNotAnApp"
+    ],
+    [
+        "Polaris could not find what it needs in that file. Upload the whole Philips Air+ app, not a split or language part of it.",
+        "refusals.apkNoSecret"
+    ],
+    [
+        "That file holds more than one candidate, so Polaris cannot tell which one Philips uses. Upload the Philips Air+ app itself.",
+        "refusals.apkAmbiguous"
+    ],
+    ["That step took too long and has run out. Start connecting again.", "refusals.pairingRanOut"],
+    ["Upload the Philips Air+ app file to go on", "refusals.uploadToGoOn"]
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */
@@ -322,13 +340,7 @@ const SHAPED: readonly {
     { pattern: /^(.+) has to be connected again$/s, key: "refusals.reconnect", params: ["name"] },
     {
         pattern:
-            /^Polaris found appliances on this Philips account, but no air purifier\. What it saw: (.+)\.$/s,
-        key: "refusals.philipsCloudOnlyOthers",
-        params: ["summary"]
-    },
-    {
-        pattern:
-            /^Polaris found no air purifier on this Philips account\. What it saw: (.+)\. Check that the purifier is in the Air\+ app under this same email\.$/s,
+            /^Polaris found no device on this Philips account\. What it saw: (.+)\. Check that the device is in a Philips app under this same email\.$/s,
         key: "refusals.philipsCloudNothing",
         params: ["summary"]
     },

@@ -64,6 +64,7 @@ import { host } from "@polaris/app-host";
 import type { MessageParams } from "@polaris/core";
 import { placesT } from "../lib/i18n";
 import type { PlacesKey } from "../../messages";
+import type { PairingNext } from "../lib/drivers/contract";
 import { placesRefusalText } from "../lib/refusal-text";
 import { guard } from "../lib/action-guard";
 import { connectionWords } from "../lib/device-connections";
@@ -1458,6 +1459,9 @@ export async function startDevicePairingAction(input: unknown): Promise<{
  */
 export async function pollDevicePairingAction(input: unknown): Promise<{
     waiting?: boolean;
+    /** A step to draw before asking again: a file to upload, with the state
+     *  to send back once it is, and what the attempt saw so far. */
+    next?: { state: Record<string, string>; summary: string; skippable: boolean };
     /** Model codes connected that cannot be fully operated yet. */
     unsupported?: string[];
     devices?: DeviceView[];
@@ -1471,7 +1475,10 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
 
     const result = await guard(async () => {
         const answer = await deviceAccounts.pollPairing(connection.id, fields, parsed.state);
-        if (!answer.done) return null;
+        if (!answer.done) {
+            const next: PairingNext | undefined = answer.next;
+            return next ? { next } : null;
+        }
         if (parsed.accountId) {
             await deviceAccounts.reconnectAccount(install.id, parsed.accountId, {
                 connection: connection.id,
@@ -1495,6 +1502,10 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
     });
     if (result.error) return { error: result.error };
     if (!result.value) return { waiting: true };
+    if ("next" in result.value && result.value.next) {
+        const { state, summary, skippable } = result.value.next;
+        return { waiting: true, next: { state: { ...state }, summary, skippable } };
+    }
     await recordAudit({
         actorId: user.id,
         action: parsed.accountId

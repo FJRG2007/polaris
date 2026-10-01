@@ -65,6 +65,7 @@ const DEVICE_FIELDS = {
     unit: true,
     climate: true,
     air: true,
+    appliance: true,
     stateAt: true
 } as const;
 
@@ -88,6 +89,7 @@ type DeviceRow = {
     unit: string | null;
     climate: Prisma.JsonValue | null;
     air: Prisma.JsonValue | null;
+    appliance: Prisma.JsonValue | null;
     stateAt: Date | null;
 };
 
@@ -110,6 +112,19 @@ function airColumn(
 ): Prisma.InputJsonValue | typeof Prisma.DbNull {
     const storable = kinds.storableAir(settings);
     return storable ? (storable as Prisma.InputJsonValue) : Prisma.DbNull;
+}
+
+/** What a kitchen appliance is doing, as stored. Null for every other kind. */
+function applianceOf(row: Pick<DeviceRow, "kind" | "appliance">): kinds.ApplianceView | null {
+    return kinds.deviceKind(row.kind) === "appliance" ? kinds.applianceView(row.appliance) : null;
+}
+
+/** What an appliance reported, as the column takes it. */
+function applianceColumn(
+    view: kinds.ApplianceView | null | undefined
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    const parsed = view ? kinds.applianceView(view) : null;
+    return parsed ? (parsed as Prisma.InputJsonValue) : Prisma.DbNull;
 }
 
 /** An air conditioner's settings with its room temperature beside them. */
@@ -140,7 +155,8 @@ function toView(row: DeviceRow): kinds.DeviceView {
         reading: row.value ? { value: row.value, unit: row.unit ?? "" } : null,
         stateAt: row.stateAt?.toISOString() ?? null,
         climate: climateOf(row),
-        air: airOf(row)
+        air: airOf(row),
+        appliance: applianceOf(row)
     };
 }
 
@@ -249,6 +265,10 @@ export async function actOnDevice(
     if (!device.accountId) throw new HomeError(`${device.name} is not connected to anything`);
     if (!device.online)
         throw new HomeError(`${device.name} was not answering when it was last checked`);
+    // An appliance that cannot be stopped from here is refused before anything
+    // is sent, rather than sent something it would ignore.
+    if (action === "stop" && !applianceOf(device)?.stoppable)
+        throw new HomeError("That device cannot be told to do that");
     // A setting is checked against the unit before anything is sent: a
     // temperature its own remote would not offer is refused here, in a sentence,
     // rather than sent and answered with silence or a beep. It is checked as the
@@ -322,8 +342,9 @@ export async function actOnDevice(
         ? "climate" in applied
             ? { climate: climateColumn(applied.climate) }
             : { air: airColumn(applied.air) }
-        : kinds.needsCommand(action)
-          ? {}
+        : kinds.needsCommand(action) || action === "stop"
+          ? // A stopped appliance says where it ended up at the next read.
+            {}
           : { state: kinds.settledState(action) ?? "moving" };
     const row = await prisma.placeDevice.update({
         where: { id: device.id },
@@ -417,6 +438,7 @@ async function syncAccount(
                 unit: snapshot.unit ?? null,
                 climate: climateColumn(snapshot.climate),
                 air: airColumn(snapshot.air),
+                appliance: applianceColumn(snapshot.appliance),
                 stateAt: new Date()
             };
             const saved = await prisma.placeDevice.upsert({

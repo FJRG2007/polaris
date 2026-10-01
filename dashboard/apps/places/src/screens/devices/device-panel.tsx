@@ -32,6 +32,7 @@ import type {
 import { DeviceSwitch } from "./device-switch";
 import { AirControls, FilterChip } from "./air-controls";
 import { ClimateControls } from "./climate-controls";
+import { ApplianceControls } from "./appliance-controls";
 import {
     Badge,
     Button,
@@ -46,6 +47,7 @@ import {
 import {
     AirVent,
     BatteryLow,
+    CookingPot,
     DoorClosed,
     DoorOpen,
     Droplets,
@@ -59,6 +61,7 @@ import {
     Plug,
     Power,
     PowerOff,
+    Square,
     ToggleRight,
     Wind
 } from "lucide-react";
@@ -82,7 +85,8 @@ const ACTION_ICONS: Record<DeviceAction, typeof Lock> = {
     "set-temperature": AirVent,
     "set-fan": AirVent,
     "set-option": AirVent,
-    "set-humidity": Droplets
+    "set-humidity": Droplets,
+    stop: Square
 };
 
 /** What each sort of device looks like in a list. A row of doors and a row of
@@ -96,7 +100,8 @@ const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
     switch: ToggleRight,
     outlet: Plug,
     light: Lightbulb,
-    sensor: Gauge
+    sensor: Gauge,
+    appliance: CookingPot
 };
 
 /** The one button that gets the weight. Locking up is what people came to
@@ -177,6 +182,18 @@ export function DeviceControls({
     if (kinds.deviceKind(device.kind) === "air") {
         return (
             <AirControls
+                device={device}
+                canControl={canControl}
+                busy={busy}
+                onAct={onAct}
+                detailed={detailed}
+                className={className}
+            />
+        );
+    }
+    if (kinds.deviceKind(device.kind) === "appliance") {
+        return (
+            <ApplianceControls
                 device={device}
                 canControl={canControl}
                 busy={busy}

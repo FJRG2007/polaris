@@ -24,6 +24,14 @@
  * Which kind of step, how often and for how long are the registry's; nothing
  * here names a make.
  *
+ * A pairing can also ask for a file after its first step - Philips' fan and
+ * heater cloud needs a value read out of the maker's own app. The poll answers
+ * that step with what it saw so far, the dialog says why the file is needed and
+ * where to get it, streams it to `/api/home/pairing/file` (an action carries a
+ * megabyte; an app is a hundred times that) and polls again with what comes
+ * back - a handle to what was read, never the value. Where the attempt found
+ * something already, it can also go on without the file.
+ *
  * A credential is written once and never shown again. There is no reveal and no
  * masked copy of it in a field on the next visit: it is a key to somebody's front
  * door, and a screen that can print it back is a screen somebody can be walked
@@ -36,7 +44,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as kinds from "../../lib/device-kinds";
 import type { DeviceView } from "../../lib/device-kinds";
 import * as registry from "../../lib/device-connections";
-import { Check, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { Check, ExternalLink, Loader2, RefreshCw, Upload } from "lucide-react";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import {
     Badge,
@@ -64,6 +72,49 @@ const { QRCodeSVG } = hostUi.qrCode;
 interface Pairing {
     readonly state: Record<string, string>;
     readonly qr?: string;
+}
+
+/** A file the attempt asked for after its first step. */
+interface FileStep {
+    readonly state: Record<string, string>;
+    readonly summary: string;
+    readonly skippable: boolean;
+}
+
+/** What a poll answered, as far as finishing goes. */
+interface PollAnswer {
+    readonly error?: string;
+    readonly waiting?: boolean;
+    readonly next?: FileStep;
+    readonly unsupported?: string[];
+    readonly devices?: DeviceView[];
+    readonly accounts?: DeviceAccountView[];
+}
+
+/** Send a file to the pairing's file step and answer the state it adds, or
+ *  the refusal to show. */
+async function uploadPairingFile(
+    connection: string,
+    file: File
+): Promise<{ state?: Record<string, string>; error?: string }> {
+    try {
+        const response = await fetch(
+            `/api/home/pairing/file?connection=${encodeURIComponent(connection)}`,
+            {
+                method: "POST",
+                headers: { "content-type": "application/octet-stream" },
+                body: file
+            }
+        );
+        const body = (await response.json().catch(() => ({}))) as {
+            state?: Record<string, string>;
+            error?: string;
+        };
+        if (!response.ok || !body.state) return { error: body.error ?? "" };
+        return { state: body.state };
+    } catch {
+        return { error: "" };
+    }
 }
 
 /** A make's name as the picker shows it: its own, or the words for the
@@ -171,6 +222,9 @@ export function ConnectDialog({
     const [expired, setExpired] = useState(false);
     /** The code typed for a pairing that is emailed one. */
     const [code, setCode] = useState("");
+    /** The file the attempt asked for after its code, and the one chosen. */
+    const [fileStep, setFileStep] = useState<FileStep | null>(null);
+    const [chosenFile, setChosenFile] = useState<File | null>(null);
     /** A connection made with models it cannot fully operate yet: said once,
      *  before the dialog closes, rather than left to be found row by row. */
     const [finished, setFinished] = useState<{
@@ -204,6 +258,8 @@ export function ConnectDialog({
         setExpired(false);
         setCode("");
         setFinished(null);
+        setFileStep(null);
+        setChosenFile(null);
     }, [open]);
 
     // Ask whether the other side has agreed, every few seconds, until it has, it
@@ -276,6 +332,7 @@ export function ConnectDialog({
         setFields({});
         setError("");
         setPairing(null);
+        setFileStep(null);
     };
 
     const pickConnection = (next: string) => {
@@ -283,6 +340,7 @@ export function ConnectDialog({
         setFields({});
         setError("");
         setPairing(null);
+        setFileStep(null);
     };
 
     /** Begin an attempt at pairing - or a fresh one, when the last ran out. */
@@ -302,7 +360,94 @@ export function ConnectDialog({
         }
         setExpired(false);
         setCode("");
+        setFileStep(null);
+        setChosenFile(null);
         setPairing({ state: result.state, qr: result.qr });
+    };
+
+    /** What a poll that sent something answered: a refusal stays on the step
+     *  it came from, a file step is drawn, and a connection closes the dialog -
+     *  after naming any model it cannot fully operate yet. */
+    const settle = (result: PollAnswer) => {
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        if (result.next) {
+            setFileStep(result.next);
+            setChosenFile(null);
+            return;
+        }
+        if (result.waiting) return;
+        setPairing(null);
+        setFileStep(null);
+        setChosenFile(null);
+        setExpired(false);
+        setCode("");
+        setFields({});
+        setLabel("");
+        const connected = { devices: result.devices ?? [], accounts: result.accounts ?? [] };
+        if (result.unsupported && result.unsupported.length > 0) {
+            setFinished({ result: connected, unsupported: result.unsupported });
+            return;
+        }
+        onConnected(connected);
+    };
+
+    /** Poll once with a state, for a step that sends something. */
+    const pollWith = async (state: Record<string, string>) => {
+        if (!connection) return;
+        const result = await runAction(
+            () =>
+                actions.pollDevicePairingAction({
+                    connection: connection.id,
+                    label,
+                    fields,
+                    state,
+                    accountId: reconnect?.id
+                }),
+            setError
+        );
+        if (result) settle(result);
+    };
+
+    const fileSpec = connection?.pairing?.file;
+    const fileWords = said?.pairingFile;
+    /** Why a chosen file cannot be sent, before it is: not an app file, or
+     *  larger than the step takes. */
+    const fileIssue =
+        chosenFile && fileSpec
+            ? !fileSpec.accept
+                  .split(",")
+                  .some((ending) => chosenFile.name.toLowerCase().endsWith(ending.trim()))
+                ? t("connect.pair.fileType", { accept: fileSpec.accept.replace(/,/g, ", ") })
+                : chosenFile.size > fileSpec.maxBytes
+                  ? t("connect.pair.fileLarge")
+                  : ""
+            : "";
+
+    /** Upload the chosen file, then ask again with what reading it gave. */
+    const sendFile = async () => {
+        if (!connection || !fileStep || !chosenFile || fileIssue || saving) return;
+        setSaving(true);
+        setError("");
+        const uploaded = await uploadPairingFile(connection.id, chosenFile);
+        if (!uploaded.state) {
+            setSaving(false);
+            setError(uploaded.error || t("connect.pair.fileFailed"));
+            return;
+        }
+        await pollWith({ ...fileStep.state, ...uploaded.state });
+        setSaving(false);
+    };
+
+    /** Finish with what was found before the file step. */
+    const skipFile = async () => {
+        if (!fileStep || saving) return;
+        setSaving(true);
+        setError("");
+        await pollWith({ ...fileStep.state, skip: "1" });
+        setSaving(false);
     };
 
     /** Send the emailed code. A wrong one leaves the box where it is, saying why,
@@ -325,22 +470,7 @@ export function ConnectDialog({
         );
         setSaving(false);
         if (!result) return;
-        if (result.error) {
-            setError(result.error);
-            return;
-        }
-        if (result.waiting) return;
-        setPairing(null);
-        setExpired(false);
-        setCode("");
-        setFields({});
-        setLabel("");
-        const connected = { devices: result.devices ?? [], accounts: result.accounts ?? [] };
-        if (result.unsupported && result.unsupported.length > 0) {
-            setFinished({ result: connected, unsupported: result.unsupported });
-            return;
-        }
-        onConnected(connected);
+        settle(result);
     };
 
     const submit = async () => {
@@ -555,7 +685,7 @@ export function ConnectDialog({
                                 </ol>
                             )}
 
-                            {pairing && connection?.pairing?.kind === "code" && (
+                            {pairing && !fileStep && connection?.pairing?.kind === "code" && (
                                 <div className="flex flex-col gap-3">
                                     {said?.pairingPrompt && (
                                         <p className="text-xs text-muted-foreground">
@@ -596,6 +726,64 @@ export function ConnectDialog({
                                         <RefreshCw className="size-4" />
                                         {t("connect.pair.resend")}
                                     </Button>
+                                </div>
+                            )}
+
+                            {pairing && fileStep && fileSpec && fileWords && (
+                                <div className="flex flex-col gap-3">
+                                    <p className="text-sm font-medium">{fileWords.title}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {fileWords.why(fileStep.summary)}
+                                    </p>
+                                    <label className="flex flex-col gap-1.5">
+                                        <span className="text-xs text-muted-foreground">
+                                            {fileWords.field}
+                                            <span className="text-danger"> *</span>
+                                        </span>
+                                        <input
+                                            type="file"
+                                            accept={fileSpec.accept}
+                                            disabled={saving}
+                                            onChange={(event) => {
+                                                setError("");
+                                                setChosenFile(event.target.files?.[0] ?? null);
+                                            }}
+                                            aria-label={fileWords.field}
+                                            className="min-w-0 rounded-md border border-border bg-background px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:text-foreground"
+                                        />
+                                    </label>
+                                    {fileIssue && (
+                                        <span className="text-xs text-danger">{fileIssue}</span>
+                                    )}
+                                    <p className="text-xs text-foreground-subtle">
+                                        {fileWords.link &&
+                                        fileWords.where.includes(fileWords.link) ? (
+                                            <>
+                                                {fileWords.where.split(fileWords.link)[0]}
+                                                <Link
+                                                    href={fileSpec.href}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-foreground underline"
+                                                >
+                                                    {fileWords.link}
+                                                    <ExternalLink className="size-3 shrink-0" />
+                                                </Link>
+                                                {fileWords.where.split(fileWords.link)[1]}
+                                            </>
+                                        ) : (
+                                            fileWords.where
+                                        )}
+                                    </p>
+                                    {saving && (
+                                        <p
+                                            className="flex items-center gap-2 text-xs text-foreground-subtle"
+                                            aria-live="polite"
+                                        >
+                                            <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                                            {t("connect.pair.fileReading")}
+                                        </p>
+                                    )}
                                 </div>
                             )}
 
@@ -712,10 +900,45 @@ export function ConnectDialog({
                             </Button>
                             {pairing ? (
                                 <>
-                                    <Button variant="outline" onClick={() => setPairing(null)}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setPairing(null);
+                                            setFileStep(null);
+                                            setChosenFile(null);
+                                        }}
+                                        disabled={saving}
+                                    >
                                         {t("connect.pair.back")}
                                     </Button>
-                                    {connection?.pairing?.kind === "code" && (
+                                    {fileStep && fileStep.skippable && fileWords?.skip && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => void skipFile()}
+                                            disabled={saving}
+                                        >
+                                            {fileWords.skip}
+                                        </Button>
+                                    )}
+                                    {fileStep && (
+                                        <Button
+                                            onClick={() => void sendFile()}
+                                            disabled={!chosenFile || Boolean(fileIssue) || saving}
+                                            aria-disabled={
+                                                !chosenFile || Boolean(fileIssue) || saving
+                                            }
+                                        >
+                                            {saving ? (
+                                                <Loader2 className="size-4 animate-spin" />
+                                            ) : (
+                                                <Upload className="size-4" />
+                                            )}
+                                            {saving
+                                                ? t("connect.checking")
+                                                : t("connect.pair.fileSend")}
+                                        </Button>
+                                    )}
+                                    {!fileStep && connection?.pairing?.kind === "code" && (
                                         <Button
                                             onClick={() => void sendCode()}
                                             disabled={!code.trim() || saving || expired}

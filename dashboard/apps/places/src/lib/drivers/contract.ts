@@ -13,6 +13,7 @@
 
 import type {
     AirSettings,
+    ApplianceView,
     ClimateSettings,
     DeviceCommand,
     DeviceAction,
@@ -71,6 +72,8 @@ export interface DeviceSnapshot {
     /** How a purifier or humidifier is set, what it can be set to and what it
      *  measures. Its headline figure is also `value`, in `unit`. */
     readonly air?: AirSettings | null;
+    /** What a kitchen appliance is doing, as far as it says. */
+    readonly appliance?: ApplianceView | null;
 }
 
 /** One thing that happened, as the vendor's own record of it. */
@@ -101,10 +104,25 @@ export interface PairingStart {
     readonly qr?: string;
 }
 
+/**
+ * A step a pairing needs before it can finish, beyond the one it started with:
+ * a file somebody has to upload. `state` replaces what the dialog sends back on
+ * the next poll; `summary` is what the attempt saw so far, in words with
+ * nothing private in them; `skippable` says the attempt can also finish
+ * without the step.
+ */
+export interface PairingNext {
+    readonly step: "file";
+    readonly state: Readonly<Record<string, string>>;
+    readonly summary: string;
+    readonly skippable: boolean;
+}
+
 /** Whether the other side has said yes yet. Not yet is the normal answer, asked
- *  again a few seconds later until the attempt runs out. */
+ *  again a few seconds later until the attempt runs out - or a step of its own
+ *  that the dialog draws before asking again. */
 export type PairingPoll =
-    | { readonly done: false }
+    | { readonly done: false; readonly next?: PairingNext }
     | {
           readonly done: true;
           readonly credentials: Credentials;
@@ -125,6 +143,14 @@ export type PairingPoll =
 export interface DevicePairing {
     start(fields: Credentials): Promise<PairingStart>;
     poll(fields: Credentials, state: Readonly<Record<string, string>>): Promise<PairingPoll>;
+    /**
+     * Read a file uploaded at a `file` step (`PairingNext`), from the path it
+     * was saved to, and answer what to add to the state for the next poll.
+     * What it reads stays on the server and comes back as a handle
+     * (`pairing-vault.ts`): the state is shown to the browser.
+     * The file is deleted by the caller as soon as this returns.
+     */
+    file?(path: string): Promise<Readonly<Record<string, string>>>;
 }
 
 /**

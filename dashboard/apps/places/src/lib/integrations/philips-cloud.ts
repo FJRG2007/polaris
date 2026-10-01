@@ -164,7 +164,8 @@ const gigyaSchema = z
         errorCode: z.number().optional(),
         vToken: z.string().max(4000).optional(),
         sessionInfo: z.object({ cookieValue: z.string().max(4000).optional() }).optional(),
-        gmidTicket: z.string().max(4000).optional()
+        gmidTicket: z.string().max(4000).optional(),
+        UID: z.string().max(200).optional()
     })
     .passthrough();
 
@@ -192,8 +193,14 @@ export async function requestPhilipsCode(email: string): Promise<string> {
     return answer.vToken;
 }
 
-/** The code from the email, traded for a Gigya session. */
-async function sessionFor(email: string, code: string, vToken: string): Promise<string> {
+/** The code from the email, traded for a Gigya session, with the account's id
+ *  at Gigya - which is also how Philips' fan and heater cloud knows the account
+ *  (`verify_otp` in the Air+ fan integration). */
+async function sessionFor(
+    email: string,
+    code: string,
+    vToken: string
+): Promise<{ session: string; uid: string }> {
     const answer = await gigya("accounts.auth.otp.email.login", {
         email,
         code,
@@ -214,7 +221,7 @@ async function sessionFor(email: string, code: string, vToken: string): Promise<
             "unauthorized"
         );
     }
-    return session;
+    return { session, uid: answer.UID?.trim() ?? "" };
 }
 
 // --- step 3: the session as tokens ----------------------------------------------
@@ -336,14 +343,14 @@ export async function tokensFor(
     );
 }
 
-/** The emailed code, all the way to tokens. */
+/** The emailed code, all the way to tokens, with the account's Gigya id. */
 export async function signInWithCode(
     email: string,
     code: string,
     vToken: string
-): Promise<{ gigyaSession: string; session: PhilipsSession }> {
-    const gigyaSession = await sessionFor(email, code, vToken);
-    return { gigyaSession, session: await tokensFor(gigyaSession, "airplus") };
+): Promise<{ gigyaSession: string; session: PhilipsSession; uid: string }> {
+    const { session: gigyaSession, uid } = await sessionFor(email, code, vToken);
+    return { gigyaSession, session: await tokensFor(gigyaSession, "airplus"), uid };
 }
 
 /** Whether a session is close enough to its end to be renewed now. */
@@ -624,7 +631,13 @@ export type PhilipsSource = "iot" | "homeid-app";
 /** One place Polaris looked, as the reader is told about it. */
 export interface PhilipsLookup {
     /** Which app's sign-in, and which list. */
-    readonly where: "Air+" | "HomeID" | "HomeID app" | "HomeID account";
+    readonly where:
+        | "Air+"
+        | "HomeID"
+        | "HomeID app"
+        | "HomeID account"
+        | "Air+ account"
+        | "Philips Air";
     /** How many appliances it listed, or null where it could not be read. */
     readonly count: number | null;
     /** Each appliance's model code or type, as Philips wrote it. */
@@ -655,31 +668,39 @@ function failureOf(caught: unknown): string {
     return "format";
 }
 
-/** The first of a list's appliances that is drawn as an air device, if any. */
+/** The devices of a list that are air devices. */
 function airOf(devices: readonly PhilipsCloudDevice[]): PhilipsCloudDevice[] {
     return devices.filter((device) => philipsApplianceKind(device.model) === "air");
 }
 
 /** One lookup that read a list, as the reader is told about it. */
-function seen(
+export function seenLookup(
     where: PhilipsLookup["where"],
-    devices: readonly PhilipsCloudDevice[]
+    models: readonly (string | null)[]
 ): PhilipsLookup {
-    return { where, count: devices.length, models: devices.map((device) => device.model ?? "?") };
+    return { where, count: models.length, models: models.map((model) => model ?? "?") };
 }
 
-/** A signed-in account and what was found on it. */
-export interface PhilipsDiscovery {
+/** What a sign-in found on Philips' Versuni side, and where. */
+export interface PhilipsFound {
     readonly session: PhilipsSession;
     readonly userId: string;
     readonly source: PhilipsSource;
     readonly devices: PhilipsCloudDevice[];
+}
+
+/** A signed-in account and what was found on it. */
+export interface PhilipsDiscovery {
+    /** The list to keep reading, or null where no list held anything. */
+    readonly found: PhilipsFound | null;
+    /** Whether that list holds an air device, rather than kitchen ones only. */
+    readonly hasAir: boolean;
     readonly lookups: readonly PhilipsLookup[];
 }
 
 /**
- * Everywhere a purifier on this account can be listed, in order, until one
- * lists something to draw:
+ * Everywhere a device on this account can be listed on Philips' Versuni side,
+ * in order, until one lists an air device:
  *
  * 1. the IoT registry with the Air+ app's token - a purifier paired in the Air+
  *    app is only shown to that client (both integrations);
@@ -688,17 +709,23 @@ export interface PhilipsDiscovery {
  *    last resort, `get_appliances_via_homeid`).
  *
  * A failure in one is noted and the next is tried: what one list refuses
- * another may hold. An appliance whose model nobody has mapped is drawn all the
- * same, named by its model; only a kitchen appliance is left out, since it is
- * not an air device at all. Nothing anywhere is a refusal that says what was
- * seen in each place, and the same summary is logged once so the next attempt
- * leaves evidence.
+ * another may hold. Where none holds an air device, the first list holding
+ * anything at all - a kitchen appliance - is the one kept; where none holds
+ * anything, nothing is, and the caller goes on to Philips' third cloud. What
+ * was seen in each place comes back either way, for the screen to say.
  */
 export async function discoverPhilipsDevices(
     gigyaSession: string,
     airplus: PhilipsSession
 ): Promise<PhilipsDiscovery> {
     const lookups: PhilipsLookup[] = [];
+    /** Sessions the IoT API would not name the account for: asked once. */
+    const refused = new Set<PhilipsSession>();
+    const candidates: {
+        session: PhilipsSession;
+        source: PhilipsSource;
+        devices: PhilipsCloudDevice[];
+    }[] = [];
 
     const registry = async (
         where: PhilipsLookup["where"],
@@ -711,7 +738,12 @@ export async function discoverPhilipsDevices(
                 return [];
             }
             const devices = unique(deviceItems(answer.body).map(philipsCloudDevice));
-            lookups.push(seen(where, devices));
+            lookups.push(
+                seenLookup(
+                    where,
+                    devices.map((device) => device.model)
+                )
+            );
             return devices;
         } catch (caught) {
             lookups.push({ where, count: null, models: [], failure: failureOf(caught) });
@@ -719,16 +751,15 @@ export async function discoverPhilipsDevices(
         }
     };
 
-    const refuse = (message: (summary: string) => string): never => {
-        const summary = philipsLookupSummary(lookups);
-        console.warn(`places: a Philips account sign-in found nothing to drive (${summary})`);
-        throw new DriverError(message(summary), "refused");
-    };
-
-    const fromAirplus = airOf(await registry("Air+", airplus));
-    if (fromAirplus.length > 0) {
+    const fromAirplus = await registry("Air+", airplus);
+    candidates.push({ session: airplus, source: "iot", devices: fromAirplus });
+    if (airOf(fromAirplus).length > 0) {
         const userId = await philipsUserId(airplus.accessToken);
-        return { session: airplus, userId, source: "iot", devices: fromAirplus, lookups };
+        return {
+            found: { session: airplus, userId, source: "iot", devices: fromAirplus },
+            hasAir: true,
+            lookups
+        };
     }
 
     let homeid: PhilipsSession | null = null;
@@ -740,18 +771,27 @@ export async function discoverPhilipsDevices(
         lookups.push({ where: "HomeID app", count: null, models: [], failure });
     }
     if (homeid) {
-        const fromHomeId = airOf(await registry("HomeID", homeid));
-        if (fromHomeId.length > 0) {
+        const fromHomeId = await registry("HomeID", homeid);
+        candidates.push({ session: homeid, source: "iot", devices: fromHomeId });
+        if (airOf(fromHomeId).length > 0) {
             const userId = await philipsUserId(homeid.accessToken);
-            return { session: homeid, userId, source: "iot", devices: fromHomeId, lookups };
+            return {
+                found: { session: homeid, userId, source: "iot", devices: fromHomeId },
+                hasAir: true,
+                lookups
+            };
         }
         let fromApp: PhilipsCloudDevice[] = [];
         try {
-            const appliances = unique(
+            fromApp = unique(
                 (await listHomeIdAppliances(homeid.accessToken)).map(philipsHomeIdAppliance)
             );
-            lookups.push(seen("HomeID app", appliances));
-            fromApp = airOf(appliances);
+            lookups.push(
+                seenLookup(
+                    "HomeID app",
+                    fromApp.map((device) => device.model)
+                )
+            );
         } catch (caught) {
             lookups.push({
                 where: "HomeID app",
@@ -760,31 +800,50 @@ export async function discoverPhilipsDevices(
                 failure: failureOf(caught)
             });
         }
-        if (fromApp.length > 0) {
+        candidates.push({ session: homeid, source: "homeid-app", devices: fromApp });
+        if (airOf(fromApp).length > 0) {
             try {
                 const userId = await philipsUserId(homeid.accessToken);
-                return { session: homeid, userId, source: "homeid-app", devices: fromApp, lookups };
+                return {
+                    found: { session: homeid, userId, source: "homeid-app", devices: fromApp },
+                    hasAir: true,
+                    lookups
+                };
             } catch (caught) {
+                refused.add(homeid);
                 lookups.push({
                     where: "HomeID account",
                     count: null,
                     models: [],
                     failure: failureOf(caught)
                 });
-                refuse(
-                    (summary) =>
-                        `Polaris found an air purifier on this Philips account, but Philips does not let this sign-in control it. What it saw: ${summary}.`
-                );
             }
         }
     }
 
-    const anything = lookups.some((lookup) => (lookup.count ?? 0) > 0);
-    return refuse((summary) =>
-        anything
-            ? `Polaris found appliances on this Philips account, but no air purifier. What it saw: ${summary}.`
-            : `Polaris found no air purifier on this Philips account. What it saw: ${summary}. Check that the purifier is in the Air+ app under this same email.`
-    );
+    // No air device anywhere it could be driven from: keep the first list that
+    // holds anything at all - a kitchen appliance - which goes over the same
+    // link.
+    for (const candidate of candidates) {
+        if (candidate.devices.length === 0 || refused.has(candidate.session)) continue;
+        try {
+            const userId = await philipsUserId(candidate.session.accessToken);
+            return {
+                found: { ...candidate, userId },
+                hasAir: airOf(candidate.devices).length > 0,
+                lookups
+            };
+        } catch (caught) {
+            refused.add(candidate.session);
+            lookups.push({
+                where: candidate.session === airplus ? "Air+ account" : "HomeID account",
+                count: null,
+                models: [],
+                failure: failureOf(caught)
+            });
+        }
+    }
+    return { found: null, hasAir: false, lookups };
 }
 
 /** The devices of a connection, from where it found them when it was made. */
@@ -792,9 +851,9 @@ export async function listPhilipsSource(
     accessToken: string,
     source: PhilipsSource
 ): Promise<PhilipsCloudDevice[]> {
-    if (source === "iot") return airOf(await listPhilipsDevices(accessToken));
+    if (source === "iot") return listPhilipsDevices(accessToken);
     try {
-        return airOf(unique((await listHomeIdAppliances(accessToken)).map(philipsHomeIdAppliance)));
+        return unique((await listHomeIdAppliances(accessToken)).map(philipsHomeIdAppliance));
     } catch (caught) {
         if (caught instanceof HomeIdStatus) {
             throw caught.status >= 500 ? unreachable() : garbled();
@@ -802,7 +861,6 @@ export async function listPhilipsSource(
         throw caught;
     }
 }
-
 /**
  * The MQTT client id for one device: the account's id, the device's, and a
  * suffix of Polaris' own - `build_client_id`. The broker allows one connection
