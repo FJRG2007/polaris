@@ -223,8 +223,13 @@ interface PlaceHow {
 
 /** How many tries a search has, counted from where it starts (`Loop.placeFloor`). */
 function placeLimit(loop: Loop, nearHome: boolean): number {
-    return PLACE_TRIES + (nearHome ? loop.placeFloor : 0);
+    return PLACE_TRIES + (nearHome ? loop.placeFloor + NEAR_TRIES : 0);
 }
+
+/** The tries a search that may come in near a home has besides: the ground of
+ *  a small island is mostly a home, a farm and a shore, and a try there is
+ *  quick - every column of it judged in a few commands. */
+const NEAR_TRIES = 10;
 /** How much ground a chest or a boss is judged by around where it goes. */
 const SPOT_RADIUS = 3;
 const WRITE_TRIES = 5;
