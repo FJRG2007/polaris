@@ -22,6 +22,7 @@ import type { SessionUser } from "./access";
 import {
     feedAddressOf,
     fetcherFor,
+    inBackground,
     ownerMayReachLan,
     sealFeedAddress,
     syncSource
@@ -125,8 +126,10 @@ async function roomForAnother(user: SessionUser): Promise<void> {
 
 /** Pull a new source's calendars without holding the screen. */
 function firstPull(sourceId: string): void {
-    void syncSource(sourceId).catch((caught: unknown) =>
-        console.error("polaris: a new calendar source did not sync:", caught)
+    inBackground(
+        syncSource(sourceId).catch((caught: unknown) =>
+            console.error("polaris: a new calendar source did not sync:", caught)
+        )
     );
 }
 

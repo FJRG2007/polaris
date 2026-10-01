@@ -451,6 +451,23 @@ export async function syncSource(sourceId: string, now = new Date()): Promise<vo
     }
 }
 
+/** Work started without holding the caller, until it ends either way. */
+const background = new Set<Promise<unknown>>();
+
+/** Run work in the background, kept track of so a test can wait for it. */
+export function inBackground(work: Promise<unknown>): void {
+    background.add(work);
+    void work.then(
+        () => background.delete(work),
+        () => background.delete(work)
+    );
+}
+
+/** Resolves once no background work is running, including any it started. */
+export async function backgroundIdle(): Promise<void> {
+    while (background.size > 0) await Promise.allSettled([...background]);
+}
+
 /**
  * A local change to a provider calendar: marked, then sent in the background.
  * The mark is what makes it survive a restart - the next pass sends it.
@@ -464,10 +481,12 @@ export async function pushChange(
         where: { id: objectId },
         data: { pendingPush: removed ? "delete" : "put" }
     });
-    void pushNow(objectId, sourceId).catch((caught: unknown) =>
-        console.error(
-            "polaris: a calendar change was not pushed yet:",
-            caught instanceof Error ? caught.message : caught
+    inBackground(
+        pushNow(objectId, sourceId).catch((caught: unknown) =>
+            console.error(
+                "polaris: a calendar change was not pushed yet:",
+                caught instanceof Error ? caught.message : caught
+            )
         )
     );
 }

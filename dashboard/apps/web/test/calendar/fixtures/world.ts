@@ -25,18 +25,15 @@ export function resetWorld(at: Date = NOW): void {
 
 /**
  * Let what an action started in the background (a push, a first pull) finish.
- * The modules that work loads lazily are loaded here first: a first load reads
- * from disk, which a slow runner can stretch past any number of turns.
+ * The work is awaited, not counted in turns: a first load of a lazily imported
+ * module reads from disk, which a slow runner can stretch past any number of
+ * turns. The turns after it drain what the host fakes leave in flight.
  */
 export async function settle(): Promise<void> {
-    await Promise.all([
-        import("@polaris-app/calendar/src/lib/sync-engine"),
-        import("@polaris-app/calendar/src/lib/effects"),
-        import("@polaris-app/calendar/src/lib/reminders"),
-        import("@polaris-app/calendar/src/lib/booking"),
-        import("@polaris-app/calendar/src/lib/invitations")
-    ]);
+    const { backgroundIdle } = await import("@polaris-app/calendar/src/lib/sync-engine");
+    await backgroundIdle();
     for (let round = 0; round < 40; round++) await new Promise((resolve) => setImmediate(resolve));
+    await backgroundIdle();
 }
 
 /** A sentence from the Calendar's English catalog. */
