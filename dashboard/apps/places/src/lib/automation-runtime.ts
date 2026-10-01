@@ -21,7 +21,14 @@ import { homeInstall } from "./access";
 import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import { readsDevices } from "./automation-kinds";
-import { airSettings, climateSettings, filterLife, wornFilter } from "./device-kinds";
+import {
+    airQuality,
+    airQualityRank,
+    airSettings,
+    climateSettings,
+    filterLife,
+    wornFilter
+} from "./device-kinds";
 import { prismaAutomationStore } from "./automation-store";
 import {
     createEngine,
@@ -55,7 +62,7 @@ export interface ObservedRow {
 }
 
 /** A purifier's figures as the engine compares them: each measure it reports,
- *  and the least filter life left as a share. */
+ *  the least filter life left as a share, and how good the air is as a rank. */
 function figuresOf(air: ReturnType<typeof airSettings>): Record<string, string> | undefined {
     if (!air) return undefined;
     const figures: Record<string, string> = {};
@@ -64,6 +71,8 @@ function figuresOf(air: ReturnType<typeof airSettings>): Record<string, string> 
     }
     const life = filterLife(air);
     if (life !== null) figures.filter = String(life);
+    const quality = airQuality(air);
+    if (quality) figures.quality = String(airQualityRank(quality.level));
     return figures;
 }
 

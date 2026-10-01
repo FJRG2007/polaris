@@ -1044,10 +1044,29 @@ function TriggerCard({
                                 id={id}
                                 value={trigger.direction}
                                 disabled={disabled}
-                                options={[
-                                    { value: "above", label: t("automations.fields.above") },
-                                    { value: "below", label: t("automations.fields.below") }
-                                ]}
+                                options={
+                                    trigger.measure === "quality"
+                                        ? [
+                                              {
+                                                  value: "above",
+                                                  label: t("automations.fields.worse")
+                                              },
+                                              {
+                                                  value: "below",
+                                                  label: t("automations.fields.better")
+                                              }
+                                          ]
+                                        : [
+                                              {
+                                                  value: "above",
+                                                  label: t("automations.fields.above")
+                                              },
+                                              {
+                                                  value: "below",
+                                                  label: t("automations.fields.below")
+                                              }
+                                          ]
+                                }
                                 onValueChange={(direction) =>
                                     onChange({
                                         ...trigger,
@@ -1057,12 +1076,11 @@ function TriggerCard({
                             />
                         )}
                     </fields.Field>
-                    <fields.NumberField
+                    <fields.FigureField
+                        measure={trigger.measure}
                         label={t("automations.fields.value")}
                         path={path}
-                        field="value"
                         value={trigger.value}
-                        step="any"
                         suffix={fields.measureSuffix(trigger.measure, device?.reading?.unit)}
                         disabled={disabled}
                         onChange={(value) => onChange({ ...trigger, value })}
@@ -1312,7 +1330,7 @@ function ConditionCard({
                                 disabled={disabled}
                                 options={auto.COMPARISONS.map((op) => ({
                                     value: op,
-                                    label: words.comparisonText(op, t)
+                                    label: words.comparisonText(op, t, condition.measure)
                                 }))}
                                 onValueChange={(op) =>
                                     onChange({ ...condition, op: op as auto.Comparison })
@@ -1320,12 +1338,11 @@ function ConditionCard({
                             />
                         )}
                     </fields.Field>
-                    <fields.NumberField
+                    <fields.FigureField
+                        measure={condition.measure}
                         label={t("automations.fields.value")}
                         path={path}
-                        field="value"
                         value={condition.value}
-                        step="any"
                         suffix={fields.measureSuffix(condition.measure, device?.reading?.unit)}
                         disabled={disabled}
                         onChange={(value) => onChange({ ...condition, value })}

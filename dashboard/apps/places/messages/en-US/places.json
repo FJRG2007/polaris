@@ -1312,6 +1312,22 @@
                 "allergen": "Allergen index",
                 "humidity": "Humidity",
                 "temperature": "Temperature"
+            },
+            "quality": {
+                "good": "Good",
+                "fair": "Fair",
+                "moderate": "Moderate",
+                "poor": "Poor",
+                "veryPoor": "Very poor",
+                "extremelyPoor": "Extremely poor"
+            },
+            "qualityHints": {
+                "good": "Fine to open the windows.",
+                "fair": "Fine for most people. Auto keeps it there.",
+                "moderate": "Keep the purifier on and the windows shut.",
+                "poor": "Keep it on, turn it up and keep the windows shut.",
+                "veryPoor": "Run it on high and spend little time in the room.",
+                "extremelyPoor": "Run it on turbo and stay out of the room if you can."
             }
         }
     },
@@ -1389,7 +1405,8 @@
             "readings": "Readings",
             "filters": "Filters",
             "lifePercent": "{percent}% left",
-            "lifeHours": "{hours} h left"
+            "lifeHours": "{hours} h left",
+            "quality": "Air quality"
         }
     },
     "deviceDialog": {
@@ -1542,7 +1559,9 @@
             "notify": "Notify: {message}",
             "run": "Run {name}",
             "set": "Set {device} to {value}",
-            "figure": "{measure} of {device}"
+            "figure": "{measure} of {device}",
+            "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}",
+            "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -1750,7 +1769,9 @@
             "optionTo": "Turn it",
             "measure": "Reading",
             "speed": "Fan speed",
-            "humidity": "Humidity"
+            "humidity": "Humidity",
+            "worse": "Gets worse than",
+            "better": "Gets better than"
         },
         "log": {
             "title": "What it did",
@@ -1786,7 +1807,16 @@
         "settingOn": "{option} on",
         "settingOff": "{option} off",
         "measures": {
-            "filter": "Filter life left"
+            "filter": "Filter life left",
+            "quality": "Air quality"
+        },
+        "qualityCompare": {
+            "gt": "Worse than",
+            "gte": "This or worse",
+            "lt": "Better than",
+            "lte": "This or better",
+            "eq": "Exactly",
+            "ne": "Not"
         }
     }
 }

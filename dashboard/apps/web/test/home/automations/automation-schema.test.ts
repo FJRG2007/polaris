@@ -674,7 +674,8 @@ describe("an air purifier", () => {
             "allergen",
             "humidity",
             "temperature",
-            "filter"
+            "filter",
+            "quality"
         ]);
         expect(auto.measuresFor("sensor")).toEqual([]);
         expect(

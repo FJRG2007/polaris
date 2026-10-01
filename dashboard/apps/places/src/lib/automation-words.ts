@@ -71,9 +71,9 @@ export function valueText(
 
 /** One of a purifier's figures, in the reader's words: "PM2.5", "Filter life". */
 export function measureText(measure: auto.ReadingMeasure, t: PlacesTranslator): string {
-    return measure === "filter"
-        ? t("automations.measures.filter")
-        : kinds.airMeasureText(measure, t);
+    if (measure === "filter") return t("automations.measures.filter");
+    if (measure === "quality") return t("automations.measures.quality");
+    return kinds.airMeasureText(measure, t);
 }
 
 /** A device, or one of its figures: "Bedroom purifier" or "PM2.5 of Bedroom
@@ -159,8 +159,29 @@ const COMPARISON_KEYS: Readonly<Record<auto.Comparison, PlacesKey>> = {
     ne: "automations.compare.ne"
 };
 
-export function comparisonText(op: auto.Comparison, t: PlacesTranslator): string {
-    return t(COMPARISON_KEYS[op]);
+export function comparisonText(
+    op: auto.Comparison,
+    t: PlacesTranslator,
+    measure?: auto.ReadingMeasure
+): string {
+    // Air quality is a rank where more is worse, so its comparisons are said in
+    // those words: "Worse than Moderate", not "Above 3".
+    return measure === "quality" ? t(`automations.qualityCompare.${op}`) : t(COMPARISON_KEYS[op]);
+}
+
+/** A figure's value as a person reads it: the number, or for air quality the
+ *  level that rank is. */
+export function figureValueText(
+    measure: auto.ReadingMeasure | undefined,
+    value: number,
+    t: PlacesTranslator
+): string {
+    if (!Number.isFinite(value)) return "?";
+    if (measure === "quality") {
+        const level = kinds.airQualityAt(value);
+        return level ? kinds.airQualityText(level, t) : "?";
+    }
+    return String(value);
 }
 
 function deviceName(
@@ -188,11 +209,16 @@ export function describeTrigger(
             return t("automations.say.manual");
         case "threshold": {
             const device = deviceName(lookup, trigger.deviceId, t);
-            return t("automations.say.threshold", {
-                device: figureOf(device.name, trigger.measure, t),
-                direction: trigger.direction,
-                value: Number.isFinite(trigger.value) ? String(trigger.value) : "?"
-            });
+            return t(
+                trigger.measure === "quality"
+                    ? "automations.say.qualityThreshold"
+                    : "automations.say.threshold",
+                {
+                    device: figureOf(device.name, trigger.measure, t),
+                    direction: trigger.direction,
+                    value: figureValueText(trigger.measure, trigger.value, t)
+                }
+            );
         }
         case "change": {
             const device = deviceName(lookup, trigger.deviceId, t);
@@ -232,10 +258,17 @@ export function describeCondition(
         }
         case "reading": {
             const device = deviceName(lookup, condition.deviceId, t);
+            if (condition.measure === "quality") {
+                return t("automations.say.qualityReading", {
+                    device: figureOf(device.name, condition.measure, t),
+                    op: condition.op,
+                    value: figureValueText(condition.measure, condition.value, t)
+                });
+            }
             return t("automations.say.reading", {
                 device: figureOf(device.name, condition.measure, t),
                 compare: comparisonText(condition.op, t),
-                value: Number.isFinite(condition.value) ? String(condition.value) : "?"
+                value: figureValueText(condition.measure, condition.value, t)
             });
         }
         case "time":
@@ -304,10 +337,15 @@ export function describeCause(
             span: durationText((cause.minutes ?? 0) * 60, t)
         });
     }
+    // A rank of air quality reads as its level, not as the number it is kept as.
+    const figure = (value: string | undefined) =>
+        cause.measure === "quality" && value
+            ? figureValueText("quality", Number(value), t)
+            : valueText(attribute, device.kind, value ?? "", t);
     return t("automations.cause.change", {
         device: figureOf(device.name, cause.measure, t),
-        from: valueText(attribute, device.kind, cause.from ?? "", t),
-        to: valueText(attribute, device.kind, cause.to ?? "", t)
+        from: figure(cause.from),
+        to: figure(cause.to)
     });
 }
 

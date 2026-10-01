@@ -1312,6 +1312,22 @@
                 "allergen": "Índice alérgenos",
                 "humidity": "Humedad",
                 "temperature": "Temperatura"
+            },
+            "quality": {
+                "good": "Buena",
+                "fair": "Pasable",
+                "moderate": "Regular",
+                "poor": "Mala",
+                "veryPoor": "Muy mala",
+                "extremelyPoor": "Pésima"
+            },
+            "qualityHints": {
+                "good": "Puedes abrir las ventanas.",
+                "fair": "Bien para casi todos. En Auto se mantiene.",
+                "moderate": "Deja el purificador puesto y las ventanas cerradas.",
+                "poor": "Déjalo puesto, súbelo y cierra las ventanas.",
+                "veryPoor": "Ponlo alto y pasa poco tiempo en la habitación.",
+                "extremelyPoor": "Ponlo en turbo y evita la habitación si puedes."
             }
         }
     },
@@ -1389,7 +1405,8 @@
             "readings": "Lecturas",
             "filters": "Filtros",
             "lifePercent": "Queda {percent}%",
-            "lifeHours": "Quedan {hours} h"
+            "lifeHours": "Quedan {hours} h",
+            "quality": "Calidad"
         }
     },
     "deviceDialog": {
@@ -1542,7 +1559,9 @@
             "notify": "Avisar: {message}",
             "run": "Lanzar {name}",
             "set": "Poner {device} en {value}",
-            "figure": "{measure} de {device}"
+            "figure": "{measure} de {device}",
+            "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}",
+            "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -1750,7 +1769,9 @@
             "optionTo": "Ponerlo",
             "measure": "Lectura",
             "speed": "Velocidad",
-            "humidity": "Humedad"
+            "humidity": "Humedad",
+            "worse": "Pasa a peor que",
+            "better": "Pasa a mejor que"
         },
         "log": {
             "title": "Qué hizo",
@@ -1786,7 +1807,16 @@
         "settingOn": "{option} activado",
         "settingOff": "{option} desactivado",
         "measures": {
-            "filter": "Vida del filtro"
+            "filter": "Vida del filtro",
+            "quality": "Calidad"
+        },
+        "qualityCompare": {
+            "gt": "Peor que",
+            "gte": "Esta o peor",
+            "lt": "Mejor que",
+            "lte": "Esta o mejor",
+            "eq": "Justo",
+            "ne": "No es"
         }
     }
 }
