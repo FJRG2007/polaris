@@ -317,6 +317,22 @@ export async function tuyaStatus(
     return parsed.data;
 }
 
+/** What a device accepts and reports, with each data point's range
+ *  (`GET /v1.0/devices/{device_id}/specifications`). Unchecked here: the
+ *  vocabulary that reads it validates it. */
+export async function tuyaSpecification(
+    credentials: TuyaCredentials,
+    deviceId: string
+): Promise<unknown> {
+    const { token } = await tuyaToken(credentials);
+    return call(
+        credentials,
+        "GET",
+        `/v1.0/devices/${encodeURIComponent(deviceId)}/specifications`,
+        { accessToken: token }
+    );
+}
+
 /** Tell a device to do something. Their call answers when they have accepted it,
  *  which for a plug on wifi is a good proxy for it having happened. */
 export async function tuyaCommand(

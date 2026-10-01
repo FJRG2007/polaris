@@ -9918,6 +9918,10 @@ model PlaceDevice {
     value          String?
     /// What that reading is in, as its own maker wrote it - "C", "%", "lx".
     unit           String?
+    /// How an air conditioner is set and what it can be set to (mode, target,
+    /// range, fan, extras), as `device-kinds` validates it. Null for every other
+    /// kind. Its room temperature is `value`, like any other thermometer's.
+    climate        Json?
     /// open | closed | unknown | none - the door itself, when a sensor is paired.
     /// `none` is no sensor, which is not the same as not knowing.
     doorState      String    @default("none")
@@ -10057,6 +10061,9 @@ model PlaceDeviceObservation {
     /// A sensor's reading as text, or empty for a device that has none.
     reading      String
     readingSince DateTime
+    /// An air conditioner's mode (cool, heat...), or empty for anything else.
+    mode         String   @default("")
+    modeSince    DateTime @default(now())
     /// One more on every change: what names each change, and what the swap
     /// compares, so two readers of the same change fire it once.
     version      Int      @default(0)

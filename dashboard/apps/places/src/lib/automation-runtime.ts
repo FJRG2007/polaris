@@ -21,6 +21,7 @@ import { homeInstall } from "./access";
 import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import { readsDevices } from "./automation-kinds";
+import { climateSettings } from "./device-kinds";
 import { prismaAutomationStore } from "./automation-store";
 import {
     createEngine,
@@ -47,6 +48,8 @@ export interface ObservedRow {
     readonly doorState: string;
     readonly value: string | null;
     readonly online: boolean;
+    /** An air conditioner's settings, as stored; anything else for the rest. */
+    readonly climate?: unknown;
 }
 
 function readout(row: ObservedRow): DeviceReadout {
@@ -57,6 +60,7 @@ function readout(row: ObservedRow): DeviceReadout {
         state: row.state,
         door: row.doorState,
         reading: row.value ?? "",
+        mode: row.state === "on" ? (climateSettings(row.climate)?.mode ?? "") : "",
         online: row.online
     };
 }
@@ -78,12 +82,13 @@ export function automationEngine(): AutomationEngine {
                         state: true,
                         doorState: true,
                         value: true,
+                        climate: true,
                         online: true
                     }
                 });
                 return row ? readout(row) : null;
             },
-            async act(installedAppId, deviceId, action, by) {
+            async act(installedAppId, deviceId, action, by, setting) {
                 // The same service as the button on the screen: the same four
                 // refusals, the same history entry, the same state afterwards.
                 const devices = await import("./devices");
@@ -92,14 +97,19 @@ export function automationEngine(): AutomationEngine {
                         installedAppId,
                         deviceId,
                         action,
-                        by.automationName
+                        by.automationName,
+                        setting
                     );
                     await recordAudit({
                         actorId: by.ownerId,
                         action: `places.device.${action}`,
                         targetType: "placeDevice",
                         targetId: deviceId,
-                        metadata: { name: device.name, automationId: by.automationId }
+                        metadata: {
+                            name: device.name,
+                            automationId: by.automationId,
+                            ...(setting ? { setting } : {})
+                        }
                     });
                 } catch (error) {
                     await recordAudit({

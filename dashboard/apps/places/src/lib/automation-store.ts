@@ -232,6 +232,8 @@ export const prismaAutomationStore: AutomationStore = {
                 doorSince: true,
                 reading: true,
                 readingSince: true,
+                mode: true,
+                modeSince: true,
                 version: true
             }
         });

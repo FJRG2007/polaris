@@ -11,7 +11,14 @@
  * Server-only: a driver holds somebody's credentials and talks to their house.
  */
 
-import type { DeviceAction, DeviceKind, DeviceState, DoorState } from "../device-kinds";
+import type {
+    ClimateCommand,
+    ClimateSettings,
+    DeviceAction,
+    DeviceKind,
+    DeviceState,
+    DoorState
+} from "../device-kinds";
 
 /** The fields a connection asked for, by the key the registry gave them. Opaque
  *  to everything except the driver that named them. */
@@ -57,6 +64,9 @@ export interface DeviceSnapshot {
     readonly value?: string | null;
     /** What that reading is in, as its own maker wrote it. */
     readonly unit?: string | null;
+    /** How an air conditioner is set and what it can be set to. Its room
+     *  temperature is `value`, in `unit`, like any other thermometer's. */
+    readonly climate?: ClimateSettings | null;
 }
 
 /** One thing that happened, as the vendor's own record of it. */
@@ -148,7 +158,10 @@ export interface DeviceDriver {
     act(
         credentials: Credentials,
         device: { readonly externalId: string; readonly kind: string },
-        action: DeviceAction
+        action: DeviceAction,
+        /** What to set, for the actions that set something - a mode, a
+         *  temperature. Already checked against the unit's own settings. */
+        command?: ClimateCommand
     ): Promise<void>;
     /** Present on a connection made by pairing rather than by typing. */
     readonly pair?: DevicePairing;

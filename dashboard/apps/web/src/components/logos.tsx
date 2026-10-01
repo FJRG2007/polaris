@@ -115,7 +115,11 @@ const SERVICE_IMAGES: Record<string, string> = {
     tuya: "/logos/tuya.webp",
     // SwitchBot's own wordmark, as their site serves it (switch-bot.com). Not in
     // any vector registry; their single brand red reads on both surfaces.
-    switchbot: "/logos/switchbot.svg"
+    switchbot: "/logos/switchbot.svg",
+    // Gree's emblem, cut from their own logo file (Wikimedia Commons, credited to
+    // gree.com) without the wordmark, which is unreadable at icon size. Their
+    // blue and orange, as published.
+    gree: "/logos/gree.svg"
 };
 
 /**

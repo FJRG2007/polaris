@@ -15,7 +15,7 @@
  * Server-only.
  */
 
-import { prisma } from "@polaris/db";
+import { Prisma, prisma } from "@polaris/db";
 import * as kinds from "./device-kinds";
 import { HomeError } from "./home-error";
 import * as accounts from "./device-accounts";
@@ -63,6 +63,7 @@ const DEVICE_FIELDS = {
     controllable: true,
     value: true,
     unit: true,
+    climate: true,
     stateAt: true
 } as const;
 
@@ -84,8 +85,24 @@ type DeviceRow = {
     controllable: boolean;
     value: string | null;
     unit: string | null;
+    climate: Prisma.JsonValue | null;
     stateAt: Date | null;
 };
+
+/** Settings to store, as the column takes them: SQL NULL for a device that has
+ *  none rather than a JSON null nobody asked for. */
+function climateColumn(
+    settings: kinds.ClimateSettings | null | undefined
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    return settings ? (settings as Prisma.InputJsonValue) : Prisma.DbNull;
+}
+
+/** An air conditioner's settings with its room temperature beside them. */
+function climateOf(row: DeviceRow): kinds.ClimateView | null {
+    if (kinds.deviceKind(row.kind) !== "climate") return null;
+    const settings = kinds.climateSettings(row.climate);
+    return settings ? { ...settings, current: kinds.readingNumber(row.value) } : null;
+}
 
 function toView(row: DeviceRow): kinds.DeviceView {
     return {
@@ -106,7 +123,8 @@ function toView(row: DeviceRow): kinds.DeviceView {
         // Both or neither: a unit with nothing to put it after is not a reading,
         // and a screen that drew one would print a bare "C".
         reading: row.value ? { value: row.value, unit: row.unit ?? "" } : null,
-        stateAt: row.stateAt?.toISOString() ?? null
+        stateAt: row.stateAt?.toISOString() ?? null,
+        climate: climateOf(row)
     };
 }
 
@@ -202,7 +220,8 @@ export async function actOnDevice(
     installedAppId: string,
     id: string,
     action: kinds.DeviceAction,
-    actor: string = ""
+    actor: string = "",
+    command?: kinds.ClimateCommand
 ): Promise<kinds.DeviceView> {
     const device = await requireDevice(installedAppId, id);
     if (!kinds.actionsFor(device.kind).includes(action)) {
@@ -214,6 +233,17 @@ export async function actOnDevice(
     if (!device.accountId) throw new HomeError(`${device.name} is not connected to anything`);
     if (!device.online)
         throw new HomeError(`${device.name} was not answering when it was last checked`);
+    // A setting is checked against the unit before anything is sent: a
+    // temperature its own remote would not offer is refused here, in a sentence,
+    // rather than sent and answered with silence or a beep.
+    const settings = kinds.climateSettings(device.climate);
+    if (kinds.needsCommand(action)) {
+        if (!command || command.action !== action) throw new HomeError("Say what to set it to");
+        const issue = kinds.climateCommandIssue(settings, command);
+        if (issue) throw new HomeError(issue);
+    } else if (command) {
+        throw new HomeError("Say what to set it to");
+    }
 
     const { view, credentials } = await accounts.accountWithCredentials(
         installedAppId,
@@ -221,7 +251,12 @@ export async function actOnDevice(
     );
     const driver = accounts.driverFor(view.connection);
     try {
-        await driver.act(credentials, { externalId: device.externalId, kind: device.kind }, action);
+        await driver.act(
+            credentials,
+            { externalId: device.externalId, kind: device.kind },
+            action,
+            kinds.needsCommand(action) ? command : undefined
+        );
     } catch (caught) {
         // Written down even though it never happened. A door that refused to move
         // is exactly what somebody comes to this history for, and the account's
@@ -257,9 +292,15 @@ export async function actOnDevice(
         });
     }
 
+    // A setting lands where it was told, like a switch; the power stays as it
+    // was. A lock is turning, and where it gets to is the account's to report.
+    const settled =
+        command && settings && kinds.needsCommand(action)
+            ? { climate: climateColumn(kinds.applyClimate(settings, command)) }
+            : { state: kinds.settledState(action) ?? "moving" };
     const row = await prisma.placeDevice.update({
         where: { id: device.id },
-        data: { state: kinds.settledState(action) ?? "moving", stateAt: new Date() },
+        data: { ...settled, stateAt: new Date() },
         select: DEVICE_FIELDS
     });
     // A socket told to go on is on now, and whatever is watching it hears so
@@ -347,6 +388,7 @@ async function syncAccount(
                 online: snapshot.online,
                 value: snapshot.value ?? null,
                 unit: snapshot.unit ?? null,
+                climate: climateColumn(snapshot.climate),
                 stateAt: new Date()
             };
             const saved = await prisma.placeDevice.upsert({
