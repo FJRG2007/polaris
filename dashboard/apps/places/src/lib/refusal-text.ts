@@ -236,6 +236,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["That temperature is not one this device accepts", "refusals.climateTemperature"],
     ["That fan speed is not one this device has", "refusals.climateFan"],
     ["That setting is not one this device has", "refusals.climateOption"],
+    ["This device takes a range rather than one temperature", "refusals.climateRange"],
     ["The air conditioner did not answer.", "refusals.greeQuiet"],
     ["The air conditioner refused that.", "refusals.greeRefused"],
     [

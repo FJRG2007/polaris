@@ -267,6 +267,25 @@ describe("an air conditioner", () => {
         ).rejects.toThrow("That mode is not one this device has");
         expect(sent.slice(before).some((call) => call.method === "POST")).toBe(false);
     });
+
+    it("refuses one temperature on an entity that only takes a range", async () => {
+        const before = sent.length;
+        const attributes = (states as { entity_id: string; attributes: Record<string, unknown> }[]).find(
+            (entity) => entity.entity_id === "climate.living_room"
+        )!.attributes;
+        delete attributes.temperature;
+        attributes.target_temp_low = 20;
+        attributes.target_temp_high = 24;
+        await expect(
+            homeAssistantDriver.act(
+                HOME,
+                { externalId: "climate.living_room", kind: "climate" },
+                "set-temperature",
+                { action: "set-temperature", target: 22 }
+            )
+        ).rejects.toThrow("This device takes a range rather than one temperature");
+        expect(sent.slice(before).some((call) => call.method === "POST")).toBe(false);
+    });
 });
 
 describe("what is sent", () => {

@@ -241,6 +241,8 @@ export async function actOnDevice(
         if (!command || command.action !== action) throw new HomeError("Say what to set it to");
         const issue = kinds.climateCommandIssue(settings, command);
         if (issue) throw new HomeError(issue);
+    } else if (command) {
+        throw new HomeError("Say what to set it to");
     }
 
     const { view, credentials } = await accounts.accountWithCredentials(
@@ -293,7 +295,7 @@ export async function actOnDevice(
     // A setting lands where it was told, like a switch; the power stays as it
     // was. A lock is turning, and where it gets to is the account's to report.
     const settled =
-        command && settings
+        command && settings && kinds.needsCommand(action)
             ? { climate: climateColumn(kinds.applyClimate(settings, command)) }
             : { state: kinds.settledState(action) ?? "moving" };
     const row = await prisma.placeDevice.update({

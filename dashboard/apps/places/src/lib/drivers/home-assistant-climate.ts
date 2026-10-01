@@ -148,6 +148,12 @@ export function haClimateService(
             return { service: "set_hvac_mode", data: { hvac_mode: word } };
         }
         case "set-temperature":
+            if (
+                numberOf(entity.attributes.temperature) === null &&
+                (numberOf(entity.attributes.target_temp_low) !== null ||
+                    numberOf(entity.attributes.target_temp_high) !== null)
+            )
+                throw new HomeError("This device takes a range rather than one temperature");
             return { service: "set_temperature", data: { temperature: command.target } };
         case "set-fan": {
             const word = fanTable(entity).get(command.fan);

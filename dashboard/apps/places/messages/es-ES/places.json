@@ -526,6 +526,7 @@
         "climateTemperature": "Este dispositivo no admite esa temperatura",
         "climateFan": "Este dispositivo no tiene esa velocidad de ventilador",
         "climateOption": "Este dispositivo no tiene ese ajuste",
+        "climateRange": "Este dispositivo usa un rango, no una sola temperatura",
         "greeQuiet": "El aire acondicionado no respondió.",
         "greeRefused": "El aire acondicionado lo rechazó.",
         "greeUnpaired": "Polaris ya no está emparejado con estos aires. Vuelve a conectarlos.",

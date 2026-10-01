@@ -60,7 +60,7 @@ function readout(row: ObservedRow): DeviceReadout {
         state: row.state,
         door: row.doorState,
         reading: row.value ?? "",
-        mode: climateSettings(row.climate)?.mode ?? "",
+        mode: row.state === "on" ? (climateSettings(row.climate)?.mode ?? "") : "",
         online: row.online
     };
 }
