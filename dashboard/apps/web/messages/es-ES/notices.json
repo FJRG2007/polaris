@@ -88,7 +88,9 @@
         "downMany": "{count} dominios dejaron de dar servicio",
         "upMany": "{count} dominios vuelven a responder",
         "downManyBody": "{names}. Cayeron a la vez, así que suele ser la conexión o el borde más que los propios servicios.",
-        "upManyBody": "{names}."
+        "upManyBody": "{names}.",
+        "upOneBodyAfter": "Vuelve a responder, tras al menos {duration} caído.",
+        "upManyBodyAfter": "{names}. El que más estuvo caído, al menos {duration}."
     },
     "delivery": {
         "openInPolaris": "Abrir en Polaris"
@@ -194,7 +196,8 @@
         "offlineBody": "Nada respondió en {url}, ni tampoco nada más: los resolvedores públicos que comprueba Polaris también están en silencio, así que es la línea y no la dirección. No hay que cambiar nada de {host}: volverá a ser accesible cuando vuelva la conexión. Todo lo que Polaris hace fuera de esta red queda en pausa hasta entonces.",
         "downTitle": "{host} no responde",
         "downBody": "Nada respondió en {url}. Polaris puede acceder a internet, así que el problema es esa dirección y no la conexión. Sigue en Ajustes, marcada como inaccesible.",
-        "downBodyDetail": "Nada respondió en {url} ({detail}). Polaris puede acceder a internet, así que el problema es esa dirección y no la conexión. Sigue en Ajustes, marcada como inaccesible."
+        "downBodyDetail": "Nada respondió en {url} ({detail}). Polaris puede acceder a internet, así que el problema es esa dirección y no la conexión. Sigue en Ajustes, marcada como inaccesible.",
+        "backBodyAfter": "{url} vuelve a ser accesible, tras {duration} caído."
     },
     "leftover": {
         "title": "{count, plural, one {Polaris eliminó un volumen sobrante ({size})} other {Polaris eliminó # volúmenes sobrantes ({size})}}",
@@ -263,5 +266,14 @@
         "silentHome": "Nada respondió en {hostname} desde aquí. Muchos routers no devuelven hacia dentro su propia dirección pública, así que esto no es una prueba por sí solo: compruébalo desde fuera de la red, con datos móviles, para estar seguro.",
         "silentDatacenter": "Nada respondió en {hostname} desde aquí.",
         "allowInbound": "Permite la entrada por 80 y 443 en el firewall o grupo de seguridad de tu proveedor."
+    },
+    "span": {
+        "seconds": "{seconds} s",
+        "minutes": "{minutes} min",
+        "minutesSeconds": "{minutes} min {seconds} s",
+        "hours": "{hours} h",
+        "hoursMinutes": "{hours} h {minutes} min",
+        "days": "{days} d",
+        "daysHours": "{days} d {hours} h"
     }
 }

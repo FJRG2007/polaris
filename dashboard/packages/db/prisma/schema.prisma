@@ -5360,6 +5360,64 @@ model AlarmEvent {
 
     @@index([alarmId, createdAt])
 }
+
+// One stretch of time this deployment could not be reached from outside, or could
+// not reach out at all. Written by the address watcher (lib/address-health.ts)
+// through lib/connectivity/outage-tracker.ts from the same probes that raise the
+// "cannot reach the internet" alert - there is no second prober.
+//
+// Duration is not stored: it is endedAt - startedAt, and an ongoing one is
+// measured against the last pass that saw it (lastSeenAt), never against a clock
+// that kept running while Polaris was stopped.
+model ConnectivityOutage {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    // line | dns | address - the worst seen while it lasted. line: the public
+    // resolvers were silent too; dns: the address's name did not resolve;
+    // address: the line works and the public address did not answer.
+    kind        String
+    startedAt   DateTime
+    endedAt     DateTime?
+    // The last pass that found it still down. What a restart is measured against.
+    lastSeenAt  DateTime
+    // The last pass that found everything answering before it began, so the
+    // screen can say how precisely the start is known.
+    lastUpAt    DateTime?
+    // The host whose probe noticed it, or null when no public address is listed
+    // and only the resolvers were asked.
+    detectedBy  String?
+    // The probe's own words at the start: "Timed out", "HTTP 502".
+    detail      String?
+    // What answered first on the way back: "internet" (the resolvers, while the
+    // address was still silent) or the host that answered.
+    firstBack   String?
+    firstBackAt DateTime?
+    // recovered | unobserved (Polaris stopped watching mid-outage; closed at the
+    // last pass that saw it down rather than counting time nobody measured).
+    closedBy    String?
+    // Outages shorter apart than the merge gap folded into this one.
+    blips       Int       @default(0)
+    // "open" while ongoing, null once ended: the unique index is what keeps two
+    // web containers serving during an update from each opening one.
+    openSlot    String?   @unique
+    createdAt   DateTime  @default(now())
+
+    @@index([startedAt])
+    @@index([endedAt])
+}
+
+// Outages older than the retention window, folded into one row per month and
+// kind, so a year-old history still answers "how often" after its rows are gone.
+model ConnectivityOutageMonth {
+    id              String @id @default(uuid(7)) @db.Uuid
+    // YYYY-MM, UTC.
+    month           String
+    kind            String
+    count           Int    @default(0)
+    downtimeSeconds Int    @default(0)
+    longestSeconds  Int    @default(0)
+
+    @@unique([month, kind])
+}
 // ---------------------------------------------------------------------------
 // Organizations and teams
 // ---------------------------------------------------------------------------

@@ -127,6 +127,28 @@ describe("when a whole sweep moves at once", () => {
     });
 });
 
+describe("a recovery says how long it was down", () => {
+    it("for one domain, counted from the alert", () => {
+        const said = domainHealthMessage("up", [LABELS[0]!], null, undefined, 47 * 60_000);
+        expect(said.body).toBe("It is answering again, after at least 47 min down.");
+    });
+
+    it("for a sweep, the longest of them", () => {
+        const said = domainHealthMessage("up", LABELS.slice(0, 2), null, undefined, 2 * 3_600_000 + 5 * 60_000);
+        expect(said.body).toContain("The longest had been down for at least 2 h 5 min.");
+    });
+
+    it("in the reader's language", async () => {
+        const { translatorFor } = await import("@/lib/i18n/translate");
+        const said = domainHealthMessage("up", [LABELS[0]!], null, translatorFor("es-ES", "notices"), 90_000);
+        expect(said.body).toBe("Vuelve a responder, tras al menos 1 min 30 s caído.");
+    });
+
+    it("and stays as it was when the length is not known", () => {
+        expect(domainHealthMessage("up", [LABELS[0]!], null).body).toBe("It is answering again.");
+    });
+});
+
 /**
  * That the sweep speaks once is asserted where it can be watched doing it, in
  * `one-alert-per-sweep`. What is left here is the other half of the same switch:

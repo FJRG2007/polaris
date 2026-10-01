@@ -36,6 +36,13 @@ function matches(key: string, where: KeyWhere): boolean {
 }
 
 const setting = {
+    findUnique: vi.fn(async ({ where }: { where: { key: string; }; }) =>
+        rows.has(where.key) ? { value: rows.get(where.key) } : null
+    ),
+    upsert: vi.fn(async ({ where, create, update }: { where: { key: string; }; create: { value: string; }; update: { value: string; }; }) => {
+        rows.set(where.key, rows.has(where.key) ? update.value : create.value);
+        return {};
+    }),
     findMany: vi.fn(async ({ where }: { where: KeyWhere; }) =>
         [...rows].filter(([key]) => matches(key, where)).map(([key, value]) => ({ key, value }))
     ),
@@ -91,6 +98,16 @@ vi.mock("@/lib/polaris-tunnel-service", () => ({
     stopPolarisTunnel: () => stopPolarisTunnel()
 }));
 
+/** Whether the public resolvers answer, as the offline alert asks. */
+let online = true;
+vi.mock("@/lib/internet-reach", () => ({ hasInternet: async () => online }));
+
+/** What each pass told the outage record (outage-tracker.test.ts owns the rest). */
+const recordPass = vi.fn(async (_observation: unknown) => ({ closely: false }));
+vi.mock("@/lib/connectivity/outage-tracker", () => ({
+    recordPass: (observation: unknown) => recordPass(observation)
+}));
+
 // Settling the public tunnel is its own concern (share-tunnel.test.ts).
 vi.mock("@/lib/public-reach", () => ({ settleShareTunnel: async () => "unchanged" }));
 
@@ -114,6 +131,8 @@ beforeEach(() => {
     notify.mockClear();
     stopPolarisTunnel.mockClear();
     checkDomain.mockClear();
+    recordPass.mockClear();
+    online = true;
     tunnelRunning = true;
     addresses = [
         { url: "http://polaris.local", host: "polaris.local", kind: "app" },
@@ -215,5 +234,52 @@ describe("what happens to a dead address", () => {
         addresses = addresses.filter((address) => address.kind !== "domain");
         await sweep();
         expect([...rows.keys()]).not.toContain("address.health.polaris.example.com");
+    });
+});
+
+describe("what a pass tells the outage record", () => {
+    it("says the connection is up when any address answered", async () => {
+        answering.delete("ready-cat-9.trycloudflare.com");
+        await sweep();
+        expect(recordPass).toHaveBeenLastCalledWith({ up: true, via: "polaris.example.com" });
+    });
+
+    it("says the line is down when nothing answered and the resolvers are silent too", async () => {
+        answering.clear();
+        online = false;
+        await sweep();
+        expect(recordPass).toHaveBeenLastCalledWith(
+            expect.objectContaining({ up: false, kind: "line", detectedBy: "polaris.example.com" })
+        );
+        expect(alerts()[0]?.title).toBe("Polaris cannot reach the internet");
+    });
+
+    it("says it is the address when the line works", async () => {
+        answering.clear();
+        await sweep();
+        expect(recordPass).toHaveBeenLastCalledWith(expect.objectContaining({ up: false, kind: "address" }));
+    });
+});
+
+describe("an address answering again", () => {
+    it("says how long it was down", async () => {
+        answering.delete("polaris.example.com");
+        await sweep();
+        notify.mockClear();
+
+        await vi.advanceTimersByTimeAsync(25 * 60_000);
+        answering.add("polaris.example.com");
+        await sweep();
+        expect(alerts()[0]?.title).toContain("answering again");
+        expect(alerts()[0]?.body).toMatch(/is reachable again, after 25 min down\./);
+    });
+
+    it("forgets when a removed address changed, with its health", async () => {
+        answering.delete("polaris.example.com");
+        await sweep();
+        expect([...rows.keys()]).toContain("address.since.polaris.example.com");
+        addresses = addresses.filter((address) => address.kind !== "domain");
+        await sweep();
+        expect([...rows.keys()]).not.toContain("address.since.polaris.example.com");
     });
 });

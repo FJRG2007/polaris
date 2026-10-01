@@ -62,6 +62,10 @@ export interface DomainHealth {
     code: number | null;
     latencyMs: number;
     detail: string | null;
+    /** The network error code behind a failure that never got an answer -
+     *  `ENOTFOUND`, `ECONNREFUSED` - when the runtime gave one. Not persisted: it is
+     *  what tells a name that did not resolve from an address that did not answer. */
+    errorCode?: string;
     /** Set when the edge itself answered that nothing serves this hostname, rather than
      *  a service answering badly. Not persisted - it is what tells the poller to
      *  republish the routes, since that is a fault Polaris can repair on its own. */
@@ -137,6 +141,7 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
             detail: status === "down" ? `HTTP ${response.status}` : null
         };
     } catch (caught) {
+        const errorCode = (caught as { cause?: { code?: unknown } })?.cause?.code;
         return {
             status: "down",
             code: null,
@@ -145,7 +150,8 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
                 ? "Timed out"
                 : caught instanceof Error
                   ? caught.message
-                  : "Unreachable"
+                  : "Unreachable",
+            ...(typeof errorCode === "string" && !controller.signal.aborted ? { errorCode } : {})
         };
     } finally {
         clearTimeout(timer);
@@ -257,7 +263,10 @@ async function persistHealth(
         const change: DomainHealthChange = {
             domainId: id,
             status: next.alert,
-            detail: health.detail
+            detail: health.detail,
+            // A recovery says how long it was down: at least since the alert went
+            // out, which is the earliest moment this row can vouch for.
+            downSince: next.alert === "up" ? previous.healthAlertedAt : null
         };
         if (collect) collect.push(change);
         else await notifyDomainHealthChanged(change);
