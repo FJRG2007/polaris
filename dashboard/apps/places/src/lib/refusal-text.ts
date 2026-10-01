@@ -229,7 +229,13 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["SwitchBot answered with something unexpected.", "refusals.switchbotOdd"],
     ["The device is not answering SwitchBot right now.", "refusals.switchbotOffline"],
     ["SwitchBot refused the request.", "refusals.switchbotRefused"],
-    ["A SwitchBot device cannot be told to do that", "refusals.switchbotCannot"]
+    ["A SwitchBot device cannot be told to do that", "refusals.switchbotCannot"],
+    ["Say what to set it to", "refusals.climateNoSetting"],
+    ["That device has not said what it can be set to yet", "refusals.climateUnknown"],
+    ["That mode is not one this device has", "refusals.climateMode"],
+    ["That temperature is not one this device accepts", "refusals.climateTemperature"],
+    ["That fan speed is not one this device has", "refusals.climateFan"],
+    ["That setting is not one this device has", "refusals.climateOption"]
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */
@@ -338,7 +344,10 @@ export function placesRefusalText(t: PlacesTranslator, message: string): string 
     const action = cannot ? ACTION_BY_VERB.get(cannot[2] ?? "") : undefined;
     // An ICU selector cannot hold a hyphen, so "turn-on" is asked as "turnOn".
     if (kind && action)
-        return t("refusals.kindCannot", { kind, action: action.replace("-on", "On") });
+        return t("refusals.kindCannot", {
+            kind,
+            action: action.replace(/-(\w)/g, (_, letter: string) => letter.toUpperCase())
+        });
     for (const { pattern, key: shaped, params } of OUTAGES) {
         const found = pattern.exec(message);
         if (!found) continue;

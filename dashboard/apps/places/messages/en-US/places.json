@@ -436,7 +436,7 @@
         "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "tuyaRefused": "Tuya refused the request.",
         "reconnect": "{name} has to be connected again",
-        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} other {turn off}}",
+        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} other {do that}}",
         "watchOnly": "{name} is set to be watched, not operated",
         "notConnected": "{name} is not connected to anything",
         "notAnswering": "{name} was not answering when it was last checked",
@@ -519,7 +519,13 @@
         "switchbotCannot": "A SwitchBot device cannot be told to do that",
         "automationGone": "That automation is not here",
         "automationNewer": "That automation was saved by a newer Polaris",
-        "automationNames": "That automation names something that is not here"
+        "automationNames": "That automation names something that is not here",
+        "climateNoSetting": "Say what to set it to",
+        "climateUnknown": "That device has not said what it can be set to yet",
+        "climateMode": "That mode is not one this device has",
+        "climateTemperature": "That temperature is not one this device accepts",
+        "climateFan": "That fan speed is not one this device has",
+        "climateOption": "That setting is not one this device has"
     },
     "connections": {
         "nuki-web": {
@@ -1065,7 +1071,8 @@
             "switch": "Switch",
             "outlet": "Socket",
             "light": "Light",
-            "sensor": "Sensor"
+            "sensor": "Sensor",
+            "climate": "Air conditioner"
         },
         "groups": {
             "lock": "Doors",
@@ -1073,7 +1080,8 @@
             "switch": "Switches and sockets",
             "outlet": "Switches and sockets",
             "light": "Lights",
-            "sensor": "Sensors"
+            "sensor": "Sensors",
+            "climate": "Climate"
         },
         "states": {
             "locked": "Locked",
@@ -1096,7 +1104,11 @@
             "unlock": "Unlock",
             "unlatch": "Open",
             "turn-on": "On",
-            "turn-off": "Off"
+            "turn-off": "Off",
+            "set-mode": "Mode",
+            "set-temperature": "Temperature",
+            "set-fan": "Fan speed",
+            "set-option": "Setting"
         },
         "via": {
             "polaris": "from Polaris",
@@ -1118,7 +1130,11 @@
             "door-closed": "Door closed",
             "door-ajar": "Door left open",
             "calibrated": "Calibrated",
-            "other": "Something happened"
+            "other": "Something happened",
+            "set-mode": "Mode changed",
+            "set-temperature": "Temperature set",
+            "set-fan": "Fan speed changed",
+            "set-option": "Setting changed"
         },
         "kindStates": {
             "lock": {
@@ -1154,6 +1170,29 @@
             "connected": "Connected",
             "disconnected": "Disconnected",
             "tampered": "Tampered"
+        },
+        "climate": {
+            "modes": {
+                "cool": "Cool",
+                "heat": "Heat",
+                "dry": "Dry",
+                "fan": "Fan only",
+                "auto": "Auto"
+            },
+            "fans": {
+                "auto": "Auto",
+                "low": "Low",
+                "medium-low": "Medium-low",
+                "medium": "Medium",
+                "medium-high": "Medium-high",
+                "high": "High"
+            },
+            "options": {
+                "swing": "Swing",
+                "turbo": "Turbo",
+                "quiet": "Quiet",
+                "eco": "Eco"
+            }
         }
     },
     "devicesView": {
@@ -1196,7 +1235,21 @@
         "emptyBody": "Everything this has been told to do lands here, including whatever did not finish.",
         "switchName": "Turn {name} on or off",
         "noControl": "You can see this, but not operate it.",
-        "offline": "It is not answering, so it cannot be switched now."
+        "offline": "It is not answering, so it cannot be switched now.",
+        "climate": {
+            "mode": "Mode",
+            "fan": "Fan speed",
+            "target": "Target",
+            "room": "Room temperature",
+            "extras": "Extras",
+            "modeName": "Mode of {name}",
+            "fanName": "Fan speed of {name}",
+            "targetName": "Target temperature of {name}",
+            "lower": "Lower the target on {name}",
+            "raise": "Raise the target on {name}",
+            "optionName": "{option} on {name}",
+            "unknown": "It has not said what it can be set to yet. It will once it answers a check."
+        }
     },
     "deviceDialog": {
         "connected": "Connected through the account it is on.",

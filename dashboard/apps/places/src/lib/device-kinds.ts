@@ -13,18 +13,28 @@
  * the driver.
  */
 
+import { z } from "zod";
 import type { PlacesTranslator } from "./i18n";
 import { wallClock, zonedInstant } from "@polaris/core";
 import { englishPlaces as en, type PlacesKey } from "../../messages";
 
 /** What a device does, which is what decides the buttons it gets. */
-export const DEVICE_KINDS = ["lock", "opener", "switch", "outlet", "light", "sensor"] as const;
+export const DEVICE_KINDS = [
+    "lock",
+    "opener",
+    "climate",
+    "switch",
+    "outlet",
+    "light",
+    "sensor"
+] as const;
 
 export type DeviceKind = (typeof DEVICE_KINDS)[number];
 
 export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
     lock: en("devices.kinds.lock"),
     opener: en("devices.kinds.opener"),
+    climate: en("devices.kinds.climate"),
     switch: en("devices.kinds.switch"),
     outlet: en("devices.kinds.outlet"),
     light: en("devices.kinds.light"),
@@ -36,6 +46,7 @@ export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
 export const DEVICE_GROUP_LABELS: Readonly<Record<DeviceKind, string>> = {
     lock: en("devices.groups.lock"),
     opener: en("devices.groups.opener"),
+    climate: en("devices.groups.climate"),
     switch: en("devices.groups.switch"),
     outlet: en("devices.groups.outlet"),
     light: en("devices.groups.light"),
@@ -230,7 +241,17 @@ export const DOOR_STATE_LABELS: Readonly<Record<DoorState, string>> = {
 };
 
 /** What somebody can ask of a device from here. */
-export const DEVICE_ACTIONS = ["lock", "unlock", "unlatch", "turn-on", "turn-off"] as const;
+export const DEVICE_ACTIONS = [
+    "lock",
+    "unlock",
+    "unlatch",
+    "turn-on",
+    "turn-off",
+    "set-mode",
+    "set-temperature",
+    "set-fan",
+    "set-option"
+] as const;
 
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
 
@@ -239,7 +260,11 @@ export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
     unlock: en("devices.actions.unlock"),
     unlatch: en("devices.actions.unlatch"),
     "turn-on": en("devices.actions.turn-on"),
-    "turn-off": en("devices.actions.turn-off")
+    "turn-off": en("devices.actions.turn-off"),
+    "set-mode": en("devices.actions.set-mode"),
+    "set-temperature": en("devices.actions.set-temperature"),
+    "set-fan": en("devices.actions.set-fan"),
+    "set-option": en("devices.actions.set-option")
 };
 
 /** The same actions as something a sentence can be built out of. The label on a
@@ -250,7 +275,11 @@ export const DEVICE_ACTION_VERBS: Readonly<Record<DeviceAction, string>> = {
     unlock: "unlock",
     unlatch: "open",
     "turn-on": "turn on",
-    "turn-off": "turn off"
+    "turn-off": "turn off",
+    "set-mode": "change mode",
+    "set-temperature": "change temperature",
+    "set-fan": "change fan speed",
+    "set-option": "change a setting"
 };
 
 /**
@@ -265,6 +294,10 @@ export const DEVICE_ACTION_VERBS: Readonly<Record<DeviceAction, string>> = {
 const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
     lock: ["lock", "unlock", "unlatch"],
     opener: ["unlatch"],
+    // An air conditioner is switched like a socket and then told how: a mode,
+    // a temperature, a fan speed and whichever extras it has. The extras are
+    // per unit, and `climateCommandIssue` is what refuses one it lacks.
+    climate: ["turn-on", "turn-off", "set-mode", "set-temperature", "set-fan", "set-option"],
     switch: ["turn-on", "turn-off"],
     outlet: ["turn-on", "turn-off"],
     light: ["turn-on", "turn-off"],
@@ -293,6 +326,206 @@ export function settledState(action: DeviceAction): DeviceState | null {
     return null;
 }
 
+// --- air conditioners ---------------------------------------------------------
+
+/**
+ * What an air conditioner can be set to do. The words are Places' own: Gree
+ * numbers them, Tuya calls cooling "cold" and Home Assistant calls the fan
+ * "fan_only", and each driver translates once on the way in and on the way out.
+ * Off is not a mode here - it is the power, which is the device's state - so a
+ * unit that is off still remembers whether it was cooling.
+ */
+export const CLIMATE_MODES = ["cool", "heat", "dry", "fan", "auto"] as const;
+export type ClimateMode = (typeof CLIMATE_MODES)[number];
+
+/** Fan speeds, slowest first after automatic. A unit offers the ones it has. */
+export const CLIMATE_FANS = ["auto", "low", "medium-low", "medium", "medium-high", "high"] as const;
+export type ClimateFan = (typeof CLIMATE_FANS)[number];
+
+/** The extras some units have and some do not, each simply on or off. */
+export const CLIMATE_OPTIONS = ["swing", "turbo", "quiet", "eco"] as const;
+export type ClimateOption = (typeof CLIMATE_OPTIONS)[number];
+
+export const CLIMATE_UNITS = ["C", "F"] as const;
+export type ClimateUnit = (typeof CLIMATE_UNITS)[number];
+
+/** The widest range any unit is believed when it states its own: anything past
+ *  this is a misread, not an air conditioner. */
+const TEMPERATURE_FLOOR = -50;
+const TEMPERATURE_CEILING = 150;
+
+const temperature = z.number().finite().min(TEMPERATURE_FLOOR).max(TEMPERATURE_CEILING);
+
+/**
+ * How an air conditioner is set, and what it can be set to.
+ *
+ * Stored on the device row as one document, refreshed by every sync. The
+ * current room temperature is not in here: it is the device's reading, the same
+ * column a thermometer's lives in, which is what lets an automation compare it
+ * like any other temperature. An option is listed only when the unit has it, so
+ * a switch for something it cannot do is never drawn.
+ */
+export const climateSettingsSchema = z
+    .object({
+        mode: z.enum(CLIMATE_MODES).nullable(),
+        modes: z.array(z.enum(CLIMATE_MODES)).max(CLIMATE_MODES.length),
+        target: temperature.nullable(),
+        min: temperature,
+        max: temperature,
+        step: z.number().finite().positive().max(10),
+        unit: z.enum(CLIMATE_UNITS),
+        fan: z.enum(CLIMATE_FANS).nullable(),
+        fans: z.array(z.enum(CLIMATE_FANS)).max(CLIMATE_FANS.length),
+        options: z.object({
+            swing: z.boolean().optional(),
+            turbo: z.boolean().optional(),
+            quiet: z.boolean().optional(),
+            eco: z.boolean().optional()
+        })
+    })
+    .refine((settings) => settings.min < settings.max);
+
+export type ClimateSettings = z.infer<typeof climateSettingsSchema>;
+
+/** The settings with the room's temperature beside them, as a screen draws it. */
+export interface ClimateView extends ClimateSettings {
+    readonly current: number | null;
+}
+
+/** Stored settings, read back, or null for anything that is not them - a row
+ *  from before air conditioners, or a document a later build wrote. */
+export function climateSettings(value: unknown): ClimateSettings | null {
+    const parsed = climateSettingsSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+}
+
+/** A reading that is a number, or null. "22.5" and "22,5" are both 22.5. */
+export function readingNumber(value: string | null | undefined): number | null {
+    const match = /-?\d+(?:[.,]\d+)?/.exec(value ?? "");
+    if (!match) return null;
+    const parsed = Number(match[0].replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * One change to an air conditioner, with what it is changed to.
+ *
+ * Checked twice: by this schema for its shape wherever it arrives from, and by
+ * `climateCommandIssue` against the unit it is for, because a temperature that is
+ * a perfectly good number is still not one a unit that stops at 30 accepts.
+ */
+export const climateCommandSchema = z.discriminatedUnion("action", [
+    z.object({ action: z.literal("set-mode"), mode: z.enum(CLIMATE_MODES) }),
+    z.object({ action: z.literal("set-temperature"), target: temperature }),
+    z.object({ action: z.literal("set-fan"), fan: z.enum(CLIMATE_FANS) }),
+    z.object({
+        action: z.literal("set-option"),
+        option: z.enum(CLIMATE_OPTIONS),
+        on: z.boolean()
+    })
+]);
+
+export type ClimateCommand = z.infer<typeof climateCommandSchema>;
+
+/** The actions that say what to set, and so arrive with a command. */
+export function needsCommand(action: DeviceAction): boolean {
+    return (
+        action === "set-mode" ||
+        action === "set-temperature" ||
+        action === "set-fan" ||
+        action === "set-option"
+    );
+}
+
+/** Whether a temperature sits on a unit's own grid: 24.5 is fine on a unit that
+ *  steps by a half and refused on one that steps by whole degrees. */
+function onStep(value: number, settings: ClimateSettings): boolean {
+    const steps = (value - settings.min) / settings.step;
+    return Math.abs(steps - Math.round(steps)) < 1e-6;
+}
+
+/**
+ * Why a command cannot go to this unit, as the sentence the service refuses
+ * with, or null when it can. The same answer in the browser, where it decides
+ * what is drawn, and on the server, where it decides what is sent.
+ */
+export function climateCommandIssue(
+    settings: ClimateSettings | null,
+    command: ClimateCommand
+): string | null {
+    if (!settings) return "That device has not said what it can be set to yet";
+    switch (command.action) {
+        case "set-mode":
+            return settings.modes.includes(command.mode)
+                ? null
+                : "That mode is not one this device has";
+        case "set-temperature":
+            return command.target >= settings.min &&
+                command.target <= settings.max &&
+                onStep(command.target, settings)
+                ? null
+                : "That temperature is not one this device accepts";
+        case "set-fan":
+            return settings.fans.includes(command.fan)
+                ? null
+                : "That fan speed is not one this device has";
+        case "set-option":
+            return settings.options[command.option] === undefined
+                ? "That setting is not one this device has"
+                : null;
+    }
+}
+
+/** The settings once a command has landed. What the row shows the moment it is
+ *  pressed, and what the service stores once the unit has accepted it. */
+export function applyClimate(settings: ClimateSettings, command: ClimateCommand): ClimateSettings {
+    switch (command.action) {
+        case "set-mode":
+            return { ...settings, mode: command.mode };
+        case "set-temperature":
+            return { ...settings, target: command.target };
+        case "set-fan":
+            return { ...settings, fan: command.fan };
+        case "set-option":
+            return { ...settings, options: { ...settings.options, [command.option]: command.on } };
+    }
+}
+
+/** A temperature as a person reads it: no trailing ".0", the unit closed up. */
+export function temperatureText(value: number, unit: ClimateUnit): string {
+    const rounded = Math.round(value * 10) / 10;
+    return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}°${unit}`;
+}
+
+export function climateModeText(mode: ClimateMode, t: PlacesTranslator = en): string {
+    return t(`devices.climate.modes.${mode}`);
+}
+
+export function climateFanText(fan: ClimateFan, t: PlacesTranslator = en): string {
+    return t(`devices.climate.fans.${fan}`);
+}
+
+export function climateOptionText(option: ClimateOption, t: PlacesTranslator = en): string {
+    return t(`devices.climate.options.${option}`);
+}
+
+/**
+ * The word on a device's badge.
+ *
+ * A sensor's badge is its reading, and one whose reading has not arrived says so
+ * rather than borrowing the word a lock uses for the same silence. An air
+ * conditioner that is on says what it is doing - "Cool" tells somebody more than
+ * "On". Everything else says its state, in its own kind's words.
+ */
+export function badgeText(device: DeviceView, t: PlacesTranslator = en): string {
+    if (!device.online) return t("devices.states.unknown");
+    const kind = deviceKind(device.kind);
+    if (kind === "sensor") return readingLine(device.reading, t) || t("devicesView.nothingRead");
+    if (kind === "climate" && device.state === "on" && device.climate?.mode) {
+        return climateModeText(device.climate.mode, t);
+    }
+    return stateLabel(device.kind, device.state, t);
+}
 /** Whether a word off a device row is one this app knows. A device synced by a
  *  newer build and read by an older one is the case this exists for. */
 export function deviceState(value: string): DeviceState {
@@ -327,6 +560,9 @@ export interface DeviceView {
     /** When the state was last read, so a screen can say how old it is rather
      *  than presenting a stale reading as the present. */
     readonly stateAt: string | null;
+    /** How an air conditioner is set, and the room's temperature beside it. Null,
+     *  or absent, for every other kind. */
+    readonly climate?: ClimateView | null;
 }
 
 /** How something came to happen. `polaris` is the one that carries weight: it is

@@ -44,6 +44,7 @@ import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "../lib/discovery";
 import { requireHome, requireHomeInstall, requireHomeShared } from "../lib/access";
 import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "../lib/detection";
 import type { DeviceAction, DeviceEventView, DeviceView } from "../lib/device-kinds";
+import { DEVICE_ACTIONS, climateCommandSchema } from "../lib/device-kinds";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "../lib/current-place";
 import {
     countDeviceUse,
@@ -1190,15 +1191,30 @@ export async function syncDevicesAction(options: { probe?: boolean } = {}): Prom
  */
 export async function operateDeviceAction(
     deviceId: string,
-    action: DeviceAction
+    action: DeviceAction,
+    command?: unknown
 ): Promise<{ device?: DeviceView; error?: string }> {
     const user = await requireUser();
     const install = await requireHomeInstall();
+    // Both arrive from the browser, so neither is taken on trust: an action this
+    // app does not have, or a setting in the wrong shape, stops here.
+    const known = (DEVICE_ACTIONS as readonly unknown[]).includes(action);
+    const setting =
+        command === undefined || command === null ? null : climateCommandSchema.safeParse(command);
+    if (!known || (setting !== null && !setting.success)) {
+        return { error: await say("refusals.deviceCannot") };
+    }
     const lent = await guard(() => requireDeviceControl(user, String(deviceId)));
     if (lent.error) return { error: lent.error };
 
     const result = await guard(() =>
-        devices.actOnDevice(install.id, String(deviceId), action, user.name)
+        devices.actOnDevice(
+            install.id,
+            String(deviceId),
+            action,
+            user.name,
+            setting?.success ? setting.data : undefined
+        )
     );
     if (result.error) {
         // Recorded refused as well as done. An attempt that was turned down is
@@ -1219,7 +1235,11 @@ export async function operateDeviceAction(
         targetId: String(deviceId),
         // Which of the two rights was used, so the log tells a resident opening
         // their own door apart from a visitor spending one of four.
-        metadata: { name: result.value?.name, lent: Boolean(lent.value) }
+        metadata: {
+            name: result.value?.name,
+            lent: Boolean(lent.value),
+            ...(setting?.success ? { setting: setting.data } : {})
+        }
     });
     return { device: result.value };
 }

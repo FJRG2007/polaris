@@ -436,7 +436,7 @@
         "tuyaKeys": "Tuya rechazó las claves. Puede que se hayan revocado o que el proyecto no cubra estos dispositivos.",
         "tuyaRefused": "Tuya rechazó la petición.",
         "reconnect": "Hay que volver a conectar {name}",
-        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} other {se apague}}",
+        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} climate {un aire acondicionado} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} turnOff {se apague} setMode {cambie de modo} setTemperature {cambie de temperatura} setFan {cambie el ventilador} setOption {cambie un ajuste} other {haga eso}}",
         "watchOnly": "{name} está configurado para vigilarse, no para manejarse",
         "notConnected": "{name} no está conectado a nada",
         "notAnswering": "{name} no respondía la última vez que se comprobó",
@@ -519,7 +519,13 @@
         "switchbotCannot": "A un dispositivo SwitchBot no se le puede pedir eso",
         "automationGone": "Esa automatización no está aquí",
         "automationNewer": "Esa automatización la guardó un Polaris más nuevo",
-        "automationNames": "Esa automatización nombra algo que ya no está aquí"
+        "automationNames": "Esa automatización nombra algo que ya no está aquí",
+        "climateNoSetting": "Indica a qué valor ponerlo",
+        "climateUnknown": "Ese dispositivo aún no ha dicho qué admite",
+        "climateMode": "Este dispositivo no tiene ese modo",
+        "climateTemperature": "Este dispositivo no admite esa temperatura",
+        "climateFan": "Este dispositivo no tiene esa velocidad de ventilador",
+        "climateOption": "Este dispositivo no tiene ese ajuste"
     },
     "connections": {
         "nuki-web": {
@@ -1065,7 +1071,8 @@
             "switch": "Interruptor",
             "outlet": "Enchufe",
             "light": "Luz",
-            "sensor": "Sensor"
+            "sensor": "Sensor",
+            "climate": "Aire acondicionado"
         },
         "groups": {
             "lock": "Puertas",
@@ -1073,7 +1080,8 @@
             "switch": "Interruptores y enchufes",
             "outlet": "Interruptores y enchufes",
             "light": "Luces",
-            "sensor": "Sensores"
+            "sensor": "Sensores",
+            "climate": "Clima"
         },
         "states": {
             "locked": "Cerrada",
@@ -1105,7 +1113,11 @@
             "unlock": "Abrir",
             "unlatch": "Abrir",
             "turn-on": "Encender",
-            "turn-off": "Apagar"
+            "turn-off": "Apagar",
+            "set-mode": "Modo",
+            "set-temperature": "Temperatura",
+            "set-fan": "Ventilador",
+            "set-option": "Ajuste"
         },
         "via": {
             "polaris": "desde Polaris",
@@ -1127,7 +1139,11 @@
             "door-closed": "Puerta cerrada",
             "door-ajar": "Puerta sin cerrar",
             "calibrated": "Calibrada",
-            "other": "Pasó algo"
+            "other": "Pasó algo",
+            "set-mode": "Modo cambiado",
+            "set-temperature": "Temperatura fijada",
+            "set-fan": "Ventilador cambiado",
+            "set-option": "Ajuste cambiado"
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
@@ -1154,6 +1170,29 @@
             "connected": "Conectado",
             "disconnected": "Desconectado",
             "tampered": "Manipulado"
+        },
+        "climate": {
+            "modes": {
+                "cool": "Frío",
+                "heat": "Calor",
+                "dry": "Seco",
+                "fan": "Ventilar",
+                "auto": "Auto"
+            },
+            "fans": {
+                "auto": "Auto",
+                "low": "Baja",
+                "medium-low": "Media-baja",
+                "medium": "Media",
+                "medium-high": "Media-alta",
+                "high": "Alta"
+            },
+            "options": {
+                "swing": "Oscilar",
+                "turbo": "Turbo",
+                "quiet": "Silencio",
+                "eco": "Eco"
+            }
         }
     },
     "devicesView": {
@@ -1196,7 +1235,21 @@
         "emptyBody": "Aquí llega todo lo que se le ha pedido hacer, incluido lo que no terminó.",
         "switchName": "Encender o apagar {name}",
         "noControl": "Puedes verlo, pero no manejarlo.",
-        "offline": "No responde, así que ahora no se puede cambiar."
+        "offline": "No responde, así que ahora no se puede cambiar.",
+        "climate": {
+            "mode": "Modo",
+            "fan": "Ventilador",
+            "target": "Objetivo",
+            "room": "Temperatura ambiente",
+            "extras": "Extras",
+            "modeName": "Modo de {name}",
+            "fanName": "Ventilador de {name}",
+            "targetName": "Temperatura objetivo de {name}",
+            "lower": "Bajar el objetivo de {name}",
+            "raise": "Subir el objetivo de {name}",
+            "optionName": "{option} en {name}",
+            "unknown": "Aún no ha dicho qué admite. Lo hará en cuanto responda a una comprobación."
+        }
     },
     "deviceDialog": {
         "connected": "Conectado a través de la cuenta en la que está.",

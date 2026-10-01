@@ -34,6 +34,7 @@ export const DOOR_WORDS = ["open", "closed"] as const;
 const WATCHED_STATES: Readonly<Record<DeviceKind, readonly kinds.DeviceState[]>> = {
     lock: ["locked", "unlocked", "unlatched", "jammed"],
     opener: ["locked", "unlatched"],
+    climate: ["on", "off"],
     switch: ["on", "off"],
     outlet: ["on", "off"],
     light: ["on", "off"],

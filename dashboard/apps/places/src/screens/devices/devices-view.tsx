@@ -32,7 +32,7 @@ import type { DeviceAccountView } from "../../lib/device-accounts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as registry from "../../lib/device-connections";
 import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
-import type { DeviceAction, DeviceView } from "../../lib/device-kinds";
+import type { ClimateCommand, DeviceAction, DeviceView } from "../../lib/device-kinds";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
@@ -176,22 +176,35 @@ export function DevicesView({
      * second later. A lock is left alone until it reports: it is turning, and
      * where it gets to is the vendor's to say.
      */
-    const act = async (device: DeviceView, action: DeviceAction) => {
+    const act = async (device: DeviceView, action: DeviceAction, command?: ClimateCommand) => {
         setBusy({ id: device.id, action });
         setError("");
         const settled = kinds.settledState(action);
-        if (settled) settle({ ...device, state: settled });
+        // A setting lands where it was told, like a switch: the row shows it now
+        // and puts the old one back if the unit refuses.
+        const climate =
+            command && device.climate
+                ? { ...device.climate, ...kinds.applyClimate(device.climate, command) }
+                : null;
+        if (climate) settle({ ...device, climate });
+        else if (settled) settle({ ...device, state: settled });
         const result = await runAction(
-            () => actions.operateDeviceAction(device.id, action),
+            () => actions.operateDeviceAction(device.id, action, command),
             setError
         );
         setBusy(null);
         if (!result || result.error) {
-            if (settled) {
-                const restore = (entry: DeviceView) =>
-                    entry.id === device.id && entry.state === settled
-                        ? { ...entry, state: device.state }
-                        : entry;
+            // Only what this press changed is put back, and only while it is
+            // still what this press made it: a later press, or a sync, wins.
+            const restore = (entry: DeviceView): DeviceView => {
+                if (entry.id !== device.id) return entry;
+                if (climate && entry.climate === climate)
+                    return { ...entry, climate: device.climate };
+                if (!climate && settled && entry.state === settled)
+                    return { ...entry, state: device.state };
+                return entry;
+            };
+            if (climate || settled) {
                 setDevices((current) => (current ?? []).map(restore));
                 setOpened((current) => (current ? restore(current) : current));
             }
@@ -428,16 +441,7 @@ export function DevicesView({
                                                 <Badge
                                                     className={cn("shrink-0", stateClass(device))}
                                                 >
-                                                    {!device.online
-                                                        ? t("devices.states.unknown")
-                                                        : kinds.deviceKind(device.kind) === "sensor"
-                                                          ? kinds.readingLine(device.reading, t) ||
-                                                            t("devicesView.nothingRead")
-                                                          : kinds.stateLabel(
-                                                                device.kind,
-                                                                device.state,
-                                                                t
-                                                            )}
+                                                    {kinds.badgeText(device, t)}
                                                 </Badge>
                                                 {device.batteryCritical && (
                                                     <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">
@@ -472,10 +476,12 @@ export function DevicesView({
                                             device={device}
                                             canControl={canControl}
                                             busy={busy?.id === device.id ? busy.action : null}
-                                            onAct={(action) => {
+                                            onAct={(action, command) => {
                                                 // Thrown by `act` so the panel can show it; on
                                                 // the row the line above the list already has.
-                                                void act(device, action).catch(() => undefined);
+                                                void act(device, action, command).catch(
+                                                    () => undefined
+                                                );
                                             }}
                                         />
                                     </li>
