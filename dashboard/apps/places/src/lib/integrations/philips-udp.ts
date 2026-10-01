@@ -65,7 +65,8 @@ export function openCoapLink(address: string, port = COAP_PORT): Promise<CoapLin
             send(message) {
                 if (closed) return;
                 socket.send(encodeCoap(message), (error) => {
-                    if (error && (error as NodeJS.ErrnoException).code === "ECONNREFUSED") refused = true;
+                    if (error && (error as NodeJS.ErrnoException).code === "ECONNREFUSED")
+                        refused = true;
                 });
             },
             next(match, ms) {
@@ -118,7 +119,12 @@ export function openCoapLink(address: string, port = COAP_PORT): Promise<CoapLin
             const message = decodeCoap(data);
             if (!message) return;
             if (message.type === CoapType.CON) {
-                link.send({ type: CoapType.ACK, code: CoapCode.EMPTY, messageId: message.messageId, token: Buffer.alloc(0) });
+                link.send({
+                    type: CoapType.ACK,
+                    code: CoapCode.EMPTY,
+                    messageId: message.messageId,
+                    token: Buffer.alloc(0)
+                });
             }
             const waiter = waiters.find((entry) => entry.match(message));
             if (waiter) {

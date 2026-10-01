@@ -33,7 +33,12 @@ import { DriverError } from "../drivers/contract";
 import { CoapCode, CoapType, type CoapMessage } from "./coap";
 import { coapScan, openCoapLink, type CoapLink } from "./philips-udp";
 import { PhilipsCipher, PhilipsDigestError, openPhilips, pythonJson } from "./philips-crypto";
-import { PHILIPS_GARBLED, PHILIPS_LOCAL_OFF, PHILIPS_QUIET, PHILIPS_REFUSED } from "./philips-sentences";
+import {
+    PHILIPS_GARBLED,
+    PHILIPS_LOCAL_OFF,
+    PHILIPS_QUIET,
+    PHILIPS_REFUSED
+} from "./philips-sentences";
 
 /** How long one request is given. A unit on a busy access point is slow now
  *  and then; anything past this is retried rather than waited on. */
@@ -74,7 +79,9 @@ function wait(ms: number): Promise<void> {
 }
 
 function object(value: unknown): Record<string, unknown> | null {
-    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
 }
 
 /** `{"state": {"reported": {...}}}`, opened, or null for anything else. */
@@ -84,7 +91,8 @@ export function reportedOf(sealed: Buffer | undefined): PhilipsStatus | null {
     try {
         parsed = JSON.parse(openPhilips(sealed.toString("utf8")));
     } catch (error) {
-        if (error instanceof PhilipsDigestError) throw new DriverError(PHILIPS_GARBLED, "unreachable");
+        if (error instanceof PhilipsDigestError)
+            throw new DriverError(PHILIPS_GARBLED, "unreachable");
         return null;
     }
     return object(object(object(parsed)?.state)?.reported);
@@ -92,7 +100,9 @@ export function reportedOf(sealed: Buffer | undefined): PhilipsStatus | null {
 
 /** The control message, as the libraries write it. */
 export function controlPayload(values: Readonly<Record<string, unknown>>): string {
-    return pythonJson({ state: { desired: { CommandType: "app", DeviceId: "", EnduserId: "", ...values } } });
+    return pythonJson({
+        state: { desired: { CommandType: "app", DeviceId: "", EnduserId: "", ...values } }
+    });
 }
 
 /**
@@ -122,7 +132,11 @@ export class PhilipsSession {
     async request(
         code: number,
         path: readonly string[],
-        options: { readonly observe?: number; readonly payload?: Buffer; readonly token?: Buffer } = {},
+        options: {
+            readonly observe?: number;
+            readonly payload?: Buffer;
+            readonly token?: Buffer;
+        } = {},
         windowMs = REQUEST_WINDOW_MS
     ): Promise<CoapMessage | null> {
         const token = options.token ?? randomBytes(4);
@@ -135,7 +149,10 @@ export class PhilipsSession {
             ...(options.observe !== undefined ? { observe: options.observe } : {}),
             ...(options.payload ? { payload: options.payload } : {})
         });
-        return this.link.next((message) => message.code !== CoapCode.EMPTY && message.token.equals(token), windowMs);
+        return this.link.next(
+            (message) => message.code !== CoapCode.EMPTY && message.token.equals(token),
+            windowMs
+        );
     }
 
     /** Ask the unit for its counter. */
@@ -161,7 +178,9 @@ export class PhilipsSession {
     async control(values: Readonly<Record<string, unknown>>): Promise<boolean> {
         if (!this.cipher) await this.sync();
         const sealed = this.cipher!.seal(controlPayload(values));
-        const answer = await this.request(CoapCode.POST, CONTROL_PATH, { payload: Buffer.from(sealed, "ascii") });
+        const answer = await this.request(CoapCode.POST, CONTROL_PATH, {
+            payload: Buffer.from(sealed, "ascii")
+        });
         if (!answer?.payload) return false;
         try {
             return object(JSON.parse(answer.payload.toString("utf8")))?.status === "success";
@@ -201,7 +220,8 @@ export async function readPhilips(address: string): Promise<PhilipsStatus> {
             if (status) return status;
             if (session.link.refused) throw localOff();
         } catch (error) {
-            if (!(error instanceof DriverError) || error.message !== PHILIPS_QUIET || attempt === 1) throw error;
+            if (!(error instanceof DriverError) || error.message !== PHILIPS_QUIET || attempt === 1)
+                throw error;
         } finally {
             session.close();
         }
@@ -212,7 +232,10 @@ export async function readPhilips(address: string): Promise<PhilipsStatus> {
 
 /** Set values on a unit: synced, sent, and on anything but success synced
  *  again and resent. */
-export async function controlPhilips(address: string, values: Readonly<Record<string, unknown>>): Promise<void> {
+export async function controlPhilips(
+    address: string,
+    values: Readonly<Record<string, unknown>>
+): Promise<void> {
     const session = await PhilipsSession.open(address);
     try {
         for (let attempt = 0; attempt <= CONTROL_RETRIES; attempt += 1) {
@@ -255,14 +278,20 @@ export async function nudgedPhilips(
     try {
         await session.sync();
         const token = randomBytes(4);
-        const pushed = session.request(CoapCode.GET, STATUS_PATH, { observe: 0, token }, NUDGE_REGISTER_MS);
+        const pushed = session.request(
+            CoapCode.GET,
+            STATUS_PATH,
+            { observe: 0, token },
+            NUDGE_REGISTER_MS
+        );
         const first = await pushed;
         if (first) {
             const status = reportedOf(first.payload);
             if (status) return { status, session, token };
         }
         for (let attempt = 0; attempt < NUDGE_ATTEMPTS; attempt += 1) {
-            for (const [key, value] of nudge) await session.control({ [key]: value }).catch(() => false);
+            for (const [key, value] of nudge)
+                await session.control({ [key]: value }).catch(() => false);
             const push = await session.link.next(
                 (message) => message.code !== CoapCode.EMPTY && message.token.equals(token),
                 NUDGE_WAIT_MS
@@ -287,7 +316,10 @@ export interface PhilipsFound {
 
 /** Ask these addresses who is a Philips air purifier: the plain identity
  *  resource, which needs no sync. Each address once. */
-export async function scanPhilips(targets: readonly string[], windowMs = SCAN_WINDOW_MS): Promise<PhilipsFound[]> {
+export async function scanPhilips(
+    targets: readonly string[],
+    windowMs = SCAN_WINDOW_MS
+): Promise<PhilipsFound[]> {
     if (targets.length === 0) return [];
     const replies = await coapScan(
         targets,

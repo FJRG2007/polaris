@@ -73,11 +73,13 @@ function nibble(value: number): { nibble: number; extended: Buffer } {
 export function encodeCoap(message: CoapMessage): Buffer {
     if (message.token.length > 8) throw new Error("A CoAP token is at most eight bytes");
     const options: { number: number; value: Buffer }[] = [];
-    if (message.observe !== undefined) options.push({ number: OPTION_OBSERVE, value: uint(message.observe) });
+    if (message.observe !== undefined)
+        options.push({ number: OPTION_OBSERVE, value: uint(message.observe) });
     for (const segment of message.path ?? []) {
         options.push({ number: OPTION_URI_PATH, value: Buffer.from(segment, "utf8") });
     }
-    if (message.maxAge !== undefined) options.push({ number: OPTION_MAX_AGE, value: uint(message.maxAge) });
+    if (message.maxAge !== undefined)
+        options.push({ number: OPTION_MAX_AGE, value: uint(message.maxAge) });
     options.sort((a, b) => a.number - b.number);
 
     const parts: Buffer[] = [];
@@ -90,10 +92,16 @@ export function encodeCoap(message: CoapMessage): Buffer {
     for (const option of options) {
         const delta = nibble(option.number - previous);
         const length = nibble(option.value.length);
-        parts.push(Buffer.from([(delta.nibble << 4) | length.nibble]), delta.extended, length.extended, option.value);
+        parts.push(
+            Buffer.from([(delta.nibble << 4) | length.nibble]),
+            delta.extended,
+            length.extended,
+            option.value
+        );
         previous = option.number;
     }
-    if (message.payload && message.payload.length > 0) parts.push(Buffer.from([0xff]), message.payload);
+    if (message.payload && message.payload.length > 0)
+        parts.push(Buffer.from([0xff]), message.payload);
     return Buffer.concat(parts);
 }
 

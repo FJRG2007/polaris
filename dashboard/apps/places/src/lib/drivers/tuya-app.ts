@@ -140,8 +140,11 @@ export const tuyaAppDriver: DeviceDriver = {
     async act(credentials, device, action, command) {
         const session = sessionOf(credentials);
         await tuyaSpeaking(async () => {
-            const { deviceId, commands } = await tuyaActionFor(device, action, climateCommandOf(command), (id) =>
-                tuya.tuyaSharedSpecification(session, id)
+            const { deviceId, commands } = await tuyaActionFor(
+                device,
+                action,
+                climateCommandOf(command),
+                (id) => tuya.tuyaSharedSpecification(session, id)
             );
             await tuya.sendTuyaCommands(session, deviceId, commands);
         });

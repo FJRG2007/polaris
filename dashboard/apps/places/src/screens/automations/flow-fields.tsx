@@ -257,7 +257,10 @@ export function MeasurePicker({
                     disabled={disabled}
                     placeholder={t("automations.fields.chooseValue")}
                     className={invalid ? "border-danger-edge" : undefined}
-                    options={offered.map((measure) => ({ value: measure, label: words.measureText(measure, t) }))}
+                    options={offered.map((measure) => ({
+                        value: measure,
+                        label: words.measureText(measure, t)
+                    }))}
                     onValueChange={(next) => {
                         const measure = offered.find((entry) => entry === next);
                         if (measure) onChange(measure);
@@ -269,7 +272,10 @@ export function MeasurePicker({
 }
 
 /** What a figure is counted in, for the field beside it. */
-export function measureSuffix(measure: auto.ReadingMeasure | undefined, fallback: string | undefined): string | undefined {
+export function measureSuffix(
+    measure: auto.ReadingMeasure | undefined,
+    fallback: string | undefined
+): string | undefined {
     if (!measure) return fallback || undefined;
     if (measure === "filter") return "%";
     return kinds.MEASURE_UNITS[measure] || undefined;
@@ -606,7 +612,15 @@ export function SettingFields({
     const climate = device?.climate ?? null;
     const at = [...path, "setting"];
     if (device && kinds.deviceKind(device.kind) === "air") {
-        return <AirSettingFields device={device} setting={setting} onChange={onChange} at={at} disabled={disabled} />;
+        return (
+            <AirSettingFields
+                device={device}
+                setting={setting}
+                onChange={onChange}
+                at={at}
+                disabled={disabled}
+            />
+        );
     }
     if ("speed" in setting || setting.action === "set-humidity") return null;
     switch (setting.action) {
@@ -687,7 +701,8 @@ export function SettingFields({
                                     const option = kinds.CLIMATE_OPTIONS.find(
                                         (entry) => entry === next
                                     );
-                                    if (option) onChange({ action: "set-option", option, on: setting.on });
+                                    if (option)
+                                        onChange({ action: "set-option", option, on: setting.on });
                                 }}
                             />
                         )}
@@ -792,7 +807,9 @@ function AirSettingFields({
         );
     }
     if (setting.action !== "set-option") return null;
-    const offered = air ? kinds.AIR_OPTIONS.filter((option) => air.options[option] !== undefined) : kinds.AIR_OPTIONS;
+    const offered = air
+        ? kinds.AIR_OPTIONS.filter((option) => air.options[option] !== undefined)
+        : kinds.AIR_OPTIONS;
     const current = kinds.AIR_OPTIONS.find((entry) => entry === setting.option) ?? "";
     return (
         <>
@@ -804,7 +821,10 @@ function AirSettingFields({
                         disabled={disabled}
                         placeholder={t("automations.fields.chooseValue")}
                         className={invalid ? "border-danger-edge" : undefined}
-                        options={offered.map((option) => ({ value: option, label: kinds.airOptionText(option, t) }))}
+                        options={offered.map((option) => ({
+                            value: option,
+                            label: kinds.airOptionText(option, t)
+                        }))}
                         onValueChange={(next) => {
                             const option = kinds.AIR_OPTIONS.find((entry) => entry === next);
                             if (option) onChange({ action: "set-option", option, on: setting.on });

@@ -66,12 +66,15 @@ function text(value: unknown): string {
 
 function numberOf(value: unknown): number | null {
     if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)))
+        return Number(value);
     return null;
 }
 
 function strings(value: unknown): string[] {
-    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+    return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === "string")
+        : [];
 }
 
 function isFilter(entity: HomeAssistantState): boolean {
@@ -81,7 +84,11 @@ function isFilter(entity: HomeAssistantState): boolean {
 /** What only an air purifier has beside it: a room's temperature is not enough. */
 function isAirSensor(entity: HomeAssistantState): boolean {
     if (domainOf(entity.entity_id) !== "sensor") return false;
-    return AIR_DEVICE_CLASSES.has(text(entity.attributes.device_class)) || isFilter(entity) || /allergen/.test(entity.entity_id);
+    return (
+        AIR_DEVICE_CLASSES.has(text(entity.attributes.device_class)) ||
+        isFilter(entity) ||
+        /allergen/.test(entity.entity_id)
+    );
 }
 
 /**
@@ -109,10 +116,22 @@ export function haAirUnits(
                 ? primary
                 : (siblings.find((entity) => domainOf(entity.entity_id) === "humidifier") ?? null),
         sensors: siblings.filter(
-            (entity) => isAirSensor(entity) || (domainOf(entity.entity_id) === "sensor" && text(entity.attributes.device_class) === "temperature")
+            (entity) =>
+                isAirSensor(entity) ||
+                (domainOf(entity.entity_id) === "sensor" &&
+                    text(entity.attributes.device_class) === "temperature")
         ),
-        childLock: siblings.find((entity) => domainOf(entity.entity_id) === "switch" && /child_lock/.test(entity.entity_id)) ?? null,
-        light: siblings.find((entity) => domainOf(entity.entity_id) === "light" && /display|backlight/.test(entity.entity_id)) ?? null
+        childLock:
+            siblings.find(
+                (entity) =>
+                    domainOf(entity.entity_id) === "switch" && /child_lock/.test(entity.entity_id)
+            ) ?? null,
+        light:
+            siblings.find(
+                (entity) =>
+                    domainOf(entity.entity_id) === "light" &&
+                    /display|backlight/.test(entity.entity_id)
+            ) ?? null
     });
     for (const entity of states) {
         if (domainOf(entity.entity_id) !== "fan") continue;
@@ -180,14 +199,16 @@ function celsius(entity: HomeAssistantState): number | null {
     const value = numberOf(entity.state);
     if (value === null) return null;
     const unit = text(entity.attributes.unit_of_measurement);
-    return unit.includes("F") ? Math.round(((value - 32) * 5) / 9 * 10) / 10 : value;
+    return unit.includes("F") ? Math.round((((value - 32) * 5) / 9) * 10) / 10 : value;
 }
 
 /** A unit's entities as Places' settings. */
 export function haAirSettings(unit: HaAirUnit): kinds.AirSettings {
     const primary = unit.primary;
     const presets = presetsOf(unit);
-    const word = text(primary.attributes[domainOf(primary.entity_id) === "fan" ? "preset_mode" : "mode"]);
+    const word = text(
+        primary.attributes[domainOf(primary.entity_id) === "fan" ? "preset_mode" : "mode"]
+    );
     const steps = stepsOf(primary);
     const percentage = numberOf(primary.attributes.percentage);
 
@@ -202,14 +223,22 @@ export function haAirSettings(unit: HaAirUnit): kinds.AirSettings {
             const percent = unitOf === "%" ? Math.max(0, Math.min(100, value)) : null;
             const hours = unitOf === "h" ? Math.max(0, value) : null;
             if (percent === null && hours === null) continue;
-            filters.push({ kind: filterKind(sensor.entity_id), percent, hours, state: kinds.filterState(percent, hours) });
+            filters.push({
+                kind: filterKind(sensor.entity_id),
+                percent,
+                hours,
+                state: kinds.filterState(percent, hours)
+            });
         } else if (deviceClass === "pm25") readings.pm25 ??= value;
-        else if (deviceClass === "humidity" && value >= 0 && value <= 100) readings.humidity ??= value;
-        else if (deviceClass === "temperature") readings.temperature ??= celsius(sensor) ?? undefined;
+        else if (deviceClass === "humidity" && value >= 0 && value <= 100)
+            readings.humidity ??= value;
+        else if (deviceClass === "temperature")
+            readings.temperature ??= celsius(sensor) ?? undefined;
         else if (/allergen/.test(sensor.entity_id)) readings.allergen ??= value;
     }
     const current = numberOf(unit.humidifier?.attributes.current_humidity);
-    if (readings.humidity === undefined && current !== null && current >= 0 && current <= 100) readings.humidity = current;
+    if (readings.humidity === undefined && current !== null && current >= 0 && current <= 100)
+        readings.humidity = current;
 
     let humidity: kinds.AirSettings["humidity"] = null;
     if (unit.humidifier) {
@@ -230,12 +259,16 @@ export function haAirSettings(unit: HaAirUnit): kinds.AirSettings {
     if (unit.childLock) options.childLock = unit.childLock.state === "on";
     if (unit.light) options.light = unit.light.state === "on";
     // A purifier with a humidifier beside it: humidifying is that entity's power.
-    if (unit.humidifier && unit.humidifier !== primary) options.humidify = unit.humidifier.state === "on";
+    if (unit.humidifier && unit.humidifier !== primary)
+        options.humidify = unit.humidifier.state === "on";
 
     return {
         mode: [...presets].find(([, offered]) => offered === word)?.[0] ?? null,
         modes: [...presets.keys()],
-        speed: steps > 0 && percentage !== null && percentage > 0 ? (`speed_${stepOf(percentage, steps)}` as kinds.AirSpeed) : null,
+        speed:
+            steps > 0 && percentage !== null && percentage > 0
+                ? (`speed_${stepOf(percentage, steps)}` as kinds.AirSpeed)
+                : null,
         speeds: speedWords(steps),
         humidity,
         options,
@@ -267,8 +300,18 @@ export function haAirService(
             const word = presetsOf(unit).get(setting.mode);
             if (!word) throw new HomeError("That mode is not one this device has");
             return domain === "fan"
-                ? { entityId: primary.entity_id, domain, service: "set_preset_mode", data: { preset_mode: word } }
-                : { entityId: primary.entity_id, domain, service: "set_mode", data: { mode: word } };
+                ? {
+                      entityId: primary.entity_id,
+                      domain,
+                      service: "set_preset_mode",
+                      data: { preset_mode: word }
+                  }
+                : {
+                      entityId: primary.entity_id,
+                      domain,
+                      service: "set_mode",
+                      data: { mode: word }
+                  };
         }
         case "set-fan": {
             const steps = stepsOf(primary);

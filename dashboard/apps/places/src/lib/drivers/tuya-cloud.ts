@@ -55,8 +55,11 @@ export const tuyaCloudDriver: DeviceDriver = {
     async act(credentials, device, action, command) {
         const keys = credentialsOf(credentials);
         await tuyaSpeaking(async () => {
-            const { deviceId, commands } = await tuyaActionFor(device, action, climateCommandOf(command), (id) =>
-                tuya.tuyaSpecification(keys, id)
+            const { deviceId, commands } = await tuyaActionFor(
+                device,
+                action,
+                climateCommandOf(command),
+                (id) => tuya.tuyaSpecification(keys, id)
             );
             await tuya.tuyaCommand(keys, deviceId, commands);
         });

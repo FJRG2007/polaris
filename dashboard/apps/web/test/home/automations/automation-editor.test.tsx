@@ -131,7 +131,14 @@ const AIR_SAVED: AutomationView = {
     definition: {
         ...SAVED.definition,
         triggers: [
-            { id: "trig01", kind: "threshold", deviceId: "air", direction: "above", value: 35, measure: "pm25" }
+            {
+                id: "trig01",
+                kind: "threshold",
+                deviceId: "air",
+                direction: "above",
+                value: 35,
+                measure: "pm25"
+            }
         ],
         actions: [
             {
@@ -170,7 +177,13 @@ const RUNS: RunView[] = [
 vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     getAutomationAction: async (id: string | null) => ({
         automation:
-            id === "auto-climate" ? CLIMATE_SAVED : id === "auto-air" ? AIR_SAVED : id ? SAVED : undefined,
+            id === "auto-climate"
+                ? CLIMATE_SAVED
+                : id === "auto-air"
+                  ? AIR_SAVED
+                  : id
+                    ? SAVED
+                    : undefined,
         runs: id ? RUNS : [],
         context: {
             placeId: "place-1",
@@ -464,17 +477,27 @@ describe("an automation on an air purifier", () => {
         await painted();
         expect(screen.getByRole("combobox", { name: /^Reading/ }).textContent).toContain("PM2.5");
         expect(screen.getByText("µg/m³")).toBeDefined();
-        expect(screen.getByRole("combobox", { name: /^Fan speed/ }).textContent).toContain("Speed 2");
+        expect(screen.getByRole("combobox", { name: /^Fan speed/ }).textContent).toContain(
+            "Speed 2"
+        );
         const value = screen.getByLabelText(/^Value/) as HTMLInputElement;
         fireEvent.change(value, { target: { value: "50" } });
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         await painted();
         const input = saved[0] as { definition: { triggers: unknown[]; actions: unknown[] } };
         expect(input.definition.triggers).toEqual([
-            expect.objectContaining({ kind: "threshold", deviceId: "air", value: 50, measure: "pm25" })
+            expect.objectContaining({
+                kind: "threshold",
+                deviceId: "air",
+                value: 50,
+                measure: "pm25"
+            })
         ]);
         expect(input.definition.actions).toEqual([
-            expect.objectContaining({ do: "set-fan", setting: { action: "set-fan", speed: "speed_2" } })
+            expect.objectContaining({
+                do: "set-fan",
+                setting: { action: "set-fan", speed: "speed_2" }
+            })
         ]);
     });
 });

@@ -97,7 +97,9 @@ afterEach(() => {
 
 async function drawn(devices: DeviceView[], canControl = true, locale?: "es-ES") {
     listed = devices;
-    render(withMessages(<DevicesView places={[]} canControl={canControl} canManage={false} />, locale));
+    render(
+        withMessages(<DevicesView places={[]} canControl={canControl} canManage={false} />, locale)
+    );
     await screen.findByText(devices[0]!.name);
 }
 
@@ -110,42 +112,60 @@ async function opened(device: DeviceView) {
 describe("an air purifier's row", () => {
     it("draws its power, preset, fan speed, the dust in the room and a worn filter", async () => {
         await drawn([purifier()]);
-        expect(screen.getByRole("switch", { name: "Turn Bedroom purifier on or off" })).toBeTruthy();
-        expect(screen.getByRole("combobox", { name: "Mode of Bedroom purifier" }).textContent).toContain("Auto");
+        expect(
+            screen.getByRole("switch", { name: "Turn Bedroom purifier on or off" })
+        ).toBeTruthy();
+        expect(
+            screen.getByRole("combobox", { name: "Mode of Bedroom purifier" }).textContent
+        ).toContain("Auto");
         // Running a preset, the speed is the preset's: the picker says so.
-        expect(screen.getByRole("combobox", { name: "Fan speed of Bedroom purifier" }).textContent).toContain(
-            "Set by mode"
-        );
+        expect(
+            screen.getByRole("combobox", { name: "Fan speed of Bedroom purifier" }).textContent
+        ).toContain("Set by mode");
         expect(screen.getByText("12 µg/m³")).toBeTruthy();
         expect(screen.getByText("Change filter soon")).toBeTruthy();
         // On, the badge says what it is running rather than "On".
         expect(screen.getAllByText("Auto").length).toBeGreaterThan(1);
         // The humidity stepper is the panel's, not the row's.
-        expect(screen.queryByRole("group", { name: "Target humidity of Bedroom purifier" })).toBeNull();
+        expect(
+            screen.queryByRole("group", { name: "Target humidity of Bedroom purifier" })
+        ).toBeNull();
     });
 
     it("says nothing about filters that are fine", async () => {
-        await drawn([purifier({ air: { ...AIR, filters: [{ kind: "hepa", percent: 80, hours: null, state: "ok" }] } })]);
+        await drawn([
+            purifier({
+                air: { ...AIR, filters: [{ kind: "hepa", percent: 80, hours: null, state: "ok" }] }
+            })
+        ]);
         expect(screen.queryByText("Change filter soon")).toBeNull();
         expect(screen.queryByText("Change filter")).toBeNull();
     });
 
     it("is off limits, saying why, when it is not answering", async () => {
         await drawn([purifier({ online: false, state: "unknown" })]);
-        const mode = screen.getByRole("combobox", { name: "Mode of Bedroom purifier" }) as HTMLButtonElement;
+        const mode = screen.getByRole("combobox", {
+            name: "Mode of Bedroom purifier"
+        }) as HTMLButtonElement;
         expect(mode.disabled).toBe(true);
-        expect(mode.closest("label")?.getAttribute("title")).toBe("It is not answering, so it cannot be switched now.");
+        expect(mode.closest("label")?.getAttribute("title")).toBe(
+            "It is not answering, so it cannot be switched now."
+        );
     });
 
     it("offers only the pickers the unit has", async () => {
         await drawn([purifier({ air: { ...AIR, modes: [], speeds: [] } })]);
         expect(screen.queryByRole("combobox", { name: "Mode of Bedroom purifier" })).toBeNull();
-        expect(screen.queryByRole("combobox", { name: "Fan speed of Bedroom purifier" })).toBeNull();
+        expect(
+            screen.queryByRole("combobox", { name: "Fan speed of Bedroom purifier" })
+        ).toBeNull();
     });
 
     it("speaks Spanish", async () => {
         await drawn([purifier({ air: { ...AIR, mode: "sleep" } })], true, "es-ES");
-        expect(screen.getByRole("combobox", { name: "Modo de Bedroom purifier" }).textContent).toContain("Sueño");
+        expect(
+            screen.getByRole("combobox", { name: "Modo de Bedroom purifier" }).textContent
+        ).toContain("Sueño");
         expect(screen.getByText("Filtro: cambiar pronto")).toBeTruthy();
     });
 });
@@ -166,17 +186,22 @@ describe("an air purifier's panel", () => {
     it("gathers presses of the humidity stepper into one change", async () => {
         const dialog = await opened(purifier());
         vi.useFakeTimers();
-        const raise = within(dialog).getByRole("button", { name: "Raise the target humidity on Bedroom purifier" });
+        const raise = within(dialog).getByRole("button", {
+            name: "Raise the target humidity on Bedroom purifier"
+        });
         fireEvent.click(raise);
         fireEvent.click(raise);
-        expect(within(dialog).getByRole("group", { name: "Target humidity of Bedroom purifier" }).textContent).toContain(
-            "70%"
-        );
+        expect(
+            within(dialog).getByRole("group", { name: "Target humidity of Bedroom purifier" })
+                .textContent
+        ).toContain("70%");
         expect(pressed).toEqual([]);
         await act(async () => {
             vi.advanceTimersByTime(800);
         });
-        expect(pressed).toEqual([["air-1", "set-humidity", { action: "set-humidity", target: 70 }]]);
+        expect(pressed).toEqual([
+            ["air-1", "set-humidity", { action: "set-humidity", target: 70 }]
+        ]);
     });
 
     it("flips a switch at once and puts it back when the unit refuses", async () => {
@@ -184,24 +209,34 @@ describe("an air purifier's panel", () => {
         const lock = within(dialog).getByRole("switch", { name: "Child lock on Bedroom purifier" });
         expect(lock.getAttribute("aria-checked")).toBe("false");
         fireEvent.click(lock);
-        expect(pressed).toEqual([["air-1", "set-option", { action: "set-option", option: "childLock", on: true }]]);
+        expect(pressed).toEqual([
+            ["air-1", "set-option", { action: "set-option", option: "childLock", on: true }]
+        ]);
         await waitFor(() =>
             expect(
-                within(dialog).getByRole("switch", { name: "Child lock on Bedroom purifier" }).getAttribute("aria-checked")
+                within(dialog)
+                    .getByRole("switch", { name: "Child lock on Bedroom purifier" })
+                    .getAttribute("aria-checked")
             ).toBe("true")
         );
         await act(async () => answer({ error: "The air purifier did not answer." }));
         await waitFor(() =>
             expect(
-                within(dialog).getByRole("switch", { name: "Child lock on Bedroom purifier" }).getAttribute("aria-checked")
+                within(dialog)
+                    .getByRole("switch", { name: "Child lock on Bedroom purifier" })
+                    .getAttribute("aria-checked")
             ).toBe("false")
         );
-        expect(within(dialog).getByRole("alert").textContent).toContain("The air purifier did not answer.");
+        expect(within(dialog).getByRole("alert").textContent).toContain(
+            "The air purifier did not answer."
+        );
     });
 
     it("offers no humidity on a unit that does not humidify", async () => {
         const dialog = await opened(purifier({ air: { ...AIR, humidity: null } }));
-        expect(within(dialog).queryByRole("group", { name: "Target humidity of Bedroom purifier" })).toBeNull();
+        expect(
+            within(dialog).queryByRole("group", { name: "Target humidity of Bedroom purifier" })
+        ).toBeNull();
     });
 });
 
@@ -213,18 +248,21 @@ describe("what an air purifier accepts", () => {
         expect(kinds.airCommandIssue(AIR, { action: "set-fan", speed: "speed_3" })).toBe(
             "That fan speed is not one this device has"
         );
-        expect(kinds.airCommandIssue(AIR, { action: "set-option", option: "humidify", on: true })).toBe(
-            "That setting is not one this device has"
-        );
+        expect(
+            kinds.airCommandIssue(AIR, { action: "set-option", option: "humidify", on: true })
+        ).toBe("That setting is not one this device has");
         expect(kinds.airCommandIssue(AIR, { action: "set-humidity", target: 55 })).toBe(
             "That humidity is not one this device accepts"
         );
         expect(kinds.airCommandIssue(AIR, { action: "set-humidity", target: 80 })).toBe(
             "That humidity is not one this device accepts"
         );
-        expect(kinds.airCommandIssue({ ...AIR, humidity: null }, { action: "set-humidity", target: 50 })).toBe(
-            "That device does not humidify"
-        );
+        expect(
+            kinds.airCommandIssue(
+                { ...AIR, humidity: null },
+                { action: "set-humidity", target: 50 }
+            )
+        ).toBe("That device does not humidify");
         expect(kinds.airCommandIssue(AIR, { action: "set-humidity", target: 60 })).toBe(null);
         expect(kinds.airCommandIssue(AIR, { action: "set-fan", speed: "turbo" })).toBe(null);
     });
@@ -236,7 +274,10 @@ describe("what an air purifier accepts", () => {
             "That device cannot be told to do that"
         );
         expect(
-            kinds.commandIssue({ kind: "climate", climate: null, air: null }, { action: "set-fan", speed: "turbo" })
+            kinds.commandIssue(
+                { kind: "climate", climate: null, air: null },
+                { action: "set-fan", speed: "turbo" }
+            )
         ).toBe("That device cannot be told to do that");
     });
 
@@ -245,7 +286,12 @@ describe("what an air purifier accepts", () => {
             mode: null,
             speed: "speed_2"
         });
-        expect(kinds.applyAir({ ...AIR, mode: null, speed: "turbo" }, { action: "set-mode", mode: "sleep" })).toMatchObject({
+        expect(
+            kinds.applyAir(
+                { ...AIR, mode: null, speed: "turbo" },
+                { action: "set-mode", mode: "sleep" }
+            )
+        ).toMatchObject({
             mode: "sleep",
             speed: null
         });
@@ -265,7 +311,9 @@ describe("what an air purifier accepts", () => {
     it("reads a stored document only when it is whole", () => {
         expect(kinds.airSettings(AIR)).not.toBeNull();
         expect(kinds.airSettings({ ...AIR, modes: ["boost"] })).toBeNull();
-        expect(kinds.airSettings({ ...AIR, humidity: { target: 50, min: 70, max: 40, step: 10 } })).toBeNull();
+        expect(
+            kinds.airSettings({ ...AIR, humidity: { target: 50, min: 70, max: 40, step: 10 } })
+        ).toBeNull();
         expect(kinds.airSettings(null)).toBeNull();
     });
 

@@ -73,7 +73,9 @@ export function measuresFor(kind: string): readonly ReadingMeasure[] {
 }
 
 /** The words a mode can be, whichever kind of device it is on. */
-const MODE_WORDS: readonly string[] = [...new Set<string>([...kinds.CLIMATE_MODES, ...kinds.AIR_MODES])];
+const MODE_WORDS: readonly string[] = [
+    ...new Set<string>([...kinds.CLIMATE_MODES, ...kinds.AIR_MODES])
+];
 
 /** Whether a kind of device has a number to compare - a sensor's reading, the
  *  room temperature an air conditioner reads, or a purifier's figures. What a
@@ -225,7 +227,8 @@ function airShaped(value: unknown): boolean {
     if (!value || typeof value !== "object") return false;
     const setting = value as Record<string, unknown>;
     if ("speed" in setting || setting.action === "set-humidity") return true;
-    if (setting.action === "set-option") return (kinds.AIR_OPTIONS as readonly unknown[]).includes(setting.option);
+    if (setting.action === "set-option")
+        return (kinds.AIR_OPTIONS as readonly unknown[]).includes(setting.option);
     if (setting.action === "set-mode") {
         return (
             (kinds.AIR_MODES as readonly unknown[]).includes(setting.mode) &&
@@ -240,7 +243,8 @@ function airShaped(value: unknown): boolean {
 const settingSchema = z.unknown().transform((value, context): ClimateSetting | AirSetting => {
     const parsed = (airShaped(value) ? airSettingSchema : climateSettingSchema).safeParse(value);
     if (parsed.success) return parsed.data;
-    for (const issue of parsed.error.issues) context.addIssue({ ...issue, message: issue.message } as z.IssueData);
+    for (const issue of parsed.error.issues)
+        context.addIssue({ ...issue, message: issue.message } as z.IssueData);
     return z.NEVER;
 });
 
@@ -832,7 +836,10 @@ export function blankSetting(
 }
 
 /** The same for a purifier. */
-function blankAirSetting(action: StepDeviceAction, air: kinds.AirSettings | null | undefined): StepSetting | undefined {
+function blankAirSetting(
+    action: StepDeviceAction,
+    air: kinds.AirSettings | null | undefined
+): StepSetting | undefined {
     switch (action) {
         case "set-mode":
             return { action, mode: air?.mode ?? air?.modes[0] ?? "auto" };
@@ -841,7 +848,8 @@ function blankAirSetting(action: StepDeviceAction, air: kinds.AirSettings | null
         case "set-humidity":
             return { action, target: air?.humidity?.target ?? air?.humidity?.min ?? Number.NaN };
         case "set-option": {
-            const option = kinds.AIR_OPTIONS.find((entry) => air?.options[entry] !== undefined) ?? "childLock";
+            const option =
+                kinds.AIR_OPTIONS.find((entry) => air?.options[entry] !== undefined) ?? "childLock";
             return { action, option, on: true };
         }
         default:

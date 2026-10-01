@@ -191,7 +191,9 @@ export function Select({
                                 is still there on hover. */}
                             <span
                                 className="truncate"
-                                title={typeof selected.label === "string" ? selected.label : undefined}
+                                title={
+                                    typeof selected.label === "string" ? selected.label : undefined
+                                }
                             >
                                 {selected.label}
                             </span>

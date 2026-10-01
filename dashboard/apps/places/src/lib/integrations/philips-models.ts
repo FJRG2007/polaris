@@ -58,13 +58,13 @@ export interface PhilipsHumidifier {
 const M_AC0650: PhilipsModel = {
     generation: "gen2",
     presets: {
-        "auto": { "D03-02": "ON", "D03-12": "Auto General" },
-        "turbo": { "D03-02": "ON", "D03-12": "Turbo" },
-        "sleep": { "D03-02": "ON", "D03-12": "Sleep" }
+        auto: { "D03-02": "ON", "D03-12": "Auto General" },
+        turbo: { "D03-02": "ON", "D03-12": "Turbo" },
+        sleep: { "D03-02": "ON", "D03-12": "Sleep" }
     },
     speeds: {
-        "sleep": { "D03-02": "ON", "D03-12": "Sleep" },
-        "turbo": { "D03-02": "ON", "D03-12": "Turbo" }
+        sleep: { "D03-02": "ON", "D03-12": "Sleep" },
+        turbo: { "D03-02": "ON", "D03-12": "Turbo" }
     },
     switches: [],
     lights: [],
@@ -78,13 +78,13 @@ const M_AC0650: PhilipsModel = {
 const M_AC0850_11: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "turbo": { "D03102": 1, "D0310C": 18 },
-        "sleep": { "D03102": 1, "D0310C": 17 }
+        auto: { D03102: 1, D0310C: 0 },
+        turbo: { D03102: 1, D0310C: 18 },
+        sleep: { D03102: 1, D0310C: 17 }
     },
     speeds: {
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "turbo": { "D03102": 1, "D0310C": 18 }
+        sleep: { D03102: 1, D0310C: 17 },
+        turbo: { D03102: 1, D0310C: 18 }
     },
     switches: [],
     lights: [],
@@ -98,15 +98,15 @@ const M_AC0850_11: PhilipsModel = {
 const M_AC0950: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "turbo": { "D03102": 1, "D0310C": 18 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "sleep": { "D03102": 1, "D0310C": 17 }
+        auto: { D03102: 1, D0310C: 0 },
+        turbo: { D03102: 1, D0310C: 18 },
+        medium: { D03102: 1, D0310C: 19 },
+        sleep: { D03102: 1, D0310C: 17 }
     },
     speeds: {
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "turbo": { "D03102": 1, "D0310C": 18 }
+        sleep: { D03102: 1, D0310C: 17 },
+        medium: { D03102: 1, D0310C: 19 },
+        turbo: { D03102: 1, D0310C: 18 }
     },
     switches: ["D03103", "D03130"],
     lights: ["D03105#1"],
@@ -120,20 +120,20 @@ const M_AC0950: PhilipsModel = {
 const M_AC1214: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "mode": "P" },
-        "allergen": { "mode": "A" },
-        "night": { "mode": "N" },
-        "speed_1": { "mode": "M", "om": "1" },
-        "speed_2": { "mode": "M", "om": "2" },
-        "speed_3": { "mode": "M", "om": "3" },
-        "turbo": { "mode": "M", "om": "t" }
+        auto: { mode: "P" },
+        allergen: { mode: "A" },
+        night: { mode: "N" },
+        speed_1: { mode: "M", om: "1" },
+        speed_2: { mode: "M", om: "2" },
+        speed_3: { mode: "M", om: "3" },
+        turbo: { mode: "M", om: "t" }
     },
     speeds: {
-        "night": { "mode": "N" },
-        "speed_1": { "mode": "M", "om": "1" },
-        "speed_2": { "mode": "M", "om": "2" },
-        "speed_3": { "mode": "M", "om": "3" },
-        "turbo": { "mode": "M", "om": "t" }
+        night: { mode: "N" },
+        speed_1: { mode: "M", om: "1" },
+        speed_2: { mode: "M", om: "2" },
+        speed_3: { mode: "M", om: "3" },
+        turbo: { mode: "M", om: "t" }
     },
     switches: ["cl"],
     lights: ["uil", "aqil"],
@@ -147,17 +147,17 @@ const M_AC1214: PhilipsModel = {
 const M_AC1715: PhilipsModel = {
     generation: "gen2",
     presets: {
-        "auto": { "D03-02": "ON", "D03-12": "Auto General" },
-        "speed_1": { "D03-02": "ON", "D03-12": "Gentle/Speed 1" },
-        "speed_2": { "D03-02": "ON", "D03-12": "Speed 2" },
-        "turbo": { "D03-02": "ON", "D03-12": "Turbo" },
-        "sleep": { "D03-02": "ON", "D03-12": "Sleep" }
+        auto: { "D03-02": "ON", "D03-12": "Auto General" },
+        speed_1: { "D03-02": "ON", "D03-12": "Gentle/Speed 1" },
+        speed_2: { "D03-02": "ON", "D03-12": "Speed 2" },
+        turbo: { "D03-02": "ON", "D03-12": "Turbo" },
+        sleep: { "D03-02": "ON", "D03-12": "Sleep" }
     },
     speeds: {
-        "sleep": { "D03-02": "ON", "D03-12": "Sleep" },
-        "speed_1": { "D03-02": "ON", "D03-12": "Gentle/Speed 1" },
-        "speed_2": { "D03-02": "ON", "D03-12": "Speed 2" },
-        "turbo": { "D03-02": "ON", "D03-12": "Turbo" }
+        sleep: { "D03-02": "ON", "D03-12": "Sleep" },
+        speed_1: { "D03-02": "ON", "D03-12": "Gentle/Speed 1" },
+        speed_2: { "D03-02": "ON", "D03-12": "Speed 2" },
+        turbo: { "D03-02": "ON", "D03-12": "Turbo" }
     },
     switches: [],
     lights: ["D03-05"],
@@ -171,17 +171,17 @@ const M_AC1715: PhilipsModel = {
 const M_AC2210: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "turbo": { "D03102": 1, "D0310C": 18 },
-        "sleep": { "D03102": 1, "D0310C": 17 }
+        auto: { D03102: 1, D0310C: 0 },
+        medium: { D03102: 1, D0310C: 19 },
+        turbo: { D03102: 1, D0310C: 18 },
+        sleep: { D03102: 1, D0310C: 17 }
     },
     speeds: {
-        "speed_1": { "D03102": 1, "D0310C": 1 },
-        "speed_2": { "D03102": 1, "D0310C": 2 },
-        "speed_3": { "D03102": 1, "D0310C": 3 },
-        "speed_4": { "D03102": 1, "D0310C": 4 },
-        "speed_5": { "D03102": 1, "D0310C": 5 }
+        speed_1: { D03102: 1, D0310C: 1 },
+        speed_2: { D03102: 1, D0310C: 2 },
+        speed_3: { D03102: 1, D0310C: 3 },
+        speed_4: { D03102: 1, D0310C: 4 },
+        speed_5: { D03102: 1, D0310C: 5 }
     },
     switches: ["D03103", "D03130", "D03180"],
     lights: ["D03105#1"],
@@ -195,20 +195,20 @@ const M_AC2210: PhilipsModel = {
 const M_AC2729: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "P" },
-        "allergen": { "pwr": "1", "mode": "A" },
-        "night": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        auto: { pwr: "1", mode: "P" },
+        allergen: { pwr: "1", mode: "A" },
+        night: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     speeds: {
-        "night": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        night: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     switches: ["cl", "uil"],
     lights: ["uil", "aqil"],
@@ -222,21 +222,21 @@ const M_AC2729: PhilipsModel = {
 const M_AC2889: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "P" },
-        "allergen": { "pwr": "1", "mode": "A" },
-        "bacteria": { "pwr": "1", "mode": "B" },
-        "sleep": { "pwr": "1", "mode": "M", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        auto: { pwr: "1", mode: "P" },
+        allergen: { pwr: "1", mode: "A" },
+        bacteria: { pwr: "1", mode: "B" },
+        sleep: { pwr: "1", mode: "M", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "M", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        sleep: { pwr: "1", mode: "M", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     switches: [],
     lights: ["uil", "aqil"],
@@ -250,15 +250,15 @@ const M_AC2889: PhilipsModel = {
 const M_AC2936: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "AG" },
-        "sleep": { "pwr": "1", "mode": "S" },
-        "gentle": { "pwr": "1", "mode": "GT" },
-        "turbo": { "pwr": "1", "mode": "T" }
+        auto: { pwr: "1", mode: "AG" },
+        sleep: { pwr: "1", mode: "S" },
+        gentle: { pwr: "1", mode: "GT" },
+        turbo: { pwr: "1", mode: "T" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "S" },
-        "gentle": { "pwr": "1", "mode": "GT" },
-        "turbo": { "pwr": "1", "mode": "T" }
+        sleep: { pwr: "1", mode: "S" },
+        gentle: { pwr: "1", mode: "GT" },
+        turbo: { pwr: "1", mode: "T" }
     },
     switches: ["cl"],
     lights: ["uil", "aqil"],
@@ -272,18 +272,18 @@ const M_AC2936: PhilipsModel = {
 const M_AC3033: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "AG" },
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "allergy_sleep": { "pwr": "1", "mode": "AS", "om": "as" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        auto: { pwr: "1", mode: "AG" },
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        allergy_sleep: { pwr: "1", mode: "AS", om: "as" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     switches: [],
     lights: ["uil", "aqil"],
@@ -297,17 +297,17 @@ const M_AC3033: PhilipsModel = {
 const M_AC3055: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "AG" },
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        auto: { pwr: "1", mode: "AG" },
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     switches: [],
     lights: ["uil", "aqil"],
@@ -321,15 +321,15 @@ const M_AC3055: PhilipsModel = {
 const M_AC3420: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "turbo": { "D03102": 1, "D0310C": 18 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "sleep": { "D03102": 1, "D0310C": 17 }
+        auto: { D03102: 1, D0310C: 0 },
+        turbo: { D03102: 1, D0310C: 18 },
+        medium: { D03102: 1, D0310C: 19 },
+        sleep: { D03102: 1, D0310C: 17 }
     },
     speeds: {
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "turbo": { "D03102": 1, "D0310C": 18 }
+        sleep: { D03102: 1, D0310C: 17 },
+        medium: { D03102: 1, D0310C: 19 },
+        turbo: { D03102: 1, D0310C: 18 }
     },
     switches: ["D03103", "D03130"],
     lights: ["D03105#1"],
@@ -343,15 +343,15 @@ const M_AC3420: PhilipsModel = {
 const M_AC3737: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310A": 2, "D0310C": 0 },
-        "sleep": { "D03102": 1, "D0310A": 2, "D0310C": 17 },
-        "turbo": { "D03102": 1, "D0310A": 3, "D0310C": 18 }
+        auto: { D03102: 1, D0310A: 2, D0310C: 0 },
+        sleep: { D03102: 1, D0310A: 2, D0310C: 17 },
+        turbo: { D03102: 1, D0310A: 3, D0310C: 18 }
     },
     speeds: {
-        "sleep": { "D03102": 1, "D0310A": 2, "D0310C": 17 },
-        "speed_1": { "D03102": 1, "D0310A": 2, "D0310C": 1 },
-        "speed_2": { "D03102": 1, "D0310A": 2, "D0310C": 2 },
-        "turbo": { "D03102": 1, "D0310A": 3, "D0310C": 18 }
+        sleep: { D03102: 1, D0310A: 2, D0310C: 17 },
+        speed_1: { D03102: 1, D0310A: 2, D0310C: 1 },
+        speed_2: { D03102: 1, D0310A: 2, D0310C: 2 },
+        turbo: { D03102: 1, D0310A: 3, D0310C: 18 }
     },
     switches: ["D03103"],
     lights: ["D03105"],
@@ -365,20 +365,20 @@ const M_AC3737: PhilipsModel = {
 const M_AC3829: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "P" },
-        "allergen": { "pwr": "1", "mode": "A" },
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        auto: { pwr: "1", mode: "P" },
+        allergen: { pwr: "1", mode: "A" },
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     switches: ["cl"],
     lights: ["uil", "aqil"],
@@ -392,13 +392,13 @@ const M_AC3829: PhilipsModel = {
 const M_AC3836: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "AG", "om": "1" },
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        auto: { pwr: "1", mode: "AG", om: "1" },
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     switches: [],
     lights: ["uil", "aqil"],
@@ -412,18 +412,18 @@ const M_AC3836: PhilipsModel = {
 const M_AC3854_51: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "AG" },
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "allergy_sleep": { "pwr": "1", "mode": "AS", "om": "as" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        auto: { pwr: "1", mode: "AG" },
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        allergy_sleep: { pwr: "1", mode: "AS", om: "as" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "S", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "turbo": { "pwr": "1", "mode": "T", "om": "t" }
+        sleep: { pwr: "1", mode: "S", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        turbo: { pwr: "1", mode: "T", om: "t" }
     },
     switches: ["cl"],
     lights: ["uil", "aqil"],
@@ -437,16 +437,16 @@ const M_AC3854_51: PhilipsModel = {
 const M_AC4550: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "auto": { "pwr": "1", "mode": "AG", "om": "a" },
-        "gas": { "pwr": "1", "mode": "F", "om": "a" },
-        "pollution": { "pwr": "1", "mode": "P", "om": "a" },
-        "allergen": { "pwr": "1", "mode": "A", "om": "a" }
+        auto: { pwr: "1", mode: "AG", om: "a" },
+        gas: { pwr: "1", mode: "F", om: "a" },
+        pollution: { pwr: "1", mode: "P", om: "a" },
+        allergen: { pwr: "1", mode: "A", om: "a" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "om": "s" },
-        "speed_1": { "pwr": "1", "om": "1" },
-        "speed_2": { "pwr": "1", "om": "2" },
-        "turbo": { "pwr": "1", "om": "t" }
+        sleep: { pwr: "1", om: "s" },
+        speed_1: { pwr: "1", om: "1" },
+        speed_2: { pwr: "1", om: "2" },
+        turbo: { pwr: "1", om: "t" }
     },
     switches: ["cl"],
     lights: ["uil", "aqil"],
@@ -460,21 +460,21 @@ const M_AC4550: PhilipsModel = {
 const M_AC5659: PhilipsModel = {
     generation: "gen1",
     presets: {
-        "pollution": { "pwr": "1", "mode": "P" },
-        "allergen": { "pwr": "1", "mode": "A" },
-        "bacteria": { "pwr": "1", "mode": "B" },
-        "sleep": { "pwr": "1", "mode": "M", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        pollution: { pwr: "1", mode: "P" },
+        allergen: { pwr: "1", mode: "A" },
+        bacteria: { pwr: "1", mode: "B" },
+        sleep: { pwr: "1", mode: "M", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     speeds: {
-        "sleep": { "pwr": "1", "mode": "M", "om": "s" },
-        "speed_1": { "pwr": "1", "mode": "M", "om": "1" },
-        "speed_2": { "pwr": "1", "mode": "M", "om": "2" },
-        "speed_3": { "pwr": "1", "mode": "M", "om": "3" },
-        "turbo": { "pwr": "1", "mode": "M", "om": "t" }
+        sleep: { pwr: "1", mode: "M", om: "s" },
+        speed_1: { pwr: "1", mode: "M", om: "1" },
+        speed_2: { pwr: "1", mode: "M", om: "2" },
+        speed_3: { pwr: "1", mode: "M", om: "3" },
+        turbo: { pwr: "1", mode: "M", om: "t" }
     },
     switches: [],
     lights: ["uil", "aqil"],
@@ -488,21 +488,21 @@ const M_AC5659: PhilipsModel = {
 const M_AMF765: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "turbo": { "D03102": 1, "D0310C": 18 }
+        auto: { D03102: 1, D0310C: 0 },
+        sleep: { D03102: 1, D0310C: 17 },
+        turbo: { D03102: 1, D0310C: 18 }
     },
     speeds: {
-        "speed_1": { "D03102": 1, "D0310C": 1 },
-        "speed_2": { "D03102": 1, "D0310C": 2 },
-        "speed_3": { "D03102": 1, "D0310C": 3 },
-        "speed_4": { "D03102": 1, "D0310C": 4 },
-        "speed_5": { "D03102": 1, "D0310C": 5 },
-        "speed_6": { "D03102": 1, "D0310C": 6 },
-        "speed_7": { "D03102": 1, "D0310C": 7 },
-        "speed_8": { "D03102": 1, "D0310C": 8 },
-        "speed_9": { "D03102": 1, "D0310C": 9 },
-        "speed_10": { "D03102": 1, "D0310C": 10 }
+        speed_1: { D03102: 1, D0310C: 1 },
+        speed_2: { D03102: 1, D0310C: 2 },
+        speed_3: { D03102: 1, D0310C: 3 },
+        speed_4: { D03102: 1, D0310C: 4 },
+        speed_5: { D03102: 1, D0310C: 5 },
+        speed_6: { D03102: 1, D0310C: 6 },
+        speed_7: { D03102: 1, D0310C: 7 },
+        speed_8: { D03102: 1, D0310C: 8 },
+        speed_9: { D03102: 1, D0310C: 9 },
+        speed_10: { D03102: 1, D0310C: 10 }
     },
     switches: ["D03103", "D03130", "D03134", "D03180"],
     lights: ["D0312D"],
@@ -516,21 +516,21 @@ const M_AMF765: PhilipsModel = {
 const M_AMF870: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "turbo": { "D03102": 1, "D0310C": 18 }
+        auto: { D03102: 1, D0310C: 0 },
+        sleep: { D03102: 1, D0310C: 17 },
+        turbo: { D03102: 1, D0310C: 18 }
     },
     speeds: {
-        "speed_1": { "D03102": 1, "D0310C": 1 },
-        "speed_2": { "D03102": 1, "D0310C": 2 },
-        "speed_3": { "D03102": 1, "D0310C": 3 },
-        "speed_4": { "D03102": 1, "D0310C": 4 },
-        "speed_5": { "D03102": 1, "D0310C": 5 },
-        "speed_6": { "D03102": 1, "D0310C": 6 },
-        "speed_7": { "D03102": 1, "D0310C": 7 },
-        "speed_8": { "D03102": 1, "D0310C": 8 },
-        "speed_9": { "D03102": 1, "D0310C": 9 },
-        "speed_10": { "D03102": 1, "D0310C": 10 }
+        speed_1: { D03102: 1, D0310C: 1 },
+        speed_2: { D03102: 1, D0310C: 2 },
+        speed_3: { D03102: 1, D0310C: 3 },
+        speed_4: { D03102: 1, D0310C: 4 },
+        speed_5: { D03102: 1, D0310C: 5 },
+        speed_6: { D03102: 1, D0310C: 6 },
+        speed_7: { D03102: 1, D0310C: 7 },
+        speed_8: { D03102: 1, D0310C: 8 },
+        speed_9: { D03102: 1, D0310C: 9 },
+        speed_10: { D03102: 1, D0310C: 10 }
     },
     switches: ["D03103", "D03130", "D03134", "D03180"],
     lights: ["D0312D"],
@@ -544,16 +544,16 @@ const M_AMF870: PhilipsModel = {
 const M_CX3120: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto_plus": { "D03102": 1, "D0310A": 3, "D0310C": 0 },
-        "ventilation": { "D03102": 1, "D0310A": 1, "D0310C": -127 },
-        "low": { "D03102": 1, "D0310A": 3, "D0310C": 66 },
-        "medium": { "D03102": 1, "D0310A": 3, "D0310C": 67 },
-        "high": { "D03102": 1, "D0310A": 3, "D0310C": 65 }
+        auto_plus: { D03102: 1, D0310A: 3, D0310C: 0 },
+        ventilation: { D03102: 1, D0310A: 1, D0310C: -127 },
+        low: { D03102: 1, D0310A: 3, D0310C: 66 },
+        medium: { D03102: 1, D0310A: 3, D0310C: 67 },
+        high: { D03102: 1, D0310A: 3, D0310C: 65 }
     },
     speeds: {
-        "low": { "D03102": 1, "D0310A": 3, "D0310C": 66 },
-        "medium": { "D03102": 1, "D0310A": 3, "D0310C": 67 },
-        "high": { "D03102": 1, "D0310A": 3, "D0310C": 65 }
+        low: { D03102: 1, D0310A: 3, D0310C: 66 },
+        medium: { D03102: 1, D0310A: 3, D0310C: 67 },
+        high: { D03102: 1, D0310A: 3, D0310C: 65 }
     },
     switches: ["D03103"],
     lights: [],
@@ -567,14 +567,14 @@ const M_CX3120: PhilipsModel = {
 const M_CX5120: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310A": 3, "D0310C": 0 },
-        "ventilation": { "D03102": 1, "D0310A": 1, "D0310C": -127 },
-        "low": { "D03102": 1, "D0310A": 3, "D0310C": 66 },
-        "high": { "D03102": 1, "D0310A": 3, "D0310C": 65 }
+        auto: { D03102: 1, D0310A: 3, D0310C: 0 },
+        ventilation: { D03102: 1, D0310A: 1, D0310C: -127 },
+        low: { D03102: 1, D0310A: 3, D0310C: 66 },
+        high: { D03102: 1, D0310A: 3, D0310C: 65 }
     },
     speeds: {
-        "low": { "D03102": 1, "D0310A": 3, "D0310C": 66 },
-        "high": { "D03102": 1, "D0310A": 3, "D0310C": 65 }
+        low: { D03102: 1, D0310A: 3, D0310C: 66 },
+        high: { D03102: 1, D0310A: 3, D0310C: 65 }
     },
     switches: ["D03130"],
     lights: ["D03105"],
@@ -588,16 +588,16 @@ const M_CX5120: PhilipsModel = {
 const M_CX3550: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "speed_1": { "D03102": 1, "D0310A": 1, "D0310C": 1, "D0310D": 1 },
-        "speed_2": { "D03102": 1, "D0310A": 1, "D0310C": 2, "D0310D": 2 },
-        "speed_3": { "D03102": 1, "D0310A": 1, "D0310C": 3, "D0310D": 3 },
-        "natural": { "D03102": 1, "D0310A": 1, "D0310C": -126, "D0310D": 1 },
-        "sleep": { "D03102": 1, "D0310A": 1, "D0310C": 17, "D0310D": 2 }
+        speed_1: { D03102: 1, D0310A: 1, D0310C: 1, D0310D: 1 },
+        speed_2: { D03102: 1, D0310A: 1, D0310C: 2, D0310D: 2 },
+        speed_3: { D03102: 1, D0310A: 1, D0310C: 3, D0310D: 3 },
+        natural: { D03102: 1, D0310A: 1, D0310C: -126, D0310D: 1 },
+        sleep: { D03102: 1, D0310A: 1, D0310C: 17, D0310D: 2 }
     },
     speeds: {
-        "speed_1": { "D03102": 1, "D0310A": 1, "D0310C": 1, "D0310D": 1 },
-        "speed_2": { "D03102": 1, "D0310A": 1, "D0310C": 2, "D0310D": 2 },
-        "speed_3": { "D03102": 1, "D0310A": 1, "D0310C": 3, "D0310D": 3 }
+        speed_1: { D03102: 1, D0310A: 1, D0310C: 1, D0310D: 1 },
+        speed_2: { D03102: 1, D0310A: 1, D0310C: 2, D0310D: 2 },
+        speed_3: { D03102: 1, D0310A: 1, D0310C: 3, D0310D: 3 }
     },
     switches: ["D03130"],
     lights: [],
@@ -611,67 +611,73 @@ const M_CX3550: PhilipsModel = {
 const M_CX7550: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310A": 1, "D0310C": 0 },
-        "sleep": { "D03102": 1, "D0310A": 1, "D0310C": 17 },
-        "natural": { "D03102": 1, "D0310A": 1, "D0310C": -126 }
+        auto: { D03102: 1, D0310A: 1, D0310C: 0 },
+        sleep: { D03102: 1, D0310A: 1, D0310C: 17 },
+        natural: { D03102: 1, D0310A: 1, D0310C: -126 }
     },
     speeds: {
-        "speed_1": { "D03102": 1, "D0310A": 1, "D0310C": 1 },
-        "speed_2": { "D03102": 1, "D0310A": 1, "D0310C": 2 },
-        "speed_3": { "D03102": 1, "D0310A": 1, "D0310C": 3 },
-        "speed_4": { "D03102": 1, "D0310A": 1, "D0310C": 4 },
-        "speed_5": { "D03102": 1, "D0310A": 1, "D0310C": 5 },
-        "speed_6": { "D03102": 1, "D0310A": 1, "D0310C": 6 },
-        "speed_7": { "D03102": 1, "D0310A": 1, "D0310C": 7 },
-        "speed_8": { "D03102": 1, "D0310A": 1, "D0310C": 8 },
-        "speed_9": { "D03102": 1, "D0310A": 1, "D0310C": 9 },
-        "speed_10": { "D03102": 1, "D0310A": 1, "D0310C": 10 },
-        "speed_11": { "D03102": 1, "D0310A": 1, "D0310C": 11 },
-        "speed_12": { "D03102": 1, "D0310A": 1, "D0310C": 82 }
+        speed_1: { D03102: 1, D0310A: 1, D0310C: 1 },
+        speed_2: { D03102: 1, D0310A: 1, D0310C: 2 },
+        speed_3: { D03102: 1, D0310A: 1, D0310C: 3 },
+        speed_4: { D03102: 1, D0310A: 1, D0310C: 4 },
+        speed_5: { D03102: 1, D0310A: 1, D0310C: 5 },
+        speed_6: { D03102: 1, D0310A: 1, D0310C: 6 },
+        speed_7: { D03102: 1, D0310A: 1, D0310C: 7 },
+        speed_8: { D03102: 1, D0310A: 1, D0310C: 8 },
+        speed_9: { D03102: 1, D0310A: 1, D0310C: 9 },
+        speed_10: { D03102: 1, D0310A: 1, D0310C: 10 },
+        speed_11: { D03102: 1, D0310A: 1, D0310C: 11 },
+        speed_12: { D03102: 1, D0310A: 1, D0310C: 82 }
     },
     switches: ["D03130", "D03133"],
     lights: ["D03105#2"],
     humidifiers: [],
     unavailableFilters: [],
     unavailableSensors: ["D0310D", "D03122"],
-    nudge: [["D03105#2", 0], ["D03105#2", 115]]
+    nudge: [
+        ["D03105#2", 0],
+        ["D03105#2", 115]
+    ]
 };
 
 /** HU1509, HU1510, HU4209/00 */
 const M_HU1509: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "high": { "D03102": 1, "D0310C": 65 }
+        auto: { D03102: 1, D0310C: 0 },
+        sleep: { D03102: 1, D0310C: 17 },
+        medium: { D03102: 1, D0310C: 19 },
+        high: { D03102: 1, D0310C: 65 }
     },
     speeds: {
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "high": { "D03102": 1, "D0310C": 65 }
+        sleep: { D03102: 1, D0310C: 17 },
+        medium: { D03102: 1, D0310C: 19 },
+        high: { D03102: 1, D0310C: 65 }
     },
     switches: ["D03130", "D03134"],
     lights: ["D03105#2"],
     humidifiers: ["D03128#2"],
     unavailableFilters: [],
     unavailableSensors: [],
-    nudge: [["D03105#2", 0], ["D03105#2", 115]]
+    nudge: [
+        ["D03105#2", 0],
+        ["D03105#2", 115]
+    ]
 };
 
 /** HU5710 */
 const M_HU5710: PhilipsModel = {
     generation: "gen3",
     presets: {
-        "auto": { "D03102": 1, "D0310C": 0 },
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "high": { "D03102": 1, "D0310C": 65 }
+        auto: { D03102: 1, D0310C: 0 },
+        sleep: { D03102: 1, D0310C: 17 },
+        medium: { D03102: 1, D0310C: 19 },
+        high: { D03102: 1, D0310C: 65 }
     },
     speeds: {
-        "sleep": { "D03102": 1, "D0310C": 17 },
-        "medium": { "D03102": 1, "D0310C": 19 },
-        "high": { "D03102": 1, "D0310C": 65 }
+        sleep: { D03102: 1, D0310C: 17 },
+        medium: { D03102: 1, D0310C: 19 },
+        high: { D03102: 1, D0310C: 65 }
     },
     switches: ["D03103", "D03130", "D03139", "D03138", "D03134"],
     lights: ["D03105#2"],
@@ -682,7 +688,7 @@ const M_HU5710: PhilipsModel = {
 };
 
 export const PHILIPS_MODELS: Readonly<Record<string, PhilipsModel>> = {
-    "AC0650": M_AC0650,
+    AC0650: M_AC0650,
     "AC0850/11 AWS_Philips_AIR": M_AC0650,
     "AC0850/11 AWS_Philips_AIR_Combo": M_AC0850_11,
     "AC0850/20 AWS_Philips_AIR": M_AC0650,
@@ -695,78 +701,114 @@ export const PHILIPS_MODELS: Readonly<Record<string, PhilipsModel>> = {
     "AC0850/70 AWS_Philips_AIR_Combo": M_AC0850_11,
     "AC0850/81": M_AC0850_11,
     "AC0850/85": M_AC0650,
-    "AC0950": M_AC0950,
-    "AC0951": M_AC0950,
-    "AC1214": M_AC1214,
-    "AC1715": M_AC1715,
-    "AC2210": M_AC2210,
-    "AC2221": M_AC2210,
-    "AC2729": M_AC2729,
-    "AC2889": M_AC2889,
-    "AC2936": M_AC2936,
-    "AC2939": M_AC2936,
-    "AC2958": M_AC2936,
-    "AC2959": M_AC2936,
-    "AC3033": M_AC3033,
-    "AC3036": M_AC3033,
-    "AC3039": M_AC3033,
-    "AC3055": M_AC3055,
-    "AC3059": M_AC3055,
-    "AC3210": M_AC2210,
-    "AC3220": M_AC2210,
-    "AC3221": M_AC2210,
-    "AC3259": M_AC2889,
-    "AC3420": M_AC3420,
-    "AC3421": M_AC3420,
-    "AC3737": M_AC3737,
-    "AC3829": M_AC3829,
-    "AC3836": M_AC3836,
+    AC0950: M_AC0950,
+    AC0951: M_AC0950,
+    AC1214: M_AC1214,
+    AC1715: M_AC1715,
+    AC2210: M_AC2210,
+    AC2221: M_AC2210,
+    AC2729: M_AC2729,
+    AC2889: M_AC2889,
+    AC2936: M_AC2936,
+    AC2939: M_AC2936,
+    AC2958: M_AC2936,
+    AC2959: M_AC2936,
+    AC3033: M_AC3033,
+    AC3036: M_AC3033,
+    AC3039: M_AC3033,
+    AC3055: M_AC3055,
+    AC3059: M_AC3055,
+    AC3210: M_AC2210,
+    AC3220: M_AC2210,
+    AC3221: M_AC2210,
+    AC3259: M_AC2889,
+    AC3420: M_AC3420,
+    AC3421: M_AC3420,
+    AC3737: M_AC3737,
+    AC3829: M_AC3829,
+    AC3836: M_AC3836,
     "AC3854/50": M_AC3055,
     "AC3858/50": M_AC3055,
     "AC3854/51": M_AC3854_51,
     "AC3858/51": M_AC3854_51,
     "AC3858/83": M_AC3854_51,
     "AC3858/86": M_AC3854_51,
-    "AC4220": M_AC2210,
-    "AC4221": M_AC2210,
-    "AC4236": M_AC3854_51,
-    "AC4550": M_AC4550,
-    "AC4558": M_AC4550,
-    "AC5659": M_AC5659,
-    "AC5660": M_AC5659,
-    "AMF765": M_AMF765,
-    "AMF870": M_AMF870,
-    "CX3120": M_CX3120,
-    "CX5120": M_CX5120,
-    "CX3550": M_CX3550,
-    "CX7550": M_CX7550,
-    "HU1509": M_HU1509,
-    "HU1510": M_HU1509,
+    AC4220: M_AC2210,
+    AC4221: M_AC2210,
+    AC4236: M_AC3854_51,
+    AC4550: M_AC4550,
+    AC4558: M_AC4550,
+    AC5659: M_AC5659,
+    AC5660: M_AC5659,
+    AMF765: M_AMF765,
+    AMF870: M_AMF870,
+    CX3120: M_CX3120,
+    CX5120: M_CX5120,
+    CX3550: M_CX3550,
+    CX7550: M_CX7550,
+    HU1509: M_HU1509,
+    HU1510: M_HU1509,
     "HU4209/00": M_HU1509,
-    "HU5710": M_HU5710
+    HU5710: M_HU5710
 };
 
 /** `LIGHT_TYPES`: the value a display light is on and off at, by its key. */
 export const PHILIPS_LIGHTS: Readonly<Record<string, { on: Value; off: Value }>> = {
-    "D03-05": { "on": 100, "off": 0 },
-    "D03105": { "on": 100, "off": 0 },
-    "D03105#1": { "on": 123, "off": 0 },
-    "D03105#2": { "on": 123, "off": 0 },
-    "D0312D": { "on": 100, "off": 0 },
-    "aqil": { "on": 100, "off": 0 },
-    "uil": { "on": "1", "off": "0" }
+    "D03-05": { on: 100, off: 0 },
+    D03105: { on: 100, off: 0 },
+    "D03105#1": { on: 123, off: 0 },
+    "D03105#2": { on: 123, off: 0 },
+    D0312D: { on: 100, off: 0 },
+    aqil: { on: 100, off: 0 },
+    uil: { on: "1", off: "0" }
 };
 
 /** `SWITCH_TYPES`, the child lock's two keys: on and off. */
 export const PHILIPS_CHILD_LOCKS: Readonly<Record<string, { on: Value; off: Value }>> = {
-    "cl": { "on": true, "off": false },
-    "D03103": { "on": 1, "off": 0 }
+    cl: { on: true, off: false },
+    D03103: { on: 1, off: 0 }
 };
 
 /** `HUMIDIFIER_TYPES`: where the target humidity is, its range and step, and how a
  *  2-in-1 unit is switched between purifying and humidifying. */
 export const PHILIPS_HUMIDIFIERS: Readonly<Record<string, PhilipsHumidifier>> = {
-    "D03128#1": { "humidity": "D03125", "power": "D03102", "on": 1, "off": 0, "function": "D0310D", "humidifying": 1, "idle": 5, "switch": false, "min": 40, "max": 70, "step": 10 },
-    "D03128#2": { "humidity": "D03125", "power": "D03102", "on": 1, "off": 0, "function": "D03102", "humidifying": 1, "idle": 0, "switch": false, "min": 30, "max": 70, "step": 5 },
-    "rhset": { "humidity": "rh", "power": "pwr", "on": "1", "off": "0", "function": "func", "humidifying": "PH", "idle": "P", "switch": true, "min": 40, "max": 70, "step": 10 }
+    "D03128#1": {
+        humidity: "D03125",
+        power: "D03102",
+        on: 1,
+        off: 0,
+        function: "D0310D",
+        humidifying: 1,
+        idle: 5,
+        switch: false,
+        min: 40,
+        max: 70,
+        step: 10
+    },
+    "D03128#2": {
+        humidity: "D03125",
+        power: "D03102",
+        on: 1,
+        off: 0,
+        function: "D03102",
+        humidifying: 1,
+        idle: 0,
+        switch: false,
+        min: 30,
+        max: 70,
+        step: 5
+    },
+    rhset: {
+        humidity: "rh",
+        power: "pwr",
+        on: "1",
+        off: "0",
+        function: "func",
+        humidifying: "PH",
+        idle: "P",
+        switch: true,
+        min: 40,
+        max: 70,
+        step: 10
+    }
 };

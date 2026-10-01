@@ -30,7 +30,9 @@ const storedFigure = z.object({ value: z.string().max(200), since: z.string().da
 
 /** The figures column, read back: each figure with when it changed, and the
  *  filter's state among them. Anything unreadable is left out. */
-function figuresOf(stored: Prisma.JsonValue): Pick<Observation, "figures" | "filter" | "filterSince"> {
+function figuresOf(
+    stored: Prisma.JsonValue
+): Pick<Observation, "figures" | "filter" | "filterSince"> {
     const parsed = z.record(z.string(), z.unknown()).safeParse(stored);
     if (!parsed.success) return {};
     const figures: Record<string, Figure> = {};
@@ -55,7 +57,8 @@ function rowOf(observation: Observation) {
     for (const [key, figure] of Object.entries(figures ?? {})) {
         stored[key] = { value: figure.value, since: figure.since.toISOString() };
     }
-    if (filter) stored[FILTER_KEY] = { value: filter, since: (filterSince ?? new Date()).toISOString() };
+    if (filter)
+        stored[FILTER_KEY] = { value: filter, since: (filterSince ?? new Date()).toISOString() };
     return { ...rest, figures: stored as Prisma.InputJsonValue };
 }
 
@@ -262,25 +265,27 @@ export const prismaAutomationStore: AutomationStore = {
     },
 
     async observation(deviceId) {
-        return prisma.placeDeviceObservation.findUnique({
-            where: { deviceId },
-            select: {
-                state: true,
-                stateSince: true,
-                door: true,
-                doorSince: true,
-                reading: true,
-                readingSince: true,
-                mode: true,
-                modeSince: true,
-                figures: true,
-                version: true
-            }
-        }).then((row) => {
-            if (!row) return null;
-            const { figures, ...rest } = row;
-            return { ...rest, ...figuresOf(figures) };
-        });
+        return prisma.placeDeviceObservation
+            .findUnique({
+                where: { deviceId },
+                select: {
+                    state: true,
+                    stateSince: true,
+                    door: true,
+                    doorSince: true,
+                    reading: true,
+                    readingSince: true,
+                    mode: true,
+                    modeSince: true,
+                    figures: true,
+                    version: true
+                }
+            })
+            .then((row) => {
+                if (!row) return null;
+                const { figures, ...rest } = row;
+                return { ...rest, ...figuresOf(figures) };
+            });
     },
 
     async swapObservation(deviceId, previous, next: Observation) {

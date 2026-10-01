@@ -55,7 +55,12 @@ vi.mock("@polaris/db", () => ({
             }),
             update: (args: unknown) => {
                 update(args);
-                return { ...(args as { data: object }).data, id: "air", kind: "air", name: "Bedroom purifier" };
+                return {
+                    ...(args as { data: object }).data,
+                    id: "air",
+                    kind: "air",
+                    name: "Bedroom purifier"
+                };
             }
         },
         placeDeviceEvent: { create: vi.fn() }
@@ -79,9 +84,9 @@ beforeEach(() => {
 
 describe("a command on an air purifier", () => {
     it("refuses an air conditioner's setting, before anything is sent", async () => {
-        await expect(actOnDevice("app", "air", "set-fan", "", { action: "set-fan", fan: "high" })).rejects.toThrow(
-            "That device cannot be told to do that"
-        );
+        await expect(
+            actOnDevice("app", "air", "set-fan", "", { action: "set-fan", fan: "high" })
+        ).rejects.toThrow("That device cannot be told to do that");
         expect(accountWithCredentials).not.toHaveBeenCalled();
     });
 
@@ -100,7 +105,11 @@ describe("a command on an air purifier", () => {
             "set-fan",
             { action: "set-fan", speed: "turbo" }
         );
-        const data = (update.mock.calls[0]![0] as { data: { air: { speed: string; mode: unknown }; state?: string } }).data;
+        const data = (
+            update.mock.calls[0]![0] as {
+                data: { air: { speed: string; mode: unknown }; state?: string };
+            }
+        ).data;
         expect(data.air).toMatchObject({ speed: "turbo", mode: null });
         // A setting is not a change of power.
         expect(data.state).toBeUndefined();

@@ -1021,7 +1021,11 @@ function TriggerCard({
                         onChange={(next) => {
                             const { measure: _was, ...rest } = trigger;
                             const measure = auto.measuresFor(next.kind)[0];
-                            onChange({ ...rest, deviceId: next.id, ...(measure ? { measure } : {}) });
+                            onChange({
+                                ...rest,
+                                deviceId: next.id,
+                                ...(measure ? { measure } : {})
+                            });
                         }}
                     />
                     <fields.MeasurePicker
@@ -1286,7 +1290,11 @@ function ConditionCard({
                         onChange={(next) => {
                             const { measure: _was, ...rest } = condition;
                             const measure = auto.measuresFor(next.kind)[0];
-                            onChange({ ...rest, deviceId: next.id, ...(measure ? { measure } : {}) });
+                            onChange({
+                                ...rest,
+                                deviceId: next.id,
+                                ...(measure ? { measure } : {})
+                            });
                         }}
                     />
                     <fields.MeasurePicker

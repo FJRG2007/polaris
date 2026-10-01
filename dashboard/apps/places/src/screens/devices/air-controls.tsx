@@ -35,7 +35,13 @@ const FILTER_TONES: Readonly<Record<kinds.FilterState, string>> = {
 
 /** The chip a worn filter gets, on the row and in the panel. Nothing while every
  *  filter is fine: a row of "OK" chips would be noise. */
-export function FilterChip({ air, className }: { air: AirSettings | null | undefined; className?: string }) {
+export function FilterChip({
+    air,
+    className
+}: {
+    air: AirSettings | null | undefined;
+    className?: string;
+}) {
     const t = usePlacesT();
     const worn = kinds.wornFilter(air);
     if (!worn || worn.state === "ok") return null;
@@ -116,7 +122,9 @@ export function AirControls({
         return (
             <div className={cn("flex flex-wrap items-center gap-2", className)}>
                 {switchControl}
-                {detailed && <p className="text-xs text-muted-foreground">{t("devicePanel.air.unknown")}</p>}
+                {detailed && (
+                    <p className="text-xs text-muted-foreground">{t("devicePanel.air.unknown")}</p>
+                )}
             </div>
         );
     }
@@ -154,7 +162,8 @@ export function AirControls({
                 options={air.modes.map((value) => ({ value, label: kinds.airModeText(value, t) }))}
                 onValueChange={(value) => {
                     const next = kinds.AIR_MODES.find((entry) => entry === value);
-                    if (next && next !== air.mode) onAct("set-mode", { action: "set-mode", mode: next });
+                    if (next && next !== air.mode)
+                        onAct("set-mode", { action: "set-mode", mode: next });
                 }}
             />
         </label>
@@ -169,10 +178,14 @@ export function AirControls({
                 disabled={disabled}
                 aria-label={t("devicePanel.air.speedName", { name: device.name })}
                 className="w-32"
-                options={air.speeds.map((value) => ({ value, label: kinds.airSpeedText(value, t) }))}
+                options={air.speeds.map((value) => ({
+                    value,
+                    label: kinds.airSpeedText(value, t)
+                }))}
                 onValueChange={(value) => {
                     const next = kinds.AIR_SPEEDS.find((entry) => entry === value);
-                    if (next && next !== air.speed) onAct("set-fan", { action: "set-fan", speed: next });
+                    if (next && next !== air.speed)
+                        onAct("set-fan", { action: "set-fan", speed: next });
                 }}
             />
         </label>
@@ -184,7 +197,9 @@ export function AirControls({
         if (!range) return;
         const from = pending.current ?? range.target ?? range.min;
         const next =
-            Math.round(Math.min(range.max, Math.max(range.min, from + direction * range.step)) * 100) / 100;
+            Math.round(
+                Math.min(range.max, Math.max(range.min, from + direction * range.step)) * 100
+            ) / 100;
         if (next === (pending.current ?? range.target)) return;
         pending.current = next;
         setDraft(next);
@@ -212,7 +227,10 @@ export function AirControls({
                 >
                     <Minus className="size-4" aria-hidden="true" />
                 </Button>
-                <output aria-live="polite" className="min-w-[3.5rem] px-1 text-center text-sm font-medium tabular-nums">
+                <output
+                    aria-live="polite"
+                    className="min-w-[3.5rem] px-1 text-center text-sm font-medium tabular-nums"
+                >
                     {shown === null ? "-" : `${shown}%`}
                 </output>
                 <Button
@@ -235,7 +253,12 @@ export function AirControls({
 
     return (
         <div className={cn("flex flex-col gap-3", className)}>
-            <div className={cn("flex flex-wrap gap-x-3 gap-y-2", detailed ? "items-end" : "items-center")}>
+            <div
+                className={cn(
+                    "flex flex-wrap gap-x-3 gap-y-2",
+                    detailed ? "items-end" : "items-center"
+                )}
+            >
                 {switchControl}
                 {reading}
                 {mode}
@@ -249,7 +272,9 @@ export function AirControls({
             </div>
             {detailed && switches.length > 0 && (
                 <fieldset className="flex flex-col gap-2" aria-describedby={describedBy}>
-                    <legend className="mb-1 text-xs text-muted-foreground">{t("devicePanel.air.switches")}</legend>
+                    <legend className="mb-1 text-xs text-muted-foreground">
+                        {t("devicePanel.air.switches")}
+                    </legend>
                     <div className="flex flex-wrap gap-x-5 gap-y-2" title={reason || undefined}>
                         {switches.map((option) => (
                             <label key={option} className="inline-flex items-center gap-2 text-sm">
@@ -260,7 +285,9 @@ export function AirControls({
                                         option: kinds.airOptionText(option, t),
                                         name: device.name
                                     })}
-                                    onChange={(on) => onAct("set-option", { action: "set-option", option, on })}
+                                    onChange={(on) =>
+                                        onAct("set-option", { action: "set-option", option, on })
+                                    }
                                 />
                                 {kinds.airOptionText(option, t)}
                             </label>
@@ -270,11 +297,16 @@ export function AirControls({
             )}
             {detailed && measures.length > 0 && (
                 <section className="flex flex-col gap-2">
-                    <h3 className="text-xs text-muted-foreground">{t("devicePanel.air.readings")}</h3>
+                    <h3 className="text-xs text-muted-foreground">
+                        {t("devicePanel.air.readings")}
+                    </h3>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                         {measures.map((measure) => (
                             <div key={measure} className="flex min-w-0 flex-col">
-                                <dt className="truncate text-xs text-foreground-subtle" title={kinds.airMeasureText(measure, t)}>
+                                <dt
+                                    className="truncate text-xs text-foreground-subtle"
+                                    title={kinds.airMeasureText(measure, t)}
+                                >
                                     {kinds.airMeasureText(measure, t)}
                                 </dt>
                                 <dd className="text-sm font-medium tabular-nums">
@@ -287,18 +319,30 @@ export function AirControls({
             )}
             {detailed && air.filters.length > 0 && (
                 <section className="flex flex-col gap-2">
-                    <h3 className="text-xs text-muted-foreground">{t("devicePanel.air.filters")}</h3>
+                    <h3 className="text-xs text-muted-foreground">
+                        {t("devicePanel.air.filters")}
+                    </h3>
                     <ul className="flex flex-col gap-1.5">
                         {air.filters.map((filter, index) => (
-                            <li key={`${filter.kind}-${index}`} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                                <span className="min-w-0 flex-1 truncate text-sm" title={kinds.airFilterText(filter.kind, t)}>
+                            <li
+                                key={`${filter.kind}-${index}`}
+                                className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+                            >
+                                <span
+                                    className="min-w-0 flex-1 truncate text-sm"
+                                    title={kinds.airFilterText(filter.kind, t)}
+                                >
                                     {kinds.airFilterText(filter.kind, t)}
                                 </span>
                                 <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
                                     {filter.percent !== null
-                                        ? t("devicePanel.air.lifePercent", { percent: Math.round(filter.percent) })
+                                        ? t("devicePanel.air.lifePercent", {
+                                              percent: Math.round(filter.percent)
+                                          })
                                         : filter.hours !== null
-                                          ? t("devicePanel.air.lifeHours", { hours: Math.round(filter.hours) })
+                                          ? t("devicePanel.air.lifeHours", {
+                                                hours: Math.round(filter.hours)
+                                            })
                                           : ""}
                                 </span>
                                 <Badge className={cn("shrink-0", FILTER_TONES[filter.state])}>

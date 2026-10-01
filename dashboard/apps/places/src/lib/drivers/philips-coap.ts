@@ -63,14 +63,19 @@ const MODEL_KEYS = ["modelid", "D01-05", "D01S05"];
 const FIRMWARE_KEYS = ["swversion", "D01-21", "D01S12"];
 
 /** `ApiGeneration` power keys and their on and off values (`DeviceModelConfig`). */
-const POWER: Readonly<Record<PhilipsModel["generation"], { key: string; on: Value; off: Value }>> = {
-    gen1: { key: "pwr", on: "1", off: "0" },
-    gen2: { key: "D03-02", on: "ON", off: "OFF" },
-    gen3: { key: "D03102", on: 1, off: 0 }
-};
+const POWER: Readonly<Record<PhilipsModel["generation"], { key: string; on: Value; off: Value }>> =
+    {
+        gen1: { key: "pwr", on: "1", off: "0" },
+        gen2: { key: "D03-02", on: "ON", off: "OFF" },
+        gen3: { key: "D03102", on: 1, off: 0 }
+    };
 
 /** `SENSOR_TYPES`, the measures Places draws, and how each value reads. */
-const SENSORS: readonly { key: string; measure: keyof kinds.AirSettings["readings"]; scale?: number }[] = [
+const SENSORS: readonly {
+    key: string;
+    measure: keyof kinds.AirSettings["readings"];
+    scale?: number;
+}[] = [
     { key: "pm25", measure: "pm25" },
     { key: "D03-33", measure: "pm25" },
     { key: "D03221", measure: "pm25" },
@@ -128,7 +133,12 @@ export function modelIdOf(status: Status): string {
 export function philipsModelOf(modelId: string, wifiVersion = ""): PhilipsModel | null {
     if (!modelId) return null;
     const long = `${modelId} ${wifiVersion.split("@")[0] ?? ""}`;
-    return PHILIPS_MODELS[modelId] ?? PHILIPS_MODELS[long] ?? PHILIPS_MODELS[modelId.slice(0, 6)] ?? null;
+    return (
+        PHILIPS_MODELS[modelId] ??
+        PHILIPS_MODELS[long] ??
+        PHILIPS_MODELS[modelId.slice(0, 6)] ??
+        null
+    );
 }
 
 /** The key scheme a status uses, for a model the table does not list. */
@@ -152,9 +162,17 @@ function filtersOf(status: Status, model: PhilipsModel | null): kinds.AirFilterR
         if (left === null) continue;
         const total = numberOf(status[filter.total]);
         // `PhilipsFilterSensor`: with a total it is a share; without, hours.
-        const percent = total !== null && total > 0 ? Math.max(0, Math.min(100, Math.round((100 * left) / total))) : null;
+        const percent =
+            total !== null && total > 0
+                ? Math.max(0, Math.min(100, Math.round((100 * left) / total)))
+                : null;
         const hours = Math.max(0, left);
-        filters.push({ kind: filter.kind, percent, hours, state: kinds.filterState(percent, hours) });
+        filters.push({
+            kind: filter.kind,
+            percent,
+            hours,
+            state: kinds.filterState(percent, hours)
+        });
     }
     return filters;
 }
@@ -162,15 +180,18 @@ function filtersOf(status: Status, model: PhilipsModel | null): kinds.AirFilterR
 /** A unit's status, as Places' settings. */
 export function philipsAir(status: Status, model: PhilipsModel | null): kinds.AirSettings {
     const presets = Object.entries(model?.presets ?? {}).filter(
-        (entry): entry is [kinds.AirMode, Readonly<Record<string, Value>>] => (kinds.AIR_MODES as readonly string[]).includes(entry[0])
+        (entry): entry is [kinds.AirMode, Readonly<Record<string, Value>>] =>
+            (kinds.AIR_MODES as readonly string[]).includes(entry[0])
     );
     const speeds = Object.entries(model?.speeds ?? {}).filter(
-        (entry): entry is [kinds.AirSpeed, Readonly<Record<string, Value>>] => (kinds.AIR_SPEEDS as readonly string[]).includes(entry[0])
+        (entry): entry is [kinds.AirSpeed, Readonly<Record<string, Value>>] =>
+            (kinds.AIR_SPEEDS as readonly string[]).includes(entry[0])
     );
 
     const options: kinds.AirSettings["options"] = {};
     const lock = model?.switches.find((key) => key in PHILIPS_CHILD_LOCKS);
-    if (lock && status[lock] !== undefined) options.childLock = status[lock] !== PHILIPS_CHILD_LOCKS[lock]!.off;
+    if (lock && status[lock] !== undefined)
+        options.childLock = status[lock] !== PHILIPS_CHILD_LOCKS[lock]!.off;
     const light = model?.lights[0];
     if (light && status[bare(light)] !== undefined) {
         // `PhilipsLight.is_on`: compared as numbers.
@@ -196,7 +217,11 @@ export function philipsAir(status: Status, model: PhilipsModel | null): kinds.Ai
 
     const readings: kinds.AirSettings["readings"] = {};
     for (const sensor of SENSORS) {
-        if (readings[sensor.measure] !== undefined || model?.unavailableSensors.includes(sensor.key)) continue;
+        if (
+            readings[sensor.measure] !== undefined ||
+            model?.unavailableSensors.includes(sensor.key)
+        )
+            continue;
         const value = numberOf(status[sensor.key]);
         if (value === null) continue;
         const read = sensor.scale ? Math.round(value * sensor.scale * 10) / 10 : value;
@@ -244,7 +269,10 @@ export function philipsValues(
             const spec = humidifier ? PHILIPS_HUMIDIFIERS[humidifier] : undefined;
             if (!humidifier || !spec) throw new HomeError("That device does not humidify");
             // `async_set_humidity`: onto the step, inside the range.
-            const target = Math.max(spec.min, Math.min(spec.max, Math.round(setting.target / spec.step) * spec.step));
+            const target = Math.max(
+                spec.min,
+                Math.min(spec.max, Math.round(setting.target / spec.step) * spec.step)
+            );
             return { [bare(humidifier)]: target };
         }
         case "set-option": {
@@ -264,7 +292,10 @@ export function philipsValues(
             const spec = humidifier ? PHILIPS_HUMIDIFIERS[humidifier] : undefined;
             if (!spec?.switch) break;
             // `PhilipsHumidifier.async_set_mode`: on, and the function chosen.
-            return { [spec.power]: spec.on, [spec.function]: setting.on ? spec.humidifying : spec.idle };
+            return {
+                [spec.power]: spec.on,
+                [spec.function]: setting.on ? spec.humidifying : spec.idle
+            };
         }
     }
     throw new HomeError("That setting is not one this device has");
@@ -297,7 +328,10 @@ function unitsOf(credentials: Credentials): PhilipsUnit[] {
     }
     const parsed = unitsSchema.safeParse(raw);
     if (!parsed.success || parsed.data.length === 0) {
-        throw new DriverError("Polaris has lost track of these air purifiers. Connect them again.", "unauthorized");
+        throw new DriverError(
+            "Polaris has lost track of these air purifiers. Connect them again.",
+            "unauthorized"
+        );
     }
     return parsed.data;
 }
@@ -388,7 +422,8 @@ export function nudgeFor(nudge: PhilipsModel["nudge"], last: Status | null): [st
     let transient: Value = nudge[0]![1];
     let resting: Value = nudge[nudge.length - 1]![1];
     const known = last?.[key];
-    if (typeof known === "number" || typeof known === "string" || typeof known === "boolean") resting = known;
+    if (typeof known === "number" || typeof known === "string" || typeof known === "boolean")
+        resting = known;
     if (transient === resting) transient = nudge[nudge.length - 1]![1];
     return [
         [key, transient],
@@ -407,7 +442,10 @@ function connectWatch(address: string, model: PhilipsModel, watch: PushWatch): P
     watch.connecting ??= (async () => {
         closeWatch(watch);
         try {
-            const opened = await philips.nudgedPhilips(address, nudgeFor(model.nudge, watch.status));
+            const opened = await philips.nudgedPhilips(
+                address,
+                nudgeFor(model.nudge, watch.status)
+            );
             watch.session = opened.session;
             watch.token = opened.token;
             watch.status = opened.status;
@@ -502,7 +540,10 @@ async function relocate(units: readonly PhilipsUnit[]): Promise<void> {
  * then its status the way its firmware allows. A unit that says who it is and
  * then never answers a status read has had local control switched off.
  */
-async function firstRead(address: string, found: philips.PhilipsFound | null): Promise<PhilipsUnit> {
+async function firstRead(
+    address: string,
+    found: philips.PhilipsFound | null
+): Promise<PhilipsUnit> {
     const model = found ? philipsModelOf(found.model.slice(0, 9)) : null;
     let status: Status;
     try {
@@ -519,7 +560,10 @@ async function firstRead(address: string, found: philips.PhilipsFound | null): P
         }
         throw error;
     }
-    const deviceId = typeof status.DeviceId === "string" && status.DeviceId.trim() ? status.DeviceId.trim() : address;
+    const deviceId =
+        typeof status.DeviceId === "string" && status.DeviceId.trim()
+            ? status.DeviceId.trim()
+            : address;
     const wifi = typeof status.WifiVersion === "string" ? status.WifiVersion : "";
     return {
         address,
@@ -600,7 +644,8 @@ export const philipsCoapDriver: DeviceDriver = {
         }
         units.forEach((unit, index) => {
             const status = statuses[index];
-            if (status && !modelOfUnit(unit)) generations.set(unit.deviceId, generationOf(status, null));
+            if (status && !modelOfUnit(unit))
+                generations.set(unit.deviceId, generationOf(status, null));
         });
         return units.map((unit, index) => philipsSnapshot(located(unit), statuses[index] ?? null));
     },
@@ -615,7 +660,8 @@ export const philipsCoapDriver: DeviceDriver = {
             ? model.generation
             : watch?.status
               ? generationOf(watch.status, null)
-              : (generations.get(here.deviceId) ?? generationOf(await philips.readPhilips(here.address), null));
+              : (generations.get(here.deviceId) ??
+                generationOf(await philips.readPhilips(here.address), null));
         const values = philipsValues(model, generation, action, command);
         // A push-only unit serves one client: its command goes on the link
         // already open to it, and the push that follows is its new state.

@@ -69,7 +69,8 @@ function figuresOf(air: ReturnType<typeof airSettings>): Record<string, string> 
 
 function readout(row: ObservedRow): DeviceReadout {
     const air = row.kind === "air" ? airSettings(row.air) : null;
-    const mode = row.kind === "air" ? (air?.mode ?? "") : (climateSettings(row.climate)?.mode ?? "");
+    const mode =
+        row.kind === "air" ? (air?.mode ?? "") : (climateSettings(row.climate)?.mode ?? "");
     const filter = wornFilter(air)?.state;
     const figures = figuresOf(air);
     return {

@@ -9,7 +9,13 @@
 import { createSocket, type Socket } from "node:dgram";
 import { afterEach, describe, expect, it } from "vitest";
 import { coapScan, openCoapLink } from "@polaris-app/places/src/lib/integrations/philips-udp";
-import { CoapCode, CoapType, decodeCoap, encodeCoap, type CoapMessage } from "@polaris-app/places/src/lib/integrations/coap";
+import {
+    CoapCode,
+    CoapType,
+    decodeCoap,
+    encodeCoap,
+    type CoapMessage
+} from "@polaris-app/places/src/lib/integrations/coap";
 
 let unit: Socket | null = null;
 
@@ -20,7 +26,9 @@ afterEach(() => {
 
 /** A unit on the loopback that answers each request through `respond`, and
  *  records everything it hears. */
-async function playUnit(respond: (request: CoapMessage) => CoapMessage[]): Promise<{ port: number; heard: CoapMessage[] }> {
+async function playUnit(
+    respond: (request: CoapMessage) => CoapMessage[]
+): Promise<{ port: number; heard: CoapMessage[] }> {
     const heard: CoapMessage[] = [];
     const socket = createSocket({ type: "udp4" });
     unit = socket;
@@ -49,15 +57,30 @@ describe("a link to one unit", () => {
             message.code === CoapCode.GET
                 ? [
                       // Somebody else's token first: never taken for this answer.
-                      { type: CoapType.NON, code: CoapCode.CONTENT, messageId: 40, token: Buffer.from("ffffffff", "hex"), payload: Buffer.from("no") },
-                      { type: CoapType.CON, code: CoapCode.CONTENT, messageId: 41, token: message.token, payload: Buffer.from("yes") }
+                      {
+                          type: CoapType.NON,
+                          code: CoapCode.CONTENT,
+                          messageId: 40,
+                          token: Buffer.from("ffffffff", "hex"),
+                          payload: Buffer.from("no")
+                      },
+                      {
+                          type: CoapType.CON,
+                          code: CoapCode.CONTENT,
+                          messageId: 41,
+                          token: message.token,
+                          payload: Buffer.from("yes")
+                      }
                   ]
                 : []
         );
         const link = await openCoapLink("127.0.0.1", port);
         try {
             link.send(request("01020304", ["sys", "dev", "info"]));
-            const answer = await link.next((message) => message.token.equals(Buffer.from("01020304", "hex")), 2000);
+            const answer = await link.next(
+                (message) => message.token.equals(Buffer.from("01020304", "hex")),
+                2000
+            );
             expect(answer?.payload?.toString()).toBe("yes");
             await new Promise((resolve) => setTimeout(resolve, 100));
             const ack = heard.find((message) => message.type === CoapType.ACK);
@@ -108,9 +131,20 @@ describe("a link to one unit", () => {
 describe("a scan", () => {
     it("collects what the addresses it wrote to say", async () => {
         const { port } = await playUnit((message) => [
-            { type: CoapType.NON, code: CoapCode.CONTENT, messageId: 9, token: message.token, payload: Buffer.from('{"modelid":"AC3829/10"}') }
+            {
+                type: CoapType.NON,
+                code: CoapCode.CONTENT,
+                messageId: 9,
+                token: message.token,
+                payload: Buffer.from('{"modelid":"AC3829/10"}')
+            }
         ]);
-        const replies = await coapScan(["127.0.0.1"], request("01020304", ["sys", "dev", "info"]), 300, port);
+        const replies = await coapScan(
+            ["127.0.0.1"],
+            request("01020304", ["sys", "dev", "info"]),
+            300,
+            port
+        );
         expect(replies).toHaveLength(1);
         expect(replies[0]!.address).toBe("127.0.0.1");
         expect(replies[0]!.message.payload?.toString()).toBe('{"modelid":"AC3829/10"}');

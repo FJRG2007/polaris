@@ -359,7 +359,9 @@ export function createEngine(ports: EnginePorts) {
         const passing = device.state === "moving" || device.state === "unknown";
         const state = passing ? (previous?.state ?? device.state) : device.state;
         const seenFigures = (figures: Readonly<Record<string, string>> | undefined) =>
-            Object.fromEntries(Object.entries(figures ?? {}).map(([key, value]) => [key, { value, since: now }]));
+            Object.fromEntries(
+                Object.entries(figures ?? {}).map(([key, value]) => [key, { value, since: now }])
+            );
         if (!previous) {
             await store.swapObservation(device.id, null, {
                 state,

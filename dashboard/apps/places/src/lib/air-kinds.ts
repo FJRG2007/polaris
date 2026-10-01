@@ -198,10 +198,7 @@ export function wornFilter(settings: AirSettings | null | undefined): AirFilterR
     let worst: AirFilterReading | null = null;
     for (const filter of settings?.filters ?? []) {
         if (!worst || rank(filter) > rank(worst)) worst = filter;
-        else if (
-            rank(filter) === rank(worst) &&
-            (filter.percent ?? 101) < (worst.percent ?? 101)
-        )
+        else if (rank(filter) === rank(worst) && (filter.percent ?? 101) < (worst.percent ?? 101))
             worst = filter;
     }
     return worst;
@@ -292,7 +289,8 @@ export function airHeadline(
 ): { value: string; unit: string; measure: AirMeasure } | null {
     for (const measure of ["pm25", "humidity", "allergen"] as const) {
         const value = settings.readings[measure];
-        if (value !== undefined) return { value: String(value), unit: MEASURE_UNITS[measure], measure };
+        if (value !== undefined)
+            return { value: String(value), unit: MEASURE_UNITS[measure], measure };
     }
     return null;
 }

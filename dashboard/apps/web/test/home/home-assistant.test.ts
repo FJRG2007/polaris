@@ -394,14 +394,23 @@ describe("an air purifier", () => {
             {
                 entity_id: "humidifier.bedroom_purifier",
                 state: "off",
-                attributes: { humidity: 50, min_humidity: 40, max_humidity: 70, current_humidity: 44 }
+                attributes: {
+                    humidity: 50,
+                    min_humidity: 40,
+                    max_humidity: 70,
+                    current_humidity: 44
+                }
             },
             {
                 entity_id: "sensor.bedroom_purifier_pm2_5",
                 state: "9",
                 attributes: { device_class: "pm25", unit_of_measurement: "µg/m³" }
             },
-            { entity_id: "sensor.bedroom_purifier_indoor_allergen_index", state: "3", attributes: {} },
+            {
+                entity_id: "sensor.bedroom_purifier_indoor_allergen_index",
+                state: "3",
+                attributes: {}
+            },
             {
                 entity_id: "sensor.bedroom_purifier_humidity",
                 state: "45",
@@ -428,7 +437,12 @@ describe("an air purifier", () => {
             {
                 entity_id: "fan.ceiling",
                 state: "on",
-                attributes: { friendly_name: "Ceiling", percentage: 50, percentage_step: 33.33, supported_features: 1 }
+                attributes: {
+                    friendly_name: "Ceiling",
+                    percentage: 50,
+                    percentage_step: 33.33,
+                    supported_features: 1
+                }
             },
             // A humidifier on its own.
             {
@@ -481,7 +495,9 @@ describe("an air purifier", () => {
     });
 
     it("reads a humidifier on its own by its modes and its target", async () => {
-        const row = (await homeAssistantDriver.list(HOME)).find((entry) => entry.externalId === "humidifier.nursery");
+        const row = (await homeAssistantDriver.list(HOME)).find(
+            (entry) => entry.externalId === "humidifier.nursery"
+        );
         expect(row?.air).toMatchObject({
             mode: "sleep",
             modes: ["auto", "sleep"],
@@ -495,7 +511,10 @@ describe("an air purifier", () => {
     it("leaves fans out, rather than guessing, when Home Assistant will not say what shares a device", async () => {
         templateStatus = 400;
         const rows = (await homeAssistantDriver.list(HOME)).filter((row) => row.kind === "air");
-        expect(rows.map((row) => row.externalId)).toEqual(["humidifier.bedroom_purifier", "humidifier.nursery"]);
+        expect(rows.map((row) => row.externalId)).toEqual([
+            "humidifier.bedroom_purifier",
+            "humidifier.nursery"
+        ]);
     });
 
     const act = (action: Parameters<typeof homeAssistantDriver.act>[2], command?: unknown) =>
@@ -506,7 +525,9 @@ describe("an air purifier", () => {
             command as Parameters<typeof homeAssistantDriver.act>[3]
         );
     const lastService = () => {
-        const request = sent.filter((entry) => new URL(entry.url).pathname.startsWith("/api/services/")).at(-1)!;
+        const request = sent
+            .filter((entry) => new URL(entry.url).pathname.startsWith("/api/services/"))
+            .at(-1)!;
         return [new URL(request.url).pathname, JSON.parse(request.body)];
     };
 
@@ -527,11 +548,20 @@ describe("an air purifier", () => {
             { humidity: 60, entity_id: "humidifier.bedroom_purifier" }
         ]);
         await act("set-option", { action: "set-option", option: "childLock", on: true });
-        expect(lastService()).toEqual(["/api/services/switch/turn_on", { entity_id: "switch.bedroom_purifier_child_lock" }]);
+        expect(lastService()).toEqual([
+            "/api/services/switch/turn_on",
+            { entity_id: "switch.bedroom_purifier_child_lock" }
+        ]);
         await act("set-option", { action: "set-option", option: "humidify", on: true });
-        expect(lastService()).toEqual(["/api/services/humidifier/turn_on", { entity_id: "humidifier.bedroom_purifier" }]);
+        expect(lastService()).toEqual([
+            "/api/services/humidifier/turn_on",
+            { entity_id: "humidifier.bedroom_purifier" }
+        ]);
         await act("turn-off");
-        expect(lastService()).toEqual(["/api/services/fan/turn_off", { entity_id: "fan.bedroom_purifier" }]);
+        expect(lastService()).toEqual([
+            "/api/services/fan/turn_off",
+            { entity_id: "fan.bedroom_purifier" }
+        ]);
     });
 
     it("refuses a preset or a speed the entity does not have, before sending anything", async () => {
@@ -541,6 +571,8 @@ describe("an air purifier", () => {
         await expect(act("set-fan", { action: "set-fan", speed: "speed_5" })).rejects.toThrow(
             "That fan speed is not one this device has"
         );
-        expect(sent.some((entry) => new URL(entry.url).pathname.startsWith("/api/services/"))).toBe(false);
+        expect(sent.some((entry) => new URL(entry.url).pathname.startsWith("/api/services/"))).toBe(
+            false
+        );
     });
 });

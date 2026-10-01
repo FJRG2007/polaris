@@ -87,7 +87,10 @@ export function openPhilips(sealed: string): string {
     const { key, iv } = keyAndIv(counter);
     const decipher = createDecipheriv("aes-128-cbc", key, iv);
     try {
-        return Buffer.concat([decipher.update(Buffer.from(ciphertext, "hex")), decipher.final()]).toString("utf8");
+        return Buffer.concat([
+            decipher.update(Buffer.from(ciphertext, "hex")),
+            decipher.final()
+        ]).toString("utf8");
     } catch {
         throw new PhilipsDigestError();
     }

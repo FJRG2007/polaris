@@ -166,7 +166,13 @@ function airSnapshot(unit: HaAirUnit): DeviceSnapshot {
         name: text(entity.attributes.friendly_name) || entity.entity_id,
         model: null,
         firmware: null,
-        state: !online ? "unknown" : entity.state === "on" ? "on" : entity.state === "off" ? "off" : "unknown",
+        state: !online
+            ? "unknown"
+            : entity.state === "on"
+              ? "on"
+              : entity.state === "off"
+                ? "off"
+                : "unknown",
         doorState: "none",
         batteryPercent: null,
         batteryCritical: false,
@@ -205,7 +211,8 @@ export const homeAssistantDriver: DeviceDriver = {
         const states = await ha.homeAssistantStates(home);
         if (
             !states.some(
-                (entity) => kindOf(entity) !== null || AIR_DOMAINS.includes(domainOf(entity.entity_id))
+                (entity) =>
+                    kindOf(entity) !== null || AIR_DOMAINS.includes(domainOf(entity.entity_id))
             )
         ) {
             throw new DriverError(

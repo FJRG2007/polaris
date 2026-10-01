@@ -316,7 +316,8 @@ export async function actOnDevice(
 
     // A setting lands where it was told, like a switch; the power stays as it
     // was. A lock is turning, and where it gets to is the account's to report.
-    const applied = command && kinds.needsCommand(action) ? kinds.applyCommand(target, command) : null;
+    const applied =
+        command && kinds.needsCommand(action) ? kinds.applyCommand(target, command) : null;
     const settled = applied
         ? "climate" in applied
             ? { climate: climateColumn(applied.climate) }

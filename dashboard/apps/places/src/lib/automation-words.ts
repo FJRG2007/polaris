@@ -56,7 +56,11 @@ export function valueText(
         const mode = kinds.CLIMATE_MODES.find((entry) => entry === value);
         if (mode && kinds.deviceKind(kind) !== "air") return kinds.climateModeText(mode, t);
         const preset = kinds.AIR_MODES.find((entry) => entry === value);
-        return preset ? kinds.airModeText(preset, t) : mode ? kinds.climateModeText(mode, t) : value;
+        return preset
+            ? kinds.airModeText(preset, t)
+            : mode
+              ? kinds.climateModeText(mode, t)
+              : value;
     }
     if (attribute === "filter") {
         const state = kinds.FILTER_STATES.find((entry) => entry === value);
@@ -67,13 +71,21 @@ export function valueText(
 
 /** One of a purifier's figures, in the reader's words: "PM2.5", "Filter life". */
 export function measureText(measure: auto.ReadingMeasure, t: PlacesTranslator): string {
-    return measure === "filter" ? t("automations.measures.filter") : kinds.airMeasureText(measure, t);
+    return measure === "filter"
+        ? t("automations.measures.filter")
+        : kinds.airMeasureText(measure, t);
 }
 
 /** A device, or one of its figures: "Bedroom purifier" or "PM2.5 of Bedroom
  *  purifier". */
-function figureOf(device: string, measure: auto.ReadingMeasure | undefined, t: PlacesTranslator): string {
-    return measure ? t("automations.say.figure", { measure: measureText(measure, t), device }) : device;
+function figureOf(
+    device: string,
+    measure: auto.ReadingMeasure | undefined,
+    t: PlacesTranslator
+): string {
+    return measure
+        ? t("automations.say.figure", { measure: measureText(measure, t), device })
+        : device;
 }
 
 /** What a step sets a unit to: "Cool", "24\u00b0", "High", "Swing on". */
@@ -84,7 +96,10 @@ export function settingText(setting: auto.StepSetting, t: PlacesTranslator): str
     if (setting.action === "set-humidity")
         return Number.isFinite(setting.target) ? `${setting.target}%` : "?";
     if ("speed" in setting) return kinds.airSpeedText(setting.speed, t);
-    if (setting.action === "set-option" && kinds.AIR_OPTIONS.some((entry) => entry === setting.option)) {
+    if (
+        setting.action === "set-option" &&
+        kinds.AIR_OPTIONS.some((entry) => entry === setting.option)
+    ) {
         const option = kinds.AIR_OPTIONS.find((entry) => entry === setting.option)!;
         return switched(kinds.airOptionText(option, t), setting.on);
     }
