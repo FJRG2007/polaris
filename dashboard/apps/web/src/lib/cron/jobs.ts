@@ -544,6 +544,29 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: ensureManagedCertificates
     },
     {
+        key: "storage-whereabouts",
+        // Five minutes: a NAS whose lease moved overnight should be followed
+        // before the first upload of the morning finds it gone, and asking a
+        // storage that is where it was costs one SMB greeting.
+        everyMs: 5 * MINUTE,
+        // Unleased: two runners each ask the same device who it is, and the move
+        // itself is written only if the address is still the old one.
+        leaseMs: null,
+        run: async () => (await import("@/lib/storage-whereabouts/follow")).checkWhereabouts()
+    },
+    {
+        key: "storage-returns",
+        // Five minutes, and also run the moment a storage answers again: this is
+        // the pass that catches up with what that moment missed.
+        everyMs: 5 * MINUTE,
+        // Unleased: each file is claimed before it is touched, so a second
+        // runner skips the ones the first has.
+        leaseMs: null,
+        run: async () => {
+            await (await import("@/lib/storage-returns")).returnFallbackFiles();
+        }
+    },
+    {
         key: "drive-transfers",
         // Hourly, because a fortnight is what an offer stands for and nothing is
         // waiting on the minute it stops. What this ends is an offer the

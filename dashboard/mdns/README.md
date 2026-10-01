@@ -12,3 +12,17 @@ falls back to the hosts-file entry the installer adds on the local machine.
 
 Configure the advertised name with `POLARIS_MDNS_HOSTNAME` (default `polaris`)
 and the port with `POLARIS_MDNS_PORT` (default `80`, where Caddy listens).
+
+## The host's neighbour table
+
+Because it runs with `network_mode: host`, this is also the only Polaris
+container that can read `/proc/net/arp` - the host's own view of which hardware
+address answers for which IP on the LAN. Neither the web container nor the host
+daemon sees that: both sit on Docker bridges, whose own neighbour tables list
+only the bridge gateway. So when a storage on the network (an SMB share, a NAS)
+needs to be found again after its address changed, the host daemon execs a
+read-only `awk` in this container to read it
+(`lib/storage-whereabouts/neighbours.ts` in the web app). An install with no
+`mdns` container running - the limited edition, or host networking unavailable -
+simply has no neighbour table to read, and that storage is then identified by
+its SMB answer alone.

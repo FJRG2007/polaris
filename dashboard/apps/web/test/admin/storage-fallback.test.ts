@@ -29,6 +29,9 @@ const getDriverForConnection = vi.fn();
 /** The administrators being told, which is what an unplugged NAS now does. */
 const reportStorageUnreachable = vi.fn(async () => undefined);
 const storageAnswered = vi.fn();
+/** The list of files to take back to their storage once it answers again. */
+const recordFallback = vi.fn(async () => undefined);
+const returnFallbackFiles = vi.fn(async () => undefined);
 
 /** A storage that behaves however a test needs it to, and remembers what it was
  *  given so the test can ask where the file actually ended up. */
@@ -78,6 +81,7 @@ vi.mock("node:fs/promises", () => ({ mkdir: vi.fn(async () => undefined) }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: "/var/polaris" }) }));
 vi.mock("@/lib/storage-service", () => ({ getDriverForConnection }));
 vi.mock("@/lib/storage-alert", () => ({ reportStorageUnreachable, storageAnswered }));
+vi.mock("@/lib/storage-returns", () => ({ recordFallback, returnFallbackFiles }));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: vi.fn(async () => null),
     setSetting: vi.fn(async () => undefined)
@@ -151,6 +155,31 @@ beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+describe("a file kept on this server instead", () => {
+    it("is listed to go back to its storage once that answers again", async () => {
+        getDriverForConnection.mockImplementation(async () => {
+            throw new Error("connect EHOSTUNREACH 192.168.1.129:445");
+        });
+
+        const placed = await put();
+
+        expect(placed.targetId).toBe(LOCAL_TARGET);
+        await vi.waitFor(() =>
+            expect(recordFallback).toHaveBeenCalledWith(NAS, "chat", "polaris/chat/c1/file")
+        );
+    });
+
+    it("is not listed when it reached its storage", async () => {
+        getDriverForConnection.mockImplementation(async () => storage());
+
+        const placed = await put();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(placed.targetId).toBe(NAS);
+        expect(recordFallback).not.toHaveBeenCalled();
+    });
 });
 
 describe("opening a storage to write to", () => {

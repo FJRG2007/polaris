@@ -278,6 +278,13 @@
     },
     "storage": {
         "unreachableTitle": "{name} is not reachable",
-        "unreachableBody": "Polaris could not reach the storage {name}, so new uploads are being kept on this server, where they stay readable. Check that the device is on and connected, or point uploads at another storage."
+        "unreachableBody": "Polaris could not reach the storage {name}, so new uploads are being kept on this server, where they stay readable. Check that the device is on and connected, or point uploads at another storage.",
+        "unreachableGone": "Polaris could not reach the storage {name}, and looked for it across the local network: it is not answering anywhere, so it is off or disconnected. New uploads are kept on this server meanwhile and move to it once it answers again.",
+        "unreachableAnswering": "Polaris could not use the storage {name}. It answers at {address}, but would not take the file: check its sign-in and share in the storage settings. New uploads are kept on this server meanwhile and move to it once it takes them.",
+        "unreachableImpostor": "Polaris could not reach the storage {name}. A different device answers at {address} ({device}), so the password of {name} is not sent there, and {name} was not found anywhere else on the network. Check the address on the uploads screen. New uploads are kept on this server meanwhile.",
+        "unreachableCandidates": "Polaris could not reach the storage {name}. {count, plural, one {An SMB server answers} other {# SMB servers answer}} on the network, the first at {address} ({device}), but Polaris has no record of who {name} is, so it cannot tell whether that is it. If it is, choose it on the uploads screen. New uploads are kept on this server meanwhile.",
+        "movedTitle": "{name} moved to a new address",
+        "movedBody": "{name} moved from {from} to {to} on your network, and Polaris follows it there now. So it does not move again, reserve {to} for the device {mac} in your router's DHCP settings.",
+        "movedBodyNoMac": "{name} moved from {from} to {to} on your network, and Polaris follows it there now. So it does not move again, reserve {to} for it in your router's DHCP settings."
     }
 }

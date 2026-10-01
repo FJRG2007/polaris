@@ -278,6 +278,13 @@
     },
     "storage": {
         "unreachableTitle": "{name} no responde",
-        "unreachableBody": "Polaris no pudo llegar al almacenamiento {name}, así que las subidas nuevas se guardan en este servidor, donde siguen disponibles. Comprueba que el dispositivo esté encendido y conectado, o envía las subidas a otro almacenamiento."
+        "unreachableBody": "Polaris no pudo llegar al almacenamiento {name}, así que las subidas nuevas se guardan en este servidor, donde siguen disponibles. Comprueba que el dispositivo esté encendido y conectado, o envía las subidas a otro almacenamiento.",
+        "unreachableGone": "Polaris no pudo llegar al almacenamiento {name} y lo buscó en toda la red local: no responde en ningún sitio, así que está apagado o desconectado. Mientras, las subidas nuevas se guardan en este servidor y pasan a él cuando vuelva a responder.",
+        "unreachableAnswering": "Polaris no pudo usar el almacenamiento {name}. Responde en {address}, pero no aceptó el archivo: revisa su inicio de sesión y su recurso compartido en los ajustes del almacenamiento. Mientras, las subidas nuevas se guardan en este servidor y pasan a él cuando las acepte.",
+        "unreachableImpostor": "Polaris no pudo llegar al almacenamiento {name}. Otro dispositivo responde en {address} ({device}), así que la contraseña de {name} no se envía ahí, y {name} no aparece en ningún otro sitio de la red. Revisa la dirección en la pantalla de subidas. Mientras, las subidas nuevas se guardan en este servidor.",
+        "unreachableCandidates": "Polaris no pudo llegar al almacenamiento {name}. {count, plural, one {Un servidor SMB responde} other {# servidores SMB responden}} en la red, el primero en {address} ({device}), pero Polaris no sabe quién es {name}, así que no puede saber si es ese. Si lo es, elígelo en la pantalla de subidas. Mientras, las subidas nuevas se guardan en este servidor.",
+        "movedTitle": "{name} cambió de dirección",
+        "movedBody": "{name} pasó de {from} a {to} en tu red, y Polaris lo sigue ahí. Para que no vuelva a cambiar, reserva {to} para el dispositivo {mac} en los ajustes DHCP del router.",
+        "movedBodyNoMac": "{name} pasó de {from} a {to} en tu red, y Polaris lo sigue ahí. Para que no vuelva a cambiar, reserva {to} para él en los ajustes DHCP del router."
     }
 }

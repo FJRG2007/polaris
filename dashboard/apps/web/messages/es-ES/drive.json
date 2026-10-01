@@ -696,7 +696,9 @@
         "tooManySubmissions": "Demasiados envíos desde aquí. Vuelve a intentarlo más tarde.",
         "invalidSubmission": "Envío no válido",
         "full": "Este buzón ya ha recibido todo lo que iba a aceptar.",
-        "noSealed": "Este buzón no acepta envíos sellados."
+        "noSealed": "Este buzón no acepta envíos sellados.",
+        "addressDifferent": "Otro dispositivo responde en {address} ({device}). La contraseña sigue con este almacenamiento, así que la dirección no cambió.",
+        "addressSilent": "Nada responde en {address}, así que Polaris no puede comprobar que sea este almacenamiento. La dirección no cambió."
     },
     "sharedLinks": {
         "status": {

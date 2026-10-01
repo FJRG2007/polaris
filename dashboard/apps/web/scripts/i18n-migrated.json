@@ -417,6 +417,7 @@
         "web/src/app/(app)/admin/settings/transfer-actions.ts",
         "web/src/app/(app)/admin/settings/transfer-card.tsx",
         "web/src/app/(app)/admin/uploads/actions.ts",
+        "web/src/app/(app)/admin/uploads/network-card.tsx",
         "web/src/app/(app)/admin/uploads/page.tsx",
         "web/src/app/(app)/admin/uploads/target-picker.tsx",
         "web/src/app/(app)/admin/uploads/uploads-view.tsx",

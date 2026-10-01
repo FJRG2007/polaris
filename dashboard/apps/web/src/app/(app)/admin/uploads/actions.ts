@@ -6,6 +6,10 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
+import { isLocalAddress } from "@polaris/core";
+import * as whereabouts from "@/lib/storage-whereabouts/follow";
+import type { WhereaboutsView } from "@/lib/storage-whereabouts/follow";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
@@ -38,7 +42,8 @@ const avatarSchema = z.object({ target, gravatar: z.boolean() });
 export async function setUploadSettingsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = settingsSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setUploadSettings(parsed.data);
         await recordAudit({
@@ -58,7 +63,8 @@ export async function setUploadSettingsAction(input: unknown): Promise<{ error?:
 export async function setAvatarSettingsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = avatarSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setAvatarSettings(parsed.data);
         await recordAudit({
@@ -92,7 +98,8 @@ export async function setAvatarSettingsAction(input: unknown): Promise<{ error?:
 export async function setFootageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setFootageTarget(parsed.data.target);
         await recordAudit({
@@ -111,7 +118,8 @@ export async function setFootageTargetAction(input: unknown): Promise<{ error?: 
 export async function setChatStorageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setChatStorageTarget(parsed.data.target);
         await recordAudit({
@@ -160,7 +168,8 @@ export async function tidyChatStorageAction(): Promise<{
 export async function setPersonalDriveTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setPersonalDriveTarget(parsed.data.target);
         await recordAudit({
@@ -182,7 +191,8 @@ export async function setOrganizationDriveTargetAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setOrganizationDriveTarget(parsed.data.target);
         await recordAudit({
@@ -244,4 +254,101 @@ export async function checkStorageAction(
         ...result,
         where: target.name
     };
+}
+
+const storageIdSchema = z.string().uuid();
+
+/**
+ * Look for a storage's device on the network now, rather than waiting for the
+ * next upload that fails or the next scheduled look. Follows it when it proves
+ * to be the same device somewhere else.
+ */
+export async function findStorageAgainAction(id: unknown): Promise<{
+    view?: WhereaboutsView;
+    error?: string;
+}> {
+    await requireAdmin();
+    const parsed = storageIdSchema.safeParse(id);
+    const t = await getTranslations("admin");
+    if (!parsed.success) return { error: t("uploads.network.notFound") };
+    try {
+        await whereabouts.searchFor(parsed.data, { force: true });
+        const view = (await whereabouts.listWhereabouts()).find((one) => one.id === parsed.data);
+        return view ? { view } : { error: t("uploads.network.notFound") };
+    } catch (caught) {
+        console.error(caught);
+        return { error: t("uploads.network.searchFailed") };
+    }
+}
+
+const addressSchema = z.object({
+    id: z.string().uuid(),
+    address: z
+        .string()
+        .trim()
+        .min(1)
+        .max(15)
+        .refine((value) => isLocalAddress(value)),
+    /** The person saw who answers there and chose it anyway - only asked when the
+     *  storage has never said who it is, so there is nothing to prove it by. */
+    accept: z.boolean().default(false)
+});
+
+/**
+ * Give a storage on the network a new address, checked by who answers there.
+ *
+ * The stored password goes wherever this points, so the device at the new
+ * address has to be the one the storage remembers. One that never said who it
+ * was is shown to the person first, and used only once they say so.
+ */
+export async function setStorageAddressAction(input: unknown): Promise<{
+    view?: WhereaboutsView;
+    confirm?: { device: string };
+    error?: string;
+}> {
+    const admin = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = addressSchema.safeParse(input);
+    if (!parsed.success) return { error: t("uploads.network.addressFormat") };
+    const { id, address, accept } = parsed.data;
+
+    const row = await prisma.storageConnection.findUnique({
+        where: { id },
+        select: { id: true, name: true, kind: true, config: true, deviceIdentity: true }
+    });
+    if (!row || !whereabouts.isFollowable(row)) return { error: t("uploads.network.notFound") };
+    const before = whereabouts.addressOf(row);
+
+    try {
+        if (before !== address) {
+            const check = await whereabouts.checkAddress(row, address);
+            if (check.kind === "different") {
+                return {
+                    error: t("uploads.network.different", {
+                        address,
+                        device: check.label ?? address,
+                        name: row.name
+                    })
+                };
+            }
+            if (check.kind === "silent") return { error: t("uploads.network.silent", { address }) };
+            if (check.kind === "unproven" && !accept)
+                return { confirm: { device: check.label ?? address } };
+            if (!(await whereabouts.moveToAddress(row, address, check.identity))) {
+                return { error: t("uploads.network.changed") };
+            }
+            await recordAudit({
+                actorId: admin.id,
+                action: "storage.address.update",
+                targetType: "connection",
+                targetId: id,
+                metadata: { from: before, to: address, confirmed: check.kind === "same" }
+            });
+        }
+        const view = (await whereabouts.listWhereabouts()).find((one) => one.id === id);
+        return view ? { view } : { error: t("uploads.network.notFound") };
+    } catch (caught) {
+        console.error(caught);
+        return { error: t("uploads.errors.saveFailed") };
+    }
 }

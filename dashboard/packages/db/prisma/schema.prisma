@@ -1729,6 +1729,13 @@ model StorageConnection {
     credentialKeyId     String?
     requiresHostd       Boolean  @default(false)
     status              String   @default("active")
+    // Who the device behind a LAN address was the last time it answered as
+    // itself: its hardware address and what its SMB server says about itself
+    // before sign-in (GUID, NetBIOS and DNS names), plus that address and when.
+    // What a storage whose lease moved is found again by, and what stops the
+    // stored password going to whatever picked the old address up. Null until
+    // the device has been seen; see lib/storage-whereabouts.
+    deviceIdentity      Json?
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
@@ -11972,4 +11979,36 @@ model CalendarPreference {
     updatedAt DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// A file that was meant for a storage and was kept on this server instead,
+/// because that storage was not answering when it arrived.
+///
+/// Each row is one file still waiting to go where it was meant to: once the
+/// storage answers again it is copied there, read back and compared, the rows
+/// that point at it are repointed, and only then is this server's copy removed.
+/// Resumable by being a row: a restart part-way picks up where it stopped.
+///
+/// No relation to the connection on purpose. A storage deleted while its files
+/// wait here leaves them where they are, readable, and the row is dropped by
+/// the pass that finds the storage gone.
+model StorageFallbackFile {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    /// The storage connection the file was meant for.
+    targetId    String    @db.Uuid
+    /// The folder under POLARIS_DATA_DIR it was kept in (`chat`, `avatars`, ...).
+    localFolder String
+    /// Its path inside that folder, which is also the path it gets on the storage.
+    path        String
+    /// Set once the copy is on the storage and the rows point there. This
+    /// server's copy is removed a while after, so a reader that loaded the old
+    /// row a moment before is not left holding nothing.
+    movedAt     DateTime?
+    attempts    Int       @default(0)
+    /// Why the last attempt did not finish, for the log. Never shown.
+    lastError   String?
+    createdAt   DateTime  @default(now())
+
+    @@unique([localFolder, path])
+    @@index([targetId])
 }

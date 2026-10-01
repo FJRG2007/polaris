@@ -414,6 +414,10 @@
         "storageUnreachable": {
             "label": "Upload storage is not reachable",
             "description": "The storage files are saved to stopped answering, so new uploads are kept on this server. Only reaches administrators."
+        },
+        "storageMoved": {
+            "label": "Storage moved to a new address",
+            "description": "A NAS took a new address on the local network and Polaris found it and follows it. Only reaches administrators."
         }
     },
     "groups": {

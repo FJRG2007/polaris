@@ -414,6 +414,10 @@
         "storageUnreachable": {
             "label": "El almacenamiento no responde",
             "description": "El almacenamiento de archivos dejó de responder, así que las subidas nuevas se guardan en este servidor. Solo llega a administradores."
+        },
+        "storageMoved": {
+            "label": "Almacenamiento con nueva dirección",
+            "description": "Un NAS tomó otra dirección en la red local y Polaris lo encontró y lo sigue. Solo llega a administradores."
         }
     },
     "groups": {

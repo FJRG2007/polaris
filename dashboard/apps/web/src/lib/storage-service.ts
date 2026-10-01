@@ -8,9 +8,10 @@
  */
 
 import { isUuid } from "@/lib/uuid";
-import { prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import { mkdir } from "node:fs/promises";
 import { listSmbShares } from "@/lib/smb-shares";
+import * as whereabouts from "@/lib/storage-whereabouts/follow";
 import { HostdClient } from "@polaris/hostd-client";
 import { getCapabilities, loadEnv } from "@polaris/config";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
@@ -197,11 +198,13 @@ async function loadConnection(connectionId: string, ownerId: string) {
 /** The minimal storage-connection row this module needs to build a driver. */
 type ConnectionRow = {
     id: string;
+    name: string;
     kind: string;
     config: string;
     encryptedCredential: Uint8Array | null;
     credentialNonce: Uint8Array | null;
     credentialKeyId: string | null;
+    deviceIdentity?: unknown;
 };
 
 /** Decrypt a row's credentials, whatever kind it is. */
@@ -310,6 +313,11 @@ function forgetConnection(connectionId: string): void {
     mountsFailed.delete(connectionId);
 }
 
+/** `forgetConnection` for the code that moves a connection to a new address. */
+export function forgetConnectionState(connectionId: string): void {
+    forgetConnection(connectionId);
+}
+
 /** A local driver onto a mount, or null when the path is not readable from here. */
 async function mountedLocalDriver(connectionId: string): Promise<StorageDriver | null> {
     const driver = new LocalDriver({
@@ -415,6 +423,27 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
         return driver;
     }
 
+    // A storage reached at a LAN address is asked who it is before it is given
+    // the password, is remembered once the password has worked, and is looked
+    // for when it stops answering - a DHCP lease that moved should cost a
+    // minute, not a day of uploads on the wrong disk. See lib/storage-whereabouts.
+    if (whereabouts.isFollowedKind(row.kind)) {
+        await whereabouts.confirmBeforeCredentials(row);
+        try {
+            const driver = await signIn(row, config);
+            void whereabouts.rememberAfterSuccess(row).catch(() => undefined);
+            return driver;
+        } catch (error) {
+            if (!(error instanceof SmbShareRequiredError))
+                void whereabouts.searchFor(row.id).catch(() => undefined);
+            throw error;
+        }
+    }
+    return signIn(row, config);
+}
+
+/** Decrypt a row's credentials and open a driver with them. */
+async function signIn(row: ConnectionRow, config: StorageConfig): Promise<StorageDriver> {
     const credentials = credentialsOf(row);
 
     // A UniFi UNAS is a metrics connection, but its files are reachable over the
@@ -563,7 +592,10 @@ export async function resolveMountTarget(
     connectionId: string,
     ownerId: string
 ): Promise<MountSpec | null> {
-    return mountSpecFor(await loadConnection(connectionId, ownerId));
+    const row = await loadConnection(connectionId, ownerId);
+    // The deploy pipeline hands this to the kernel with the password in it.
+    await whereabouts.confirmBeforeCredentials(row);
+    return mountSpecFor(row);
 }
 
 /** Build a connected driver for a connection owned by the given user. A `host:`
@@ -615,6 +647,8 @@ async function localDriveDisk(): Promise<StorageDriver> {
 export async function getUnasMetrics(connectionId: string, ownerId: string): Promise<UnasMetrics> {
     const row = await loadConnection(connectionId, ownerId);
     if (row.kind !== "unifi-unas") throw new Error("Not a UniFi UNAS connection");
+    // The console sign-in carries the password too.
+    await whereabouts.confirmBeforeCredentials(row);
     const env = loadEnv();
     const config = JSON.parse(row.config) as Extract<StorageConfig, { kind: "unifi-unas" }>;
     const credentials =
@@ -982,11 +1016,15 @@ export async function updateConnection(
     const blob = hasSecret
         ? encryptCredentials(input.credentials as StorageCredentials, env.POLARIS_MASTER_KEY)
         : null;
+    const identity = await whereabouts.identityForEdit(row, input.config, blob !== null);
     await prisma.storageConnection.update({
         where: { id: connectionId },
         data: {
             name: input.name,
             config: JSON.stringify(input.config),
+            ...(identity === undefined
+                ? {}
+                : { deviceIdentity: identity === null ? Prisma.DbNull : { ...identity } }),
             ...(blob
                 ? {
                       encryptedCredential: blob.ciphertext,
@@ -1017,6 +1055,7 @@ export async function deleteConnection(ownerId: string, connectionId: string) {
 export async function discoverUnasShares(ownerId: string, connectionId: string): Promise<string[]> {
     const row = await loadConnection(connectionId, ownerId);
     if (row.kind !== "unifi-unas") throw new Error("Not a UniFi UNAS connection");
+    await whereabouts.confirmBeforeCredentials(row);
     const env = loadEnv();
     const config = JSON.parse(row.config) as Extract<StorageConfig, { kind: "unifi-unas" }>;
     const creds =
