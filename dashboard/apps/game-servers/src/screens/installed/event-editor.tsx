@@ -613,6 +613,19 @@ function OptionsFields({
                             }
                         />
                     </Field>
+                    <label className="flex items-center justify-between gap-3 text-sm">
+                        <span>
+                            <span className="font-medium">{t("editor.fistsOnly")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("editor.fistsOnlyHint")}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={value.fistsOnly}
+                            onChange={(on) => onChange({ ...value, fistsOnly: on })}
+                            aria-label={t("editor.fistsOnly")}
+                        />
+                    </label>
                 </>
             );
         }

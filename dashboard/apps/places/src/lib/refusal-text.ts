@@ -229,7 +229,32 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["SwitchBot answered with something unexpected.", "refusals.switchbotOdd"],
     ["The device is not answering SwitchBot right now.", "refusals.switchbotOffline"],
     ["SwitchBot refused the request.", "refusals.switchbotRefused"],
-    ["A SwitchBot device cannot be told to do that", "refusals.switchbotCannot"]
+    ["A SwitchBot device cannot be told to do that", "refusals.switchbotCannot"],
+    ["Say what to set it to", "refusals.climateNoSetting"],
+    ["That device has not said what it can be set to yet", "refusals.climateUnknown"],
+    ["That mode is not one this device has", "refusals.climateMode"],
+    ["That temperature is not one this device accepts", "refusals.climateTemperature"],
+    ["That fan speed is not one this device has", "refusals.climateFan"],
+    ["That setting is not one this device has", "refusals.climateOption"],
+    ["This device takes a range rather than one temperature", "refusals.climateRange"],
+    ["The air conditioner did not answer.", "refusals.greeQuiet"],
+    ["The air conditioner refused that.", "refusals.greeRefused"],
+    [
+        "Polaris is not paired with these air conditioners any more. Connect them again.",
+        "refusals.greeUnpaired"
+    ],
+    [
+        "No Gree air conditioner answered at that address. Check it is switched on at the wall and on the same network as Polaris.",
+        "refusals.greeNoneThere"
+    ],
+    [
+        "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "refusals.greeNoneFound"
+    ],
+    [
+        "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
+        "refusals.greeNoPair"
+    ]
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */
@@ -338,7 +363,10 @@ export function placesRefusalText(t: PlacesTranslator, message: string): string 
     const action = cannot ? ACTION_BY_VERB.get(cannot[2] ?? "") : undefined;
     // An ICU selector cannot hold a hyphen, so "turn-on" is asked as "turnOn".
     if (kind && action)
-        return t("refusals.kindCannot", { kind, action: action.replace("-on", "On") });
+        return t("refusals.kindCannot", {
+            kind,
+            action: action.replace(/-(\w)/g, (_, letter: string) => letter.toUpperCase())
+        });
     for (const { pattern, key: shaped, params } of OUTAGES) {
         const found = pattern.exec(message);
         if (!found) continue;

@@ -436,7 +436,7 @@
         "tuyaKeys": "Tuya rechazó las claves. Puede que se hayan revocado o que el proyecto no cubra estos dispositivos.",
         "tuyaRefused": "Tuya rechazó la petición.",
         "reconnect": "Hay que volver a conectar {name}",
-        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} other {se apague}}",
+        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} climate {un aire acondicionado} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} turnOff {se apague} setMode {cambie de modo} setTemperature {cambie de temperatura} setFan {cambie el ventilador} setOption {cambie un ajuste} other {haga eso}}",
         "watchOnly": "{name} está configurado para vigilarse, no para manejarse",
         "notConnected": "{name} no está conectado a nada",
         "notAnswering": "{name} no respondía la última vez que se comprobó",
@@ -519,7 +519,20 @@
         "switchbotCannot": "A un dispositivo SwitchBot no se le puede pedir eso",
         "automationGone": "Esa automatización no está aquí",
         "automationNewer": "Esa automatización la guardó un Polaris más nuevo",
-        "automationNames": "Esa automatización nombra algo que ya no está aquí"
+        "automationNames": "Esa automatización nombra algo que ya no está aquí",
+        "climateNoSetting": "Indica a qué valor ponerlo",
+        "climateUnknown": "Ese dispositivo aún no ha dicho qué admite",
+        "climateMode": "Este dispositivo no tiene ese modo",
+        "climateTemperature": "Este dispositivo no admite esa temperatura",
+        "climateFan": "Este dispositivo no tiene esa velocidad de ventilador",
+        "climateOption": "Este dispositivo no tiene ese ajuste",
+        "climateRange": "Este dispositivo usa un rango, no una sola temperatura",
+        "greeQuiet": "El aire acondicionado no respondió.",
+        "greeRefused": "El aire acondicionado lo rechazó.",
+        "greeUnpaired": "Polaris ya no está emparejado con estos aires. Vuelve a conectarlos.",
+        "greeNoneThere": "Ningún aire Gree respondió en esa dirección. Comprueba que tiene corriente y está en la misma red que Polaris.",
+        "greeNoneFound": "Ningún aire Gree respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
+        "greeNoPair": "El aire respondió pero no quiso emparejarse. Quítale la corriente un minuto y vuelve a intentarlo."
     },
     "connections": {
         "nuki-web": {
@@ -810,7 +823,23 @@
         },
         "tooShort": "Parece demasiado corto para ser el campo {field}",
         "tooLong": "Es más largo de lo que puede ser el campo {field}",
-        "pickListed": "Elige una de las opciones"
+        "pickListed": "Elige una de las opciones",
+        "gree-local": {
+            "label": "Gree+ (red local)",
+            "summary": "Los aires que usas con la app Gree+, directamente por tu red. Sin cuenta y sin pasar por la nube.",
+            "note": "Polaris busca los aparatos en tu red y se empareja con cada uno, como hace Home Assistant. Antes tienen que estar configurados en la app Gree+ y en la misma red que Polaris.",
+            "steps": {
+                "s0": "Configura el aire en la app Gree+, en la misma red wifi que Polaris.",
+                "s1": "Pulsa Conectar. Deja la dirección vacía para buscar todos los aparatos, o escribe una para emparejar solo ese."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "Opcional. Vacía busca todos los aparatos de esta red; tu router muestra la dirección de cada uno entre sus dispositivos conectados.",
+                    "placeholder": "192.168.1.40"
+                }
+            }
+        }
     },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",
@@ -1065,7 +1094,8 @@
             "switch": "Interruptor",
             "outlet": "Enchufe",
             "light": "Luz",
-            "sensor": "Sensor"
+            "sensor": "Sensor",
+            "climate": "Aire acondicionado"
         },
         "groups": {
             "lock": "Puertas",
@@ -1073,7 +1103,8 @@
             "switch": "Interruptores y enchufes",
             "outlet": "Interruptores y enchufes",
             "light": "Luces",
-            "sensor": "Sensores"
+            "sensor": "Sensores",
+            "climate": "Clima"
         },
         "states": {
             "locked": "Cerrada",
@@ -1105,7 +1136,11 @@
             "unlock": "Abrir",
             "unlatch": "Abrir",
             "turn-on": "Encender",
-            "turn-off": "Apagar"
+            "turn-off": "Apagar",
+            "set-mode": "Modo",
+            "set-temperature": "Temperatura",
+            "set-fan": "Ventilador",
+            "set-option": "Ajuste"
         },
         "via": {
             "polaris": "desde Polaris",
@@ -1127,7 +1162,11 @@
             "door-closed": "Puerta cerrada",
             "door-ajar": "Puerta sin cerrar",
             "calibrated": "Calibrada",
-            "other": "Pasó algo"
+            "other": "Pasó algo",
+            "set-mode": "Modo cambiado",
+            "set-temperature": "Temperatura fijada",
+            "set-fan": "Ventilador cambiado",
+            "set-option": "Ajuste cambiado"
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
@@ -1154,6 +1193,29 @@
             "connected": "Conectado",
             "disconnected": "Desconectado",
             "tampered": "Manipulado"
+        },
+        "climate": {
+            "modes": {
+                "cool": "Frío",
+                "heat": "Calor",
+                "dry": "Seco",
+                "fan": "Ventilar",
+                "auto": "Auto"
+            },
+            "fans": {
+                "auto": "Auto",
+                "low": "Baja",
+                "medium-low": "Media-baja",
+                "medium": "Media",
+                "medium-high": "Media-alta",
+                "high": "Alta"
+            },
+            "options": {
+                "swing": "Oscilar",
+                "turbo": "Turbo",
+                "quiet": "Silencio",
+                "eco": "Eco"
+            }
         }
     },
     "devicesView": {
@@ -1196,7 +1258,21 @@
         "emptyBody": "Aquí llega todo lo que se le ha pedido hacer, incluido lo que no terminó.",
         "switchName": "Encender o apagar {name}",
         "noControl": "Puedes verlo, pero no manejarlo.",
-        "offline": "No responde, así que ahora no se puede cambiar."
+        "offline": "No responde, así que ahora no se puede cambiar.",
+        "climate": {
+            "mode": "Modo",
+            "fan": "Ventilador",
+            "target": "Objetivo",
+            "room": "Temperatura ambiente",
+            "extras": "Extras",
+            "modeName": "Modo de {name}",
+            "fanName": "Ventilador de {name}",
+            "targetName": "Temperatura objetivo de {name}",
+            "lower": "Bajar el objetivo de {name}",
+            "raise": "Subir el objetivo de {name}",
+            "optionName": "{option} en {name}",
+            "unknown": "Aún no ha dicho qué admite. Lo hará en cuanto responda a una comprobación."
+        }
     },
     "deviceDialog": {
         "connected": "Conectado a través de la cuenta en la que está.",
@@ -1292,7 +1368,8 @@
         "attributes": {
             "state": "Su estado",
             "door": "Su puerta",
-            "reading": "Su lectura"
+            "reading": "Su lectura",
+            "mode": "Su modo"
         },
         "triggers": {
             "change": "Un aparato cambia",
@@ -1344,7 +1421,8 @@
             "delay": "Esperar {span}",
             "wait": "Esperar a que {device} esté {value}, hasta {span}",
             "notify": "Avisar: {message}",
-            "run": "Lanzar {name}"
+            "run": "Lanzar {name}",
+            "set": "Poner {device} en {value}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -1421,14 +1499,15 @@
             "place": "Ese sitio ya no está.",
             "deviceGone": "Ese dispositivo ya no está en este sitio.",
             "attribute": "Ese dispositivo no tiene nada así que vigilar.",
-            "notSensor": "Elige un sensor.",
+            "notSensor": "Elige un sensor o un aire acondicionado.",
             "watchOnly": "Ese dispositivo está para verse, no para usarse.",
             "cannotDo": "Ese dispositivo no puede hacer eso.",
             "runSelf": "Una automatización no puede lanzarse a sí misma.",
             "automationGone": "Esa automatización ya no está.",
             "fix": "Hay tarjetas que corregir antes de poder guardarla.",
             "noControl": "No puedes usar los dispositivos de aquí, así que una automatización que guardes tampoco podría.",
-            "noAutoOff": "Ese dispositivo no tiene nada que apagar solo."
+            "noAutoOff": "Ese dispositivo no tiene nada que apagar solo.",
+            "setting": "Elige un valor que admita este aparato."
         },
         "notice": {
             "title": "Automatización: {name}"
@@ -1542,7 +1621,12 @@
                 "seconds": "Segundos",
                 "minutes": "Minutos",
                 "hours": "Horas"
-            }
+            },
+            "mode": "Modo",
+            "target": "Temperatura",
+            "fan": "Ventilador",
+            "option": "Ajuste",
+            "optionTo": "Ponerlo"
         },
         "log": {
             "title": "Qué hizo",
@@ -1574,6 +1658,8 @@
             "follow": {
                 "title": "Si cambia uno, ajustar otro"
             }
-        }
+        },
+        "settingOn": "{option} activado",
+        "settingOff": "{option} desactivado"
     }
 }

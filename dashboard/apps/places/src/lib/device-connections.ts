@@ -344,7 +344,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         // Polaris' own bound: long enough to find the phone, short enough that
         // a code left on a screen is not waited on for ever.
         pairing: { kind: "qr", pollMs: 3_000, lifetimeMs: 120_000 },
-        kinds: ["switch", "outlet", "light"],
+        kinds: ["switch", "outlet", "light", "climate"],
         search: [
             "smart life",
             "tuya smart",
@@ -402,7 +402,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 }))
             }
         ],
-        kinds: ["switch", "outlet", "light"],
+        kinds: ["switch", "outlet", "light", "climate"],
         search: [
             "smart life",
             "switch",
@@ -569,6 +569,41 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     // stable way in - one button press, every light on the bridge, no cloud.
     // Pairing is inside the driver's verify, so it can later move to a pairing
     // screen without a second implementation.
+    // Gree: local, like Home Assistant's own integration - no account and no
+    // cloud. The units are found on the network, or at an address, and each one
+    // is paired on the spot; its key is the credential.
+    {
+        id: "gree-local",
+        brand: "Gree",
+        recommended: true,
+        logo: "gree",
+        label: en("connections.gree-local.label"),
+        reach: "same-network",
+        summary: en("connections.gree-local.summary"),
+        note: en("connections.gree-local.note"),
+        steps: [en("connections.gree-local.steps.s0"), en("connections.gree-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.gree-local.fields.host.label"),
+                hint: en("connections.gree-local.fields.host.hint"),
+                placeholder: en("connections.gree-local.fields.host.placeholder"),
+                optional: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["climate"],
+        search: [
+            "gree",
+            "gree+",
+            "air conditioner",
+            "aircon",
+            "ac",
+            "climate",
+            "heat pump",
+            "local"
+        ]
+    },
     {
         id: "hue-bridge",
         brand: "Philips Hue",
@@ -685,7 +720,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
                 maxLength: 1000
             }
         ],
-        kinds: ["switch", "outlet", "light", "lock", "sensor"],
+        kinds: ["switch", "outlet", "light", "lock", "sensor", "climate"],
         search: [
             "home assistant",
             "hass",

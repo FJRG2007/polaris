@@ -3690,7 +3690,10 @@ model EventInventoryStash {
     inventory      String
     // Stringified InventoryItem[] of the slots kept, each stack's data included.
     items          String
-    // Stringified [{x,y,z}]: the two barrels, and the barrier round them.
+    // Stringified {levels, points}: the experience taken, until it is given back.
+    experience     String?
+    // Stringified [{x,y,z}]: a stash kept in barrels before they were in the
+    // database only - the two barrels, and the barrier round them. "[]" since.
     barrels        String
     casing         String    @default("[]")
     // "stashed" | "failed"
@@ -3698,6 +3701,10 @@ model EventInventoryStash {
     note           String?
     // Stringified slot numbers still owed, once failed.
     missing        String?
+    // Stringified slot numbers a give-back is writing into their own empty
+    // slots, until it has read them back: a stack found whole in one of these is
+    // the one it wrote.
+    writing        String?
     createdAt      DateTime  @default(now())
     updatedAt      DateTime  @updatedAt
     dismissedAt    DateTime?
@@ -5359,6 +5366,64 @@ model AlarmEvent {
     alarm Alarm @relation(fields: [alarmId], references: [id], onDelete: Cascade)
 
     @@index([alarmId, createdAt])
+}
+
+// One stretch of time this deployment could not be reached from outside, or could
+// not reach out at all. Written by the address watcher (lib/address-health.ts)
+// through lib/connectivity/outage-tracker.ts from the same probes that raise the
+// "cannot reach the internet" alert - there is no second prober.
+//
+// Duration is not stored: it is endedAt - startedAt, and an ongoing one is
+// measured against the last pass that saw it (lastSeenAt), never against a clock
+// that kept running while Polaris was stopped.
+model ConnectivityOutage {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    // line | dns | address - the worst seen while it lasted. line: the public
+    // resolvers were silent too; dns: the address's name did not resolve;
+    // address: the line works and the public address did not answer.
+    kind        String
+    startedAt   DateTime
+    endedAt     DateTime?
+    // The last pass that found it still down. What a restart is measured against.
+    lastSeenAt  DateTime
+    // The last pass that found everything answering before it began, so the
+    // screen can say how precisely the start is known.
+    lastUpAt    DateTime?
+    // The host whose probe noticed it, or null when no public address is listed
+    // and only the resolvers were asked.
+    detectedBy  String?
+    // The probe's own words at the start: "Timed out", "HTTP 502".
+    detail      String?
+    // What answered first on the way back: "internet" (the resolvers, while the
+    // address was still silent) or the host that answered.
+    firstBack   String?
+    firstBackAt DateTime?
+    // recovered | unobserved (Polaris stopped watching mid-outage; closed at the
+    // last pass that saw it down rather than counting time nobody measured).
+    closedBy    String?
+    // Outages shorter apart than the merge gap folded into this one.
+    blips       Int       @default(0)
+    // "open" while ongoing, null once ended: the unique index is what keeps two
+    // web containers serving during an update from each opening one.
+    openSlot    String?   @unique
+    createdAt   DateTime  @default(now())
+
+    @@index([startedAt])
+    @@index([endedAt])
+}
+
+// Outages older than the retention window, folded into one row per month and
+// kind, so a year-old history still answers "how often" after its rows are gone.
+model ConnectivityOutageMonth {
+    id              String @id @default(uuid(7)) @db.Uuid
+    // YYYY-MM, UTC.
+    month           String
+    kind            String
+    count           Int    @default(0)
+    downtimeSeconds Int    @default(0)
+    longestSeconds  Int    @default(0)
+
+    @@unique([month, kind])
 }
 // ---------------------------------------------------------------------------
 // Organizations and teams
@@ -9860,6 +9925,10 @@ model PlaceDevice {
     value          String?
     /// What that reading is in, as its own maker wrote it - "C", "%", "lx".
     unit           String?
+    /// How an air conditioner is set and what it can be set to (mode, target,
+    /// range, fan, extras), as `device-kinds` validates it. Null for every other
+    /// kind. Its room temperature is `value`, like any other thermometer's.
+    climate        Json?
     /// open | closed | unknown | none - the door itself, when a sensor is paired.
     /// `none` is no sensor, which is not the same as not knowing.
     doorState      String    @default("none")
@@ -9999,6 +10068,9 @@ model PlaceDeviceObservation {
     /// A sensor's reading as text, or empty for a device that has none.
     reading      String
     readingSince DateTime
+    /// An air conditioner's mode (cool, heat...), or empty for anything else.
+    mode         String   @default("")
+    modeSince    DateTime @default(now())
     /// One more on every change: what names each change, and what the swap
     /// compares, so two readers of the same change fire it once.
     version      Int      @default(0)

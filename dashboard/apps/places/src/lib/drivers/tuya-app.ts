@@ -20,7 +20,7 @@ import { HomeError } from "../home-error";
 import * as tuya from "../integrations/tuya-sharing";
 import { TuyaError } from "../integrations/tuya-api";
 import type { Credentials, DeviceDriver } from "./contract";
-import { tuyaCommandFor, tuyaSnapshots, tuyaSpeaking } from "./tuya-vocabulary";
+import { tuyaActionFor, tuyaSnapshots, tuyaSpecsFor, tuyaSpeaking } from "./tuya-vocabulary";
 
 export const TUYA_APP = "tuya-app";
 
@@ -128,13 +128,22 @@ export const tuyaAppDriver: DeviceDriver = {
                     if (!devices.has(device.id)) devices.set(device.id, device);
                 }
             }
-            return tuyaSnapshots([...devices.values()]);
+            const all = [...devices.values()];
+            const specs = await tuyaSpecsFor(all, (id) =>
+                tuya.tuyaSharedSpecification(session, id)
+            );
+            return tuyaSnapshots(all, specs);
         });
     },
 
-    async act(credentials, device, action) {
-        const { deviceId, commands } = tuyaCommandFor(device.externalId, action);
-        await tuyaSpeaking(() => tuya.sendTuyaCommands(sessionOf(credentials), deviceId, commands));
+    async act(credentials, device, action, command) {
+        const session = sessionOf(credentials);
+        await tuyaSpeaking(async () => {
+            const { deviceId, commands } = await tuyaActionFor(device, action, command, (id) =>
+                tuya.tuyaSharedSpecification(session, id)
+            );
+            await tuya.sendTuyaCommands(session, deviceId, commands);
+        });
     },
 
     async forget(credentials) {

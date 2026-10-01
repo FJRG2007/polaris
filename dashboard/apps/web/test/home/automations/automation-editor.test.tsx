@@ -53,7 +53,24 @@ function device(id: string, kind: string, extra: Partial<DeviceView> = {}): Devi
 
 const DEVICES = [
     device("plug", "outlet"),
-    device("door", "lock", { state: "locked", doorState: "closed" })
+    device("door", "lock", { state: "locked", doorState: "closed" }),
+    device("ac", "climate", {
+        state: "on",
+        reading: { value: "24", unit: "\u00b0C" },
+        climate: {
+            mode: "cool",
+            modes: ["cool", "heat"],
+            target: 24,
+            min: 16,
+            max: 30,
+            step: 1,
+            unit: "C",
+            fan: "auto",
+            fans: ["auto", "high"],
+            options: {},
+            current: 24
+        }
+    })
 ];
 
 const SAVED: AutomationView = {
@@ -71,6 +88,25 @@ const SAVED: AutomationView = {
     lastRunAt: "2026-09-30T07:00:00.000Z",
     lastStatus: "failed",
     updatedAt: "2026-09-30T06:00:00.000Z"
+};
+
+/** An evening that warms the bedroom: a step that sets a temperature. */
+const CLIMATE_SAVED: AutomationView = {
+    ...SAVED,
+    id: "auto-climate",
+    name: "Warm the bedroom",
+    definition: {
+        ...SAVED.definition,
+        actions: [
+            {
+                id: "step01",
+                kind: "device",
+                deviceId: "ac",
+                do: "set-temperature",
+                setting: { action: "set-temperature", target: 22 }
+            }
+        ]
+    }
 };
 
 const RUNS: RunView[] = [
@@ -97,7 +133,7 @@ const RUNS: RunView[] = [
 
 vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     getAutomationAction: async (id: string | null) => ({
-        automation: id ? SAVED : undefined,
+        automation: id === "auto-climate" ? CLIMATE_SAVED : id ? SAVED : undefined,
         runs: id ? RUNS : [],
         context: {
             placeId: "place-1",
@@ -337,5 +373,41 @@ describe("the list", () => {
                 .getByRole("switch", { name: "Switch on Fixture automation" })
                 .getAttribute("aria-checked")
         ).toBe("false");
+    });
+});
+
+describe("a step that sets an air conditioner", () => {
+    it("shows what it sets, and refuses at once a value the unit does not accept", async () => {
+        render(
+            <AutomationEditor
+                automationId="auto-climate"
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
+        await painted();
+        const target = screen.getByLabelText(/^Temperature/) as HTMLInputElement;
+        expect(target.value).toBe("22");
+        fireEvent.change(target, { target: { value: "35" } });
+        expect(screen.getByText("Choose a value this device accepts.")).toBeDefined();
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
+        fireEvent.change(target, { target: { value: "21" } });
+        expect(screen.queryByText("Choose a value this device accepts.")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as { definition: { actions: unknown[] } };
+        expect(input.definition.actions).toEqual([
+            expect.objectContaining({
+                kind: "device",
+                deviceId: "ac",
+                do: "set-temperature",
+                setting: { action: "set-temperature", target: 21 }
+            })
+        ]);
     });
 });

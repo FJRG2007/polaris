@@ -47,6 +47,8 @@ import type { GameKey } from "../../../../messages";
 import * as stageService from "./kinds/stage-service";
 import * as arenaService from "./kinds/arena-service";
 import * as stashService from "./kinds/stash-service";
+import * as search from "./place-search";
+import * as hillService from "./kinds/hill-service";
 import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
@@ -242,7 +244,8 @@ interface Loop {
     readonly timer: ReturnType<typeof setInterval>;
     /** The boss bar's clock, a second at a time, apart from the tick. */
     clock: ReturnType<typeof setInterval> | null;
-    /** Parkour: the quick look at falls and checkpoints, far oftener than the tick. */
+    /** Parkour and a team duel: the quick look, far oftener than the tick -
+     *  falls and checkpoints, or whoever was brought low. */
     quick: ReturnType<typeof setInterval> | null;
     quickBusy: boolean;
     busy: boolean;
@@ -622,6 +625,9 @@ export async function startEvent(input: {
         place: null,
         target: null,
         placeTries: 0,
+        placeFrom: null,
+        placeLog: [],
+        overSea: false,
         reveals: 0,
         round: -1,
         roundEndsAt: null,
@@ -742,9 +748,16 @@ export async function retryStash(
     });
 }
 
-/** Taken off the panel: the operator has dealt with it. */
+/** Taken off the panel: the operator has dealt with it. The blocks a stash kept
+ *  in barrels placed go with it, while the server is up to take them. */
 export async function dismissStash(installedAppId: string, id: string): Promise<void> {
-    await stashService.dismissStash(installedAppId, id);
+    const row = await readRow(installedAppId);
+    if (!row) throw new Error(refused("noServer"));
+    const done = await withServerContainer(row.ownerId, installedAppId, async (server) => {
+        await stashService.dismissStash(server.running ? server : null, installedAppId, id);
+        return true;
+    }).catch(() => false);
+    if (!done) await stashService.dismissStash(null, installedAppId, id);
 }
 
 // ------------------------------------------------------------------ the loop
@@ -812,7 +825,7 @@ function startLoop(
     loop.timer.unref?.();
     loop.clock = setInterval(() => void showClock(loop), CLOCK_MS);
     loop.clock.unref?.();
-    if (run.preset.kind === "parkour") {
+    if (run.preset.kind === "parkour" || run.preset.kind === "team-duel") {
         loop.quick = setInterval(() => void quickLook(loop), QUICK_MS);
         loop.quick.unref?.();
     }
@@ -1035,13 +1048,23 @@ async function countdown(
  * The boss's and a horde's bars show health and waves, and are left to them.
  */
 /**
- * Parkour's quick look (`stageService.quickLines`): one batch, nothing read,
+ * The quick look - parkour's falls and checkpoints (`stageService.quickLines`),
+ * a duel's low players shielded (`duel.shieldLow`): one batch, nothing read,
  * never two at once, and nothing while the tick has no connection open.
  */
 async function quickLook(loop: Loop): Promise<void> {
     const server = loop.link?.server;
     if (!server || loop.finishing || loop.quickBusy || loop.run.phase !== "running") return;
-    const lines = stageService.quickLines(loop);
+    const lines =
+        loop.run.preset.kind === "team-duel"
+            ? loop.run.readyAt === null
+                ? []
+                : [
+                      duel.shieldLow(
+                          (loop.run.preset.options as catalog.EventOptions<"team-duel">).downHearts
+                      )
+                  ]
+            : stageService.quickLines(loop);
     if (lines.length === 0) return;
     loop.quickBusy = true;
     try {
@@ -1313,9 +1336,10 @@ async function begin(
         await persist(installedAppId, loop);
         lines.push(commands.MIDDAY);
     }
-    if (catalog.needsPvp(preset)) {
-        // Nobody loses what they carry to a fight: a death keeps all of it, for
-        // exactly as long as the duel lasts, and the rule is put back after.
+    if (catalog.takesJoiners(preset)) {
+        // Nobody loses what they carry to a fight or a fall: a death keeps all
+        // of it, for exactly as long as the event lasts - through everybody
+        // being sent home and coming down - and the rule is put back after.
         const before: Record<string, string> = {};
         for (const rule of duel.KEEP_INVENTORY) {
             const value = commands.readRuleValue(await server.say([commands.readRule(rule)]));
@@ -1325,7 +1349,7 @@ async function begin(
             break;
         }
         // A rule it cannot read is one it cannot hold or give back: no fight.
-        if (Object.keys(before).length === 0) {
+        if (Object.keys(before).length === 0 && catalog.needsPvp(preset)) {
             return finish(
                 installedAppId,
                 loop,
@@ -1398,7 +1422,17 @@ async function play(
             decided = await bossService.tick(kindContext(installedAppId, loop, server, now), lines);
             break;
         case "king-of-the-hill":
-            decided = await kingOfTheHill(installedAppId, loop, server, lines);
+            // With fists only it is played in an arena of its own (`kinds/hill`).
+            decided = catalog.hillFistsOnly(preset)
+                ? await arenaService.arenaTick(
+                      kindContext(installedAppId, loop, server, now),
+                      lines
+                  )
+                : await hillService.walkInTick(
+                      kindContext(installedAppId, loop, server, now),
+                      TICK_MS / 1000,
+                      lines
+                  );
             break;
         case "explorer":
             if (isRace(preset)) decided = await race(installedAppId, loop, server, lines);
@@ -1490,6 +1524,7 @@ async function findPlace(
     if (!loop.run.target) {
         const center = await centerFor(server, place);
         if (!center) return "failed";
+        loop.run = { ...loop.run, placeFrom: center };
         let point: { x: number; z: number } | null = center;
         if (!chosen) {
             const homes = await homesOf(loop, server);
@@ -1509,7 +1544,10 @@ async function findPlace(
             );
         }
         if (!point) {
-            loop.run = { ...loop.run, placeTries: loop.run.placeTries + 1 };
+            loop.run = {
+                ...noted(loop, center.x, center.z, "homes"),
+                placeTries: loop.run.placeTries + 1
+            };
             await persist(installedAppId, loop);
             return loop.run.placeTries >= limit ? "failed" : null;
         }
@@ -1527,11 +1565,14 @@ async function findPlace(
     const walkable = !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
     if (!walkable && how.nearHome)
         loop.run = { ...loop.run, placeTries: Math.max(loop.run.placeTries, NEAR_AFTER - 1) };
-    if (
-        point &&
-        (chosen ||
-            (walkable && (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground"))))
-    ) {
+    const refused: search.PlaceRefusal | null =
+        !point || chosen
+            ? null
+            : !walkable
+              ? "water"
+              : await siteIsOpen(loop, server, point, radius, how.surface ?? "ground");
+    const why: search.PlaceRefusal = refused ?? "noGround";
+    if (point && !refused) {
         // The marker can come down a block or two from the column tried - an
         // older server spreads it - and so in the next chunk: that chunk is
         // the one held from now on, and the one tried let go of.
@@ -1540,7 +1581,8 @@ async function findPlace(
         loop.run = { ...loop.run, place: point, target: { x: point.x, z: point.z } };
         await persist(installedAppId, loop);
         if (moved) await server.sayAll([commands.forceloadRemove(x, z)]);
-        if (how.nearHome && !chosen) loop.placeFloor = Math.min(loop.run.placeTries, PLACE_TRIES - 2);
+        if (how.nearHome && !chosen)
+            loop.placeFloor = Math.min(loop.run.placeTries, PLACE_TRIES - 2);
         return point;
     }
     await server.sayAll([
@@ -1552,7 +1594,7 @@ async function findPlace(
             ? [commands.forceloadRemove(point.x, point.z)]
             : [])
     ]);
-    loop.run = { ...loop.run, target: null, placeTries: loop.run.placeTries + 1 };
+    loop.run = { ...noted(loop, x, z, why), target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     return loop.run.placeTries >= limit ? "failed" : null;
 }
@@ -1595,8 +1637,9 @@ async function homesOf(loop: Loop, server: ServerContainer): Promise<{ x: number
 /**
  * Whether the ground over the whole of a place is the world's own and walkable:
  * every sampled column dry, within a few blocks of the center's height, and on
- * nothing anybody built. Leaves the marker back on the center, where whatever
- * the event puts down is put.
+ * nothing anybody built. Answers null when it is, and what is in the way when it
+ * is not. Leaves the marker back on the center, where whatever the event puts
+ * down is put.
  *
  * Every column is judged at once - a marker summoned onto each, and each
  * question asked of all of them in one command - which is a handful of trips to
@@ -1610,14 +1653,14 @@ async function siteIsOpen(
     radius: number,
     /** `open` for what is built in the air: open water under it is as good as land. */
     surface: "ground" | "open" = "ground"
-): Promise<boolean> {
+): Promise<search.PlaceRefusal | null> {
     const reach = radius + 1;
     const area = `${center.x - reach} ${center.z - reach} ${center.x + reach} ${center.z + reach}`;
     await server.sayAll([`execute in minecraft:overworld run forceload add ${area}`]);
     try {
         const samples = commands.siteSamples(center, radius);
         const judged = await judgeAtOnce(loop, server, center, samples, surface);
-        return judged ?? (await judgeOneByOne(loop, server, center, samples, surface));
+        return judged ? judged.refused : await judgeOneByOne(loop, server, center, samples, surface);
     } finally {
         // The area let go, and the center's own chunk held again as before.
         await server.sayAll([
@@ -1629,22 +1672,26 @@ async function siteIsOpen(
     }
 }
 
-/** What one column of a place was found to be. */
-type Column = "fine" | "rough" | "water" | "built";
+/** What one column of a place was found to be: `water` is open water where
+ *  that is as good as land, `sea` where it is not. */
+type Column = "fine" | "rough" | "water" | "sea" | "built";
 
-/** The verdict on a place from its columns, the center's first: open while no
- *  column is built on, the center is fine, and no more than a quarter are rough. */
-function verdict(columns: readonly Column[]): boolean {
-    if (columns.some((one) => one === "built")) return false;
-    if (columns[0] === "rough") return false;
+/** The verdict on a place from its columns, the center's first: open (null)
+ *  while no column is built on, the center is fine, and no more than a quarter
+ *  are rough; otherwise what is in the way. */
+function verdict(columns: readonly Column[]): search.PlaceRefusal | null {
+    if (columns.some((one) => one === "built")) return "built";
+    if (columns.some((one) => one === "sea")) return "water";
+    if (columns[0] === "rough") return "uneven";
     const rough = columns.filter((one) => one === "rough").length;
-    return rough <= commands.roughAllowed(columns.length);
+    return rough <= commands.roughAllowed(columns.length) ? null : "uneven";
 }
 
 /**
- * Every column judged in a few commands (`commands.sampleLines`). Null when the
- * server would not put the markers down - older than the heightmap - or would
- * not say what is under them, for the column-at-a-time judging instead.
+ * Every column judged in a few commands (`commands.sampleLines`): what is in the
+ * way, or null when nothing is. Null in place of an answer when the server would
+ * not put the markers down - older than the heightmap - or would not say what is
+ * under them, for the column-at-a-time judging instead.
  */
 async function judgeAtOnce(
     loop: Loop,
@@ -1652,16 +1699,19 @@ async function judgeAtOnce(
     center: stored.Point,
     samples: readonly { x: number; z: number }[],
     surface: "ground" | "open"
-): Promise<boolean | null> {
+): Promise<{ refused: search.PlaceRefusal | null } | null> {
     await server.sayAll(commands.sampleLines(samples));
     const down = commands.samplesIn(await server.say([commands.READ_SAMPLES]));
     if (down.length === 0) return null;
     const key = (one: { x: number; z: number }) => `${one.x},${one.z}`;
     const at = new Map(down.map((one) => [key(one), one]));
     const read = async (line: string) => new Set(commands.samplesIn(await server.say([line])).map(key));
-    const water = surface === "open" ? await read(commands.SAMPLES_ON_WATER) : new Set<string>();
     const built = await builtAtOnce(loop, server);
     if (built === null) return null;
+    const water =
+        surface === "open" || built.size > 0
+            ? await read(commands.SAMPLES_ON_WATER)
+            : new Set<string>();
     const trees = new Set<string>();
     if (built.size > 0) for (const line of commands.SAMPLES_ON_TREES) for (const one of await read(line)) trees.add(one);
     const columns = samples.map((sample): Column => {
@@ -1669,13 +1719,14 @@ async function judgeAtOnce(
         // No marker: water or lava, where the heightmap is no ground at all.
         if (!ground) return "rough";
         const level = Math.abs(ground.y - center.y) <= commands.SITE_STEP;
-        if (level && water.has(key(sample))) return "water";
+        if (level && surface === "open" && water.has(key(sample))) return "water";
+        if (built.has(key(sample)) && water.has(key(sample))) return "sea";
         // A tree is rough ground; anything else - a build, water - is not
         // somewhere to put anything.
         if (built.has(key(sample))) return trees.has(key(sample)) ? "rough" : "built";
         return level ? "fine" : "rough";
     });
-    return verdict(columns);
+    return { refused: verdict(columns) };
 }
 
 /** The ground names this server was last found to know, kept across events:
@@ -1724,7 +1775,7 @@ async function judgeOneByOne(
     center: stored.Point,
     samples: readonly { x: number; z: number }[],
     surface: "ground" | "open"
-): Promise<boolean> {
+): Promise<search.PlaceRefusal | null> {
     let rough = 0;
     for (const [index, sample] of samples.entries()) {
         const ground = await dropMark(server, sample.x, sample.z);
@@ -1745,14 +1796,19 @@ async function judgeOneByOne(
             for (const line of commands.treeUnder(ground)) {
                 if (commands.readTest(await server.say([line])) === "passed") tree = true;
             }
-            if (!tree) return false;
+            if (!tree)
+                return commands.readTest(await server.say([commands.waterUnder(ground)])) ===
+                    "passed"
+                    ? "water"
+                    : "built";
             fine = false;
         }
         if (fine) continue;
         rough += 1;
-        if (index === 0 || rough > commands.roughAllowed(samples.length)) return false;
+        if (index === 0 || rough > commands.roughAllowed(samples.length))
+            return ground === null ? "water" : "uneven";
     }
-    return true;
+    return null;
 }
 
 /**
@@ -1829,10 +1885,16 @@ async function retryPlace(
     installedAppId: string,
     loop: Loop,
     server: ServerContainer,
-    point: stored.Point
+    point: stored.Point,
+    why: search.PlaceRefusal = "occupied"
 ): Promise<void> {
     await server.sayAll([commands.CLEAR_MARK, ...commands.release(point, loop.run.target)]);
-    loop.run = { ...loop.run, place: null, target: null, placeTries: loop.run.placeTries + 1 };
+    loop.run = {
+        ...noted(loop, point.x, point.z, why),
+        place: null,
+        target: null,
+        placeTries: loop.run.placeTries + 1
+    };
     await persist(installedAppId, loop);
     if (loop.run.placeTries >= PLACE_TRIES) throw new PlaceNotFound();
 }
@@ -1851,12 +1913,17 @@ async function walkStart(
 async function centerFor(
     server: ServerContainer,
     place: catalog.EventPlace
-): Promise<{ x: number; z: number } | null> {
-    if (place.mode === "fixed") return { x: place.x, z: place.z };
+): Promise<{ x: number; z: number; near: string | null } | null> {
+    if (place.mode === "fixed") return { x: place.x, z: place.z, near: null };
     const here = commands.readWhere(await server.say([commands.IN_OVERWORLD]));
     if (here.length === 0) return null;
     const one = here[Math.floor(Math.random() * here.length)]!;
-    return { x: Math.round(one.x), z: Math.round(one.z) };
+    return { x: Math.round(one.x), z: Math.round(one.z), near: one.name };
+}
+
+/** One try that would not do, written into the run for the history (`place-search`). */
+function noted(loop: Loop, x: number, z: number, why: search.PlaceRefusal): stored.EventRun {
+    return { ...loop.run, placeLog: search.withTry(loop.run.placeLog, { x, z, why }) };
 }
 
 // ------------------------------------------------------------------ each kind
@@ -1880,7 +1947,7 @@ function kindContext(
             loop.run = next;
         },
         persist: () => persist(installedAppId, loop),
-        findPlace: (place, distance, radius, surface) =>
+        findPlace: (place, distance, radius, surface, nearHome) =>
             findPlace(
                 installedAppId,
                 loop,
@@ -1891,13 +1958,15 @@ function kindContext(
                 commands.HOME_CLEARANCE,
                 true,
                 {
-                    surface: surface ?? "ground"
+                    surface: surface ?? "ground",
+                    nearHome: nearHome === true
                 }
             ),
-        giveUpPlace: (point) => retryPlace(installedAppId, loop, server, point),
+        giveUpPlace: (point, why) => retryPlace(installedAppId, loop, server, point, why),
         chat: () => chatSince(loop, server),
         atLeast: (wanted) => serverAtLeast(server, wanted),
         stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name },
+        tickSeconds: TICK_MS / 1000,
         owed: async () => {
             const row = await readRow(installedAppId);
             return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
@@ -1995,59 +2064,6 @@ async function supplyDrop(
     loop.run = { ...loop.run, decidedBy: opener };
     lines.push(commands.say(messages.tag(language) + messages.dropFound(opener ?? "?", language)));
     return opener ? `Found by ${opener}` : "Opened";
-}
-
-async function kingOfTheHill(
-    installedAppId: string,
-    loop: Loop,
-    server: ServerContainer,
-    lines: string[]
-): Promise<string | null> {
-    const options = loop.run.preset.options as catalog.EventOptions<"king-of-the-hill">;
-    if (!loop.run.place) {
-        const found = await findPlace(
-            installedAppId,
-            loop,
-            server,
-            options.place,
-            32,
-            options.radius,
-            commands.HOME_CLEARANCE,
-            true,
-            // A circle to stand in changes nothing: on an island it comes in to the island.
-            { nearHome: true }
-        );
-        if (found === "failed") throw new PlaceNotFound();
-        if (!found) return null;
-        await server.sayAll([
-            commands.CLEAR_MARK,
-            commands.say(
-                messages.tag(loop.language) +
-                    messages.circleAt(found.x, found.y, found.z, loop.language)
-            )
-        ]);
-        return null;
-    }
-    const place = loop.run.place;
-    lines.push(...commands.hillTick(place, options.radius, TICK_MS / 1000));
-    // Each player told how far it is and which way, in their own action bar:
-    // coordinates in the chat scroll away, and a circle is small from far off.
-    for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
-        const away = Math.hypot(one.x - (place.x + 0.5), one.z - (place.z + 0.5));
-        lines.push(
-            commands.actionbarFor(
-                one.name,
-                commands.inHill(one, place, options.radius)
-                    ? messages.hillInside(loop.language)
-                    : messages.hillGuide(
-                          Math.round(away),
-                          commands.headingTo(one, { x: place.x + 0.5, z: place.z + 0.5 }),
-                          loop.language
-                      )
-            )
-        );
-    }
-    return null;
 }
 
 async function race(
@@ -2967,7 +2983,7 @@ function stageTools(
             if (found === "failed") throw new PlaceNotFound();
             return found;
         },
-        giveUpSite: (point) => retryPlace(installedAppId, loop, server, point),
+        giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, why),
         chat: () => newChat(server, loop),
         owed: async () => {
             const row = await readRow(installedAppId);
@@ -3345,7 +3361,12 @@ async function finish(
         participants: run.participants.length,
         podium: placed,
         disqualified: run.participants.filter((name) => disqualified.has(name.toLowerCase())),
-        delivered
+        delivered,
+        // Nowhere would do: where it looked, and what was in the way.
+        search:
+            outcome === "failed" && !run.place && run.placeLog.length > 0
+                ? search.summarize(run.placeFrom, run.placeLog, run.overSea)
+                : null
     };
     await updateEventState(installedAppId, (state) => ({
         ...stored.withHistory(
@@ -3407,6 +3428,10 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "treasure-hunt":
             after.push(...hunt.huntCleanup(run.chests, run.held));
+            break;
+        case "king-of-the-hill":
+            // Its platform over the sea, while its chunks are held.
+            before.push(...hillService.platformCleanup(run));
             break;
         case "world-boss":
             // Its minions, vexes and fangs, while their chunks are still held.
@@ -3501,7 +3526,8 @@ async function abandon(
         participants: run.participants.length,
         podium: [],
         disqualified: [],
-        delivered: []
+        delivered: [],
+        search: null
     };
     // An arena and whoever is in it are the minute sweep's to undo from here.
     const arenaLeftover = catalog.playsInArena(run.preset)
@@ -4016,7 +4042,8 @@ async function skip(
             participants: 0,
             podium: [],
             disqualified: [],
-            delivered: []
+            delivered: [],
+            search: null
         })
     );
 }

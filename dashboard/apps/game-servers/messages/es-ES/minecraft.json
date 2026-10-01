@@ -1583,6 +1583,23 @@
         "prizesWaiting": "Premios pendientes",
         "givenTheNextTimeEach": "Se dan la próxima vez que cada jugador entre. Se guardan 14 días.",
         "history": "Historial",
+        "placeSearch": {
+            "fromNear": "Buscó {tries, plural, one {una vez} other {# veces}} cerca de {near} ({x}, {z}), hasta {reach} bloques",
+            "fromAt": "Buscó {tries, plural, one {una vez} other {# veces}} cerca de {x}, {z}, hasta {reach} bloques",
+            "nobody": "No había nadie en el Overworld para buscar cerca",
+            "overSea": "y sobre el mar para una plataforma",
+            "why": {
+                "homes": "{count} muy cerca de una casa",
+                "noGround": "{count} sin suelo debajo",
+                "water": "{count} sobre agua",
+                "built": "{count} sobre algo construido",
+                "uneven": "{count} muy abruptos o con árboles",
+                "occupied": "{count} con algo en medio",
+                "tooHigh": "{count} muy altos para el mundo",
+                "refused": "{count} donde se rechazaron bloques",
+                "unloaded": "{count} sin cargar a tiempo"
+            }
+        },
         "noEventsHaveRunOn": "Aún no se ha celebrado ningún evento en este servidor.",
         "kinds": {
             "mining-rush": {
@@ -1800,7 +1817,7 @@
             "tooFewActive": "{overworld, select, yes {Solo {active} de los {count} jugadores conectados están activos en el mundo normal; este evento espera a {needed}} other {Solo {active} de los {count} jugadores conectados están activos; este evento espera a {needed}}}",
             "notNow": "Ahora no: {reason}",
             "peaceful": "El servidor está en Pacífico, donde los mobs hostiles desaparecen nada más aparecer. Pon la dificultad en Fácil o más alta en Reglas antes.",
-            "pvpBlocked": "El jugador contra jugador está Bloqueado en este servidor, y un duelo lo necesita. Permítelo en Ajustes antes.",
+            "pvpBlocked": "El jugador contra jugador está Bloqueado en este servidor, y este evento lo necesita. Permítelo en Ajustes antes.",
             "needsNewer": "{kind} necesita Minecraft 1.16 o posterior, y este servidor usa una versión anterior.",
             "anotherOn": "Ya hay otro evento en marcha. Deja que acabe o cancélalo antes.",
             "noneOn": "Nada en marcha",
@@ -1856,15 +1873,22 @@
             "bow": "Arco"
         },
         "thingsNotGivenBack": "Cosas sin devolver",
-        "thingsNotGivenBackHint": "Guardadas a salvo en sus barriles bajo la arena. Devuélvelas mientras el jugador esté conectado, o descártalo cuando esté resuelto.",
+        "thingsNotGivenBackHint": "Guardadas a salvo por Polaris. Devuélvelas mientras el jugador esté conectado, o descártalo cuando esté resuelto.",
         "stashStacks": "{count, plural, one {# montón} other {# montones}} en los barriles de {x} {y} {z}",
+        "stashCount": "{count, plural, one {# montón} other {# montones}}",
+        "stashLevels": "{count, plural, one {# nivel} other {# niveles}}",
+        "stashLater": "No se pudo llegar a las cosas de {name} ahora. Inténtalo en un momento.",
+        "stashNote": {
+            "notGiven": "no se pudo devolver y comprobar",
+            "experience": "experiencia sin devolver"
+        },
         "giveBackNow": "Devolver ahora",
         "givenBack": "{name} ya tiene sus cosas.",
         "stashOffline": "{name} no está en el servidor. Vuelve a intentarlo cuando esté.",
         "stashStillFailed": "Algunas cosas de {name} siguen sin poder devolverse.",
         "dismissStash": "Descartar las cosas guardadas de {name}",
         "dismissStashTitle": "¿Descartar las cosas guardadas de {name}?",
-        "dismissStashHint": "Deja de mostrarse aquí. Lo que siga en los barriles se queda allí.",
+        "dismissStashHint": "Deja de mostrarse aquí. Lo que quede en un barril antiguo se queda; los vacíos se quitan.",
         "dismissIt": "Descartar",
         "problems": {
             "itemId": "Escribe el objeto como espacio:id, por ejemplo minecraft:diamond",
@@ -1946,6 +1970,8 @@
         "regeneration": "Regeneración",
         "healthComesBackOnIts": "La salud vuelve sola.",
         "circleRadiusBlocks": "Radio del círculo (bloques)",
+        "fistsOnly": "Solo puños, nadie muere",
+        "fistsOnlyHint": "Quien se apunta entra sin nada: sus cosas se guardan y se devuelven, nadie puede morir y se gana a empujones.",
         "between3And20": "Entre 3 y 20.",
         "waves": "Oleadas",
         "3To10": "3 a 10",

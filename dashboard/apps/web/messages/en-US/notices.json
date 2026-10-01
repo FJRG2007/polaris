@@ -88,7 +88,9 @@
         "downMany": "{count} domains stopped serving",
         "upMany": "{count} domains are answering again",
         "downManyBody": "{names}. They went down together, so this is usually the connection or the edge rather than the services themselves.",
-        "upManyBody": "{names}."
+        "upManyBody": "{names}.",
+        "upOneBodyAfter": "It is answering again, after at least {duration} down.",
+        "upManyBodyAfter": "{names}. The longest had been down for at least {duration}."
     },
     "delivery": {
         "openInPolaris": "Open in Polaris"
@@ -194,7 +196,8 @@
         "offlineBody": "Nothing answered at {url}, and neither did anything else - the public resolvers Polaris checks are silent too, so this is the line rather than the address. Nothing about {host} needs changing: it will be reachable again when the connection is. Anything Polaris does outside this network is paused until then.",
         "downTitle": "{host} is not answering",
         "downBody": "Nothing answered at {url}. Polaris can reach the internet, so this is about that address rather than about the connection. It is still listed in Settings, marked unreachable.",
-        "downBodyDetail": "Nothing answered at {url} ({detail}). Polaris can reach the internet, so this is about that address rather than about the connection. It is still listed in Settings, marked unreachable."
+        "downBodyDetail": "Nothing answered at {url} ({detail}). Polaris can reach the internet, so this is about that address rather than about the connection. It is still listed in Settings, marked unreachable.",
+        "backBodyAfter": "{url} is reachable again, after {duration} down."
     },
     "leftover": {
         "title": "{count, plural, one {Polaris removed a leftover volume ({size})} other {Polaris removed # leftover volumes ({size})}}",
@@ -263,5 +266,14 @@
         "silentHome": "Nothing answered on {hostname} from here. Plenty of routers will not route their own public address back inward, so this is not proof on its own - check it from outside the network, on mobile data, to be sure.",
         "silentDatacenter": "Nothing answered on {hostname} from here.",
         "allowInbound": "Allow inbound 80 and 443 in your provider''s firewall or security group."
+    },
+    "span": {
+        "seconds": "{seconds} s",
+        "minutes": "{minutes} min",
+        "minutesSeconds": "{minutes} min {seconds} s",
+        "hours": "{hours} h",
+        "hoursMinutes": "{hours} h {minutes} min",
+        "days": "{days} d",
+        "daysHours": "{days} d {hours} h"
     }
 }

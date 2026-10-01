@@ -2123,12 +2123,13 @@ describe("the kit is marked, and only it is taken back", () => {
             const lines = build.kitCommands("Ana", marker);
             expect(lines).toHaveLength(build.KIT_IDS.length);
             expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
-            const glass = lines[0]!;
+            // The brush first, so it lands in the hotbar; the glass after it.
+            const glass = lines[1]!;
             expect(glass).toContain(
                 marker === "components" ? "minecraft:can_place_on={blocks:[" : "CanPlaceOn:["
             );
             expect(glass).toContain(`"${build.FLOOR}"`);
-            const brush = lines.at(-1)!;
+            const brush = lines[0]!;
             expect(brush).toContain(
                 marker === "components" ? "minecraft:can_break={blocks:[" : "CanDestroy:["
             );

@@ -14,17 +14,20 @@
  * the console text is prose that changes between versions.
  */
 
-import { gameMessage } from "../game-message";
 import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
-import { withTimeout } from "@polaris/core";
-import { AsyncLocalStorage } from "node:async_hooks";
+import { inRconTurn } from "./rcon-turn";
+import { keyedTurns } from "../turns";
 import { liveContext } from "./live-values";
+import { gameMessage } from "../game-message";
 import { gameServerAddress } from "./address";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { AppHostTypes } from "@polaris/app-host";
 import { readContainerFile } from "../container-files";
+import { gameOfServer, withTimeout } from "@polaris/core";
 import { readsPlayerList, readsServer } from "./text-vars";
+import { sayEachReplies, sayEachScript } from "./say-each";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
@@ -32,9 +35,9 @@ import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "../crash-loop";
 import type { ExecResult, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
-import { inRconTurn } from "./rcon-turn";
 import { audienceNames, namedByPolaris, parseTarget, type Roster } from "./announce-target";
 import { announcementCommands, announcementProblems, type Announcement } from "./announcement";
+import { NO_PLAYER_LOG, nextPlayerLog, playerLogScript, type PlayerLogState } from "./player-log";
 
 const { resolveWaf } = host.wafService;
 const { getHostLanIp } = host.hostAddress;
@@ -577,6 +580,13 @@ export interface ServerContainer {
      */
     sayAll(lines: readonly string[]): Promise<void>;
     /**
+     * Send several commands and hand back each one's answer, in as few trips to
+     * the container as fit (see `say-each`). Null for an answer that did not
+     * arrive whole - ask that one again with `say`. Optional so a stand-in for a
+     * server can leave it out; everything that uses it falls back to `say`.
+     */
+    sayEach?(commands: readonly (readonly string[])[]): Promise<(string | null)[]>;
+    /**
      * Stream a file out of the container, as bytes.
      *
      * `run` collects its output into a string, which is right for a command's
@@ -638,11 +648,43 @@ function containerOn(install: MinecraftInstall, ports: RuntimePorts): ServerCont
         },
         say: (argv) => sendGameCommand(ports, install, argv),
         sayAll: (lines) => sendGameLines(ports, install, lines),
+        sayEach: (commands) => sendGameCommands(ports, install, commands),
         readFile: (path) => ports.readFile(install.container, path),
         trimWorld: ports.trimWorld
             ? (script, options) => ports.trimWorld!(install.container, script, options)
             : null
     };
+}
+
+/**
+ * Several commands and their answers, one trip into the container per batch.
+ *
+ * Java only: Bedrock's console answers nowhere a command can read back, so it
+ * takes them one at a time. In one RCON turn, so nothing else's answer lands in
+ * between. A batch the container refused is answered as missing, which the
+ * caller asks again one command at a time.
+ */
+async function sendGameCommands(
+    ports: RuntimePorts,
+    install: MinecraftInstall,
+    commands: readonly (readonly string[])[]
+): Promise<(string | null)[]> {
+    for (const argv of commands) assertSafeCommand(argv);
+    if (commands.length === 0) return [];
+    if (install.edition !== "java") {
+        const answers: (string | null)[] = [];
+        for (const argv of commands)
+            answers.push(await sendGameCommand(ports, install, argv).catch(() => null));
+        return answers;
+    }
+    const result = await inRconTurn(install.installedAppId, () =>
+        withTimeout(
+            ports.runIn(install.container, ["sh", "-c", sayEachScript(commands)]),
+            COMMAND_TIMEOUT_MS * 2,
+            gameMessage("games", "lib.noAnswerInTime")
+        )
+    );
+    return sayEachReplies(result.output, commands.length);
 }
 
 /** Room for one batch in a command's arguments, in base64 characters. */
@@ -1125,15 +1167,66 @@ export async function setPlayerExperience(
     });
 }
 
+/**
+ * The server's lines about players arriving and leaving, as container-log lines
+ * (`<RFC3339> <line>`), oldest first.
+ *
+ * Picked out of the server's own log files inside the container (see
+ * `player-log`), because the container's log is where every RCON command Polaris
+ * sends leaves two lines, and its tail can hold nothing else. The container's log
+ * is still read when that finds no files - Bedrock writes none - or the container
+ * cannot be asked, which is also the only record of a server that is not running.
+ */
+export async function readPlayerLog(ownerId: string, installedAppId: string): Promise<string> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    if (install.edition === "java" && install.running) {
+        const picked = await inPlayerLogTurn(installedAppId, async () => {
+            const state = playerLogs.get(installedAppId) ?? NO_PLAYER_LOG;
+            const next = await withPorts(install, ownerId, (ports) =>
+                ports.runIn(install.container, ["sh", "-c", playerLogScript(state.cursor)])
+            )
+                .then((result) => (result.code === 0 ? nextPlayerLog(state, result.output) : null))
+                .catch(() => null);
+            if (!next) return null;
+            playerLogs.set(installedAppId, next);
+            return next.lines.join("\n");
+        });
+        if (picked !== null) return picked;
+    }
+    return readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL);
+}
+
+/** Where each server's log was last read to, and what it held (see `player-log`). */
+const playerLogs = new Map<string, PlayerLogState>();
+/** One read of a server's log at a time, so two readers never start from the same cursor. */
+const inPlayerLogTurn = keyedTurns();
+
 /** Every join and leave the server's log still holds, oldest first. */
 export async function getPlayerSessions(
     ownerId: string,
     installedAppId: string
 ): Promise<readonly PlayerSessionEvent[]> {
-    const install = await resolveInstall(ownerId, installedAppId);
-    return parsePlayerSessions(
-        await readAppRuntimeLog(install.applicationId, ownerId, SESSION_LOG_TAIL)
-    );
+    return parsePlayerSessions(await readPlayerLog(ownerId, installedAppId));
+}
+
+/**
+ * The same, for a record keeper that looks at every kind of game server: null for
+ * an install that is not a Minecraft server, whose log is not in this format and
+ * is not worth reading for it.
+ *
+ * Read on the install's own owner, whoever is watching: the callers are the sweep
+ * and the live feed, both of which only ever reach servers their reader may see,
+ * and a server somebody was invited to keeps its record like any other.
+ */
+export async function getPlayerSessionsIfMinecraft(
+    installedAppId: string
+): Promise<readonly PlayerSessionEvent[] | null> {
+    const row = await prisma.installedApp.findFirst({
+        where: { id: installedAppId, status: { not: "removed" } },
+        select: { catalogId: true, ownerId: true }
+    });
+    if (!row || gameOfServer(row.catalogId)?.id !== "minecraft") return null;
+    return getPlayerSessions(row.ownerId, installedAppId);
 }
 
 /** Operators, whitelisted players and bans, as the server has them on disk. */

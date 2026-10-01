@@ -30,6 +30,7 @@ import { HOME_ASSISTANT, homeAssistantDriver } from "./drivers/home-assistant";
 import { DIRIGERA_HUB, dirigeraHubDriver } from "./drivers/dirigera-hub";
 import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
 import { SHELLY_LOCAL, shellyLocalDriver } from "./drivers/shelly-local";
+import { GREE_LOCAL, greeLocalDriver } from "./drivers/gree-local";
 import { KASA_LOCAL, TAPO_LOCAL, kasaLocalDriver, tapoLocalDriver } from "./drivers/tplink-local";
 import {
     DriverError,
@@ -58,7 +59,8 @@ const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [HUE_BRIDGE]: hueBridgeDriver,
     [DIRIGERA_HUB]: dirigeraHubDriver,
     [HOME_ASSISTANT]: homeAssistantDriver,
-    [SWITCHBOT_CLOUD]: switchBotCloudDriver
+    [SWITCHBOT_CLOUD]: switchBotCloudDriver,
+    [GREE_LOCAL]: greeLocalDriver
 };
 
 export function driverFor(connection: string): DeviceDriver {

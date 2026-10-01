@@ -36,14 +36,22 @@ import type { ArkProfile } from "../../lib/ark/profile";
 import type { PlayerSeen } from "../../lib/games-activity";
 import type { ServerPresence } from "../../lib/games-service";
 import { useGamePresence } from "../../components/use-game-presence";
-import { presenceLine, seenFor } from "../../lib/games-activity";
+import { presenceLine, seenFor, withLiveSince } from "../../lib/games-activity";
 import { findArkMap, mapRequirementHint } from "@polaris/core";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { ArkAccessView, ArkStatus } from "../../lib/ark/service";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ReactNode
+} from "react";
 import { timeoutFor, type PlayerTimeout } from "../../lib/player-timeout";
 import { foldArkPlayers, matchesArkPlayer, type ArkPlayerEntry } from "../../lib/ark/players";
 import { generateJoinPassword, isJoinPassword, JOIN_PASSWORD_HINT } from "../../lib/ark/access";
@@ -54,17 +62,7 @@ import {
     ArkMessageDialog,
     ArkPlayerDialog
 } from "./ark-player-dialogs";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    cn,
-    Input,
-    ScrollRow,
-    Skeleton,
-    Switch
-} from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Skeleton, Switch } from "@polaris/ui";
 import {
     Ban,
     Clock,
@@ -301,10 +299,22 @@ export function ArkPanel({
     // snapshot from whenever it was opened, and reading them together is how a
     // server that had just been started kept saying it was stopped.
     const isRunning = status?.running ?? running;
+    // When each player on began the visit they are on, from the stream as soon as
+    // it has it rather than a poll late.
+    const liveSeen = useMemo(
+        () =>
+            streamed && Date.now() - presence.at < PRESENCE_STALE_MS
+                ? withLiveSince(reading.seen, streamed.players)
+                : reading.seen,
+        [reading.seen, streamed, presence.at]
+    );
 
     useEffect(() => {
         const state = statusState(reading.status, isRunning);
-        onStatus?.(state === null ? null : t(STATE_LABEL[state]), state === "notRunning" ? "danger" : undefined);
+        onStatus?.(
+            state === null ? null : t(STATE_LABEL[state]),
+            state === "notRunning" ? "danger" : undefined
+        );
     }, [onStatus, reading.status, isRunning, t]);
 
     const reloadSettings = useCallback(() => {
@@ -376,7 +386,7 @@ export function ArkPanel({
                     timeouts={reading.timeouts}
                     admins={reading.admins}
                     profiles={reading.profiles}
-                    seen={reading.seen}
+                    seen={liveSeen}
                     canModerate={held.includes("games.moderate")}
                     canManage={held.includes("games.manage")}
                     onChanged={(next) => {
@@ -604,7 +614,9 @@ function ConnectCard({
                         <div className="flex w-full items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
                             <UserPlus className="mt-0.5 size-4 shrink-0 text-warning" />
                             <div className="flex flex-col items-start gap-1 text-xs">
-                                <p className="font-medium text-foreground">{t("panel.nobodyCanJoinYet")}</p>
+                                <p className="font-medium text-foreground">
+                                    {t("panel.nobodyCanJoinYet")}
+                                </p>
                                 <p className="text-muted-foreground">
                                     {t("panel.thisServerOnlyLetsIn")}
                                 </p>
@@ -752,7 +764,10 @@ function StatusBadge({ status, running }: { status: ArkStatus | null; running: b
     if (state === "stopped") return <Badge>{t("panel.stopped")}</Badge>;
     return (
         <Badge className="border-success-edge text-success">
-            {t("panel.playersOnline", { count: status?.players.length ?? 0, max: status?.max ?? "?" })}
+            {t("panel.playersOnline", {
+                count: status?.players.length ?? 0,
+                max: status?.max ?? "?"
+            })}
         </Badge>
     );
 }
@@ -1230,8 +1245,7 @@ function PlayersTab({
                         onKill={() =>
                             void confirm({
                                 title: t("panel.killTitle", { name: entry.name }),
-                                description:
-                                    t("panel.theirSurvivorDiesWhereThey"),
+                                description: t("panel.theirSurvivorDiesWhereThey"),
                                 confirmLabel: t("panel.killThem"),
                                 danger: true
                             }).then((agreed) => {
@@ -1244,7 +1258,8 @@ function PlayersTab({
                                                 "kill"
                                             ),
                                         t("panel.killSent"),
-                                        (reason) => t("panel.notKilled", { name: entry.name, reason })
+                                        (reason) =>
+                                            t("panel.notKilled", { name: entry.name, reason })
                                     );
                                 }
                             })
@@ -1252,8 +1267,7 @@ function PlayersTab({
                         onStrip={() =>
                             void confirm({
                                 title: t("panel.emptyTitle", { name: entry.name }),
-                                description:
-                                    t("panel.everythingTheyAreCarryingWearing"),
+                                description: t("panel.everythingTheyAreCarryingWearing"),
                                 confirmLabel: t("panel.emptyIt"),
                                 danger: true
                             }).then((agreed) => {
@@ -1266,7 +1280,8 @@ function PlayersTab({
                                                 "strip"
                                             ),
                                         t("panel.sentToServer"),
-                                        (reason) => t("panel.notStripped", { name: entry.name, reason })
+                                        (reason) =>
+                                            t("panel.notStripped", { name: entry.name, reason })
                                     );
                                 }
                             })
@@ -1429,7 +1444,10 @@ function PlayersTab({
                             // command and answers nothing either way, so the note
                             // is about what was sent.
                             lines.length === 1
-                                ? t("panel.gaveOne", { quantity: lines[0]?.quantity ?? 1, name: target.name })
+                                ? t("panel.gaveOne", {
+                                      quantity: lines[0]?.quantity ?? 1,
+                                      name: target.name
+                                  })
                                 : t("panel.gaveMany", { count: lines.length, name: target.name }),
                             // Part of a list can land before something stops the
                             // rest, and the refusal says how far it got - so this
@@ -1548,7 +1566,9 @@ function Broadcast({ installedAppId, answering }: { installedAppId: string; answ
             <span className={cn("text-xs", error ? "text-danger" : "text-muted-foreground")}>
                 {error ??
                     note ??
-                    (answering ? t("panel.appearsInEveryoneSChat") : t("panel.theServerIsNotAnswering"))}
+                    (answering
+                        ? t("panel.appearsInEveryoneSChat")
+                        : t("panel.theServerIsNotAnswering"))}
             </span>
         </div>
     );
@@ -1710,9 +1730,7 @@ function ArkPlayerRow({
                   ? ([
                         {
                             kind: "item",
-                            text: admin
-                                ? t("panel.menu.adminOff")
-                                : t("panel.menu.adminOn"),
+                            text: admin ? t("panel.menu.adminOff") : t("panel.menu.adminOn"),
                             icon: admin ? (
                                 <ShieldMinus className="size-4" />
                             ) : (
@@ -1813,170 +1831,193 @@ function ArkPlayerRow({
 
     return (
         <RowContextMenu entries={[...quick, { kind: "separator" } as const, ...more]}>
-        <tr
-            className={cn(
-                "border-t border-border hover:bg-card-hover",
-                // Somebody the server will not let in is still worth showing and is
-                // not what anybody is scanning for.
-                entry.standing === "not-allowed" && !entry.online && "opacity-60"
-            )}
-        >
-            <td className="px-3 py-2">
-                <p className="flex items-center gap-1.5 truncate font-medium" title={entry.name}>
-                    {/* The same mark the Minecraft table puts against an operator,
+            <tr
+                className={cn(
+                    "border-t border-border hover:bg-card-hover",
+                    // Somebody the server will not let in is still worth showing and is
+                    // not what anybody is scanning for.
+                    entry.standing === "not-allowed" && !entry.online && "opacity-60"
+                )}
+            >
+                <td className="px-3 py-2">
+                    <p
+                        className="flex items-center gap-1.5 truncate font-medium"
+                        title={entry.name}
+                    >
+                        {/* The same mark the Minecraft table puts against an operator,
                         because it is the same thing: somebody who may do anything
                         on this server. */}
-                    {admin && (
-                        <Crown className="size-3.5 text-warning" role="img" aria-label={t("panel.admin")} />
-                    )}
-                    {entry.name}
-                </p>
-                {/* The name they gave their survivor, when it is not the Steam name
+                        {admin && (
+                            <Crown
+                                className="size-3.5 text-warning"
+                                role="img"
+                                aria-label={t("panel.admin")}
+                            />
+                        )}
+                        {entry.name}
+                    </p>
+                    {/* The name they gave their survivor, when it is not the Steam name
                     the list came back with - a moderator recognises one of the two
                     and it is not always the same one. */}
-                {profile?.characterName && profile.characterName !== entry.name && (
-                    <span className="block truncate text-xs text-muted-foreground">
-                        {t("panel.playsAs", { name: profile.characterName })}
+                    {profile?.characterName && profile.characterName !== entry.name && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                            {t("panel.playsAs", { name: profile.characterName })}
+                        </span>
+                    )}
+                    <span className="block truncate text-xs text-muted-foreground md:hidden">
+                        {entry.steamId}
                     </span>
-                )}
-                <span className="block truncate text-xs text-muted-foreground md:hidden">
-                    {entry.steamId}
-                </span>
-            </td>
-            {/* Out of the survivor's own file rather than out of the game: ARK has
+                </td>
+                {/* Out of the survivor's own file rather than out of the game: ARK has
                 no command that answers it, and a player who has never joined has no
                 file to read. */}
-            <td className="px-3 py-2 tabular-nums">
-                {profile?.level == null ? (
-                    <span
-                        className="text-muted-foreground"
-                        title={t("panel.readFromTheSurvivorS")}
-                    >
-                        -
-                    </span>
-                ) : (
-                    profile.level
-                )}
-            </td>
-            <td className="hidden px-3 py-2 md:table-cell">
-                <div className="flex items-center gap-1">
-                    <code className="font-mono text-xs text-muted-foreground">{entry.steamId}</code>
-                    <CopyButton value={entry.steamId} label={t("panel.steamIdOf", { name: entry.name })} />
-                </div>
-            </td>
-            {/* Badge and a smaller line under it, the shape the Minecraft table
+                <td className="px-3 py-2 tabular-nums">
+                    {profile?.level == null ? (
+                        <span
+                            className="text-muted-foreground"
+                            title={t("panel.readFromTheSurvivorS")}
+                        >
+                            -
+                        </span>
+                    ) : (
+                        profile.level
+                    )}
+                </td>
+                <td className="hidden px-3 py-2 md:table-cell">
+                    <div className="flex items-center gap-1">
+                        <code className="font-mono text-xs text-muted-foreground">
+                            {entry.steamId}
+                        </code>
+                        <CopyButton
+                            value={entry.steamId}
+                            label={t("panel.steamIdOf", { name: entry.name })}
+                        />
+                    </div>
+                </td>
+                {/* Badge and a smaller line under it, the shape the Minecraft table
                 uses - and now saying the same thing it does: when they were last
                 on. ARK itself cannot answer that (it reports who is connected this
                 second and nothing about a minute ago), so it comes from Polaris's
                 own record of who it has watched. Only somebody Polaris has never
                 seen play falls back to when the row was added, which is a fact
                 about the list rather than about the person. */}
-            <td className="px-3 py-2">
-                <div className="flex flex-col items-start gap-0.5">
-                    {!read ? (
-                        <Skeleton className="h-5 w-16" />
-                    ) : entry.online ? (
-                        <Badge variant="success">{playerPresence.playing}</Badge>
-                    ) : (
-                        <Badge>{playerPresence.offline}</Badge>
-                    )}
-                    {/* The whole history is a click away wherever there is one,
+                <td className="px-3 py-2">
+                    <div className="flex flex-col items-start gap-0.5">
+                        {!read ? (
+                            <Skeleton className="h-5 w-16" />
+                        ) : entry.online ? (
+                            <Badge variant="success">{playerPresence.playing}</Badge>
+                        ) : (
+                            <Badge>{playerPresence.offline}</Badge>
+                        )}
+                        {/* The whole history is a click away wherever there is one,
                         the way it is on the Minecraft table: what somebody asks
                         after "last on yesterday" is "how often". */}
-                    {line?.kind === "added" ? (
-                        <span
-                            className="text-xs text-muted-foreground"
-                            title={t("panel.polarisHasNotWatchedThem")}
-                        >
-                            {t.rich<ReactNode>("panel.addedAt", {
-                                time: () => <RelativeTime key="time" iso={line.iso} />
-                            })}
-                        </span>
-                    ) : (
-                        line && (
-                            <button
-                                type="button"
-                                onClick={onHistory}
-                                className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                                title={t("panel.historyOf", { name: entry.name })}
+                        {line?.kind === "added" ? (
+                            <span
+                                className="text-xs text-muted-foreground"
+                                title={t("panel.polarisHasNotWatchedThem")}
                             >
-                                {t.rich<ReactNode>(line.kind === "since" ? "panel.playingSince" : "panel.lastOn", {
+                                {t.rich<ReactNode>("panel.addedAt", {
                                     time: () => <RelativeTime key="time" iso={line.iso} />
                                 })}
-                            </button>
-                        )
-                    )}
-                </div>
-            </td>
-            <td className="px-3 py-2">
-                <div className="flex flex-wrap items-center gap-1">
-                    {entry.userId && (
-                        <Badge
-                            title={t("panel.linkedHint", { name: linkedName ?? t("panel.theirAccount") })}
-                        >
-                            {t("panel.linked")}
-                        </Badge>
-                    )}
-                    {entry.held && (
-                        <Badge
-                            variant="warning"
-                            title={t("panel.signedOutHint", { name: linkedName ?? t("panel.theirAccountCapital") })}
-                        >
-                            {t("panel.signedOut")}
-                        </Badge>
-                    )}
-                    {entry.standing === "allowed" && !entry.held && (
-                        <Badge variant="primary">{playerStanding.allowed}</Badge>
-                    )}
-                    {entry.standing === "waiting" && (
-                        <Badge title={t("panel.recordedHereTheServerIs")}>
-                            <Clock className="size-3" /> {playerStanding.waiting}
-                        </Badge>
-                    )}
-                    {entry.standing === "not-allowed" && (
-                        <Badge variant="warning">{playerStanding.notAllowed}</Badge>
-                    )}
-                    {admin && (
-                        <Badge title={t("panel.mayRunAdminCommandsIn")}>
-                            {playerStanding.operator}
-                        </Badge>
-                    )}
-                    {/* The only ban this screen can be sure of. ARK keeps its ban
+                            </span>
+                        ) : (
+                            line && (
+                                <button
+                                    type="button"
+                                    onClick={onHistory}
+                                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                    title={t("panel.historyOf", { name: entry.name })}
+                                >
+                                    {t.rich<ReactNode>(
+                                        line.kind === "since"
+                                            ? "panel.playingSince"
+                                            : "panel.lastOn",
+                                        {
+                                            time: () => <RelativeTime key="time" iso={line.iso} />
+                                        }
+                                    )}
+                                </button>
+                            )
+                        )}
+                    </div>
+                </td>
+                <td className="px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-1">
+                        {entry.userId && (
+                            <Badge
+                                title={t("panel.linkedHint", {
+                                    name: linkedName ?? t("panel.theirAccount")
+                                })}
+                            >
+                                {t("panel.linked")}
+                            </Badge>
+                        )}
+                        {entry.held && (
+                            <Badge
+                                variant="warning"
+                                title={t("panel.signedOutHint", {
+                                    name: linkedName ?? t("panel.theirAccountCapital")
+                                })}
+                            >
+                                {t("panel.signedOut")}
+                            </Badge>
+                        )}
+                        {entry.standing === "allowed" && !entry.held && (
+                            <Badge variant="primary">{playerStanding.allowed}</Badge>
+                        )}
+                        {entry.standing === "waiting" && (
+                            <Badge title={t("panel.recordedHereTheServerIs")}>
+                                <Clock className="size-3" /> {playerStanding.waiting}
+                            </Badge>
+                        )}
+                        {entry.standing === "not-allowed" && (
+                            <Badge variant="warning">{playerStanding.notAllowed}</Badge>
+                        )}
+                        {admin && (
+                            <Badge title={t("panel.mayRunAdminCommandsIn")}>
+                                {playerStanding.operator}
+                            </Badge>
+                        )}
+                        {/* The only ban this screen can be sure of. ARK keeps its ban
                         list to itself, so a permanent one leaves nothing to show;
                         a timeout is Polaris' own note and says when it lifts. */}
-                    {timeout && (
-                        <Badge
-                            variant="danger"
-                            title={t("panel.lifts", { date: new Date(timeout.until).toLocaleString() })}
-                        >
-                            <Timer className="size-3" />
-                            {t("panel.timedOut", { left: timeoutText(tGames, timeout.until) })}
-                        </Badge>
-                    )}
-                </div>
-            </td>
-            <td className="px-3 py-2">
-                <div className="flex justify-end gap-1">
-                    {/* The same verbs the right button offers, as icons - one list
+                        {timeout && (
+                            <Badge
+                                variant="danger"
+                                title={t("panel.lifts", {
+                                    date: new Date(timeout.until).toLocaleString()
+                                })}
+                            >
+                                <Timer className="size-3" />
+                                {t("panel.timedOut", { left: timeoutText(tGames, timeout.until) })}
+                            </Badge>
+                        )}
+                    </div>
+                </td>
+                <td className="px-3 py-2">
+                    <div className="flex justify-end gap-1">
+                        {/* The same verbs the right button offers, as icons - one list
                         so a verb added to either is in both. */}
-                    {quick.map((item, index) =>
-                        item.kind === "item" ? (
-                            <PlayerIconAction
-                                key={index}
-                                label={item.text}
-                                icon={item.icon}
-                                danger={item.danger}
-                                disabled={item.disabled}
-                                onClick={item.onSelect}
-                            />
-                        ) : null
-                    )}
-                    {canModerate && (
-                        <RowMenuButton entries={more} label={playerAction.more(entry.name)} />
-                    )}
-                </div>
-            </td>
-        </tr>
+                        {quick.map((item, index) =>
+                            item.kind === "item" ? (
+                                <PlayerIconAction
+                                    key={index}
+                                    label={item.text}
+                                    icon={item.icon}
+                                    danger={item.danger}
+                                    disabled={item.disabled}
+                                    onClick={item.onSelect}
+                                />
+                            ) : null
+                        )}
+                        {canModerate && (
+                            <RowMenuButton entries={more} label={playerAction.more(entry.name)} />
+                        )}
+                    </div>
+                </td>
+            </tr>
         </RowContextMenu>
     );
 }
@@ -2070,9 +2111,7 @@ function PasswordCard({
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm font-medium">{t("panel.passwords")}</p>
-                <p className="text-sm text-muted-foreground">
-                    {t("panel.theJoinPasswordIsWhat")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("panel.theJoinPasswordIsWhat")}</p>
 
                 {error && <p className="text-sm text-danger">{error}</p>}
 

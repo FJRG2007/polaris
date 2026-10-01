@@ -275,7 +275,8 @@
         "Where the room went": "Qué ocupa espacio",
         "Who gets in": "Quién entra",
         "World": "Mundo",
-        "Developers": "Desarrollo"
+        "Developers": "Desarrollo",
+        "Connectivity": "Conexión"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

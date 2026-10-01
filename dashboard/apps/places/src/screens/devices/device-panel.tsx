@@ -22,8 +22,15 @@ import * as actions from "../actions";
 import * as kinds from "../../lib/device-kinds";
 import { usePlacesT } from "../use-places-t";
 import { placesRefusalText } from "../../lib/refusal-text";
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import type { DeviceAction, DeviceEventView, DeviceView } from "../../lib/device-kinds";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type {
+    ClimateCommand,
+    DeviceAction,
+    DeviceEventView,
+    DeviceView
+} from "../../lib/device-kinds";
+import { DeviceSwitch } from "./device-switch";
+import { ClimateControls } from "./climate-controls";
 import {
     Badge,
     Button,
@@ -32,11 +39,11 @@ import {
     DialogTitle,
     EmptyState,
     Skeleton,
-    Switch,
     TimeSeriesChart,
     cn
 } from "@polaris/ui";
 import {
+    AirVent,
     BatteryLow,
     DoorClosed,
     DoorOpen,
@@ -65,7 +72,13 @@ const ACTION_ICONS: Record<DeviceAction, typeof Lock> = {
     unlock: LockOpen,
     unlatch: DoorOpen,
     "turn-on": Power,
-    "turn-off": PowerOff
+    "turn-off": PowerOff,
+    // Drawn by the air conditioner's own controls, never as a button of their
+    // own; listed so every action has a glyph.
+    "set-mode": AirVent,
+    "set-temperature": AirVent,
+    "set-fan": AirVent,
+    "set-option": AirVent
 };
 
 /** What each sort of device looks like in a list. A row of doors and a row of
@@ -74,6 +87,7 @@ const ACTION_ICONS: Record<DeviceAction, typeof Lock> = {
 const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
     lock: DoorClosed,
     opener: DoorOpen,
+    climate: AirVent,
     switch: ToggleRight,
     outlet: Plug,
     light: Lightbulb,
@@ -116,72 +130,12 @@ export function stateClass(device: DeviceView): string {
 /** How the state reads on the badge. Deliberately not a colour on its own: a
  *  colour is the glance and the word is the answer. */
 function StatePill({ device }: { device: DeviceView }) {
-    // A sensor has no state to be in - it has a reading, and that is what the
-    // badge is for on one. A sensor whose reading has not arrived says so rather
-    // than borrowing the word a lock uses for the same silence.
     const t = usePlacesT();
-    const reading = kinds.readingLine(device.reading, t);
     return (
         <Badge className={cn("gap-1.5", stateClass(device))}>
             {device.state === "moving" && <Loader2 className="size-3 animate-spin" />}
-            {!device.online
-                ? t("devices.states.unknown")
-                : kinds.deviceKind(device.kind) === "sensor"
-                  ? reading || t("devicesView.nothingRead")
-                  : kinds.stateLabel(device.kind, device.state, t)}
+            {kinds.badgeText(device, t)}
         </Badge>
-    );
-}
-
-/**
- * On and off, as one switch where the device is now.
- *
- * It flips the moment it is pressed: the screen above moves the device to where
- * it was told before the answer arrives, and back if the answer is a refusal. So
- * this reads the device and nothing else - there is no second, local idea of the
- * state to fall out of step with the badge beside it.
- *
- * When it cannot be pressed it still shows where the device is, off limits, and
- * says why - on hover, and to a screen reader - rather than disappearing.
- */
-function DeviceSwitch({
-    device,
-    canControl,
-    busy,
-    onAct,
-    className
-}: {
-    device: DeviceView;
-    canControl: boolean;
-    busy: boolean;
-    onAct: (action: DeviceAction) => void;
-    className?: string;
-}) {
-    const t = usePlacesT();
-    const reasonId = useId();
-    const reason = !canControl
-        ? t("devicePanel.noControl")
-        : !device.controllable
-          ? t("devicePanel.watchOnly")
-          : !device.online
-            ? t("devicePanel.offline")
-            : "";
-    const on = device.online && device.state === "on";
-    return (
-        <span className={cn("inline-flex items-center", className)} title={reason || undefined}>
-            <Switch
-                checked={on}
-                disabled={reason !== "" || busy}
-                onChange={(next) => onAct(next ? "turn-on" : "turn-off")}
-                aria-label={t("devicePanel.switchName", { name: device.name })}
-                aria-describedby={reason ? reasonId : undefined}
-            />
-            {reason && (
-                <span id={reasonId} className="sr-only">
-                    {reason}
-                </span>
-            )}
-        </span>
     );
 }
 
@@ -191,15 +145,30 @@ export function DeviceControls({
     canControl,
     busy,
     onAct,
+    detailed = false,
     className
 }: {
     device: DeviceView;
     canControl: boolean;
     busy: DeviceAction | null;
-    onAct: (action: DeviceAction) => void;
+    onAct: (action: DeviceAction, command?: ClimateCommand) => void;
+    /** The panel's version, where a kind has more than fits on a row. */
+    detailed?: boolean;
     className?: string;
 }) {
     const t = usePlacesT();
+    if (kinds.deviceKind(device.kind) === "climate") {
+        return (
+            <ClimateControls
+                device={device}
+                canControl={canControl}
+                busy={busy}
+                onAct={onAct}
+                detailed={detailed}
+                className={className}
+            />
+        );
+    }
     if (kinds.isSwitchable(device.kind)) {
         return (
             <DeviceSwitch
@@ -269,7 +238,7 @@ export function DevicePanel({
     canControl: boolean;
     canManage: boolean;
     onClose: () => void;
-    onAct: (device: DeviceView, action: DeviceAction) => Promise<void>;
+    onAct: (device: DeviceView, action: DeviceAction, command?: ClimateCommand) => Promise<void>;
     onEdit: (device: DeviceView) => void;
 }) {
     const format = useDisplayFormat();
@@ -310,12 +279,12 @@ export function DevicePanel({
         [used, format.preferences.timeZone]
     );
 
-    const act = async (action: DeviceAction) => {
+    const act = async (action: DeviceAction, command?: ClimateCommand) => {
         if (!device) return;
         setBusy(action);
         setError("");
         try {
-            await onAct(device, action);
+            await onAct(device, action, command);
             // The account's own log is where the entry comes from, and it arrives
             // a moment behind the press, so the history is asked again rather than
             // written to here.
@@ -388,7 +357,8 @@ export function DevicePanel({
                                     device={device}
                                     canControl={canControl}
                                     busy={busy}
-                                    onAct={(action) => void act(action)}
+                                    onAct={(action, command) => void act(action, command)}
+                                    detailed
                                 />
                                 <p className="text-xs text-foreground-subtle">
                                     {[

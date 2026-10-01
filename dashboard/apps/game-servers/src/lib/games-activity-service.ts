@@ -11,9 +11,11 @@
  * asking is the expensive part - a command inside a container, for every server, for
  * a number that was already sitting in memory.
  *
- * Nothing here parses a log. A name that is on the roster now and was not a minute
- * ago has arrived; a name that has gone has left. That works for ARK, which prints
- * nothing worth reading, exactly as well as it does for Minecraft.
+ * Who is on decides the record: a name that is on the roster now and was not a
+ * minute ago has arrived; a name that has gone has left. That works for ARK, which
+ * prints nothing worth reading, exactly as well as it does for Minecraft. Where the
+ * server does print its joins and leaves, they only decide when - the reconnect
+ * that happened between two looks, and the moment rather than the minute.
  */
 
 import { prisma, type Prisma } from "@polaris/db";
@@ -30,13 +32,17 @@ import {
     historyOf,
     rosterChange,
     seenKey,
-    type OpenSession,
+    sessionWrites,
+    type LoggedConnection,
     type PlayerCount,
     type PlayerHistory,
     type PlayerSeen,
-    type RosterPlayer
+    type RosterPlayer,
+    type TimedSession
 } from "./games-activity";
 import { host } from "@polaris/app-host";
+import { keyedTurns } from "./turns";
+import { logConnection, sessionsByPlayer, type PlayerSessionEvent } from "./minecraft/sessions";
 
 const { patchInstallConfig } = host.appsInstallConfig;
 const { announceActivity } = host.activityLive;
@@ -120,60 +126,15 @@ export async function sweepGameActivity(
             continue;
         }
 
-        // The visits with no end are who was on when this last looked, so they are
-        // both the history and the memory. Nothing else has to remember a roster.
-        const open: OpenSession[] = await prisma.gamePlayerSession
-            .findMany({
-                where: { installedAppId: presence.id, leftAt: null },
-                select: { id: true, name: true, playerId: true }
-            })
-            .catch(() => []);
-
-        // The roster as the game answered it, id and all: on ARK that id is the
-        // only half of it that is the person.
-        const change = rosterChange(open, presence.players);
-
-        // A visit that was open when the id started being kept: the game has just
-        // said whose it is, so the row is told before it closes and stops being
-        // findable by anything but a name the list may not hold.
-        for (const row of change.adopted) {
-            await prisma.gamePlayerSession
-                .updateMany({ where: { id: row.id, playerId: null }, data: { playerId: row.playerId } })
-                .catch(() => undefined);
-        }
-
-        if (change.left.length > 0) {
-            await prisma.gamePlayerSession
-                .updateMany({ where: { id: { in: [...change.left] } }, data: { leftAt: now } })
-                .catch(() => undefined);
-            left += change.left.length;
-        }
-        if (change.arrived.length > 0) {
-            await prisma.gamePlayerSession
-                .createMany({
-                    data: change.arrived.map((player) => ({
-                        installedAppId: presence.id,
-                        name: player.name,
-                        playerId: player.id,
-                        joinedAt: now
-                    }))
-                })
-                .catch(() => undefined);
-            arrived += change.arrived.length;
-        }
-
-        // Whoever arrived or left may be somebody's account, and their card says
-        // "Playing Minecraft" or stops saying it: their screens are told now
-        // rather than at the next presence refresh. Best effort - the card is
-        // right within a minute either way.
-        if (change.arrived.length > 0 || change.left.length > 0) {
-            const gone = new Set(change.left);
-            const names = [
-                ...change.arrived.map((player) => player.name),
-                ...open.filter((row) => gone.has(row.id)).map((row) => row.name)
-            ];
-            await announcePlayers(presence.id, names);
-        }
+        // Every minute the log is read as well, whenever anybody is or was on:
+        // this pass looks once a minute, and somebody who dropped and came back
+        // inside that minute is only in the log.
+        const recorded = await recordRoster(presence.id, presence.players, now, {
+            log: "always",
+            readLog: () => readSessionLog(presence.id)
+        });
+        arrived += recorded.arrived;
+        left += recorded.left;
 
         // Written even when nothing changed, and especially then: this row is the
         // evidence that anybody looked, which is what keeps a quiet night apart
@@ -183,6 +144,169 @@ export async function sweepGameActivity(
 
     await pruneActivity(now);
     return { known, arrived, left };
+}
+
+/** What one recording did, and when each visit still open began. */
+export interface RosterRecord {
+    readonly arrived: number;
+    readonly left: number;
+    /** When the visit each player on is on began, by `seenKey`. */
+    readonly since: ReadonlyMap<string, Date>;
+}
+
+/** The passes in flight, one per server, so two readers - the minute's sweep and
+ *  a screen's live feed - never both open a visit for the same arrival, and no
+ *  visit is opened from open rows a close has just ended. */
+const inTurn = keyedTurns();
+
+/**
+ * Write down what changed on one server since it was last looked at.
+ *
+ * Shared by the minute's sweep and by the live feed a screen holds open, so that
+ * who is on and since when is as fresh as whatever is looking - every few seconds
+ * while somebody watches, every minute while nobody does. One at a time per
+ * server: two passes reading the same open visits would both see the same arrival.
+ *
+ * `readLog` is the server's own record of joins and leaves, for the games that
+ * keep one. The sweep reads it on every pass, because between two of its looks a
+ * reconnect leaves no other trace; the live feed only when something changed,
+ * because reading a log every few seconds costs more than the answer is worth.
+ */
+export async function recordRoster(
+    installedAppId: string,
+    players: readonly RosterPlayer[],
+    now: Date,
+    options: {
+        readonly readLog?: () => Promise<readonly PlayerSessionEvent[] | null>;
+        readonly log?: "always" | "changes";
+    } = {}
+): Promise<RosterRecord> {
+    return inTurn(installedAppId, () => writeRoster(installedAppId, players, now, options));
+}
+
+async function writeRoster(
+    installedAppId: string,
+    players: readonly RosterPlayer[],
+    now: Date,
+    options: {
+        readonly readLog?: () => Promise<readonly PlayerSessionEvent[] | null>;
+        readonly log?: "always" | "changes";
+    }
+): Promise<RosterRecord> {
+    // The visits with no end are who was on when this last looked, so they are
+    // both the history and the memory. Nothing else has to remember a roster.
+    // Oldest first, so that of two left open by an interrupted pass the one kept
+    // is the one that began the visit.
+    const open: TimedSession[] = await prisma.gamePlayerSession
+        .findMany({
+            where: { installedAppId, leftAt: null },
+            select: { id: true, name: true, playerId: true, joinedAt: true },
+            orderBy: { joinedAt: "asc" }
+        })
+        .catch(() => []);
+
+    // The roster as the game answered it, id and all: on ARK that id is the
+    // only half of it that is the person.
+    const change = rosterChange(open, players);
+    const changed = change.arrived.length > 0 || change.left.length > 0;
+    const wantsLog =
+        options.readLog !== undefined &&
+        (options.log === "always" ? open.length > 0 || players.length > 0 : changed);
+    const events = wantsLog ? await options.readLog!().catch(() => null) : null;
+    const writes = sessionWrites(open, change, players, events ? connections(events) : null, now);
+
+    // A visit that was open when the id started being kept: the game has just
+    // said whose it is, so the row is told before it closes and stops being
+    // findable by anything but a name the list may not hold.
+    for (const row of change.adopted) {
+        await prisma.gamePlayerSession
+            .updateMany({ where: { id: row.id, playerId: null }, data: { playerId: row.playerId } })
+            .catch(() => undefined);
+    }
+
+    // One write per distinct time, which is one for the whole set whenever the
+    // log had nothing to add.
+    const byTime = new Map<number, string[]>();
+    for (const row of writes.close) {
+        const held = byTime.get(row.leftAt.getTime());
+        if (held) held.push(row.id);
+        else byTime.set(row.leftAt.getTime(), [row.id]);
+    }
+    for (const [time, ids] of byTime) {
+        await prisma.gamePlayerSession
+            .updateMany({
+                where: { id: { in: ids }, leftAt: null },
+                data: { leftAt: new Date(time) }
+            })
+            .catch(() => undefined);
+    }
+    if (writes.open.length > 0) {
+        await prisma.gamePlayerSession
+            .createMany({
+                data: writes.open.map((row) => ({
+                    installedAppId,
+                    name: row.player.name,
+                    playerId: row.player.id,
+                    joinedAt: row.joinedAt
+                }))
+            })
+            .catch(() => undefined);
+    }
+
+    // Whoever arrived or left may be somebody's account, and their card says
+    // "Playing Minecraft" or stops saying it: their screens are told now
+    // rather than at the next presence refresh. A reconnect counts, because the
+    // card says since when. Best effort - the card is right within a minute
+    // either way.
+    if (writes.close.length > 0 || writes.open.length > 0) {
+        const closed = new Set(writes.close.map((row) => row.id));
+        const names = [
+            ...writes.open.map((row) => row.player.name),
+            ...open.filter((row) => closed.has(row.id)).map((row) => row.name)
+        ];
+        await announcePlayers(installedAppId, [...new Set(names)]);
+    }
+
+    // When each visit still open began, for a live feed that says so.
+    const since = new Map<string, Date>();
+    const reopened = new Set(writes.close.map((row) => row.id));
+    for (const row of open) {
+        if (reopened.has(row.id)) continue;
+        const key = seenKey({ name: row.name, id: row.playerId });
+        if (!since.has(key)) since.set(key, row.joinedAt);
+    }
+    for (const row of writes.open) since.set(seenKey(row.player), row.joinedAt);
+
+    return { arrived: change.arrived.length, left: change.left.length, since };
+}
+
+/** The log's joins and leaves, as each player's connection stands. */
+function connections(events: readonly PlayerSessionEvent[]): Map<string, LoggedConnection> {
+    const found = new Map<string, LoggedConnection>();
+    for (const [key, own] of sessionsByPlayer(events)) {
+        const connection = logConnection(own);
+        const stamp = (iso: string | null): Date | null => {
+            if (!iso) return null;
+            const at = new Date(iso);
+            return Number.isNaN(at.getTime()) ? null : at;
+        };
+        found.set(key, {
+            online: connection.online,
+            since: stamp(connection.since),
+            lastLeft: stamp(connection.lastLeft)
+        });
+    }
+    return found;
+}
+
+/** The server's log of joins and leaves, for the servers that print one, and
+ *  null for every other: reading it is a container's log, so it is only done
+ *  where there is something to read. */
+export async function readSessionLog(
+    installedAppId: string
+): Promise<readonly PlayerSessionEvent[] | null> {
+    const { getPlayerSessionsIfMinecraft } = await import("./minecraft/service");
+    return getPlayerSessionsIfMinecraft(installedAppId);
 }
 
 /** Tell the screens drawing these players' accounts that they arrived or left.
@@ -230,7 +354,9 @@ const VISIT_LIMIT = 50;
  * opens, can afford the other comparison and does.
  */
 function visitsOf(players: readonly RosterPlayer[]): Prisma.GamePlayerSessionWhereInput[] {
-    const ids = [...new Set(players.map((player) => player.id?.trim()).filter((id): id is string => !!id))];
+    const ids = [
+        ...new Set(players.map((player) => player.id?.trim()).filter((id): id is string => !!id))
+    ];
     const names = [
         ...new Set(players.map((player) => player.name.trim()).filter((name) => name.length > 0))
     ];
@@ -262,31 +388,53 @@ export async function readLastSeen(
 ): Promise<Record<string, PlayerSeen>> {
     const or = visitsOf(players);
     if (or.length === 0) return {};
-    const rows = await prisma.gamePlayerSession
-        .groupBy({
-            by: ["name", "playerId"],
-            where: { installedAppId, OR: or },
-            _max: { joinedAt: true, leftAt: true }
-        })
-        .catch(() => []);
+    const [rows, open] = await Promise.all([
+        prisma.gamePlayerSession
+            .groupBy({
+                by: ["name", "playerId"],
+                where: { installedAppId, OR: or },
+                _max: { joinedAt: true, leftAt: true }
+            })
+            .catch(() => []),
+        // The visits still open, apart: the newest start of all of them is only
+        // the one they are on when that one is open, and the newest end is the
+        // visit before it - neither is "playing since".
+        prisma.gamePlayerSession
+            .groupBy({
+                by: ["name", "playerId"],
+                where: { installedAppId, leftAt: null, OR: or },
+                _max: { joinedAt: true }
+            })
+            .catch(() => [])
+    ]);
 
     const found: Record<string, PlayerSeen> = {};
-    const file = (key: string, since: Date | null, lastSeen: Date | null): void => {
+    const file = (
+        key: string,
+        since: Date | null,
+        lastSeen: Date | null,
+        current: Date | null
+    ): void => {
         // A player has one row per name they have played under, so the newest of
         // them is the answer rather than whichever the database returned last.
         const held = found[key];
         found[key] = {
             since: newest(held?.since ?? null, since?.toISOString() ?? null),
-            lastSeen: newest(held?.lastSeen ?? null, lastSeen?.toISOString() ?? null)
+            lastSeen: newest(held?.lastSeen ?? null, lastSeen?.toISOString() ?? null),
+            open: newest(held?.open ?? null, current?.toISOString() ?? null)
         };
     };
+    const openOf = new Map(
+        open.map((row) => [`${row.name}\u0000${row.playerId ?? ""}`, row._max.joinedAt ?? null])
+    );
     for (const row of rows) {
         const since = row._max.joinedAt ?? null;
         const left = row._max.leftAt ?? null;
-        if (row.playerId) file(seenKey({ name: row.name, id: row.playerId }), since, left);
+        const current = openOf.get(`${row.name}\u0000${row.playerId ?? ""}`) ?? null;
+        if (row.playerId) file(seenKey({ name: row.name, id: row.playerId }), since, left, current);
         // Filed under the name as well, so a row still finds it under the name it
         // is drawn with when the game has no id to look it up by.
-        file(seenKey({ name: row.name, id: null }), since, left);
+        file(seenKey({ name: row.name, id: null }), since, left, current);
     }
     return found;
 }
@@ -357,6 +505,10 @@ export async function closeGameSessions(
     installedAppId: string,
     at: Date = new Date()
 ): Promise<void> {
+    return inTurn(installedAppId, () => closeOpenSessions(installedAppId, at));
+}
+
+async function closeOpenSessions(installedAppId: string, at: Date): Promise<void> {
     const open = await prisma.gamePlayerSession
         .findMany({ where: { installedAppId, leftAt: null }, select: { id: true, name: true } })
         .catch(() => []);
@@ -364,7 +516,10 @@ export async function closeGameSessions(
     await prisma.gamePlayerSession
         .updateMany({ where: { id: { in: open.map((row) => row.id) } }, data: { leftAt: at } })
         .catch(() => undefined);
-    await announcePlayers(installedAppId, open.map((row) => row.name));
+    await announcePlayers(
+        installedAppId,
+        open.map((row) => row.name)
+    );
 }
 
 /** What every one of these servers was last seen doing, in one read. */

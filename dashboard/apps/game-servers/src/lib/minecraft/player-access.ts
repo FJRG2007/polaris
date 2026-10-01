@@ -46,6 +46,7 @@ import {
 import {
     editionOf,
     getServerPlayers,
+    readPlayerLog,
     runServerCommand,
     withServerContainer,
     type MinecraftEdition,
@@ -63,7 +64,6 @@ import {
 } from "./access";
 import { host } from "@polaris/app-host";
 
-const { readAppRuntimeLog } = host.deployService;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { getSetting } = host.settingStore;
 const { requireUser } = host.session;
@@ -108,10 +108,6 @@ export async function forViewer(view: PlayerAccessView): Promise<PlayerAccessVie
         )
     };
 }
-
-/** How much log to read back when matching joins. A join line per player is all
- *  that is wanted, and a busy server prints a lot between them. */
-const JOIN_LOG_TAIL = 400;
 
 export interface PlayerAccessRule extends PlayerAccess {
     readonly id: string;
@@ -1086,9 +1082,9 @@ export async function enforcePlayerAddresses(
 
     if (status.players.players.length === 0) return nothing;
 
-    const log = await readAppRuntimeLog(install.applicationId, ownerId, JOIN_LOG_TAIL).catch(
-        () => ""
-    );
+    // The lines about players alone: the container's log can be nothing but the
+    // RCON chatter Polaris's own commands leave behind (see `player-log`).
+    const log = await readPlayerLog(ownerId, installedAppId).catch(() => "");
     const addresses = parseJoinAddresses(log);
 
     // Reachability first, and for everyone on rather than only the allowed: a

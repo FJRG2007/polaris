@@ -1726,7 +1726,9 @@ const RING_POINTS = 24;
 export function hillTick(
     point: { x: number; y: number; z: number },
     radius: number,
-    seconds: number
+    seconds: number,
+    /** Only players carrying this tag score: those an event brought to it. */
+    tag?: string
 ): string[] {
     const cx = point.x + 0.5;
     const cz = point.z + 0.5;
@@ -1739,7 +1741,7 @@ export function hillTick(
     return [
         ...edge,
         `execute in minecraft:overworld run particle minecraft:end_rod ${cx} ${point.y + 16} ${cz} 0 16 0 0.01 120 force`,
-        `execute in minecraft:overworld positioned ${cx} ${point.y} ${cz} as @a[distance=..${radius},gamemode=!spectator] run scoreboard players add @s ${SCORE} ${seconds}`
+        `execute in minecraft:overworld positioned ${cx} ${point.y} ${cz} as @a[distance=..${radius},gamemode=!spectator${tag ? `,tag=${tag}` : ""}] run scoreboard players add @s ${SCORE} ${seconds}`
     ];
 }
 

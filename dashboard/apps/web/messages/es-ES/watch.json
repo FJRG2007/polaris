@@ -207,5 +207,142 @@
         "checked": "comprobada {time}",
         "notEvaluated": "aún sin evaluar",
         "manage": "Gestionar las alarmas"
+    },
+    "span": {
+        "seconds": "{seconds} s",
+        "minutes": "{minutes} min",
+        "minutesSeconds": "{minutes} min {seconds} s",
+        "hours": "{hours} h",
+        "hoursMinutes": "{hours} h {minutes} min",
+        "days": "{days} d",
+        "daysHours": "{days} d {hours} h"
+    },
+    "connectivity": {
+        "title": "Conexión",
+        "description": "Cada vez que Polaris perdió la conexión o no se podía llegar a él desde fuera, y cuánto duró.",
+        "checkNow": "Comprobar",
+        "checking": "Comprobando",
+        "kinds": {
+            "line": "Línea",
+            "dns": "DNS",
+            "address": "Dirección pública"
+        },
+        "kindHints": {
+            "line": "Nada respondió, y los resolutores públicos que consulta Polaris tampoco.",
+            "dns": "Internet funcionaba, pero el nombre de la dirección pública no se resolvía.",
+            "address": "Internet funcionaba, pero nada respondía en la dirección pública."
+        },
+        "state": {
+            "title": "Ahora",
+            "online": "En línea",
+            "offline": "Sin red",
+            "unknown": "Sin datos",
+            "onlineBody": "Accesible desde fuera. Comprobado <time></time>.",
+            "offlineBody": "Caído desde hace {duration}, desde {since}.",
+            "detected": "Detectado en {host}: {detail}",
+            "detectedHost": "Detectado en {host}.",
+            "lineBack": "Internet volvió a las {time}; la dirección pública sigue sin responder.",
+            "unwatched": "Sin comprobar desde {time}. Polaris no estaba comprobando, así que es lo último que sabe.",
+            "never": "Sin comprobar aún. La primera comprobación es un minuto después de arrancar Polaris.",
+            "cadence": "Se comprueba cada {interval}, y cada {close} mientras algo falla. Cortes a menos de {gap} cuentan como uno.",
+            "cadenceNoMerge": "Se comprueba cada {interval}, y cada {close} mientras algo falla. Cada corte cuenta por separado."
+        },
+        "periods": {
+            "title": "Disponibilidad",
+            "24h": "Últimas 24 horas",
+            "7d": "Últimos 7 días",
+            "30d": "Últimos 30 días",
+            "90d": "Últimos 90 días",
+            "outages": "Cortes",
+            "down": "Caído",
+            "longest": "Más largo",
+            "average": "Media",
+            "since": "Registrado desde {date}",
+            "noData": "Sin datos aún"
+        },
+        "days": {
+            "title": "Caída por día",
+            "description": "Los últimos 90 días, en tu zona horaria. Elige un día para ver sus cortes.",
+            "label": "Caída por día en los últimos 90 días: {count, plural, =0 {ningún día tuvo} one {# día tuvo} other {# días tuvieron}}.",
+            "cell": "{date}: {duration} caído, {count, plural, one {# corte} other {# cortes}}",
+            "clear": "{date}: sin caídas",
+            "untracked": "{date}: aún sin registrar",
+            "hint": "Pasa por un día o enfócalo para verlo.",
+            "legend": {
+                "none": "Nada",
+                "under5m": "Menos de 5 min",
+                "under30m": "Menos de 30 min",
+                "under3h": "Menos de 3 h",
+                "over3h": "3 h o más",
+                "untracked": "Sin registro"
+            }
+        },
+        "list": {
+            "title": "Cortes",
+            "started": "Inicio",
+            "ended": "Fin",
+            "duration": "Duración",
+            "kind": "Tipo",
+            "detectedBy": "Detectado en",
+            "detail": "Qué vio la prueba",
+            "firstBack": "Volvió antes",
+            "ongoing": "En curso",
+            "resolvers": "Resolutores",
+            "backInternet": "Internet",
+            "startWindow": "Todo respondía a las {from}; se vio por primera vez a las {to}.",
+            "unobserved": "Polaris dejó de comprobar durante este corte, así que acaba en la última comprobación que lo vio caído.",
+            "merged": "{count, plural, one {# microcorte unido} other {# microcortes unidos}}",
+            "shown": "{shown} de {total}",
+            "showMore": "Ver más",
+            "export": "Exportar CSV",
+            "exportTitle": "Exportar como CSV los cortes listados",
+            "empty": "No hay cortes registrados.",
+            "emptyHint": "Polaris ha sido accesible cada vez que lo ha comprobado.",
+            "emptyFiltered": "Ningún corte coincide con estos filtros.",
+            "clear": "Quitar filtros",
+            "truncated": "Solo se listan los {count} cortes más recientes del año."
+        },
+        "filters": {
+            "kind": "Tipo",
+            "range": "Periodo",
+            "range7d": "7 días",
+            "range30d": "30 días",
+            "range90d": "90 días",
+            "range365d": "Año",
+            "min": "Duración",
+            "minAny": "Cualquiera",
+            "min1m": "1 min o más",
+            "min10m": "10 min o más",
+            "min1h": "1 h o más",
+            "day": "El {date}",
+            "removeDay": "Todos los días"
+        },
+        "merge": {
+            "title": "Unir microcortes",
+            "label": "Cortes así de juntos son uno",
+            "unit": "segundos",
+            "hint": "Una conexión que cae y vuelve en menos de estos segundos es un corte, no varios. 0 cuenta cada caída.",
+            "save": "Guardar",
+            "saved": "Guardado",
+            "unchanged": "No hay cambios",
+            "invalid": "Escribe un número entero de 0 a {max}.",
+            "failed": "No se pudo guardar. Inténtalo de nuevo."
+        },
+        "older": {
+            "title": "De hace más de un año",
+            "description": "Los cortes de hace más de un año se guardan como totales mensuales.",
+            "month": "Mes"
+        },
+        "errors": {
+            "load": "No se pudo cargar el historial de conexión.",
+            "loadHint": "Recarga la página para intentarlo de nuevo.",
+            "check": "No se pudo comprobar. Inténtalo en un momento."
+        },
+        "csv": {
+            "durationSeconds": "Duración (s)",
+            "closedBy": "Cómo acabó",
+            "recovered": "Se recuperó",
+            "unobserved": "Sin vigilar"
+        }
     }
 }

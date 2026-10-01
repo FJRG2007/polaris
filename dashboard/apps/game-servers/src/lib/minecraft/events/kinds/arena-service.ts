@@ -28,13 +28,15 @@ import * as stage from "./stage";
 import * as duel from "./team-duel";
 import * as catalog from "../catalog";
 import * as build from "./build-battle";
-import * as stash from "./stash";
+import * as hill from "./hill";
+import * as hillService from "./hill-service";
 import * as stashService from "./stash-service";
 import * as commands from "../commands";
 import * as speech from "../../speech";
 import * as written from "../messages";
 import type * as stored from "../state";
 import type { ServerContainer } from "../../service";
+import type { PlaceRefusal } from "../place-search";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
@@ -61,10 +63,13 @@ export interface KindContext {
         distance: number,
         radius: number,
         /** `open` for what is built in the air, where open water under it will do. */
-        surface?: "ground" | "open"
+        surface?: "ground" | "open",
+        /** Whether, after a few tries, it may come in closer and near a home. */
+        nearHome?: boolean
     ): Promise<stored.Point | "failed" | null>;
-    /** The place given up and another looked for; throws once the tries run out. */
-    giveUpPlace(point: stored.Point): Promise<void>;
+    /** The place given up, for the reason given, and another looked for; throws
+     *  once the tries run out. */
+    giveUpPlace(point: stored.Point, why?: PlaceRefusal): Promise<void>;
     /** What was said since the last time this was asked; null the first time. */
     chat(): Promise<readonly Said[] | null>;
     atLeast(version: readonly number[]): Promise<boolean>;
@@ -72,6 +77,8 @@ export interface KindContext {
     owed(): Promise<ReadonlySet<string>>;
     /** Whose run a kept bag belongs to, for its database copy. */
     readonly stashOwner: stashService.StashOwner;
+    /** How long one tick is, in seconds: what a second in the circle is counted by. */
+    readonly tickSeconds: number;
 }
 
 /** The event cannot go on, for the reason given. */
@@ -175,6 +182,8 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
         return null;
     }
     if (ctx.run.preset.kind === "team-duel") await duelTick(ctx, lines);
+    else if (ctx.run.preset.kind === "king-of-the-hill")
+        await hillService.fightTick(ctx, ctx.tickSeconds, lines);
     else await buildTick(ctx, lines);
     return null;
 }
@@ -191,7 +200,12 @@ async function enroll(ctx: KindContext, lines: string[]): Promise<void> {
         (name) =>
             catalog.PLAYER_NAME.test(name) && online.has(lower(name)) && !owed.has(lower(name))
     );
-    const most = ctx.run.preset.kind === "team-duel" ? duel.DUEL_MAX : build.MAX_PLOTS;
+    const most =
+        ctx.run.preset.kind === "team-duel"
+            ? duel.DUEL_MAX
+            : ctx.run.preset.kind === "king-of-the-hill"
+              ? hill.MOST
+              : build.MAX_PLOTS;
     for (const name of ready.slice(most)) {
         lines.push(arena.tellTo(name, messages.tag(language) + messages.joinFull(language)));
     }
@@ -240,6 +254,11 @@ function blocksFor(run: stored.EventRun, fills: { block: string }[]): string[] {
  * and only then built.
  */
 async function raise(ctx: KindContext): Promise<void> {
+    // The hill's own: on the ground, or on a platform over the sea.
+    if (ctx.run.preset.kind === "king-of-the-hill") {
+        await hillService.raiseHill(ctx);
+        return;
+    }
     const run = ctx.run;
     const place = run.place;
     if (!place) {
@@ -254,7 +273,7 @@ async function raise(ctx: KindContext): Promise<void> {
     }
     const box = boxFor(run, place);
     if (box.y2 > arena.worldTop(await ctx.atLeast([1, 18]))) {
-        await giveUpSite(ctx, place);
+        await giveUpSite(ctx, place, "tooHigh");
         return;
     }
     if (!run.site) {
@@ -279,7 +298,7 @@ async function raise(ctx: KindContext): Promise<void> {
     }
     memory.loadWaits = 0;
     if (solid > 0 || waiting) {
-        await giveUpSite(ctx, place);
+        await giveUpSite(ctx, place, solid > 0 ? "occupied" : "unloaded");
         return;
     }
     // Nothing but air: ours to build in, and written down as ours before a
@@ -299,14 +318,14 @@ async function raise(ctx: KindContext): Promise<void> {
     if (commands.readTest(await ctx.server.say([probe])) !== "passed") {
         await ctx.server.sayAll(arena.teardown(built));
         ctx.run = { ...ctx.run, arena: null };
-        await giveUpSite(ctx, place);
+        await giveUpSite(ctx, place, "refused");
     }
 }
 
-async function giveUpSite(ctx: KindContext, place: stored.Point): Promise<void> {
+async function giveUpSite(ctx: KindContext, place: stored.Point, why: PlaceRefusal): Promise<void> {
     if (ctx.run.site) await ctx.server.sayAll([arena.forceloadArea(ctx.run.site, false)]);
     ctx.run = { ...ctx.run, site: null };
-    await ctx.giveUpPlace(place);
+    await ctx.giveUpPlace(place, why);
 }
 
 /**
@@ -339,10 +358,14 @@ async function bringIn(ctx: KindContext): Promise<void> {
     const language = ctx.language;
     const box = run.arena!.box;
     const duelling = run.preset.kind === "team-duel";
+    const hillside = run.preset.kind === "king-of-the-hill";
     const marker: stored.Marker = run.marker ?? (await kitMarker(ctx));
+    // Nothing in the hands on the hill: fists only.
     const kit = duelling
         ? duel.duelKit((run.preset.options as catalog.EventOptions<"team-duel">).kit)
-        : build.KIT_IDS;
+        : hillside
+          ? []
+          : build.KIT_IDS;
     const moved = new Set(run.entrants.map((one) => lower(one.name)));
     const waiting = run.joined.filter((name) => !moved.has(lower(name)));
     if (waiting.length > 0) {
@@ -407,6 +430,11 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 )
             );
         }
+    } else if (hillside) {
+        const overGround = await ctx.atLeast([1, 19, 4]);
+        for (const one of entrants) {
+            out.push(...hillService.enterLines(ctx.run, one.name, one.side, overGround, language));
+        }
     } else {
         const options = run.preset.options as catalog.EventOptions<"build-battle">;
         // Kept in the server's own language; shown in each reader's.
@@ -428,7 +456,9 @@ async function bringIn(ctx: KindContext): Promise<void> {
     await ctx.server.sayAll(out);
     const seconds =
         run.preset.minutes * 60 +
-        (duelling ? 0 : (run.preset.options as catalog.EventOptions<"build-battle">).voteSeconds);
+        (duelling || hillside
+            ? 0
+            : (run.preset.options as catalog.EventOptions<"build-battle">).voteSeconds);
     ctx.run = {
         ...ctx.run,
         readyAt: ctx.now,
@@ -439,42 +469,23 @@ async function bringIn(ctx: KindContext): Promise<void> {
 }
 
 /**
- * Everybody's own things kept in barrels under the floor before they are
- * brought in and handed the kit (`stash`), each written into the run as it is
- * kept. From 1.17, which has `item`; before it, the kit goes beside what they
- * carry, as it always has.
+ * Everybody's own things kept before they are brought in and handed the kit
+ * (`stash`), each written into the run as it is kept. From 1.17, which has
+ * `item`; before it, the kit goes beside what they carry, as it always has.
  */
-async function stashAll(ctx: KindContext): Promise<void> {
+export async function stashAll(ctx: KindContext): Promise<void> {
     if (!(await ctx.atLeast([1, 17]))) return;
-    const box = ctx.run.arena!.box;
-    const candidates = stash.spotsUnder({
-        x1: box.x1,
-        z1: box.z1,
-        x2: box.x2,
-        z2: box.z2,
-        y: box.y1
-    });
     for (const one of ctx.run.entrants) {
         if (one.stash || !one.away) continue;
-        const taken = ctx.run.entrants.flatMap((each) =>
-            each.stash ? [...each.stash.barrels, ...each.stash.casing] : []
-        );
-        await stashService.stashIn(
-            ctx.server,
-            ctx.stashOwner,
-            one.name,
-            candidates,
-            taken,
-            async (kept) => {
-                ctx.run = {
-                    ...ctx.run,
-                    entrants: ctx.run.entrants.map((each) =>
-                        each.name === one.name ? { ...each, stash: kept } : each
-                    )
-                };
-                await ctx.persist();
-            }
-        );
+        await stashService.stashIn(ctx.server, ctx.stashOwner, one.name, async (kept) => {
+            ctx.run = {
+                ...ctx.run,
+                entrants: ctx.run.entrants.map((each) =>
+                    each.name === one.name ? { ...each, stash: kept } : each
+                )
+            };
+            await ctx.persist();
+        });
     }
 }
 
@@ -875,10 +886,11 @@ function releases(left: stored.ArenaLeftover): string[] {
 }
 
 /**
- * Everything an arena event did, undone as far as it can be now: game rules
- * owed back, the kit lying about removed, every player who is on sent back with
- * their kit taken and their game mode given back, and - once nobody is left in
- * it - the arena taken down. Answers what is still to do, or null when nothing
+ * Everything an arena event did, undone as far as it can be now: the kit lying
+ * about removed, every player who is on sent back with their kit taken, their
+ * game mode and - once they are down - their own things given back, the game
+ * rules owed put back after that, and - once nobody is left in it - the arena
+ * taken down. Answers what is still to do, or null when nothing
  * is. Never throws: whatever it did not get to is in what it answers.
  */
 export async function closeArena(
@@ -891,61 +903,64 @@ export async function closeArena(
     const remaining: stored.Entrant[] = [];
     let index = 0;
     try {
-        // Their barrels are under the floor: loaded while they are given back.
-        if (left.arena && left.entrants.some((one) => one.stash))
-            await server.sayAll([arena.forceloadArea(left.arena.box, true)]);
-        const owedRules = Object.entries(rules)
-            .filter(([name, value]) => /^[A-Za-z:_]+$/.test(name) && /^(true|false)$/.test(value))
-            .map(([name, value]) => commands.setRule(name, value));
-        if (owedRules.length > 0) await server.sayAll(owedRules);
-        rules = {};
         const box = left.arena?.box ?? null;
         if (box && left.marker) await server.sayAll([arena.killMarkedDrops(box, left.marker)]);
         for (; index < left.entrants.length; index += 1) {
             let one = left.entrants[index]!;
             if (!one.away || !arena.commandable(one)) continue;
-            // The kit off, then their own things back into their slots, then
-            // home - where anything whose slot was taken is dropped at their feet.
-            let home = false;
-            const goHome = async (): Promise<boolean> => {
-                home = arena.wentHome(await server.say([arena.sendHome(one)]));
-                if (home) await server.say([arena.homeMode(one)]);
-                return home;
-            };
-            const giveBack = async (then?: () => Promise<boolean>): Promise<boolean> => {
+            // Their own things back only once they are home and down: nothing
+            // is given back to a player who could still fall with it.
+            const giveBack = async (): Promise<boolean> => {
+                const down = await stashService.settle(server, one.name, (name) =>
+                    stage.fallProof(name, 5)
+                );
                 if (!one.stash) return true;
+                if (!down) return false;
                 const how = await stashService.giveBack(
                     server,
                     one.name,
                     one.stash,
                     async (kept) => {
                         one = { ...one, stash: kept };
-                    },
-                    then
+                    }
                 );
                 return how === "done" || how === "failed";
             };
-            // Sent back by an end that was stopped before it wrote so: not moved again.
+            // Sent home already, by an end that stopped before it gave everything
+            // back: not moved again, only given what they are still owed.
             const say = (line: string) => server.say([line]);
             if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))) {
                 await server.sayAll(stage.fallProof(one.name));
                 if (!(await giveBack())) remaining.push(one);
                 continue;
             }
+            // The kit off, unable to fall to their death, then home - with their
+            // own game mode only there.
             await server.sayAll(arena.homeward(one, left.marker, left.kit));
-            if (!(await giveBack(goHome)) || (!home && !(await goHome()))) {
+            if (!arena.wentHome(await server.say([arena.sendHome(one)]))) {
                 remaining.push(one);
                 continue;
             }
-            await server.say([arena.leftArena(one.name)]);
+            await server.sayAll([arena.homeMode(one), arena.leftArena(one.name)]);
             const thrown = box ? arena.sendThrown(box, one) : null;
             if (thrown) await server.say([thrown]);
+            if (!(await giveBack())) {
+                remaining.push(one);
+                continue;
+            }
             if (language) {
                 await server.say([
                     arena.tellTo(one.name, messages.tag(language) + messages.takenBack(language))
                 ]);
             }
         }
+        // The rules it held - keepInventory among them - put back only once
+        // everybody who could be sent home is home and down.
+        const owedRules = Object.entries(rules)
+            .filter(([name, value]) => /^[A-Za-z:_]+$/.test(name) && /^(true|false)$/.test(value))
+            .map(([name, value]) => commands.setRule(name, value));
+        if (owedRules.length > 0) await server.sayAll(owedRules);
+        rules = {};
         if (remaining.length > 0) {
             // Held up for them: closed and safe to log in to. Not kept loaded -
             // they load it themselves, arriving.

@@ -101,6 +101,36 @@ export async function homeAssistantStates(home: HomeAssistant): Promise<HomeAssi
     });
 }
 
+/** One entity and what it is doing, or null when Home Assistant has no such
+ *  entity any more. */
+export async function homeAssistantState(
+    home: HomeAssistant,
+    entityId: string
+): Promise<HomeAssistantState | null> {
+    const response = await call(home, "GET", `/api/states/${encodeURIComponent(entityId)}`);
+    if (response.status === 404) return null;
+    const parsed = stateSchema.safeParse(jsonOf(response));
+    if (response.status !== 200 || !parsed.success) {
+        throw new DriverError("That address answered, but not as Home Assistant.", "refused");
+    }
+    return parsed.data;
+}
+
+/** The unit the install shows temperatures in. A climate entity's numbers are
+ *  in it, and nothing on the entity says which it is. */
+export async function homeAssistantTemperatureUnit(home: HomeAssistant): Promise<"C" | "F"> {
+    const response = await call(home, "GET", "/api/config");
+    const parsed = z
+        .object({ unit_system: z.object({ temperature: z.string() }).passthrough() })
+        .passthrough()
+        .safeParse(jsonOf(response));
+    return response.status === 200 &&
+        parsed.success &&
+        parsed.data.unit_system.temperature.includes("F")
+        ? "F"
+        : "C";
+}
+
 /**
  * Call one service on one entity.
  *
@@ -112,9 +142,12 @@ export async function callService(
     home: HomeAssistant,
     domain: string,
     service: string,
-    entityId: string
+    entityId: string,
+    /** What the service is told besides the entity: a mode, a temperature. */
+    data: Readonly<Record<string, unknown>> = {}
 ): Promise<void> {
     const response = await call(home, "POST", `/api/services/${domain}/${service}`, {
+        ...data,
         entity_id: entityId
     });
     if (response.status === 400) {

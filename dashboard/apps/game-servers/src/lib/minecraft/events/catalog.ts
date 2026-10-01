@@ -297,7 +297,11 @@ export const optionsSchemas = {
         }),
     "king-of-the-hill": z.object({
         place: placeSchema.default({ mode: "players" }),
-        radius: z.number().int().min(3).max(20).default(6)
+        radius: z.number().int().min(3).max(20).default(6),
+        /** Played by who joins, brought to it with nothing in their hands - their
+         *  things kept and given back after - where nobody can die, and pushing
+         *  is how the circle is won (`kinds/hill`). */
+        fistsOnly: z.boolean().default(true)
     }),
     "treasure-hunt": z.object({
         chests: z
@@ -888,6 +892,9 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "build-battle": EPIC
 };
 
+/** A king of the hill's length: a few minutes of pushing is plenty. */
+export const HILL_MINUTES = 4;
+
 /**
  * How long each kind runs when it is made, in minutes: what fits it. A trivia
  * game, a gathering and a horde defense run for their rounds and waves
@@ -903,7 +910,7 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     trivia: 5,
     explorer: 6,
     "happy-hour": 20,
-    "king-of-the-hill": 10,
+    "king-of-the-hill": HILL_MINUTES,
     "treasure-hunt": 8,
     gathering: 6,
     "rare-catch": 8,
@@ -921,6 +928,21 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
 export function oldDefaultMinutes(kind: EventKind): number {
     if (kind === "happy-hour" || kind === "xp-boost" || kind === "rare-catch") return 20;
     return kind === "trivia" ? 5 : 10;
+}
+
+/**
+ * A king of the hill saved before "fists only" existed, and still on the ten
+ * minutes every event started with then, is read as the shorter length it has
+ * now: ten was nobody's choice, and ten minutes of it was too long. One saved
+ * since carries the option, and keeps whatever length it was given.
+ */
+export function migratePreset(entry: unknown): unknown {
+    if (typeof entry !== "object" || entry === null) return entry;
+    const raw = entry as { kind?: unknown; minutes?: unknown; options?: unknown };
+    if (raw.kind !== "king-of-the-hill" || raw.minutes !== 10) return entry;
+    const options = raw.options;
+    if (typeof options === "object" && options !== null && "fistsOnly" in options) return entry;
+    return { ...raw, minutes: HILL_MINUTES };
 }
 
 /** A new event of one kind, as the screen adds it. */
@@ -956,7 +978,8 @@ export function toKindDefaults(preset: EventPreset): EventPreset {
     let next = preset;
     if (KIND_INFO[preset.kind].competitive && same(preset.rewards, OLD_DEFAULT_REWARDS))
         next = { ...next, rewards: DEFAULT_PRIZES[preset.kind] };
-    if (preset.minutes === oldDefaultMinutes(preset.kind))
+    // A king of the hill's length is `migratePreset`'s, which runs first.
+    if (preset.kind !== "king-of-the-hill" && preset.minutes === oldDefaultMinutes(preset.kind))
         next = { ...next, minutes: DEFAULT_MINUTES[preset.kind] };
     if (preset.kind === "waves" && preset.name === BRITISH_HORDE_NAME)
         next = { ...next, name: KIND_NAMES.waves.en };
@@ -1021,7 +1044,9 @@ export function readEventsConfig(
     const saved = (value.settings as { defaults?: unknown } | undefined)?.defaults;
     const old = typeof saved !== "number" || saved < DEFAULTS_VERSION;
     const presets = (Array.isArray(value.presets) ? value.presets : []).flatMap((entry) => {
-        const parsed = presetSchema.safeParse(entry);
+        // A king of the hill's own length first (`migratePreset`), then every
+        // kind's defaults, which leave a king of the hill's length to it.
+        const parsed = presetSchema.safeParse(migratePreset(entry));
         if (!parsed.success) return [];
         return [old ? toKindDefaults(parsed.data) : parsed.data];
     });
@@ -1208,9 +1233,11 @@ export function readyToPlay(run: {
 }): boolean {
     const { preset } = run;
     switch (preset.kind) {
+        case "king-of-the-hill":
+            // With fists only, once everybody is on the hill.
+            return hillFistsOnly(preset) ? run.readyAt !== null : run.place !== null;
         case "supply-drop":
         case "world-boss":
-        case "king-of-the-hill":
         case "waves":
             return run.place !== null;
         case "explorer":
@@ -1306,7 +1333,15 @@ export function playsOnStage(preset: EventPreset): boolean {
 /** Played in an arena built in the sky, by sides - two teams, a plot each - with
  *  a marked kit (`kinds/arena-service.ts`). */
 export function playsInArena(preset: EventPreset): boolean {
-    return preset.kind === "team-duel" || preset.kind === "build-battle";
+    return preset.kind === "team-duel" || preset.kind === "build-battle" || hillFistsOnly(preset);
+}
+
+/** A king of the hill played with fists only: by who joins, in an arena of its own. */
+export function hillFistsOnly(preset: EventPreset): boolean {
+    return (
+        preset.kind === "king-of-the-hill" &&
+        (preset.options as EventOptions<"king-of-the-hill">).fistsOnly
+    );
 }
 
 /**
@@ -1349,5 +1384,6 @@ export function summonsMobs(preset: EventPreset): boolean {
 
 /** The events players fight each other in, which a server with PvP off cannot run. */
 export function needsPvp(preset: EventPreset): boolean {
-    return preset.kind === "team-duel";
+    // Pushing is punching: with PvP off, nobody on the hill could move anybody.
+    return preset.kind === "team-duel" || hillFistsOnly(preset);
 }

@@ -1,3 +1,5 @@
+import { keyedTurns } from "../turns";
+
 /**
  * One exchange with a server's RCON at a time.
  *
@@ -10,15 +12,4 @@
  * place an event looked at into one it could not use. So every command Polaris
  * sends to a server waits for the one before it.
  */
-const rconTurns = new Map<string, Promise<unknown>>();
-
-export function inRconTurn<T>(installedAppId: string, work: () => Promise<T>): Promise<T> {
-    const before = rconTurns.get(installedAppId) ?? Promise.resolve();
-    const turn = before.catch(() => undefined).then(work);
-    const settled = turn.catch(() => undefined);
-    rconTurns.set(installedAppId, settled);
-    void settled.then(() => {
-        if (rconTurns.get(installedAppId) === settled) rconTurns.delete(installedAppId);
-    });
-    return turn;
-}
+export const inRconTurn = keyedTurns();

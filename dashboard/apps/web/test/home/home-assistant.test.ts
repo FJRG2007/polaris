@@ -24,6 +24,7 @@ let sent: Sent[] = [];
 let states: unknown[] = [];
 let tokenValid = true;
 let serviceStatus = 200;
+let configUnit = "°C";
 
 vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) => {
     const actual =
@@ -60,6 +61,15 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
             const path = new URL(options.url).pathname;
             if (path === "/api/") return reply(200, { message: "API running." });
             if (path === "/api/states") return reply(200, states);
+            if (path === "/api/config")
+                return reply(200, { unit_system: { temperature: configUnit } });
+            if (path.startsWith("/api/states/")) {
+                const id = decodeURIComponent(path.slice("/api/states/".length));
+                const found = (states as { entity_id: string }[]).find(
+                    (entity) => entity.entity_id === id
+                );
+                return found ? reply(200, found) : reply(404, {});
+            }
             if (path.startsWith("/api/services/")) return reply(serviceStatus, []);
             return reply(404, {});
         }
@@ -74,6 +84,7 @@ beforeEach(() => {
     sent = [];
     tokenValid = true;
     serviceStatus = 200;
+    configUnit = "°C";
     states = [
         {
             entity_id: "switch.kettle",
@@ -104,14 +115,28 @@ beforeEach(() => {
         {
             entity_id: "climate.living_room",
             state: "heat",
-            attributes: { friendly_name: "Thermostat" }
+            attributes: {
+                friendly_name: "Living room AC",
+                hvac_modes: ["off", "heat", "cool", "heat_cool", "dry", "fan_only"],
+                min_temp: 16,
+                max_temp: 30,
+                target_temp_step: 0.5,
+                temperature: 22.5,
+                current_temperature: 20.1,
+                fan_mode: "medium low",
+                fan_modes: ["auto", "low", "medium low", "medium", "high", "focus"],
+                swing_mode: "off",
+                swing_modes: ["off", "vertical", "horizontal", "both"],
+                preset_mode: "none",
+                preset_modes: ["none", "eco", "boost", "sleep"]
+            }
         },
         { entity_id: "cover.garage", state: "closed", attributes: { friendly_name: "Garage" } }
     ];
 });
 
 describe("what a house has", () => {
-    it("takes switches, lights, locks and sensors, and leaves the rest", async () => {
+    it("takes switches, lights, locks, sensors and air conditioners, and leaves the rest", async () => {
         const found = await homeAssistantDriver.list(HOME);
         expect(
             found.map((row) => [row.externalId, row.kind, row.name, row.state, row.online])
@@ -121,7 +146,8 @@ describe("what a house has", () => {
             ["light.lounge", "light", "Lounge", "unknown", false],
             ["lock.front_door", "lock", "Front door", "moving", true],
             ["binary_sensor.back_door", "sensor", "Back door", "unknown", true],
-            ["sensor.hall_temperature", "sensor", "Hall", "unknown", true]
+            ["sensor.hall_temperature", "sensor", "Hall", "unknown", true],
+            ["climate.living_room", "climate", "Living room AC", "on", true]
         ]);
     });
 
@@ -141,6 +167,139 @@ describe("what a house has", () => {
         await homeAssistantDriver.list(HOME);
         expect(sent[0]?.url).toBe("http://homeassistant.local:8123/api/states");
         expect(sent[0]?.trust).toBe("system");
+    });
+});
+
+describe("an air conditioner", () => {
+    it("is read from its attributes, its room temperature as its reading", async () => {
+        const found = await homeAssistantDriver.list(HOME);
+        const unit = found.find((row) => row.externalId === "climate.living_room")!;
+        expect(unit).toMatchObject({ value: "20.1", unit: "°C" });
+        expect(unit.climate).toEqual({
+            mode: "heat",
+            // heat_cool stands in for automatic; "focus" is not a speed.
+            modes: ["heat", "cool", "dry", "fan", "auto"],
+            target: 22.5,
+            min: 16,
+            max: 30,
+            step: 0.5,
+            unit: "C",
+            fan: "medium-low",
+            fans: ["auto", "low", "medium-low", "medium", "high"],
+            options: { swing: false, eco: false, turbo: false }
+        });
+    });
+
+    it("is in Fahrenheit where the install is", async () => {
+        configUnit = "°F";
+        const found = await homeAssistantDriver.list(HOME);
+        expect(found.find((row) => row.externalId === "climate.living_room")).toMatchObject({
+            unit: "°F",
+            climate: { unit: "F" }
+        });
+    });
+
+    it("is off when its state is off", async () => {
+        (states as { entity_id: string; state: string }[]).find(
+            (entity) => entity.entity_id === "climate.living_room"
+        )!.state = "off";
+        const found = await homeAssistantDriver.list(HOME);
+        expect(found.find((row) => row.externalId === "climate.living_room")).toMatchObject({
+            state: "off",
+            climate: { mode: null }
+        });
+    });
+
+    it.each([
+        ["turn-on", undefined, "turn_on", {}],
+        ["turn-off", undefined, "turn_off", {}],
+        [
+            "set-mode",
+            { action: "set-mode", mode: "auto" },
+            "set_hvac_mode",
+            { hvac_mode: "heat_cool" }
+        ],
+        [
+            "set-mode",
+            { action: "set-mode", mode: "fan" },
+            "set_hvac_mode",
+            { hvac_mode: "fan_only" }
+        ],
+        [
+            "set-temperature",
+            { action: "set-temperature", target: 23.5 },
+            "set_temperature",
+            { temperature: 23.5 }
+        ],
+        [
+            "set-fan",
+            { action: "set-fan", fan: "medium-low" },
+            "set_fan_mode",
+            { fan_mode: "medium low" }
+        ],
+        [
+            "set-option",
+            { action: "set-option", option: "swing", on: true },
+            "set_swing_mode",
+            { swing_mode: "vertical" }
+        ],
+        [
+            "set-option",
+            { action: "set-option", option: "turbo", on: true },
+            "set_preset_mode",
+            { preset_mode: "boost" }
+        ],
+        [
+            "set-option",
+            { action: "set-option", option: "eco", on: false },
+            "set_preset_mode",
+            { preset_mode: "none" }
+        ]
+    ] as const)("%s is climate.%s with its own words", async (action, command, service, data) => {
+        await homeAssistantDriver.act(
+            HOME,
+            { externalId: "climate.living_room", kind: "climate" },
+            action,
+            command
+        );
+        const call = sent.at(-1)!;
+        expect(new URL(call.url).pathname).toBe(`/api/services/climate/${service}`);
+        expect(JSON.parse(call.body)).toEqual({ ...data, entity_id: "climate.living_room" });
+    });
+
+    it("refuses a mode the entity does not offer, before sending anything", async () => {
+        const before = sent.length;
+        (states as { entity_id: string; attributes: Record<string, unknown> }[]).find(
+            (entity) => entity.entity_id === "climate.living_room"
+        )!.attributes.hvac_modes = ["off", "cool"];
+        await expect(
+            homeAssistantDriver.act(
+                HOME,
+                { externalId: "climate.living_room", kind: "climate" },
+                "set-mode",
+                { action: "set-mode", mode: "heat" }
+            )
+        ).rejects.toThrow("That mode is not one this device has");
+        expect(sent.slice(before).some((call) => call.method === "POST")).toBe(false);
+    });
+
+    it("refuses one temperature on an entity that only takes a range", async () => {
+        const before = sent.length;
+        const attributes = (
+            states as { entity_id: string; attributes: Record<string, unknown> }[]
+        ).find((entity) => entity.entity_id === "climate.living_room")!.attributes;
+        delete attributes.temperature;
+        attributes.target_temp_low = 20;
+        attributes.target_temp_high = 24;
+        await expect(
+            homeAssistantDriver.act(
+                HOME,
+                { externalId: "climate.living_room", kind: "climate" },
+                "set-temperature",
+                { action: "set-temperature", target: 22 }
+            )
+        ).rejects.toThrow("This device takes a range rather than one temperature");
+        expect(sent.slice(before).some((call) => call.method === "POST")).toBe(false);
     });
 });
 
