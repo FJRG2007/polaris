@@ -15,6 +15,7 @@ import ICAL from "ical.js";
 import type * as T from "./types";
 import { parseRule } from "./rule";
 import { addToWall, formatWall, resolveZone } from "./tz";
+import { vtimezoneFor } from "./vtimezone";
 import { addDays, clockFor, isDateOnly, valueToInstant, valueWall, vtimezoneId } from "./zones";
 import { expandItem, generateStarts, isRecurring, placeEvent, type ExpandContext } from "./expand";
 
@@ -797,12 +798,37 @@ export function serializeItem(item: T.CalendarItem, options: { method?: string; 
     const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", property("prodid", {}, "text", options.prodId ?? DEFAULT_PRODID), "CALSCALE:GREGORIAN"];
     if (options.method) lines.push(`METHOD:${options.method.toUpperCase()}`);
     for (const block of item.timezones) lines.push(...splitLines(block));
+    const components: string[] = [];
     if (item.component === "VEVENT") {
-        if (item.master) lines.push(...eventLines(item.master, options.now));
-        for (const override of item.overrides) lines.push(...eventLines(override, options.now));
-    } else lines.push(...todoLines(item.todo, options.now));
+        if (item.master) components.push(...eventLines(item.master, options.now));
+        for (const override of item.overrides) components.push(...eventLines(override, options.now));
+    } else components.push(...todoLines(item.todo, options.now));
+    lines.push(...missingTimezones(components, item.timezones), ...components);
     lines.push("END:VCALENDAR");
     return `${lines.map(foldLine).join("\r\n")}\r\n`;
+}
+
+/**
+ * A VTIMEZONE for every TZID the components use that the item does not define
+ * (RFC 5545 3.2.19), written from the zone's current rules for the year the
+ * events start in. A zone the file defined itself keeps its own block.
+ */
+function missingTimezones(components: readonly string[], timezones: readonly string[]): string[] {
+    const defined = new Set(timezones.map((block) => vtimezoneId(block)).filter((id): id is string => Boolean(id)));
+    const years = new Map<string, number>();
+    for (const line of components) {
+        for (const match of line.matchAll(/;TZID=("[^"]+"|[^;:]+)[^:]*:(\d{4})/g)) {
+            const id = match[1]!.replace(/^"|"$/g, "");
+            const year = Number(match[2]);
+            if (!defined.has(id) && (!years.has(id) || year < years.get(id)!)) years.set(id, year);
+        }
+    }
+    const out: string[] = [];
+    for (const [id, year] of years) {
+        const block = vtimezoneFor(id, year);
+        if (block) out.push(...splitLines(block));
+    }
+    return out;
 }
 
 /* ------------------------------------------------------------------ building */

@@ -9,6 +9,7 @@ export type * from "./types";
 export * from "./tz";
 export * from "./zones";
 export * from "./ical";
+export * from "./vtimezone";
 export * from "./expand";
 export * from "./edit";
 export * from "./rule";

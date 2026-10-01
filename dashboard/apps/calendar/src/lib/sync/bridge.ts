@@ -102,7 +102,12 @@ export function readRecurrence(lines: readonly string[], start: types.DateValue)
 export function recurrenceLines(event: types.CalendarEvent): string[] {
     if (!event.rule && event.exdates.length === 0 && event.rdates.length === 0) return [];
     const bare: EventDraft = { ...blankEvent(event.uid, event.start, event.end), rule: event.rule, exdates: event.exdates, rdates: event.rdates };
-    return contentLines(writeItem(eventItem(event.uid, bare, []))).filter((line) => /^(RRULE|EXDATE|RDATE)[;:]/.test(line));
+    // Only the event's own lines: the VTIMEZONE blocks in the same file carry
+    // RRULE and RDATE lines of their own, which describe the zone, not the event.
+    const lines = contentLines(writeItem(eventItem(event.uid, bare, [])));
+    const start = lines.indexOf("BEGIN:VEVENT");
+    const end = lines.indexOf("END:VEVENT", start);
+    return lines.slice(start, end).filter((line) => /^(RRULE|EXDATE|RDATE)[;:]/.test(line));
 }
 
 /** The value of an `X-` property kept in `extra`, or null. */

@@ -37,9 +37,13 @@ describe("round trip parse -> serialize -> parse", () => {
             expect(parsed.items.length).toBeGreaterThan(0);
             for (const item of parsed.items) {
                 const again = roundTrip(item);
-                expect(again).toEqual(item);
-                // And a second trip writes the same text.
-                expect(engine.serializeItem(again)).toBe(engine.serializeItem(item));
+                // The first write may add a VTIMEZONE for a zone the file
+                // named another way (Outlook's "Romance Standard Time" is
+                // written back as Europe/Paris, which the file never defined);
+                // everything the file had comes back as it was.
+                expect({ ...again, timezones: again.timezones.slice(0, item.timezones.length) }).toEqual(item);
+                // And from then on a trip writes the same text.
+                expect(engine.serializeItem(roundTrip(again))).toBe(engine.serializeItem(again));
             }
         });
     }

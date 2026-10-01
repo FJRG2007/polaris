@@ -74,6 +74,9 @@ describe("calendar objects", () => {
         expect(row.endsAt).toEqual(new Date("2026-10-08T09:00:00Z"));
         expect(row.recurring).toBe(false);
         expect(row.uid).toBe(world.eventIn(row).uid);
+        // Stamped when it was written here, never the epoch.
+        expect(row.ics).toMatch(/^DTSTAMP:20[0-9]{6}T[0-9]{6}Z/m);
+        expect(row.ics).not.toContain("DTSTAMP:19700101");
 
         const series = db.byId("calendarObject", await createSeries())!;
         expect(series.recurring).toBe(true);

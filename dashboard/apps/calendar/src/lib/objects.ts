@@ -116,7 +116,10 @@ export async function writeItem(
     item: engine.CalendarItem,
     context: WriteContext
 ): Promise<string> {
-    const ics = engine.serializeItem(item);
+    // A change made here is stamped now (DTSTAMP is when the object last
+    // changed, and clients compare it); what came from a provider or a file
+    // keeps the stamp it arrived with.
+    const ics = engine.serializeItem(item, context.fromProvider || context.fromImport ? {} : { now: new Date() });
     const columns = derived(item, context.floatingZone);
     const before = previous ? tryItemOf(previous.ics) : null;
     const row = previous
