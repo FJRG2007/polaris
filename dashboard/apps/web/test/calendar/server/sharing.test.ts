@@ -115,6 +115,7 @@ describe("calendar sharing", () => {
                 summary: "Launch party",
                 location: "Rooftop",
                 description: "Bring snacks",
+                alarms: [{ action: "DISPLAY", trigger: { kind: "relative", minutes: -30, related: "START" }, description: "" }],
                 start: world.at("2026-10-10T18:00:00"),
                 end: world.at("2026-10-10T21:00:00"),
                 attendees: [{ email: bob.email, name: "Bob", role: "REQ-PARTICIPANT", partstat: "ACCEPTED", rsvp: false, type: "INDIVIDUAL" }]
@@ -156,6 +157,8 @@ describe("calendar sharing", () => {
             const token = (await sharing.publish(alice, calendar, "full"))!;
             const feed = (await published.publishedFeed(token, "Busy"))!;
             expect(feed.ics).toContain("Launch party");
+            // The owner's reminders never ring on a subscriber's phone.
+            expect(feed.ics).not.toContain("BEGIN:VALARM");
             expect(feed.ics).not.toContain("Therapy");
             expect(feed.ics).not.toContain("Clinic");
             expect(feed.ics).not.toContain("Secret place");

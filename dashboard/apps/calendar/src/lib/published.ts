@@ -44,11 +44,15 @@ function shown(mode: string, event: engine.CalendarEvent): boolean {
 /** An item as a link in this mode may show it, or null when nothing of it is
  *  shown (a transparent event says nothing about being busy). */
 function forLink(item: engine.CalendarItem, mode: string, busyLabel: string): engine.CalendarItem | null {
-    if (item.component !== "VEVENT") return mode === "full" ? item : null;
+    // A task's reminders are its owner's, like an event's below.
+    if (item.component !== "VEVENT") return mode === "full" ? { ...item, todo: { ...item.todo, alarms: [] } } : null;
     // What the page leaves out - free time, cancelled events - the feed does too.
     const events = [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent => Boolean(event));
     if (events.every((event) => event.transparency === "TRANSPARENT" || event.status === "CANCELLED")) return null;
-    const map = (event: engine.CalendarEvent) => (shown(mode, event) ? event : blurred(event, busyLabel));
+    // Reminders are the owner's, not the subscribers': a feed that carried them
+    // would ring on every phone that subscribes to it.
+    const map = (event: engine.CalendarEvent) =>
+        shown(mode, event) ? { ...event, alarms: [] } : blurred(event, busyLabel);
     return {
         ...item,
         master: item.master ? map(item.master) : null,
