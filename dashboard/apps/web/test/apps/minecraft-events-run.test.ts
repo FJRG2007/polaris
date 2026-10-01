@@ -2445,6 +2445,39 @@ describe("a world boss", () => {
         expect(world.sent).toContain("execute as @e[tag=pe_boss] at @s run tp @s ~ -1000 ~");
     });
 
+    it("points whoever is out of its reach the way, with how far and which way to turn", async () => {
+        const boss = groundBoss("boss", 10);
+        setUp([boss]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
+        // The boss stands at (310, 70, 4); Ana is far past its 40-block reach.
+        world.online = ["Ana"];
+        world.at = { Ana: [200, 64, 4] };
+        await play(8_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title Ana actionbar") &&
+                    /The Warlord: \d+ m [↑↗→↘↓↙←↖]/.test(visible(line))
+            )
+        ).toBe(true);
+        // Once within its reach, it stops pointing the way.
+        world.at = { Ana: [310, 70, 4] };
+        await play(2_100);
+        const since = world.sent.length;
+        await play(2_100);
+        expect(
+            world.sent
+                .slice(since)
+                .some((line) => line.startsWith("title Ana actionbar") && visible(line).includes("The Warlord:"))
+        ).toBe(false);
+    });
+
     it("is not taken as felled when it is out of reach and somebody far off kills its kind", async () => {
         const boss = groundBoss("boss", 10);
         setUp([boss]);
