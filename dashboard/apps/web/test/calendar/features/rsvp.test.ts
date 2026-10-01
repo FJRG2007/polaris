@@ -77,6 +77,8 @@ describe("answering an invitation from its link", () => {
 
     it("is rate limited per address and per link", async () => {
         const { token } = await invite();
+        expect(fake.rateKeys).toEqual([`calendar.mail-out:${alice.id}`]);
+        fake.rateKeys.length = 0;
         await rsvp.answerByToken({ token, partstat: "TENTATIVE", recurrenceKey: null });
         expect(fake.rateKeys).toEqual(["calendar.rsvp:203.0.113.7", `calendar.rsvp-token:${token}`]);
         fake.rateAllowed = false;

@@ -18,6 +18,7 @@
 import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { tryItemOf } from "./objects";
+import { reachingWindow } from "./occurrences";
 import { host } from "@polaris/app-host";
 import type { SessionUser } from "./access";
 import { loadPreferences } from "./preferences-store";
@@ -50,8 +51,7 @@ export async function calendarBusy(
             calendarId: { in: calendars.map((calendar) => calendar.id) },
             deletedAt: null,
             component: "VEVENT",
-            OR: [{ startsAt: null }, { startsAt: { lt: window.to } }],
-            AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: window.from } }] }]
+            ...reachingWindow(window)
         },
         select: { uid: true, ics: true },
         take: MAX_OBJECTS

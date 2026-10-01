@@ -111,6 +111,8 @@ describe("createGraphProvider", () => {
         expect(deltas[0]!.headers.prefer).toContain("odata.maxpagesize=200");
         expect(deltas[0]!.headers.prefer).toContain("outlook.timezone=\"UTC\"");
         expect(first.full).toBe(true);
+        expect(first.window?.start.toISOString()).toBe(deltas[0]!.url.searchParams.get("startDateTime"));
+        expect(first.window?.end.toISOString()).toBe(deltas[0]!.url.searchParams.get("endDateTime"));
         expect(first.syncToken).toBe(`${GRAPH}/me/calendars/cal-1/calendarView/delta?$deltatoken=d1`);
         expect(first.changed.map((o) => o.href).sort()).toEqual(["m1", "s1"]);
     });

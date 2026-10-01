@@ -36,6 +36,8 @@ export interface ChangeSet {
     ctag: string;
     /** True when `changed` is the complete set: anything not in it is gone. */
     full: boolean;
+    /** The span a full set is complete for, when it covers only part of the calendar. */
+    window?: { start: Date; end: Date };
 }
 
 /** The state a pull starts from, as the previous pull left it. */

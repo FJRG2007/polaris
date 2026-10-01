@@ -112,6 +112,24 @@ describe("calendar reminders", () => {
         expect(db.rows("calendarReminder").filter((row) => row.objectId === id)).toHaveLength(6);
     });
 
+    it("keeps the due reminders one pass had no room for, and plans the next once they are sent", async () => {
+        const id = await weeklyWithAlarms();
+        const planned = db.rows("calendarReminder").find((row) => row.objectId === id && row.action === "DISPLAY")!;
+        for (let index = 0; index < 600; index += 1) {
+            db.insert("calendarReminder", { ...planned, id: undefined, userId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}` });
+        }
+        const at = new Date("2026-10-01T09:50:30Z");
+        const first = await fireDueReminders(at);
+        expect(first.sent).toBe(500);
+        expect(db.rows("calendarReminder").filter((row) => row.objectId === id && (row.fireAt as Date) <= at)).toHaveLength(106);
+        const second = await fireDueReminders(at);
+        expect(second.sent).toBe(106);
+        expect(fake.notices).toHaveLength(603);
+        const next = db.rows("calendarReminder").filter((row) => row.objectId === id);
+        expect(next).toHaveLength(6);
+        expect(next.every((row) => (row.occurrence as Date).toISOString() === "2026-10-08T10:00:00.000Z")).toBe(true);
+    });
+
     it("sends a claimed reminder once even when two passes run at the same time", async () => {
         await weeklyWithAlarms();
         const at = new Date("2026-10-01T09:50:30Z");

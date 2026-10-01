@@ -103,7 +103,20 @@ describe("bookingSlots", () => {
         expect(local(slots)).toEqual(["03-27T09:00", "03-29T01:00", "03-29T03:00", "03-30T09:00"]);
     });
 
-    it("offers nothing when the range is over", () => {
+    it("keeps a slot in the repeated hour of a clock change at its length", () => {
+        const slots = engine.bookingSlots(
+            input({
+                availability: { weekly: { ...weekdays([]), "0": [{ from: "02:00", to: "04:00" }] }, overrides: {} },
+                now: new Date("2026-10-24T00:00:00Z"),
+                from: new Date("2026-10-24T00:00:00Z"),
+                to: new Date("2026-10-26T00:00:00Z")
+            })
+        );
+        expect(slots.length).toBeGreaterThan(0);
+        for (const slot of slots) expect(slot.end.getTime() - slot.start.getTime()).toBe(30 * 60_000);
+    });
+
+        it("offers nothing when the range is over", () => {
         expect(engine.bookingSlots(input({ now: new Date("2026-06-02T00:00:00Z") }))).toEqual([]);
     });
 });

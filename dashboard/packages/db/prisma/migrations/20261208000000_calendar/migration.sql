@@ -248,6 +248,9 @@ CREATE INDEX IF NOT EXISTS "Calendar_ownerId_idx" ON "Calendar"("ownerId");
 CREATE INDEX IF NOT EXISTS "Calendar_sourceId_idx" ON "Calendar"("sourceId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "Calendar_sourceId_remoteId_key" ON "Calendar"("sourceId", "remoteId");
+
+-- CreateIndex
 CREATE INDEX IF NOT EXISTS "Calendar_kind_idx" ON "Calendar"("kind");
 
 -- CreateIndex

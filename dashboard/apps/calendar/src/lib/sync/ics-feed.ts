@@ -80,12 +80,29 @@ export async function fetchIcsFeed(input: {
  * changed, never written.
  *
  * The feed's own ETag and Last-Modified travel in the sync state's `syncToken`
- * and `ctag`, so a pull of an unchanged feed is a 304.
+ * and `ctag`, so a pull of an unchanged feed is a 304. `validators` are the
+ * stored ones, so listing the calendar and pulling it in the same pass is one
+ * conditional download.
  */
-export function createIcsProvider(input: { url: string; fetcher: Fetcher; maxBytes?: number; name?: string }): CalendarProvider {
+export function createIcsProvider(input: {
+    url: string;
+    fetcher: Fetcher;
+    maxBytes?: number;
+    name?: string;
+    validators?: { etag: string; lastModified: string };
+}): CalendarProvider {
+    let last: { key: string; result: Promise<FeedResult> } | null = null;
+    const fetchOnce = (etag: string, lastModified: string): Promise<FeedResult> => {
+        const key = JSON.stringify([etag, lastModified]);
+        if (last?.key === key) return last.result;
+        const result = fetchIcsFeed({ url: input.url, etag: etag || null, lastModified: lastModified || null, fetcher: input.fetcher, maxBytes: input.maxBytes });
+        last = { key, result };
+        return result;
+    };
+
     return {
         async listCalendars() {
-            const result = await fetchIcsFeed({ url: input.url, etag: null, lastModified: null, fetcher: input.fetcher, maxBytes: input.maxBytes });
+            const result = await fetchOnce(input.validators?.etag ?? "", input.validators?.lastModified ?? "");
             const calendar = result.notModified ? null : result.calendar;
             return [
                 {
@@ -101,13 +118,7 @@ export function createIcsProvider(input: { url: string; fetcher: Fetcher; maxByt
         },
 
         async pull(state) {
-            const result = await fetchIcsFeed({
-                url: input.url,
-                etag: state.syncToken || null,
-                lastModified: state.ctag || null,
-                fetcher: input.fetcher,
-                maxBytes: input.maxBytes
-            });
+            const result = await fetchOnce(state.syncToken, state.ctag);
             if (result.notModified) return { changed: [], removed: [], syncToken: state.syncToken, ctag: state.ctag, full: false };
             return { changed: result.objects, removed: [], syncToken: result.etag ?? "", ctag: result.lastModified ?? "", full: true };
         },

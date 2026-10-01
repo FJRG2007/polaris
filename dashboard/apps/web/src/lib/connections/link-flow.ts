@@ -37,6 +37,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import * as core from "@polaris/core";
 import { findConnectionProvider, sameAddress } from "@polaris/core";
 import { publicAppUrl, requestOrigin } from "@/lib/domain-service";
+import type { CalendarLinkProvider } from "@/lib/calendar-host";
 import { connectionSignInChallenged } from "@/lib/instance-security";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
 import { clearConnectionFailure, describeFailure, recordConnectionFailure } from "./attention";
@@ -64,6 +65,14 @@ const CONNECTIONS_SCREEN = "/account/connections";
 const MAIL_SCREEN = "/mail/settings/accounts";
 /** Where a link started from the Calendar app comes back to. */
 const CALENDAR_SCREEN = "/calendar/settings/accounts";
+
+/** The services the Calendar links accounts of. A calendar link is exempt from
+ *  the per-person cap, so it is honoured for these and no others. */
+const CALENDAR_PROVIDERS: Record<CalendarLinkProvider, true> = { google: true, microsoft: true };
+
+function linksCalendars(provider: string): boolean {
+    return Object.hasOwn(CALENDAR_PROVIDERS, provider);
+}
 const LOGIN_SCREEN = "/oauth/login";
 const CHALLENGE_SCREEN = "/oauth/2fa";
 /** Where a finished sign-in lands when the screen asked for nothing else. The
@@ -357,7 +366,7 @@ export async function startConnectionLink(request: Request, provider: string): P
         );
     }
     const scope = url.searchParams.get("scope");
-    if (scope === "calendar") return begin(request, provider, "calendar");
+    if (scope === "calendar" && linksCalendars(provider)) return begin(request, provider, "calendar");
     if (scope !== "mail") {
         return begin(request, provider, scope === "storage" ? "storage" : "link");
     }
@@ -433,7 +442,7 @@ export async function finishConnectionCallback(
     const back = mailReturn(held);
     if (!code) return endLink(origin, provider, "cancelled", screen, back);
     if (!valid) return endLink(origin, provider, "state_error", screen, back);
-    return finishLink(origin, provider, code, screen, back, held?.wanted, held?.mode === "calendar");
+    return finishLink(origin, provider, code, screen, back, held?.wanted, held?.mode === "calendar" && linksCalendars(provider));
 }
 
 /**

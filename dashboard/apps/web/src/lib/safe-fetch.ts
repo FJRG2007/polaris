@@ -102,9 +102,10 @@ export async function resolveName(hostname: string): Promise<VettedAddress[]> {
     }
 }
 
-/** An address Polaris is willing to consider at all. */
-export function safeUrl(address: string): URL | null {
-    if (address.length > core.MAX_LINK_LENGTH) return null;
+/** An address Polaris is willing to consider at all. `maxLength` is a pasted
+ *  link's unless the caller says otherwise. */
+export function safeUrl(address: string, maxLength: number = core.MAX_LINK_LENGTH): URL | null {
+    if (address.length > maxLength) return null;
     let url: URL;
     try {
         url = new URL(address);
@@ -300,7 +301,7 @@ export async function configuredRequest(
     init: RequestInit & { timeoutMs?: number },
     options: { allowPrivate: boolean }
 ): Promise<Response> {
-    const url = safeUrl(address);
+    const url = safeUrl(address, Number.POSITIVE_INFINITY);
     if (!url) throw new RefusedAddressError();
     if (!options.allowPrivate && !(await reachable(url.hostname))) throw new RefusedAddressError();
     const { timeoutMs, ...rest } = init;

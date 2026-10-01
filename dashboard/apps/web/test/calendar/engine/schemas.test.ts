@@ -113,6 +113,8 @@ describe("eventInputSchema", () => {
         refuses({ color: "#12345" });
         refuses({ url: "javascript:alert(1)" });
         refuses({ conference: "ftp://example.com/room" });
+        refuses({ conference: "https://meet.example.com/room\r\nATTENDEE:mailto:someone@example.com" });
+        refuses({ url: "https://example.com/\tpath" });
     });
 
     it("refuses unknown kinds, statuses and classes", () => {

@@ -18,9 +18,9 @@ vi.mock("@polaris-app/calendar/src/lib/sync", async (importOriginal) => ({
     createGoogleProvider: () => slot.provider
 }));
 
-import { db } from "../fixtures/fake-db";
 import * as world from "../fixtures/world";
 import { addUser, fake } from "../fixtures/fake-host";
+import { FakePrismaError, db } from "../fixtures/fake-db";
 import * as engine from "@polaris-app/calendar/src/engine";
 import * as objects from "@polaris-app/calendar/src/lib/objects";
 import * as syncEngine from "@polaris-app/calendar/src/lib/sync-engine";
@@ -238,6 +238,90 @@ describe("calendar sync engine", () => {
         await syncEngine.syncDueSources(world.NOW);
         expect(remote.object("primary", "dentist")).toBeUndefined();
         expect(db.byId("calendarObject", id)).toMatchObject({ pendingPush: "", href: "" });
+    });
+
+    it("keeps every calendar when the provider's listing comes back empty", async () => {
+        const calendar = await firstPull();
+        (remote.provider as unknown as { listCalendars: () => Promise<unknown[]> }).listCalendars = async () => [];
+        await syncEngine.syncSource(sourceId);
+        expect(db.byId("calendar", String(calendar.id))).toBeDefined();
+        expect(objectAt("dentist")?.deletedAt).toBeNull();
+    });
+
+    it("does not create a calendar twice when another pass created it first", async () => {
+        const create = db.prisma.calendar.create;
+        let raced = false;
+        db.prisma.calendar.create = async (args: Parameters<typeof create>[0]) => {
+            if (!raced) {
+                raced = true;
+                await create(args);
+                throw new FakePrismaError("P2002", "fake-db: unique calendar.sourceId_remoteId violated");
+            }
+            return create(args);
+        };
+        try {
+            await syncEngine.syncSource(sourceId);
+        } finally {
+            db.prisma.calendar.create = create;
+        }
+        expect(db.rows("calendar").filter((row) => row.sourceId === sourceId)).toHaveLength(1);
+        expect(db.byId("calendarSource", sourceId)?.status).toBe("ok");
+        expect(objectAt("dentist")?.summary).toBe("Dentist");
+    });
+
+    it("removes only what is missing inside the span a windowed full pull covers", async () => {
+        await firstPull();
+        const pull = remote.provider.pull.bind(remote.provider);
+        (remote.provider as { pull: typeof pull }).pull = async (state) => ({
+            ...(await pull({ ...state, syncToken: "" })),
+            changed: [],
+            full: true,
+            window: { start: new Date("2026-10-13T00:00:00Z"), end: new Date("2027-10-13T00:00:00Z") }
+        });
+        await syncEngine.syncSource(sourceId);
+        expect(objectAt("lunch")?.deletedAt).toBeInstanceOf(Date);
+        expect(objectAt("dentist")?.deletedAt).toBeNull();
+    });
+
+    it("downloads a feed once a pass, conditionally, and keeps the name it was subscribed under", async () => {
+        const feed = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Feed//EN",
+            "X-WR-CALNAME:Their name",
+            "X-WR-TIMEZONE:Europe/Madrid",
+            "BEGIN:VEVENT",
+            "UID:one@feed.test",
+            "DTSTAMP:20260101T000000Z",
+            "DTSTART:20261001T090000Z",
+            "DTEND:20261001T100000Z",
+            "SUMMARY:Standup",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            ""
+        ].join("\r\n");
+        const seen: Record<string, string>[] = [];
+        fake.fetchHandler = async (_url, init) => {
+            const headers = (init.headers ?? {}) as Record<string, string>;
+            seen.push(headers);
+            if (headers["If-None-Match"] === "\"v1\"") return new Response(null, { status: 304 });
+            return new Response(feed, { status: 200, headers: { ETag: "\"v1\"" } });
+        };
+        const url = "https://feeds.example.test/team.ics";
+        const feedSource = db.insert("calendarSource", { userId: alice.id, kind: "ics", label: "My name", url }).id as string;
+        const calendarId = db.insert("calendar", { ownerId: alice.id, sourceId: feedSource, kind: "remote", remoteId: url, name: "My name", readOnly: true }).id as string;
+
+        await syncEngine.syncSource(feedSource);
+        expect(seen).toHaveLength(1);
+        expect(seen[0]?.["If-None-Match"]).toBeUndefined();
+        expect(db.byId("calendar", calendarId)).toMatchObject({ name: "My name", timezone: "Europe/Madrid", syncToken: "\"v1\"" });
+        expect(db.rows("calendarObject").filter((row) => row.calendarId === calendarId)).toHaveLength(1);
+
+        await syncEngine.syncSource(feedSource);
+        expect(seen).toHaveLength(2);
+        expect(seen[1]?.["If-None-Match"]).toBe("\"v1\"");
+        expect(db.byId("calendar", calendarId)).toMatchObject({ name: "My name", timezone: "Europe/Madrid" });
+        expect(db.byId("calendarSource", feedSource)?.status).toBe("ok");
     });
 
     it("removes from Polaris the calendars deleted at the provider", async () => {

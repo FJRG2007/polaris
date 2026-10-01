@@ -54,7 +54,7 @@ export async function upcomingEvents(userId: string, limit: number, now = new Da
         }
     );
     return view.occurrences
-        .filter((occurrence) => occurrence.status !== "CANCELLED")
+        .filter((occurrence) => !occurrence.busyOnly && occurrence.status !== "CANCELLED")
         .filter((occurrence) => preferences.showDeclined || occurrence.myPartstat !== "DECLINED")
         .filter((occurrence) => new Date(occurrence.end) > now)
         .slice(0, limit)

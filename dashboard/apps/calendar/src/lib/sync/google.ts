@@ -455,10 +455,10 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
                         components: ["VEVENT"]
                     });
                 }
-                if (!data.nextPageToken) break;
+                if (!data.nextPageToken) return calendars;
                 pageToken = data.nextPageToken;
             }
-            return calendars;
+            throw new SyncUnreachableError("Google kept paging without an end", null);
         },
 
         async pull(state): Promise<ChangeSet> {
@@ -521,13 +521,23 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
             let firstEtag = "";
 
             if (master) {
-                const response = href
+                let response = href
                     ? await call("PATCH", `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`, {
                           query,
                           body: eventToGoogle(master, colors, { instance: false, insert: false }),
                           ifMatch: masterEtag
                       })
                     : await call("POST", calendarPath(target.remoteId), { query, body: eventToGoogle(master, colors, { instance: false, insert: true }) });
+                if (!href && response.status === 409) {
+                    const existing = (await group(target.remoteId, object.uid)).find((e) => !e.recurringEventId && e.status !== "cancelled");
+                    if (existing) {
+                        await response.body?.cancel().catch(() => undefined);
+                        response = await call("PATCH", `${calendarPath(target.remoteId)}/${encodeURIComponent(existing.id)}`, {
+                            query,
+                            body: eventToGoogle(master, colors, { instance: false, insert: false })
+                        });
+                    }
+                }
                 const saved = await json(response, GoogleEvent);
                 href = saved.id;
                 firstEtag = saved.etag ?? "";

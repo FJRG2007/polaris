@@ -212,6 +212,24 @@ describe("overrides and extra dates", () => {
         expect(found.slice(2).every((occurrence) => occurrence.event.summary === "Afternoon")).toBe(true);
     });
 
+    it("moves later occurrences by the override's shift on the series' own clock when it moved to another zone", () => {
+        const item = onlyItem(
+            calendar(
+                ...weekly(
+                    "OVERRIDE RECURRENCE-ID;RANGE=THISANDFUTURE;TZID=Europe/Berlin:20260119T100000|DTSTART;TZID=America/New_York:20260119T100000|DTEND;TZID=America/New_York:20260119T110000"
+                )
+            )
+        );
+        expect(starts(engine.expandItem(item, range, { floatingZone: "UTC" }))).toEqual(["2026-01-05T10:00", "2026-01-12T10:00", "2026-01-19T16:00", "2026-01-26T16:00", "2026-02-02T16:00", "2026-02-09T16:00"]);
+    });
+
+    it("draws occurrences a THISANDFUTURE override moves into the range from either side of it", () => {
+        const later = onlyItem(calendar(...weekly("OVERRIDE RECURRENCE-ID;RANGE=THISANDFUTURE;TZID=Europe/Berlin:20260112T100000|DTSTART;TZID=Europe/Berlin:20260117T100000|DTEND;TZID=Europe/Berlin:20260117T110000")));
+        expect(starts(engine.expandItem(later, { from: new Date("2026-02-07T00:00:00Z"), to: new Date("2026-02-08T00:00:00Z") }, { floatingZone: "UTC" }))).toEqual(["2026-02-07T10:00"]);
+        const earlier = onlyItem(calendar(...weekly("OVERRIDE RECURRENCE-ID;RANGE=THISANDFUTURE;TZID=Europe/Berlin:20260119T100000|DTSTART;TZID=Europe/Berlin:20260114T100000|DTEND;TZID=Europe/Berlin:20260114T110000")));
+        expect(starts(engine.expandItem(earlier, { from: new Date("2026-02-04T00:00:00Z"), to: new Date("2026-02-05T00:00:00Z") }, { floatingZone: "UTC" }))).toEqual(["2026-02-04T10:00"]);
+    });
+
     it("ignores an override for an occurrence the rule never makes", () => {
         const item = onlyItem(calendar(...weekly("OVERRIDE RECURRENCE-ID;TZID=Europe/Berlin:20260106T100000|DTSTART;TZID=Europe/Berlin:20260106T100000|DTEND;TZID=Europe/Berlin:20260106T110000")));
         expect(engine.expandItem(item, range, { floatingZone: "UTC" })).toHaveLength(6);
@@ -223,6 +241,58 @@ describe("overrides and extra dates", () => {
         expect(found).toHaveLength(5);
         expect(found[0]?.start.toISOString()).toBe("2026-01-10T10:00:00.000Z");
         expect(engine.expandItem(item, { from: new Date("2026-01-10T11:00:00Z"), to: new Date("2026-01-11T00:00:00Z") }, { floatingZone: "UTC" })).toHaveLength(0);
+    });
+});
+
+describe("long-running and impossible rules", () => {
+    const range = (from: string, to: string) => ({ from: new Date(from), to: new Date(to) });
+
+    it("draws an hourly series started decades ago in today's range", () => {
+        const item = onlyItem(calendar(...event("DTSTART:20000101T000000Z", "DURATION:PT10M", "RRULE:FREQ=HOURLY")));
+        const found = engine.expandItem(item, range("2026-03-01T00:00:00Z", "2026-03-02T00:00:00Z"), { floatingZone: "UTC" });
+        expect(found).toHaveLength(24);
+        expect(found[0]?.start.toISOString()).toBe("2026-03-01T00:00:00.000Z");
+        expect(found[0]?.recurrenceKey).toBe("2026-03-01T00:00:00.000Z");
+    });
+
+    it("starts its walk near the range and finds what a walk from DTSTART finds", () => {
+        const cases = [
+            ["DTSTART;TZID=Europe/Madrid:20180103T090000", "RRULE:FREQ=DAILY;INTERVAL=3;BYMONTH=1,3,6"],
+            ["DTSTART;TZID=Europe/Madrid:20190107T093000", "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;UNTIL=20260320T000000Z"],
+            ["DTSTART;TZID=America/New_York:20241001T010000", "RRULE:FREQ=HOURLY;INTERVAL=5;BYDAY=SU,MO"],
+            ["DTSTART:20251201T000000Z", "RRULE:FREQ=MINUTELY;INTERVAL=7;BYHOUR=9"],
+            ["DTSTART;VALUE=DATE:20150105", "RRULE:FREQ=WEEKLY;INTERVAL=3;BYDAY=MO,FR"]
+        ];
+        const window = range("2026-03-01T00:00:00Z", "2026-03-15T00:00:00Z");
+        for (const [start, rule] of cases) {
+            const item = onlyItem(calendar(...event(start!, "DURATION:PT5M", rule!, "EXDATE;TZID=Europe/Madrid:20260304T090000")));
+            if (item.component !== "VEVENT" || !item.master) throw new Error("no master");
+            const master = item.master;
+            const context = { floatingZone: "UTC", timezones: item.timezones };
+            const exdates = new Set(master.exdates.map((value) => engine.wallKeyOf(value, master, context)));
+            const walked = engine
+                .generateStarts(master, context, "2026-03-20")
+                .filter((start) => !exdates.has(start.wallKey))
+                .map((start) => engine.recurrenceKeyOf(start.wallKey, master, context))
+                .filter((key) => {
+                    const at = new Date(key.length === 10 ? `${key}T00:00:00Z` : key).getTime();
+                    return at + 5 * 60_000 > window.from.getTime() && at < window.to.getTime();
+                });
+            const drawn = engine.expandItem(item, window, { floatingZone: "UTC", limit: 10_000 }).map((occurrence) => occurrence.recurrenceKey);
+            expect(drawn.length, rule).toBeGreaterThan(0);
+            expect(drawn, rule).toEqual(walked);
+        }
+    });
+
+    it("skips February 29th in the years that have none instead of drawing March 1st", () => {
+        expect(series("20260101T090000", "FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=29", [], { from: "2026-01-01", to: "2034-01-01" })).toEqual(at9("2026-01-01", "2028-02-29", "2032-02-29"));
+        expect(series("20260101T090000", "FREQ=YEARLY;BYMONTH=4,5;BYMONTHDAY=31", [], { from: "2026-01-01", to: "2028-01-01" })).toEqual(at9("2026-01-01", "2026-05-31", "2027-05-31"));
+    });
+
+    it("draws only DTSTART for a rule naming a day no month has, without spinning", () => {
+        for (const rule of ["FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30", "FREQ=YEARLY;BYMONTH=4,6;BYMONTHDAY=31", "FREQ=MONTHLY;BYMONTH=2;BYMONTHDAY=-30"]) {
+            expect(series("20260101T090000", rule, [], { from: "2026-01-01", to: "2030-01-01" }), rule).toEqual(at9("2026-01-01"));
+        }
     });
 });
 

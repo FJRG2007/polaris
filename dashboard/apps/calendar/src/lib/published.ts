@@ -16,25 +16,13 @@ import { tryItemOf } from "./objects";
 import type { OccurrenceView } from "./wire";
 import { publishedCalendar } from "./sharing";
 import { exportCalendarRow } from "./transfer";
+import { reachingWindow } from "./occurrences";
+import { busyBlock, todoClassification } from "./access";
 
-/** Only that the time is taken. */
-function blurred(event: engine.CalendarEvent, label: string): engine.CalendarEvent {
-    return {
-        ...event,
-        summary: label,
-        description: "",
-        location: "",
-        url: "",
-        conference: "",
-        categories: [],
-        attendees: [],
-        alarms: [],
-        attachments: [],
-        organizer: null,
-        color: null,
-        extra: [],
-        extraComponents: []
-    };
+/** A public event as anybody with the link may read it: what and when, but
+ *  not who else is invited, what is attached, or a property nobody here reads. */
+function published(event: engine.CalendarEvent): engine.CalendarEvent {
+    return { ...event, attendees: [], organizer: null, alarms: [], attachments: [], extra: [], extraComponents: [] };
 }
 
 function shown(mode: string, event: engine.CalendarEvent): boolean {
@@ -45,14 +33,16 @@ function shown(mode: string, event: engine.CalendarEvent): boolean {
  *  shown (a transparent event says nothing about being busy). */
 function forLink(item: engine.CalendarItem, mode: string, busyLabel: string): engine.CalendarItem | null {
     // A task's reminders are its owner's, like an event's below.
-    if (item.component !== "VEVENT") return mode === "full" ? { ...item, todo: { ...item.todo, alarms: [] } } : null;
+    if (item.component !== "VEVENT") {
+        if (mode !== "full" || todoClassification(item.todo) !== "PUBLIC") return null;
+        return { ...item, todo: { ...item.todo, alarms: [], extra: [], extraComponents: [] } };
+    }
     // What the page leaves out - free time, cancelled events - the feed does too.
     const events = [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent => Boolean(event));
     if (events.every((event) => event.transparency === "TRANSPARENT" || event.status === "CANCELLED")) return null;
     // Reminders are the owner's, not the subscribers': a feed that carried them
     // would ring on every phone that subscribes to it.
-    const map = (event: engine.CalendarEvent) =>
-        shown(mode, event) ? { ...event, alarms: [] } : blurred(event, busyLabel);
+    const map = (event: engine.CalendarEvent) => (shown(mode, event) ? published(event) : busyBlock(event, busyLabel));
     return {
         ...item,
         master: item.master ? map(item.master) : null,
@@ -84,8 +74,7 @@ export async function publishedRange(
             calendarId: calendar.id,
             deletedAt: null,
             component: "VEVENT",
-            OR: [{ startsAt: null }, { startsAt: { lt: window.to } }],
-            AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: window.from } }] }]
+            ...reachingWindow(window)
         },
         select: { id: true, ics: true },
         take: 5000

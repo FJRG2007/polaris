@@ -8,18 +8,18 @@
  *   COUNT when the rule counted) and starts a new series, with a new UID, at the
  *   occurrence. Overrides and EXDATEs from there on move to the new series.
  * - "all" changes the master. Overrides keep their own values; when the series'
- *   time of day, zone or kind changes, their RECURRENCE-IDs and the EXDATEs are
- *   re-pointed at the occurrences' new starts so they still match.
+ *   date, time of day, zone or kind changes, their RECURRENCE-IDs and the
+ *   EXDATEs are re-pointed at the occurrences' new starts so they still match.
  *
  * Keys are the `recurrenceKey` of an `Occurrence`. A floating event's keys were
  * placed in the reader's zone, so the functions take that zone too (UTC when
  * not given, which is only right for events that are not floating).
  */
 
-import * as expand from "./expand";
 import { withRule } from "./rule";
-import { addDays, isDateOnly, valueToInstant, instantToValue } from "./zones";
+import * as expand from "./expand";
 import { formatWall, parseWall, wallDifferenceSeconds, addToWall } from "./tz";
+import { addDays, daysBetween, isDateOnly, valueToInstant, instantToValue } from "./zones";
 import type { CalendarEvent, CalendarItem, DateValue, EditScope, PartStat, RecurrenceRule } from "./types";
 
 type EventItem = Extract<CalendarItem, { component: "VEVENT" }>;
@@ -59,12 +59,17 @@ function frame(value: DateValue): string {
     return isDateOnly(value) ? "date" : `${value.tzid ?? ""}|${value.dateTime.slice(11)}`;
 }
 
+function dateOf(value: DateValue): string {
+    return isDateOnly(value) ? value.date : value.dateTime.slice(0, 10);
+}
+
 /**
- * A RECURRENCE-ID / EXDATE / RDATE re-pointed at a master whose frame changed:
- * the same calendar date, at the new start's time, zone and kind.
+ * A RECURRENCE-ID / EXDATE / RDATE re-pointed at a master whose frame or date
+ * changed: the calendar date moved by `days`, at the new start's time, zone
+ * and kind.
  */
-function reframe(value: DateValue, oldMaster: CalendarEvent, newStart: DateValue, ctx: expand.ExpandContext): DateValue {
-    const date = expand.wallKeyOf(value, oldMaster, ctx).slice(0, 10);
+function reframe(value: DateValue, oldMaster: CalendarEvent, newStart: DateValue, ctx: expand.ExpandContext, days = 0): DateValue {
+    const date = addDays(expand.wallKeyOf(value, oldMaster, ctx).slice(0, 10), days);
     if (isDateOnly(newStart)) return { date };
     return { dateTime: `${date}${newStart.dateTime.slice(10)}`, tzid: newStart.tzid };
 }
@@ -112,15 +117,16 @@ function editAll(item: EventItem, recurrenceKey: string | null, next: CalendarEv
         }
     }
     const updated = bumped(master, { ...next, uid: master.uid, recurrenceId: null, thisAndFuture: false, start, end, exdates: master.exdates, rdates: master.rdates });
-    if (frame(master.start) === frame(start)) return { ...item, master: updated };
+    const days = daysBetween(dateOf(master.start), dateOf(start));
+    if (days === 0 && frame(master.start) === frame(start)) return { ...item, master: updated };
     return {
         ...item,
         master: {
             ...updated,
-            exdates: master.exdates.map((value) => reframe(value, master, start, ctx)),
-            rdates: master.rdates.map((value) => reframe(value, master, start, ctx))
+            exdates: master.exdates.map((value) => reframe(value, master, start, ctx, days)),
+            rdates: master.rdates.map((value) => reframe(value, master, start, ctx, days))
         },
-        overrides: item.overrides.map((override) => (override.recurrenceId ? { ...override, recurrenceId: reframe(override.recurrenceId, master, start, ctx) } : override))
+        overrides: item.overrides.map((override) => (override.recurrenceId ? { ...override, recurrenceId: reframe(override.recurrenceId, master, start, ctx, days) } : override))
     };
 }
 
@@ -206,7 +212,8 @@ function editFollowing(item: EventItem, recurrenceKey: string, next: CalendarEve
     const occurrenceStart = recurrenceIdStart(wallKey, master);
     const newMaster: CalendarEvent = { ...next, uid, recurrenceId: null, thisAndFuture: false, rule, sequence: 0, exdates: [], rdates: [] };
     const moved = frame(occurrenceStart) !== frame(newMaster.start) || !sameValue(occurrenceStart, newMaster.start);
-    const carry = (value: DateValue) => (moved ? reframe(value, master, newMaster.start, ctx) : value);
+    const days = daysBetween(wallKey.slice(0, 10), dateOf(newMaster.start));
+    const carry = (value: DateValue) => (moved ? reframe(value, master, newMaster.start, ctx, days) : value);
     const splitMaster: CalendarEvent = { ...newMaster, exdates: cut.exdates.map(carry), rdates: cut.rdates.map(carry) };
     const split: EventItem = {
         component: "VEVENT",
@@ -378,4 +385,3 @@ export function setAttendeeStatus(item: CalendarItem, email: string, partstat: P
     if (isDateOnly(events.master.start) && occurrence.startDate && occurrence.endDate) return editThis(events, recurrenceKey, { ...moved, start: { date: occurrence.startDate }, end: { date: occurrence.endDate } }, ctx);
     return editThis(events, recurrenceKey, moved, ctx);
 }
-

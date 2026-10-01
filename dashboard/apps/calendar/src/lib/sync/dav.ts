@@ -8,7 +8,7 @@
 
 import { SyncRefusedError } from "./errors";
 import { XmlError, child, childrenOf, parseXml, textContent, type XmlElement } from "./xml";
-import { MAX_RESPONSE_BYTES, basicAuth, errorFor, readCapped, reasonOf, send, type Fetcher } from "./http";
+import { MAX_RESPONSE_BYTES, basicAuth, errorFor, readCapped, reasonOf, requireHttpUrl, sameSite, send, type Fetcher } from "./http";
 
 export const DAV = "DAV:";
 export const CALDAV = "urn:ietf:params:xml:ns:caldav";
@@ -132,6 +132,8 @@ export interface DavCredentials {
     readonly username: string;
     readonly password: string;
     readonly fetcher: Fetcher;
+    /** The server the password was given for; an href elsewhere is not sent it. */
+    readonly origin: string;
 }
 
 export interface DavResult {
@@ -147,10 +149,12 @@ export async function davRequest(
     url: string,
     options: { depth?: "0" | "1"; body?: string; headers?: Record<string, string> } = {}
 ): Promise<DavResult> {
+    const origin = requireHttpUrl(credentials.origin);
+    if (!sameSite(origin, requireHttpUrl(url))) throw new SyncRefusedError("The server pointed at an address on another host", null);
     const headers: Record<string, string> = { Authorization: basicAuth(credentials.username, credentials.password), ...options.headers };
     if (options.depth !== undefined) headers.Depth = options.depth;
     if (options.body !== undefined) headers["Content-Type"] = "application/xml; charset=utf-8";
-    return send(credentials.fetcher, url, { method, headers, body: options.body });
+    return send(credentials.fetcher, url, { method, headers, body: options.body, credentialOrigin: origin });
 }
 
 /**

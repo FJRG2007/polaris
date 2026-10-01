@@ -74,6 +74,7 @@ export async function share(
             : { calendarId_teamId: { calendarId: calendar.id, teamId: input.target.id } };
     const existing = await prisma.calendarShare.findUnique({ where, select: { id: true, access: true } });
     if (existing?.access === input.access) return;
+    if (existing?.access === "manage" && calendar.reach !== "owner") throw new CalendarRefusal(t("sharing.onlyOwnerManage"));
     await prisma.calendarShare.upsert({
         where,
         create: {

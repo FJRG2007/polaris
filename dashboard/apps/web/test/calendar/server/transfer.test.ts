@@ -156,6 +156,36 @@ describe("calendar import and export", () => {
         expect((await transfer.exportEvent(bob, String(row.id))).ics).toContain("Secret");
     });
 
+    it("exports to a reader what the calendar shows them: private events as busy blocks, private tasks not at all", async () => {
+        const bob = addUser({ name: "Bob", email: "bob@example.test" });
+        world.storeEvent(calendar, { uid: "open@example", summary: "Launch", start: world.at("2026-10-05T10:00:00"), end: world.at("2026-10-05T11:00:00") });
+        const hidden = world.storeEvent(calendar, {
+            uid: "closed@example",
+            summary: "Therapy",
+            location: "Clinic",
+            description: "Session notes",
+            classification: "PRIVATE",
+            attendees: [{ email: "doctor@outside.test", name: "", role: "REQ-PARTICIPANT", partstat: "ACCEPTED", rsvp: false, type: "INDIVIDUAL" }],
+            start: world.at("2026-10-06T10:00:00"),
+            end: world.at("2026-10-06T11:00:00")
+        });
+        const task = engine.newTodo({ uid: "task@example", summary: "Lawyer", due: world.at("2026-10-07T12:00:00") });
+        world.storeItem(calendar, engine.todoItem({ ...task, extra: [{ line: "CLASS:PRIVATE" }] }));
+        world.addShare(calendar, { userId: bob.id }, "read");
+
+        const file = (await transfer.exportCalendar(bob, calendar)).ics;
+        expect(file).toContain("Launch");
+        for (const secret of ["Therapy", "Clinic", "Session notes", "doctor@outside.test", "Lawyer"]) expect(file).not.toContain(secret);
+        expect(engine.parseCalendarText(file).items.map((item) => item.uid).sort()).toEqual(["closed@example", "open@example"]);
+        const one = await transfer.exportEvent(bob, String(hidden.id));
+        expect(one.name).toBe("event");
+        expect(one.ics).not.toContain("Therapy");
+
+        db.rows("calendarShare")[0]!.access = "write";
+        expect((await transfer.exportCalendar(bob, calendar)).ics).toContain("Therapy");
+        expect((await transfer.exportCalendar(alice, calendar)).ics).toContain("Lawyer");
+    });
+
     it("names a download with safe characters only", () => {
         expect(transfer.fileName("Café / Équipe: plans", "ics")).toBe("Cafe-Equipe-plans.ics");
         expect(transfer.fileName("///", "ics")).toBe("calendar.ics");

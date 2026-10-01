@@ -16,11 +16,18 @@
 
 import ICAL from "ical.js";
 import { addToWall, formatWall, parseWall, wallDifferenceSeconds } from "./tz";
-import type { CalendarEvent, CalendarItem, DateValue, Occurrence, WallTime } from "./types";
+import type { CalendarEvent, CalendarItem, DateValue, Frequency, Occurrence, RecurrenceRule, WallTime } from "./types";
 import { addDays, clockFor, daysBetween, isDateOnly, valueToInstant, valueWall, type ZoneClock } from "./zones";
 
 /** Iterations a single rule may take before it is treated as runaway. */
 const ITERATION_GUARD = 200_000;
+
+/** The wall-clock length of one period, for the frequencies whose periods all
+ *  have the same length. */
+const PERIOD_SECONDS: Partial<Record<Frequency, number>> = { SECONDLY: 1, MINUTELY: 60, HOURLY: 3600, DAILY: 86_400, WEEKLY: 604_800 };
+
+/** The most days each month can have. */
+const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /** Where every expansion of one item reads its times. */
 export interface ExpandContext {
@@ -90,11 +97,32 @@ function untilKey(master: CalendarEvent, context: ExpandContext): string | null 
     return wallKeyOf(until, master, context);
 }
 
+/** Whether a rule's BYMONTH and BYMONTHDAY name no day that exists. */
+function noSuchDay(rule: RecurrenceRule): boolean {
+    if (rule.byMonthDay.length === 0) return false;
+    const months = rule.byMonth.length > 0 ? rule.byMonth : MONTH_DAYS.map((_, index) => index + 1);
+    return months.every((month) => rule.byMonthDay.every((day) => Math.abs(day) > (MONTH_DAYS[month - 1] ?? 0)));
+}
+
+/** Whether a generated day is one the rule's BYMONTH and BYMONTHDAY allow:
+ *  ical.js rolls a day the month does not have (February 29th) into the next. */
+function allowedDay(rule: RecurrenceRule, wall: WallTime): boolean {
+    if (rule.byMonth.length > 0 && !rule.byMonth.includes(wall.month)) return false;
+    if (rule.byMonthDay.length === 0) return true;
+    const days = new Date(Date.UTC(wall.year, wall.month, 0)).getUTCDate();
+    return rule.byMonthDay.some((day) => day === wall.day || days + day + 1 === wall.day);
+}
+
 /**
  * Every start the master's rule and RDATEs generate, in order, stopping after
  * `stopAfter` (a wall key) or `max` starts. EXDATE is not applied here.
+ *
+ * Starts before `from` (a wall key) other than DTSTART are left out, and a rule
+ * that neither counts nor has periods of varying length is not walked through
+ * them: its iteration begins a whole number of periods after DTSTART, two
+ * periods short of `from`, which generates the same starts from there on.
  */
-export function generateStarts(master: CalendarEvent, context: ExpandContext, stopAfter: string | null, max = Number.POSITIVE_INFINITY): GeneratedStart[] {
+export function generateStarts(master: CalendarEvent, context: ExpandContext, stopAfter: string | null, max = Number.POSITIVE_INFINITY, from: string | null = null): GeneratedStart[] {
     const allDay = isDateOnly(master.start);
     const first = valueWall(master.start);
     const firstKey = allDay ? formatWall(first).slice(0, 10) : formatWall(first);
@@ -102,11 +130,17 @@ export function generateStarts(master: CalendarEvent, context: ExpandContext, st
     const keyOfWall = (wall: WallTime) => (allDay ? formatWall(wall).slice(0, 10) : formatWall(wall));
     found.set(firstKey, { wallKey: firstKey, wall: first });
     const rule = master.rule;
-    if (rule) {
+    if (rule && !noSuchDay(rule)) {
         const limit = Math.min(max, rule.count ?? Number.POSITIVE_INFINITY);
         const until = untilKey(master, context);
         const recur = ICAL.Recur.fromString(rawWithout(rule.raw, ["COUNT", "UNTIL"]));
-        const iterator = recur.iterator(ICAL.Time.fromData({ ...first, isDate: allDay }));
+        let anchor = first;
+        const period = (PERIOD_SECONDS[rule.frequency] ?? 0) * rule.interval;
+        if (from !== null && rule.count === null && period > 0 && (!allDay || period % 86_400 === 0)) {
+            const periods = Math.floor(wallDifferenceSeconds(first, parseWall(from)) / period) - 2;
+            if (periods > 0) anchor = addToWall(first, { seconds: periods * period });
+        }
+        const iterator = recur.iterator(ICAL.Time.fromData({ ...anchor, isDate: allDay }));
         let emitted = 1;
         let guard = 0;
         for (let next = iterator.next(); next && emitted < limit && guard < ITERATION_GUARD; next = iterator.next(), guard++) {
@@ -115,7 +149,8 @@ export function generateStarts(master: CalendarEvent, context: ExpandContext, st
             if (key <= firstKey) continue;
             if (until !== null && key > until) break;
             if (stopAfter !== null && key > stopAfter) break;
-            found.set(key, { wallKey: key, wall });
+            if (!allowedDay(rule, wall)) continue;
+            if (from === null || key >= from) found.set(key, { wallKey: key, wall });
             emitted++;
         }
     }
@@ -229,16 +264,19 @@ export function expandItem(item: CalendarItem, range: { from: Date; to: Date }, 
     }
     const overrides = overridesByKey(item, context);
     const exdates = new Set(master.exdates.map((value) => wallKeyOf(value, master, context)));
+    const futures = [...overrides.entries()].filter(([, event]) => event.thisAndFuture).sort(([a], [b]) => (a < b ? -1 : 1));
     // Iterate far enough to reach the range's end and every overridden
-    // occurrence, which may have been moved into the range from later on.
-    const margin = 2 * 86_400_000 + masterLengthMs(master, context);
-    let stopAfter = formatWall(clock.toWall(new Date(range.to.getTime() + 2 * 86_400_000)));
+    // occurrence, which may have been moved into the range from later on, and
+    // as far again on both sides as a THISANDFUTURE override moves the rest.
+    const reach = Math.max(0, ...futures.map(([, event]) => Math.abs(shiftSeconds(event, master, context)))) * 1000;
+    const margin = 2 * 86_400_000 + masterLengthMs(master, context) + reach;
+    let stopAfter = formatWall(clock.toWall(new Date(range.to.getTime() + 2 * 86_400_000 + reach)));
     if (isDateOnly(master.start)) stopAfter = stopAfter.slice(0, 10);
     for (const key of overrides.keys()) if (key > stopAfter) stopAfter = key;
     const lowWall = formatWall(clock.toWall(new Date(range.from.getTime() - margin)));
     const low = isDateOnly(master.start) ? lowWall.slice(0, 10) : lowWall;
-    const futures = [...overrides.entries()].filter(([, event]) => event.thisAndFuture).sort(([a], [b]) => (a < b ? -1 : 1));
-    for (const generated of generateStarts(master, context, stopAfter)) {
+    const from = [...overrides.keys()].reduce((earliest, key) => (key < earliest ? key : earliest), low);
+    for (const generated of generateStarts(master, context, stopAfter, Number.POSITIVE_INFINITY, from)) {
         if (exdates.has(generated.wallKey)) continue;
         const override = overrides.get(generated.wallKey);
         if (override) {
@@ -249,25 +287,26 @@ export function expandItem(item: CalendarItem, range: { from: Date; to: Date }, 
         if (generated.wallKey < low) continue;
         const future = [...futures].reverse().find(([key]) => key < generated.wallKey)?.[1];
         const event = future ?? master;
-        const wall = future ? shiftedWall(generated.wall, future, master, context) : generated.wall;
-        const span = placed(event, wall, context, future ? clockFor(isDateOnly(future.start) ? null : future.start.tzid, context.floatingZone, context.timezones) : clock);
+        const wall = future ? addToWall(generated.wall, { seconds: shiftSeconds(future, master, context) }) : generated.wall;
+        const span = placed(event, wall, context, future && isDateOnly(master.start) ? clockFor(isDateOnly(future.start) ? null : future.start.tzid, context.floatingZone, context.timezones) : clock);
         if (overlaps(span.start, span.end, range)) result.push(occurrenceOf(event, recurrenceKeyOf(generated.wallKey, master, context), span, false, true));
     }
     return sortAndLimit(result, limit);
 }
 
-/** Where a THISANDFUTURE override moves a later occurrence: by the same wall delta. */
-function shiftedWall(wall: WallTime, future: CalendarEvent, master: CalendarEvent, context: ExpandContext): WallTime {
+/** How far a THISANDFUTURE override moves a later occurrence: its wall delta
+ *  in seconds, read in the master's frame. */
+function shiftSeconds(future: CalendarEvent, master: CalendarEvent, context: ExpandContext): number {
     const original = future.recurrenceId;
-    if (!original) return wall;
+    if (!original) return 0;
     if (isDateOnly(future.start) || isDateOnly(original)) {
         const from = isDateOnly(original) ? original.date : original.dateTime.slice(0, 10);
         const to = isDateOnly(future.start) ? future.start.date : future.start.dateTime.slice(0, 10);
-        return addToWall(wall, { days: daysBetween(from, to) });
+        return daysBetween(from, to) * 86_400;
     }
     const originalKey = wallKeyOf(original, master, context);
     const movedKey = wallKeyOf(future.start, master, context);
-    return addToWall(wall, { seconds: wallDifferenceSeconds(parseWall(originalKey), parseWall(movedKey)) });
+    return wallDifferenceSeconds(parseWall(originalKey), parseWall(movedKey));
 }
 
 function masterLengthMs(master: CalendarEvent, context: ExpandContext): number {

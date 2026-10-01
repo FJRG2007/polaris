@@ -243,6 +243,31 @@ describe("serializeItem", () => {
         expect(back?.component === "VEVENT" && back.master?.summary).toBe(long.summary);
     });
 
+    it("writes no line a value did not ask for, whatever control characters the values carry", () => {
+        const injected = "ATTENDEE:mailto:intruder@example.com";
+        const event = engine.newEvent({
+            uid: "controls",
+            summary: `Lone return\r${injected}`,
+            location: `Bell\u0007${injected}`,
+            conference: `https://meet.example.com/room\r\n${injected}`,
+            url: `https://example.com/page\n${injected}`,
+            attachments: [{ uri: `https://example.com/file\r${injected}`, name: `Report\r${injected}`, mime: "" }],
+            organizer: { email: `owner@example.com\n${injected}`, name: `Owner\r${injected}` },
+            start: { dateTime: "2026-05-01T10:00:00", tzid: `vendor\r\n${injected}/Europe/Madrid` },
+            end: { dateTime: "2026-05-01T11:00:00", tzid: "Europe/Madrid" },
+            extra: engine.parseCalendarText(["BEGIN:VCALENDAR", "BEGIN:VEVENT", "UID:x", "DTSTART:20260101T100000Z", `STATUS:ODD\\n${injected}`, "END:VEVENT", "END:VCALENDAR"].join("\r\n")).items.flatMap((item) => (item.component === "VEVENT" ? (item.master?.extra ?? []) : []))
+        });
+        const text = engine.serializeItem(engine.eventItem(event));
+        const lines = text.split("\r\n");
+        for (const line of lines) expect(line).not.toMatch(/[\u0000-\u001F\u007F]/);
+        expect(lines.filter((line) => line.startsWith("ATTENDEE"))).toEqual([]);
+        const back = engine.parseCalendarText(text).items[0];
+        if (!back || back.component !== "VEVENT" || !back.master) throw new Error("no event");
+        expect(back.master.attendees).toEqual([]);
+        expect(back.master.summary).toBe(`Lone return\n${injected}`);
+        expect(back.master.conference).toBe(`https://meet.example.com/room${injected}`);
+    });
+
     it("never copies METHOD from the item, and takes a PRODID", () => {
         const item: engine.CalendarItem = { ...engine.eventItem(long), method: "REQUEST" };
         const text = engine.serializeItem(item, { prodId: "-//Other//EN" });

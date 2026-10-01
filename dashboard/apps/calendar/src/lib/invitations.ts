@@ -25,10 +25,11 @@ import { host } from "@polaris/app-host";
 import { randomBytes } from "node:crypto";
 import type { ObjectChange } from "./effects";
 import { calendarTIn, localeOf } from "./i18n";
-import { tryItemOf, writeItem } from "./objects";
+import { tryItemOf, writeItem, type StoredObject } from "./objects";
 import { resourceIdOf } from "./resource-address";
 import { loadPreferences } from "./preferences-store";
 import { ensurePersonalCalendarFor } from "./personal";
+import { mayMailOutside } from "./scheduling-guard";
 
 type EventItem = Extract<engine.CalendarItem, { component: "VEVENT" }>;
 
@@ -120,7 +121,7 @@ export async function afterChange(change: ObjectChange, ownerId: string): Promis
 }
 
 /** The addresses an owner organizes events as. */
-async function ownerAddresses(userId: string): Promise<Set<string>> {
+export async function ownerAddresses(userId: string): Promise<Set<string>> {
     const [person, extra] = await Promise.all([
         host.calendarHost.peopleByIds([userId]),
         prisma.userEmail.findMany({ where: { userId, verifiedAt: { not: null } }, select: { email: true } })
@@ -155,7 +156,7 @@ async function requestFor(
             continue;
         }
         if (userId && userId !== organizerId) {
-            await deliverInternal(userId, item, "REQUEST");
+            await deliverInternal(userId, organizerId, item, "REQUEST");
         } else if (!userId) {
             await mailInvitation(email, item, "REQUEST", invitation.token, organizerId);
         }
@@ -180,7 +181,7 @@ async function cancelFor(
             continue;
         }
         const userId = internal.get(email) ?? null;
-        if (userId && userId !== organizerId) await deliverInternal(userId, item, "CANCEL");
+        if (userId && userId !== organizerId) await deliverInternal(userId, organizerId, item, "CANCEL");
         else if (!userId) await mailInvitation(email, item, "CANCEL", null, organizerId);
     }
     await prisma.calendarInvitation.deleteMany({ where: { objectId, email: { in: [...emails] } } });
@@ -204,29 +205,58 @@ async function answerAsRoom(
         .catch((caught: unknown) => console.error("polaris: a room did not answer an invitation:", caught));
 }
 
+const STORED_COLUMNS = {
+    id: true,
+    calendarId: true,
+    uid: true,
+    component: true,
+    ics: true,
+    href: true,
+    etag: true,
+    updatedAt: true,
+    deletedAt: true
+} as const;
+
+/**
+ * Somebody's copy of an event with this UID, and whether one exists at all. A
+ * UID is not a secret - everybody invited and every free/busy reader sees it -
+ * so a copy counts only when it was organized at one of `organizer`'s
+ * addresses: the same UID under anybody else is a different event.
+ */
+async function copyFrom(
+    userId: string,
+    uid: string,
+    organizer: ReadonlySet<string>,
+    live: boolean
+): Promise<{ copy: StoredObject | null; taken: boolean }> {
+    const rows = await prisma.calendarObject.findMany({
+        where: { uid, ...(live ? { deletedAt: null } : {}), calendar: { ownerId: userId, trashedAt: null } },
+        select: STORED_COLUMNS
+    });
+    const copy = rows.find((row) => {
+        const email = organizerOf(tryItemOf(row.ics))?.email;
+        return email !== undefined && organizer.has(email);
+    });
+    return { copy: copy ?? null, taken: rows.length > 0 };
+}
+
 /**
  * Put the organizer's event into a Polaris attendee's own calendar, keeping
  * whatever they already answered and the reminders they set on their copy; or
- * mark their copy cancelled.
+ * mark their copy cancelled. An event of the attendee's own, or of somebody
+ * else, that carries the same UID is left alone.
  */
-async function deliverInternal(userId: string, item: engine.CalendarItem, method: "REQUEST" | "CANCEL"): Promise<void> {
+async function deliverInternal(
+    userId: string,
+    organizerId: string,
+    item: engine.CalendarItem,
+    method: "REQUEST" | "CANCEL"
+): Promise<void> {
     if (item.component !== "VEVENT") return;
     const calendarId = await invitationCalendarOf(userId);
     if (!calendarId) return;
-    const existing = await prisma.calendarObject.findFirst({
-        where: { uid: item.uid, calendar: { ownerId: userId, trashedAt: null } },
-        select: {
-            id: true,
-            calendarId: true,
-            uid: true,
-            component: true,
-            ics: true,
-            href: true,
-            etag: true,
-            updatedAt: true,
-            deletedAt: true
-        }
-    });
+    const { copy: existing, taken } = await copyFrom(userId, item.uid, await ownerAddresses(organizerId), false);
+    if (taken && !existing) return;
     const mine = existing ? tryItemOf(existing.ics) : null;
     const emails = await ownerAddresses(userId);
     let copy: engine.CalendarItem =
@@ -337,6 +367,10 @@ async function mailInvitation(
 ): Promise<void> {
     const event = eventsOf(item)[0];
     if (!event) return;
+    if (!(await mayMailOutside(organizerId))) {
+        console.error("polaris: a calendar invitation was not sent: the organizer's mail limit is spent");
+        return;
+    }
     const locale = await localeOf(organizerId);
     const t = calendarTIn(locale);
     const title = event.summary || t("invitations.untitled");
@@ -412,22 +446,9 @@ export async function applyAnswer(
     partstat: engine.PartStat,
     recurrenceKey: string | null
 ): Promise<void> {
-    const row = await prisma.calendarObject.findFirst({
-        where: { uid, deletedAt: null, calendar: { ownerId: organizerId, trashedAt: null } },
-        select: {
-            id: true,
-            calendarId: true,
-            uid: true,
-            component: true,
-            ics: true,
-            href: true,
-            etag: true,
-            updatedAt: true,
-            deletedAt: true
-        }
-    });
+    const { copy: row } = await copyFrom(organizerId, uid, await ownerAddresses(organizerId), true);
     const item = row ? tryItemOf(row.ics) : null;
-    if (!row || !item) return;
+    if (!row || !item || !eventsOf(item).some((event) => event.attendees.some((attendee) => attendee.email === email))) return;
     const answered = engine.applyReply(item, email, partstat, recurrenceKey);
     await writeItem(row.calendarId, row, answered, { actor: null, floatingZone: "UTC", fromImport: true });
     await prisma.calendarInvitation.updateMany({

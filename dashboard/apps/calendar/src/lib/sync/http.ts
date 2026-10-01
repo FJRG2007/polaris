@@ -6,7 +6,7 @@
  * a redirect typed by a user cannot reach into the host's own network. Redirects
  * are followed here, by hand, for the same reason - each hop goes back through
  * the fetcher, a hop may not downgrade https to http, and credentials only
- * travel to the host they were given for (or one of its siblings).
+ * travel to the origin they were given for (or a host under it).
  */
 
 import { SyncAuthError, SyncConflictError, SyncGoneError, SyncNotFoundError, SyncRefusedError, SyncUnreachableError, safeReason } from "./errors";
@@ -27,20 +27,29 @@ export interface SendOptions {
     timeoutMs?: number;
     /** Headers that carry credentials, dropped when a redirect leaves the host. */
     credentialHeaders?: readonly string[];
+    /** The address the credentials were given for; the request's own when absent. */
+    credentialOrigin?: URL;
 }
+
+/**
+ * Hosts a configured one hands an account on to. iCloud answers on
+ * `caldav.icloud.com` and keeps each account on `pNN-caldav.icloud.com`, which
+ * needs the same password.
+ */
+const PARTITIONS: readonly { host: string; partition: RegExp }[] = [{ host: "caldav.icloud.com", partition: /^p\d+-caldav\.icloud\.com$/ }];
 
 /**
  * Whether credentials given for `from` may be sent to `to`.
  *
- * Same host, or a host under the same parent domain: iCloud answers on
- * `caldav.icloud.com` and moves each account to `pNN-caldav.icloud.com`, and
- * that account needs the same password. A redirect to anywhere else loses them.
+ * The same origin, a host under it over https, or a partition the configured
+ * host is known to move accounts to. A sibling host is not enough: without the
+ * public suffix list, `example.co.uk` and `another.co.uk` look like siblings.
  */
 export function sameSite(from: URL, to: URL): boolean {
-    if (from.hostname === to.hostname) return true;
-    const labels = from.hostname.split(".");
-    const parent = labels.length > 2 ? labels.slice(1).join(".") : from.hostname;
-    return to.hostname === parent || to.hostname.endsWith(`.${parent}`);
+    if (from.origin === to.origin) return true;
+    if (to.protocol !== "https:" || to.port !== from.port) return false;
+    if (to.hostname.endsWith(`.${from.hostname}`)) return true;
+    return PARTITIONS.some((entry) => entry.host === from.hostname && entry.partition.test(to.hostname));
 }
 
 /** Parses Retry-After (seconds or an HTTP date) into seconds, or null. */
@@ -82,6 +91,7 @@ export async function send(fetcher: Fetcher, rawUrl: string, options: SendOption
     let method = options.method ?? "GET";
     let body = options.body;
     let headers = { ...options.headers };
+    const origin = options.credentialOrigin ?? url;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     for (let hop = 0; ; hop++) {
         let response: Response;
@@ -96,6 +106,7 @@ export async function send(fetcher: Fetcher, rawUrl: string, options: SendOption
             });
         } catch (error) {
             if (error instanceof SyncRefusedError || error instanceof SyncAuthError) throw error;
+            if (error instanceof Error && error.name === "RefusedAddressError") throw error;
             const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
             throw new SyncUnreachableError(timedOut ? `No answer from ${url.host} in time` : `Could not reach ${url.host}`, null);
         }
@@ -112,7 +123,7 @@ export async function send(fetcher: Fetcher, rawUrl: string, options: SendOption
         }
         if (next.protocol !== "https:" && next.protocol !== "http:") throw new SyncRefusedError("The server redirected to an unsupported address", response.status);
         if (url.protocol === "https:" && next.protocol === "http:") throw new SyncRefusedError("The server redirected from https to http", response.status);
-        if (!sameSite(url, next)) {
+        if (!sameSite(origin, next)) {
             const drop = new Set((options.credentialHeaders ?? ["authorization"]).map((h) => h.toLowerCase()));
             headers = Object.fromEntries(Object.entries(headers).filter(([name]) => !drop.has(name.toLowerCase())));
         }

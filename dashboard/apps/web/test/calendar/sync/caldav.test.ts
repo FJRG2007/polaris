@@ -13,11 +13,12 @@ import {
     SyncAuthError,
     SyncConflictError,
     SyncRefusedError,
+    SyncUnreachableError,
     createCalDavProvider,
     discoverCalDav,
     type PullState
 } from "@polaris-app/calendar/src/lib/sync";
-import { send } from "@polaris-app/calendar/src/lib/sync/http";
+import { sameSite, send } from "@polaris-app/calendar/src/lib/sync/http";
 import { createFakeCalDav, vevent } from "./fixtures/fake-caldav";
 
 const NEXTCLOUD = "https://cloud.example.test";
@@ -70,18 +71,40 @@ describe("discoverCalDav", () => {
 
     it("follows an iCloud-style principal on another host, with DAV: as the default namespace", async () => {
         const server = createFakeCalDav({
-            origins: ["https://caldav.icloud.example", "https://p42-caldav.icloud.example"],
+            origins: ["https://caldav.icloud.com", "https://p42-caldav.icloud.com"],
             username: "someone@example.test",
             password: "abcd-efgh-ijkl-mnop",
             davPrefix: "",
             wellKnown: null,
-            principal: "https://p42-caldav.icloud.example/123456/principal/",
-            home: "https://p42-caldav.icloud.example/123456/calendars/"
+            principal: "https://p42-caldav.icloud.com/123456/principal/",
+            home: "https://p42-caldav.icloud.com/123456/calendars/"
         });
         server.addCalendar({ path: "/123456/calendars/home/", name: "Home", color: "#1BADF8FF", components: ["VEVENT"] });
-        const found = await discoverCalDav({ url: "https://caldav.icloud.example", username: "someone@example.test", password: "abcd-efgh-ijkl-mnop", fetcher: server.fetcher });
-        expect(found.homeUrl).toBe("https://p42-caldav.icloud.example/123456/calendars/");
-        expect(found.calendars.map((c) => [c.remoteId, c.color])).toEqual([["https://p42-caldav.icloud.example/123456/calendars/home/", "#1badf8"]]);
+        const found = await discoverCalDav({ url: "https://caldav.icloud.com", username: "someone@example.test", password: "abcd-efgh-ijkl-mnop", fetcher: server.fetcher });
+        expect(found.homeUrl).toBe("https://p42-caldav.icloud.com/123456/calendars/");
+        expect(found.calendars.map((c) => [c.remoteId, c.color])).toEqual([["https://p42-caldav.icloud.com/123456/calendars/home/", "#1badf8"]]);
+    });
+
+    it("fails instead of reading the address as the home when the principal does not answer", async () => {
+        const { server } = nextcloud();
+        const fetcher = async (url: string, init: RequestInit & { timeoutMs?: number }) =>
+            url.endsWith("/principals/users/alice/") ? new Response("busy", { status: 503 }) : server.fetcher(url, init);
+        await expect(discoverCalDav({ url: NEXTCLOUD, username: "alice", password: "app-password", fetcher })).rejects.toBeInstanceOf(SyncUnreachableError);
+        const provider = createCalDavProvider({ serverUrl: NEXTCLOUD, username: "alice", password: "app-password", fetcher });
+        await expect(provider.listCalendars()).rejects.toBeInstanceOf(SyncUnreachableError);
+    });
+
+    it("does not send the password to a principal the server names on another host", async () => {
+        const server = createFakeCalDav({
+            origins: ["https://dav.example.co.uk", "https://another.co.uk"],
+            username: "alice",
+            password: "app-password",
+            wellKnown: null,
+            principal: "https://another.co.uk/principal/",
+            home: "https://another.co.uk/calendars/"
+        });
+        await expect(discoverCalDav({ url: "https://dav.example.co.uk/dav/", username: "alice", password: "app-password", fetcher: server.fetcher })).rejects.toBeInstanceOf(SyncRefusedError);
+        expect(server.requests.filter((r) => r.url.startsWith("https://another.co.uk"))).toEqual([]);
     });
 
     it("reports a refused password as an auth error", async () => {
@@ -103,18 +126,46 @@ describe("redirects", () => {
         await expect(send(fetcher, "https://cloud.example.test/.well-known/caldav")).rejects.toBeInstanceOf(SyncRefusedError);
     });
 
-    it("drops credentials when a redirect leaves the site, keeps them for a sibling host", async () => {
+    it("drops credentials when a redirect leaves the origin, keeps them for an iCloud partition", async () => {
         const seen: Record<string, string | undefined> = {};
         const fetcher = async (url: string, init: RequestInit) => {
             seen[new URL(url).host] = (init.headers as Record<string, string>).Authorization;
-            if (url.startsWith("https://caldav.icloud.example")) return new Response(null, { status: 307, headers: { Location: "https://p1-caldav.icloud.example/x" } });
-            if (url.startsWith("https://p1-caldav.icloud.example")) return new Response(null, { status: 307, headers: { Location: "https://elsewhere.example.net/y" } });
+            if (url.startsWith("https://caldav.icloud.com")) return new Response(null, { status: 307, headers: { Location: "https://p1-caldav.icloud.com/x" } });
+            if (url.startsWith("https://p1-caldav.icloud.com")) return new Response(null, { status: 307, headers: { Location: "https://elsewhere.example.net/y" } });
             return new Response("ok");
         };
-        await send(fetcher, "https://caldav.icloud.example/", { headers: { Authorization: "Basic abc" } });
-        expect(seen["caldav.icloud.example"]).toBe("Basic abc");
-        expect(seen["p1-caldav.icloud.example"]).toBe("Basic abc");
+        await send(fetcher, "https://caldav.icloud.com/", { headers: { Authorization: "Basic abc" } });
+        expect(seen["caldav.icloud.com"]).toBe("Basic abc");
+        expect(seen["p1-caldav.icloud.com"]).toBe("Basic abc");
         expect(seen["elsewhere.example.net"]).toBeUndefined();
+    });
+
+    it("drops credentials on a redirect to a sibling registrable domain, keeps them under the host", async () => {
+        const seen: Record<string, string | undefined> = {};
+        const fetcher = async (url: string, init: RequestInit) => {
+            seen[new URL(url).host] = (init.headers as Record<string, string>).Authorization;
+            if (url.startsWith("https://example.co.uk")) return new Response(null, { status: 302, headers: { Location: "https://dav.example.co.uk/x" } });
+            if (url.startsWith("https://dav.example.co.uk")) return new Response(null, { status: 302, headers: { Location: "https://another.co.uk/y" } });
+            return new Response("ok");
+        };
+        await send(fetcher, "https://example.co.uk/", { headers: { Authorization: "Basic abc" } });
+        expect(seen["dav.example.co.uk"]).toBe("Basic abc");
+        expect(seen["another.co.uk"]).toBeUndefined();
+        expect(sameSite(new URL("https://mail.example.com/"), new URL("https://dav.example.com/"))).toBe(false);
+        expect(sameSite(new URL("https://example.com/"), new URL("http://dav.example.com/"))).toBe(false);
+    });
+
+    it("passes a refused address through as itself, not as an unreachable server", async () => {
+        class RefusedAddressError extends Error {
+            constructor() {
+                super("That address cannot be reached from here.");
+                this.name = "RefusedAddressError";
+            }
+        }
+        const fetcher = async () => {
+            throw new RefusedAddressError();
+        };
+        await expect(send(fetcher, "https://inside.example.test/")).rejects.toBeInstanceOf(RefusedAddressError);
     });
 
     it("stops after five redirects", async () => {

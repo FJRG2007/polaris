@@ -7,7 +7,7 @@
  * cap, buffers, the busy time of the booking calendar and the conflict
  * calendars, and the other bookings - and a slot they pick is held for them
  * until they confirm their address from the email this sends. A hold nobody
- * confirms is dropped after a day by `sweepStaleBookings`.
+ * confirms is dropped after an hour by `sweepStaleBookings`.
  *
  * Confirming checks the slot again (somebody may have taken it since), then
  * writes the event into the booking calendar through `writeItem` with the
@@ -21,9 +21,9 @@ import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { calendarBusy } from "./freebusy";
-import { readInstanceSettings } from "./instance-settings";
 import { CalendarRefusal } from "./errors";
 import type { SessionUser } from "./access";
+import { readInstanceSettings } from "./instance-settings";
 import { calendarT, calendarTFor, calendarTIn, localeOf } from "./i18n";
 import { callerAddress, newLinkToken, throttle } from "./scheduling-guard";
 import { itemOf, trashObject, writeItem, type StoredObject } from "./objects";
@@ -42,7 +42,7 @@ const HOUR = 3_600_000;
 const DAY = 86_400_000;
 
 /** How long an unconfirmed booking holds its slot. */
-export const HOLD_MS = DAY;
+export const HOLD_MS = HOUR;
 
 /** Pages one person may keep. */
 const MAX_PAGES = 50;
@@ -332,10 +332,14 @@ export async function listBookings(user: SessionUser, pageId: string): Promise<B
 
 // ---------------------------------------------------------------- slots
 
-/** Bookings that hold time: confirmed ones, and holds younger than a day. */
+/** Bookings that hold time: confirmed ones, and holds younger than `HOLD_MS`. */
 function holdingWhere(now: Date) {
     return { OR: [{ status: "confirmed" }, { status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } }] };
 }
+
+type SlotIgnore = { bookingId?: string; uid?: string; holdsBefore?: Date };
+
+type Client = Pick<typeof prisma, "calendarBooking" | "calendarBookingPage">;
 
 /**
  * The slots a page offers inside a window. `ignore` leaves out one booking and
@@ -347,9 +351,18 @@ async function slotsFor(
     page: PageRow,
     window: { from: Date; to: Date },
     now: Date,
-    ignore: { bookingId?: string; uid?: string; holdsBefore?: Date } = {}
+    ignore: SlotIgnore = {}
 ): Promise<{ start: Date; end: Date }[]> {
-    const padded = { from: new Date(window.from.getTime() - DAY), to: new Date(window.to.getTime() + DAY) };
+    return slotsAmong(page, window, now, await busyFor(page, window, ignore), await holdsFor(prisma, page, window, now, ignore));
+}
+
+function paddedWindow(window: { from: Date; to: Date }): { from: Date; to: Date } {
+    return { from: new Date(window.from.getTime() - DAY), to: new Date(window.to.getTime() + DAY) };
+}
+
+/** The owner's busy time on the booking calendar and the conflict calendars. */
+async function busyFor(page: PageRow, window: { from: Date; to: Date }, ignore: SlotIgnore) {
+    const padded = paddedWindow(window);
     const conflictIds = readIds(page.conflictIds);
     const candidates = await prisma.calendar.findMany({
         where: { id: { in: [page.calendarId, ...conflictIds] }, trashedAt: null },
@@ -359,12 +372,17 @@ async function slotsFor(
     const reach = await reachOf(page.ownerId, candidates);
     const calendarIds = candidates.filter((calendar) => reaches(reach.get(calendar.id) ?? null, "freebusy")).map((calendar) => calendar.id);
     const [owner] = await host.calendarHost.peopleByIds([page.ownerId]);
-    const busy = await calendarBusy(calendarIds, padded, {
+    return calendarBusy(calendarIds, padded, {
         selfEmails: owner ? [owner.email] : [],
         floatingZone: page.timezone,
         ...(ignore.uid ? { skipUid: ignore.uid } : {})
     });
-    const holding = await prisma.calendarBooking.findMany({
+}
+
+/** The other bookings on the page that hold time around the window. */
+async function holdsFor(client: Client, page: PageRow, window: { from: Date; to: Date }, now: Date, ignore: SlotIgnore) {
+    const padded = paddedWindow(window);
+    const holding = await client.calendarBooking.findMany({
         where: {
             pageId: page.id,
             start: { lt: padded.to },
@@ -374,9 +392,18 @@ async function slotsFor(
         },
         select: { start: true, end: true, status: true, createdAt: true }
     });
-    const bookings = holding.filter(
+    return holding.filter(
         (booking) => booking.status === "confirmed" || !ignore.holdsBefore || booking.createdAt < ignore.holdsBefore
     );
+}
+
+function slotsAmong(
+    page: PageRow,
+    window: { from: Date; to: Date },
+    now: Date,
+    busy: Awaited<ReturnType<typeof busyFor>>,
+    bookings: Awaited<ReturnType<typeof holdsFor>>
+): { start: Date; end: Date }[] {
     return engine.bookingSlots({
         durationMinutes: page.durationMinutes,
         slotMinutes: page.slotMinutes,
@@ -417,11 +444,29 @@ export async function publicSlots(slug: string, window: { from: Date; to: Date }
     return slots.map((slot) => ({ start: slot.start.toISOString(), end: slot.end.toISOString() }));
 }
 
-/** Whether the slot starting at `start` is offered, as the given exceptions see it. */
-async function offered(page: PageRow, start: Date, now: Date, ignore: Parameters<typeof slotsFor>[3] = {}): Promise<boolean> {
-    const end = new Date(start.getTime() + page.durationMinutes * 60_000);
-    const slots = await slotsFor(page, { from: start, to: end }, now, ignore);
-    return slots.some((slot) => slot.start.getTime() === start.getTime());
+/**
+ * Run `write` if the slot starting at `start` is offered, as the given
+ * exceptions see it, with every other booking write on the page held back until
+ * it is done: two visitors, or a visitor and a move, reaching for one slot at
+ * once cannot both get it. Answers null when the slot is not offered.
+ */
+async function claimSlot<T>(
+    page: PageRow,
+    start: Date,
+    now: Date,
+    ignore: SlotIgnore,
+    write: (client: Client) => Promise<T>
+): Promise<T | null> {
+    const window = { from: start, to: new Date(start.getTime() + page.durationMinutes * 60_000) };
+    const busy = await busyFor(page, window, ignore);
+    return prisma.$transaction(async (tx) => {
+        // Writing the page's row locks it until the transaction ends.
+        const locked = await tx.calendarBookingPage.updateMany({ where: { id: page.id }, data: { updatedAt: new Date() } });
+        if (locked.count === 0) return null;
+        const slots = slotsAmong(page, window, now, busy, await holdsFor(tx, page, window, now, ignore));
+        if (!slots.some((slot) => slot.start.getTime() === start.getTime())) return null;
+        return write(tx);
+    });
 }
 
 // ---------------------------------------------------------------- mail
@@ -462,25 +507,27 @@ export async function requestBooking(input: BookingRequest, now = new Date()): P
         where: { pageId: page.id, email: input.email, start, status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } },
         select: { id: true, confirmToken: true }
     });
-    if (!own && !(await offered(page, start, now))) throw new CalendarRefusal(t("booking.slotTaken"));
 
     const stored = { ...answers.data, ...(input.note ? { [NOTE_KEY]: input.note } : {}) };
     const booking =
         own ??
-        (await prisma.calendarBooking.create({
-            data: {
-                pageId: page.id,
-                name: input.name,
-                email: input.email,
-                answers: JSON.stringify(stored),
-                timezone: input.timezone,
-                start,
-                end,
-                confirmToken: newLinkToken(),
-                manageToken: newLinkToken()
-            },
-            select: { id: true, confirmToken: true }
-        }));
+        (await claimSlot(page, start, now, {}, (client) =>
+            client.calendarBooking.create({
+                data: {
+                    pageId: page.id,
+                    name: input.name,
+                    email: input.email,
+                    answers: JSON.stringify(stored),
+                    timezone: input.timezone,
+                    start,
+                    end,
+                    confirmToken: newLinkToken(),
+                    manageToken: newLinkToken()
+                },
+                select: { id: true, confirmToken: true }
+            })
+        ));
+    if (!booking) throw new CalendarRefusal(t("booking.slotTaken"));
 
     const locale = await host.i18nRequest.getLocale();
     const base = await host.domainService.appBaseUrl();
@@ -626,14 +673,16 @@ export async function confirmBooking(
     if (booking.createdAt.getTime() < now.getTime() - HOLD_MS) return { status: "expired", manageToken: null };
     if (!page.enabled || !(await bookingAllowed())) throw new CalendarRefusal(t("booking.pageGone"));
 
-    if (!(await offered(page, booking.start, now, { bookingId: booking.id, holdsBefore: booking.createdAt }))) {
+    const claimed = await claimSlot(page, booking.start, now, { bookingId: booking.id, holdsBefore: booking.createdAt }, (client) =>
+        client.calendarBooking.updateMany({
+            where: { id: booking.id, status: "pending" },
+            data: { status: "confirmed" }
+        })
+    );
+    if (!claimed) {
         await prisma.calendarBooking.updateMany({ where: { id: booking.id, status: "pending" }, data: { status: "cancelled" } });
         return { status: "taken", manageToken: null };
     }
-    const claimed = await prisma.calendarBooking.updateMany({
-        where: { id: booking.id, status: "pending" },
-        data: { status: "confirmed" }
-    });
     if (claimed.count === 0) {
         const again = await prisma.calendarBooking.findUnique({ where: { id: booking.id }, select: { status: true } });
         return again?.status === "confirmed"
@@ -712,11 +761,12 @@ export async function rescheduleBooking(manageToken: string, startIso: string, n
     if (!page.enabled || !(await bookingAllowed())) throw new CalendarRefusal(t("booking.pageGone"));
     const row = await eventRow(booking.objectId);
     const start = new Date(startIso);
-    if (!(await offered(page, start, now, { bookingId: booking.id, ...(row ? { uid: row.uid } : {}) }))) {
-        throw new CalendarRefusal(t("booking.slotTaken"));
-    }
     const end = new Date(start.getTime() + page.durationMinutes * 60_000);
-    await prisma.calendarBooking.update({ where: { id: booking.id }, data: { start, end } });
+    const moved = await claimSlot(page, start, now, { bookingId: booking.id, ...(row ? { uid: row.uid } : {}) }, (client) =>
+        client.calendarBooking.updateMany({ where: { id: booking.id, status: "confirmed" }, data: { start, end } })
+    );
+    if (!moved) throw new CalendarRefusal(t("booking.slotTaken"));
+    if (moved.count === 0) throw new CalendarRefusal(t("booking.notConfirmed"));
     if (row && !row.deletedAt) {
         const item = await itemOf(row);
         if (item.component === "VEVENT" && item.master) {
@@ -775,7 +825,7 @@ export async function publicPagesOf(userId: string): Promise<{ ownerName: string
     };
 }
 
-/** Drop holds nobody confirmed within a day. Answers how many went. */
+/** Drop holds nobody confirmed in time. Answers how many went. */
 export async function sweepStaleBookings(now = new Date()): Promise<number> {
     const result = await prisma.calendarBooking.deleteMany({
         where: { status: "pending", createdAt: { lt: new Date(now.getTime() - HOLD_MS) } }

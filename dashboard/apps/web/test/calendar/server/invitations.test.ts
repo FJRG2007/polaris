@@ -69,6 +69,13 @@ describe("calendar invitations", () => {
         expect(fake.notices).toEqual([]);
     });
 
+    it("mails nobody outside once the organizer's hourly mail is spent, and still delivers inside", async () => {
+        fake.rateAllowed = false;
+        const id = await save([GUEST, bob.email]);
+        expect(fake.mails).toEqual([]);
+        expect(copyOf(bob.id, db.byId("calendarObject", id)!.uid)).toBeDefined();
+    });
+
     it("puts the event in a Polaris attendee's own calendar with a notice, and mails nobody", async () => {
         const id = await save([bob.email]);
         expect(fake.mails).toEqual([]);
@@ -207,5 +214,54 @@ describe("calendar invitations", () => {
         await world.settle();
         expect(fake.mails).toEqual([]);
         expect(db.rows("calendarInvitation")).toEqual([]);
+    });
+
+    it("never overwrites an attendee's own event that shares the UID of an invitation", async () => {
+        const own = world.storeEvent(world.addCalendar(bob.id), {
+            uid: "bobs-own",
+            summary: "Bob's dentist",
+            start: world.at("2026-10-09T09:00:00"),
+            end: world.at("2026-10-09T10:00:00"),
+            organizer: { email: bob.email, name: "Bob" }
+        });
+        const forged = engine.serializeItem(
+            engine.eventItem(
+                world.event({
+                    uid: "bobs-own",
+                    summary: "Gone",
+                    start: world.at("2026-10-12T10:00:00"),
+                    end: world.at("2026-10-12T11:00:00"),
+                    organizer: { email: alice.email, name: "Alice" },
+                    attendees: [{ email: bob.email, name: "", role: "REQ-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "INDIVIDUAL" }]
+                })
+            )
+        );
+        await importCalendar(alice, { target: { kind: "existing", calendarId: calendar }, text: forged, floatingZone: ZONE });
+        const imported = db.rows("calendarObject").find((row) => row.calendarId === calendar && row.uid === "bobs-own")!;
+        await save([bob.email], { start: world.at("2026-10-13T10:00:00"), end: world.at("2026-10-13T11:00:00") }, String(imported.id));
+        expect(db.rows("calendarObject").filter((row) => row.uid === "bobs-own" && row.calendarId !== calendar)).toHaveLength(1);
+        expect(world.eventIn(db.byId("calendarObject", String(own.id)))).toMatchObject({ summary: "Bob's dentist", organizer: { email: bob.email } });
+        expect(fake.notices).toEqual([]);
+    });
+
+    it("records an answer only from somebody invited, on an event the organizer organizes", async () => {
+        const id = await save([GUEST]);
+        const uid = String(db.byId("calendarObject", id)!.uid);
+        const before = String(db.byId("calendarObject", id)!.ics);
+        await applyAnswer(alice.id, uid, "stranger@outside.test", "ACCEPTED", null);
+        expect(db.byId("calendarObject", id)!.ics).toBe(before);
+        expect(fake.notices).toEqual([]);
+
+        const theirs = world.storeEvent(world.addCalendar(bob.id), {
+            uid: "alices-invite",
+            summary: "Alice's party",
+            start: world.at("2026-10-09T19:00:00"),
+            end: world.at("2026-10-09T22:00:00"),
+            organizer: { email: alice.email, name: "Alice" },
+            attendees: [{ email: GUEST, name: "", role: "REQ-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "INDIVIDUAL" }]
+        });
+        await applyAnswer(bob.id, "alices-invite", GUEST, "DECLINED", null);
+        expect(world.eventIn(db.byId("calendarObject", String(theirs.id))).attendees[0]?.partstat).toBe("NEEDS-ACTION");
+        expect(fake.notices).toEqual([]);
     });
 });

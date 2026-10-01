@@ -14,6 +14,7 @@
  */
 
 import { calendarT } from "./i18n";
+import type * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { CalendarRefusal } from "./errors";
@@ -162,4 +163,44 @@ export async function requireWritableCalendar(userId: string, calendarId: string
     const calendar = await requireCalendar(userId, calendarId, "write");
     if (calendar.readOnly) throw new CalendarRefusal((await calendarT())("errors.readOnly"));
     return calendar;
+}
+
+/** An event reduced to the time it takes, for a reader who may not see it. */
+export function busyBlock(event: engine.CalendarEvent, summary = ""): engine.CalendarEvent {
+    return {
+        ...event,
+        summary,
+        description: "",
+        location: "",
+        url: "",
+        conference: "",
+        categories: [],
+        attendees: [],
+        alarms: [],
+        attachments: [],
+        organizer: null,
+        color: null,
+        extra: [],
+        extraComponents: []
+    };
+}
+
+/** A task's CLASS, which the engine keeps among the lines it does not model.
+ *  A value nobody knows is private, as RFC 5545 asks. */
+export function todoClassification(todo: engine.CalendarTodo): engine.Classification {
+    const line = todo.extra.find((extra) => /^CLASS[;:]/i.test(extra.line))?.line;
+    if (!line) return "PUBLIC";
+    const value = line.slice(line.lastIndexOf(":") + 1).trim().toUpperCase();
+    return value === "PUBLIC" || value === "CONFIDENTIAL" ? value : "PRIVATE";
+}
+
+/**
+ * An item as a reader below `write` may see it: public events in full, every
+ * other event as a busy block, a task only when it is public. Null when nothing
+ * of it may be seen.
+ */
+export function forReader(item: engine.CalendarItem): engine.CalendarItem | null {
+    if (item.component === "VTODO") return todoClassification(item.todo) === "PUBLIC" ? item : null;
+    const map = (event: engine.CalendarEvent) => (event.classification === "PUBLIC" ? event : busyBlock(event));
+    return { ...item, master: item.master ? map(item.master) : null, overrides: item.overrides.map(map) };
 }

@@ -128,6 +128,23 @@ describe("createIcsProvider", () => {
         await expect(provider.put({ remoteId: "x" }, { href: null, etag: null, ics: FEED, uid: "one@feed.test" })).rejects.toBeInstanceOf(SyncRefusedError);
         await expect(provider.remove({ remoteId: "x" }, { href: "one@feed.test", etag: null })).rejects.toBeInstanceOf(SyncRefusedError);
     });
+
+    it("downloads once for the listing and the pull of one pass, conditionally on the stored validators", async () => {
+        const { fetcher, seen } = feedServer();
+        const url = "https://feeds.example.test/team.ics";
+        const fresh = createIcsProvider({ url, fetcher, name: "Mine" });
+        await fresh.listCalendars();
+        const first = await fresh.pull({ remoteId: url, syncToken: "", ctag: "", known: new Map() });
+        expect(seen).toHaveLength(1);
+        expect(first.changed).toHaveLength(3);
+
+        const next = createIcsProvider({ url, fetcher, name: "Mine", validators: { etag: first.syncToken, lastModified: first.ctag } });
+        const [calendar] = await next.listCalendars();
+        expect(calendar).toMatchObject({ name: "Mine", timezone: null });
+        expect(await next.pull({ remoteId: url, syncToken: first.syncToken, ctag: first.ctag, known: new Map() })).toMatchObject({ changed: [], full: false });
+        expect(seen).toHaveLength(2);
+        expect(seen[1]!.headers["If-None-Match"]).toBe("\"v1\"");
+    });
 });
 
 describe("HOLIDAY_CALENDARS", () => {

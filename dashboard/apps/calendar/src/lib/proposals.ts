@@ -19,7 +19,7 @@ import { host } from "@polaris/app-host";
 import { CalendarRefusal } from "./errors";
 import { requireWritableCalendar, type SessionUser } from "./access";
 import { calendarT, calendarTFor, calendarTIn, localeOf } from "./i18n";
-import { callerAddress, newLinkToken, throttle } from "./scheduling-guard";
+import { callerAddress, mayMailOutside, newLinkToken, throttle } from "./scheduling-guard";
 import { VOTES, type ProposalInput, type Vote } from "./scheduling-schemas";
 import type { ProposalSummary, ProposalView, VotePageView } from "./scheduling-wire";
 
@@ -150,10 +150,19 @@ async function accountsFor(emails: readonly string[]): Promise<Map<string, strin
     return new Map(found.map((account) => [account.email, account.id]));
 }
 
+/** Spend the owner's allowance of mail to people outside Polaris on the people
+ *  about to be asked, before anything is written. */
+async function spendMail(user: SessionUser, notify: boolean, emails: readonly string[], accounts: Map<string, string>): Promise<void> {
+    const outside = notify ? emails.filter((email) => !accounts.has(email)).length : 0;
+    if (!(await mayMailOutside(user.id, outside))) throw new CalendarRefusal((await calendarT())("proposals.slowDown"));
+}
+
 export async function createProposal(user: SessionUser, input: ProposalInput): Promise<ProposalView> {
     const open = await prisma.calendarProposal.count({ where: { ownerId: user.id, status: "open" } });
     if (open >= MAX_OPEN) throw new CalendarRefusal((await calendarT())("proposals.tooMany"));
-    const accounts = await accountsFor(input.participants.map((participant) => participant.email));
+    const emails = input.participants.map((participant) => participant.email);
+    const accounts = await accountsFor(emails);
+    await spendMail(user, input.notify, emails, accounts);
     const created = await prisma.calendarProposal.create({
         data: {
             ownerId: user.id,
@@ -203,6 +212,12 @@ export async function updateProposal(user: SessionUser, id: string, input: Propo
     const removed = row.participants.filter((participant) => !wantedEmails.has(participant.email)).map((participant) => participant.id);
     const added = input.participants.filter((participant) => !byEmail.has(participant.email));
     const accounts = await accountsFor(added.map((participant) => participant.email));
+    await spendMail(
+        user,
+        input.notify,
+        added.map((participant) => participant.email),
+        accounts
+    );
 
     await prisma.$transaction([
         prisma.calendarProposal.update({

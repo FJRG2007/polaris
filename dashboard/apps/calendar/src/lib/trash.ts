@@ -14,7 +14,7 @@ import { prisma } from "@polaris/db";
 import { CalendarRefusal } from "./errors";
 import type { TrashItemView } from "./wire";
 import { tryItemOf, writeItem, type StoredObject } from "./objects";
-import { reachableCalendars, reaches, type SessionUser } from "./access";
+import { reachableCalendars, reaches, requireWritableCalendar, type SessionUser } from "./access";
 
 export const RETENTION_DAYS = 30;
 const DAY = 86_400_000;
@@ -122,6 +122,7 @@ export async function restoreTrash(
         return;
     }
     const row = await trashedObject(user, id);
+    await requireWritableCalendar(user.id, row.calendarId);
     const item = tryItemOf(row.ics);
     if (!item) throw new CalendarRefusal((await calendarT())("errors.unreadableEvent"));
     await prisma.calendarObject.update({ where: { id: row.id }, data: { href: "", etag: "" } });

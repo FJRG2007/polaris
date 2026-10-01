@@ -3,7 +3,7 @@
  * on the conflict calendars and the holds of other visitors; a hold becomes an
  * event only once its email is confirmed, and the confirmation checks the slot
  * again so of two visitors who raced for it the first keeps it; holds nobody
- * confirmed are swept after a day.
+ * confirmed are swept after an hour.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -131,6 +131,33 @@ describe("booking pages", () => {
         expect(scheduling.rows("calendarBooking").find((row) => row.email === "late@outside.test")?.status).toBe("cancelled");
     });
 
+    it("gives one slot to one of two visitors who ask for it at once", async () => {
+        const answers = await Promise.allSettled([request("first@outside.test", "09:00"), request("second@outside.test", "09:00")]);
+        expect(answers.map((answer) => answer.status).sort()).toEqual(["fulfilled", "rejected"]);
+        expect(answers.find((answer) => answer.status === "rejected")).toMatchObject({ reason: { message: world.en("booking.slotTaken") } });
+        expect(scheduling.rows("calendarBooking")).toHaveLength(1);
+    });
+
+    it("moves only one of two bookings into the same slot at once", async () => {
+        const tokens: string[] = [];
+        for (const [email, time] of [["first@outside.test", "09:00"], ["second@outside.test", "11:00"]] as const) {
+            await request(email, time);
+            tokens.push((await booking.confirmBooking(confirmToken(email))).manageToken!);
+        }
+        const answers = await Promise.allSettled(tokens.map((token) => booking.rescheduleBooking(token, madrid("09:30"))));
+        expect(answers.map((answer) => answer.status).sort()).toEqual(["fulfilled", "rejected"]);
+        const moved = scheduling.rows("calendarBooking").filter((row) => new Date(String(row.start)).toISOString() === madrid("09:30"));
+        expect(moved).toHaveLength(1);
+    });
+
+    it("lets a hold go after an hour: the slot is offered again and its link has expired", async () => {
+        await request("first@outside.test", "09:00");
+        const later = new Date(Date.now() + booking.HOLD_MS + 60_000);
+        expect(booking.HOLD_MS).toBe(3_600_000);
+        expect((await booking.publicSlots(slug, day, later))?.map((slot) => slot.start)).toContain(madrid("09:00"));
+        expect((await booking.confirmBooking(confirmToken("first@outside.test"), later)).status).toBe("expired");
+    });
+
     it("refuses a confirmation when the owner filled the slot meanwhile", async () => {
         await request("first@outside.test", "11:30");
         world.storeEvent(calendar, { summary: "Call", start: world.at(`${TUESDAY}T11:15:00`), end: world.at(`${TUESDAY}T12:00:00`) });
@@ -145,7 +172,7 @@ describe("booking pages", () => {
         await expect(request("again@outside.test", "09:30")).rejects.toThrow(world.en("booking.slowDown"));
     });
 
-    it("sweeps holds nobody confirmed within a day, and nothing else", async () => {
+    it("sweeps holds nobody confirmed within an hour, and nothing else", async () => {
         const pageId = scheduling.rows("calendarBookingPage")[0]!.id;
         const at = (hoursAgo: number, status: string, token: string) =>
             scheduling.insert("calendarBooking", {
@@ -159,8 +186,8 @@ describe("booking pages", () => {
                 manageToken: token.toUpperCase().repeat(24),
                 createdAt: new Date(world.NOW.getTime() - hoursAgo * 3_600_000)
             });
-        at(25, "pending", "a");
-        at(1, "pending", "b");
+        at(2, "pending", "a");
+        at(0.5, "pending", "b");
         at(30, "confirmed", "c");
         expect(await booking.sweepStaleBookings(world.NOW)).toBe(1);
         expect(scheduling.rows("calendarBooking").map((row) => row.email).sort()).toEqual(["b@outside.test", "c@outside.test"]);

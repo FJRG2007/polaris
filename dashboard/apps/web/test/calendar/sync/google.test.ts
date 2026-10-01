@@ -261,6 +261,50 @@ describe("createGoogleProvider", () => {
         expect(eventsOf(object.ics).overrides[0]!.summary).toBe("Daily (late)");
     });
 
+    it("adopts the event an earlier, interrupted insert left behind instead of failing on 409 forever", async () => {
+        const ics = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Test//EN",
+            "BEGIN:VEVENT",
+            "UID:half-written@polaris.test",
+            "DTSTAMP:20260101T000000Z",
+            "DTSTART;TZID=Europe/Madrid:20261102T100000",
+            "DTEND;TZID=Europe/Madrid:20261102T110000",
+            "RRULE:FREQ=DAILY;COUNT=5",
+            "SUMMARY:Daily",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            "UID:half-written@polaris.test",
+            "DTSTAMP:20260101T000000Z",
+            "RECURRENCE-ID;TZID=Europe/Madrid:20261104T100000",
+            "DTSTART;TZID=Europe/Madrid:20261104T120000",
+            "DTEND;TZID=Europe/Madrid:20261104T130000",
+            "SUMMARY:Daily (late)",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            ""
+        ].join("\r\n");
+        const target = { remoteId: fake.calendarId };
+        let masterId = "";
+        const interrupted = createGoogleProvider({
+            accessToken: fake.accessToken,
+            fetcher: async (url, init) => {
+                if ((init.method ?? "GET") === "PATCH") throw new Error("socket hang up");
+                const response = await fake.fetcher(url, init);
+                if (init.method === "POST") masterId = ((await response.clone().json()) as { id: string }).id;
+                return response;
+            }
+        });
+        await expect(interrupted.put(target, { href: null, etag: null, ics, uid: "half-written@polaris.test" })).rejects.toBeInstanceOf(SyncUnreachableError);
+        expect(fake.get(masterId)).toMatchObject({ iCalUID: "half-written@polaris.test" });
+
+        const written = await provider.put(target, { href: null, etag: null, ics, uid: "half-written@polaris.test" });
+        expect(written.href).toBe(masterId);
+        expect(fake.requests.filter((r) => r.method === "POST")).toHaveLength(2);
+        expect(fake.get(`${masterId}_20261104T090000Z`)).toMatchObject({ summary: "Daily (late)" });
+    });
+
     it("deletes with If-Match", async () => {
         const a = first.changed.find((o) => o.href === "a")!;
         await provider.remove({ remoteId: fake.calendarId }, { href: "a", etag: a.etag });

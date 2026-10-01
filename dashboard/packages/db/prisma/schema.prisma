@@ -11692,6 +11692,7 @@ model Calendar {
     shares   CalendarShare[]
     displays CalendarDisplay[]
 
+    @@unique([sourceId, remoteId])
     @@index([ownerId])
     @@index([sourceId])
     @@index([kind])

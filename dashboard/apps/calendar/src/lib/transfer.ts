@@ -12,12 +12,12 @@
 
 import * as engine from "../engine";
 import { prisma } from "@polaris/db";
-import { writeItem } from "./objects";
+import { tryItemOf, writeItem } from "./objects";
 import { host } from "@polaris/app-host";
 import { CalendarRefusal } from "./errors";
 import { calendarT, ruleTIn } from "./i18n";
 import { createCalendar } from "./calendars";
-import { requireCalendar, requireWritableCalendar, type SessionUser } from "./access";
+import { forReader, reaches, requireCalendar, requireWritableCalendar, type SessionUser } from "./access";
 
 /** Events one import may bring in. A decade of somebody's work calendar is a
  *  few thousand; more than this is a file that is not a calendar. */
@@ -151,11 +151,20 @@ function escapeText(value: string): string {
     return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 }
 
-/** A calendar this person may read in full, as one file. A free/busy reader
- *  gets nothing: an export is every detail. */
+/** What a reader below `write` may take of a stored resource: what the
+ *  calendar shows them, or null when it shows them nothing of it. */
+function readerCopy(ics: string): string | null {
+    const item = tryItemOf(ics);
+    const visible = item ? forReader(item) : null;
+    return visible ? engine.serializeItem(visible) : null;
+}
+
+/** A calendar this person may read, as one file: everything for whoever may
+ *  change it, and what the calendar view shows for a reader. A free/busy
+ *  reader gets nothing. */
 export async function exportCalendar(user: SessionUser, calendarId: string): Promise<{ name: string; ics: string }> {
     const calendar = await requireCalendar(user.id, calendarId, "read");
-    return exportCalendarRow(calendar.id);
+    return reaches(calendar.reach, "write") ? exportCalendarRow(calendar.id) : exportCalendarRow(calendar.id, readerCopy);
 }
 
 /** The export of a calendar by id, with no reader check - for the public feed,
@@ -188,8 +197,13 @@ export async function exportEvent(user: SessionUser, objectId: string): Promise<
         select: { calendarId: true, ics: true, summary: true, deletedAt: true }
     });
     if (!row || row.deletedAt) throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
-    await requireCalendar(user.id, row.calendarId, "read");
-    return { name: row.summary || "event", ics: row.ics };
+    const calendar = await requireCalendar(user.id, row.calendarId, "read");
+    if (reaches(calendar.reach, "write")) return { name: row.summary || "event", ics: row.ics };
+    const ics = readerCopy(row.ics);
+    if (!ics) throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
+    const shown = tryItemOf(ics);
+    const name = shown?.component === "VEVENT" ? (shown.master ?? shown.overrides[0])?.summary : shown?.todo.summary;
+    return { name: name || "event", ics };
 }
 
 /** A file name for a download: letters, digits, dashes, and the extension. */

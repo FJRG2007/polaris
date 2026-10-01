@@ -120,6 +120,14 @@ describe("calendar trash", () => {
         expect(db.byId("calendar", calendar)).toBeDefined();
     });
 
+    it("refuses to restore an event into a calendar that has become read-only", async () => {
+        const id = await create(calendar, "Planning");
+        await remove(id);
+        db.byId("calendar", calendar)!.readOnly = true;
+        await expect(trash.restoreTrash(alice, "event", id, ZONE)).rejects.toThrow(world.en("errors.readOnly"));
+        expect(db.byId("calendarObject", id)?.deletedAt).toBeInstanceOf(Date);
+    });
+
     it("removes an event or a calendar for good, with everything in it", async () => {
         const id = await create(calendar, "Gone");
         await remove(id);

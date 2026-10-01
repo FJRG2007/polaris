@@ -98,6 +98,20 @@ describe("meeting proposals", () => {
         await expect(proposals.castVotes(tokenOf(GUEST), {})).rejects.toThrow(world.en("proposals.closed"));
     });
 
+    it("counts each email to somebody outside Polaris against the owner, and refuses before writing once that is spent", async () => {
+        const made = await create();
+        expect(fake.rateKeys).toEqual([`calendar.mail-out:${alice.id}`]);
+        fake.rateAllowed = false;
+        fake.mails.length = 0;
+        await expect(create()).rejects.toThrow(world.en("proposals.slowDown"));
+        const input = { ...made, notify: true, dates: made.dates.map((date) => date.start) };
+        const participants = [...made.participants, { email: "new@outside.test", name: "New", required: true }];
+        await expect(proposals.updateProposal(alice as never, made.id, { ...input, participants })).rejects.toThrow(world.en("proposals.slowDown"));
+        expect(scheduling.rows("calendarProposal")).toHaveLength(1);
+        expect(scheduling.rows("calendarProposalParticipant")).toHaveLength(2);
+        expect(fake.mails).toEqual([]);
+    });
+
     it("keeps someone else from opening or choosing on a proposal that is not theirs", async () => {
         const made = await create();
         await expect(proposals.proposal(bob as never, made.id)).rejects.toThrow(world.en("proposals.notFound"));

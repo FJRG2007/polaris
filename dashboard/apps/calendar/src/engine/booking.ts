@@ -63,7 +63,7 @@ export function bookingSlots(input: BookingInput): { start: Date; end: Date }[] 
             const close = minutesOf(window.to);
             for (let minute = open; minute + input.durationMinutes <= close; minute += step) {
                 const start = instantAt(date, minute, input.timezone).getTime();
-                const end = instantAt(date, minute + input.durationMinutes, input.timezone).getTime();
+                const end = start + input.durationMinutes * MINUTE;
                 if (start < earliest || start >= latest || end <= start) continue;
                 const guardFrom = start - input.bufferBefore * MINUTE;
                 const guardTo = end + input.bufferAfter * MINUTE;

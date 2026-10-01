@@ -112,6 +112,26 @@ describe("applyEdit - all occurrences", () => {
         ]);
     });
 
+    it("moves EXDATEs and overrides with the series when only its date changes", () => {
+        const item = series();
+        const current = occurrence(item, MAR_9).event;
+        const edited = engine.applyEdit(item, MAR_9, { ...current, start: { dateTime: "2026-03-10T09:00:00", tzid: MADRID }, end: { dateTime: "2026-03-10T10:00:00", tzid: MADRID } }, "all");
+        expect(master(edited.item).start).toEqual({ dateTime: "2026-03-03T09:00:00", tzid: MADRID });
+        expect(master(edited.item).exdates).toEqual([{ dateTime: "2026-03-24T09:00:00", tzid: MADRID }]);
+        expect(overrides(edited.item)[0]?.recurrenceId).toEqual({ dateTime: "2026-03-17T09:00:00", tzid: MADRID });
+        expect(local(edited.item)).toEqual([
+            "2026-03-03T09:00 Planning",
+            "2026-03-10T09:00 Planning",
+            "2026-03-16T11:00 Planning (late)",
+            "2026-03-31T09:00 Planning",
+            "2026-04-07T09:00 Planning",
+            "2026-04-14T09:00 Planning",
+            "2026-04-21T09:00 Planning",
+            "2026-04-28T09:00 Planning",
+            "2026-05-05T09:00 Planning"
+        ]);
+    });
+
     it("changes only the details when the time stays, without bumping SEQUENCE", () => {
         const item = series();
         const edited = engine.applyEdit(item, null, { ...master(item), location: "Room 2" }, "all");
@@ -149,6 +169,16 @@ describe("applyEdit - this and following", () => {
         expect(overrides(split)[0]?.uid).toBe(split.uid);
         expect(local(edited.item)).toEqual(["2026-03-02T09:00 Planning"]);
         expect(local(split).slice(0, 4)).toEqual(["2026-03-09T09:00 New", "2026-03-16T11:00 Planning (late)", "2026-03-30T09:00 New", "2026-04-06T09:00 New"]);
+    });
+
+    it("moves the EXDATEs and overrides it carries over when the new series starts on another date", () => {
+        const item = series("FREQ=WEEKLY");
+        const current = occurrence(item, MAR_9).event;
+        const edited = engine.applyEdit(item, MAR_9, { ...current, summary: "New", start: { dateTime: "2026-03-10T09:00:00", tzid: MADRID }, end: { dateTime: "2026-03-10T10:00:00", tzid: MADRID } }, "following");
+        const split = edited.split as engine.CalendarItem;
+        expect(master(split).exdates).toEqual([{ dateTime: "2026-03-24T09:00:00", tzid: MADRID }]);
+        expect(overrides(split)[0]?.recurrenceId).toEqual({ dateTime: "2026-03-17T09:00:00", tzid: MADRID });
+        expect(local(split).slice(0, 4)).toEqual(["2026-03-10T09:00 New", "2026-03-16T11:00 Planning (late)", "2026-03-31T09:00 New", "2026-04-07T09:00 New"]);
     });
 
     it("is an edit of everything from the first occurrence", () => {

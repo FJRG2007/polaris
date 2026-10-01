@@ -13,6 +13,7 @@ vi.mock("@polaris/auth", () => ({ userHasPermission: async () => false }));
 
 import { db } from "../fixtures/fake-db";
 import * as world from "../fixtures/world";
+import * as engine from "@polaris-app/calendar/src/engine";
 import { addUser, fake } from "../fixtures/fake-host";
 import * as objects from "@polaris-app/calendar/src/lib/objects";
 import * as resources from "@polaris-app/calendar/src/lib/resources";
@@ -25,9 +26,16 @@ describe("rooms", () => {
     let alice: ReturnType<typeof addUser>;
     let calendar: string;
     let room: Awaited<ReturnType<typeof resources.createRoom>>;
+    const locks: string[] = [];
 
     beforeEach(async () => {
         world.resetWorld();
+        locks.length = 0;
+        // What Postgres is asked for; the fake has no raw SQL of its own.
+        (db.prisma as unknown as Record<string, unknown>).$executeRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
+            locks.push(`${parts.join("?")} ${values.join(" ")}`);
+            return 0;
+        };
         admin = addUser({ name: "Admin", email: "admin@example.test", isAdmin: true });
         alice = addUser({ name: "Alice", email: "alice@example.test" });
         fake.granted.set(admin.id, new Set(["settings.manage"]));
@@ -44,7 +52,7 @@ describe("rooms", () => {
         });
     });
 
-    async function book(start: string, end: string, summary = "Review"): Promise<string> {
+    async function book(start: string, end: string, summary = "Review", fields: Record<string, unknown> = {}): Promise<string> {
         const { objectId } = await objects.saveEvent(alice as never, {
             objectId: null,
             recurrenceKey: null,
@@ -54,7 +62,8 @@ describe("rooms", () => {
                 summary,
                 start: world.at(start),
                 end: world.at(end),
-                attendees: [{ email: room.email, name: room.name, type: "ROOM" }]
+                attendees: [{ email: room.email, name: room.name, type: "ROOM" }],
+                ...fields
             }),
             floatingZone: ZONE
         });
@@ -104,5 +113,54 @@ describe("rooms", () => {
         expect(world.objectsIn(room.id)[0]?.deletedAt).toBeInstanceOf(Date);
         const again = await book("2026-10-06T10:00:00", "2026-10-06T11:00:00", "Again");
         expect(roomAnswer(again)).toBe("ACCEPTED");
+    });
+
+    it("accepts only one of two invitations into the same slot that arrive together", async () => {
+        const [first, second] = await Promise.all([
+            book("2026-10-06T10:00:00", "2026-10-06T11:00:00", "First"),
+            book("2026-10-06T10:30:00", "2026-10-06T11:30:00", "Second")
+        ]);
+        expect([roomAnswer(first), roomAnswer(second)].sort()).toEqual(["ACCEPTED", "DECLINED"]);
+        expect(world.objectsIn(room.id).filter((row) => !row.deletedAt)).toHaveLength(1);
+        expect(locks.length).toBeGreaterThan(0);
+        expect(locks.every((lock) => lock.includes("pg_advisory_xact_lock") && lock.includes(room.id))).toBe(true);
+    });
+
+    it("keeps only the time and the organizer of a booking, and the title only when it is public", async () => {
+        await book("2026-10-06T10:00:00", "2026-10-06T11:00:00", "Salaries", {
+            description: "Who earns what",
+            location: "Board room",
+            classification: "PRIVATE",
+            attendees: [{ email: room.email, name: room.name, type: "ROOM" }, { email: "guest@outside.test" }]
+        });
+        const held = world.eventIn(world.objectsIn(room.id)[0]);
+        expect(held).toMatchObject({ summary: "", description: "", location: "", alarms: [] });
+        expect(held.organizer?.email).toBe(alice.email);
+        expect(held.attendees.map((attendee) => [attendee.email, attendee.partstat])).toEqual([[room.email, "ACCEPTED"]]);
+        const rooms = await resources.roomsFor({ from: new Date("2026-10-06T08:30:00Z"), to: new Date("2026-10-06T09:30:00Z") });
+        expect(rooms.find((entry) => entry.id === room.id)?.free).toBe(false);
+    });
+
+    it("never lets somebody else's event under the same UID change or release a booking", async () => {
+        const id = await book("2026-10-06T10:00:00", "2026-10-06T11:00:00");
+        const uid = String(db.byId("calendarObject", id)!.uid);
+        const mallory = addUser({ name: "Mallory", email: "mallory@example.test" });
+        const forged = engine.eventItem(
+            world.event({
+                uid,
+                summary: "Mine now",
+                start: world.at("2026-10-07T10:00:00"),
+                end: world.at("2026-10-07T11:00:00"),
+                organizer: { email: mallory.email, name: "Mallory" },
+                attendees: [{ email: room.email, name: room.name, role: "NON-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "ROOM" }]
+            })
+        );
+        expect(await resources.answerForRoom(mallory.id, room.id, forged, "REQUEST")).toBe("DECLINED");
+        await resources.answerForRoom(mallory.id, room.id, forged, "CANCEL");
+        const held = world.objectsIn(room.id);
+        expect(held).toHaveLength(1);
+        expect(held[0]?.deletedAt ?? null).toBeNull();
+        expect(world.eventIn(held[0])).toMatchObject({ summary: "Review", organizer: { email: alice.email } });
+        expect(roomAnswer(id)).toBe("ACCEPTED");
     });
 });

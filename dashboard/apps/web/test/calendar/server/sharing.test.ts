@@ -44,6 +44,10 @@ describe("calendar sharing", () => {
         const dave = addUser({ name: "Dave", email: "dave@example.test" });
         const daveShare = world.addShare(calendar, { userId: dave.id }, "manage");
         await expect(sharing.unshare(bob, daveShare)).rejects.toThrow(world.en("sharing.onlyOwnerManage"));
+        await expect(sharing.share(bob, { calendarId: calendar, target: { kind: "user", id: dave.id }, access: "freebusy" })).rejects.toThrow(
+            world.en("sharing.onlyOwnerManage")
+        );
+        expect(db.byId("calendarShare", daveShare)?.access).toBe("manage");
         await sharing.share(alice, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "manage" });
         expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe("manage");
     });
@@ -167,6 +171,29 @@ describe("calendar sharing", () => {
             expect(party).toMatchObject({ location: "Rooftop", busyOnly: false });
             const therapy = range.occurrences.find((occurrence) => occurrence.start === "2026-10-11T07:00:00.000Z");
             expect(therapy).toMatchObject({ summary: "", location: "", busyOnly: true });
+        });
+
+        it("never gives the link guests, the organizer, attachments, unknown properties or private tasks", async () => {
+            world.storeEvent(calendar, {
+                uid: "meeting-1",
+                summary: "Town hall",
+                start: world.at("2026-10-14T10:00:00"),
+                end: world.at("2026-10-14T11:00:00"),
+                organizer: { email: alice.email, name: "Alice" },
+                attendees: [{ email: "guest@outside.test", name: "Guest", role: "REQ-PARTICIPANT", partstat: "ACCEPTED", rsvp: false, type: "INDIVIDUAL" }],
+                attachments: [{ uri: "https://files.example.test/budget.pdf", name: "budget.pdf", mime: "application/pdf" }],
+                extra: [{ line: "X-INTERNAL-NOTE:salary review" }]
+            });
+            const task = engine.newTodo({ uid: "task-1", summary: "Call the lawyer", due: world.at("2026-10-15T12:00:00") });
+            world.storeItem(calendar, engine.todoItem({ ...task, extra: [{ line: "CLASS:PRIVATE" }] }));
+            world.storeItem(calendar, engine.todoItem(engine.newTodo({ uid: "task-2", summary: "Order cake", due: world.at("2026-10-16T12:00:00") })));
+            const token = (await sharing.publish(alice, calendar, "full"))!;
+            const feed = (await published.publishedFeed(token, "Busy"))!;
+            expect(feed.ics).toContain("Town hall");
+            expect(feed.ics).toContain("Order cake");
+            for (const secret of ["guest@outside.test", "alice@example.test", "bob@example.test", "budget.pdf", "salary review", "Call the lawyer"]) {
+                expect(feed.ics).not.toContain(secret);
+            }
         });
 
         it("answers nothing for a trashed calendar or a malformed token", async () => {

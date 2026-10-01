@@ -134,7 +134,14 @@ export async function fireDueReminders(now = new Date()): Promise<{ sent: number
             })
             .catch((caught: unknown) => console.error("polaris: a calendar reminder could not be sent:", caught));
     }
-    // The next firing of every alarm that just fired, from after this one.
+    // The next firing of every alarm that just fired, from after this one -
+    // once nothing is left due for the object, since planning it again drops
+    // the rows this pass had no room for.
+    const unsent = await prisma.calendarReminder.findMany({
+        where: { objectId: { in: [...replan] }, fireAt: { lte: now } },
+        select: { objectId: true }
+    });
+    for (const row of unsent) replan.delete(row.objectId);
     for (const objectId of replan) {
         const row = await prisma.calendarObject.findUnique({
             where: { id: objectId },

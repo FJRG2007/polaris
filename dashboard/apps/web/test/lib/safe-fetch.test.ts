@@ -48,7 +48,7 @@ vi.mock("node:dns/promises", () => ({
     }
 }));
 
-const { fetchImage, vettedAddresses } = await import("@/lib/safe-fetch");
+const { configuredRequest, fetchImage, safeUrl, vettedAddresses } = await import("@/lib/safe-fetch");
 
 const CAP = 1024;
 const fetched = network.fetched;
@@ -139,6 +139,22 @@ describe("what it refuses", () => {
 
     it("refuses a link carrying credentials", async () => {
         expect(await fetchImage("https://user:secret@pictures.example/x.gif", CAP)).toBeNull();
+        expect(fetched).toEqual([]);
+    });
+});
+
+describe("a request to an address somebody configured", () => {
+    it("takes a provider's long paging address that a pasted link may not be", async () => {
+        const long = `https://pictures.example/delta?$skiptoken=${"a".repeat(1500)}`;
+        responses.set(long, { status: 200, headers: {}, body: "{}" });
+        expect(safeUrl(long)).toBeNull();
+        const response = await configuredRequest(long, {}, { allowPrivate: false });
+        expect(response.status).toBe(200);
+        expect(fetched).toEqual([long]);
+    });
+
+    it("still refuses one that resolves inside the network", async () => {
+        await expect(configuredRequest("https://inside.test/cal", {}, { allowPrivate: false })).rejects.toThrow("cannot be reached");
         expect(fetched).toEqual([]);
     });
 });

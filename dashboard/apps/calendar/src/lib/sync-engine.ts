@@ -112,8 +112,11 @@ export async function providerFor(source: SourceRow): Promise<sync.CalendarProvi
             if (!password) throw new sync.SyncAuthError("The password needs entering again", null);
             return sync.createCalDavProvider({ serverUrl: source.url, username: source.username, password, fetcher });
         }
-        default:
-            return sync.createIcsProvider({ url: source.url, fetcher, name: source.label });
+        default: {
+            const held = await prisma.calendar.findFirst({ where: { sourceId: source.id }, select: { syncToken: true, ctag: true } });
+            const validators = held ? { etag: held.syncToken, lastModified: held.ctag } : undefined;
+            return sync.createIcsProvider({ url: source.url, fetcher, name: source.label, validators });
+        }
     }
 }
 
@@ -151,9 +154,16 @@ async function recordFailure(source: { id: string; userId: string; label: string
     }
 }
 
+/** Whether a write was refused by a unique key: somebody else wrote the row first. */
+function isUniqueClash(caught: unknown): boolean {
+    return caught instanceof Error && (caught as { code?: unknown }).code === "P2002";
+}
+
 /**
  * Bring a source's list of calendars in step with the provider's: new ones
- * appear, renamed ones follow, ones deleted there leave Polaris too.
+ * appear, renamed ones follow, ones deleted there leave Polaris too. A feed
+ * keeps the name it was subscribed under. A listing with nothing in it removes
+ * nothing.
  */
 export async function refreshCalendars(source: SourceRow, provider: sync.CalendarProvider): Promise<void> {
     const remote = await provider.listCalendars();
@@ -162,21 +172,25 @@ export async function refreshCalendars(source: SourceRow, provider: sync.Calenda
         select: { id: true, remoteId: true }
     });
     const known = new Map(local.map((calendar) => [calendar.remoteId, calendar.id]));
+    const feed = source.kind === "ics";
     for (const calendar of remote) {
+        const name = calendar.name.slice(0, 120) || source.label;
         const data = {
-            name: calendar.name.slice(0, 120) || source.label,
             description: calendar.description.slice(0, 2000),
-            readOnly: calendar.readOnly || source.kind === "ics",
+            readOnly: calendar.readOnly || feed,
             components: calendar.components.join(",") || "VEVENT",
-            timezone: (calendar.timezone && engine.resolveZone(calendar.timezone)) || ""
+            ...(feed && !calendar.timezone ? {} : { timezone: (calendar.timezone && engine.resolveZone(calendar.timezone)) || "" })
         };
         const id = known.get(calendar.remoteId);
         if (id) {
-            await prisma.calendar.update({ where: { id }, data });
-        } else {
+            await prisma.calendar.update({ where: { id }, data: feed ? data : { ...data, name } });
+            continue;
+        }
+        try {
             await prisma.calendar.create({
                 data: {
                     ...data,
+                    name,
                     ownerId: source.userId,
                     sourceId: source.id,
                     kind: "remote",
@@ -184,8 +198,12 @@ export async function refreshCalendars(source: SourceRow, provider: sync.Calenda
                     color: calendar.color && /^#[0-9a-f]{6}$/i.test(calendar.color) ? calendar.color.toLowerCase() : "#3b82f6"
                 }
             });
+        } catch (caught) {
+            if (!isUniqueClash(caught)) throw caught;
+            await prisma.calendar.updateMany({ where: { sourceId: source.id, remoteId: calendar.remoteId }, data: feed ? data : { ...data, name } });
         }
     }
+    if (remote.length === 0) return;
     const still = new Set(remote.map((calendar) => calendar.remoteId));
     const gone = local.filter((calendar) => !still.has(calendar.remoteId)).map((calendar) => calendar.id);
     if (gone.length > 0) await prisma.calendar.deleteMany({ where: { id: { in: gone } } });
@@ -198,7 +216,7 @@ export async function pullCalendar(
 ): Promise<{ changed: number; removed: number }> {
     const rows = await prisma.calendarObject.findMany({
         where: { calendarId: calendar.id, href: { not: "" } },
-        select: { href: true, etag: true }
+        select: { href: true, etag: true, startsAt: true, endsAt: true }
     });
     const known = new Map(rows.map((row) => [row.href, row.etag]));
     let changes: sync.ChangeSet;
@@ -223,7 +241,10 @@ export async function pullCalendar(
     const removedHrefs = new Set(changes.removed);
     if (changes.full) {
         const present = new Set(changes.changed.map((object) => object.href));
-        for (const href of known.keys()) if (!present.has(href)) removedHrefs.add(href);
+        const window = changes.window;
+        const inside = (row: { startsAt: Date | null; endsAt: Date | null }) =>
+            !window || (row.startsAt !== null && row.startsAt < window.end && (row.endsAt === null || row.endsAt > window.start));
+        for (const row of rows) if (!present.has(row.href) && inside(row)) removedHrefs.add(row.href);
     }
     let removed = 0;
     if (removedHrefs.size > 0) {

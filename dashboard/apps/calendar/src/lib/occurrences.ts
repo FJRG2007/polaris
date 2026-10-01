@@ -14,7 +14,7 @@ import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { OccurrenceView, RangeView, TaskItemView } from "./wire";
-import { reachableCalendars, reaches, type Reach, type SessionUser } from "./access";
+import { reachableCalendars, reaches, todoClassification, type Reach, type SessionUser } from "./access";
 
 /** The widest window answered: a year view with the weeks around it. */
 export const MAX_WINDOW_DAYS = 400;
@@ -22,6 +22,24 @@ export const MAX_WINDOW_DAYS = 400;
 /** Objects read for one window at most. A calendar that holds more inside one
  *  year view than this is drawn partially and says so. */
 const MAX_OBJECTS = 5000;
+
+/**
+ * How far apart two readings of the same floating time or all-day date can be:
+ * from UTC+14 to UTC-12. An object's indexed bounds are read in the zone of
+ * whoever saved it, and the window in the reader's, so a query widens by this
+ * much on each side and the expansion below keeps only what is really inside.
+ */
+const ZONE_SPREAD_MS = 26 * 3_600_000;
+
+/** The filter for the objects that can reach a window, read in any zone. */
+export function reachingWindow(window: { from: Date; to: Date }) {
+    const to = new Date(window.to.getTime() + ZONE_SPREAD_MS);
+    const from = new Date(window.from.getTime() - ZONE_SPREAD_MS);
+    return {
+        OR: [{ startsAt: null }, { startsAt: { lt: to } }],
+        AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: from } }] }]
+    };
+}
 
 /** Parsed items by row id, keyed by the version they were parsed from. */
 const parsed = new Map<string, { version: number; item: engine.CalendarItem | null }>();
@@ -86,8 +104,7 @@ export async function occurrencesIn(
                   where: {
                       calendarId: { in: ids },
                       deletedAt: null,
-                      OR: [{ startsAt: null }, { startsAt: { lt: window.to } }],
-                      AND: [{ OR: [{ endsAt: null }, { endsAt: { gt: window.from } }] }]
+                      ...reachingWindow(window)
                   },
                   select: { id: true, calendarId: true, uid: true, ics: true, updatedAt: true, component: true },
                   take: MAX_OBJECTS
@@ -106,6 +123,7 @@ export async function occurrencesIn(
         const editable = reaches(level, "write") && !readOnly.get(row.calendarId);
         if (item.component === "VTODO") {
             if (!options.includeTasks || level === "freebusy") continue;
+            if (!reaches(level, "write") && todoClassification(item.todo) !== "PUBLIC") continue;
             const placed = engine.expandTodo(item, options.floatingZone);
             const when = placed.due ?? placed.start;
             if (!when || when < window.from || when >= window.to) continue;
@@ -136,7 +154,7 @@ export async function occurrencesIn(
             occurrences.push({
                 objectId: row.id,
                 calendarId: row.calendarId,
-                uid: occurrence.uid,
+                uid: full ? occurrence.uid : "",
                 recurrenceKey: occurrence.recurrenceKey,
                 start: occurrence.start.toISOString(),
                 end: occurrence.end.toISOString(),

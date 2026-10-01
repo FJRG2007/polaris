@@ -18,6 +18,7 @@ import { addUser, fake } from "../fixtures/fake-host";
 import * as engine from "@polaris-app/calendar/src/engine";
 import { eventDetail, todoDetail } from "@polaris-app/calendar/src/lib/event-detail";
 import { addressesOf, occurrencesIn } from "@polaris-app/calendar/src/lib/occurrences";
+import { upcomingEvents } from "@polaris-app/calendar/src/lib/upcoming";
 
 const ZONE = "Europe/Madrid";
 const OCTOBER = { from: new Date("2026-10-01T00:00:00Z"), to: new Date("2026-11-01T00:00:00Z") };
@@ -86,6 +87,37 @@ describe("occurrences in a window", () => {
         expect(standup.editable).toBe(false);
         const doctor = range.occurrences.find((occurrence) => occurrence.objectId === privateId)!;
         expect(doctor).toMatchObject({ summary: "", location: "", busyOnly: true, hasAlarms: false, attendeeCount: 0, editable: false });
+        expect(doctor.uid).toBe("");
+        expect(standup.uid).not.toBe("");
+    });
+
+    it("draws an all-day event saved in UTC+14 for a reader in UTC-10", async () => {
+        const day = world.storeItem(
+            calendar,
+            engine.eventItem(world.event({ summary: "Holiday", start: { date: "2026-10-20" }, end: { date: "2026-10-21" } })),
+            {},
+            "Pacific/Kiritimati"
+        );
+        const honolulu = { from: new Date("2026-10-20T10:00:00Z"), to: new Date("2026-10-21T10:00:00Z") };
+        const range = await occurrencesIn(alice, honolulu, { floatingZone: "Pacific/Honolulu", emails: [], includeTasks: false });
+        expect(range.occurrences.filter((occurrence) => occurrence.objectId === day.id).map((occurrence) => occurrence.startDate)).toEqual(["2026-10-20"]);
+    });
+
+    it("leaves busy blocks off the Overview card", async () => {
+        world.addShare(calendar, { userId: bob.id }, "read");
+        const upcoming = await upcomingEvents(bob.id, 20, world.NOW);
+        expect(upcoming.length).toBeGreaterThan(0);
+        expect(upcoming.some((entry) => entry.id === privateId)).toBe(false);
+        expect(upcoming.every((entry) => entry.title !== "")).toBe(true);
+        expect((await upcomingEvents(alice.id, 20, world.NOW)).some((entry) => entry.id === privateId)).toBe(true);
+    });
+
+    it("hides a private task from a read-only sharee and shows it to a writer", async () => {
+        const task = engine.newTodo({ uid: "todo-private", summary: "Lawyer", due: world.at("2026-10-20T12:00:00") });
+        world.storeItem(calendar, engine.todoItem({ ...task, extra: [{ line: "CLASS:PRIVATE" }] }));
+        world.addShare(calendar, { userId: bob.id }, "read");
+        expect((await read(bob, true)).tasks.filter((entry) => entry.source === "calendar")).toEqual([]);
+        expect((await read(alice, true)).tasks.map((entry) => entry.title)).toContain("Lawyer");
     });
 
     it("shows a free/busy sharee nothing but busy blocks, and no tasks", async () => {

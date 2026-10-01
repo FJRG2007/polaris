@@ -4,7 +4,8 @@
  * Models what the client relies on: paging, sync tokens that expire (410),
  * deleted events coming back as `status: "cancelled"` with little else, the
  * `iCalUID` filter returning a master with its exceptions, etags checked by
- * `If-Match` (412), and instance ids of the form `<masterId>_<start>`.
+ * `If-Match` (412), an insert of a UID already there refused (409), and
+ * instance ids of the form `<masterId>_<start>`.
  */
 
 type Json = Record<string, unknown>;
@@ -102,6 +103,10 @@ export function createFakeGoogle(options: { pageSize?: number; calendarId?: stri
             return json(200, { kind: "calendar#events", items: page, ...(more ? { nextPageToken: String(offset + pageSize) } : { nextSyncToken: `tok-${seq}` }) });
         }
         if (path === listPath && method === "POST") {
+            const uid = body?.iCalUID as string | undefined;
+            if (uid && [...events.values()].some((e) => e.event.iCalUID === uid && !e.event.recurringEventId)) {
+                return error(409, "The requested identifier already exists.", "duplicate");
+            }
             const id = `ev${++idCounter}`;
             const fields = Object.fromEntries(Object.entries(body ?? {}).filter(([, value]) => value !== null));
             const created = store({ ...fields, id, etag: nextEtag(), iCalUID: (body?.iCalUID as string) ?? `${id}@google.com`, status: "confirmed" } as FakeGoogleEvent);

@@ -70,7 +70,7 @@ const tzidSchema = z
     .trim()
     .min(1)
     .max(100)
-    .refine((zone) => resolveZone(zone) !== null, SCHEMA_MESSAGES.unknownZone)
+    .refine((zone) => !/[\u0000-\u001f\u007f]/.test(zone) && resolveZone(zone) !== null, SCHEMA_MESSAGES.unknownZone)
     .nullable();
 
 export const dateValueSchema = z.union([
@@ -132,6 +132,7 @@ const linkSchema = z
     .max(2000)
     .refine((text) => {
         if (text === "") return true;
+        if (/[\u0000-\u001f\u007f]/.test(text)) return false;
         try {
             const url = new URL(text);
             return url.protocol === "https:" || url.protocol === "http:";

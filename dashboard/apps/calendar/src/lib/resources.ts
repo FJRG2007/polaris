@@ -19,7 +19,7 @@ import { host } from "@polaris/app-host";
 import { calendarBusy } from "./freebusy";
 import { CalendarRefusal } from "./errors";
 import { readResource } from "./calendars";
-import type { SessionUser } from "./access";
+import { busyBlock, type SessionUser } from "./access";
 import { resourceAddress } from "./resource-address";
 import type { RoomInput } from "./scheduling-schemas";
 import type { RoomAvailability, RoomView } from "./scheduling-wire";
@@ -161,10 +161,55 @@ function answerOnCopy(item: engine.CalendarItem, email: string): engine.PartStat
 }
 
 /**
+ * What a room keeps of a booking: the time it takes and who booked it, so a
+ * later change or cancellation from the same organizer finds it. The rest is
+ * the organizer's and their guests', not the room keeper's - the title only
+ * when the event is public, as any reader of the organizer's calendar sees it.
+ */
+function bookingOf(item: Extract<engine.CalendarItem, { component: "VEVENT" }>, email: string): engine.CalendarItem {
+    const hold = (event: engine.CalendarEvent): engine.CalendarEvent => ({
+        ...busyBlock(event, event.classification === "PUBLIC" ? event.summary : ""),
+        organizer: event.organizer,
+        attendees: event.attendees.filter((attendee) => attendee.email === email)
+    });
+    return { ...item, method: null, master: item.master ? hold(item.master) : null, overrides: item.overrides.map(hold) };
+}
+
+/** Room answers in progress, by room. */
+const answering = new Map<string, Promise<unknown>>();
+
+/**
+ * Run one room's answer alone: checking that the room is free and holding the
+ * time are one step, so two invitations into the same slot cannot both be
+ * accepted. In this process by a queue per room, and across processes by a
+ * lock Postgres holds until the answer is written.
+ */
+async function oneAtATime<T>(roomId: string, work: () => Promise<T>): Promise<T> {
+    const locked = () =>
+        process.env.POLARIS_DB_PROVIDER === "sqlite"
+            ? work()
+            : prisma.$transaction(
+                  async (tx) => {
+                      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`polaris.calendar.room:${roomId}`}))`;
+                      return work();
+                  },
+                  { maxWait: 60_000, timeout: 60_000 }
+              );
+    const run = (answering.get(roomId) ?? Promise.resolve()).catch(() => undefined).then(locked);
+    answering.set(roomId, run);
+    try {
+        return await run;
+    } finally {
+        if (answering.get(roomId) === run) answering.delete(roomId);
+    }
+}
+
+/**
  * A room was invited to (or dropped from) an organizer's event. Answers for the
  * room: holds the time when every occurrence is free, declines otherwise, and
- * lets go of the time when it is cancelled. Returns the answer given, or null
- * for an address that is no room.
+ * lets go of the time when it is cancelled. A booking under the same UID by
+ * somebody else is theirs: a request declines and a cancellation does nothing.
+ * Returns the answer given, or null for an address that is no room.
  */
 export async function answerForRoom(
     organizerId: string,
@@ -178,8 +223,23 @@ export async function answerForRoom(
         select: { id: true }
     });
     if (!room || item.component !== "VEVENT") return null;
-    const email = resourceAddress(room.id);
-    const existing = await roomCopy(room.id, item.uid);
+    return oneAtATime(room.id, () => answerAlone(organizerId, room.id, item, method, now));
+}
+
+async function answerAlone(
+    organizerId: string,
+    roomId: string,
+    item: Extract<engine.CalendarItem, { component: "VEVENT" }>,
+    method: "REQUEST" | "CANCEL",
+    now: Date
+): Promise<engine.PartStat | null> {
+    const email = resourceAddress(roomId);
+    const invitations = await import("./invitations");
+    const found = await roomCopy(roomId, item.uid);
+    const booking = found ? tryItemOf(found.ics) : null;
+    const booker = booking?.component === "VEVENT" ? (booking.master ?? booking.overrides[0])?.organizer?.email : undefined;
+    const theirs = found !== null && !(booker !== undefined && (await invitations.ownerAddresses(organizerId)).has(booker));
+    const existing = theirs ? null : found;
     const context = { actor: null, floatingZone: "UTC", fromImport: true } as const;
 
     const release = async () => {
@@ -195,13 +255,13 @@ export async function answerForRoom(
     }
 
     const taken = takenBy(item, now);
-    let free = true;
-    if (taken.length > 0) {
+    let free = !theirs;
+    if (free && taken.length > 0) {
         const window = {
             from: new Date(Math.min(...taken.map((slot) => slot.start.getTime()))),
             to: new Date(Math.max(...taken.map((slot) => slot.end.getTime())))
         };
-        const busy = await calendarBusy([room.id], window, { skipUid: item.uid });
+        const busy = await calendarBusy([roomId], window, { skipUid: item.uid });
         free = !taken.some((slot) =>
             busy.some((interval) => interval.start.getTime() < slot.end.getTime() && interval.end.getTime() > slot.start.getTime())
         );
@@ -209,13 +269,12 @@ export async function answerForRoom(
 
     const answer: engine.PartStat = free ? "ACCEPTED" : "DECLINED";
     if (free) {
-        const copy = { ...engine.applyReply(item, email, "ACCEPTED", null), method: null };
-        await writeItem(room.id, existing, copy, context);
+        const accepted = engine.applyReply(item, email, "ACCEPTED", null);
+        if (accepted.component === "VEVENT") await writeItem(roomId, existing, bookingOf(accepted, email), context);
     } else {
         await release();
     }
     if (answerOnCopy(item, email) !== answer) {
-        const invitations = await import("./invitations");
         await invitations.applyAnswer(organizerId, item.uid, email, answer, null);
     }
     return answer;

@@ -415,8 +415,8 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
     const kind = text("X-POLARIS-KIND");
     const organizer = single.get("ORGANIZER");
     const sequence = Number.parseInt(text("SEQUENCE"), 10);
-    if (status && !EVENT_STATUSES.includes(status as T.EventStatus)) extra.push({ line: `STATUS:${status}` });
-    if (classification && !CLASSES.includes(classification as T.Classification)) extra.push({ line: `CLASS:${classification}` });
+    if (status && !EVENT_STATUSES.includes(status as T.EventStatus)) extra.push({ line: property("status", {}, "text", status) });
+    if (classification && !CLASSES.includes(classification as T.Classification)) extra.push({ line: property("class", {}, "text", classification) });
     const stamp = (name: string) => {
         const parsed = single.get(name);
         const value = parsed ? String(parsed.values[0] ?? "") : "";
@@ -521,7 +521,7 @@ function readTodo(raw: RawComponent, zones: Set<string>): T.CalendarTodo {
         }
     }
     const status = text("STATUS").toUpperCase();
-    if (status && !TODO_STATUSES.includes(status as T.TodoStatus)) extra.push({ line: `STATUS:${status}` });
+    if (status && !TODO_STATUSES.includes(status as T.TodoStatus)) extra.push({ line: property("status", {}, "text", status) });
     const percent = Number.parseInt(text("PERCENT-COMPLETE"), 10);
     const priority = Number.parseInt(text("PRIORITY"), 10);
     const completed = single.get("COMPLETED");
@@ -657,10 +657,22 @@ export function foldLine(line: string): string {
     return out.join("\r\n ");
 }
 
+/** A value as it may appear on one content line. ical.js escapes a line feed
+ *  in TEXT (and RFC 6868 in a parameter) and passes every other control
+ *  character through, so a TEXT value or a parameter keeps its tabs and line
+ *  breaks (as line feeds) and any other value loses every control character. */
+function lineSafe(value: string, text: boolean): string {
+    if (!text) return value.replace(/[\u0000-\u001F\u007F]/g, "");
+    return value.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "");
+}
+
 function property(name: string, params: Params, type: string, ...values: unknown[]): string {
     const clean: Record<string, string | string[]> = {};
-    for (const [key, value] of Object.entries(params)) if (value !== "" && value !== undefined) clean[key] = typeof value === "string" ? value : [...value];
-    return new ICAL.Property([name.toLowerCase(), clean, type, ...values]).toICALString();
+    for (const [key, value] of Object.entries(params)) {
+        if (value !== "" && value !== undefined) clean[key] = typeof value === "string" ? lineSafe(value, true) : value.map((entry) => lineSafe(entry, true));
+    }
+    const safe = values.map((value) => (typeof value === "string" ? lineSafe(value, type === "text") : value));
+    return new ICAL.Property([name.toLowerCase(), clean, type, ...safe]).toICALString();
 }
 
 function dateLine(name: string, value: T.DateValue, params: Params = {}): string {
@@ -693,7 +705,7 @@ function attendeeLine(attendee: T.Attendee): string {
 }
 
 function alarmLines(alarm: T.Alarm): string[] {
-    const lines = ["BEGIN:VALARM", `ACTION:${alarm.action}`];
+    const lines = ["BEGIN:VALARM", property("action", {}, "text", alarm.action)];
     if (alarm.trigger.kind === "absolute") lines.push(property("trigger", {}, "date-time", alarm.trigger.at));
     else {
         const duration = ICAL.Duration.fromSeconds(Math.round(alarm.trigger.minutes * 60)).toString();
@@ -734,15 +746,15 @@ function eventLines(event: T.CalendarEvent, now: Date | undefined): string[] {
     if (event.summary) lines.push(property("summary", {}, "text", event.summary));
     if (event.description) lines.push(property("description", {}, "text", event.description));
     if (event.location) lines.push(property("location", {}, "text", event.location));
-    if (event.status) lines.push(`STATUS:${event.status}`);
-    if (event.transparency !== "OPAQUE") lines.push(`TRANSP:${event.transparency}`);
-    if (event.classification !== "PUBLIC") lines.push(`CLASS:${event.classification}`);
+    if (event.status) lines.push(property("status", {}, "text", event.status));
+    if (event.transparency !== "OPAQUE") lines.push(property("transp", {}, "text", event.transparency));
+    if (event.classification !== "PUBLIC") lines.push(property("class", {}, "text", event.classification));
     if (event.categories.length > 0) lines.push(property("categories", {}, "text", ...event.categories));
     if (event.color) lines.push(property("color", {}, "text", event.color));
     if (event.url) lines.push(property("url", {}, "uri", event.url));
     if (event.organizer) lines.push(property("organizer", personParams(event.organizer), "cal-address", address(event.organizer.email)));
     lines.push(...event.attendees.map(attendeeLine));
-    if (event.rule) lines.push(`RRULE:${event.rule.raw}`);
+    if (event.rule) lines.push(`RRULE:${lineSafe(event.rule.raw, false)}`);
     lines.push(...event.rdates.map((value) => dateLine("rdate", value)));
     lines.push(...event.exdates.map((value) => dateLine("exdate", value)));
     for (const attachment of event.attachments) {
@@ -753,8 +765,8 @@ function eventLines(event: T.CalendarEvent, now: Date | undefined): string[] {
     // Google's own line already says it; a second, standard one would be read
     // back as the same link.
     const googleUrl = google ? textOf(parseLine(google.line)) : undefined;
-    if (event.conference && event.conference !== googleUrl) lines.push(`CONFERENCE;VALUE=URI:${event.conference}`);
-    if (event.kind !== "default") lines.push(`X-POLARIS-KIND:${event.kind}`);
+    if (event.conference && event.conference !== googleUrl) lines.push(property("conference", {}, "uri", event.conference));
+    if (event.kind !== "default") lines.push(property("x-polaris-kind", {}, "unknown", event.kind));
     if (event.created) lines.push(stampLine("created", event.created));
     if (event.lastModified) lines.push(stampLine("last-modified", event.lastModified));
     lines.push(...dtstamp.rest);
@@ -773,11 +785,11 @@ function todoLines(todo: T.CalendarTodo, now: Date | undefined): string[] {
     if (todo.start) lines.push(dateLine("dtstart", todo.start));
     if (todo.due) lines.push(dateLine("due", todo.due));
     if (todo.completed) lines.push(stampLine("completed", todo.completed));
-    lines.push(`STATUS:${todo.status}`);
+    lines.push(property("status", {}, "text", todo.status));
     if (todo.percent > 0) lines.push(property("percent-complete", {}, "integer", todo.percent));
     if (todo.priority > 0) lines.push(property("priority", {}, "integer", todo.priority));
     if (todo.categories.length > 0) lines.push(property("categories", {}, "text", ...todo.categories));
-    if (todo.rule) lines.push(`RRULE:${todo.rule.raw}`);
+    if (todo.rule) lines.push(`RRULE:${lineSafe(todo.rule.raw, false)}`);
     lines.push(...dtstamp.rest);
     for (const alarm of todo.alarms) lines.push(...alarmLines(alarm));
     for (const block of todo.extraComponents ?? []) lines.push(...splitLines(block));
@@ -796,7 +808,7 @@ function todoLines(todo: T.CalendarTodo, now: Date | undefined): string[] {
  */
 export function serializeItem(item: T.CalendarItem, options: { method?: string; prodId?: string; now?: Date } = {}): string {
     const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", property("prodid", {}, "text", options.prodId ?? DEFAULT_PRODID), "CALSCALE:GREGORIAN"];
-    if (options.method) lines.push(`METHOD:${options.method.toUpperCase()}`);
+    if (options.method) lines.push(property("method", {}, "text", options.method.toUpperCase()));
     for (const block of item.timezones) lines.push(...splitLines(block));
     const components: string[] = [];
     if (item.component === "VEVENT") {

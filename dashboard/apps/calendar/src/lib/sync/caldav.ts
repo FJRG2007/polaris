@@ -170,7 +170,6 @@ async function locate(credentials: dav.DavCredentials, raw: string): Promise<Loc
         try {
             const { multistatus, url } = await dav.davMultistatus(credentials, "PROPFIND", candidate, "0", PRINCIPAL_BODY);
             const first = multistatus.responses[0];
-            answered ??= url.href;
             const principal = dav.propHref(first, dav.DAV, "current-user-principal", url) ?? (dav.hasType(first, dav.DAV, "principal") ? url.href : null);
             const directHome = dav.propHref(first, dav.CALDAV, "calendar-home-set", url);
             if (principal) {
@@ -179,8 +178,9 @@ async function locate(credentials: dav.DavCredentials, raw: string): Promise<Loc
             } else if (directHome) {
                 return { serverUrl: url.href, principalUrl: url.href, homeUrl: asCollection(directHome) };
             }
+            answered ??= url.href;
         } catch (error) {
-            if (error instanceof SyncAuthError) throw error;
+            if (error instanceof SyncAuthError || error instanceof SyncUnreachableError) throw error;
             lastError = error;
         }
     }
@@ -205,7 +205,7 @@ export async function discoverCalDav(input: { url: string; username: string; pas
     homeUrl: string;
     calendars: RemoteCalendar[];
 }> {
-    const credentials: dav.DavCredentials = { username: input.username, password: input.password, fetcher: input.fetcher };
+    const credentials: dav.DavCredentials = { username: input.username, password: input.password, fetcher: input.fetcher, origin: normalizeServerUrl(input.url).href };
     const located = await locate(credentials, input.url);
     const calendars = await listUnder(credentials, located.homeUrl);
     return { ...located, calendars };
@@ -222,7 +222,7 @@ function hrefFor(url: string, collection: string): string {
 
 /** A CalDAV account as a `CalendarProvider`. */
 export function createCalDavProvider(input: { serverUrl: string; username: string; password: string; fetcher: Fetcher }): CalendarProvider {
-    const credentials: dav.DavCredentials = { username: input.username, password: input.password, fetcher: input.fetcher };
+    const credentials: dav.DavCredentials = { username: input.username, password: input.password, fetcher: input.fetcher, origin: normalizeServerUrl(input.serverUrl).href };
     let home: string | null = null;
 
     /** Fetches bodies with calendar-multiget, falling back to one GET each. */

@@ -99,7 +99,7 @@ export function suggestTimes(input: {
             const close = minutesOf(window.to);
             for (let minute = open; minute + input.durationMinutes <= close; minute += step) {
                 const start = instantAt(date, minute, input.zone).getTime();
-                const end = instantAt(date, minute + input.durationMinutes, input.zone).getTime();
+                const end = start + input.durationMinutes * 60_000;
                 if (start < earliest || end > input.to.getTime() || end <= start) continue;
                 if (overlapsAny(start, end, everyone)) continue;
                 if (found.some((slot) => slot.start.getTime() === start)) continue;

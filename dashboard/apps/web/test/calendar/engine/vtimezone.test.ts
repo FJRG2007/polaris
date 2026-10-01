@@ -52,6 +52,20 @@ describe("a VTIMEZONE written from Intl", () => {
         expect(block).toContain("TZOFFSETTO:+0200");
     });
 
+    it("describes a change on the first weekday on or after a day the same way in every year", () => {
+        // Israel: the Friday before the last Sunday of March (Fri>=23), which
+        // is not the last Friday in 2028 or 2029.
+        const block = engine.vtimezoneFor("Asia/Jerusalem", 2026)!;
+        expect(block).toContain("RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=FR;BYMONTHDAY=23,24,25,26,27,28,29");
+        expect(block).toContain("RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU");
+        for (let year = 2026; year <= 2037; year++) {
+            for (let day = 22; day <= 31; day++) {
+                const wall = `${year}-03-${day}T12:00:00`;
+                expect(offsetFromBlock(block, wall), wall).toBe(offsetFromIntl("Asia/Jerusalem", wall));
+            }
+        }
+    });
+
     it("writes nothing for UTC or a zone Intl does not know", () => {
         expect(engine.vtimezoneFor("UTC", 2026)).toBeNull();
         expect(engine.vtimezoneFor("Nowhere/Middle", 2026)).toBeNull();

@@ -659,7 +659,14 @@ export function createGraphProvider(input: {
             }
             const full = !state.syncToken;
             const reported = full ? changed : changed.filter((object) => state.known.get(object.href) !== object.etag);
-            return { changed: reported, removed: full ? [] : [...removed], syncToken: deltaLink || state.syncToken, ctag: "", full };
+            return {
+                changed: reported,
+                removed: full ? [] : [...removed],
+                syncToken: deltaLink || state.syncToken,
+                ctag: "",
+                full,
+                ...(full ? { window: { start: new Date(start), end: new Date(end) } } : {})
+            };
         },
 
         async put(target, object) {

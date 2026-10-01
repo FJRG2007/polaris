@@ -24,6 +24,7 @@ import {
 } from "@/lib/google-calendar/service";
 import {
     MICROSOFT_CALENDAR_SCOPES,
+    MicrosoftAuthExpiredError,
     getMicrosoftOAuthClient,
     microsoftAccessToken
 } from "@/lib/connections/microsoft";
@@ -118,7 +119,9 @@ export async function calendarAccessToken(userId: string, connectionId: string):
             MICROSOFT_CALENDAR_SCOPES.filter((scope) => scope !== "openid" && scope !== "email")
         );
     } catch (caught) {
-        if (caught instanceof GoogleAuthExpiredError) throw new CalendarLinkExpiredError();
+        if (caught instanceof GoogleAuthExpiredError || caught instanceof MicrosoftAuthExpiredError) {
+            throw new CalendarLinkExpiredError();
+        }
         throw caught;
     }
 }

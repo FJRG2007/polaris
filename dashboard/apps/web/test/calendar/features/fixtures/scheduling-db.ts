@@ -286,9 +286,19 @@ export const scheduling = {
     }
 };
 
+/** Interactive transactions run one at a time, as a row lock held to commit
+ *  would make two that write the same row. */
+let running: Promise<unknown> = Promise.resolve();
+
 /** The shared fake's client with the scheduling tables beside it. */
-export const prisma = Object.assign(Object.create(null) as Record<string, unknown>, db.prisma, {
-    ...Object.fromEntries(Object.keys(TABLES).map((name) => [name, delegate(name)]))
+export const prisma: Record<string, unknown> = Object.assign(Object.create(null) as Record<string, unknown>, db.prisma, {
+    ...Object.fromEntries(Object.keys(TABLES).map((name) => [name, delegate(name)])),
+    $transaction: async (work: unknown): Promise<unknown> => {
+        if (typeof work !== "function") return db.prisma.$transaction(work);
+        const turn = running.then(() => (work as (client: unknown) => Promise<unknown>)(prisma));
+        running = turn.catch(() => undefined);
+        return turn;
+    }
 });
 
 /** What `vi.mock("@polaris/db", ...)` answers with in a feature test. */

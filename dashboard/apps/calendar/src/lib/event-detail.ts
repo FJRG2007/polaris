@@ -9,7 +9,7 @@ import { prisma } from "@polaris/db";
 import * as engine from "../engine";
 import { CalendarRefusal } from "./errors";
 import { calendarT } from "./i18n";
-import { reaches, type SessionUser } from "./access";
+import { reaches, todoClassification, type SessionUser } from "./access";
 import { itemOf, readableObject, versionOf } from "./objects";
 import type { EventDetail, TodoDetail } from "./wire";
 
@@ -18,6 +18,7 @@ import type { EventDetail, TodoDetail } from "./wire";
 function busyOnly(event: engine.CalendarEvent): engine.CalendarEvent {
     return {
         ...event,
+        uid: "",
         summary: "",
         description: "",
         location: "",
@@ -98,6 +99,9 @@ export async function todoDetail(user: SessionUser, objectId: string): Promise<T
     if (calendar.reach === "freebusy") throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
     const item = await itemOf(row);
     if (item.component !== "VTODO") throw new CalendarRefusal((await calendarT())("errors.notATask"));
+    if (!reaches(calendar.reach, "write") && todoClassification(item.todo) !== "PUBLIC") {
+        throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
+    }
     return {
         objectId: row.id,
         calendarId: row.calendarId,
