@@ -26,20 +26,22 @@
  */
 
 import { z } from "zod";
-import { randomUUID } from "node:crypto";
 import * as draw from "./draw";
 import * as play from "./play";
 import * as stored from "./state";
 import { readXray } from "../xray";
 import * as period from "./period";
 import * as season from "./season";
+import * as speech from "../speech";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
-import * as progress from "./progress";
-import * as speech from "../speech";
 import * as written from "./messages";
+import * as service from "../service";
+import * as progress from "./progress";
 import * as commands from "./commands";
 import * as playing from "../activity";
+import * as delivery from "../delivery";
+import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "../schedule";
 import { parseProperties } from "../parse";
@@ -47,13 +49,11 @@ import type * as plan from "../events/plan";
 import * as settingsModule from "./settings";
 import * as replies from "../events/replies";
 import { readEventState } from "../events/state";
-import { readEventsConfig } from "../events/catalog";
-import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 import * as speechService from "../speech-service";
-import * as delivery from "../delivery";
 import * as eventMessages from "../events/messages";
-import * as service from "../service";
 import { editionOf, type ServerContainer } from "../service";
+import { chosenLanguage as chosenEventsLanguage, readEventsConfig } from "../events/catalog";
+import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -154,14 +154,11 @@ async function readRow(installedAppId: string): Promise<Row | null> {
     };
 }
 
-/** The settings, with the events' time zone and language as the defaults. */
+/** The settings, with the events' time zone as the default. */
 export function settingsOf(config: Record<string, unknown>): settingsModule.ChallengeSettings {
     const timezone = readSchedule(config).timezone;
     const events = readEventsConfig(config, timezone).settings;
-    return settingsModule.readSettings(config, {
-        timezone: events.timezone,
-        language: events.language
-    });
+    return settingsModule.readSettings(config, { timezone: events.timezone });
 }
 
 function clockOf(settings: settingsModule.ChallengeSettings): period.Clock {
@@ -201,7 +198,7 @@ export async function saveSettings(
     for (let attempt = 0; attempt < WRITE_TRIES; attempt += 1) {
         const row = await prisma.installedApp.findUnique({
             where: { id: installedAppId },
-            select: { config: true, status: true }
+            select: { ownerId: true, config: true, status: true }
         });
         if (!row || row.status === "removed") throw new ChallengeRefusal("errors.notHere");
         const config = readInstallConfig(row.config);
@@ -217,6 +214,7 @@ export async function saveSettings(
                     ...state,
                     since: state.since ?? Date.now()
                 }));
+            wake(row.ownerId, installedAppId, parsed.data.enabled);
             return parsed.data;
         }
     }
@@ -424,6 +422,8 @@ interface Loop {
     lastSlow: number;
     lastFile: number;
     version: string | null | undefined;
+    /** When the version was last looked for, to look again while it is unread. */
+    versionAt: number;
     level: string | null;
     uuids: Map<string, string> | null;
     /** Who was on at the last read, by lowercased name. */
@@ -437,6 +437,10 @@ interface Loop {
 
 const loops = new Map<string, Loop>();
 
+/** Why a server with challenges on has no loop working for it, as its last try found. */
+export type Idle = "stopped" | "unreachable";
+const idle = new Map<string, Idle>();
+
 function ensureLoop(ownerId: string, installedAppId: string): void {
     if (loops.has(installedAppId)) return;
     const loop: Loop = {
@@ -448,6 +452,7 @@ function ensureLoop(ownerId: string, installedAppId: string): void {
         lastSlow: 0,
         lastFile: 0,
         version: undefined,
+        versionAt: 0,
         level: null,
         uuids: null,
         online: new Set(),
@@ -456,6 +461,20 @@ function ensureLoop(ownerId: string, installedAppId: string): void {
         bars: new Set()
     };
     loops.set(installedAppId, loop);
+}
+
+/**
+ * Saved from the screen: switched on, the loop is started and takes its first
+ * look now, rather than on the next minute's sweep - the screen reads Running,
+ * and the server's version, within seconds. Switched off, a running loop takes
+ * the objectives down on this look instead of its next.
+ */
+function wake(ownerId: string, installedAppId: string, enabled: boolean): void {
+    if (enabled) {
+        idle.delete(installedAppId);
+        ensureLoop(ownerId, installedAppId);
+    }
+    if (loops.has(installedAppId)) void tick(installedAppId);
 }
 
 async function stopLoop(installedAppId: string): Promise<void> {
@@ -475,12 +494,14 @@ async function tick(installedAppId: string, now = Date.now()): Promise<void> {
             if (!loop.link) loop.link = await openServerContainer(loop.ownerId, installedAppId);
             const server = loop.link.server;
             if (!server.running) {
+                idle.set(installedAppId, "stopped");
                 await stopLoop(installedAppId);
                 return;
             }
             const row = await readRow(installedAppId);
             const settings = row ? settingsOf(row.config) : null;
             if (!row || !settings?.enabled) {
+                idle.delete(installedAppId);
                 await switchOff(installedAppId, server, row);
                 await stopLoop(installedAppId);
                 return;
@@ -489,11 +510,13 @@ async function tick(installedAppId: string, now = Date.now()): Promise<void> {
             if (now - loop.lastRead >= READ_MS) {
                 loop.lastRead = now;
                 await readAll(installedAppId, loop, server, now);
+                idle.delete(installedAppId);
             }
         });
     } catch (error) {
         // A server that stopped answering: the connection is opened again on
         // the next tick; a loop whose server is gone is let go by the sweep.
+        idle.set(installedAppId, "unreachable");
         console.warn("polaris: challenges tick failed", installedAppId, String(error));
         await loop.link?.close().catch(() => undefined);
         loop.link = null;
@@ -606,7 +629,12 @@ async function contextFor(
     settings: settingsModule.ChallengeSettings,
     now: number
 ): Promise<Sweep> {
-    if (loop.version === undefined) loop.version = await versionOf(server);
+    // Looked for again while unread: a log read too early, or cut short, must
+    // not leave the screen saying "not read yet" for as long as the loop lives.
+    if (loop.version === undefined || (loop.version === null && now - loop.versionAt >= SLOW_MS)) {
+        loop.versionAt = now;
+        loop.version = await versionOf(server);
+    }
     const state = stored.readServerState(row.config);
     const clock = clockOf(settings);
     const seasonNow = period.seasonOf(
@@ -1105,7 +1133,7 @@ async function rotateCommunity(sweep: Sweep): Promise<void> {
     if (ended.length > 0 && current) {
         for (const goal of ended) await finishGoal(sweep, goal, current);
         goals = goals.map((goal) => (ended.includes(goal) ? { ...goal, finished: true } : goal));
-        await sweep.server.sayAll([commands.barRemove(commands.GOAL_BAR)]);
+        await sweep.server.sayAll(commands.GOAL_BARS.map((id) => commands.barRemove(id)));
     }
     goals = goals
         .filter((goal) => !goal.finished || now - goal.endsAt < 30 * 86_400_000)
@@ -1177,22 +1205,34 @@ async function runGoals(sweep: Sweep): Promise<void> {
     const first = live[0];
     if (!first || !sweep.settings.layers.community) return;
     const total = Object.values(first.shares).reduce((sum, one) => sum + one.value, 0);
-    const title = play.titleOf(
-        { template: first.template, variant: first.variant, target: first.target },
-        sweep.home
-    );
-    if (sweep.eventOn) await sweep.server.sayAll(commands.barHide(commands.GOAL_BAR));
-    else
-        await sweep.server.sayAll(
-            commands.barShow(
-                commands.GOAL_BAR,
-                messages.goalBar(title, play.goalTier(total, first.target), sweep.home),
-                total,
-                first.target,
-                "@a",
-                "pink"
+    const which = { template: first.template, variant: first.variant, target: first.target };
+    if (sweep.eventOn) {
+        await sweep.server.sayAll(commands.GOAL_BARS.flatMap((id) => commands.barHide(id)));
+    } else {
+        // One bar per language somebody on reads, each named in it; a language
+        // nobody on reads has its bar taken down, since a bar's players cannot
+        // be set to a selector that finds nobody.
+        const reading = new Set([...sweep.seen.values()].map((one) => sweep.languageOf(one.name)));
+        await sweep.server.sayAll([
+            commands.barRemove(commands.GOAL_BAR),
+            ...speech.LANGUAGES.flatMap((language) =>
+                reading.has(language)
+                    ? commands.barShow(
+                          commands.goalBar(language),
+                          messages.goalBar(
+                              play.titleOf(which, language),
+                              play.goalTier(total, first.target),
+                              language
+                          ),
+                          total,
+                          first.target,
+                          speech.readersOf(language, sweep.home),
+                          "pink"
+                      )
+                    : [commands.barRemove(commands.goalBar(language))]
             )
-        );
+        ]);
+    }
     for (const goal of live) await payGoalTiers(sweep, goal);
 }
 
@@ -1817,7 +1857,7 @@ async function carry(
     if (said.length > 0) await sweep.server.sayAll(said);
     if (owed.items.length === 0 && owed.levels === 0) return;
     if (online) await sweep.server.sayAll([commands.tell(name, messages.rewardWaiting(language))]);
-    await owe(sweep.installedAppId, name, owed, sweep.home);
+    await owe(sweep.installedAppId, name, owed, language);
 }
 
 /**
@@ -2324,6 +2364,7 @@ export async function sweepChallenges(
                 async (server) => server.running
             );
             if (!due) {
+                idle.set(row.id, "stopped");
                 if (loops.has(row.id)) await stopLoop(row.id);
                 continue;
             }
@@ -2347,6 +2388,7 @@ export async function sweepChallenges(
                     sweep.state.card?.key
                 ]);
                 await rotate({ ...sweep, seen: playing.seenOn(row.id) ?? new Map() });
+                idle.delete(row.id);
                 if (
                     JSON.stringify([
                         sweep.state.daily?.key,
@@ -2357,6 +2399,7 @@ export async function sweepChallenges(
                     rotated += 1;
             });
         } catch (error) {
+            idle.set(row.id, "unreachable");
             console.warn("polaris: challenges sweep failed", row.id, String(error));
         }
     }
@@ -2400,6 +2443,11 @@ export interface PoolView {
 export interface ChallengesView {
     readonly settings: settingsModule.ChallengeSettings;
     readonly running: boolean;
+    /** Switched on but not running: why, as the last try found; null while
+     *  nothing has been tried yet, or it runs. */
+    readonly idle: Idle | null;
+    /** What `serverLanguage: null` reads as here: the events' language, or the owner's. */
+    readonly automaticLanguage: catalog.Language;
     readonly version: string | null;
     readonly daily: PoolView | null;
     readonly weekly: PoolView | null;
@@ -2531,9 +2579,15 @@ ${holder.holder}`) ?? null,
         tomorrowKey
     );
     const eventState = readEventState(row.config);
+    const stuck = settings.enabled ? (idle.get(installedAppId) ?? null) : null;
     return {
         settings,
-        running: loops.has(installedAppId),
+        running: loops.has(installedAppId) && stuck === null,
+        idle: stuck,
+        automaticLanguage: await speechService.homeLanguage(
+            row.ownerId,
+            chosenEventsLanguage(row.config)
+        ),
         version: state.version,
         daily: poolView("daily"),
         weekly: poolView("weekly"),

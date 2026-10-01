@@ -383,13 +383,41 @@ describe("community goals", () => {
 });
 
 describe("the settings", () => {
-    it("reads an empty server as switched off, in its events' zone and language", () => {
-        const read = settingsModule.readSettings({}, { timezone: "Europe/Madrid", language: "es" });
+    it("reads an empty server as switched off, in its events' zone, its language left to the server", () => {
+        const read = settingsModule.readSettings({}, { timezone: "Europe/Madrid" });
         expect(read.enabled).toBe(false);
         expect(read.timezone).toBe("Europe/Madrid");
-        expect(read.language).toBe("es");
+        expect(read.serverLanguage).toBeNull();
         expect(read.rewards.daily.hard.points).toBe(40);
         expect(read.season.tiers).toBe(40);
+    });
+
+    it("takes a language as chosen only when it was, never the one an older screen wrote back", () => {
+        // What the switch saved before: the English it showed, on a server whose events never chose.
+        const saved = { challenges: { enabled: true, language: "en" } };
+        expect(settingsModule.readSettings(saved).serverLanguage).toBeNull();
+        expect(settingsModule.chosenLanguage(saved)).toBeNull();
+        // Saving it again does not turn it into a choice.
+        const again = settingsModule.settingsSchema.parse(settingsModule.readSettings(saved));
+        expect(again.serverLanguage).toBeNull();
+        expect("language" in again).toBe(false);
+        // A real choice, or the events', is kept.
+        expect(settingsModule.chosenLanguage({ challenges: { serverLanguage: "en" } })).toBe("en");
+        expect(
+            settingsModule.chosenLanguage({
+                challenges: {},
+                events: { settings: { language: "es" } }
+            })
+        ).toBe("es");
+    });
+
+    it("shows a champion's title in the reader's language, whichever it was won in", () => {
+        expect(catalog.championSeason("Season 3 champion")).toBe(3);
+        expect(catalog.championSeason("Campeón de la temporada 12")).toBe(12);
+        expect(catalog.championSeason("Anything else")).toBeNull();
+        expect(messages.titleIn("Season 3 champion", "es")).toBe("Campeón de la temporada 3");
+        expect(messages.titleIn("Campeón de la temporada 3", "en")).toBe("Season 3 champion");
+        expect(messages.titleIn("Anything else", "es")).toBe("Anything else");
     });
 
     it("refuses a shared season with no group, and a goal that cannot be one", () => {

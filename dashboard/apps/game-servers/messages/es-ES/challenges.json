@@ -5,6 +5,9 @@
         "on": "Retos activados",
         "running": "En marcha",
         "idle": "Esperando al servidor",
+        "starting": "Arrancando",
+        "stopped": "El servidor está parado. Los retos empiezan cuando arranque.",
+        "unreachable": "La consola del servidor no responde. Polaris lo sigue intentando.",
         "off": "Desactivados",
         "version": "Versión del servidor: {version}",
         "versionUnknown": "Versión del servidor: aún sin leer",
@@ -111,6 +114,7 @@
         "streak": "Racha",
         "lastSeen": "Última vez",
         "never": "nunca",
+        "champion": "Campeón de la temporada {season}",
         "backlog": "+{count} pendientes",
         "cardDone": "{done}/{total}",
         "progress": "{title}: {progress} / {target}",
@@ -122,7 +126,9 @@
     },
     "settings": {
         "title": "Ajustes",
-        "language": "Idioma en el juego",
+        "language": "Idioma por defecto",
+        "automatic": "Automático",
+        "automaticIs": "Automático ({language})",
         "english": "Inglés",
         "spanish": "Español",
         "timezone": "Zona horaria",
@@ -162,7 +168,7 @@
         "groups": {
             "schedule": {
                 "title": "Idioma y horario",
-                "hint": "Qué leen los jugadores y cuándo empiezan el día y la semana nuevos."
+                "hint": "Los vinculados leen el idioma de su cuenta; el resto, este. Y cuándo empiezan el día y la semana."
             },
             "layers": {
                 "title": "Qué funciona",

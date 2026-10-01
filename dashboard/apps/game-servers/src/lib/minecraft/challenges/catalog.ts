@@ -49,6 +49,17 @@ export type Layer = (typeof LAYERS)[number];
 export type Language = "en" | "es";
 export type Text = Readonly<Record<Language, string>>;
 
+/**
+ * The season a champion's title names, in whichever language it was written
+ * (`Season 3 champion`, `Campeón de la temporada 3`); null for any other title.
+ * A title is kept as it was first written, so it is read back to be shown in
+ * the reader's own language.
+ */
+export function championSeason(title: string): number | null {
+    const found = /^(?:Season (\d+) champion|Campeón de la temporada (\d+))$/.exec(title);
+    return found ? Number(found[1] ?? found[2]) : null;
+}
+
 /** A version as numbers, `[1, 17]` for 1.17. */
 export type Version = readonly number[];
 

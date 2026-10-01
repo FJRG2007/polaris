@@ -37,7 +37,9 @@ const now = Date.now();
 const view = {
     settings,
     running: true,
-    version: "1.21.4",
+    idle: null as "stopped" | "unreachable" | null,
+    automaticLanguage: "en" as "en" | "es",
+    version: "1.21.4" as string | null,
     daily: {
         key: "2026-09-29",
         endsAt: now + 5 * 3_600_000,
@@ -103,6 +105,8 @@ const ID = "00000000-0000-4000-8000-000000000001";
 
 afterEach(() => {
     cleanup();
+    // A spy a failed test left in place must not answer for the next one.
+    vi.restoreAllMocks();
     saved.length = 0;
     locale = "en-US";
     // The part last opened is remembered per browser; every test starts on the summary.
@@ -155,6 +159,80 @@ describe("the Challenges tab", () => {
         await waitFor(() => expect(saved).toHaveLength(1));
         expect((saved[0] as { enabled: boolean }).enabled).toBe(false);
         expect(screen.queryByText("Save")).toBeNull();
+    });
+
+    it("reads again within seconds of being switched on, until it runs with the version", async () => {
+        // It used to show "Waiting for the server" and "not read yet" until
+        // the half-minute read after the minute's sweep, or a reload.
+        const actions = await import(
+            "@polaris-app/game-servers/src/screens/installed/challenges-actions"
+        );
+        const off = {
+            ...view,
+            settings: { ...settings, enabled: false },
+            running: false,
+            version: null
+        };
+        const waiting = { ...off, settings };
+        const save = vi
+            .spyOn(actions, "saveChallengesAction")
+            .mockResolvedValueOnce({ view: waiting } as never);
+        render(<MinecraftChallenges installedAppId={ID} canManage />);
+        answerRead({ view: off });
+        const read = vi
+            .spyOn(actions, "readChallengesAction")
+            .mockResolvedValueOnce({ view: waiting } as never)
+            .mockResolvedValue({ view } as never);
+        fireEvent.click(await screen.findByLabelText("Challenges on"));
+        await waitFor(() => expect(screen.getByText("Starting")).toBeTruthy());
+        expect(screen.getByText("Server version: not read yet")).toBeTruthy();
+        await waitFor(() => expect(screen.getByText("Running")).toBeTruthy(), { timeout: 6_000 });
+        expect(screen.getByText("Server version: 1.21.4")).toBeTruthy();
+        expect(read.mock.calls.length).toBe(2);
+        // Running with its version: no more quick reads.
+        await new Promise((resolve) => setTimeout(resolve, 2_500));
+        expect(read.mock.calls.length).toBe(2);
+        save.mockRestore();
+        read.mockRestore();
+    });
+
+    it("says why it waits when the server cannot run them now", async () => {
+        const actions = await import(
+            "@polaris-app/game-servers/src/screens/installed/challenges-actions"
+        );
+        const off = {
+            ...view,
+            settings: { ...settings, enabled: false },
+            running: false,
+            version: null
+        };
+        const stopped = { ...off, settings, idle: "stopped" as const };
+        const save = vi
+            .spyOn(actions, "saveChallengesAction")
+            .mockResolvedValueOnce({ view: stopped } as never);
+        render(<MinecraftChallenges installedAppId={ID} canManage />);
+        answerRead({ view: off });
+        const read = vi.spyOn(actions, "readChallengesAction");
+        fireEvent.click(await screen.findByLabelText("Challenges on"));
+        await waitFor(() =>
+            expect(
+                screen.getByText("The server is stopped. Challenges start once it is running.")
+            ).toBeTruthy()
+        );
+        expect(screen.getByText("Waiting for the server")).toBeTruthy();
+        // It said why: nothing to hurry for.
+        await new Promise((resolve) => setTimeout(resolve, 2_500));
+        expect(read).not.toHaveBeenCalled();
+        save.mockRestore();
+        read.mockRestore();
+    });
+
+    it("leaves the language to the server unless one is chosen, and says what that is", async () => {
+        render(<MinecraftChallenges installedAppId={ID} canManage />);
+        fireEvent.click(screen.getByText("Settings"));
+        answerRead({ view: { ...view, automaticLanguage: "es" } });
+        expect(await screen.findByText("Automatic (Spanish)")).toBeTruthy();
+        expect(screen.getByText("Default language")).toBeTruthy();
     });
 
     it("puts the switch back and says why when the save is refused", async () => {

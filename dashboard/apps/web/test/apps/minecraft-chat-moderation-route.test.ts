@@ -28,7 +28,11 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
             findFirst: async () => ({ applicationId: "app-1", ownerId: "owner-1" }),
-            findUnique: async () => ({ ownerId: "owner-1", config: fake.config, applicationId: "app-1" })
+            findUnique: async () => ({
+                ownerId: "owner-1",
+                config: fake.config,
+                applicationId: "app-1"
+            })
         },
         gamePlayerLink: {
             findFirst: async ({ where }: { where: { player: { equals: string } } }) => {
@@ -38,10 +42,12 @@ vi.mock("@polaris/db", () => ({
         },
         minecraftChatBlock: {
             count: async ({ where }: { where: { player: string; at: { gt: Date } } }) =>
-                fake.rows.filter((row) => row.player === where.player && row.at > where.at.gt).length,
+                fake.rows.filter((row) => row.player === where.player && row.at > where.at.gt)
+                    .length,
             findFirst: async ({ where }: { where: { player: string } }) =>
-                fake.rows.filter((row) => row.player === where.player && row.action === "timeout").at(-1) ??
-                null,
+                fake.rows
+                    .filter((row) => row.player === where.player && row.action === "timeout")
+                    .at(-1) ?? null,
             create: async ({ data }: { data: (typeof fake.rows)[number] }) => {
                 fake.rows.push(data);
                 return data;
@@ -64,18 +70,29 @@ vi.mock("@polaris/app-host", () => ({
             patchInstallConfig: async () => undefined
         },
         rateLimitService: { rateLimit: async () => ({ ok: true, retryAfterMs: 0 }) },
-        i18nLocaleService: { getUserLocale: async (id: string) => fake.locales.get(id) ?? "en-US" }
+        i18nLocaleService: {
+            getUserLocale: async (id: string) => fake.locales.get(id) ?? "en-US",
+            storedLocale: async (id: string) => fake.locales.get(id) ?? null
+        }
     }
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/timeout-service", () => ({
-    timeoutPlayer: async (_owner: string, _id: string, player: string, minutes: number, reason?: string) => {
+    timeoutPlayer: async (
+        _owner: string,
+        _id: string,
+        player: string,
+        minutes: number,
+        reason?: string
+    ) => {
         fake.timeouts.push({ player, minutes, reason });
         return { player, until: "" };
     }
 }));
 
-const { GET, POST } = await import("@polaris-app/game-servers/src/routes/api/minecraft/chat/[id]/route");
+const { GET, POST } = await import(
+    "@polaris-app/game-servers/src/routes/api/minecraft/chat/[id]/route"
+);
 
 function call(method: "GET" | "POST", body?: unknown, token = "the-token", id = SERVER) {
     const request = new Request(`https://polaris.example/api/minecraft/chat/${id}`, {
@@ -85,7 +102,8 @@ function call(method: "GET" | "POST", body?: unknown, token = "the-token", id = 
             "content-type": "application/json",
             "user-agent": "Polaris-Minecraft/0.1.0+abc"
         },
-        body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body)
+        body:
+            body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body)
     });
     const context = { params: Promise.resolve({ id }) };
     return method === "GET" ? GET(request, context) : POST(request, context);
@@ -150,18 +168,27 @@ describe("a stopped line", () => {
         fake.links.set("bruno", "user-2");
         fake.locales.set("user-2", "es-ES");
         const answer = await call("POST", block({ player: "Bruno", reason: "flood" }));
-        expect(((await answer.json()) as { warn: string }).warn).toBe("Más despacio: tu mensaje no se envió.");
+        expect(((await answer.json()) as { warn: string }).warn).toBe(
+            "Más despacio: tu mensaje no se envió."
+        );
     });
 
     it("says the next one counts, then times the player out", async () => {
         await call("POST", block());
         const second = (await (await call("POST", block())).json()) as { warn: string };
         expect(second.warn).toContain("One more and you will be removed for 10 min.");
-        const third = (await (await call("POST", block())).json()) as { warn: string; action: string };
+        const third = (await (await call("POST", block())).json()) as {
+            warn: string;
+            action: string;
+        };
         expect(third.action).toBe("timeout");
         await vi.runAllTimersAsync();
         expect(fake.timeouts).toEqual([
-            { player: "Alba", minutes: 10, reason: "Removed for 10 min for breaking the chat rules." }
+            {
+                player: "Alba",
+                minutes: 10,
+                reason: "Removed for 10 min for breaking the chat rules."
+            }
         ]);
         // Back from it, a player starts counting again.
         const after = (await (await call("POST", block())).json()) as { action: string };

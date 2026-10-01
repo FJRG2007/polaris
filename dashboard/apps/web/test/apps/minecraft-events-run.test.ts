@@ -1368,7 +1368,8 @@ vi.mock("@polaris/app-host", () => ({
                 raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
         },
         i18nLocaleService: {
-            getUserLocale: async (userId: string) => world.locales[userId] ?? "en-US"
+            getUserLocale: async (userId: string) => world.locales[userId] ?? "en-US",
+            storedLocale: async (userId: string) => world.locales[userId] ?? null
         }
     }
 }));

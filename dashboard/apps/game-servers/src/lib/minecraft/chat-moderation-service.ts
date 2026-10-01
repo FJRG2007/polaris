@@ -15,12 +15,12 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { Locale } from "@polaris/core";
 import { SOFTWARE_KEY } from "./join-guard";
-import { homeLanguage } from "./speech-service";
+import { accountLanguage, homeLanguage } from "./speech-service";
 import * as moderation from "./chat-moderation";
 import { gameCatalogs } from "../../../messages";
 import { chosenLanguage } from "./events/catalog";
 import { timeoutPlayer } from "./timeout-service";
-import { gameLanguage, type Language } from "./speech";
+import type { Language } from "./speech";
 import { MODS_KEY, URL_KEY, hasMod, loginOn } from "./polaris-login";
 import { anticheatBuildFor, anticheatOn } from "./polaris-anticheat";
 
@@ -87,12 +87,7 @@ async function playerLanguage(
             select: { userId: true }
         })
         .catch(() => null);
-    if (!link) return home;
-    try {
-        return gameLanguage(await host.i18nLocaleService.getUserLocale(link.userId));
-    } catch {
-        return home;
-    }
+    return link ? accountLanguage(link.userId, home) : home;
 }
 
 /** The rules the server applies, and a note that it asked. */
@@ -169,7 +164,9 @@ export async function recordBlock(
         }
     });
     await prisma.minecraftChatBlock
-        .deleteMany({ where: { installedAppId, at: { lt: new Date(now - moderation.LOG_KEEP_MS) } } })
+        .deleteMany({
+            where: { installedAppId, at: { lt: new Date(now - moderation.LOG_KEEP_MS) } }
+        })
         .catch(() => undefined);
 
     const home = await serverLanguage(ownerId, config);
@@ -180,9 +177,17 @@ export async function recordBlock(
         // Not awaited: the ban goes through the console, and the answer the
         // player is waiting on should not wait on it. A failure is logged; the
         // next stop tries again.
-        void timeoutPlayer(ownerId, installedAppId, block.player, rules.timeoutMinutes, reason).catch(
-            (caught) =>
-                console.error(`[minecraft-chat] could not time out ${block.player} on ${installedAppId}:`, caught)
+        void timeoutPlayer(
+            ownerId,
+            installedAppId,
+            block.player,
+            rules.timeoutMinutes,
+            reason
+        ).catch((caught) =>
+            console.error(
+                `[minecraft-chat] could not time out ${block.player} on ${installedAppId}:`,
+                caught
+            )
         );
         return { warn: reason, action: "timeout" };
     }

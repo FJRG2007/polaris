@@ -472,7 +472,12 @@ export function seasonMenu(player: string, ledger: Ledger, context: Context): st
         )
         .map((one) => commands.tell(player, one));
     if (ledger.titles.length > 0)
-        lines.push(commands.tell(player, `&6${ledger.titles.join(", ")}`));
+        lines.push(
+            commands.tell(
+                player,
+                `&6${ledger.titles.map((one) => messages.titleIn(one, language)).join(", ")}`
+            )
+        );
     lines.push(
         ...commands.fitted(player, [
             commands.button(
