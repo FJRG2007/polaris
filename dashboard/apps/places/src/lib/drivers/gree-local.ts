@@ -36,6 +36,7 @@ import {
     type ClimateCommand,
     type ClimateFan,
     type ClimateMode,
+    climateCommandOf,
     type ClimateSettings,
     type DeviceAction
 } from "../device-kinds";
@@ -384,7 +385,7 @@ export const greeLocalDriver: DeviceDriver = {
                     ? "F"
                     : "C"
                 : "C";
-        await gree.commandGree(unit, greeValues(action, command, unitOfMeasure));
+        await gree.commandGree(unit, greeValues(action, climateCommandOf(command), unitOfMeasure));
     },
 
     /** Keep a unit's new address once it has been found there. */

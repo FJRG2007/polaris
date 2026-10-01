@@ -436,7 +436,7 @@
         "tuyaKeys": "Tuya rechazó las claves. Puede que se hayan revocado o que el proyecto no cubra estos dispositivos.",
         "tuyaRefused": "Tuya rechazó la petición.",
         "reconnect": "Hay que volver a conectar {name}",
-        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} climate {un aire acondicionado} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} turnOff {se apague} setMode {cambie de modo} setTemperature {cambie de temperatura} setFan {cambie el ventilador} setOption {cambie un ajuste} other {haga eso}}",
+        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} climate {un aire acondicionado} air {un purificador} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} turnOff {se apague} setMode {cambie de modo} setTemperature {cambie de temperatura} setFan {cambie el ventilador} setOption {cambie un ajuste} setHumidity {cambie la humedad} other {haga eso}}",
         "watchOnly": "{name} está configurado para vigilarse, no para manejarse",
         "notConnected": "{name} no está conectado a nada",
         "notAnswering": "{name} no respondía la última vez que se comprobó",
@@ -532,7 +532,9 @@
         "greeUnpaired": "Polaris ya no está emparejado con estos aires. Vuelve a conectarlos.",
         "greeNoneThere": "Ningún aire Gree respondió en esa dirección. Comprueba que tiene corriente y está en la misma red que Polaris.",
         "greeNoneFound": "Ningún aire Gree respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
-        "greeNoPair": "El aire respondió pero no quiso emparejarse. Quítale la corriente un minuto y vuelve a intentarlo."
+        "greeNoPair": "El aire respondió pero no quiso emparejarse. Quítale la corriente un minuto y vuelve a intentarlo.",
+        "airNoHumidity": "Ese dispositivo no humidifica",
+        "airHumidity": "Este dispositivo no admite esa humedad"
     },
     "connections": {
         "nuki-web": {
@@ -1095,7 +1097,8 @@
             "outlet": "Enchufe",
             "light": "Luz",
             "sensor": "Sensor",
-            "climate": "Aire acondicionado"
+            "climate": "Aire acondicionado",
+            "air": "Purificador"
         },
         "groups": {
             "lock": "Puertas",
@@ -1104,7 +1107,8 @@
             "outlet": "Interruptores y enchufes",
             "light": "Luces",
             "sensor": "Sensores",
-            "climate": "Clima"
+            "climate": "Clima",
+            "air": "Aire"
         },
         "states": {
             "locked": "Cerrada",
@@ -1140,7 +1144,8 @@
             "set-mode": "Modo",
             "set-temperature": "Temperatura",
             "set-fan": "Ventilador",
-            "set-option": "Ajuste"
+            "set-option": "Ajuste",
+            "set-humidity": "Humedad"
         },
         "via": {
             "polaris": "desde Polaris",
@@ -1166,7 +1171,8 @@
             "set-mode": "Modo cambiado",
             "set-temperature": "Temperatura fijada",
             "set-fan": "Ventilador cambiado",
-            "set-option": "Ajuste cambiado"
+            "set-option": "Ajuste cambiado",
+            "set-humidity": "Humedad fijada"
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
@@ -1216,6 +1222,73 @@
                 "quiet": "Silencio",
                 "eco": "Eco"
             }
+        },
+        "air": {
+            "modes": {
+                "auto": "Auto",
+                "auto_plus": "Auto+",
+                "allergen": "Alérgenos",
+                "allergy_sleep": "Sueño alergia",
+                "bacteria": "Bacterias",
+                "pollution": "Polución",
+                "gas": "Gas",
+                "sleep": "Sueño",
+                "night": "Noche",
+                "gentle": "Suave",
+                "low": "Baja",
+                "medium": "Media",
+                "high": "Alta",
+                "speed_1": "Nivel 1",
+                "speed_2": "Nivel 2",
+                "speed_3": "Nivel 3",
+                "turbo": "Turbo",
+                "natural": "Natural",
+                "ventilation": "Ventilación"
+            },
+            "speeds": {
+                "sleep": "Sueño",
+                "night": "Noche",
+                "gentle": "Suave",
+                "low": "Baja",
+                "medium": "Media",
+                "high": "Alta",
+                "speed_1": "Nivel 1",
+                "speed_2": "Nivel 2",
+                "speed_3": "Nivel 3",
+                "speed_4": "Nivel 4",
+                "speed_5": "Nivel 5",
+                "speed_6": "Nivel 6",
+                "speed_7": "Nivel 7",
+                "speed_8": "Nivel 8",
+                "speed_9": "Nivel 9",
+                "speed_10": "Nivel 10",
+                "speed_11": "Nivel 11",
+                "speed_12": "Nivel 12",
+                "turbo": "Turbo"
+            },
+            "options": {
+                "childLock": "Bloqueo niños",
+                "light": "Luz pantalla",
+                "humidify": "Humidificar"
+            },
+            "filters": {
+                "pre": "Prefiltro",
+                "hepa": "Filtro HEPA",
+                "carbon": "Filtro carbón",
+                "wick": "Mecha",
+                "nanoprotect": "Filtro NanoProtect"
+            },
+            "filterStates": {
+                "ok": "Bien",
+                "soon": "Cambiar pronto",
+                "now": "Cambiar ya"
+            },
+            "measures": {
+                "pm25": "PM2.5",
+                "allergen": "Índice alérgenos",
+                "humidity": "Humedad",
+                "temperature": "Temperatura"
+            }
         }
     },
     "devicesView": {
@@ -1240,7 +1313,9 @@
         "nothingRead": "Sin lecturas",
         "notPlaced": "Sin ubicar",
         "disconnectBody": "Sus dispositivos se van con ella, y también todo lo que han hecho. Polaris no guarda copia de un edificio del que le han dicho que no es asunto suyo.",
-        "disconnect": "Desconectar"
+        "disconnect": "Desconectar",
+        "filterSoon": "Filtro: cambiar pronto",
+        "filterNow": "Cambiar filtro"
     },
     "devicePanel": {
         "watchOnly": "Configurado para vigilarse, no para manejarse.",
@@ -1272,6 +1347,25 @@
             "raise": "Subir el objetivo de {name}",
             "optionName": "{option} en {name}",
             "unknown": "Aún no ha dicho qué admite. Lo hará en cuanto responda a una comprobación."
+        },
+        "air": {
+            "unknown": "Aún no ha dicho qué admite. Lo hará en cuanto responda a una comprobación.",
+            "mode": "Modo",
+            "noMode": "Sin modo",
+            "modeName": "Modo de {name}",
+            "speed": "Velocidad",
+            "noSpeed": "Según modo",
+            "speedName": "Velocidad de {name}",
+            "target": "Humedad objetivo",
+            "targetName": "Humedad objetivo de {name}",
+            "lower": "Bajar la humedad objetivo de {name}",
+            "raise": "Subir la humedad objetivo de {name}",
+            "switches": "Opciones",
+            "optionName": "{option} en {name}",
+            "readings": "Lecturas",
+            "filters": "Filtros",
+            "lifePercent": "Queda {percent}%",
+            "lifeHours": "Quedan {hours} h"
         }
     },
     "deviceDialog": {

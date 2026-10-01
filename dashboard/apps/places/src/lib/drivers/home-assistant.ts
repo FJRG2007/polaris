@@ -17,7 +17,7 @@
 
 import { HomeError } from "../home-error";
 import * as ha from "../integrations/home-assistant-api";
-import { BINARY_WORDS, type DeviceKind } from "../device-kinds";
+import { BINARY_WORDS, climateCommandOf, type DeviceKind } from "../device-kinds";
 import { haClimateService, haClimateSettings } from "./home-assistant-climate";
 import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
@@ -186,7 +186,7 @@ export const homeAssistantDriver: DeviceDriver = {
             const home = homeOf(credentials);
             const entity = await ha.homeAssistantState(home, device.externalId);
             if (!entity) throw new HomeError("That device is not here");
-            const { service, data } = haClimateService(entity, action, command);
+            const { service, data } = haClimateService(entity, action, climateCommandOf(command));
             await ha.callService(home, domain, service, device.externalId, data);
             return;
         }

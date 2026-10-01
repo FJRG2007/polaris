@@ -44,7 +44,7 @@ import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "../lib/discovery";
 import { requireHome, requireHomeInstall, requireHomeShared } from "../lib/access";
 import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "../lib/detection";
 import type { DeviceAction, DeviceEventView, DeviceView } from "../lib/device-kinds";
-import { DEVICE_ACTIONS, climateCommandSchema } from "../lib/device-kinds";
+import { DEVICE_ACTIONS, deviceCommandSchema } from "../lib/device-kinds";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "../lib/current-place";
 import {
     countDeviceUse,
@@ -1200,7 +1200,7 @@ export async function operateDeviceAction(
     // app does not have, or a setting in the wrong shape, stops here.
     const known = (DEVICE_ACTIONS as readonly unknown[]).includes(action);
     const setting =
-        command === undefined || command === null ? null : climateCommandSchema.safeParse(command);
+        command === undefined || command === null ? null : deviceCommandSchema.safeParse(command);
     if (!known || (setting !== null && !setting.success)) {
         return { error: await say("refusals.deviceCannot") };
     }

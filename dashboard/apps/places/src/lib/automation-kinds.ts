@@ -36,6 +36,7 @@ const WATCHED_STATES: Readonly<Record<DeviceKind, readonly kinds.DeviceState[]>>
     lock: ["locked", "unlocked", "unlatched", "jammed"],
     opener: ["locked", "unlatched"],
     climate: ["on", "off"],
+    air: ["on", "off"],
     switch: ["on", "off"],
     outlet: ["on", "off"],
     light: ["on", "off"],
@@ -801,7 +802,13 @@ export type TemplateId = (typeof TEMPLATES)[number];
  *  light left on is switched off, a door left unlocked is locked. */
 export function autoOffPlan(kind: string): { is: kinds.DeviceState; do: DeviceAction } | null {
     const which = kinds.deviceKind(kind);
-    if (which === "switch" || which === "outlet" || which === "light" || which === "climate")
+    if (
+        which === "switch" ||
+        which === "outlet" ||
+        which === "light" ||
+        which === "climate" ||
+        which === "air"
+    )
         return { is: "on", do: "turn-off" };
     if (which === "lock") return { is: "unlocked", do: "lock" };
     return null;

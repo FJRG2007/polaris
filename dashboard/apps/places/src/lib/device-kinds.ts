@@ -17,12 +17,24 @@ import { z } from "zod";
 import type { PlacesTranslator } from "./i18n";
 import { wallClock, zonedInstant } from "@polaris/core";
 import { englishPlaces as en, type PlacesKey } from "../../messages";
+import {
+    airCommandIssue,
+    airCommandSchema,
+    airModeText,
+    airSpeedText,
+    applyAir,
+    type AirCommand,
+    type AirSettings
+} from "./air-kinds";
+
+export * from "./air-kinds";
 
 /** What a device does, which is what decides the buttons it gets. */
 export const DEVICE_KINDS = [
     "lock",
     "opener",
     "climate",
+    "air",
     "switch",
     "outlet",
     "light",
@@ -35,6 +47,7 @@ export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
     lock: en("devices.kinds.lock"),
     opener: en("devices.kinds.opener"),
     climate: en("devices.kinds.climate"),
+    air: en("devices.kinds.air"),
     switch: en("devices.kinds.switch"),
     outlet: en("devices.kinds.outlet"),
     light: en("devices.kinds.light"),
@@ -47,6 +60,7 @@ export const DEVICE_GROUP_LABELS: Readonly<Record<DeviceKind, string>> = {
     lock: en("devices.groups.lock"),
     opener: en("devices.groups.opener"),
     climate: en("devices.groups.climate"),
+    air: en("devices.groups.air"),
     switch: en("devices.groups.switch"),
     outlet: en("devices.groups.outlet"),
     light: en("devices.groups.light"),
@@ -250,7 +264,8 @@ export const DEVICE_ACTIONS = [
     "set-mode",
     "set-temperature",
     "set-fan",
-    "set-option"
+    "set-option",
+    "set-humidity"
 ] as const;
 
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
@@ -264,7 +279,8 @@ export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
     "set-mode": en("devices.actions.set-mode"),
     "set-temperature": en("devices.actions.set-temperature"),
     "set-fan": en("devices.actions.set-fan"),
-    "set-option": en("devices.actions.set-option")
+    "set-option": en("devices.actions.set-option"),
+    "set-humidity": en("devices.actions.set-humidity")
 };
 
 /** The same actions as something a sentence can be built out of. The label on a
@@ -279,7 +295,8 @@ export const DEVICE_ACTION_VERBS: Readonly<Record<DeviceAction, string>> = {
     "set-mode": "change mode",
     "set-temperature": "change temperature",
     "set-fan": "change fan speed",
-    "set-option": "change a setting"
+    "set-option": "change a setting",
+    "set-humidity": "change humidity"
 };
 
 /**
@@ -298,6 +315,9 @@ const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
     // a temperature, a fan speed and whichever extras it has. The extras are
     // per unit, and `climateCommandIssue` is what refuses one it lacks.
     climate: ["turn-on", "turn-off", "set-mode", "set-temperature", "set-fan", "set-option"],
+    // A purifier is switched, then put on a preset or a fan speed; a humidifier
+    // also aims at a humidity. What a unit lacks, `airCommandIssue` refuses.
+    air: ["turn-on", "turn-off", "set-mode", "set-fan", "set-option", "set-humidity"],
     switch: ["turn-on", "turn-off"],
     outlet: ["turn-on", "turn-off"],
     light: ["turn-on", "turn-off"],
@@ -433,7 +453,8 @@ export function needsCommand(action: DeviceAction): boolean {
         action === "set-mode" ||
         action === "set-temperature" ||
         action === "set-fan" ||
-        action === "set-option"
+        action === "set-option" ||
+        action === "set-humidity"
     );
 }
 
@@ -491,6 +512,76 @@ export function applyClimate(settings: ClimateSettings, command: ClimateCommand)
     }
 }
 
+// --- any setting, whichever kind it is for ------------------------------------
+
+/** One change to a device that takes a setting: an air conditioner's or a
+ *  purifier's. The two share action words and differ in what they carry. */
+export type DeviceCommand = ClimateCommand | AirCommand;
+
+/** The shape of a setting as it arrives from anywhere, either kind's. Which kind
+ *  it has to be is the device's to decide: `commandIssue` checks it again
+ *  against that kind alone. */
+export const deviceCommandSchema = z.union([climateCommandSchema, airCommandSchema]);
+
+/** What a device holds that a command is checked against. */
+export interface CommandTarget {
+    readonly kind: string;
+    readonly climate: ClimateSettings | null;
+    readonly air: AirSettings | null;
+}
+
+/** The command, read as the device's own kind's, or null when it is not one. */
+export function commandFor(
+    kind: string,
+    command: unknown
+): { kind: "climate"; command: ClimateCommand } | { kind: "air"; command: AirCommand } | null {
+    const which = deviceKind(kind);
+    if (which === "climate") {
+        const parsed = climateCommandSchema.safeParse(command);
+        return parsed.success ? { kind: "climate", command: parsed.data } : null;
+    }
+    if (which === "air") {
+        const parsed = airCommandSchema.safeParse(command);
+        return parsed.success ? { kind: "air", command: parsed.data } : null;
+    }
+    return null;
+}
+
+/** The command as an air conditioner's, or nothing when it is not one. What a
+ *  climate driver is handed, so a purifier's setting can never reach it. */
+export function climateCommandOf(command: DeviceCommand | undefined): ClimateCommand | undefined {
+    const parsed = climateCommandSchema.safeParse(command);
+    return parsed.success ? parsed.data : undefined;
+}
+
+/** The command as a purifier's, or nothing when it is not one. */
+export function airCommandOf(command: DeviceCommand | undefined): AirCommand | undefined {
+    const parsed = airCommandSchema.safeParse(command);
+    return parsed.success ? parsed.data : undefined;
+}
+
+/** Why a command cannot go to this device, or null when it can. */
+export function commandIssue(device: CommandTarget, command: DeviceCommand): string | null {
+    const read = commandFor(device.kind, command);
+    if (!read) return "That device cannot be told to do that";
+    return read.kind === "climate"
+        ? climateCommandIssue(device.climate, read.command)
+        : airCommandIssue(device.air, read.command);
+}
+
+/** A device's settings once a command has landed, or null when the command is
+ *  not its kind's or there is nothing to apply it to. */
+export function applyCommand(
+    device: CommandTarget,
+    command: DeviceCommand
+): { climate: ClimateSettings } | { air: AirSettings } | null {
+    const read = commandFor(device.kind, command);
+    if (!read) return null;
+    if (read.kind === "climate")
+        return device.climate ? { climate: applyClimate(device.climate, read.command) } : null;
+    return device.air ? { air: applyAir(device.air, read.command) } : null;
+}
+
 /** A temperature as a person reads it: no trailing ".0", the unit closed up. */
 export function temperatureText(value: number, unit: ClimateUnit): string {
     const rounded = Math.round(value * 10) / 10;
@@ -523,6 +614,11 @@ export function badgeText(device: DeviceView, t: PlacesTranslator = en): string 
     if (kind === "sensor") return readingLine(device.reading, t) || t("devicesView.nothingRead");
     if (kind === "climate" && device.state === "on" && device.climate?.mode) {
         return climateModeText(device.climate.mode, t);
+    }
+    // A purifier that is on says what it is running: "Sleep" rather than "On".
+    if (kind === "air" && device.state === "on" && device.air) {
+        if (device.air.mode) return airModeText(device.air.mode, t);
+        if (device.air.speed) return airSpeedText(device.air.speed, t);
     }
     return stateLabel(device.kind, device.state, t);
 }
@@ -563,6 +659,9 @@ export interface DeviceView {
     /** How an air conditioner is set, and the room's temperature beside it. Null,
      *  or absent, for every other kind. */
     readonly climate?: ClimateView | null;
+    /** How a purifier or humidifier is set and what it last read. Null, or
+     *  absent, for every other kind. */
+    readonly air?: AirSettings | null;
 }
 
 /** How something came to happen. `polaris` is the one that carries weight: it is

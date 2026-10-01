@@ -436,7 +436,7 @@
         "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "tuyaRefused": "Tuya refused the request.",
         "reconnect": "{name} has to be connected again",
-        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} other {do that}}",
+        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} air {air purifier} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} setHumidity {change humidity} other {do that}}",
         "watchOnly": "{name} is set to be watched, not operated",
         "notConnected": "{name} is not connected to anything",
         "notAnswering": "{name} was not answering when it was last checked",
@@ -532,7 +532,9 @@
         "greeUnpaired": "Polaris is not paired with these air conditioners any more. Connect them again.",
         "greeNoneThere": "No Gree air conditioner answered at that address. Check it is switched on at the wall and on the same network as Polaris.",
         "greeNoneFound": "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
-        "greeNoPair": "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again."
+        "greeNoPair": "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
+        "airNoHumidity": "That device does not humidify",
+        "airHumidity": "That humidity is not one this device accepts"
     },
     "connections": {
         "nuki-web": {
@@ -1095,7 +1097,8 @@
             "outlet": "Socket",
             "light": "Light",
             "sensor": "Sensor",
-            "climate": "Air conditioner"
+            "climate": "Air conditioner",
+            "air": "Air purifier"
         },
         "groups": {
             "lock": "Doors",
@@ -1104,7 +1107,8 @@
             "outlet": "Switches and sockets",
             "light": "Lights",
             "sensor": "Sensors",
-            "climate": "Climate"
+            "climate": "Climate",
+            "air": "Air"
         },
         "states": {
             "locked": "Locked",
@@ -1131,7 +1135,8 @@
             "set-mode": "Mode",
             "set-temperature": "Temperature",
             "set-fan": "Fan speed",
-            "set-option": "Setting"
+            "set-option": "Setting",
+            "set-humidity": "Humidity"
         },
         "via": {
             "polaris": "from Polaris",
@@ -1157,7 +1162,8 @@
             "set-mode": "Mode changed",
             "set-temperature": "Temperature set",
             "set-fan": "Fan speed changed",
-            "set-option": "Setting changed"
+            "set-option": "Setting changed",
+            "set-humidity": "Humidity set"
         },
         "kindStates": {
             "lock": {
@@ -1216,6 +1222,73 @@
                 "quiet": "Quiet",
                 "eco": "Eco"
             }
+        },
+        "air": {
+            "modes": {
+                "auto": "Auto",
+                "auto_plus": "Auto+",
+                "allergen": "Allergen",
+                "allergy_sleep": "Allergy sleep",
+                "bacteria": "Bacteria",
+                "pollution": "Pollution",
+                "gas": "Gas",
+                "sleep": "Sleep",
+                "night": "Night",
+                "gentle": "Gentle",
+                "low": "Low",
+                "medium": "Medium",
+                "high": "High",
+                "speed_1": "Speed 1",
+                "speed_2": "Speed 2",
+                "speed_3": "Speed 3",
+                "turbo": "Turbo",
+                "natural": "Natural",
+                "ventilation": "Ventilation"
+            },
+            "speeds": {
+                "sleep": "Sleep",
+                "night": "Night",
+                "gentle": "Gentle",
+                "low": "Low",
+                "medium": "Medium",
+                "high": "High",
+                "speed_1": "Speed 1",
+                "speed_2": "Speed 2",
+                "speed_3": "Speed 3",
+                "speed_4": "Speed 4",
+                "speed_5": "Speed 5",
+                "speed_6": "Speed 6",
+                "speed_7": "Speed 7",
+                "speed_8": "Speed 8",
+                "speed_9": "Speed 9",
+                "speed_10": "Speed 10",
+                "speed_11": "Speed 11",
+                "speed_12": "Speed 12",
+                "turbo": "Turbo"
+            },
+            "options": {
+                "childLock": "Child lock",
+                "light": "Display light",
+                "humidify": "Humidify"
+            },
+            "filters": {
+                "pre": "Pre-filter",
+                "hepa": "HEPA filter",
+                "carbon": "Carbon filter",
+                "wick": "Wick",
+                "nanoprotect": "NanoProtect filter"
+            },
+            "filterStates": {
+                "ok": "Fine",
+                "soon": "Replace soon",
+                "now": "Replace now"
+            },
+            "measures": {
+                "pm25": "PM2.5",
+                "allergen": "Allergen index",
+                "humidity": "Humidity",
+                "temperature": "Temperature"
+            }
         }
     },
     "devicesView": {
@@ -1240,7 +1313,9 @@
         "nothingRead": "Nothing read yet",
         "notPlaced": "Not placed",
         "disconnectBody": "Its devices go with it, and so does everything they have done. Polaris keeps no copy of a building it has been told it has no business with.",
-        "disconnect": "Disconnect"
+        "disconnect": "Disconnect",
+        "filterSoon": "Change filter soon",
+        "filterNow": "Change filter"
     },
     "devicePanel": {
         "watchOnly": "Set to be watched rather than operated.",
@@ -1272,6 +1347,25 @@
             "raise": "Raise the target on {name}",
             "optionName": "{option} on {name}",
             "unknown": "It has not said what it can be set to yet. It will once it answers a check."
+        },
+        "air": {
+            "unknown": "It has not said what it can be set to yet. It will once it answers a check.",
+            "mode": "Mode",
+            "noMode": "No preset",
+            "modeName": "Mode of {name}",
+            "speed": "Fan speed",
+            "noSpeed": "Set by mode",
+            "speedName": "Fan speed of {name}",
+            "target": "Target humidity",
+            "targetName": "Target humidity of {name}",
+            "lower": "Lower the target humidity on {name}",
+            "raise": "Raise the target humidity on {name}",
+            "switches": "Options",
+            "optionName": "{option} on {name}",
+            "readings": "Readings",
+            "filters": "Filters",
+            "lifePercent": "{percent}% left",
+            "lifeHours": "{hours} h left"
         }
     },
     "deviceDialog": {

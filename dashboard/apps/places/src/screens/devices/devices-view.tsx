@@ -32,8 +32,9 @@ import type { DeviceAccountView } from "../../lib/device-accounts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as registry from "../../lib/device-connections";
 import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
-import type { ClimateCommand, DeviceAction, DeviceView } from "../../lib/device-kinds";
+import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
+import { FilterChip } from "./air-controls";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
@@ -176,17 +177,30 @@ export function DevicesView({
      * second later. A lock is left alone until it reports: it is turning, and
      * where it gets to is the vendor's to say.
      */
-    const act = async (device: DeviceView, action: DeviceAction, command?: ClimateCommand) => {
+    const act = async (device: DeviceView, action: DeviceAction, command?: DeviceCommand) => {
         setBusy({ id: device.id, action });
         setError("");
         const settled = kinds.settledState(action);
         // A setting lands where it was told, like a switch: the row shows it now
-        // and puts the old one back if the unit refuses.
+        // and puts the old one back if the unit refuses. An air conditioner keeps
+        // its room temperature beside its settings; a purifier's are whole.
+        const applied = command
+            ? kinds.applyCommand(
+                  {
+                      kind: device.kind,
+                      climate: device.climate ?? null,
+                      air: device.air ?? null
+                  },
+                  command
+              )
+            : null;
         const climate =
-            command && device.climate
-                ? { ...device.climate, ...kinds.applyClimate(device.climate, command) }
+            applied && "climate" in applied && device.climate
+                ? { ...device.climate, ...applied.climate }
                 : null;
+        const air = applied && "air" in applied ? applied.air : null;
         if (climate) settle({ ...device, climate });
+        else if (air) settle({ ...device, air });
         else if (settled) settle({ ...device, state: settled });
         const result = await runAction(
             () => actions.operateDeviceAction(device.id, action, command),
@@ -200,11 +214,12 @@ export function DevicesView({
                 if (entry.id !== device.id) return entry;
                 if (climate && entry.climate === climate)
                     return { ...entry, climate: device.climate };
-                if (!climate && settled && entry.state === settled)
+                if (air && entry.air === air) return { ...entry, air: device.air };
+                if (!climate && !air && settled && entry.state === settled)
                     return { ...entry, state: device.state };
                 return entry;
             };
-            if (climate || settled) {
+            if (climate || air || settled) {
                 setDevices((current) => (current ?? []).map(restore));
                 setOpened((current) => (current ? restore(current) : current));
             }
@@ -443,6 +458,7 @@ export function DevicesView({
                                                 >
                                                     {kinds.badgeText(device, t)}
                                                 </Badge>
+                                                <FilterChip air={device.air} />
                                                 {device.batteryCritical && (
                                                     <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">
                                                         <BatteryLow className="size-3 shrink-0" />
