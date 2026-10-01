@@ -15,7 +15,9 @@ import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import type { FootageSettings } from "@/lib/footage-storage";
 import type { AvatarSettings } from "@/lib/avatar-service";
+import { NetworkStorageCard } from "./network-card";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
+import type { WhereaboutsView } from "@/lib/storage-whereabouts/follow";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
 import type { PersonalDriveSettings } from "@/lib/personal-drive";
@@ -688,7 +690,8 @@ export function UploadsView({
     chat,
     drives,
     orgDrives,
-    footage
+    footage,
+    network
 }: {
     uploads: UploadSettings;
     avatars: AvatarSettings;
@@ -699,9 +702,12 @@ export function UploadsView({
      *  so a card about where recordings go would be a setting for a feature that
      *  is not there. */
     footage: FootageSettings | null;
+    /** The storages reached at an address on the local network. */
+    network: WhereaboutsView[];
 }) {
     return (
         <div className="flex max-w-2xl flex-col gap-4">
+            {network.length > 0 ? <NetworkStorageCard storages={network} /> : null}
             <DrivesCard settings={drives} />
             <OrganizationDrivesCard settings={orgDrives} />
             <AttachmentsCard settings={uploads} />

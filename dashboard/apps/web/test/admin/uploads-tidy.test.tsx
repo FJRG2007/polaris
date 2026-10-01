@@ -48,6 +48,7 @@ function draw() {
             drives={{ choice: "auto", resolved: target, options: [], existing: [] }}
             orgDrives={{ choice: "auto", resolved: target, options: [], existing: [] }}
             footage={null}
+            network={[]}
         />,
         { wrapper: MessagesWrapper }
     );

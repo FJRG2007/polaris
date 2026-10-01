@@ -696,7 +696,9 @@
         "tooManySubmissions": "Too many submissions from here. Try again later.",
         "invalidSubmission": "Invalid submission",
         "full": "This drop point has taken everything it was going to.",
-        "noSealed": "This drop point does not accept sealed submissions."
+        "noSealed": "This drop point does not accept sealed submissions.",
+        "addressDifferent": "A different device answers at {address} ({device}). The password stays with this storage, so the address was not changed.",
+        "addressSilent": "Nothing answers at {address}, so Polaris cannot check it is this storage. The address was not changed."
     },
     "sharedLinks": {
         "status": {

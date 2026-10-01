@@ -184,7 +184,13 @@ export async function openForWriting(
             fellBackFrom: null
         };
         FAILED.delete(target.id);
-        if (DOWN.delete(target.id)) void announce((alert) => alert.storageAnswered(target.id));
+        if (DOWN.delete(target.id)) {
+            void announce((alert) => alert.storageAnswered(target.id));
+            // Back: what was kept here while it was away can go home now.
+            void import("@/lib/storage-returns")
+                .then((returns) => returns.returnFallbackFiles({ only: target.id }))
+                .catch(() => undefined);
+        }
         return opened;
     } catch (error) {
         console.error(`storage: ${target.name} could not be opened for writing:`, error);
@@ -225,6 +231,22 @@ async function openOrRefuse(
             { cause: error }
         );
     }
+}
+
+/**
+ * A file that was meant for a storage and landed on this server instead is
+ * listed, so it is moved there once the storage answers again
+ * (`lib/storage-returns`). Not waited on: the upload already succeeded, and a
+ * file that is not listed only stays readable where it is.
+ */
+function listForReturn(
+    input: { target: UploadTarget; localFolder: string; path: string },
+    landedOn: string
+): void {
+    if (landedOn !== LOCAL_TARGET || input.target.id === LOCAL_TARGET) return;
+    void import("@/lib/storage-returns")
+        .then((returns) => returns.recordFallback(input.target.id, input.localFolder, input.path))
+        .catch(() => undefined);
 }
 
 /**
@@ -357,7 +379,10 @@ export async function placeFile(input: {
 }): Promise<{ targetId: string; fellBackFrom: string | null }> {
     const chosen = await openOrRefuse(input.target, input.localFolder, input.what);
     const attempt = await writeThrough(chosen.driver, input);
-    if (attempt.ok) return { targetId: chosen.targetId, fellBackFrom: chosen.fellBackFrom };
+    if (attempt.ok) {
+        listForReturn(input, chosen.targetId);
+        return { targetId: chosen.targetId, fellBackFrom: chosen.fellBackFrom };
+    }
 
     // It answered and still would not keep the file. Worth knowing, worth
     // fixing, and not worth losing what somebody just made: the disk Polaris
@@ -381,7 +406,10 @@ export async function placeFile(input: {
     )
         .then((local) => writeThrough(local.driver, input))
         .catch((error: unknown) => ({ ok: false, detail: message(error) }));
-    if (here.ok) return { targetId: LOCAL_TARGET, fellBackFrom: chosen.name };
+    if (here.ok) {
+        listForReturn(input, LOCAL_TARGET);
+        return { targetId: LOCAL_TARGET, fellBackFrom: chosen.name };
+    }
     throw new StorageRefused(
         `${chosen.name} could not take the ${input.what} (${attempt.detail}), and neither could this server (${here.detail}).`,
         chosen.name,
@@ -454,6 +482,7 @@ export async function streamFile(input: {
             );
         }
 
+        listForReturn(input, chosen.targetId);
         return {
             targetId: chosen.targetId,
             size: Number(written.size),

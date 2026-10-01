@@ -13,18 +13,20 @@ import { chatStorageSettings } from "@/lib/chat/attachments";
 import { personalDriveSettings } from "@/lib/personal-drive";
 import { organizationDriveSettings } from "@/lib/organization-drive";
 import { uploadSettings } from "@/lib/tasks/attachment-service";
+import { listWhereabouts } from "@/lib/storage-whereabouts/follow";
 
 export const dynamic = "force-dynamic";
 
 export default async function UploadsPage() {
     await requireAdmin();
-    const [uploads, avatars, chat, drives, orgDrives, house, t] = await Promise.all([
+    const [uploads, avatars, chat, drives, orgDrives, house, network, t] = await Promise.all([
         uploadSettings(),
         avatarSettings(),
         chatStorageSettings(),
         personalDriveSettings(),
         organizationDriveSettings(),
         isAppInstalled("home"),
+        listWhereabouts(),
         getTranslations("admin")
     ]);
     // Only asked for when there is a house: on an instance with no cameras it is
@@ -47,6 +49,7 @@ export default async function UploadsPage() {
                 drives={drives}
                 orgDrives={orgDrives}
                 footage={footage}
+                network={network}
             />
         </div>
     );

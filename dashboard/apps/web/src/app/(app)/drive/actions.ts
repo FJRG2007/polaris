@@ -8,6 +8,7 @@
  * download paths are Route Handlers instead, because Server Actions buffer.
  */
 
+import { AddressRefused } from "@/lib/storage-whereabouts/follow";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
@@ -212,6 +213,17 @@ export async function updateConnectionAction(
     try {
         await updateConnection(user.id, connectionId, { name, config: config.data, credentials });
     } catch (caught) {
+        // The device at the new address is not the one this storage's password
+        // belongs to: said in the reader's words, with who answered instead.
+        if (caught instanceof AddressRefused) {
+            const t = await getTranslations("drive");
+            return {
+                error:
+                    caught.check === "different"
+                        ? t("errors.addressDifferent", { address: caught.address, device: caught.label ?? caught.address })
+                        : t("errors.addressSilent", { address: caught.address })
+            };
+        }
         return {
             error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.updateFailed")
         };

@@ -663,6 +663,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "storage.moved",
+        group: "system",
+        label: "Storage moved to a new address",
+        description:
+            "A NAS took a new address on the local network and Polaris found it and follows it. Only reaches administrators.",
+        // Info, but with mail: the fix that stops it happening again is a
+        // reservation in the router, which only a person can make.
+        level: "info",
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "system.update",
         group: "system",
         label: "Update available",
