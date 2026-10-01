@@ -178,7 +178,11 @@ export function Composer() {
         setBcc([...(composing.bcc ?? [])]);
         setShowCopies((composing.cc ?? []).length + (composing.bcc ?? []).length > 0);
         setSubject(composing.subject ?? "");
-        const body = withSignature(composing, accounts.find((one) => one.id === account), identity);
+        const body = withSignature(
+            composing,
+            accounts.find((one) => one.id === account),
+            identity
+        );
         setBody(body);
         setFiles([]);
         saves.current = draftSaves(
@@ -487,7 +491,10 @@ export function Composer() {
     // open, and a hook that only runs once a draft opens is a different number
     // of hooks between two renders - which React refuses by taking the whole
     // mail screen down the moment somebody presses Reply.
-    useDockedCorner(shell, Boolean(composing) && accounts.length > 0 && posture !== "full" && !queued);
+    useDockedCorner(
+        shell,
+        Boolean(composing) && accounts.length > 0 && posture !== "full" && !queued
+    );
 
     if (!composing || accounts.length === 0) return null;
 
@@ -603,12 +610,18 @@ export function Composer() {
                                                 },
                                                 ...(identities[one.id] ?? []).map((alias) => ({
                                                     value: `identity:${alias.id}`,
-                                                    label: t("compose.via", { alias: alias.address, address: one.address })
+                                                    label: t("compose.via", {
+                                                        alias: alias.address,
+                                                        address: one.address
+                                                    })
                                                 }))
                                             ])}
                                         />
                                     ) : (
-                                        <span className="min-w-0 truncate text-foreground" title={from}>
+                                        <span
+                                            className="min-w-0 truncate text-foreground"
+                                            title={from}
+                                        >
                                             {from}
                                         </span>
                                     )}
@@ -620,12 +633,22 @@ export function Composer() {
                                     onChange={setTo}
                                     // A reply arrives addressed: the caret belongs in the message,
                                     // and an autofocused To would take it back from the editor.
-                                    autoFocus={!(composing?.inReplyToId && (composing.to ?? []).length > 0)}
+                                    autoFocus={
+                                        !(composing?.inReplyToId && (composing.to ?? []).length > 0)
+                                    }
                                 />
                                 {showCopies ? (
                                     <>
-                                        <RecipientField label={t("compose.cc")} value={cc} onChange={setCc} />
-                                        <RecipientField label={t("compose.bcc")} value={bcc} onChange={setBcc} />
+                                        <RecipientField
+                                            label={t("compose.cc")}
+                                            value={cc}
+                                            onChange={setCc}
+                                        />
+                                        <RecipientField
+                                            label={t("compose.bcc")}
+                                            value={bcc}
+                                            onChange={setBcc}
+                                        />
                                     </>
                                 ) : (
                                     <button
@@ -674,7 +697,10 @@ export function Composer() {
 
                             {carrying ? (
                                 <p className="flex items-center gap-1.5 px-3 pb-2 text-[12px] text-foreground-subtle">
-                                    <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                                    <Loader2
+                                        className="size-3.5 shrink-0 animate-spin"
+                                        aria-hidden
+                                    />
                                     {t("compose.carrying")}
                                 </p>
                             ) : notCarried.length > 0 ? (
@@ -694,13 +720,20 @@ export function Composer() {
                                                 className="size-3.5 shrink-0 text-foreground-subtle"
                                                 aria-hidden
                                             />
-                                            <span className="max-w-[14rem] truncate" title={file.name}>
+                                            <span
+                                                className="max-w-[14rem] truncate"
+                                                title={file.name}
+                                            >
                                                 {file.name}
                                             </span>
                                             <button
                                                 type="button"
-                                                aria-label={t("recipients.remove", { address: file.name })}
-                                                title={t("recipients.remove", { address: file.name })}
+                                                aria-label={t("recipients.remove", {
+                                                    address: file.name
+                                                })}
+                                                title={t("recipients.remove", {
+                                                    address: file.name
+                                                })}
                                                 className="text-foreground-subtle hover:text-foreground"
                                                 onClick={() => void remove(file.id)}
                                             >
@@ -720,7 +753,10 @@ export function Composer() {
                                     disabled={sending || to.length === 0 || !accountId}
                                 >
                                     {sending ? (
-                                        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                        <Loader2
+                                            className="size-4 shrink-0 animate-spin"
+                                            aria-hidden
+                                        />
                                     ) : (
                                         <Send className="size-4 shrink-0" aria-hidden />
                                     )}
@@ -758,7 +794,8 @@ export function Composer() {
                                     setInsert({ token: Date.now(), text: template.body });
                                     // A template's subject fills an empty line and
                                     // never replaces one somebody already wrote.
-                                    if (template.subject && !subject.trim()) setSubject(template.subject);
+                                    if (template.subject && !subject.trim())
+                                        setSubject(template.subject);
                                 }}
                             />
 
@@ -859,7 +896,9 @@ function TemplateMenu({
                 ) : (
                     offered.map((template) => (
                         <DropdownMenuItem key={template.id} onSelect={() => onPick(template)}>
-                            <span className="truncate" title={template.name}>{template.name}</span>
+                            <span className="truncate" title={template.name}>
+                                {template.name}
+                            </span>
                         </DropdownMenuItem>
                     ))
                 )}
@@ -1067,7 +1106,12 @@ function QueuedPill({
                     <Button size="sm" variant="ghost" className="rounded-full" onClick={onUndo}>
                         {scheduled ? t("compose.bringBack") : t("compose.undo")}
                     </Button>
-                    <Button size="sm" variant="secondary" className="rounded-full" onClick={onSendNow}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        className="rounded-full"
+                        onClick={onSendNow}
+                    >
                         {t("compose.sendNow")}
                     </Button>
                 </>
