@@ -170,10 +170,14 @@ export function Select({
     "aria-label": ariaLabel
 }: SelectProps) {
     const selected = options.find((option) => option.value === value);
+    // "" with no option worth "" is nothing chosen, which Radix draws as the
+    // placeholder only when it is handed "" itself. Translated to the sentinel,
+    // it read as a chosen option that does not exist and drew a blank trigger.
+    const nothing = value === "" && !options.some((option) => option.value === "");
 
     return (
         <RadixSelect.Root
-            value={toRadixValue(value)}
+            value={nothing ? "" : toRadixValue(value)}
             onValueChange={(next) => onValueChange(fromRadixValue(next))}
             disabled={disabled}
             name={name}
