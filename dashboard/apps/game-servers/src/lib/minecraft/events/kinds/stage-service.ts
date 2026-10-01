@@ -283,7 +283,7 @@ async function raise(
     change(loop, { built: true });
     if (!whole) throw new CalledOff("Its structure could not be built whole");
 
-    const brought = await admit(loop, server, tools, state(loop).joined, now, lines);
+    const brought = await admit(loop, server, tools, state(loop).joined, now, lines, needed);
     if (brought < needed) {
         lines.push(
             commands.say(
@@ -355,7 +355,9 @@ async function admit(
     tools: StageTools,
     names: readonly string[],
     now: number,
-    lines: string[]
+    lines: string[],
+    /** How many it needs: too few to play, and nobody is moved at all. */
+    needed = 0
 ): Promise<number> {
     const layout = built(loop.run);
     if (!layout || names.length === 0) return 0;
@@ -397,28 +399,23 @@ async function admit(
     });
     // Nobody is moved until where they were is kept.
     await tools.persist();
-    // Nor until what they carry is kept too (`stash`): they come in empty-handed.
-    if (await tools.canStash()) {
-        for (const one of fresh) {
-            await stashService.stashIn(server, tools.stashOwner, one.name, async (kept) => {
-                change(loop, {
-                    saved: state(loop).saved.map((each) =>
-                        same(each.name, one.name) ? { ...each, stash: kept } : each
-                    )
-                });
-                await tools.persist();
-            });
-        }
-    }
+    if (current.saved.length + fresh.length < needed) return fresh.length;
+    // Nor until what they carry is put away too (`stash`): they come in
+    // empty-handed. One at a time, and straight in - nobody left standing about
+    // empty-handed at home, free to put their armor back on, while everybody
+    // else's is put away.
+    const stashing = await tools.canStash();
     const places = layout.kind === "spleef" ? spleef.spots(layout.arena, fresh.length) : [];
-    if (layout.kind === "parkour") lines.push(...parkour.SCORES_ADDED);
-    fresh.forEach((one, index) => {
-        const racer = racers.find((each) => same(each.name, one.name))!;
+    if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
+    const brought: string[] = [];
+    for (const [index, one] of fresh.entries()) {
+        if (stashing && !(await stashSaved(loop, server, tools, one.name, false))) continue;
+        const racer = state(loop).racers.find((each) => same(each.name, one.name))!;
         const spot =
             layout.kind === "parkour"
                 ? parkour.spotOn(layout.course, racer.checkpoint)
                 : places[index]!;
-        lines.push(
+        await server.sayAll([
             ...stage.admitLines(one.name, spot),
             `title ${one.name} times 5 50 15`,
             layout.kind === "parkour"
@@ -431,9 +428,69 @@ async function admit(
             )}`,
             // Their checkpoint, once they are on it, for the quick look.
             ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : [])
-        );
-    });
-    return fresh.length;
+        ]);
+        brought.push(one.name);
+    }
+    // And once in, a last look: whatever turned up on them on the way is put
+    // away with the rest; anybody it cannot be taken from is sent back out.
+    if (!stashing) return brought.length;
+    let inside = 0;
+    for (const name of brought) if (await stashSaved(loop, server, tools, name, true)) inside += 1;
+    return inside;
+}
+
+/**
+ * One player's own things put away (`stash`) - or, `inside`, what turned up on
+ * them on the way in put away with the rest. Answers whether they are in:
+ * somebody whose things cannot all be put away is kept out - told why, sent
+ * back where they were if they had been brought in, and handed back whatever
+ * was taken.
+ */
+async function stashSaved(
+    loop: StageLoop,
+    server: ServerContainer,
+    tools: StageTools,
+    name: string,
+    inside: boolean
+): Promise<boolean> {
+    const saved = state(loop).saved.find((one) => same(one.name, name));
+    if (!saved) return false;
+    if (!inside && saved.stash) return true;
+    const result = await stashService.stashIn(
+        server,
+        tools.stashOwner,
+        name,
+        async (kept) => {
+            change(loop, {
+                saved: state(loop).saved.map((each) =>
+                    same(each.name, name) ? { ...each, stash: kept } : each
+                )
+            });
+            await tools.persist();
+        },
+        inside ? saved.stash : null
+    );
+    if (!result.refused) return true;
+    await server.say([
+        tell(
+            name,
+            messages.tag(loop.language) +
+                messages.keptOut(result.refused.why, result.refused.items, loop.language)
+        )
+    ]);
+    loop.run = {
+        ...loop.run,
+        keptOut: [
+            ...(loop.run.keptOut ?? []).filter((each) => !same(each.name, name)),
+            { name, why: result.refused.why, items: result.refused.items }
+        ]
+    };
+    // Back where they were - or, never moved, left there - with whatever was
+    // taken given back; never counted as racing.
+    await sendHome(loop, server, tools, name);
+    change(loop, { racers: state(loop).racers.filter((one) => !same(one.name, name)) });
+    await tools.persist();
+    return false;
 }
 
 /** Back to where they were, if they are on to be moved. Answers whether they were. */

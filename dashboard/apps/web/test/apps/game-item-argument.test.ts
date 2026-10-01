@@ -117,6 +117,28 @@ describe("replaceSlot", () => {
     });
 });
 
+describe("a component taken off", () => {
+    it("is written bare, as the argument takes it", () => {
+        // Read back as `"!minecraft:attribute_modifiers": {}`; the game refuses
+        // `!minecraft:attribute_modifiers={}` with "Expected ']'".
+        const item = stack({
+            data: {
+                era: "components",
+                snbt: '{"!minecraft:attribute_modifiers": {}, "minecraft:damage": 2}'
+            }
+        });
+        expect(itemArgument(item)).toEqual({
+            ok: true,
+            value: "minecraft:stone[!minecraft:attribute_modifiers,minecraft:damage=2]"
+        });
+    });
+
+    it("refuses one that carries a value, which the game never reads back", () => {
+        const item = stack({ data: { era: "components", snbt: '{"!minecraft:food": 1}' } });
+        expect(itemArgument(item).ok).toBe(false);
+    });
+});
+
 describe("air", () => {
     it("is what empties a slot", () => {
         expect(AIR).toBe("minecraft:air");

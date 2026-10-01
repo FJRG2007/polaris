@@ -5905,27 +5905,37 @@ describe("players' own things through an arena", () => {
         expect(stashRows.size).toBe(0);
     });
 
-    it("leaves a stack no command can carry where it is, and keeps the rest", async () => {
+    it("keeps out a player carrying a stack no number of commands can carry, with all of it, and calls off a duel left too small", async () => {
         world.online = ["Ana", "Ben"];
         const huge = {
             id: "minecraft:written_book",
             count: 1,
-            components: `{"minecraft:custom_name": '"${"x".repeat(600)}"'}`
+            components: `{"minecraft:custom_name": '"${"x".repeat(1200)}"'}`
         };
+        const bread = { id: "minecraft:bread", count: 2 };
         world.inv = {
             Ana: new Map<number, Stack>([
                 [3, huge],
-                [4, { id: "minecraft:bread", count: 2 }]
+                [4, bread]
             ]),
-            Ben: new Map()
+            Ben: new Map([[4, { id: "minecraft:bread", count: 5 }]])
         };
         setUp([duelOf()]);
         await joinAndStart("duel");
+        await play(20_000);
+        // Nothing of hers was taken, and she was never moved.
         expect(world.inv.Ana!.get(3)).toEqual(huge);
-        expect(world.inv.Ana!.has(4)).toBe(false);
-        await play(3 * 60_000 + 10_000);
-        expect(world.inv.Ana!.get(3)).toEqual(huge);
-        expect(world.inv.Ana!.get(4)).toEqual({ id: "minecraft:bread", count: 2 });
+        expect(world.inv.Ana!.get(4)).toEqual(bread);
+        expect(world.sent.some((line) => /^item replace entity Ana /.test(line))).toBe(false);
+        expect(world.sent.some((line) => / tp Ana /.test(line))).toBe(false);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]).toMatchObject({
+            outcome: "cancelled",
+            keptOut: [{ name: "Ana", why: "untakeable", items: ["minecraft:written_book"] }]
+        });
+        // Ben, brought in, is back with everything.
+        expect(world.inv.Ben!.get(4)).toEqual({ id: "minecraft:bread", count: 5 });
         expect(stashRows.size).toBe(0);
     });
 

@@ -65,6 +65,16 @@ export const GAMEMODES = ["survival", "creative", "adventure", "spectator"] as c
  * where they stood, which way they faced, in which world, and the game mode
  * they played in. Written down before they are moved, and never again.
  */
+/** Somebody kept out of an arena or a stage rather than let in carrying their
+ *  own things: why, and the items that could not be put away, by id. */
+export const keptOutSchema = z.object({
+    name: z.string(),
+    why: z.enum(["unread", "untakeable", "unsaved", "unsettled"]),
+    items: z.array(z.string()).default([])
+});
+
+export type KeptOut = z.infer<typeof keptOutSchema>;
+
 export const entrantSchema = z.object({
     name: z.string(),
     /** For finding what they dropped while they were away; null when unread. */
@@ -143,6 +153,9 @@ export const runSchema = z.object({
     timeBefore: z.number().nullable().default(null),
     /** Everybody seen in creative or spectator while it ran. */
     offMode: z.array(z.string()).default([]),
+    /** Everybody kept out because what they carried could not all be put away
+     *  safely, and why (`stash-service`). */
+    keptOut: z.array(keptOutSchema).default([]),
     /** Its results are being handed out; never played again from here. */
     finishing: z.boolean().default(false),
     /** Treasure hunt: every chest it put down, and who opened each. Kept so the
@@ -262,7 +275,9 @@ const historySchema = z.object({
      *  want of room: what `give` answers cannot tell. */
     delivered: z.array(deliveredSchema).default([]),
     /** Where it looked for its place and what stopped it, when nowhere would do. */
-    search: searchSummarySchema.nullable().default(null)
+    search: searchSummarySchema.nullable().default(null),
+    /** Who was kept out to keep their things safe, and why. */
+    keptOut: z.array(keptOutSchema).default([])
 });
 
 export type EventHistoryEntry = z.infer<typeof historySchema>;

@@ -89,6 +89,14 @@ function componentList(snbt: string): string | null {
         const key = unquote(field.slice(0, colon));
         const value = field.slice(colon + 1).trim();
         if (!key || !value) return null;
+        // A component taken off the item's own defaults is read back as
+        // `"!minecraft:food": {}` and written as the bare `!minecraft:food`:
+        // the argument refuses a value after one.
+        if (key.startsWith("!")) {
+            if (value !== "{}") return null;
+            parts.push(key);
+            continue;
+        }
         parts.push(`${key}=${value}`);
     }
     return parts.join(",");

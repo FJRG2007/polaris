@@ -1046,6 +1046,31 @@ export function takenBack(language: Language): string {
         : `${INFO}You are back. The event's kit was taken back; everything of yours is as it was.`;
 }
 
+/** An item id as a player reads it: `minecraft:shulker_box` is "shulker box". */
+function itemName(id: string): string {
+    return (id.split(":").pop() ?? id).replace(/_/g, " ");
+}
+
+/**
+ * Kept out of an event because what they carry could not all be put away
+ * safely: the items named when it was those, everything of theirs left where
+ * it was.
+ */
+export function keptOut(
+    why: "unread" | "untakeable" | "unsaved" | "unsettled",
+    items: readonly string[],
+    language: Language
+): string {
+    const list = items.slice(0, 3).map(itemName).join(", ");
+    if (why === "untakeable" && list)
+        return language === "es"
+            ? `${WARN}Tu ${list} no se puede guardar a salvo: no entras en este. Guárdalo y únete al siguiente.`
+            : `${WARN}Your ${list} can't be put away safely, so you're not in this one. Store it and join the next.`;
+    return language === "es"
+        ? `${WARN}Tus cosas no se pudieron guardar a salvo: no entras en este.`
+        : `${WARN}Your things couldn't be put away safely, so you're not in this one.`;
+}
+
 // ------------------------------------------------------------------ team duel
 
 export function teamName(side: number, language: Language): string {

@@ -86,11 +86,12 @@ export function topLevelColon(field: string): number {
 }
 
 /**
- * What the server wrapped its answer in: `<name> has the following entity data:`.
+ * What the server wrapped its answer in: `<name> has the following entity data:`,
+ * and for command storage `Storage <id> has the following contents:`.
  *
  * Vanilla, Paper and Spigot all say it, for entities, blocks and storage alike.
  */
-const DATA_PREAMBLE = /has the following [a-z ]*data:\s*/i;
+const DATA_PREAMBLE = /has the following (?:[a-z ]*data|contents):\s*/i;
 
 /**
  * The value out of a `data get` reply, without the sentence around it.

@@ -22,7 +22,7 @@ describe("keeping a player's things", () => {
         expect(stash.SLOTS).toContain(-106);
     });
 
-    it("never keeps the event's own kit, a slot vanilla does not have, or a stack no command can carry", () => {
+    it("never keeps the event's own kit, a slot vanilla does not have, or a stack no number of commands can carry", () => {
         const kept = stash.keepable([
             item(
                 0,
@@ -32,9 +32,45 @@ describe("keeping a player's things", () => {
             item(1, "minecraft:stone_sword", '{"minecraft:custom_data": {polaris_event: 1b}}'),
             item(150, "curios:ring"),
             item(2, "minecraft:written_book", `{"minecraft:custom_name": '"${"x".repeat(600)}"'}`),
+            item(3, "minecraft:written_book", `{"minecraft:custom_name": '"${"x".repeat(1200)}"'}`),
             item(100, "minecraft:leather_boots", '{"minecraft:dyed_color": {rgb: 16711680}}')
         ]);
-        expect(kept.map((one) => one.slot)).toEqual([0, 100]);
+        // Too long for one command, but not for several: kept too.
+        expect(kept.map((one) => one.slot)).toEqual([0, 2, 100]);
+        expect(stash.fitsOneLine(kept[1]!)).toBe(false);
+        expect(stash.takeable(item(150, "curios:ring"))).toBe(false);
+    });
+
+    it("writes a stack taken into a slot nobody is owed yet", () => {
+        expect(stash.slotFor(102, new Set([0]))).toBe(102);
+        expect(stash.slotFor(102, new Set([102, 9]))).toBe(10);
+        expect(stash.slotFor(0, new Set(stash.SLOTS))).toBeNull();
+    });
+
+    it("drops a stack too long for one command through storage, under its own tag", () => {
+        const record = "00000000-0000-7000-8000-000000000123";
+        const lore = Array.from(
+            { length: 20 },
+            (_unused, line) => `'"Line ${line} of a long story"'`
+        ).join(", ");
+        const long = item(102, "minecraft:diamond_chestplate", `{"minecraft:lore": [${lore}]}`);
+        expect(stash.dropLines("Ana", long, record)).not.toBeNull();
+        const huge = item(
+            102,
+            "minecraft:diamond_chestplate",
+            `{"minecraft:lore": [${lore}, ${lore}, ${lore}, ${lore}]}`
+        );
+        expect(stash.dropLines("Ana", huge, record)).toBeNull();
+        const lines = stash.longDropLines("Ana", huge, record)!;
+        expect(lines.every((line) => line.length <= COMMAND_BYTES_MAX)).toBe(true);
+        const tag = stash.dropTag(record, 102);
+        expect(lines.at(-3)).toContain(
+            `summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:stone",count:1},Tags:["${tag}"]`
+        );
+        expect(lines.at(-2)).toBe(
+            `data modify entity @e[type=minecraft:item,tag=${tag},limit=1] Item set from storage polaris:io ${stash.longKey(record, 102)}`
+        );
+        expect(lines.at(-1)).toBe(`data remove storage polaris:io ${stash.longKey(record, 102)}`);
     });
 
     it("tells two stacks of one id apart by their data", () => {

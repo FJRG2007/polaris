@@ -18,6 +18,7 @@
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { isDataReply, replyIsWhole } from "./snbt";
+import { readWhole } from "./stack-storage-service";
 import { withServerContainer, type ServerContainer } from "./service";
 import { parseInventory, parseStack, type InventoryItem } from "./inventory";
 
@@ -233,7 +234,15 @@ async function fromWhole(
                 ended = true;
                 break;
             }
-            const stack = parseStack(reply);
+            // One stack bigger than an answer - a shulker box of enchanted gear -
+            // arrives cut off, and half a stack read as a stack is a different
+            // item: read it whole through storage instead.
+            const stack = replyIsWhole(reply, "{")
+                ? parseStack(reply)
+                : await readWhole(
+                      (line) => asker.ask([line]),
+                      `${target.join(" ")} ${path}[${index}]`
+                  ).then((value) => (value === null ? null : parseStack(value)));
             if (stack) found.push(stack);
             else unreadable += 1;
         }
