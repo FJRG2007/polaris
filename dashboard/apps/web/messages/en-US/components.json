@@ -343,7 +343,11 @@
         "left": "{size} - about {left} left",
         "both": "{up} going up, {down} coming down",
         "sending": "{count, plural, one {Sending a file} other {Sending # files}}",
-        "getting": "{count, plural, one {Getting a file} other {Getting # files}}"
+        "getting": "{count, plural, one {Getting a file} other {Getting # files}}",
+        "processing": "Saving on the server",
+        "dropped": "{name} could not be sent: the connection dropped",
+        "noAnswer": "{name} was sent, but the server did not answer",
+        "refused": "{name} was refused"
     },
     "calls": {
         "inNamed": "in {name}",

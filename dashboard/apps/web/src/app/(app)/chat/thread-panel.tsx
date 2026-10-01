@@ -261,10 +261,20 @@ export function ThreadPanel({
                             const response = await fetch(
                                 `/api/chat/channels/${root.channelId}/messages`,
                                 { method: "POST", body: form }
-                            );
-                            if (!response.ok) {
-                                setError("That could not be sent");
-                                return;
+                            ).catch(() => null);
+                            if (!response?.ok) {
+                                // Kept in the composer with this on it and a
+                                // retry, rather than a line up here and the
+                                // files gone.
+                                const answer: unknown = await response?.json().catch(() => null);
+                                return {
+                                    error:
+                                        typeof answer === "object" &&
+                                        answer !== null &&
+                                        "error" in answer
+                                            ? String((answer as { error: unknown }).error)
+                                            : t("errors.notSent")
+                                };
                             }
                         } else {
                             await runAction(

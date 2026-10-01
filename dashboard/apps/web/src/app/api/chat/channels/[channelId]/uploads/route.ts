@@ -22,7 +22,8 @@ import { can } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { apiPermission } from "@/lib/api-session";
 import { rulesForChannel } from "@/lib/chat/rules";
-import { StorageRefused } from "@/lib/storage-target";
+import { storageRefusal } from "@/lib/storage-refusal";
+import { isUnreachable, StorageRefused } from "@/lib/storage-target";
 import { cappedStream, wasTooLarge } from "@/lib/stream-cap";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
 import { discardUpload, stageUpload, UploadRefused } from "@/lib/chat/uploads";
@@ -90,11 +91,14 @@ export async function PUT(
             return Response.json({ error: caught.message }, { status: 400 });
         }
         // The storage took it and lost it, or would not take it at all. Said as
-        // what it is: "that could not be sent" for a share that is unplugged sends
-        // whoever reads it looking at their browser.
-        if (caught instanceof StorageRefused) {
+        // what it is, by the storage's name: "that could not be sent" for a share
+        // that is unplugged sends whoever reads it looking at their browser.
+        if (caught instanceof StorageRefused || isUnreachable(caught)) {
             console.error(caught);
-            return Response.json({ error: caught.message }, { status: 502 });
+            return Response.json(
+                { error: await storageRefusal(caught, user.isAdmin) },
+                { status: isUnreachable(caught) ? 503 : 502 }
+            );
         }
         console.error(caught);
         const detail = caught instanceof Error ? caught.message : String(caught);

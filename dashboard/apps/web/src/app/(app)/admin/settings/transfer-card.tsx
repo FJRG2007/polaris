@@ -84,6 +84,8 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
             // file anybody puts into Polaris, and it used to be a button that said
             // "Working" for as long as it took.
             const response = await sendFile("/api/admin/transfer/upload", file, {
+                // Its answer is the whole restore, which takes as long as it takes.
+                answerWithinMs: null,
                 method: "POST",
                 headers: { "x-polaris-transfer": "1" }
             });

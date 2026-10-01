@@ -461,7 +461,13 @@ export function DriveExplorer({
             const sent = await sendFile(`/api/drive/upload?${query.toString()}`, file, {
                 name: relPath
             });
-            if (!sent.ok && sent.status !== 0) setOpError(sent.body || t("explorer.refused"));
+            if (sent.ok || sent.problem === "stopped") continue;
+            // No answer to read a reason from: the connection dropped, or every
+            // byte went and the server never said what became of them. Said here
+            // too, not only in the corner, because this is where the folder is.
+            if (sent.problem === "noAnswer") setOpError(t("explorer.uploadNoAnswer", { name: relPath }));
+            else if (sent.problem === "dropped") setOpError(t("explorer.uploadDropped", { name: relPath }));
+            else setOpError(sent.body || t("explorer.refused"));
         }
         setUploading(false);
         if (fileInput.current) fileInput.current.value = "";

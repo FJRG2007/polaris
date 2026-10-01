@@ -26,6 +26,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const NAS = "018f2b7a-0000-7000-8000-0000000000f1";
 
 const getDriverForConnection = vi.fn();
+/** The administrators being told, which is what an unplugged NAS now does. */
+const reportStorageUnreachable = vi.fn(async () => undefined);
+const storageAnswered = vi.fn();
 
 /** A storage that behaves however a test needs it to, and remembers what it was
  *  given so the test can ask where the file actually ended up. */
@@ -74,6 +77,7 @@ let here = storage();
 vi.mock("node:fs/promises", () => ({ mkdir: vi.fn(async () => undefined) }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: "/var/polaris" }) }));
 vi.mock("@/lib/storage-service", () => ({ getDriverForConnection }));
+vi.mock("@/lib/storage-alert", () => ({ reportStorageUnreachable, storageAnswered }));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: vi.fn(async () => null),
     setSetting: vi.fn(async () => undefined)
@@ -113,9 +117,16 @@ vi.mock("@polaris/storage", () => ({
     }
 }));
 
-const { LOCAL_TARGET, forgetStorageFailure, openForWriting, placeFile } = await import(
-    "../../src/lib/storage-target"
-);
+const {
+    LOCAL_TARGET,
+    StorageRefused,
+    forgetStorageFailure,
+    isUnreachable,
+    openForWriting,
+    placeFile,
+    streamFile
+} = await import("../../src/lib/storage-target");
+const { storageRefusal } = await import("../../src/lib/storage-refusal");
 
 const nas = { id: NAS, name: "The NAS", automatic: true };
 const bytes = new Uint8Array(2048).fill(7);
@@ -285,5 +296,180 @@ describe("placing a file", () => {
         expect((failure as Error).message).toContain("The NAS");
         expect((failure as Error).message).toContain("STATUS_DISK_FULL");
         expect((failure as Error).message).toContain("this server");
+    });
+});
+
+/** A request body, the way a route hands one to `streamFile`. */
+function body(size = 512): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(new Uint8Array(size).fill(3));
+            controller.close();
+        }
+    });
+}
+
+const stream = () =>
+    streamFile({
+        target: nas,
+        localFolder: "chat",
+        folder: "polaris/chat/c1",
+        path: "polaris/chat/c1/upload",
+        body: body(),
+        mime: "image/png",
+        what: "file"
+    });
+
+/** Lets the module's own awaits run between two jumps of the fake clock. */
+async function settle(): Promise<void> {
+    for (let turn = 0; turn < 10; turn += 1) await Promise.resolve();
+}
+
+describe("a storage that is switched off", () => {
+    it("is given up on after a bounded wait, and the file goes to this server", async () => {
+        // The live case: the host daemon's mount of a NAS that is off, and the
+        // userspace connect after it, never came back - so the upload never did.
+        vi.useFakeTimers();
+        try {
+            getDriverForConnection.mockImplementation(() => new Promise(() => undefined));
+            let opened: Awaited<ReturnType<typeof openForWriting>> | null = null;
+            void openForWriting(nas, "chat").then((result) => {
+                opened = result;
+            });
+            await vi.advanceTimersByTimeAsync(19_000);
+            expect(opened).toBeNull();
+            await vi.advanceTimersByTimeAsync(1_500);
+            expect(opened).not.toBeNull();
+            expect(opened!.targetId).toBe(LOCAL_TARGET);
+            expect(opened!.fellBackFrom).toBe("The NAS");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("tells the administrators, by the storage's name", async () => {
+        getDriverForConnection.mockImplementation(async () => {
+            throw new Error("SMB connection failed: connect EHOSTUNREACH 192.0.2.10:445");
+        });
+
+        await openForWriting(nas, "chat");
+
+        await vi.waitFor(() =>
+            expect(reportStorageUnreachable).toHaveBeenCalledWith({ id: NAS, name: "The NAS" })
+        );
+    });
+
+    it("says it answered again once it does, so the next outage is news", async () => {
+        getDriverForConnection.mockImplementationOnce(async () => {
+            throw new Error("SMB connection failed: EHOSTUNREACH");
+        });
+        await openForWriting(nas, "chat");
+        getDriverForConnection.mockImplementation(async () => ({ id: NAS }));
+        // Past the minute it is skipped for.
+        const later = Date.now() + 61_000;
+        vi.spyOn(Date, "now").mockReturnValue(later);
+        const opened = await openForWriting(nas, "chat");
+        await settle();
+        vi.mocked(Date.now).mockRestore();
+
+        expect(opened.targetId).toBe(NAS);
+        await vi.waitFor(() => expect(storageAnswered).toHaveBeenCalledWith(NAS));
+    });
+});
+
+describe("streaming a file to a storage that stops answering", () => {
+    it("lands on this server when the storage cannot be opened, and records that", async () => {
+        getDriverForConnection.mockImplementation(async () => {
+            throw new Error("SMB connection failed: connect EHOSTUNREACH 192.0.2.10:445");
+        });
+
+        const placed = await stream();
+
+        expect(placed.targetId).toBe(LOCAL_TARGET);
+        expect(placed.fellBackFrom).toBe("The NAS");
+        expect(here.kept).toHaveLength(1);
+    });
+
+    it("gives up on a write that goes silent, by the storage's name", async () => {
+        // It opened - a session that was alive a minute ago - and then took the
+        // bytes and never finished. The request used to wait on it for ever.
+        vi.useFakeTimers();
+        try {
+            const box = storage();
+            box.writeStream.mockImplementation(
+                async (_path: string, stream: ReadableStream<Uint8Array>) => {
+                    await new Response(stream).arrayBuffer();
+                    return new Promise<{ size: bigint }>(() => undefined);
+                }
+            );
+            getDriverForConnection.mockImplementation(async () => box);
+
+            let failure: unknown = null;
+            void stream().catch((error: unknown) => {
+                failure = error;
+            });
+            await vi.advanceTimersByTimeAsync(59_000);
+            expect(failure).toBeNull();
+            await vi.advanceTimersByTimeAsync(7_000);
+
+            expect(failure).toBeInstanceOf(StorageRefused);
+            expect((failure as InstanceType<typeof StorageRefused>).storage).toBe("The NAS");
+            expect((failure as InstanceType<typeof StorageRefused>).unreachable).toBe(true);
+            // Nothing half-written is left under a name that reads like a whole file.
+            expect(box.delete).toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("names the storage when the network drops under the write", async () => {
+        const box = storage();
+        box.writeStream.mockImplementation(async () => {
+            throw Object.assign(new Error("write EHOSTUNREACH"), { code: "EHOSTUNREACH" });
+        });
+        getDriverForConnection.mockImplementation(async () => box);
+
+        const failure = await stream().catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(StorageRefused);
+        expect(isUnreachable(failure)).toBe(true);
+        expect((failure as InstanceType<typeof StorageRefused>).storage).toBe("The NAS");
+    });
+});
+
+describe("what the sender is told", () => {
+    it("is that files cannot be saved, and which storage is not there", async () => {
+        const failure = new StorageRefused(
+            "The NAS could not take the file: EHOSTUNREACH",
+            "UNAS Pro",
+            true
+        );
+
+        expect(await storageRefusal(failure, false)).toBe(
+            "Files cannot be saved right now: the storage UNAS Pro is not reachable."
+        );
+    });
+
+    it("keeps the device's own words for an administrator", async () => {
+        const failure = new StorageRefused(
+            "UNAS Pro could not take the file: EHOSTUNREACH",
+            "UNAS Pro",
+            true
+        );
+
+        const said = await storageRefusal(failure, true);
+        expect(said).toContain("the storage UNAS Pro is not reachable");
+        expect(said).toContain("EHOSTUNREACH");
+    });
+
+    it("tells a refusal from an outage", async () => {
+        const failure = new StorageRefused(
+            "UNAS Pro could not take the file: STATUS_DISK_FULL",
+            "UNAS Pro"
+        );
+
+        expect(await storageRefusal(failure, false)).toBe(
+            "The storage UNAS Pro would not keep that file."
+        );
     });
 });

@@ -25,7 +25,8 @@ import {
     isPersonalKind,
     LOCAL_TARGET,
     PERSONAL_KIND,
-    requiresHostd
+    requiresHostd,
+    withTimeout
 } from "@polaris/core";
 import {
     getHostConnection,
@@ -145,6 +146,25 @@ const MOUNT_TRUSTED_MS = 60_000;
 /** When each connection's mount was last seen readable from this process. */
 const mountsSeenLive = new Map<string, number>();
 
+/**
+ * How long the daemon gets to put a mount in place.
+ *
+ * Asking it is the first thing every read and write of a share does, and nothing
+ * used to bound it. Against a NAS that is switched off the daemon is not slow, it
+ * is waiting on `mount.cifs`, which waits out the kernel's connect retries - and
+ * every avatar, Drive listing and chat upload queued behind it. Past this the
+ * userspace path is tried, which fails in seconds when the box is not there.
+ */
+const MOUNT_REQUEST_TIMEOUT_MS = 15_000;
+
+/** How long a mount the daemon could not establish is not asked for again. The
+ *  same trade as `MOUNT_TRUSTED_MS` the other way round: a NAS that is off for an
+ *  hour costs one wait a minute, not one per request. */
+const MOUNT_RETRY_MS = 60_000;
+
+/** When each connection's mount last failed to be established. */
+const mountsFailed = new Map<string, number>();
+
 /** When each personal drive's folder was last known to be there. */
 const personalRootsSeen = new Map<string, number>();
 
@@ -243,23 +263,31 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
         if (driver) return driver;
         mountsSeenLive.delete(row.id);
     }
+    const failedAt = mountsFailed.get(row.id);
+    if (failedAt !== undefined && Date.now() - failedAt < MOUNT_RETRY_MS) return null;
     try {
-        await new HostdClient().createMount({
-            id: spec.id,
-            kind: spec.kind,
-            source: spec.source,
-            target: spec.id,
-            options: spec.options,
-            username: spec.username,
-            password: spec.password
-        });
+        await withTimeout(
+            new HostdClient().createMount({
+                id: spec.id,
+                kind: spec.kind,
+                source: spec.source,
+                target: spec.id,
+                options: spec.options,
+                username: spec.username,
+                password: spec.password
+            }),
+            MOUNT_REQUEST_TIMEOUT_MS,
+            `the host did not finish mounting it within ${MOUNT_REQUEST_TIMEOUT_MS / 1000} seconds`
+        );
     } catch (error) {
         // The daemon is the fast path, not the only one. A share it cannot mount
         // (no daemon, an NFS export that moved, a NAS that is briefly away) falls
         // back to whatever userspace path the kind has, so browsing keeps working.
+        mountsFailed.set(row.id, Date.now());
         console.error(`storage: could not host-mount ${row.id}, falling back to userspace:`, error);
         return null;
     }
+    mountsFailed.delete(row.id);
     // The daemon mounts into the HOST's namespace; this process only sees that
     // mount when `<mount_root>` is bound into its own container with slave
     // propagation. Where it is not - an older compose file, a deployment that
@@ -279,6 +307,7 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
 function forgetConnection(connectionId: string): void {
     dropStorageConnection(connectionId);
     mountsSeenLive.delete(connectionId);
+    mountsFailed.delete(connectionId);
 }
 
 /** A local driver onto a mount, or null when the path is not readable from here. */

@@ -21,7 +21,7 @@
  * what it knows, which a percentage would not be.
  */
 
-import { beginTransfer, type TransferHandle } from "./transfer-store";
+import { beginTransfer, type TransferHandle, type TransferProblem } from "./transfer-store";
 import {
     downloadStarted,
     forgetDownloadTicket,
@@ -33,7 +33,20 @@ export interface Sent {
     readonly ok: boolean;
     readonly status: number;
     readonly body: string;
+    /** Why it did not arrive, when there is no answer to read it from. */
+    readonly problem?: TransferProblem | "stopped";
 }
+
+/**
+ * How long the server gets to answer once every byte has gone.
+ *
+ * The bar can only measure the sending. After it, the server is putting the file
+ * wherever files are kept, and a storage that has gone away used to hold that
+ * part for ever - a bar at 100% with "0 seconds left" under it, and nothing
+ * anybody could do but wait. The server now gives up on a storage that is not
+ * answering well inside this, so reaching it means the answer is not coming.
+ */
+export const ANSWER_WITHIN_MS = 120_000;
 
 /**
  * Put one file somewhere, with a bar.
@@ -50,6 +63,12 @@ export async function sendFile(
         readonly headers?: Record<string, string>;
         /** Told as it goes, for a screen that draws its own progress as well. */
         readonly onProgress?: (moved: number, total: number) => void;
+        /**
+         * How long to wait for the answer after the last byte, or null to wait as
+         * long as it takes - for the few routes whose answer IS long work on the
+         * file (an instance being restored, a mail archive being read in).
+         */
+        readonly answerWithinMs?: number | null;
     } = {}
 ): Promise<Sent> {
     // Either shape, because Polaris has both: the streaming routes take one file as
@@ -69,6 +88,11 @@ export async function sendFile(
         stop: () => request.abort()
     });
 
+    const answerWithin =
+        options.answerWithinMs === undefined ? ANSWER_WITHIN_MS : options.answerWithinMs;
+    let waiting: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+
     return new Promise<Sent>((resolve) => {
         request.open(options.method ?? (asForm ? "POST" : "PUT"), url, true);
         // A form sets its own content type, boundary and all, and overriding it is
@@ -85,21 +109,51 @@ export async function sendFile(
             transfer.moved(event.loaded, total);
             options.onProgress?.(event.loaded, total);
         };
+        // The body has gone. From here the bar has nothing to measure, so it says
+        // the server is working on it - and starts the one clock that can tell a
+        // slow answer from one that is never coming.
+        request.upload.onload = () => {
+            transfer.processing();
+            options.onProgress?.(weight, weight);
+            if (answerWithin === null) return;
+            waiting = setTimeout(() => {
+                timedOut = true;
+                request.abort();
+            }, answerWithin);
+        };
         request.onload = () => {
+            clearTimeout(waiting);
             const ok = request.status >= 200 && request.status < 300;
-            if (ok) transfer.done();
-            else transfer.failed(said(request) ?? `${name} was refused`);
-            resolve({ ok, status: request.status, body: request.responseText });
+            if (ok) {
+                transfer.done();
+                resolve({ ok, status: request.status, body: request.responseText });
+                return;
+            }
+            const sentence = said(request);
+            transfer.failed(sentence ?? { problem: "refused" });
+            resolve({
+                ok,
+                status: request.status,
+                body: request.responseText,
+                ...(sentence ? {} : { problem: "refused" as const })
+            });
         };
         request.onerror = () => {
+            clearTimeout(waiting);
             // No status and no body: the request never reached anything, which is
             // the network rather than the server.
-            transfer.failed(`${name} could not be sent - the connection dropped`);
-            resolve({ ok: false, status: 0, body: "" });
+            transfer.failed({ problem: "dropped" });
+            resolve({ ok: false, status: 0, body: "", problem: "dropped" });
         };
         request.onabort = () => {
+            clearTimeout(waiting);
+            if (timedOut) {
+                transfer.failed({ problem: "noAnswer" });
+                resolve({ ok: false, status: 0, body: "", problem: "noAnswer" });
+                return;
+            }
             transfer.stopped();
-            resolve({ ok: false, status: 0, body: "" });
+            resolve({ ok: false, status: 0, body: "", problem: "stopped" });
         };
         request.send(payload);
     });

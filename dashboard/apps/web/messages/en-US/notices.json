@@ -275,5 +275,9 @@
         "hoursMinutes": "{hours} h {minutes} min",
         "days": "{days} d",
         "daysHours": "{days} d {hours} h"
+    },
+    "storage": {
+        "unreachableTitle": "{name} is not reachable",
+        "unreachableBody": "Polaris could not reach the storage {name}, so new uploads are being kept on this server, where they stay readable. Check that the device is on and connected, or point uploads at another storage."
     }
 }

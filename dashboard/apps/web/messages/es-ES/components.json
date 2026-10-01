@@ -343,7 +343,11 @@
         "left": "{size} - quedan unos {left}",
         "both": "{up} subiendo, {down} bajando",
         "sending": "{count, plural, one {Enviando un archivo} other {Enviando # archivos}}",
-        "getting": "{count, plural, one {Recibiendo un archivo} other {Recibiendo # archivos}}"
+        "getting": "{count, plural, one {Recibiendo un archivo} other {Recibiendo # archivos}}",
+        "processing": "Guardando en el servidor",
+        "dropped": "No se pudo enviar {name}: se cortó la conexión",
+        "noAnswer": "Se envió {name}, pero el servidor no respondió",
+        "refused": "Se rechazó {name}"
     },
     "calls": {
         "inNamed": "en {name}",

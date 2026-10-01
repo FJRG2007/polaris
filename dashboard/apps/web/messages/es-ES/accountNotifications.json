@@ -410,6 +410,10 @@
         "systemUpdated": {
             "label": "Actualizado automáticamente",
             "description": "Se ha ejecutado una actualización programada o automática, y cómo ha ido."
+        },
+        "storageUnreachable": {
+            "label": "El almacenamiento no responde",
+            "description": "El almacenamiento de archivos dejó de responder, así que las subidas nuevas se guardan en este servidor. Solo llega a administradores."
         }
     },
     "groups": {

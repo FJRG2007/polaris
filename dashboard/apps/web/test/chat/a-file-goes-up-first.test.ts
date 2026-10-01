@@ -37,7 +37,7 @@ const UPLOADS = readFileSync(
 
 describe("the composer", () => {
     it("sends each file to the streaming route, through the shared sender", () => {
-        expect(VIEW).toContain("import { sendFile }");
+        expect(VIEW).toMatch(/import \{ sendFile[ ,]/);
         expect(VIEW).toContain("/api/chat/channels/${channelId}/uploads?");
         expect(VIEW).toMatch(/await sendFile\(/);
     });

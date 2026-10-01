@@ -21,6 +21,7 @@
 
 import { z } from "zod";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { storageRefusal } from "@/lib/storage-refusal";
 import { apiPermission } from "@/lib/api-session";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -242,7 +243,10 @@ export async function POST(
         }
         if (caught instanceof AttachmentStorageError) {
             console.error(caught);
-            return Response.json({ error: caught.message }, { status: 502 });
+            return Response.json(
+                { error: await storageRefusal(caught.cause ?? caught, user.isAdmin) },
+                { status: 502 }
+            );
         }
         console.error(caught);
         const detail = caught instanceof Error ? caught.message : String(caught);

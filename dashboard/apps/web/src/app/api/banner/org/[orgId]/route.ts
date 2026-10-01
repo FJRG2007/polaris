@@ -16,6 +16,7 @@
  * so there is one id and it is checked.
  */
 
+import { storageRefusal } from "@/lib/storage-refusal";
 import { recordAudit } from "@/lib/audit-service";
 import { apiUser } from "@/lib/api-session";
 import { resolveSession } from "@/lib/session";
@@ -125,12 +126,7 @@ export async function POST(
         // The reason is for the operator's log; the person gets a sentence they
         // can act on, without the storage layer's paths in it.
         console.error("avatars: could not store the organization banner:", error);
-        return new Response(
-            user.isAdmin
-                ? `Could not store that banner: ${error instanceof Error ? error.message : String(error)}`
-                : "Could not store that banner",
-            { status: 502 }
-        );
+        return new Response(await storageRefusal(error, user.isAdmin), { status: 502 });
     }
 }
 

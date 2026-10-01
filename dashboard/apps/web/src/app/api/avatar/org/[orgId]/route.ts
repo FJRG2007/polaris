@@ -13,6 +13,7 @@
  * a claim, and the type a file is served back as is what a browser acts on.
  */
 
+import { storageRefusal } from "@/lib/storage-refusal";
 import { resolveSession } from "@/lib/session";
 import { apiUser } from "@/lib/api-session";
 import { profilesArePublic } from "@/lib/profile-service";
@@ -122,12 +123,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
         console.error("avatars: could not store the organization photo:", error);
         // The reason, to the one person who can act on it: it only fails here
         // when no storage at all would keep the file.
-        return new Response(
-            user.isAdmin
-                ? `Could not store that photo: ${error instanceof Error ? error.message : String(error)}`
-                : "Could not store that photo",
-            { status: 502 }
-        );
+        return new Response(await storageRefusal(error, user.isAdmin), { status: 502 });
     }
 }
 

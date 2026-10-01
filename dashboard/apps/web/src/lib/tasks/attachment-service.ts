@@ -17,10 +17,10 @@ import {
     AUTOMATIC_TARGET,
     driverForTarget,
     LOCAL_TARGET,
-    openForWriting,
     resolveStorageTarget,
     safeName,
     storageTargetOptions,
+    streamFile,
     type TargetOption,
     type UploadTarget
 } from "@/lib/storage-target";
@@ -176,44 +176,48 @@ export async function storeAttachment(input: {
     // dropped rather than refused: the file itself was legitimately uploaded to
     // the task, and losing the thread it was written beside is the smaller loss.
     const commentId = input.commentId ? await commentOnTask(input.commentId, input.taskId) : null;
-    // The storage uploads are sent to, or this server when that one cannot be
-    // opened. A share that is away must not be the reason somebody cannot
-    // attach a file to their work; the row records where it really went.
-    const target = await openForWriting(await resolveUploadTarget(), LOCAL_FOLDER);
-    const driver = target.driver;
     const folder = taskFolder(input.taskId);
     // A name of its own, so two people uploading "screenshot.png" to the same
     // task do not overwrite each other, and so a name cannot escape the folder.
     const stored = `${folder}/${crypto.randomUUID()}${extname(safeName(input.name))}`;
 
-    try {
-        await driver.mkdir(folder).catch(() => undefined);
-        const written = await driver.writeStream(stored, input.body, { mime: input.mime });
-        const size = Number(written.size) || input.size;
-        const row = await prisma.taskAttachment.create({
-            data: {
-                taskId: input.taskId,
-                name: safeName(input.name),
-                mime: input.mime,
-                size,
-                connectionId: target.targetId === LOCAL_TARGET ? null : target.targetId,
-                path: stored,
-                uploadedById: input.uploadedById,
-                commentId
-            },
-            select: {
-                id: true,
-                name: true,
-                mime: true,
-                size: true,
-                uploadedById: true,
-                createdAt: true
-            }
-        });
-        return view(row);
-    } finally {
-        await driver.dispose().catch(() => undefined);
-    }
+    // The storage uploads are sent to, or this server when that one cannot be
+    // opened. A share that is away must not be the reason somebody cannot attach
+    // a file to their work, and one that stops answering part-way must not hold
+    // the upload open for ever - both are `streamFile`, which a chat upload goes
+    // through too. The row records where the file really went.
+    const placed = await streamFile({
+        target: await resolveUploadTarget(),
+        localFolder: LOCAL_FOLDER,
+        folder,
+        path: stored,
+        body: input.body,
+        mime: input.mime,
+        declared: input.size > 0 ? input.size : undefined,
+        what: "file"
+    });
+    const size = placed.size || input.size;
+    const row = await prisma.taskAttachment.create({
+        data: {
+            taskId: input.taskId,
+            name: safeName(input.name),
+            mime: input.mime,
+            size,
+            connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId,
+            path: stored,
+            uploadedById: input.uploadedById,
+            commentId
+        },
+        select: {
+            id: true,
+            name: true,
+            mime: true,
+            size: true,
+            uploadedById: true,
+            createdAt: true
+        }
+    });
+    return view(row);
 }
 
 /** The bytes of one attachment, for the download route. */

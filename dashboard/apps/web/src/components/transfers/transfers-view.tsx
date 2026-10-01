@@ -27,6 +27,7 @@ import {
     clearSettledTransfers,
     clearTransfer,
     transferFraction,
+    isUnderWay,
     transferSecondsLeft,
     useTransfers,
     type Transfer
@@ -37,9 +38,7 @@ export function TransfersView() {
     const transfers = useTransfers();
     // A clock, so "40 seconds left" counts down rather than sitting at whatever it
     // said when the last chunk landed. Only while something is moving.
-    const moving = transfers.some(
-        (transfer) => transfer.state === "waiting" || transfer.state === "moving"
-    );
+    const moving = transfers.some(isUnderWay);
     const [, tick] = useState(0);
     useEffect(() => {
         if (!moving) return;
@@ -49,9 +48,7 @@ export function TransfersView() {
 
     if (transfers.length === 0) return null;
 
-    const settled = transfers.filter(
-        (transfer) => transfer.state !== "waiting" && transfer.state !== "moving"
-    );
+    const settled = transfers.filter((transfer) => !isUnderWay(transfer));
 
     return (
         <div
@@ -165,7 +162,7 @@ function TransferRow({ transfer }: { transfer: Transfer }) {
             )}
 
             <p className={cn("text-[0.6875rem]", failed ? "text-danger" : "text-muted-foreground")}>
-                {failed ? transfer.error : said(transfer, left, t)}
+                {failed ? failure(transfer, t) : said(transfer, left, t)}
             </p>
         </li>
     );
@@ -178,16 +175,23 @@ function said(transfer: Transfer, secondsLeft: number | null, t: Words): string 
     if (transfer.state === "waiting") {
         return transfer.way === "up" ? t("transfers.starting") : t("transfers.waiting");
     }
+    if (transfer.state === "processing") return t("transfers.processing");
     const size = transfer.total
         ? t("transfers.ofTotal", { moved: readable(transfer.moved), total: readable(transfer.total) })
         : readable(transfer.moved);
     return secondsLeft === null ? size : t("transfers.left", { size, left: clock(secondsLeft) });
 }
 
+/** Why it failed: the server's sentence when it wrote one, ours when it did not. */
+function failure(transfer: Transfer, t: Words): string {
+    if (transfer.error) return transfer.error;
+    if (transfer.problem === "dropped") return t("transfers.dropped", { name: transfer.name });
+    if (transfer.problem === "noAnswer") return t("transfers.noAnswer", { name: transfer.name });
+    return t("transfers.refused", { name: transfer.name });
+}
+
 function countSaid(transfers: readonly Transfer[], t: Words): string {
-    const moving = transfers.filter(
-        (transfer) => transfer.state === "waiting" || transfer.state === "moving"
-    );
+    const moving = transfers.filter(isUnderWay);
     const up = moving.filter((transfer) => transfer.way === "up").length;
     const down = moving.length - up;
     if (up > 0 && down > 0) return t("transfers.both", { up, down });

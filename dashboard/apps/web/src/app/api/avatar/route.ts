@@ -10,6 +10,7 @@
  * so the two are not allowed to be the same thing.
  */
 
+import { storageRefusal } from "@/lib/storage-refusal";
 import { deleteAvatar, forgetGravatar, MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
 import { apiUser } from "@/lib/api-session";
 
@@ -47,12 +48,7 @@ export async function POST(request: Request): Promise<Response> {
         console.error("avatars: could not store the photo:", error);
         // Named for an administrator, who is the one person who can act on it -
         // it only reaches here when no storage at all would keep the file.
-        return new Response(
-            user.isAdmin
-                ? `Could not store that photo: ${error instanceof Error ? error.message : String(error)}`
-                : "Could not store that photo",
-            { status: 502 }
-        );
+        return new Response(await storageRefusal(error, user.isAdmin), { status: 502 });
     }
 }
 

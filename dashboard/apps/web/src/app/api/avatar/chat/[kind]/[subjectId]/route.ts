@@ -16,6 +16,7 @@
  * group photo that changes.
  */
 
+import { storageRefusal } from "@/lib/storage-refusal";
 import { prisma } from "@polaris/db";
 import { apiUser } from "@/lib/api-session";
 
@@ -132,7 +133,7 @@ export async function POST(
         return Response.json({ ok: true });
     } catch (error) {
         console.error("avatars: could not store the chat picture:", error);
-        return new Response(refusal(error, user.isAdmin), { status: 502 });
+        return new Response(await storageRefusal(error, user.isAdmin), { status: 502 });
     }
 }
 
@@ -151,19 +152,6 @@ export async function DELETE(
 
     await deleteAvatar({ kind: what, id: subjectId });
     return Response.json({ ok: true });
-}
-
-/**
- * What to tell somebody whose photo would not save.
- *
- * It only gets this far when no storage would keep the file - the chosen one and
- * then this server - so it is an outage rather than a bad upload, and the
- * operator is the one person who can act on it. To everybody else the storage's
- * own words are noise with a hostname in them.
- */
-function refusal(error: unknown, isAdmin: boolean): string {
-    if (!isAdmin) return "Could not store that photo";
-    return `Could not store that photo: ${error instanceof Error ? error.message : String(error)}`;
 }
 
 async function mayRead(userId: string, kind: Kind, id: string): Promise<boolean> {

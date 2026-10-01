@@ -275,5 +275,9 @@
         "hoursMinutes": "{hours} h {minutes} min",
         "days": "{days} d",
         "daysHours": "{days} d {hours} h"
+    },
+    "storage": {
+        "unreachableTitle": "{name} no responde",
+        "unreachableBody": "Polaris no pudo llegar al almacenamiento {name}, así que las subidas nuevas se guardan en este servidor, donde siguen disponibles. Comprueba que el dispositivo esté encendido y conectado, o envía las subidas a otro almacenamiento."
     }
 }

@@ -117,6 +117,8 @@ export function ArchiveView({
             // upload in Polaris most worth watching - through the shared sender it
             // has a bar and can be stopped.
             const sent = await sendFile("/api/mail/uploads?kind=archive", form, {
+                // Its answer comes once the archive has been read in.
+                answerWithinMs: null,
                 name: file.name
             });
             let stored: { upload?: { id: string }; error?: string } = {};

@@ -85,14 +85,7 @@ vi.mock("@/lib/storage-target", async (importOriginal) => ({
     resolveStorageTarget: async () => "local",
     storageTargetOptions: async () => [],
     LOCAL_TARGET: "local",
-    openForWriting: async () => ({
-        targetId: "local",
-        driver: {
-            mkdir: async () => undefined,
-            writeStream: async () => ({ size: 1n }),
-            dispose: async () => undefined
-        }
-    })
+    streamFile: async () => ({ targetId: "local", size: 1, fellBackFrom: null })
 }));
 
 const { storeAttachment } = await import("../../src/lib/tasks/attachment-service");

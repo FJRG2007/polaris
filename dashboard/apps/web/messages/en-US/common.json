@@ -59,5 +59,12 @@
         "refused": "The server refused the session: {reason}.",
         "untrusted": "The browser would not open the connection. A terminal needs this address's certificate trusted, and accepting the warning on the page is not enough. <download>Download Polaris's certificate</download> and add it to this device's trusted roots, then reload.",
         "retry": "Try again"
+    },
+    "storage": {
+        "unreachable": "Files cannot be saved right now: the storage {name} is not reachable.",
+        "unreachableHere": "Files cannot be saved right now: the storage is not reachable.",
+        "refused": "The storage {name} would not keep that file.",
+        "refusedHere": "No storage would keep that file.",
+        "withDetail": "{sentence} ({detail})"
     }
 }

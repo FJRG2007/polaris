@@ -416,7 +416,9 @@
             "placeholder": "e.g. Personal-Drive, data, home",
             "connecting": "Connecting...",
             "connect": "Connect"
-        }
+        },
+        "uploadNoAnswer": "{name} was sent, but the server did not answer.",
+        "uploadDropped": "{name} could not be sent: the connection dropped."
     },
     "connection": {
         "fields": {
