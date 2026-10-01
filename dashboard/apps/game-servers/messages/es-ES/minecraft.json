@@ -643,7 +643,7 @@
         "copyJson": "Copiar JSON",
         "downloadJson": "Bajar JSON",
         "downloadCsv": "Bajar CSV",
-        "csvHint": "El CSV es solo para leer y no se puede volver a importar.",
+        "csvHint": "El CSV se abre en una hoja de cálculo y se importa igual.",
         "copied": "Copiado",
         "copyFailed": "No se pudo copiar. Descarga el archivo.",
         "nothingToExport": "Polaris aún no guarda ningún inventario.",
@@ -655,7 +655,7 @@
         "importHint": "Pega un JSON exportado o elige uno. Nada cambia hasta que confirmes.",
         "importAllHint": "Cada inventario del archivo va al jugador con ese nombre. Nada cambia hasta que confirmes.",
         "chooseFile": "Elegir archivo",
-        "pasteHere": "Pega aquí el JSON exportado",
+        "pasteHere": "Pega aquí el JSON o CSV exportado",
         "fromFile": "Del archivo",
         "into": "A",
         "mode": "Cómo",
@@ -696,7 +696,10 @@
             "where": "Dónde",
             "item": "Objeto",
             "count": "Cantidad",
-            "details": "Detalles"
+            "details": "Detalles",
+            "data": "Datos",
+            "takenAt": "Leído",
+            "live": "Origen"
         },
         "eras": {
             "components": "Minecraft 1.20.5 o posterior",
@@ -708,7 +711,7 @@
             "notJson": "Eso no es un archivo de inventario exportado.",
             "tooBig": "El archivo es demasiado grande para importarlo.",
             "notInventory": "Ese archivo no es un inventario exportado que Polaris sepa leer.",
-            "csv": "Un CSV no se puede importar. Usa el archivo JSON.",
+            "csv": "Este CSV es de una exportación antigua. Exporta de nuevo.",
             "mixedEra": "Ese archivo mezcla objetos de versiones distintas de Minecraft.",
             "duplicateSlot": "Ese archivo pone dos objetos en una casilla.",
             "duplicatePlayer": "Ese archivo repite un jugador.",

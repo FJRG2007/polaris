@@ -13,8 +13,10 @@
  * `tag` only to one that takes braces. A file whose stacks carry no data at all
  * reads the same everywhere.
  *
- * CSV is for people - a spreadsheet of who carries what - and cannot be imported:
- * it says so in its own header.
+ * CSV is the same file as rows a spreadsheet opens: one per stack, with a column
+ * that reads the stack in words and one that carries its raw data, so it imports
+ * back exactly like the JSON. Its first line names the format, the syntax and the
+ * server, because a spreadsheet has nowhere else to keep them.
  *
  * Pure and browser-safe: the screen previews an import with the same functions
  * the server applies it with.
@@ -173,13 +175,24 @@ export function parseTransfer(
 ): { ok: true; file: TransferFile } | { ok: false; problem: TransferProblem } {
     if (text.length > MOST_FILE_CHARS) return { ok: false, problem: "tooBig" };
     const trimmed = text.trim();
-    if (trimmed.startsWith(CSV_MARK)) return { ok: false, problem: "csv" };
+    if (trimmed.startsWith(READ_ONLY_CSV_MARK)) return { ok: false, problem: "csv" };
     let raw: unknown;
+    if (trimmed.startsWith(CSV_MARK)) {
+        raw = fromCsv(trimmed);
+        if (raw === null) return { ok: false, problem: "notInventory" };
+        return checked(raw);
+    }
     try {
         raw = JSON.parse(trimmed);
     } catch {
         return { ok: false, problem: "notJson" };
     }
+    return checked(raw);
+}
+
+function checked(
+    raw: unknown
+): { ok: true; file: TransferFile } | { ok: false; problem: TransferProblem } {
     const parsed = transferSchema.safeParse(raw);
     if (parsed.success) return { ok: true, file: parsed.data };
     const said = parsed.error.issues.map(
@@ -279,14 +292,20 @@ export function writesOf(plan: readonly PlannedSlot[]): PlannedSlot[] {
 
 // ------------------------------------------------------------------ CSV, for people
 
-/** The first line of every CSV export, so an import can say why it refuses one. */
-export const CSV_MARK = "# Polaris inventory export - for reading only, it cannot be imported back";
+/** The first line of a CSV export, followed by what the rows need to be read back. */
+export const CSV_MARK = "# Polaris inventory export";
+
+/** How the first CSV exports began: they carried no raw data, so they cannot be imported. */
+export const READ_ONLY_CSV_MARK = "# Polaris inventory export - for reading only";
+
+/** How a text cell may not start as it is: what a spreadsheet would run, or the quote that marks it. */
+const FORMULA_START = /^[=+\-@\t\r']/;
 
 /** A cell as CSV writes it: quoted when it has to be, and never read as a formula. */
 export function csvCell(value: string | number): string {
     let text = String(value);
     // A cell a spreadsheet would run: =, +, - or @ first, or a tab or return. A number is only a number.
-    if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    if (typeof value === "string" && FORMULA_START.test(text)) text = `'${text}`;
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
@@ -340,19 +359,135 @@ function enchantmentsIn(snbt: string): string[] {
     return found;
 }
 
-/** Bags as rows somebody can read: one per stack. `slotName` names a slot in the reader's words. */
+/**
+ * Bags as rows: one per stack, and one with no item for a bag that is empty, so
+ * an import can empty it too. The first six columns are for reading, named in
+ * the reader's words; the last three are what an import reads back. `slotName`
+ * names a slot in the reader's words.
+ */
 export function toCsv(
     file: TransferFile,
     header: readonly string[],
     slotName: (slot: number) => string
 ): string {
-    const lines = [CSV_MARK, header.map(csvCell).join(",")];
-    for (const player of file.players)
+    const mark = `${CSV_MARK} v${file.version} era=${file.era} server=${file.serverVersion ?? ""} exported=${file.exportedAt}`;
+    const lines = [mark, header.map(csvCell).join(",")];
+    for (const player of file.players) {
+        const tail = (data: string) => [data, player.takenAt, player.live ? "live" : "kept"];
+        if (player.items.length === 0)
+            lines.push([player.name, "", "", "", "", "", ...tail("")].map(csvCell).join(","));
         for (const item of player.items)
             lines.push(
-                [player.name, item.slot, slotName(item.slot), item.id, item.count, summarize(item)]
+                [
+                    player.name,
+                    item.slot,
+                    slotName(item.slot),
+                    item.id,
+                    item.count,
+                    summarize(item),
+                    ...tail(item.data?.snbt ?? "")
+                ]
                     .map(csvCell)
                     .join(",")
             );
+    }
     return `${lines.join("\r\n")}\r\n`;
+}
+
+/** Rows as RFC 4180 reads them: quoted cells may hold commas, quotes and line breaks. */
+function csvRows(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = "";
+    let quoted = false;
+    for (let index = 0; index < text.length; index++) {
+        const char = text[index]!;
+        if (quoted) {
+            if (char === '"' && text[index + 1] === '"') {
+                cell += '"';
+                index++;
+            } else if (char === '"') quoted = false;
+            else cell += char;
+        } else if (char === '"') quoted = true;
+        else if (char === ",") {
+            row.push(cell);
+            cell = "";
+        } else if (char === "\n" || char === "\r") {
+            if (char === "\r" && text[index + 1] === "\n") index++;
+            row.push(cell);
+            rows.push(row);
+            row = [];
+            cell = "";
+        } else cell += char;
+    }
+    if (cell !== "" || row.length > 0) {
+        row.push(cell);
+        rows.push(row);
+    }
+    return rows;
+}
+
+/** A text cell as it was before `csvCell` kept it from being read as a formula. */
+function textCell(cell: string): string {
+    return cell.startsWith("'") && FORMULA_START.test(cell.slice(1)) ? cell.slice(1) : cell;
+}
+
+/** A whole number as `toCsv` writes it; anything else, a blank cell included, is not one. */
+function wholeCell(cell: string): number {
+    return /^-?\d+$/.test(cell) ? Number(cell) : Number.NaN;
+}
+
+/**
+ * A CSV export read back into the shape the JSON has, for the same schema to
+ * check. Null when it is not one: no mark line, or a row of the wrong width.
+ */
+function fromCsv(text: string): unknown {
+    const [first, , ...rows] = csvRows(text);
+    const mark = first?.join(",") ?? "";
+    const meta = /^# Polaris inventory export v(\d+) era=(\w+) server=(.*) exported=(\S+)$/.exec(
+        mark
+    );
+    if (!meta) return null;
+    const era = meta[2]!;
+    const players = new Map<
+        string,
+        { name: string; takenAt: string; live: boolean; items: unknown[] }
+    >();
+    for (const cells of rows) {
+        if (cells.length === 1 && cells[0] === "") continue;
+        if (cells.length !== 9) return null;
+        const [name, slot, , id, count, , data, takenAt, live] = cells.map(textCell) as [
+            string,
+            string,
+            string,
+            string,
+            string,
+            string,
+            string,
+            string,
+            string
+        ];
+        const player = players.get(name) ?? {
+            name,
+            takenAt,
+            live: live === "live",
+            items: [] as unknown[]
+        };
+        players.set(name, player);
+        if (id === "") continue;
+        player.items.push({
+            slot: wholeCell(slot),
+            id,
+            count: wholeCell(count),
+            data: data === "" ? null : { era, snbt: data }
+        });
+    }
+    return {
+        format: TRANSFER_FORMAT,
+        version: Number(meta[1]),
+        era,
+        serverVersion: meta[3] === "" ? null : meta[3],
+        exportedAt: meta[4],
+        players: [...players.values()]
+    };
 }

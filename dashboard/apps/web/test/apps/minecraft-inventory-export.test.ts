@@ -307,10 +307,6 @@ describe("a file that cannot be imported", () => {
 
     it("is refused with a reason, never read partly", () => {
         expect(transfer.parseTransfer("not json")).toEqual({ ok: false, problem: "notJson" });
-        expect(transfer.parseTransfer(`${transfer.CSV_MARK}\r\nPlayer,Slot`)).toEqual({
-            ok: false,
-            problem: "csv"
-        });
         expect(transfer.parseTransfer(JSON.stringify({ format: "other" }))).toEqual({
             ok: false,
             problem: "notInventory"
@@ -348,7 +344,19 @@ describe("a file that cannot be imported", () => {
     });
 });
 
-describe("CSV, for reading", () => {
+describe("CSV", () => {
+    const HEADER = [
+        "Player",
+        "Slot",
+        "Where",
+        "Item",
+        "Count",
+        "Details",
+        "Data",
+        "Read at",
+        "Source"
+    ];
+
     it("escapes commas, quotes and line breaks, and never starts a formula", () => {
         expect(transfer.csvCell('a,"b"')).toBe('"a,""b"""');
         expect(transfer.csvCell("line\nbreak")).toBe('"line\nbreak"');
@@ -356,22 +364,21 @@ describe("CSV, for reading", () => {
         expect(transfer.csvCell(-106)).toBe("-106");
     });
 
-    it("says it cannot be imported, and reads a stack's name, enchantments and damage", async () => {
+    it("reads a stack's name, enchantments and damage", async () => {
         bags.set("Alice", modernBag());
         const file = transfer.exportFile(
             [{ name: "Alice", takenAt: "x", live: true, items: await bagOf("Alice") }],
             null
         );
-        const csv = transfer.toCsv(
-            file,
-            ["Player", "Slot", "Where", "Item", "Count", "Details"],
-            (slot) => `slot ${slot}`
-        );
-        const lines = csv.split("\r\n");
-        expect(lines[0]).toBe(transfer.CSV_MARK);
-        expect(lines).toContain(
-            'Alice,0,slot 0,minecraft:diamond_sword,1,"""Excalibur""; sharpness 5, unbreaking 3; damage 40"'
-        );
+        const lines = transfer.toCsv(file, HEADER, (slot) => `slot ${slot}`).split("\r\n");
+        expect(lines[0]!.startsWith(transfer.CSV_MARK)).toBe(true);
+        expect(
+            lines.some((line) =>
+                line.startsWith(
+                    'Alice,0,slot 0,minecraft:diamond_sword,1,"""Excalibur""; sharpness 5, unbreaking 3; damage 40"'
+                )
+            )
+        ).toBe(true);
         expect(
             transfer.summarize({
                 slot: 0,
@@ -380,7 +387,73 @@ describe("CSV, for reading", () => {
                 data: { era: "tag", snbt: LEGACY_SWORD }
             })
         ).toBe('"Excalibur"; sharpness 5; damage 40');
-        expect(transfer.parseTransfer(csv)).toEqual({ ok: false, problem: "csv" });
+    });
+
+    it("imports back exactly what the JSON would, empty bags included", async () => {
+        bags.set("Alice", modernBag());
+        const file = transfer.exportFile(
+            [
+                {
+                    name: "Alice",
+                    takenAt: "2026-10-01T00:00:00.000Z",
+                    live: true,
+                    items: await bagOf("Alice")
+                },
+                { name: "Bob", takenAt: "2026-10-01T00:00:00.000Z", live: false, items: [] }
+            ],
+            "1.21.4 NeoForge"
+        );
+        const csv = transfer.toCsv(file, HEADER, (slot) => `slot ${slot}`);
+        expect(transfer.parseTransfer(csv)).toEqual({ ok: true, file });
+    });
+
+    it("refuses an export from before CSV carried the data, and a row cut short", () => {
+        expect(
+            transfer.parseTransfer(
+                "# Polaris inventory export - for reading only, it cannot be imported back\r\nPlayer,Slot"
+            )
+        ).toEqual({ ok: false, problem: "csv" });
+        expect(
+            transfer.parseTransfer(
+                `${transfer.CSV_MARK} v1 era=plain server= exported=2026-10-01T00:00:00.000Z\r\nh\r\nAlice,0,x`
+            )
+        ).toEqual({ ok: false, problem: "notInventory" });
+    });
+
+    it("refuses a slot or count that is blank or not a whole number", () => {
+        const row = (slot: string, count: string) =>
+            `${transfer.CSV_MARK} v1 era=plain server= exported=2026-10-01T00:00:00.000Z\r\nh\r\nAlice,${slot},,minecraft:stone,${count},,,2026-10-01T00:00:00.000Z,live\r\n`;
+        expect(transfer.parseTransfer(row("3", "5"))).toMatchObject({ ok: true });
+        for (const [slot, count] of [
+            ["", "5"],
+            ["3", ""],
+            [" 5", "5"],
+            ["0x10", "5"],
+            ["1e1", "5"],
+            ["3", "2.0"]
+        ])
+            expect(transfer.parseTransfer(row(slot!, count!))).toEqual({
+                ok: false,
+                problem: "notInventory"
+            });
+    });
+
+    it("reads back a text cell that was kept from starting a formula", () => {
+        expect(transfer.csvCell("'=x")).toBe("''=x");
+        const file = transfer.exportFile(
+            [
+                {
+                    name: "Alice",
+                    takenAt: "2026-10-01T00:00:00.000Z",
+                    live: true,
+                    items: [{ slot: 1, id: "-ns:item", count: 2, data: null }]
+                }
+            ],
+            null
+        );
+        const csv = transfer.toCsv(file, HEADER, (slot) => `slot ${slot}`);
+        expect(csv).toContain("'-ns:item");
+        expect(transfer.parseTransfer(csv)).toEqual({ ok: true, file });
     });
 });
 

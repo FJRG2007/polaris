@@ -51,9 +51,9 @@ function download(name: string, body: string, type: string): void {
 }
 
 function csvOf(t: GameText<"minecraft">, file: transfer.TransferFile): string {
-    const header = (["player", "slot", "where", "item", "count", "details"] as const).map((key) =>
-        t(`inventoryTransfer.csvHeader.${key}`)
-    );
+    const header = (
+        ["player", "slot", "where", "item", "count", "details", "data", "takenAt", "live"] as const
+    ).map((key) => t(`inventoryTransfer.csvHeader.${key}`));
     return transfer.toCsv(file, header, (slot) => slotLabelIn(t, slot));
 }
 
@@ -338,7 +338,7 @@ function InventoryImportDialog({
                         <input
                             ref={fileInput}
                             type="file"
-                            accept="application/json,.json"
+                            accept="application/json,.json,text/csv,.csv"
                             className="hidden"
                             onChange={async (event) => {
                                 const chosen = event.target.files?.[0];
