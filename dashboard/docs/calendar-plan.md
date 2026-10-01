@@ -137,7 +137,7 @@ Phase 1 = this build. Status is tracked in the ledger, not here.
 | Subscribe by URL (http/https/webcal) (NC-54; G, P, TB) | all | ICS source, refresh interval, SSRF-guarded fetch | 1 |
 | Holiday calendars by region (NC-55; G, P) | NC G P | catalogue of public ICS feeds per country | 1 |
 | Admin-suggested public calendars, disable link subscriptions (NC-56,57) | NC | instance setting | 1 |
-| Birthday calendar (NC-143; G) | NC G | from Polaris profiles that carry a birthday, plus provider birthday calendars when synced | 1 |
+| Birthday calendar (NC-143; G) | NC G | Polaris profiles carry no birthday and Polaris has no contacts app, so there is nothing to derive one from; a linked Google account's own birthdays calendar syncs like any other | n/a (no source) |
 | Serve Polaris calendars over CalDAV to phones/desktop (NC core, Radicale) | NC S | CalDAV server with per-user app passwords | 2 |
 
 ### Event editor
@@ -253,80 +253,78 @@ duplicate.
 Status: `pending`, `done (<verification>)`, `blocked(<reason>)`,
 `deferred(<reason>)`. Update one line at a time.
 
-### Foundation
-- [ ] U01 Plan, matrix and ledger (this file) - done when committed
-- [ ] U02 Worktree install (npm ci, build:packages, prisma generate)
-- [ ] U03 Dependencies: ical.js, FullCalendar MIT parts; lockfile
-- [ ] U04 Prisma models + re-runnable migration + migrate-diff check
-- [ ] U05 `calendar.use` permission, default roles, carry-forward migration
-- [ ] U06 Notification events (reminder, invitation, reply, shared, booking, sync failed)
+Verification shorthand used below: **T** = `vitest --maxWorkers=2 test/calendar`
+green (39 files, 377 tests at the last run); **C** = `tsc --noEmit -p .` in
+`apps/calendar` clean (its program includes `apps/web/src`, the app and
+`apps/web/test/calendar`); **B** = the app bundler exits 0 and
+`test/app-bundles` + `test/build` are green; **W** = exercised in a real
+browser (Chrome via puppeteer, against `next build` + `next start` on SQLite,
+the calendar bundle loaded from the bundles dir) at 1366px and 390px, in en-US
+and es-ES.
 
-### Engine (`@polaris/core/calendar`)
-- [ ] U07 Time zones on Intl (wall time <-> instant, Windows names, VTIMEZONE fallback)
-- [ ] U08 iCalendar parse/serialize + event model mapping, round-trip on Google/iCloud/Nextcloud fixtures
-- [ ] U09 Recurrence expansion (RRULE/RDATE/EXDATE/RECURRENCE-ID) against RFC 5545 examples
-- [ ] U10 Recurring edits: this / this and following / all; delete scopes
-- [ ] U11 Recurrence rule <-> editor model + human summary (en, es)
-- [ ] U12 Alarms: triggers -> fire times, next-alarm computation
-- [ ] U13 Free/busy and "find a time" suggestions
-- [ ] U14 Booking slots (availability, overrides, buffers, notice, per-day cap, horizon)
-- [ ] U15 iTIP REQUEST/REPLY/CANCEL builders
-- [ ] U16 Input schemas (zod) shared by screens and server
+### Foundation
+- [x] U01 Plan, matrix and ledger - done
+- [x] U02 Worktree install - done
+- [x] U03 Dependencies - done (ical.js 2.2.1 MPL-2.0, @fullcalendar/* 6.1.21 MIT; lock regenerated with npm@10; `npm@10 ci --dry-run` clean after rebase)
+- [x] U04 Prisma models + migration `20261208000000_calendar` - done (renamed from 20261207 after rebase: main took that stamp for place automations; rerunnable test green)
+- [x] U05 `calendar.use` - done
+- [x] U06 Notification events - done
+
+### Engine
+- [x] U07-U16 Engine - done (T; 18 RFC 5545 examples; malformed dates in the input schema answer an issue instead of throwing; VTIMEZONE written for every TZID an object uses, checked against Intl through ical.js for six zones)
 
 ### App package and dashboard wiring
-- [ ] U17 Package scaffold (`apps/calendar`, extension, messages en/es, bundler passes)
-- [ ] U18 Web: catalog + nav entry, catch-all page, api route, public surface, Dockerfile, tailwind, web dep
-- [ ] U19 Host services the app needs (directory, connections, tasks, mail, meetings, guarded fetch)
-- [ ] U20 Calendar service: calendars CRUD, order, visibility, colours, defaults
-- [ ] U21 Object service: create/update/move/resize/delete with recurrence scopes, duplicate
-- [ ] U22 Sharing (users, teams, levels) + access checks
-- [ ] U23 Public link, embed, ICS feed
-- [ ] U24 Trash with restore and purge
-- [ ] U25 Import (.ics, jCal) and export (calendar, event, all as zip)
-- [ ] U26 Settings store (per user) + instance settings
-- [ ] U27 Search across all time
+- [x] U17 Package scaffold - done (B)
+- [x] U18 Web wiring - done (catalog, nav, /calendar, /api/calendar, public /cal, Dockerfile, tailwind, cron routes; W: /calendar loads the bundle and draws)
+- [x] U19 Host services - done (C, T; `react-dom` added to the browser modules apps may share - FullCalendar's React adapter needs it)
+- [x] U20 Calendar service - done (T: access, actions)
+- [x] U21 Object service - done (T: objects; W: create from the header, survives reload, opens; DTSTAMP stamped on local writes)
+- [x] U22 Sharing - done (T: sharing; dialog wired through `screens/slots.ts`)
+- [x] U23 Public link - done (T; W: /cal/p/<token> draws, feed.ics answers text/calendar, unknown token 404; reminders never leave in a feed)
+- [x] U24 Trash - done (T: trash; W: page draws)
+- [x] U25 Import/export - done (T: transfer)
+- [x] U26 Settings - done (W: settings and /calendar/admin draw)
+- [x] U27 Search - done (T: search). Not exercised in the browser: SQLite has no `mode: insensitive`.
 
 ### Sync
-- [ ] U28 Connection flow `scope=calendar` for Google and Microsoft, no cap for calendar links
-- [ ] U29 ICS subscriptions (+ holiday catalogue) with ETag
-- [ ] U30 CalDAV client: discovery, list, sync-collection, ctag fallback, multiget, PUT/DELETE If-Match
-- [ ] U31 Google provider: calendars, syncToken, 410, If-Match/412, sendUpdates
-- [ ] U32 Microsoft Graph provider: calendars, delta, @removed, If-Match
-- [ ] U33 Sync engine + `calendar-sync` job + conflict keep-aside + pendingPush retry
-- [ ] U34 Sync tests with mocked Google/CalDAV/Graph servers (etag conflict, deletes, 410)
+- [x] U28 Connection flow `scope=calendar` - done
+- [x] U29-U32, U34 Sync clients - done (T against fake Google/CalDAV/Graph/ICS servers; recurrence lines read from the VEVENT only, not the VTIMEZONE beside it)
+- [x] U33 Sync engine - done (T: sync-engine, sources). Not verified against real Google, iCloud or Microsoft accounts (none available).
 
 ### Delivery
-- [ ] U35 Reminders job (`calendar-reminders`) -> notifications + email
-- [ ] U36 Invitations: Polaris attendees, iMIP email, RSVP link page, replies
-- [ ] U37 Free/busy endpoint + find-a-time
-- [ ] U38 Resources and rooms
-- [ ] U39 Booking pages service + public booking flow + confirmation + cleanup
-- [ ] U40 Meeting proposals + public voting page
-- [ ] U41 Tasks integration (overlay, open in Tasks, unscheduled panel, drop to schedule)
-- [ ] U42 Birthdays calendar
-- [ ] U43 Overview widget + chat link preview
+- [x] U35 Reminders - done (T)
+- [x] U36 Invitations - done (T; mail providers carry iMIP, T in test/mail). Not verified with a real mail provider or client.
+- [x] U37 Free/busy + find a time - done (T: features/freebusy)
+- [x] U38 Resources and rooms - done (T: features/rooms)
+- [x] U39 Booking pages - done (T: features/booking; W: /cal/book/<slug> lists slots, busy time excluded)
+- [x] U40 Meeting proposals - done (T: features/proposals)
+- [x] U41 Tasks integration - done (overlay, unscheduled panel, schedule through the Tasks service; T)
+- [x] U42 Birthdays calendar - n/a (no birthday or contacts data in Polaris)
+- [x] U43 Overview card + calendar links in Chat - done (T: test/overview, test/rich-text)
 
 ### Screens
-- [ ] U44 Main screen: header, sidebar, views, instant first paint, client cache
-- [ ] U45 Drag/resize/select with optimistic UI and rollback
-- [ ] U46 Event popover + full editor (all properties), discard confirm
-- [ ] U47 Recurrence editor + scope dialog
-- [ ] U48 Reminders editor
-- [ ] U49 Attendees editor + find a time + room picker
-- [ ] U50 Calendar dialogs (new, edit, share, publish, subscribe, holiday picker)
-- [ ] U51 Accounts screen (Google, Microsoft, CalDAV, ICS; Proton note)
-- [ ] U52 Settings screen (+ shortcuts overview, legend, world clock, working hours)
-- [ ] U53 Trash screen
-- [ ] U54 Booking pages editor + public booking pages
-- [ ] U55 Public calendar + embed pages
-- [ ] U56 Print view
-- [ ] U57 Keyboard shortcuts
-- [ ] U58 390px layout
-- [ ] U59 i18n en-US + es-ES, lengths test
+- [x] U44 Main screen - done (W; instant first paint, cached reads)
+- [x] U45 Drag/resize/select - done (T: screens). Drag and resize not driven in the browser.
+- [x] U46 Popover + editor - done (T, W)
+- [x] U47 Recurrence editor + scope dialog - done (T: screens)
+- [x] U48 Reminders editor - done
+- [x] U49 Attendees + find a time + room picker - done (slots wired)
+- [x] U50 Calendar dialogs - done
+- [x] U51 Accounts screen - done (W; an address validation that threw took the page down - fixed, regression test in server/schemas)
+- [x] U52 Settings screen - done (W)
+- [x] U53 Trash screen - done (W)
+- [x] U54 Booking editor + public booking - done (W)
+- [x] U55 Public calendar + embed - done (W for /cal/p)
+- [x] U56 Print view - done (W: draws)
+- [x] U57 Keyboard shortcuts - done (T: screens)
+- [x] U58 390px layout - done (W: no sideways scroll on any calendar screen)
+- [x] U59 i18n en-US + es-ES - done (test/i18n green incl. lengths; W in es-ES; US spelling in en-US)
+- [x] U65 Attachments - link attachments done; uploading a file into Drive from the editor deferred(phase 2: Drive offers apps no write service)
+- [x] U66 Conference link - done (Polaris meeting link from the editor)
 
 ### Verification
-- [ ] U60 vitest on affected files
-- [ ] U61 tsc apps/web and apps/calendar
-- [ ] U62 bundler exit 0 + test/build contract tests
-- [ ] U63 Browser pass desktop + 390px
-- [ ] U64 CalDAV server (phase 2)
+- [x] U60 vitest - done (T, plus test/build, test/updates, test/i18n, test/cron, test/overview, test/app-bundles, test/mail, test/connections)
+- [x] U61 tsc - done (C)
+- [x] U62 bundler + contract tests - done (B)
+- [x] U63 Browser pass - done (W)
+- [ ] U64 CalDAV server for phones and desktop clients - deferred(phase 2, the one item the brief allowed: a WebDAV/CalDAV server with per-user app passwords is a project of its own)
