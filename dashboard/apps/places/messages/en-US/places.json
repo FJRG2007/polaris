@@ -525,7 +525,13 @@
         "climateMode": "That mode is not one this device has",
         "climateTemperature": "That temperature is not one this device accepts",
         "climateFan": "That fan speed is not one this device has",
-        "climateOption": "That setting is not one this device has"
+        "climateOption": "That setting is not one this device has",
+        "greeQuiet": "The air conditioner did not answer.",
+        "greeRefused": "The air conditioner refused that.",
+        "greeUnpaired": "Polaris is not paired with these air conditioners any more. Connect them again.",
+        "greeNoneThere": "No Gree air conditioner answered at that address. Check it is switched on at the wall and on the same network as Polaris.",
+        "greeNoneFound": "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "greeNoPair": "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again."
     },
     "connections": {
         "nuki-web": {
@@ -816,7 +822,23 @@
         },
         "tooShort": "That looks too short to be the {field}",
         "tooLong": "That is longer than the {field} can be",
-        "pickListed": "Pick one of the listed options"
+        "pickListed": "Pick one of the listed options",
+        "gree-local": {
+            "label": "Gree+ (local network)",
+            "summary": "The air conditioners you use with the Gree+ app, straight over your network. No account, nothing through the cloud.",
+            "note": "Polaris finds the units on your network and pairs with each one, the way Home Assistant does. They have to be set up in the Gree+ app first, and on the same network as Polaris.",
+            "steps": {
+                "s0": "Set the air conditioner up in the Gree+ app, on the same Wi-Fi network as Polaris.",
+                "s1": "Select Connect. Leave the address empty to look for every unit, or type one to pair just that unit."
+            },
+            "fields": {
+                "host": {
+                    "label": "Unit address",
+                    "hint": "Optional. Empty looks for every unit on this network; your router lists each unit's address among its connected devices.",
+                    "placeholder": "192.168.1.40"
+                }
+            }
+        }
     },
     "actions": {
         "defaultStorage": "Wherever this Polaris keeps footage ({name})",

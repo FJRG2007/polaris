@@ -235,7 +235,25 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["That mode is not one this device has", "refusals.climateMode"],
     ["That temperature is not one this device accepts", "refusals.climateTemperature"],
     ["That fan speed is not one this device has", "refusals.climateFan"],
-    ["That setting is not one this device has", "refusals.climateOption"]
+    ["That setting is not one this device has", "refusals.climateOption"],
+    ["The air conditioner did not answer.", "refusals.greeQuiet"],
+    ["The air conditioner refused that.", "refusals.greeRefused"],
+    [
+        "Polaris is not paired with these air conditioners any more. Connect them again.",
+        "refusals.greeUnpaired"
+    ],
+    [
+        "No Gree air conditioner answered at that address. Check it is switched on at the wall and on the same network as Polaris.",
+        "refusals.greeNoneThere"
+    ],
+    [
+        "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "refusals.greeNoneFound"
+    ],
+    [
+        "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
+        "refusals.greeNoPair"
+    ]
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */

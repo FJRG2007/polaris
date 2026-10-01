@@ -525,7 +525,13 @@
         "climateMode": "Este dispositivo no tiene ese modo",
         "climateTemperature": "Este dispositivo no admite esa temperatura",
         "climateFan": "Este dispositivo no tiene esa velocidad de ventilador",
-        "climateOption": "Este dispositivo no tiene ese ajuste"
+        "climateOption": "Este dispositivo no tiene ese ajuste",
+        "greeQuiet": "El aire acondicionado no respondió.",
+        "greeRefused": "El aire acondicionado lo rechazó.",
+        "greeUnpaired": "Polaris ya no está emparejado con estos aires. Vuelve a conectarlos.",
+        "greeNoneThere": "Ningún aire Gree respondió en esa dirección. Comprueba que tiene corriente y está en la misma red que Polaris.",
+        "greeNoneFound": "Ningún aire Gree respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
+        "greeNoPair": "El aire respondió pero no quiso emparejarse. Quítale la corriente un minuto y vuelve a intentarlo."
     },
     "connections": {
         "nuki-web": {
@@ -816,7 +822,23 @@
         },
         "tooShort": "Parece demasiado corto para ser el campo {field}",
         "tooLong": "Es más largo de lo que puede ser el campo {field}",
-        "pickListed": "Elige una de las opciones"
+        "pickListed": "Elige una de las opciones",
+        "gree-local": {
+            "label": "Gree+ (red local)",
+            "summary": "Los aires que usas con la app Gree+, directamente por tu red. Sin cuenta y sin pasar por la nube.",
+            "note": "Polaris busca los aparatos en tu red y se empareja con cada uno, como hace Home Assistant. Antes tienen que estar configurados en la app Gree+ y en la misma red que Polaris.",
+            "steps": {
+                "s0": "Configura el aire en la app Gree+, en la misma red wifi que Polaris.",
+                "s1": "Pulsa Conectar. Deja la dirección vacía para buscar todos los aparatos, o escribe una para emparejar solo ese."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "Opcional. Vacía busca todos los aparatos de esta red; tu router muestra la dirección de cada uno entre sus dispositivos conectados.",
+                    "placeholder": "192.168.1.40"
+                }
+            }
+        }
     },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",

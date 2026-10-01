@@ -569,6 +569,41 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     // stable way in - one button press, every light on the bridge, no cloud.
     // Pairing is inside the driver's verify, so it can later move to a pairing
     // screen without a second implementation.
+    // Gree: local, like Home Assistant's own integration - no account and no
+    // cloud. The units are found on the network, or at an address, and each one
+    // is paired on the spot; its key is the credential.
+    {
+        id: "gree-local",
+        brand: "Gree",
+        recommended: true,
+        logo: "gree",
+        label: en("connections.gree-local.label"),
+        reach: "same-network",
+        summary: en("connections.gree-local.summary"),
+        note: en("connections.gree-local.note"),
+        steps: [en("connections.gree-local.steps.s0"), en("connections.gree-local.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.gree-local.fields.host.label"),
+                hint: en("connections.gree-local.fields.host.hint"),
+                placeholder: en("connections.gree-local.fields.host.placeholder"),
+                optional: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["climate"],
+        search: [
+            "gree",
+            "gree+",
+            "air conditioner",
+            "aircon",
+            "ac",
+            "climate",
+            "heat pump",
+            "local"
+        ]
+    },
     {
         id: "hue-bridge",
         brand: "Philips Hue",
