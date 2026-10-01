@@ -127,13 +127,7 @@ async function judge(
  *  message reads as a storage that is not there, which is what it is to every
  *  caller: an upload falls back, a read fails, and nothing is signed in to. */
 export class DeviceNotConfirmed extends Error {
-    constructor(
-        message: string,
-        /** Whether something else answered at the address, as opposed to nothing. */
-        public readonly someoneElse: boolean,
-        /** What the device that answered called itself, when it did. */
-        public readonly answeredAs: string | null = null
-    ) {
+    constructor(message: string) {
         super(message);
         this.name = "DeviceNotConfirmed";
     }
@@ -170,7 +164,7 @@ export async function confirmBeforeCredentials(row: FollowedRow): Promise<void> 
     const seen = await observe(address);
     if (!seen.answered) {
         void searchFor(row.id).catch(() => undefined);
-        throw new DeviceNotConfirmed(`${row.name} did not answer at ${address}`, seen.reason === "refused");
+        throw new DeviceNotConfirmed(`${row.name} did not answer at ${address}`);
     }
     const { verdict, identity } = await judge(remembered, address, seen.identity);
     if (verdict !== "same") {
@@ -181,11 +175,7 @@ export async function confirmBeforeCredentials(row: FollowedRow): Promise<void> 
         console.error(
             `storage: ${row.name} - the device at ${address} is not the one this connection remembers (${label ?? "unnamed"}); not signing in`
         );
-        throw new DeviceNotConfirmed(
-            `${row.name} did not answer at ${address}: a different device is there now`,
-            true,
-            label
-        );
+        throw new DeviceNotConfirmed(`${row.name} did not answer at ${address}: a different device is there now`);
     }
     verified.set(key, Date.now());
 }
@@ -253,6 +243,9 @@ export type SearchOutcome =
     /** Nothing was remembered to prove a device by, and these SMB servers answer
      *  on the network. Somebody has to say which, if any, it is. */
     | { readonly kind: "candidates"; readonly candidates: readonly Candidate[] }
+    /** Something answers at its address that cannot be proved to be it, and it
+     *  was not found anywhere else. Its password is not sent there. */
+    | { readonly kind: "impostor"; readonly address: string; readonly label: string | null }
     /** Not at its address and not anywhere on the network. */
     | { readonly kind: "gone"; readonly address: string }
     /** Not a storage this can look for (not SMB, not at a private address, or
@@ -314,12 +307,14 @@ export function searchFor(connectionId: string, options: { force?: boolean } = {
         }
     }
     const startedAt = Date.now();
-    const running = withTimeout(search(connectionId), SEARCH_DEADLINE_MS, "the search took too long")
+    const stop = new AbortController();
+    const running = withTimeout(search(connectionId, stop.signal), SEARCH_DEADLINE_MS, "the search took too long")
         .catch((error: unknown): SearchOutcome => {
             console.error(`storage: looking for ${connectionId} on the network failed:`, error);
             return { kind: "unsupported" };
         })
         .then((outcome) => {
+            stop.abort();
             searches.set(connectionId, {
                 startedAt,
                 running: null,
@@ -331,7 +326,7 @@ export function searchFor(connectionId: string, options: { force?: boolean } = {
     return running;
 }
 
-async function search(connectionId: string): Promise<SearchOutcome> {
+async function search(connectionId: string, signal: AbortSignal): Promise<SearchOutcome> {
     const row = await prisma.storageConnection.findUnique({
         where: { id: connectionId },
         select: { id: true, name: true, kind: true, config: true, deviceIdentity: true }
@@ -343,11 +338,13 @@ async function search(connectionId: string): Promise<SearchOutcome> {
 
     // Where it is meant to be, first. Most "it stopped answering" is a blip.
     const here = await observe(address);
+    let stranger: who.DeviceIdentity | null = null;
     if (here.answered) {
         if (!provable) return { kind: "answering", address };
-        const { verdict } = await judge(remembered, address, here.identity);
+        const { verdict, identity } = await judge(remembered, address, here.identity);
         if (verdict === "same") return { kind: "answering", address };
         // Somebody else has its address. Keep looking for the real one.
+        stranger = identity;
     }
 
     const neighbourhood = new Set(who.neighbourhoodOf(address));
@@ -357,11 +354,12 @@ async function search(connectionId: string): Promise<SearchOutcome> {
     let table = await network.neighbours();
     if (provable && remembered.mac) {
         for (const [ip, mac] of table) {
+            if (signal.aborted) return { kind: "unsupported" };
             if (mac !== remembered.mac || ip === address || !neighbourhood.has(ip)) continue;
             const seen = await observe(ip, { table });
             if (!seen.answered) continue;
             const { verdict, identity } = await judge(remembered, ip, seen.identity, table);
-            if (verdict === "same") return follow(row, remembered, ip, identity);
+            if (verdict === "same") return follow(row, remembered, ip, identity, signal);
         }
     }
 
@@ -370,7 +368,7 @@ async function search(connectionId: string): Promise<SearchOutcome> {
     let found = false;
     const queue = [...neighbourhood];
     const worker = async () => {
-        while (queue.length > 0 && !found) {
+        while (queue.length > 0 && !found && !signal.aborted) {
             const ip = queue.shift()!;
             const seen = await observe(ip, { fast: true });
             if (!seen.answered) continue;
@@ -383,6 +381,7 @@ async function search(connectionId: string): Promise<SearchOutcome> {
         }
     };
     await Promise.all(Array.from({ length: SWEEP_CONCURRENCY }, worker));
+    if (signal.aborted) return { kind: "unsupported" };
 
     // The sweep itself fills the host's table with everyone it reached, so it
     // is read again: a device whose GUID changed is still recognised by its
@@ -391,9 +390,11 @@ async function search(connectionId: string): Promise<SearchOutcome> {
     if (provable) {
         for (const candidate of answered) {
             const { verdict, identity } = await judge(remembered, candidate.address, candidate.identity, table);
-            if (verdict === "same") return follow(row, remembered, candidate.address, identity);
+            if (verdict === "same") return follow(row, remembered, candidate.address, identity, signal);
         }
-        return { kind: "gone", address };
+        return stranger
+            ? { kind: "impostor", address, label: who.deviceLabel(stranger) }
+            : { kind: "gone", address };
     }
 
     // Nothing to prove a device by: say who answers, and let a person choose.
@@ -419,8 +420,10 @@ async function follow(
     row: FollowedRow,
     remembered: who.RememberedIdentity,
     to: string,
-    identity: who.DeviceIdentity
+    identity: who.DeviceIdentity,
+    signal: AbortSignal
 ): Promise<SearchOutcome> {
+    if (signal.aborted) return { kind: "unsupported" };
     const from = addressOf(row)!;
     const merged = who.mergeIdentity(remembered, identity, to, new Date());
     if (!(await repoint(row, to, merged))) {

@@ -200,6 +200,42 @@ describe("what must not be followed", () => {
     });
 });
 
+describe("a search past its deadline", () => {
+    it("stops sweeping and does not follow a device it finds late", async () => {
+        vi.useFakeTimers();
+        try {
+            connection(NAS);
+            devices.set("192.168.1.134", NAS);
+            table.set("192.168.1.134", NAS.mac!);
+            let release!: () => void;
+            const held = new Promise<void>((resolve) => (release = resolve));
+            follow.useNetwork({
+                probe: async (address): Promise<SmbProbeResult> => {
+                    probed.push(address);
+                    await held;
+                    const found = devices.get(address);
+                    if (!found) return { ok: false, reason: "closed", detail: "EHOSTUNREACH" };
+                    const { mac: _mac, ...smb } = found;
+                    return { ok: true, identity: smb };
+                },
+                neighbours: async () => new Map(table)
+            });
+
+            const outcome = follow.searchFor(ID);
+            await vi.advanceTimersByTimeAsync(61_000);
+            expect(await outcome).toEqual({ kind: "unsupported" });
+
+            release();
+            await vi.advanceTimersByTimeAsync(0);
+            expect(updateMany).not.toHaveBeenCalled();
+            expect(reportStorageMoved).not.toHaveBeenCalled();
+            expect(hostOf()).toBe("192.168.1.129");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
 describe("how often it looks", () => {
     it("answers a second search from memory, and a pressed button only after a short floor", async () => {
         connection(NAS);
@@ -232,8 +268,9 @@ describe("before the password goes anywhere", () => {
         devices.set("192.168.1.129", { serverGuid: "ffffffffffffffffffffffffffff0003", netbiosName: "DESKTOP-7" });
         table.set("192.168.1.129", "aa:bb:cc:dd:ee:01");
         await expect(follow.confirmBeforeCredentials(row)).rejects.toBeInstanceOf(follow.DeviceNotConfirmed);
-        // It went looking for the real one instead, and found nothing to follow.
-        expect(await follow.searchFor(ID)).toEqual({ kind: "gone", address: "192.168.1.129" });
+        // It went looking for the real one instead, found nothing to follow, and
+        // says who holds the address rather than calling the NAS off.
+        expect(await follow.searchFor(ID)).toEqual({ kind: "impostor", address: "192.168.1.129", label: "DESKTOP-7" });
         expect(hostOf()).toBe("192.168.1.129");
     });
 

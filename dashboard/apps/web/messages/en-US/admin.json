@@ -2525,6 +2525,7 @@
             "followed": "Moved from {from} to {to}, and Polaris follows it. Reserve {to} for {mac} in your router so it stays there.",
             "followedNoMac": "Moved from {from} to {to}, and Polaris follows it. Reserve {to} for it in your router so it stays there.",
             "gone": "Not at {address} and not anywhere else on the network: it is off or disconnected.",
+            "impostor": "A different device answers at {address} ({device}), so its password is not sent there, and it was not found anywhere else on the network.",
             "unsupported": "It could not be looked for just now. Try again in a moment.",
             "candidates": "Polaris has no record of who this device is, so it cannot tell which of these it is. These SMB servers answer on the network:",
             "unnamed": "No name given",

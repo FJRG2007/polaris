@@ -277,12 +277,11 @@ async function moveOne(
             }
         } catch (error) {
             await remote.delete(row.path, { recursive: false }).catch(() => undefined);
-            await note(row.id, error);
-            return /EHOSTUNREACH|EHOSTDOWN|ETIMEDOUT|ECONNRESET|stopped answering|did not answer/i.test(
+            const unreachable = /EHOSTUNREACH|EHOSTDOWN|ETIMEDOUT|ECONNRESET|stopped answering|did not answer/i.test(
                 String(error instanceof Error ? error.message : error)
-            )
-                ? "unreachable"
-                : "failed";
+            );
+            await note(row.id, error, unreachable);
+            return unreachable ? "unreachable" : "failed";
         }
 
         const repointed = await prisma.$transaction((tx) => REPOINT[row.localFolder]!(tx, row.path, row.targetId));
@@ -319,9 +318,14 @@ async function removeMovedCopies(): Promise<number> {
     return removed;
 }
 
-async function note(id: string, error: unknown): Promise<void> {
+async function note(id: string, error: unknown, unreachable: boolean): Promise<void> {
     const text = (error instanceof Error ? error.message : String(error)).slice(0, 500);
-    await prisma.storageFallbackFile.update({ where: { id }, data: { lastError: text } }).catch(() => undefined);
+    await prisma.storageFallbackFile
+        .update({
+            where: { id },
+            data: { lastError: text, ...(unreachable ? { attempts: { decrement: 1 } } : {}) }
+        })
+        .catch(() => undefined);
 }
 
 /** A stream that feeds every chunk it passes through into a hash. */

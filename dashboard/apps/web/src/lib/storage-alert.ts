@@ -53,7 +53,7 @@ export async function reportStorageUnreachable(storage: {
         const outcome = await lookFor(storage.id);
         // Found and followed: that is its own notice, sent by the search, and
         // the storage is back. Nothing is unreachable any more.
-        if (outcome?.kind === "followed" || outcome?.kind === "answering") {
+        if (outcome?.kind === "followed") {
             announced.delete(storage.id);
             return;
         }
@@ -90,6 +90,10 @@ async function lookFor(id: string): Promise<Outcome | null> {
 /** The body of the unreachable notice, with what the search found in it. */
 export function unreachableBody(t: Words, name: string, outcome: Outcome | null): string {
     if (outcome?.kind === "gone") return t("storage.unreachableGone", { name });
+    if (outcome?.kind === "answering") return t("storage.unreachableAnswering", { name, address: outcome.address });
+    if (outcome?.kind === "impostor") {
+        return t("storage.unreachableImpostor", { name, address: outcome.address, device: outcome.label ?? outcome.address });
+    }
     if (outcome?.kind === "candidates") {
         const first = outcome.candidates[0]!;
         return t("storage.unreachableCandidates", {

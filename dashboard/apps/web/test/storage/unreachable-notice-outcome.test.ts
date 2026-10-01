@@ -62,6 +62,20 @@ describe("the unreachable notice", () => {
         expect(notify).not.toHaveBeenCalled();
     });
 
+    it("is still sent when the device answers where it is but would not take the file", async () => {
+        outcome = { kind: "answering", address: "192.168.1.129" };
+        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
+        expect(said().event).toBe("storage.unreachable");
+        expect(said().body).toContain("It answers at 192.168.1.129, but would not take the file");
+    });
+
+    it("names the device that holds the address when the storage is not found elsewhere", async () => {
+        outcome = { kind: "impostor", address: "192.168.1.129", label: "DESKTOP-7" };
+        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
+        expect(said().body).toContain("A different device answers at 192.168.1.129 (DESKTOP-7)");
+        expect(said().body).not.toMatch(/off or disconnected/);
+    });
+
     it("is written in the administrator's language", async () => {
         locale = "es-ES";
         outcome = { kind: "gone", address: "192.168.1.129" };

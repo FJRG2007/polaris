@@ -2525,6 +2525,7 @@
             "followed": "Pasó de {from} a {to}, y Polaris lo sigue. Reserva {to} para {mac} en el router para que se quede ahí.",
             "followedNoMac": "Pasó de {from} a {to}, y Polaris lo sigue. Reserva {to} para él en el router para que se quede ahí.",
             "gone": "No está en {address} ni en ningún otro sitio de la red: está apagado o desconectado.",
+            "impostor": "Otro dispositivo responde en {address} ({device}), así que su contraseña no se envía ahí, y no aparece en ningún otro sitio de la red.",
             "unsupported": "Ahora no se pudo buscar. Prueba de nuevo en un momento.",
             "candidates": "Polaris no sabe quién es este dispositivo, así que no puede decir cuál de estos es. Estos servidores SMB responden en la red:",
             "unnamed": "Sin nombre",

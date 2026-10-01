@@ -40,6 +40,12 @@ function Outcome({ outcome, onUse, busy }: {
                         : t("uploads.network.followedNoMac", { from: outcome.from, to: outcome.to })}
                 </p>
             );
+        case "impostor":
+            return (
+                <p className="text-xs text-danger">
+                    {t("uploads.network.impostor", { address: outcome.address, device: outcome.label ?? outcome.address })}
+                </p>
+            );
         case "gone":
             return <p className="text-xs text-danger">{t("uploads.network.gone", { address: outcome.address })}</p>;
         case "unsupported":

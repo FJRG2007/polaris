@@ -79,9 +79,14 @@ const db = {
             row.attempts += 1;
             return { count: 1 };
         }),
-        update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<Ledger> }) => {
-            Object.assign(ledger.find((one) => one.id === where.id)!, data);
-        }),
+        update: vi.fn(
+            async ({ where, data }: { where: { id: string }; data: Omit<Partial<Ledger>, "attempts"> & { attempts?: { decrement: number } } }) => {
+                const row = ledger.find((one) => one.id === where.id)!;
+                const { attempts, ...rest } = data;
+                Object.assign(row, rest);
+                if (attempts) row.attempts -= attempts.decrement;
+            }
+        ),
         delete: vi.fn(async ({ where }: { where: { id: string } }) => {
             ledger = ledger.filter((one) => one.id !== where.id);
         }),
@@ -173,6 +178,21 @@ describe("taking a file back to its storage", () => {
         // What it wrote there is not left behind.
         expect(nas.files.has(PATH)).toBe(false);
         expect(ledger[0]!.lastError).toMatch(/not what it was given/);
+    });
+
+    it("does not count a copy cut short by the storage going away against the file", async () => {
+        nas!.writeStream.mockRejectedValueOnce(new Error("write ECONNRESET"));
+        const result = await returnFallbackFiles();
+        expect(result).toMatchObject({ moved: 0, failed: 0 });
+        expect(ledger[0]!.attempts).toBe(0);
+        expect(ledger[0]!.lastError).toMatch(/ECONNRESET/);
+        expect(here.files.get(PATH)).toEqual(BYTES);
+    });
+
+    it("counts a copy that failed on its own merits", async () => {
+        nas = disk({ corrupt: true });
+        await returnFallbackFiles();
+        expect(ledger[0]!.attempts).toBe(1);
     });
 
     it("drops a file whose owner deleted it meanwhile, leaving nothing on the storage", async () => {
