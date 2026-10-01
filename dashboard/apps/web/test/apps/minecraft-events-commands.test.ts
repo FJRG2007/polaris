@@ -957,6 +957,20 @@ describe("a treasure hunt", () => {
                 { x: 10, z: -20 }
             ])
         ).toEqual({ x: 5, z: -10 });
+        // Far apart: the larger group, never the empty ground between them.
+        expect(
+            hunt.centerOf([
+                { x: 0, z: 0 },
+                { x: 20, z: 0 },
+                { x: 3000, z: 0 }
+            ])
+        ).toEqual({ x: 10, z: 0 });
+        expect(
+            hunt.centerOf([
+                { x: 0, z: 0 },
+                { x: 3000, z: 0 }
+            ])
+        ).toEqual({ x: 0, z: 0 });
         expect(hunt.centerOf([])).toBeNull();
     });
 });
@@ -1291,7 +1305,7 @@ describe("a horde defense", () => {
         expect(chicken).toContain('"pe_wmount"');
         expect(chicken).toContain("EggLayTime:1000000");
         expect(chicken).toContain('DeathLootTable:"minecraft:empty"');
-        expect(chicken).toContain('{id:"minecraft:zombie",Tags:["pe_mob","pe_wnew","pe_wride"]');
+        expect(chicken).toContain('{id:"minecraft:zombie",Tags:["pe_mob","pe_wnew","pe_wride","pe_wrider"]');
         expect(chicken).toContain("IsBaby:1b");
         // A spider is one of the wave, and counts; a chicken or a horse is only a mount.
         const spider = jockeys.find((line) => line.includes("summon minecraft:spider"));
@@ -1404,7 +1418,7 @@ describe("a horde defense", () => {
 
     it("brings strays back onto the point, and draws it without scoring anybody", () => {
         expect(waves.leash(point)).toBe(
-            "execute in minecraft:overworld positioned 300.5 70 0.5 as @e[tag=pe_mob,distance=24..] run tp @s 300.5 70 0.5"
+            "execute in minecraft:overworld positioned 300.5 70 0.5 as @e[tag=pe_mob,tag=!pe_wrider,distance=24..] run tp @s 300.5 70 0.5"
         );
         const marks = waves.wavesMarks(point);
         expect(marks.some((line) => line.includes("particle minecraft:end_rod"))).toBe(true);

@@ -59,6 +59,9 @@ export const MOUNT_TAG = "pe_wmount";
 /** A jockey and what it rides, left out of the spread: moved one by one, the
  *  rider would be put down beside its mount. */
 const RIDING_TAG = "pe_wride";
+/** A rider, for as long as it lives: left out of the leash, which brings back
+ *  what it rides instead. */
+const RIDER_TAG = "pe_wrider";
 /** Kills near the point, and hits near it - the one who only wounds takes part too. */
 export const KILLS = "pe_wkill";
 export const HITS = "pe_whit";
@@ -231,7 +234,7 @@ export function jockeyCount(count: number, jockeys: readonly Jockey[]): number {
  */
 export function jockeyLine(jockey: Jockey, at: string): string {
     const riding = (id: string, extra = "") =>
-        `{id:"minecraft:${id}",Tags:["${MOB_TAG}","${NEW_TAG}","${RIDING_TAG}"],${MOB_DATA}${extra}}`;
+        `{id:"minecraft:${id}",Tags:["${MOB_TAG}","${NEW_TAG}","${RIDING_TAG}","${RIDER_TAG}"],${MOB_DATA}${extra}}`;
     const summon = (id: string, tags: readonly string[], data: string, rider: string) =>
         `execute in minecraft:overworld run summon minecraft:${id} ${at} {Tags:[${tags.map((tag) => `"${tag}"`).join(",")}],${data},Passengers:[${rider}]}`;
     const mount = [MOB_TAG, NEW_TAG, MOUNT_TAG, RIDING_TAG];
@@ -402,7 +405,7 @@ export function defenders(point: Point): string {
  *  with what it rides, which is brought back instead. */
 export function leash(point: Point): string {
     const at = `${point.x + 0.5} ${point.y} ${point.z + 0.5}`;
-    return `execute in minecraft:overworld positioned ${at} as @e[tag=${MOB_TAG},distance=${LEASH}..] run tp @s ${at}`;
+    return `execute in minecraft:overworld positioned ${at} as @e[tag=${MOB_TAG},tag=!${RIDER_TAG},distance=${LEASH}..] run tp @s ${at}`;
 }
 
 /** The ring and the column of light, from the hill's - without its counting. */

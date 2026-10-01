@@ -991,7 +991,7 @@ async function countdown(
             ),
             // A rare catch is told now, to give time to find a rod: the treasure is
             // caught anywhere there is water, so nobody gains a head start.
-            ...(preset.kind === "rare-catch" ? targetLines(loop.run, language) : []),
+            ...targetLines(loop.run, language),
             ...(catalog.takesJoiners(preset)
                 ? (() => {
                       const buttons = messages.joinButtonsText(language);
@@ -1157,16 +1157,10 @@ async function quieten(installedAppId: string, loop: Loop, server: ServerContain
     }
 }
 
-/** What a gathering or a rare catch is for, said with the rules. */
+/** What a rare catch is for, said with the rules; a gathering's material is
+ *  said as each round starts (`gatheringRound`). */
 function targetLines(run: stored.EventRun, language: speech.Speech): string[] {
     const { preset } = run;
-    if (preset.kind === "gathering") {
-        const material = gather.materialOf(
-            run.material,
-            preset.options as catalog.EventOptions<"gathering">
-        );
-        return [commands.say(messages.tag(language) + messages.gatherTarget(material, language))];
-    }
     if (preset.kind === "rare-catch") {
         const { treasure } = preset.options as catalog.EventOptions<"rare-catch">;
         return [commands.say(messages.tag(language) + messages.catchTarget(treasure, language))];
@@ -1730,15 +1724,26 @@ async function judgeAtOnce(
 }
 
 /** The ground names this server was last found to know, kept across events:
- *  asking the newest list first cost a refused command on every place tried. */
-const groundNamesOf = new Map<string, commands.GroundNames | "none">();
+ *  asking the newest list first cost a refused command on every place tried.
+ *  Asked again after `GROUND_NAMES_MS`, so a server updated since is judged by
+ *  the names it knows now. */
+const groundNamesOf = new Map<string, { at: number; names: commands.GroundNames | "none" }>();
+const GROUND_NAMES_MS = 30 * 60_000;
+
+function knownGroundNames(installedAppId: string): commands.GroundNames | "none" | null {
+    const known = groundNamesOf.get(installedAppId);
+    if (!known) return null;
+    if (Date.now() - known.at < GROUND_NAMES_MS) return known.names;
+    groundNamesOf.delete(installedAppId);
+    return null;
+}
 
 /**
  * The markers standing on something somebody built, by column; null when the
  * server would not say - every list of names refused, or a column not loaded.
  */
 async function builtAtOnce(loop: Loop, server: ServerContainer): Promise<Set<string> | null> {
-    loop.ground ??= groundNamesOf.get(server.installedAppId) ?? null;
+    loop.ground ??= knownGroundNames(server.installedAppId);
     while (loop.ground !== "none") {
         const names = loop.ground ?? commands.GROUND_NAMES[0];
         // Built on: in the answer of every line.
@@ -1757,11 +1762,11 @@ async function builtAtOnce(loop: Loop, server: ServerContainer): Promise<Set<str
         }
         if (refused) {
             loop.ground = commands.GROUND_NAMES[commands.GROUND_NAMES.indexOf(names) + 1] ?? "none";
-            groundNamesOf.set(server.installedAppId, loop.ground);
+            groundNamesOf.set(server.installedAppId, { at: Date.now(), names: loop.ground });
             continue;
         }
         loop.ground = names;
-        groundNamesOf.set(server.installedAppId, names);
+        groundNamesOf.set(server.installedAppId, { at: Date.now(), names });
         const [first, ...rest] = answers;
         return new Set([...(first ?? [])].filter((one) => rest.every((set) => set.has(one))));
     }
@@ -1886,6 +1891,7 @@ async function retryPlace(
     loop: Loop,
     server: ServerContainer,
     point: stored.Point,
+    nearHome: boolean,
     why: search.PlaceRefusal = "occupied"
 ): Promise<void> {
     await server.sayAll([commands.CLEAR_MARK, ...commands.release(point, loop.run.target)]);
@@ -1896,11 +1902,11 @@ async function retryPlace(
         placeTries: loop.run.placeTries + 1
     };
     await persist(installedAppId, loop);
-    if (loop.run.placeTries >= PLACE_TRIES) throw new PlaceNotFound();
+    if (loop.run.placeTries >= placeLimit(loop, nearHome)) throw new PlaceNotFound();
 }
 
-/** Where a walk to an event's place starts: the fixed point, or where the
- *  players in the Overworld are, on average. */
+/** Where a walk to an event's place starts: the fixed point, or where most
+ *  players in the Overworld are together (`hunt.centerOf`). */
 async function walkStart(
     server: ServerContainer,
     place: catalog.EventPlace
@@ -1935,6 +1941,7 @@ function kindContext(
     server: ServerContainer,
     now: number
 ): arenaService.KindContext {
+    let nearHomeLast = false;
     return {
         server,
         language: loop.language,
@@ -1947,8 +1954,9 @@ function kindContext(
             loop.run = next;
         },
         persist: () => persist(installedAppId, loop),
-        findPlace: (place, distance, radius, surface, nearHome) =>
-            findPlace(
+        findPlace: (place, distance, radius, surface, nearHome) => {
+            nearHomeLast = nearHome === true;
+            return findPlace(
                 installedAppId,
                 loop,
                 server,
@@ -1959,10 +1967,12 @@ function kindContext(
                 true,
                 {
                     surface: surface ?? "ground",
-                    nearHome: nearHome === true
+                    nearHome: nearHomeLast
                 }
-            ),
-        giveUpPlace: (point, why) => retryPlace(installedAppId, loop, server, point, why),
+            );
+        },
+        giveUpPlace: (point, why) =>
+            retryPlace(installedAppId, loop, server, point, nearHomeLast, why),
         chat: () => chatSince(loop, server),
         atLeast: (wanted) => serverAtLeast(server, wanted),
         stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name },
@@ -2029,7 +2039,7 @@ async function supplyDrop(
         // Placed, and unopened: a protected area or a plugin that refused the
         // block would otherwise read as a chest somebody already opened.
         if ((await chestTest(server, found)) !== "passed") {
-            await retryPlace(installedAppId, loop, server, found);
+            await retryPlace(installedAppId, loop, server, found, true);
             return null;
         }
         place = found;
@@ -2209,7 +2219,7 @@ async function hideTreasure(
             installedAppId,
             loop,
             server,
-            // Round where everybody was, not round one of them.
+            // Round where the most players are together, not round one of them.
             loop.run.origin ? { mode: "fixed", ...loop.run.origin } : { mode: "players" },
             hunt.huntDistance(options, Math.random),
             SPOT_RADIUS,
@@ -2983,7 +2993,7 @@ function stageTools(
             if (found === "failed") throw new PlaceNotFound();
             return found;
         },
-        giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, why),
+        giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, false, why),
         chat: () => newChat(server, loop),
         owed: async () => {
             const row = await readRow(installedAppId);

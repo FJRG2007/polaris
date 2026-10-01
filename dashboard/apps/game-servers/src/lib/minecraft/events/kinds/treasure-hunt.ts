@@ -92,16 +92,25 @@ export function tooClose(point: Spot, chests: readonly HiddenChest[], gap = CHES
     return chests.some((one) => Math.hypot(one.x - point.x, one.z - point.z) < gap);
 }
 
-/** Where everybody in the Overworld is, on average: where the chests are spread round. */
+/** How far apart players can be and still be one group (`centerOf`). */
+export const GROUP_REACH = 128;
+
+/** Where the most players in the Overworld are together, on average: where the
+ *  chests are spread round. Players far apart are not averaged into ground
+ *  nobody is near - the largest group is, or one player when none are close. */
 export function centerOf(
     players: readonly { x: number; z: number }[]
 ): { x: number; z: number } | null {
     if (players.length === 0) return null;
-    const sum = players.reduce((total, one) => ({ x: total.x + one.x, z: total.z + one.z }), {
+    const groups = players.map((one) =>
+        players.filter((other) => Math.hypot(other.x - one.x, other.z - one.z) <= GROUP_REACH)
+    );
+    const group = groups.reduce((best, next) => (next.length > best.length ? next : best));
+    const sum = group.reduce((total, one) => ({ x: total.x + one.x, z: total.z + one.z }), {
         x: 0,
         z: 0
     });
-    return { x: Math.round(sum.x / players.length), z: Math.round(sum.z / players.length) };
+    return { x: Math.round(sum.x / group.length), z: Math.round(sum.z / group.length) };
 }
 
 /**
