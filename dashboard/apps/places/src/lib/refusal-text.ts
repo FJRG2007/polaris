@@ -281,10 +281,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.philipsNoRead"
     ],
     ["Philips' cloud could not be reached.", "refusals.philipsCloudUnreachable"],
-    [
-        "Philips' cloud answered in a way Polaris could not read.",
-        "refusals.philipsCloudGarbled"
-    ],
+    ["Philips' cloud answered in a way Polaris could not read.", "refusals.philipsCloudGarbled"],
     [
         "Philips no longer accepts this sign-in. Connect the account again.",
         "refusals.philipsCloudSignedOut"
@@ -297,18 +294,12 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "That address is not a finished Philips account yet. Sign in once in the Philips Air+ app, then try again.",
         "refusals.philipsCloudUnfinished"
     ],
-    [
-        "That code is not right or has expired. Ask for a new one.",
-        "refusals.philipsCloudBadCode"
-    ],
+    ["That code is not right or has expired. Ask for a new one.", "refusals.philipsCloudBadCode"],
     [
         "There is no air purifier on this Philips account. Add it in the Air+ app first.",
         "refusals.philipsCloudEmpty"
     ],
-    [
-        "The air purifier did not answer through Philips' cloud.",
-        "refusals.philipsCloudQuiet"
-    ],
+    ["The air purifier did not answer through Philips' cloud.", "refusals.philipsCloudQuiet"],
     ["The air purifier is busy. Try again in a moment.", "refusals.philipsCloudBusy"],
     [
         "Philips' cloud would not let Polaris reach this air purifier. Connect the account again.",

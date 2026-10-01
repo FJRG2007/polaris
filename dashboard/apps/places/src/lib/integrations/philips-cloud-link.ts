@@ -95,7 +95,10 @@ interface Reply {
 }
 
 function quiet(): DriverError {
-    return new DriverError("The air purifier did not answer through Philips' cloud.", "unreachable");
+    return new DriverError(
+        "The air purifier did not answer through Philips' cloud.",
+        "unreachable"
+    );
 }
 
 function busy(): DriverError {

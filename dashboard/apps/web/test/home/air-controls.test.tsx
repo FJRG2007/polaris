@@ -155,7 +155,11 @@ describe("an air purifier's row", () => {
     it("judges by the allergen index where there is no PM2.5, and says nothing with neither", async () => {
         await drawn([
             purifier({ air: { ...AIR, readings: { allergen: 2 } } }),
-            purifier({ id: "air-2", name: "Hall humidifier", air: { ...AIR, readings: { humidity: 50 } } })
+            purifier({
+                id: "air-2",
+                name: "Hall humidifier",
+                air: { ...AIR, readings: { humidity: 50 } }
+            })
         ]);
         expect(screen.getAllByText("Good")).toHaveLength(1);
     });

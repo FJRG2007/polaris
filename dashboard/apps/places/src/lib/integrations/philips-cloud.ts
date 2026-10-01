@@ -149,7 +149,10 @@ async function json(response: Response): Promise<unknown> {
 function form(values: Readonly<Record<string, string>>): RequestInit {
     return {
         method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+        headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            accept: "application/json"
+        },
         body: new URLSearchParams(values).toString()
     };
 }
@@ -247,9 +250,7 @@ function sessionOf(
     previousRefresh = ""
 ): PhilipsSession {
     const now = Date.now();
-    const expiresAt = answer.exp
-        ? answer.exp * 1000
-        : now + (answer.expires_in ?? 60 * 60) * 1000;
+    const expiresAt = answer.exp ? answer.exp * 1000 : now + (answer.expires_in ?? 60 * 60) * 1000;
     return {
         accessToken: answer.access_token,
         refreshToken: answer.refresh_token ?? previousRefresh,
@@ -261,7 +262,11 @@ function sessionOf(
 /** What the token endpoint says, read as a refusal or an outage: `invalid_grant`,
  *  `invalid_token` and a 401 are the sign-in being refused; anything else is
  *  worth trying again (`refresh_tokens` in the HomeID integration). */
-async function tokenCall(values: Readonly<Record<string, string>>, client: PhilipsClient, previous = "") {
+async function tokenCall(
+    values: Readonly<Record<string, string>>,
+    client: PhilipsClient,
+    previous = ""
+) {
     const response = await call(`${ISSUER}/token`, form(values));
     const body = await json(response);
     const parsed = tokenSchema.safeParse(body);
@@ -269,7 +274,8 @@ async function tokenCall(values: Readonly<Record<string, string>>, client: Phili
     const error = z.object({ error: z.string() }).safeParse(body);
     if (
         response.status === 401 ||
-        (error.success && (error.data.error === "invalid_grant" || error.data.error === "invalid_token"))
+        (error.success &&
+            (error.data.error === "invalid_grant" || error.data.error === "invalid_token"))
     ) {
         throw signedOut();
     }
@@ -278,7 +284,10 @@ async function tokenCall(values: Readonly<Record<string, string>>, client: Phili
 
 /** A Gigya session as tokens for one client, through `authorize` with
  *  `prompt=none` - the browser-free flow of `_http_oauth`. */
-export async function tokensFor(gigyaSession: string, client: PhilipsClient): Promise<PhilipsSession> {
+export async function tokensFor(
+    gigyaSession: string,
+    client: PhilipsClient
+): Promise<PhilipsSession> {
     const spec = PHILIPS_CLIENTS[client];
     const { verifier, challenge } = pkcePair();
     const authorize = new URLSearchParams({

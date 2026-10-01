@@ -475,7 +475,11 @@ function checkFigure(
     path: (string | number)[]
 ): void {
     if (node.measure === "quality" && kinds.airQualityAt(node.value) === null) {
-        context.addIssue({ code: "custom", path: [...path, "value"], message: "automations.errors.state" });
+        context.addIssue({
+            code: "custom",
+            path: [...path, "value"],
+            message: "automations.errors.state"
+        });
     }
 }
 

@@ -177,11 +177,7 @@ function sessionOf(credentials: Credentials): cloud.PhilipsSession {
     };
 }
 
-function toCredentials(
-    email: string,
-    session: cloud.PhilipsSession,
-    userId: string
-): Credentials {
+function toCredentials(email: string, session: cloud.PhilipsSession, userId: string): Credentials {
     return {
         email,
         accessToken: session.accessToken,
@@ -299,7 +295,10 @@ export const philipsCloudDriver: DeviceDriver = {
         if (!cloud.philipsNeedsRefresh(session)) return null;
         try {
             const next = await cloud.refreshPhilipsSession(session);
-            return { ...credentials, ...toCredentials(credentials.email ?? "", next, credentials.userId ?? "") };
+            return {
+                ...credentials,
+                ...toCredentials(credentials.email ?? "", next, credentials.userId ?? "")
+            };
         } catch (caught) {
             // An outage while the token still has a while to run is not a reason
             // to stop: the next use tries again.
@@ -333,7 +332,8 @@ export const philipsCloudDriver: DeviceDriver = {
                     );
                     return philipsCloudSnapshot(device, state, online);
                 } catch (caught) {
-                    if (caught instanceof DriverError && caught.kind === "unauthorized") throw caught;
+                    if (caught instanceof DriverError && caught.kind === "unauthorized")
+                        throw caught;
                     // One unit that did not answer is drawn as not answering,
                     // with what was last heard; the rest of the account is not.
                     const link = cloudLink(account, device.thing);

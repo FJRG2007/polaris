@@ -41,11 +41,19 @@ class FakeClient extends EventEmitter {
         setImmediate(() =>
             callback(
                 null,
-                topics.map((topic) => ({ topic, qos: broker.refuseShadow && topic.includes("shadow") ? 128 : 0 }))
+                topics.map((topic) => ({
+                    topic,
+                    qos: broker.refuseShadow && topic.includes("shadow") ? 128 : 0
+                }))
             )
         );
     }
-    publish(topic: string, payload: string, options: { qos: number }, callback: (error?: Error) => void) {
+    publish(
+        topic: string,
+        payload: string,
+        options: { qos: number },
+        callback: (error?: Error) => void
+    ) {
         this.published.push({ topic, payload, qos: options.qos });
         setImmediate(() => {
             callback();
@@ -120,7 +128,9 @@ const at = (path: string) => (url: URL) => url.pathname.endsWith(path);
 /** A whole Philips: Gigya, the OIDC issuer and the IoT API, for one account. */
 function philips(options: { airplusDevices?: unknown[]; homeidDevices?: unknown[] } = {}) {
     const issued = new Map<string, string>();
-    route(at("/accounts.auth.otp.email.sendCode"), () => jsonReply({ errorCode: 0, vToken: "vt-1" }));
+    route(at("/accounts.auth.otp.email.sendCode"), () =>
+        jsonReply({ errorCode: 0, vToken: "vt-1" })
+    );
     route(at("/accounts.auth.otp.email.login"), (_url, init) => {
         const body = new URLSearchParams(String(init.body));
         return body.get("code") === "123456" && body.get("vToken") === "vt-1"
@@ -214,7 +224,9 @@ afterEach(() => {
 describe("signing in with an emailed code", () => {
     it("asks Gigya to email a code, and keeps the vToken it answers", async () => {
         philips();
-        const started = await driver.philipsCloudDriver.pair!.start({ email: "  Owner@Example.com " });
+        const started = await driver.philipsCloudDriver.pair!.start({
+            email: "  Owner@Example.com "
+        });
         expect(started.state).toEqual({ vToken: "vt-1" });
         const sent = calls[0]!;
         expect(sent.url.href).toBe("https://cdc.accounts.home.id/accounts.auth.otp.email.sendCode");
@@ -251,7 +263,9 @@ describe("signing in with an emailed code", () => {
         const authorize = calls.find((call) => call.url.pathname.endsWith("/authorize"))!;
         expect(authorize.url.searchParams.get("prompt")).toBe("none");
         expect(authorize.url.searchParams.get("code_challenge_method")).toBe("S256");
-        expect(authorize.url.searchParams.get("redirect_uri")).toBe("com.philips.air://loginredirect");
+        expect(authorize.url.searchParams.get("redirect_uri")).toBe(
+            "com.philips.air://loginredirect"
+        );
         expect(authorize.init.redirect).toBe("manual");
         const resume = calls.find((call) => call.url.pathname.endsWith("/authorize/continue"))!;
         expect(resume.url.searchParams.get("login_token")).toBe("gigya-session");
@@ -390,7 +404,10 @@ describe("the device list", () => {
 
     it("builds the MQTT client id from the account and the device, with a suffix of its own", () => {
         expect(
-            cloud.philipsClientId("0123456789abcdef0123456789abcdef", "da-11111111-2222-3333-4444-555555555555")
+            cloud.philipsClientId(
+                "0123456789abcdef0123456789abcdef",
+                "da-11111111-2222-3333-4444-555555555555"
+            )
         ).toBe("01234567-89ab-cdef-0123-456789abcdef_11111111-2222-3333-4444-555555555555_polaris");
     });
 });
@@ -447,8 +464,17 @@ describe("a unit's status", () => {
     });
 
     it("draws a unit nothing has been heard from as not answering", () => {
-        const snapshot = driver.philipsCloudSnapshot(cloud.philipsCloudDevice(PURIFIER)!, null, false);
-        expect(snapshot).toMatchObject({ kind: "air", name: "Bedroom", online: false, state: "unknown" });
+        const snapshot = driver.philipsCloudSnapshot(
+            cloud.philipsCloudDevice(PURIFIER)!,
+            null,
+            false
+        );
+        expect(snapshot).toMatchObject({
+            kind: "air",
+            name: "Bedroom",
+            online: false,
+            state: "unknown"
+        });
     });
 
     it("reads several JSON objects out of one frame", () => {
@@ -513,7 +539,10 @@ const THING = PURIFIER.thingName;
 const AUTH = { accessToken: "access-1", signature: "sig-1", clientId: "u_d_polaris" };
 
 /** A unit that answers every command, with these ports. */
-function unit(ports: Record<string, Record<string, unknown>>, status: (command: string) => number = () => 0) {
+function unit(
+    ports: Record<string, Record<string, unknown>>,
+    status: (command: string) => number = () => 0
+) {
     broker.answer = (client, topic, payload) => {
         if (topic.endsWith("/shadow/get")) {
             client.emit(
@@ -571,7 +600,9 @@ describe("the MQTT link", () => {
 
     it("asks a busy unit again, then lands the write", async () => {
         let busy = 2;
-        unit({ Status: { D0310C: 18 } }, (command) => (command === "setPort" && busy-- > 0 ? 1 : 0));
+        unit({ Status: { D0310C: 18 } }, (command) =>
+            command === "setPort" && busy-- > 0 ? 1 : 0
+        );
         const cloudLink = link.cloudLink("owner", THING);
         await cloudLink.write(AUTH, { D0310C: 18 });
         const writes = broker.clients[0]!.published.filter(
@@ -664,7 +695,9 @@ describe("the MQTT link", () => {
             if (topic.endsWith("/to_ncp")) client.emit("close");
         };
         const cloudLink = link.cloudLink("owner", THING);
-        await expect(cloudLink.write(AUTH, { D0310C: 18 })).rejects.toMatchObject({ kind: "unreachable" });
+        await expect(cloudLink.write(AUTH, { D0310C: 18 })).rejects.toMatchObject({
+            kind: "unreachable"
+        });
         expect(cloudLink.state.properties.D0310C).toBeUndefined();
     }, 20_000);
 
@@ -728,7 +761,9 @@ describe("the driver", () => {
             "set-mode",
             { action: "set-mode", mode: "turbo" }
         );
-        const write = broker.clients[0]!.published.find((entry) => entry.payload.includes("setPort"))!;
+        const write = broker.clients[0]!.published.find((entry) =>
+            entry.payload.includes("setPort")
+        )!;
         expect(JSON.parse(write.payload).data).toEqual({
             portName: "Control",
             properties: { D0310C: 18 }
@@ -739,7 +774,8 @@ describe("the driver", () => {
         philips({ airplusDevices: [PURIFIER] });
         unit({ Status: {}, filtRd: {}, Config: { ctn: "AC0651/10" } });
         await driver.philipsCloudDriver.list({ ...credentials });
-        const listings = () => calls.filter((call) => call.url.pathname.endsWith("/user/self/device")).length;
+        const listings = () =>
+            calls.filter((call) => call.url.pathname.endsWith("/user/self/device")).length;
         const before = listings();
         await driver.philipsCloudDriver.act(
             { ...credentials },
