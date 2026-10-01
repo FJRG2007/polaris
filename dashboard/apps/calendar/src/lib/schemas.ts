@@ -134,8 +134,15 @@ export const addressSchema = z
         z
             .string()
             .url()
+            // Runs even when `.url()` above failed (zod 3 keeps refining a
+            // value that already has an issue), so it must not throw.
             .refine((value) => {
-                const url = new URL(value);
+                let url: URL;
+                try {
+                    url = new URL(value);
+                } catch {
+                    return false;
+                }
                 if (url.protocol !== "https:" && url.protocol !== "http:") return false;
                 if (url.username || url.password) return false;
                 const host = url.hostname;
