@@ -226,6 +226,23 @@ async function authFor(
     };
 }
 
+/** Each account's devices as last listed, so a command does not list them again. */
+const listed = new Map<string, readonly cloud.PhilipsCloudDevice[]>();
+
+/** The device on the account, from the last listing or a fresh one when it is
+ *  not in it. */
+async function deviceOf(
+    credentials: Credentials,
+    account: string,
+    id: string
+): Promise<cloud.PhilipsCloudDevice | undefined> {
+    const known = listed.get(account)?.find((entry) => entry.id === id);
+    if (known) return known;
+    const devices = await cloud.listPhilipsDevices(sessionOf(credentials).accessToken);
+    listed.set(account, devices);
+    return devices.find((entry) => entry.id === id);
+}
+
 /** Run something over a link; a broker that refused the credentials is given
  *  one fresh signature before the refusal is believed. */
 async function overLink<T>(
@@ -307,6 +324,7 @@ export const philipsCloudDriver: DeviceDriver = {
         const session = sessionOf(credentials);
         const devices = await cloud.listPhilipsDevices(session.accessToken);
         const account = credentials.email ?? credentials.userId ?? "";
+        listed.set(account, devices);
         return Promise.all(
             devices.map(async (device) => {
                 try {
@@ -326,14 +344,11 @@ export const philipsCloudDriver: DeviceDriver = {
     },
 
     async act(credentials, device, action, command) {
-        const session = sessionOf(credentials);
-        const found = (await cloud.listPhilipsDevices(session.accessToken)).find(
-            (entry) => entry.id === device.externalId
-        );
+        const account = credentials.email ?? credentials.userId ?? "";
+        const found = await deviceOf(credentials, account, device.externalId);
         if (!found) {
             throw new DriverError("That device is not on this Philips account.", "refused");
         }
-        const account = credentials.email ?? credentials.userId ?? "";
         const link = cloudLink(account, found.thing);
         if (action === "turn-on" || action === "turn-off") {
             await overLink(credentials, found.id, (auth) => link.power(auth, action === "turn-on"));
@@ -351,6 +366,7 @@ export const philipsCloudDriver: DeviceDriver = {
     async forget(credentials) {
         const account = credentials.email ?? credentials.userId ?? "";
         signatures.delete(account);
+        listed.delete(account);
         closeCloudLinks(account);
     }
 };

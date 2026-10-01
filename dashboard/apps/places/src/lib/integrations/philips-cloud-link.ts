@@ -205,7 +205,8 @@ export class CloudLink {
     private refused = false;
     private shadowGranted = false;
     private chain: Promise<unknown> = Promise.resolve();
-    private readonly pending = new Map<string, (reply: Reply) => void>();
+    private abandon: (() => void) | null = null;
+    private readonly pending = new Map<string, (reply: Reply | null) => void>();
     private slowReadAt = 0;
     private current: {
         properties: Record<string, CloudValue>;
@@ -248,10 +249,7 @@ export class CloudLink {
         if (this.retryTimer) clearTimeout(this.retryTimer);
         this.idleTimer = null;
         this.retryTimer = null;
-        const client = this.client;
-        this.client = null;
-        client?.removeAllListeners();
-        client?.end(true);
+        this.drop();
         this.onIdle(this);
     }
 
@@ -273,7 +271,7 @@ export class CloudLink {
             this.refused = false;
             this.failures = 0;
             this.retryAt = 0;
-            if (this.client) this.drop();
+            if (this.client || this.opening) this.drop();
         }
         if (this.connected) return;
         if (this.refused) throw refusedLink();
@@ -287,12 +285,27 @@ export class CloudLink {
         this.client = null;
         client?.removeAllListeners();
         client?.end(true);
+        this.abandon?.();
+        this.abandon = null;
+        this.opening = null;
+        this.lose();
+    }
+
+    /** Answer every request still waiting as unanswered. */
+    private lose(): void {
+        for (const [cid, answer] of this.pending) {
+            this.pending.delete(cid);
+            answer(null);
+        }
     }
 
     private open(): Promise<void> {
-        this.opening ??= this.connect().finally(() => {
-            this.opening = null;
-        });
+        if (!this.opening) {
+            const opening = this.connect().finally(() => {
+                if (this.opening === opening) this.opening = null;
+            });
+            this.opening = opening;
+        }
         return this.opening;
     }
 
@@ -323,6 +336,11 @@ export class CloudLink {
 
         return new Promise<void>((resolve, reject) => {
             let settled = false;
+            this.abandon = () => {
+                if (settled) return;
+                settled = true;
+                reject(quiet());
+            };
             client.once("connect", () => {
                 if (this.client !== client) return;
                 client.subscribe(
@@ -349,6 +367,7 @@ export class CloudLink {
                         this.retryAt = 0;
                         this.slowReadAt = 0;
                         settled = true;
+                        this.abandon = null;
                         resolve();
                     }
                 );
@@ -380,10 +399,8 @@ export class CloudLink {
         if (this.client === client) this.client = null;
         client.removeAllListeners();
         client.end(true);
-        for (const [cid, answer] of this.pending) {
-            this.pending.delete(cid);
-            answer({ status: null, properties: {} });
-        }
+        this.abandon = null;
+        this.lose();
         if (this.refused) return;
         this.failures++;
         const delay = Math.min(RETRY_FIRST_MS * 2 ** (this.failures - 1), RETRY_MAX_MS);
@@ -540,7 +557,7 @@ export class CloudLink {
             JSON.stringify({ state: { desired: { powerOn: on } } }),
             1
         );
-        this.current.powerOn = on;
+        if (this.shadowGranted) this.current.powerOn = on;
         await this.readPort("Status").catch(() => false);
     }
 }

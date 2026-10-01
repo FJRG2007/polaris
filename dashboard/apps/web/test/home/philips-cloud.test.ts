@@ -639,6 +639,42 @@ describe("the MQTT link", () => {
         await cloudLink.ensure({ ...AUTH, signature: "sig-2" });
         expect(broker.clients).toHaveLength(2);
     });
+
+    it("gives up a connect that new credentials replace, and opens with them", async () => {
+        const cloudLink = link.cloudLink("owner", THING);
+        const first = cloudLink.ensure(AUTH);
+        const second = cloudLink.ensure({ ...AUTH, signature: "sig-2" });
+        await expect(first).rejects.toMatchObject({ kind: "unreachable" });
+        await second;
+        expect(broker.clients).toHaveLength(2);
+        expect(cloudLink.connected).toBe(true);
+    });
+
+    it("gives up a connect when the link is closed", async () => {
+        const cloudLink = link.cloudLink("owner", THING);
+        const opening = cloudLink.ensure(AUTH);
+        cloudLink.close();
+        await expect(opening).rejects.toMatchObject({ kind: "unreachable" });
+        await cloudLink.ensure(AUTH);
+        expect(cloudLink.connected).toBe(true);
+    });
+
+    it("does not count a write lost to a drop as landed", async () => {
+        broker.answer = (client, topic) => {
+            if (topic.endsWith("/to_ncp")) client.emit("close");
+        };
+        const cloudLink = link.cloudLink("owner", THING);
+        await expect(cloudLink.write(AUTH, { D0310C: 18 })).rejects.toMatchObject({ kind: "unreachable" });
+        expect(cloudLink.state.properties.D0310C).toBeUndefined();
+    }, 20_000);
+
+    it("does not keep a commanded power it cannot read back", async () => {
+        broker.refuseShadow = true;
+        unit({ Status: {} });
+        const cloudLink = link.cloudLink("owner", THING);
+        await cloudLink.power(AUTH, false);
+        expect(cloudLink.state.powerOn).toBeNull();
+    }, 20_000);
 });
 
 // --- the driver end to end --------------------------------------------------------
@@ -697,6 +733,21 @@ describe("the driver", () => {
             portName: "Control",
             properties: { D0310C: 18 }
         });
+    }, 20_000);
+
+    it("acts on a listed unit without listing the account again", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        unit({ Status: {}, filtRd: {}, Config: { ctn: "AC0651/10" } });
+        await driver.philipsCloudDriver.list({ ...credentials });
+        const listings = () => calls.filter((call) => call.url.pathname.endsWith("/user/self/device")).length;
+        const before = listings();
+        await driver.philipsCloudDriver.act(
+            { ...credentials },
+            { externalId: PURIFIER.uuid, kind: "air" },
+            "set-mode",
+            { action: "set-mode", mode: "turbo" }
+        );
+        expect(listings()).toBe(before);
     }, 20_000);
 
     it("refuses a device that is not on the account", async () => {
