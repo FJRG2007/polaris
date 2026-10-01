@@ -1654,7 +1654,8 @@ async function builtAtOnce(loop: Loop, server: ServerContainer): Promise<Set<str
     loop.ground ??= groundNamesOf.get(server.installedAppId) ?? null;
     while (loop.ground !== "none") {
         const names = loop.ground ?? commands.GROUND_NAMES[0];
-        let built: Set<string> | null = null;
+        // Built on: in the answer of every line.
+        const answers: Set<string>[] = [];
         let refused = false;
         for (const line of commands.builtUnderSamples(names)) {
             const output = await server.say([line]);
@@ -1664,8 +1665,8 @@ async function builtAtOnce(loop: Loop, server: ServerContainer): Promise<Set<str
             }
             if (/not loaded/i.test(output)) return null;
             const found = new Set(commands.samplesIn(output).map((one) => `${one.x},${one.z}`));
-            built = built === null ? found : new Set([...built].filter((one) => found.has(one)));
-            if (built.size === 0) break;
+            answers.push(found);
+            if (found.size === 0) break;
         }
         if (refused) {
             loop.ground = commands.GROUND_NAMES[commands.GROUND_NAMES.indexOf(names) + 1] ?? "none";
@@ -1674,7 +1675,8 @@ async function builtAtOnce(loop: Loop, server: ServerContainer): Promise<Set<str
         }
         loop.ground = names;
         groundNamesOf.set(server.installedAppId, names);
-        return built ?? new Set();
+        const [first, ...rest] = answers;
+        return new Set([...(first ?? [])].filter((one) => rest.every((set) => set.has(one))));
     }
     return null;
 }
