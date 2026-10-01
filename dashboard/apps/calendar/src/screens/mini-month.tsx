@@ -78,7 +78,7 @@ export function MiniMonth({
     return (
         <div className="flex flex-col gap-1 select-none">
             <div className="flex items-center gap-1">
-                <p className="min-w-0 flex-1 truncate px-1 text-[0.8125rem] font-medium capitalize" aria-live="polite">
+                <p className="min-w-0 flex-1 truncate px-1 text-[0.8125rem] font-medium first-letter:uppercase" aria-live="polite">
                     {title}
                 </p>
                 <Button size="icon-xs" variant="ghost" aria-label={t("header.previousMonth")} title={t("header.previousMonth")} onClick={() => setMonth(time.addMonths(month, -1))}>

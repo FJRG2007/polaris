@@ -42,7 +42,7 @@ export function BookingPagesSection(_props: SidebarSectionSlotProps) {
                         <li key={page.id} className="group flex min-w-0 items-center gap-1 rounded px-1 hover:bg-card-hover">
                             <Link
                                 href={`/calendar/booking/${page.id}`}
-                                className={cn("min-w-0 flex-1 truncate py-1", page.enabled ? "text-foreground" : "text-foreground-subtle line-through")}
+                                className={cn("min-w-0 flex-1 truncate py-1 text-[13px]", page.enabled ? "text-foreground" : "text-foreground-subtle line-through")}
                                 title={page.enabled ? page.title : t("bookingPage.offTitle", { title: page.title })}
                             >
                                 {page.title}

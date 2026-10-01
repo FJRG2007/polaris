@@ -139,10 +139,16 @@ export function ProposalsSection(_props: SidebarSectionSlotProps) {
     const open = (read.data ?? []).filter((proposal) => proposal.status === "open").slice(0, 5);
     return (
         <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2 px-1">
+                <h3 className="text-[11px] font-medium uppercase tracking-wider text-foreground-subtle">{t("proposals.backToList")}</h3>
+                <Link href="/calendar/proposals" className="text-xs text-muted-foreground no-underline hover:text-foreground">
+                    {t("proposals.manage")}
+                </Link>
+            </div>
             {read.loading ? (
                 <Skeleton className="h-5 w-40" />
             ) : open.length === 0 ? (
-                <Link href="/calendar/proposals/new" className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground">
+                <Link href="/calendar/proposals/new" className="inline-flex items-center gap-1.5 rounded px-1 py-1 text-xs text-muted-foreground no-underline hover:text-foreground">
                     <Plus className="size-3.5" />
                     {t("proposals.new")}
                 </Link>
@@ -159,9 +165,6 @@ export function ProposalsSection(_props: SidebarSectionSlotProps) {
                     </Link>
                 ))
             )}
-            <Link href="/calendar/proposals" className="text-xs text-muted-foreground no-underline hover:text-foreground">
-                {t("proposals.manage")}
-            </Link>
         </div>
     );
 }

@@ -40,10 +40,13 @@ export function Linkified({ text, className }: { text: string; className?: strin
 
 /** Where a panel opened beside something is drawn, kept inside the window. */
 function placement(anchor: DOMRect | null, width: number): CSSProperties {
-    if (typeof window === "undefined" || !anchor) return { left: 16, right: 16, top: 80, maxHeight: "calc(100vh - 96px)" };
+    if (typeof window === "undefined") return { left: 16, right: 16, top: 80, maxHeight: "calc(100vh - 96px)" };
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     // A phone has no room beside anything: the panel sits along the bottom.
     if (viewport.width < 640) return { left: 8, right: 8, bottom: 8, maxHeight: "80vh" };
+    // Opened from no particular place (the header's New event): its own width,
+    // centred under the header, rather than a bar across the whole screen.
+    if (!anchor) return { left: Math.max(8, (viewport.width - width) / 2), width, top: 80, maxHeight: "calc(100vh - 96px)" };
     const left = Math.max(8, Math.min(anchor.left, viewport.width - width - 8));
     const below = viewport.height - anchor.bottom;
     if (below >= 280 || below >= anchor.top) return { left, width, top: anchor.bottom + 6, maxHeight: below - 14 };

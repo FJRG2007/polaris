@@ -365,7 +365,7 @@ export function HolidayPicker({ onAdded, subscribed = [] }: { onAdded: () => voi
                             const label = group.feeds.length > 1 ? `${group.name} (${feed.language})` : group.name;
                             const done = taken.has(feed.url);
                             return (
-                                <li key={feed.url} className="flex items-center gap-2 px-2.5 py-1.5">
+                                <li key={feed.url} className="flex items-center gap-2 px-2.5 py-1.5 text-[13px]">
                                     <span className="min-w-0 flex-1 truncate" title={label}>
                                         {label}
                                     </span>
@@ -417,7 +417,7 @@ export function SuggestedCalendars({
             {adder.error ? <StatusNote tone="danger">{adder.error}</StatusNote> : null}
             <ul className="divide-y divide-border rounded-md border border-border">
                 {suggested.map((entry) => (
-                    <li key={entry.url} className="flex items-center gap-2 px-2.5 py-1.5">
+                    <li key={entry.url} className="flex items-center gap-2 px-2.5 py-1.5 text-[13px]">
                         <span className="min-w-0 flex-1 truncate" title={entry.url}>
                             {entry.name}
                         </span>

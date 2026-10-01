@@ -643,7 +643,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     <Button size="icon-sm" variant="ghost" aria-label={t("header.next")} title={t("header.next")} onClick={() => step(1)}>
                         <ChevronRight />
                     </Button>
-                    <h1 className="min-w-0 truncate text-[17px] font-semibold capitalize tracking-tight tabular-nums">
+                    <h1 className="min-w-0 truncate text-[17px] font-semibold tracking-tight first-letter:uppercase tabular-nums">
                         <button
                             id="calendar-heading"
                             type="button"

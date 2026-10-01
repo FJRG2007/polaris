@@ -128,7 +128,7 @@ export function SlotPicker({
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                        <span className="font-medium capitalize">{monthLabel}</span>
+                        <span className="inline-block font-medium first-letter:uppercase">{monthLabel}</span>
                         <span className="flex gap-1">
                             <Button
                                 size="icon-sm"

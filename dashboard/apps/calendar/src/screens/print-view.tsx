@@ -157,7 +157,7 @@ export function PrintView({ view, date }: { view: string | null; date: string | 
                             .filter((day) => byDay.has(day))
                             .map((day) => (
                                 <section key={day} className="pc-print-day">
-                                    <h3 className="border-b border-border pb-1 text-xs font-semibold capitalize">{time.formatDay(day, locale, { dateStyle: "full" })}</h3>
+                                    <h3 className="border-b border-border pb-1 text-xs font-semibold first-letter:uppercase">{time.formatDay(day, locale, { dateStyle: "full" })}</h3>
                                     <ul className="flex flex-col">
                                         {(byDay.get(day) ?? []).map((occurrence) => (
                                             <li key={`${occurrence.objectId}-${occurrence.recurrenceKey}`} className="flex items-baseline gap-3 py-0.5 text-xs">
@@ -177,7 +177,7 @@ export function PrintView({ view, date }: { view: string | null; date: string | 
                     <div className="flex flex-col gap-4">
                         {months.map((month) => (
                             <section key={month} className="pc-print-month">
-                                <h3 className="mb-1 text-xs font-semibold capitalize">{time.formatDay(month, locale, { month: "long", year: "numeric" })}</h3>
+                                <h3 className="mb-1 text-xs font-semibold first-letter:uppercase">{time.formatDay(month, locale, { month: "long", year: "numeric" })}</h3>
                                 <div className="overflow-x-auto">
                                     <table className="w-full min-w-[40rem] table-fixed border-collapse text-[11px]">
                                         <thead>
