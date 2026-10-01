@@ -94,6 +94,7 @@ import {
     Video,
     Wallet,
     Webhook,
+    Wifi,
     Workflow,
     Wrench,
     Megaphone,
@@ -793,6 +794,23 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["apps", "deploys", "cpu", "memory"]
         },
         { label: "Containers", href: "/watch/containers", icon: Container, keywords: ["docker"] }, // i18n-ignore
+        {
+            label: "Connectivity", // i18n-ignore
+            href: "/watch/connectivity",
+            icon: Wifi,
+            adminOnly: true,
+            keywords: [
+                "internet",
+                "outages",
+                "offline",
+                "uptime",
+                "downtime",
+                "connection",
+                "line",
+                "isp",
+                "availability"
+            ]
+        },
         {
             label: "Alarms", // i18n-ignore
             href: "/watch/alarms",

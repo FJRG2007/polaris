@@ -25,6 +25,7 @@ import { runAutoscale } from "@/lib/deploy/autoscaler";
 import { appJobs } from "@/lib/app-extensions/registry";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
+import { compactOutages } from "@/lib/connectivity/outage-tracker";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepUploads } from "@/lib/chat/uploads";
@@ -134,6 +135,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // zero. Nothing is written twice and nothing is lost.
         leaseMs: null,
         run: sweepRetention
+    },
+    {
+        key: "connectivity-outages",
+        // Every six hours. It folds outages that have just turned a year old into
+        // their month, and nothing reads that roll-up closer than a month apart.
+        everyMs: 6 * HOUR,
+        // Unleased. A pass deletes the rows it rolls up in the same transaction
+        // and rolls back if another runner removed any of them first, so two at
+        // once count every outage exactly once.
+        leaseMs: null,
+        run: compactOutages
     },
     {
         key: "audit-seal",

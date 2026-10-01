@@ -22,6 +22,7 @@ import { DEFAULT_LOCALE } from "@polaris/core";
 import { wordsFor } from "./notice-words";
 import { translatorFor } from "@/lib/i18n/translate";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { formatSpan } from "@/lib/connectivity/outages";
 
 /** Where a domain sits, in words, plus who is answerable for it. */
 interface DomainContext {
@@ -38,6 +39,20 @@ export interface DomainHealthChange {
     readonly domainId: string;
     readonly status: "up" | "down";
     readonly detail: string | null;
+    /** For a recovery, when its outage was first reported - the alert went out a
+     *  few failed probes into it, so the outage lasted at least from then. */
+    readonly downSince?: Date | null;
+}
+
+/** How long the longest of these had been down, from the alert to now. */
+function longestDown(
+    changes: readonly Pick<DomainHealthChange, "downSince">[],
+    now = Date.now()
+): number | null {
+    const starts = changes
+        .map((change) => change.downSince?.getTime())
+        .filter((at): at is number => typeof at === "number" && Number.isFinite(at));
+    return starts.length > 0 ? Math.max(0, now - Math.min(...starts)) : null;
 }
 
 /** Names a sweep's message lists before it stops naming them. Past a handful the
@@ -46,7 +61,10 @@ const NAMES_SHOWN = 3;
 
 function listNames(labels: readonly string[], t: NamespaceTranslator<"notices">): string {
     if (labels.length <= NAMES_SHOWN) return labels.join(", ");
-    return t("domains.andMore", { names: labels.slice(0, NAMES_SHOWN).join(", "), count: labels.length - NAMES_SHOWN });
+    return t("domains.andMore", {
+        names: labels.slice(0, NAMES_SHOWN).join(", "),
+        count: labels.length - NAMES_SHOWN
+    });
 }
 
 /**
@@ -67,23 +85,35 @@ export function domainHealthMessage(
     labels: readonly string[],
     detail: string | null,
     // The recipient's words; a webhook, which has no reader, gets the default's.
-    t: NamespaceTranslator<"notices"> = translatorFor(DEFAULT_LOCALE, "notices")
+    t: NamespaceTranslator<"notices"> = translatorFor(DEFAULT_LOCALE, "notices"),
+    // For a recovery: how long the (longest) outage lasted, when it is known.
+    downForMs: number | null = null
 ): { title: string; body: string } {
     const down = status === "down";
+    const duration =
+        downForMs === null
+            ? null
+            : formatSpan(downForMs, (form, values) => t(`span.${form}`, values));
     if (labels.length === 1) {
         const name = labels[0] ?? "";
         return {
             title: down ? t("domains.downOne", { name }) : t("domains.upOne", { name }),
             body: down
                 ? t("domains.downOneBody", { detail: detail ?? t("domains.stoppedAnswering") })
-                : t("domains.upOneBody")
+                : duration === null
+                  ? t("domains.upOneBody")
+                  : t("domains.upOneBodyAfter", { duration })
         };
     }
     return {
-        title: down ? t("domains.downMany", { count: labels.length }) : t("domains.upMany", { count: labels.length }),
+        title: down
+            ? t("domains.downMany", { count: labels.length })
+            : t("domains.upMany", { count: labels.length }),
         body: down
             ? t("domains.downManyBody", { names: listNames(labels, t) })
-            : t("domains.upManyBody", { names: listNames(labels, t) })
+            : duration === null
+              ? t("domains.upManyBody", { names: listNames(labels, t) })
+              : t("domains.upManyBodyAfter", { names: listNames(labels, t), duration })
     };
 }
 
@@ -133,9 +163,7 @@ async function answerableForMany(
     return new Map([...byProject].map(([id, recipients]) => [id, [...recipients]]));
 }
 
-async function describeDomains(
-    domainIds: readonly string[]
-): Promise<Map<string, DomainContext>> {
+async function describeDomains(domainIds: readonly string[]): Promise<Map<string, DomainContext>> {
     const domains = await prisma.domain.findMany({
         where: { id: { in: [...domainIds] } },
         select: {
@@ -146,7 +174,11 @@ async function describeDomains(
                     id: true,
                     name: true,
                     environment: {
-                        select: { project: { select: { id: true, name: true, ownerId: true, orgId: true } } }
+                        select: {
+                            project: {
+                                select: { id: true, name: true, ownerId: true, orgId: true }
+                            }
+                        }
                     }
                 }
             }
@@ -195,11 +227,24 @@ export async function notifyDomainHealthChanged(input: DomainHealthChange): Prom
 
         const down = input.status === "down";
         const event = down ? "domain.down" : "domain.up";
-        const { title, body } = domainHealthMessage(input.status, [context.label], input.detail);
+        const downFor = input.status === "up" ? longestDown([input]) : null;
+        const { title, body } = domainHealthMessage(
+            input.status,
+            [context.label],
+            input.detail,
+            undefined,
+            downFor
+        );
 
         for (const userId of context.recipients) {
             // Each recipient reads it in their own language.
-            const said = domainHealthMessage(input.status, [context.label], input.detail, await wordsFor(userId, "notices"));
+            const said = domainHealthMessage(
+                input.status,
+                [context.label],
+                input.detail,
+                await wordsFor(userId, "notices"),
+                downFor
+            );
             await notify({
                 userId,
                 event,
@@ -230,6 +275,7 @@ interface Moved {
     readonly domainId: string;
     readonly context: DomainContext;
     readonly detail: string | null;
+    readonly downSince: Date | null;
 }
 
 /** Where a sweep's alert points, since the domains in one span projects. */
@@ -276,7 +322,12 @@ export async function notifyDomainHealthChanges(
         for (const change of changes) {
             const context = contexts.get(change.domainId);
             if (!context) continue;
-            const moved: Moved = { domainId: change.domainId, context, detail: change.detail };
+            const moved: Moved = {
+                domainId: change.domainId,
+                context,
+                detail: change.detail,
+                downSince: change.downSince ?? null
+            };
             const where = change.status === "down" ? "down" : "up";
             for (const userId of context.recipients) {
                 const key = `${userId}:${context.orgId ?? ""}`;
@@ -300,7 +351,8 @@ export async function notifyDomainHealthChanges(
                     status,
                     bucket.map((item) => item.context.label),
                     one?.detail ?? null,
-                    await wordsFor(userId, "notices")
+                    await wordsFor(userId, "notices"),
+                    status === "up" ? longestDown(bucket) : null
                 );
                 await notify({
                     userId,
@@ -325,7 +377,9 @@ export async function notifyDomainHealthChanges(
                 const { title, body } = domainHealthMessage(
                     status,
                     bucket.map((item) => item.context.label),
-                    one?.detail ?? null
+                    one?.detail ?? null,
+                    undefined,
+                    status === "up" ? longestDown(bucket) : null
                 );
                 await dispatchProjectWebhooks({
                     projectId,

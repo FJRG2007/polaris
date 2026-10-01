@@ -207,5 +207,142 @@
         "checked": "checked {time}",
         "notEvaluated": "not evaluated yet",
         "manage": "Manage every alarm"
+    },
+    "span": {
+        "seconds": "{seconds} s",
+        "minutes": "{minutes} min",
+        "minutesSeconds": "{minutes} min {seconds} s",
+        "hours": "{hours} h",
+        "hoursMinutes": "{hours} h {minutes} min",
+        "days": "{days} d",
+        "daysHours": "{days} d {hours} h"
+    },
+    "connectivity": {
+        "title": "Connectivity",
+        "description": "Every time Polaris lost its connection or could not be reached from outside, and for how long.",
+        "checkNow": "Check now",
+        "checking": "Checking",
+        "kinds": {
+            "line": "Internet line",
+            "dns": "DNS",
+            "address": "Public address"
+        },
+        "kindHints": {
+            "line": "Nothing answered, and the public resolvers Polaris checks were silent too.",
+            "dns": "The internet worked, but the public address's name did not resolve.",
+            "address": "The internet worked, but nothing answered at the public address."
+        },
+        "state": {
+            "title": "Right now",
+            "online": "Online",
+            "offline": "Offline",
+            "unknown": "Unknown",
+            "onlineBody": "Reachable from outside. Last checked <time></time>.",
+            "offlineBody": "Down for {duration}, since {since}.",
+            "detected": "Noticed at {host}: {detail}",
+            "detectedHost": "Noticed at {host}.",
+            "lineBack": "The internet came back at {time}; the public address still does not answer.",
+            "unwatched": "Not checked since {time}. Polaris was not running checks, so this is the last thing it knows.",
+            "never": "Not checked yet. The first check runs a minute after Polaris starts.",
+            "cadence": "Checked every {interval}, and every {close} while something is down. Outages less than {gap} apart count as one.",
+            "cadenceNoMerge": "Checked every {interval}, and every {close} while something is down. Every outage is counted on its own."
+        },
+        "periods": {
+            "title": "Availability",
+            "24h": "Last 24 hours",
+            "7d": "Last 7 days",
+            "30d": "Last 30 days",
+            "90d": "Last 90 days",
+            "outages": "Outages",
+            "down": "Down",
+            "longest": "Longest",
+            "average": "Average",
+            "since": "Tracked since {date}",
+            "noData": "No checks yet"
+        },
+        "days": {
+            "title": "Downtime per day",
+            "description": "The last 90 days, in your time zone. Pick a day to list its outages.",
+            "label": "Downtime per day over the last 90 days: {count, plural, =0 {no day had any} one {# day had some} other {# days had some}}.",
+            "cell": "{date}: {duration} down, {count, plural, one {# outage} other {# outages}}",
+            "clear": "{date}: no downtime",
+            "untracked": "{date}: not tracked yet",
+            "hint": "Hover or focus a day to see it.",
+            "legend": {
+                "none": "None",
+                "under5m": "Under 5 min",
+                "under30m": "Under 30 min",
+                "under3h": "Under 3 h",
+                "over3h": "3 h or more",
+                "untracked": "Not tracked"
+            }
+        },
+        "list": {
+            "title": "Outages",
+            "started": "Started",
+            "ended": "Ended",
+            "duration": "Duration",
+            "kind": "Kind",
+            "detectedBy": "Noticed at",
+            "detail": "What the check saw",
+            "firstBack": "First back",
+            "ongoing": "Ongoing",
+            "resolvers": "Public resolvers",
+            "backInternet": "The internet",
+            "startWindow": "Everything answered at {from}; this was first seen at {to}.",
+            "unobserved": "Polaris stopped checking during this outage, so it ends at the last check that saw it down.",
+            "merged": "{count, plural, one {# blip merged} other {# blips merged}}",
+            "shown": "{shown} of {total}",
+            "showMore": "Show more",
+            "export": "Export CSV",
+            "exportTitle": "Export the outages listed as CSV",
+            "empty": "No outages recorded.",
+            "emptyHint": "Polaris has been reachable every time it checked.",
+            "emptyFiltered": "No outages match these filters.",
+            "clear": "Clear filters",
+            "truncated": "Only the latest {count} outages of the year are listed."
+        },
+        "filters": {
+            "kind": "Kind",
+            "range": "Period",
+            "range7d": "7 days",
+            "range30d": "30 days",
+            "range90d": "90 days",
+            "range365d": "Year",
+            "min": "Length",
+            "minAny": "Any length",
+            "min1m": "1 min or more",
+            "min10m": "10 min or more",
+            "min1h": "1 h or more",
+            "day": "On {date}",
+            "removeDay": "Show every day"
+        },
+        "merge": {
+            "title": "Merging blips",
+            "label": "Count outages this close as one",
+            "unit": "seconds",
+            "hint": "A connection that drops and comes back within this many seconds is one outage, not several. 0 counts every drop.",
+            "save": "Save",
+            "saved": "Saved",
+            "unchanged": "No changes to save",
+            "invalid": "Enter a whole number from 0 to {max}.",
+            "failed": "Could not save. Try again."
+        },
+        "older": {
+            "title": "Older than a year",
+            "description": "Outages past a year are kept as monthly totals.",
+            "month": "Month"
+        },
+        "errors": {
+            "load": "Could not load the connectivity history.",
+            "loadHint": "Reload the page to try again.",
+            "check": "The check could not run. Try again in a moment."
+        },
+        "csv": {
+            "durationSeconds": "Duration (s)",
+            "closedBy": "How it ended",
+            "recovered": "Recovered",
+            "unobserved": "Not watched"
+        }
     }
 }

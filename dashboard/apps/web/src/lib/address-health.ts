@@ -34,6 +34,9 @@ import { notifyOperators } from "@/lib/notifications/operators";
 import { reachableAddresses, type DeploymentAddress } from "@/lib/deployment-addresses";
 import { getPolarisTunnelStatus, stopPolarisTunnel } from "@/lib/polaris-tunnel-service";
 import { hasInternet } from "@/lib/internet-reach";
+import { recordPass, type PassOutcome } from "@/lib/connectivity/outage-tracker";
+import { CLOSE_WATCH_MS, WATCH_INTERVAL_MS } from "@/lib/connectivity/cadence";
+import { formatSpan, observe, type ProbeResult } from "@/lib/connectivity/outages";
 
 /** An operator alert in one reader's words, and the same in the default language
  *  for when theirs cannot be worked out. */
@@ -49,19 +52,34 @@ const ADDRESS_PERMISSION: Permission = "system.manage";
  *  can win, exactly like the update watcher's claims. */
 const KEY_PREFIX = "address.health.";
 
-/** Slower than the deployed-app probe: these are a handful of addresses, and an
- *  operator does not need to hear about a blip on their own dashboard's domain. */
-const INTERVAL_MS = Number(process.env.POLARIS_ADDRESS_WATCH_MS) || 10 * 60_000;
+/** When each host last changed state, so a recovery can say how long it was
+ *  down. Its own prefix, so the health rows' sweep never mistakes one for a host. */
+const SINCE_PREFIX = "address.since.";
+
+/** Where the history of outages is read. */
+const CONNECTIVITY_HREF = "/watch/connectivity";
 /** Let the deployment finish coming up before deciding it is unreachable. */
 const FIRST_PASS_MS = 60_000;
 /** A second opinion before calling an address down, since one alert is worth more
  *  than two and a single timeout is not an outage. */
 const RETRY_MS = 3000;
+/** The longest a pass may take before the watcher stops waiting on it. Well past a
+ *  pass full of timeouts, so only a pass that hangs ever reaches it. */
+const PASS_LIMIT_MS = 5 * 60_000;
 
 /** How much of a failure reason is kept. It goes in a settings value, one line. */
 const DETAIL_LIMIT = 120;
 
 let started = false;
+/** The pending tick, so a pass run by hand can bring the next one forward. */
+let timer: ReturnType<typeof setTimeout> | null = null;
+/** The pass in progress, shared by the timer and "check now" so they never overlap. */
+let inFlight: Promise<PassOutcome | null> | null = null;
+/** When the slower housekeeping a pass carries last ran. A pass every half-minute
+ *  while something is down must not also rewrite a route or re-raise a tunnel
+ *  every half-minute; they keep the usual pace. */
+let lastSettledAt = Number.NEGATIVE_INFINITY;
+let lastRepublishAt = Number.NEGATIVE_INFINITY;
 
 export type AddressState = "up" | "down" | "unknown";
 
@@ -81,6 +99,32 @@ const UNKNOWN: AddressHealth = { state: "unknown", checkedAt: null, detail: null
 
 function keyFor(host: string): string {
     return `${KEY_PREFIX}${host}`;
+}
+
+function sinceKeyFor(host: string): string {
+    return `${SINCE_PREFIX}${host}`;
+}
+
+/** Forget everything kept about one host. */
+async function forgetHost(host: string): Promise<void> {
+    await prisma.setting.deleteMany({ where: { key: { in: [keyFor(host), sinceKeyFor(host)] } } });
+}
+
+/**
+ * Note that a host changed state now, and say when it last did - which, for a host
+ * coming back, is when it went down. Null for a host that predates this being
+ * kept, whose recovery is then announced without a duration rather than a wrong one.
+ */
+async function markChange(host: string, now: number): Promise<number | null> {
+    const key = sinceKeyFor(host);
+    const previous = await prisma.setting.findUnique({ where: { key }, select: { value: true } });
+    await prisma.setting.upsert({
+        where: { key },
+        create: { key, value: String(now), scope: "global" },
+        update: { value: String(now) }
+    });
+    const at = Number(previous?.value);
+    return previous && Number.isFinite(at) ? at : null;
 }
 
 /** An address this container can meaningfully dial: a public name, not a LAN one. */
@@ -157,11 +201,11 @@ export async function removeAddress(host: string): Promise<AddressRemoval> {
     if (address.kind === "app" || address.kind === "local") return "built-in";
     if (address.kind === "tunnel") {
         await stopPolarisTunnel();
-        await prisma.setting.deleteMany({ where: { key: keyFor(address.host) } });
+        await forgetHost(address.host);
         return "removed";
     }
     if (!(await removeDashboardDomain(address.host))) return "managed";
-    await prisma.setting.deleteMany({ where: { key: keyFor(address.host) } });
+    await forgetHost(address.host);
     return "removed";
 }
 
@@ -170,16 +214,24 @@ export async function removeAddress(host: string): Promise<AddressRemoval> {
  * counts as answering - what is being asked is whether anything is listening on that
  * name, not whether it hands this container a page.
  */
-async function probe(
-    address: DeploymentAddress
-): Promise<{ state: "up" | "down"; detail: string | null; notRouted: boolean }> {
+async function probe(address: DeploymentAddress): Promise<{
+    state: "up" | "down";
+    detail: string | null;
+    code: string | null;
+    notRouted: boolean;
+}> {
     const target = { hostname: address.host, https: address.url.startsWith("https:") };
     const first = await checkDomain(target);
-    if (first.status === "up") return { state: "up", detail: null, notRouted: false };
+    if (first.status === "up") return { state: "up", detail: null, code: null, notRouted: false };
     await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
     const second = await checkDomain(target);
-    if (second.status === "up") return { state: "up", detail: null, notRouted: false };
-    return { state: "down", detail: tidy(second.detail), notRouted: second.notRouted === true };
+    if (second.status === "up") return { state: "up", detail: null, code: null, notRouted: false };
+    return {
+        state: "down",
+        detail: tidy(second.detail),
+        code: second.errorCode ?? null,
+        notRouted: second.notRouted === true
+    };
 }
 
 /** What a sweep found for one address, relative to what was already known. */
@@ -218,6 +270,12 @@ async function forgetMissing(hosts: readonly string[]): Promise<void> {
             ...(hosts.length > 0 ? { NOT: { key: { in: hosts.map(keyFor) } } } : {})
         }
     });
+    await prisma.setting.deleteMany({
+        where: {
+            key: { startsWith: SINCE_PREFIX },
+            ...(hosts.length > 0 ? { NOT: { key: { in: hosts.map(sinceKeyFor) } } } : {})
+        }
+    });
 }
 
 /**
@@ -232,19 +290,32 @@ async function dropDeadTunnel(host: string): Promise<boolean> {
     const status = await getPolarisTunnelStatus().catch(() => ({ running: true, url: null }));
     if (status.running) return false;
     await stopPolarisTunnel();
-    await prisma.setting.deleteMany({ where: { key: keyFor(host) } });
+    await forgetHost(host);
     return true;
 }
 
-/** Probe one address and say what changed, once, whichever container gets there first. */
-async function sweepAddress(address: DeploymentAddress): Promise<void> {
-    const { state, detail, notRouted } = await probe(address);
+/** A length of time in the notices catalog's words. */
+function spanIn(t: NamespaceTranslator<"notices">, ms: number): string {
+    return formatSpan(ms, (form, values) => t(`span.${form}`, values));
+}
+
+/**
+ * Probe one address and say what changed, once, whichever container gets there
+ * first. Answers what the probe found, for the pass's verdict on the connection -
+ * or null for a tunnel that was dropped, which is no longer an address at all.
+ */
+async function sweepAddress(address: DeploymentAddress): Promise<ProbeResult | null> {
+    const { state, detail, code, notRouted } = await probe(address);
+    const result: ProbeResult = { host: address.host, up: state === "up", detail, code };
+    const now = Date.now();
     const claim = await record(address.host, state, encode(state, detail));
     // The edge answered that it routes this name nowhere. For a dashboard address that
     // is a file this process writes, so write it again: no screen offers to, and an
     // operator reading the alert has no terminal to do it from. Best-effort, and the
-    // next sweep is what says whether it worked.
-    if (notRouted) {
+    // next sweep is what says whether it worked - at the usual pace, even while an
+    // outage has the watcher looking every half-minute.
+    if (notRouted && now - lastRepublishAt >= WATCH_INTERVAL_MS / 2) {
+        lastRepublishAt = now;
         await syncDashboardRoute().catch((error: unknown) =>
             console.error(
                 "polaris: republishing the dashboard route after an unrouted address failed:",
@@ -252,23 +323,31 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
             )
         );
     }
-    if (claim === "same") return;
+    if (claim === "same") return result;
+    const changedAt = await markChange(address.host, now).catch(() => null);
 
     if (state === "up") {
         // A first sighting that works is not news; a recovery is.
         if (claim === "changed") {
+            const downFor = changedAt === null ? null : now - changedAt;
             await notifyOperators({
                 permission: ADDRESS_PERMISSION,
                 event: "network.address",
                 ...inWords((t) => ({
                     title: t("address.backTitle", { host: address.host }),
-                    body: t("address.backBody", { url: address.url })
+                    body:
+                        downFor === null
+                            ? t("address.backBody", { url: address.url })
+                            : t("address.backBodyAfter", {
+                                  url: address.url,
+                                  duration: spanIn(t, downFor)
+                              })
                 })),
                 href: "/admin/settings",
                 level: "success"
             });
         }
-        return;
+        return result;
     }
 
     if (address.kind === "tunnel" && (await dropDeadTunnel(address.host))) {
@@ -281,7 +360,7 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
             })),
             href: "/admin/settings"
         });
-        return;
+        return null;
     }
 
     // Which of the two this is. Polaris probes its own address from inside the
@@ -298,10 +377,10 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
                 title: t("address.offlineTitle"),
                 body: t("address.offlineBody", { url: address.url, host: address.host })
             })),
-            href: "/admin/settings",
+            href: CONNECTIVITY_HREF,
             actionRequired: true
         });
-        return;
+        return result;
     }
 
     await notifyOperators({
@@ -316,34 +395,97 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
         href: "/admin/settings",
         actionRequired: true
     });
+    return result;
 }
 
 /**
  * One pass over every address. Sequential on purpose: there are a handful of them,
  * a down one spends its timeouts, and nothing here is worth opening several
  * connections out of the box at once for.
+ *
+ * The pass ends with one verdict on the connection as a whole, handed to the
+ * outage record: up when any address answered, and otherwise the same question
+ * the offline alert asks - whether the public resolvers answer - to tell a dead
+ * line from a dead address. With no public address listed at all, that question
+ * is the whole pass. Answers what the record decided about the next pass's pace.
  */
-export async function sweepAddresses(): Promise<void> {
-    await settleShareTunnel().catch((error) =>
-        console.error("polaris: settling the public tunnel failed:", error)
-    );
-    const addresses = (await reachableAddresses()).filter(checkable);
-    await forgetMissing(addresses.map((address) => address.host));
-    for (const address of addresses) {
-        await sweepAddress(address).catch((error) =>
-            console.error(`polaris: checking ${address.host} failed:`, error)
+export async function sweepAddresses(): Promise<PassOutcome | null> {
+    const now = Date.now();
+    if (now - lastSettledAt >= WATCH_INTERVAL_MS / 2) {
+        lastSettledAt = now;
+        await settleShareTunnel().catch((error) =>
+            console.error("polaris: settling the public tunnel failed:", error)
         );
     }
+    const addresses = (await reachableAddresses()).filter(checkable);
+    await forgetMissing(addresses.map((address) => address.host));
+    const results: ProbeResult[] = [];
+    for (const address of addresses) {
+        const result = await sweepAddress(address).catch((error) => {
+            console.error(`polaris: checking ${address.host} failed:`, error);
+            return null;
+        });
+        if (result) results.push(result);
+    }
+    const internet = results.some((result) => result.up)
+        ? null
+        : await hasInternet().catch(() => null);
+    const observation = observe(results, internet, addresses.length);
+    if (!observation) return null;
+    return recordPass(observation).catch((error) => {
+        console.error("polaris: recording the connection's state failed:", error);
+        return null;
+    });
+}
+
+/** Run a pass unless one is already running, in which case wait for that one. */
+function runPass(): Promise<PassOutcome | null> {
+    if (inFlight) return inFlight;
+    let limit: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<null>((resolve) => {
+        limit = setTimeout(() => {
+            console.error(
+                `polaris: an address health sweep took over ${PASS_LIMIT_MS / 1000}s, moving on`
+            );
+            resolve(null);
+        }, PASS_LIMIT_MS);
+        limit.unref();
+    });
+    const pass = sweepAddresses().catch((error) => {
+        console.error("polaris: address health sweep failed:", error);
+        return null;
+    });
+    const current: Promise<PassOutcome | null> = Promise.race([pass, expired]).finally(() => {
+        clearTimeout(limit);
+        if (inFlight === current) inFlight = null;
+    });
+    inFlight = current;
+    return current;
+}
+
+/** Set the next tick: soon while something is down or settling, at the usual pace otherwise. */
+function schedule(delayMs: number): void {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+        void runPass().then((outcome) =>
+            schedule(outcome?.closely ? CLOSE_WATCH_MS : WATCH_INTERVAL_MS)
+        );
+    }, delayMs);
+    timer.unref();
+}
+
+/**
+ * A pass now, from the Connectivity screen's "check again", rather than waiting
+ * out the interval. Shares a pass already running instead of starting a second
+ * one, and sets the watcher's next tick by what it found.
+ */
+export async function checkConnectivityNow(): Promise<void> {
+    const outcome = await runPass();
+    if (started) schedule(outcome?.closely ? CLOSE_WATCH_MS : WATCH_INTERVAL_MS);
 }
 
 export function startAddressWatcher(): void {
     if (started) return;
     started = true;
-    const tick = (): void => {
-        void sweepAddresses().catch((error) =>
-            console.error("polaris: address health sweep failed:", error)
-        );
-    };
-    setTimeout(tick, FIRST_PASS_MS).unref();
-    setInterval(tick, INTERVAL_MS).unref();
+    schedule(FIRST_PASS_MS);
 }

@@ -158,7 +158,9 @@ with one thing does not get the rest.
 
 **Keeping an eye on it**
 
-- **Watch** - alarms on app health, spikes and outages, with webhooks.
+- **Watch** - alarms on app health, spikes and outages, with webhooks, and a
+  record of every time the deployment itself lost its connection, with uptime
+  and a 90-day heatmap.
 - **Analytics** - cookieless web analytics for the sites you host.
 - **Firewall** - a rule per protection: allow and deny lists, country and network
   rules, bot and scraper defences, injection scanning, and automatic bans.
