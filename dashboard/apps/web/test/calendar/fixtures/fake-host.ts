@@ -12,6 +12,7 @@ export interface FakeUser {
     readonly email: string;
     readonly isAdmin: boolean;
     readonly username: string | null;
+    readonly sessionId: string;
 }
 
 export interface SentMail {
@@ -73,7 +74,9 @@ function blankState() {
             reference: string;
             listName: string;
         }[],
-        scheduled: [] as { taskId: string; due: unknown }[]
+        scheduled: [] as { taskId: string; due: unknown }[],
+        /** The dashboard's key-value settings. */
+        settings: new Map<string, string>()
     };
 }
 
@@ -87,7 +90,14 @@ export function resetHost(): void {
 /** A Polaris account, in the fake database and ready to sign in as. */
 export function addUser(input: { name: string; email: string; isAdmin?: boolean; username?: string | null }): FakeUser {
     const row = db.insert("user", { name: input.name, email: input.email.toLowerCase(), isAdmin: input.isAdmin ?? false, username: input.username ?? null });
-    return { id: row.id as string, name: input.name, email: input.email.toLowerCase(), isAdmin: input.isAdmin ?? false, username: input.username ?? null };
+    return {
+        id: row.id as string,
+        name: input.name,
+        email: input.email.toLowerCase(),
+        isAdmin: input.isAdmin ?? false,
+        username: input.username ?? null,
+        sessionId: `session-${String(row.id)}`
+    };
 }
 
 export function signIn(user: FakeUser | null): void {
@@ -139,6 +149,12 @@ export const host = {
         }
     },
     requestContext: { clientIp: async () => "203.0.113.7" },
+    settingStore: {
+        getSetting: async (key: string) => fake.settings.get(key) ?? null,
+        setSetting: async (key: string, value: string) => {
+            fake.settings.set(key, value);
+        }
+    },
     domainService: { appBaseUrl: async () => "https://polaris.example.test" },
     calendarHost: {
         teamIdsOf: async (userId: string) => [...fake.teams.entries()].filter(([, members]) => members.includes(userId)).map(([id]) => id),

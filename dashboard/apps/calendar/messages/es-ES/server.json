@@ -1,0 +1,110 @@
+{
+    "calendars": {
+        "personal": "Personal"
+    },
+    "errors": {
+        "alreadyThere": "Ese calendario ya tiene este evento.",
+        "calendarNotFound": "Ese calendario no está disponible.",
+        "changedMeanwhile": "Este evento cambió desde que lo abriste. Ábrelo de nuevo para ver lo último.",
+        "checkInput": "Revisa lo que escribiste e inténtalo de nuevo.",
+        "emptyImport": "Ese archivo no tiene eventos ni tareas.",
+        "eventNotFound": "Ese evento no está disponible.",
+        "generic": "No ha funcionado. Inténtalo de nuevo en un momento.",
+        "importTooLarge": "Ese archivo tiene demasiados eventos para importarlo de una vez. Divídelo e importa cada parte.",
+        "notATask": "No es una tarea.",
+        "notAnEvent": "No es un evento.",
+        "notInvited": "No estás invitado a este evento.",
+        "ownCalendar": "Este calendario es tuyo. Elimínalo en su lugar.",
+        "readOnly": "Este calendario es de solo lectura.",
+        "unreadableEvent": "Este evento no se pudo leer."
+    },
+    "instance": {
+        "notAllowed": "Solo un administrador puede cambiar esto.",
+        "subscriptionsOff": "Suscribirse a calendarios por dirección está desactivado en este Polaris.",
+        "bookingOff": "Las páginas de reserva están desactivadas en este Polaris."
+    },
+    "instancePage": {
+        "title": "Calendario para todos",
+        "description": "Lo que todos en este Polaris pueden hacer en Calendario.",
+        "back": "Ajustes",
+        "adminOnly": "Solo un administrador puede cambiar esto.",
+        "noChanges": "No hay cambios",
+        "fixSuggested": "Corrige los calendarios sugeridos",
+        "saved": "Guardado",
+        "subscriptions": "Suscripciones",
+        "subscriptionsHint": "Cualquiera puede suscribirse a un calendario que publique una dirección ICS.",
+        "booking": "Reservas",
+        "bookingHint": "Cualquiera puede publicar páginas donde otros reservan tiempo con él.",
+        "suggested": "Calendarios sugeridos",
+        "suggestedHint": "Se ofrecen a todos al suscribirse a un calendario.",
+        "name": "Nombre",
+        "namePlaceholder": "Festivos",
+        "nameInvalid": "Usa un nombre de hasta 120 caracteres.",
+        "address": "Dirección",
+        "addressInvalid": "Usa una dirección https:// de un calendario.",
+        "remove": "Quitar",
+        "removeNamed": "Quitar {name}",
+        "add": "Añadir calendario",
+        "save": "Guardar"
+    },
+    "invitations": {
+        "cancelledSubject": "Cancelado: {title}",
+        "cancelledTitle": "Cancelado: {title}",
+        "invitedSubject": "Invitación: {title} - {when}",
+        "invitedTitle": "Invitación: {title}",
+        "mailAnswer": "Responde aquí:",
+        "mailCancelled": "{organizer} canceló este evento.",
+        "mailInvited": "{organizer} te invitó a este evento.",
+        "reply": {
+            "accepted": "{who} aceptó {title}",
+            "declined": "{who} rechazó {title}",
+            "tentative": "{who} quizá asista a {title}"
+        },
+        "untitled": "Evento sin título"
+    },
+    "meeting": {
+        "untitled": "Reunión"
+    },
+    "published": {
+        "busy": "Ocupado"
+    },
+    "reminders": {
+        "body": "{when}",
+        "mailCalendar": "Calendario: {calendar}",
+        "mailSubject": "Recordatorio: {title}",
+        "untitledEvent": "Evento sin título",
+        "untitledTask": "Tarea sin título"
+    },
+    "sharing": {
+        "alreadyOwner": "Ya es dueño de este calendario.",
+        "mailBody": "{who} compartió contigo el calendario {calendar}. Ábrelo o suscríbete aquí:",
+        "mailSubject": "{who} compartió {calendar} contigo",
+        "noSuchPerson": "Esa persona no está disponible.",
+        "notFound": "Ese acceso ya no existe.",
+        "notPublished": "Publica primero el calendario.",
+        "notResources": "Las salas ya se comparten con todos.",
+        "notYourTeam": "Solo puedes compartir con equipos de los que formas parte.",
+        "onlyOwnerManage": "Solo el dueño puede dar o quitar la gestión.",
+        "sharedTitle": "{who} compartió {calendar} contigo",
+        "slowDown": "Demasiados enlaces enviados. Inténtalo en una hora.",
+        "tooMany": "Este calendario ya se comparte con el máximo de personas y equipos."
+    },
+    "sources": {
+        "linkNeedsCalendar": "Esa cuenta se enlazó para otra cosa. Conéctala de nuevo para calendarios.",
+        "linkNotFound": "Esa cuenta ya no está enlazada.",
+        "notACalendar": "Esa dirección no respondió como un calendario.",
+        "notFound": "No se encontró nada en esa dirección.",
+        "privateAddress": "Esa dirección está en una red privada. Solo un administrador puede enlazarla.",
+        "refusedCredentials": "El servidor rechazó ese usuario o contraseña. Usa una contraseña de aplicación si tu proveedor las tiene.",
+        "tooMany": "Has enlazado todos los calendarios que puedes. Quita uno para añadir otro.",
+        "unreachable": "No se pudo conectar con ese servidor. Revisa la dirección e inténtalo de nuevo."
+    },
+    "sync": {
+        "failedAuth": "Conecta la cuenta de nuevo desde los ajustes de Calendario.",
+        "failedOther": "Polaris seguirá intentándolo. Abre los ajustes de Calendario para ver por qué.",
+        "failedTitle": "{label} dejó de sincronizar"
+    },
+    "trash": {
+        "untitled": "Evento sin título"
+    }
+}

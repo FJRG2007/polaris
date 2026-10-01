@@ -39,6 +39,24 @@ describe("eventInputSchema", () => {
         expect(parsed.url).toBe("");
     });
 
+    it("answers a malformed date as an issue rather than throwing", () => {
+        const broken = engine.eventInputSchema.safeParse({ ...valid, start: { dateTime: "T10:00", tzid: "UTC" } });
+        expect(broken.success).toBe(false);
+        expect(engine.eventInputSchema.safeParse({ ...valid, end: "tomorrow" }).success).toBe(false);
+    });
+
+    it("keeps link attachments and the request to keep a rule", () => {
+        const parsed = engine.eventInputSchema.parse({
+            ...valid,
+            keepRule: true,
+            attachments: [{ uri: "https://example.com/agenda.pdf", name: "Agenda" }]
+        });
+        expect(parsed.keepRule).toBe(true);
+        expect(parsed.attachments).toEqual([{ uri: "https://example.com/agenda.pdf", name: "Agenda", mime: "" }]);
+        refuses({ attachments: [{ uri: "javascript:alert(1)" }] });
+        refuses({ attachments: [{ uri: "" }] });
+    });
+
     it("accepts empty optional strings and all-day events", () => {
         const parsed = engine.eventInputSchema.parse({ ...valid, allDay: true, start: { date: "2026-06-01" }, end: { date: "2026-06-02" }, url: undefined, conference: "" });
         expect(parsed.url).toBe("");

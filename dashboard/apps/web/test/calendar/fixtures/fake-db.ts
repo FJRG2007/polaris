@@ -643,12 +643,18 @@ export function createFakeDb() {
         };
     }
 
-    type Delegate = ReturnType<typeof delegate>;
-
-    const delegates = Object.fromEntries(Object.keys(MODELS).map((name) => [name, delegate(name)])) as Record<string, Delegate>;
-
     const prisma = {
-        ...delegates,
+        user: delegate("user"),
+        userEmail: delegate("userEmail"),
+        team: delegate("team"),
+        calendarSource: delegate("calendarSource"),
+        calendar: delegate("calendar"),
+        calendarDisplay: delegate("calendarDisplay"),
+        calendarShare: delegate("calendarShare"),
+        calendarObject: delegate("calendarObject"),
+        calendarReminder: delegate("calendarReminder"),
+        calendarInvitation: delegate("calendarInvitation"),
+        calendarPreference: delegate("calendarPreference"),
         $transaction: async (work: unknown): Promise<unknown> => {
             if (Array.isArray(work)) {
                 const results: unknown[] = [];

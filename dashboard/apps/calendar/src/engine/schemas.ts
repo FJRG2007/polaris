@@ -142,8 +142,16 @@ const linkSchema = z
     .optional()
     .default("");
 
-function instantOf(value: DateValue): number {
-    return valueToInstant(value, "UTC").getTime();
+/** When a value is, or null when it is not a value at all - zod still runs an
+ *  object's refinement after one of its fields failed its own check, and a
+ *  malformed date must come back as that field's issue, not as a throw. */
+function instantOf(value: DateValue): number | null {
+    if (!dateValueSchema.safeParse(value).success) return null;
+    try {
+        return valueToInstant(value, "UTC").getTime();
+    } catch {
+        return null;
+    }
 }
 
 /** What the event editor sends to save an event. */
@@ -157,6 +165,22 @@ export const eventInputSchema = z
         end: dateValueSchema,
         allDay: z.boolean(),
         rule: ruleEditorSchema.nullable().default(null),
+        /**
+         * Keep the series' own rule instead of `rule`: for a rule the editor
+         * cannot show (an hourly repeat, BYWEEKNO) that the person did not
+         * touch, so saving the rest of the event does not rewrite it.
+         */
+        keepRule: z.boolean().default(false),
+        attachments: z
+            .array(
+                z.object({
+                    uri: linkSchema.refine((text) => text !== "", SCHEMA_MESSAGES.linkForm),
+                    name: z.string().trim().max(300).default(""),
+                    mime: z.string().trim().max(200).default("")
+                })
+            )
+            .max(20)
+            .default([]),
         alarms: z.array(alarmSchema).max(10).default([]),
         attendees: z
             .array(attendeeSchema)
@@ -178,13 +202,18 @@ export const eventInputSchema = z
         kind: z.enum(["default", "outOfOffice", "focusTime", "workingLocation"]).default("default")
     })
     .superRefine((input, context) => {
+        if (typeof input.start !== "object" || input.start === null) return;
+        if (typeof input.end !== "object" || input.end === null) return;
         const startIsDate = "date" in input.start;
         const endIsDate = "date" in input.end;
         if (startIsDate !== input.allDay || endIsDate !== input.allDay) {
             context.addIssue({ code: z.ZodIssueCode.custom, path: ["allDay"], message: SCHEMA_MESSAGES.allDayMismatch });
             return;
         }
-        if (instantOf(input.end) < instantOf(input.start)) {
+        const start = instantOf(input.start);
+        const end = instantOf(input.end);
+        if (start === null || end === null) return;
+        if (end < start) {
             context.addIssue({ code: z.ZodIssueCode.custom, path: ["end"], message: SCHEMA_MESSAGES.endBeforeStart });
         }
     });
