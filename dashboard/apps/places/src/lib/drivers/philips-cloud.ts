@@ -310,12 +310,11 @@ export const philipsCloudDriver: DeviceDriver = {
                 parsed.data.vToken
             );
             const found = await cloud.discoverPhilipsDevices(gigyaSession, session);
-            const userId = await cloud.philipsUserId(found.session.accessToken);
             const unsupported = unsupportedModels(found.devices);
             return {
                 done: true,
                 credentials: {
-                    ...toCredentials(email, found.session, userId),
+                    ...toCredentials(email, found.session, found.userId),
                     source: found.source
                 },
                 ...(unsupported.length > 0 ? { unsupported } : {})

@@ -555,6 +555,12 @@ function backendUrl(href: string): string {
     return url;
 }
 
+function backendQuery(href: string, query: Readonly<Record<string, string>>): string {
+    const url = new URL(backendUrl(href));
+    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+    return url.toString();
+}
+
 async function homeIdGet(url: string, accessToken: string): Promise<unknown> {
     const response = await call(url, { headers: homeIdHeaders(accessToken) });
     if (response.status === 401 || response.status === 403) throw signedOut();
@@ -582,8 +588,8 @@ export async function listHomeIdAppliances(accessToken: string): Promise<unknown
     const discovery = await json(discoveryResponse);
     const profileUrl = isRecord(discovery) ? discovery.profileUrl : undefined;
     if (typeof profileUrl !== "string" || !profileUrl) throw garbled();
-    const ts = Date.now();
-    const profile = await homeIdGet(`${backendUrl(profileUrl)}?ts=${ts}`, accessToken);
+    const ts = String(Date.now());
+    const profile = await homeIdGet(backendQuery(profileUrl, { ts }), accessToken);
     if (!isRecord(profile)) return [];
 
     const embedded = isRecord(profile._embedded) ? profile._embedded.userAppliances : undefined;
@@ -602,7 +608,7 @@ export async function listHomeIdAppliances(accessToken: string): Promise<unknown
     }
     if (!href) return [];
     const body = await homeIdGet(
-        `${backendUrl(href)}?ts=${ts}&includeSkippedPairing=true`,
+        backendQuery(href, { ts, includeSkippedPairing: "true" }),
         accessToken
     );
     if (Array.isArray(body)) return body;
@@ -618,7 +624,7 @@ export type PhilipsSource = "iot" | "homeid-app";
 /** One place Polaris looked, as the reader is told about it. */
 export interface PhilipsLookup {
     /** Which app's sign-in, and which list. */
-    readonly where: "Air+" | "HomeID" | "HomeID app";
+    readonly where: "Air+" | "HomeID" | "HomeID app" | "HomeID account";
     /** How many appliances it listed, or null where it could not be read. */
     readonly count: number | null;
     /** Each appliance's model code or type, as Philips wrote it. */
@@ -665,6 +671,7 @@ function seen(
 /** A signed-in account and what was found on it. */
 export interface PhilipsDiscovery {
     readonly session: PhilipsSession;
+    readonly userId: string;
     readonly source: PhilipsSource;
     readonly devices: PhilipsCloudDevice[];
     readonly lookups: readonly PhilipsLookup[];
@@ -712,9 +719,16 @@ export async function discoverPhilipsDevices(
         }
     };
 
+    const refuse = (message: (summary: string) => string): never => {
+        const summary = philipsLookupSummary(lookups);
+        console.warn(`places: a Philips account sign-in found nothing to drive (${summary})`);
+        throw new DriverError(message(summary), "refused");
+    };
+
     const fromAirplus = airOf(await registry("Air+", airplus));
     if (fromAirplus.length > 0) {
-        return { session: airplus, source: "iot", devices: fromAirplus, lookups };
+        const userId = await philipsUserId(airplus.accessToken);
+        return { session: airplus, userId, source: "iot", devices: fromAirplus, lookups };
     }
 
     let homeid: PhilipsSession | null = null;
@@ -728,17 +742,16 @@ export async function discoverPhilipsDevices(
     if (homeid) {
         const fromHomeId = airOf(await registry("HomeID", homeid));
         if (fromHomeId.length > 0) {
-            return { session: homeid, source: "iot", devices: fromHomeId, lookups };
+            const userId = await philipsUserId(homeid.accessToken);
+            return { session: homeid, userId, source: "iot", devices: fromHomeId, lookups };
         }
+        let fromApp: PhilipsCloudDevice[] = [];
         try {
             const appliances = unique(
                 (await listHomeIdAppliances(homeid.accessToken)).map(philipsHomeIdAppliance)
             );
             lookups.push(seen("HomeID app", appliances));
-            const fromApp = airOf(appliances);
-            if (fromApp.length > 0) {
-                return { session: homeid, source: "homeid-app", devices: fromApp, lookups };
-            }
+            fromApp = airOf(appliances);
         } catch (caught) {
             lookups.push({
                 where: "HomeID app",
@@ -747,16 +760,30 @@ export async function discoverPhilipsDevices(
                 failure: failureOf(caught)
             });
         }
+        if (fromApp.length > 0) {
+            try {
+                const userId = await philipsUserId(homeid.accessToken);
+                return { session: homeid, userId, source: "homeid-app", devices: fromApp, lookups };
+            } catch (caught) {
+                lookups.push({
+                    where: "HomeID account",
+                    count: null,
+                    models: [],
+                    failure: failureOf(caught)
+                });
+                refuse(
+                    (summary) =>
+                        `Polaris found an air purifier on this Philips account, but Philips does not let this sign-in control it. What it saw: ${summary}.`
+                );
+            }
+        }
     }
 
-    const summary = philipsLookupSummary(lookups);
-    console.warn(`places: a Philips account sign-in found nothing to drive (${summary})`);
     const anything = lookups.some((lookup) => (lookup.count ?? 0) > 0);
-    throw new DriverError(
+    return refuse((summary) =>
         anything
             ? `Polaris found appliances on this Philips account, but no air purifier. What it saw: ${summary}.`
-            : `Polaris found no air purifier on this Philips account. What it saw: ${summary}. Check that the purifier is in the Air+ app under this same email.`,
-        "refused"
+            : `Polaris found no air purifier on this Philips account. What it saw: ${summary}. Check that the purifier is in the Air+ app under this same email.`
     );
 }
 

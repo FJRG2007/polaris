@@ -596,6 +596,36 @@ describe("finding the purifiers on an account", () => {
         expect(answer).toMatchObject({ done: true, credentials: { source: "homeid-app" } });
     });
 
+    it("says what it saw when the HomeID sign-in finds a purifier it may not control", async () => {
+        philips({
+            homeIdApp: { appliances: [{ externalDeviceId: "ext-5", ctn: "AC0850/11" }] }
+        });
+        const homeid = `Bearer access-${cloud.PHILIPS_CLIENTS.homeid.id}`;
+        routes.unshift({
+            match: (url, init) =>
+                (url.pathname.endsWith("/user/self") ||
+                    url.pathname.endsWith("/user/self/device")) &&
+                new Headers(init.headers).get("authorization") === homeid,
+            reply: () => jsonReply({ message: "Forbidden" }, 403)
+        });
+        await expect(sign()).rejects.toThrow(
+            "Polaris found an air purifier on this Philips account, but Philips does not let this sign-in control it. What it saw: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0850/11); HomeID account: HTTP 401/403."
+        );
+        expect(logged).toHaveLength(1);
+    });
+
+    it("adds its own query to a backend link that already carries one", async () => {
+        philips({ homeIdApp: { appliances: [{ externalDeviceId: "ext-6", ctn: "AC1715/11" }] } });
+        routes.unshift({
+            match: (url) => url.pathname === "/.well-known/tenant/oneka",
+            reply: () => jsonReply({ profileUrl: "/user/self/profile?lang=en" })
+        });
+        expect(await cloud.listHomeIdAppliances("t")).toHaveLength(1);
+        const profile = calls.find((call) => call.url.pathname === "/api/user/self/profile")!;
+        expect(profile.url.searchParams.get("lang")).toBe("en");
+        expect(profile.url.searchParams.get("ts")).toMatch(/^\d+$/);
+    });
+
     it("logs what it saw once, with no token, id, email or code in it", async () => {
         philips({ airplusDevices: [{ uuid: "secret-uuid", ctn: "HD9280/90" }] });
         await expect(sign()).rejects.toThrow(
