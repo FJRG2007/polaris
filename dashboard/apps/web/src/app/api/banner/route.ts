@@ -34,7 +34,8 @@ export async function POST(request: Request): Promise<Response> {
     if (bytes.length > MAX_AVATAR_BYTES) return new Response(TOO_BIG, { status: 413 });
 
     const mime = sniffImageMime(bytes);
-    if (!mime) return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
+    if (!mime)
+        return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
 
     try {
         await storeAvatar({ kind: "banner", id: user.id }, bytes, mime);

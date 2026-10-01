@@ -48,7 +48,8 @@ vi.mock("@polaris/db", () => ({
                 comments
                     .filter(
                         (comment) =>
-                            comment.subjectType === where.subjectType && comment.subjectId === where.subjectId
+                            comment.subjectType === where.subjectType &&
+                            comment.subjectId === where.subjectId
                     )
                     .map((comment) => ({
                         ...comment,
@@ -115,7 +116,9 @@ beforeEach(() => {
 describe("the comment a file says it was sent with", () => {
     it("is kept when it is a comment on that task", async () => {
         await upload(MINE);
-        expect(created).toHaveBeenCalledWith(expect.objectContaining({ taskId: TASK, commentId: MINE }));
+        expect(created).toHaveBeenCalledWith(
+            expect.objectContaining({ taskId: TASK, commentId: MINE })
+        );
     });
 
     it("is dropped when it belongs to another task", async () => {
@@ -123,7 +126,9 @@ describe("the comment a file says it was sent with", () => {
         // does not do is appear in a conversation on a task the uploader was
         // never authorized against.
         await upload(THEIRS);
-        expect(created).toHaveBeenCalledWith(expect.objectContaining({ taskId: TASK, commentId: null }));
+        expect(created).toHaveBeenCalledWith(
+            expect.objectContaining({ taskId: TASK, commentId: null })
+        );
     });
 
     it("is dropped when it is not a comment at all", async () => {

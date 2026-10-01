@@ -22,11 +22,7 @@
  */
 
 import { beginTransfer, type TransferHandle, type TransferProblem } from "./transfer-store";
-import {
-    downloadStarted,
-    forgetDownloadTicket,
-    newDownloadTicket
-} from "@/lib/download-ticket";
+import { downloadStarted, forgetDownloadTicket, newDownloadTicket } from "@/lib/download-ticket";
 
 /** What came back, in the shape a caller of `fetch` would expect. */
 export interface Sent {
@@ -282,7 +278,9 @@ function watchHandover(
         told.onGaveUp?.();
         // It may still arrive - this is a page watching a cookie, not the transfer
         // itself - so the sentence says what is known rather than calling it dead.
-        transfer.failed("This is taking longer than usual. Your browser will save it if it arrives.");
+        transfer.failed(
+            "This is taking longer than usual. Your browser will save it if it arrives."
+        );
     }, POLL_MS);
 }
 

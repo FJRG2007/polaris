@@ -43,7 +43,10 @@ export async function PUT(
         await requirePostable({ id: user.id }, channelId);
     } catch (caught) {
         if (caught instanceof ChatAccessError) {
-            return Response.json({ error: caught.textIn((await readerWords("chat")).locale) }, { status: 403 });
+            return Response.json(
+                { error: caught.textIn((await readerWords("chat")).locale) },
+                { status: 403 }
+            );
         }
         throw caught;
     }
@@ -51,17 +54,31 @@ export async function PUT(
     // This account's standing, then the instance's rules for this kind of
     // conversation. Both before the body is touched.
     if (!(await can(user.id, "chat.attach"))) {
-        return Response.json({ error: (await readerWords("chat"))("errors.noFilesAllowed") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.noFilesAllowed") },
+            { status: 403 }
+        );
     }
     const rules = await rulesForChannel(channelId);
     if (rules.maxAttachments === 0) {
-        return Response.json({ error: (await readerWords("chat"))("errors.noFilesHere") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.noFilesHere") },
+            { status: 400 }
+        );
     }
 
     const url = new URL(request.url);
     const name = url.searchParams.get("name");
-    if (!name) return Response.json({ error: (await readerWords("chat"))("errors.fileNoName") }, { status: 400 });
-    if (!request.body) return Response.json({ error: (await readerWords("chat"))("errors.fileEmpty") }, { status: 400 });
+    if (!name)
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.fileNoName") },
+            { status: 400 }
+        );
+    if (!request.body)
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.fileEmpty") },
+            { status: 400 }
+        );
 
     const biggest = rules.maxAttachmentMib * 1024 * 1024;
     // What the browser says it weighs. Refused here when it is already over the

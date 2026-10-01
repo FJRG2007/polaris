@@ -46,7 +46,9 @@ export async function POST(request: Request): Promise<Response> {
     const limit = await uploadLimit();
     const declared = Number(request.headers.get("content-length") ?? "0");
     if (declared > limit) {
-        return new Response(`That file is over the ${Math.round(limit / (1024 * 1024))} MB limit`, { status: 413 });
+        return new Response(`That file is over the ${Math.round(limit / (1024 * 1024))} MB limit`, {
+            status: 413
+        });
     }
 
     try {

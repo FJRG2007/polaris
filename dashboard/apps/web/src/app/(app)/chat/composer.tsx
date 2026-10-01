@@ -536,7 +536,15 @@ export function Composer({
             return;
         }
         setRefused("");
-        void deliver({ id: newOutgoingId(), scope, body: "", files: [file], kept: [], sounds: [sound], hidden: [] });
+        void deliver({
+            id: newOutgoingId(),
+            scope,
+            body: "",
+            files: [file],
+            kept: [],
+            sounds: [sound],
+            hidden: []
+        });
     });
 
     /**
@@ -548,12 +556,19 @@ export function Composer({
      * message when one of them does not make it.
      */
     const deliver = async (one: Omit<Outgoing, "phase" | "error" | "progress">): Promise<void> => {
-        const settle = (change: (was: Outgoing) => Outgoing | null) => patchOutgoing(one.id, change);
+        const settle = (change: (was: Outgoing) => Outgoing | null) =>
+            patchOutgoing(one.id, change);
         if (!putOutgoing({ ...one, phase: "sending" })) return;
         let outcome: SendOutcome;
         try {
-            outcome = await onSend(one.body, one.files, one.sounds, one.hidden, one.kept, (progress) =>
-                settle((was) => (was.phase === "sending" ? { ...was, progress } : was))
+            outcome = await onSend(
+                one.body,
+                one.files,
+                one.sounds,
+                one.hidden,
+                one.kept,
+                (progress) =>
+                    settle((was) => (was.phase === "sending" ? { ...was, progress } : was))
             );
         } catch {
             outcome = { error: t("composer.outgoing.notSent") };
@@ -601,7 +616,14 @@ export function Composer({
         if (draftKey && !editing) dropDraft(draftKey);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
         else if (sending.length > 0 || staying.length > 0) {
-            await deliver({ id: newOutgoingId(), scope, body: text, files: sending, kept: staying, hidden });
+            await deliver({
+                id: newOutgoingId(),
+                scope,
+                body: text,
+                files: sending,
+                kept: staying,
+                hidden
+            });
         } else await onSend(text, sending, undefined, hidden, staying);
     };
 
@@ -837,7 +859,9 @@ export function Composer({
             {replyingTo && !editing && (
                 <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
                     <CornerUpLeft className="size-3 shrink-0 text-muted-foreground" />
-                    <span className="shrink-0 text-muted-foreground">{t("composer.replyingTo")}</span>
+                    <span className="shrink-0 text-muted-foreground">
+                        {t("composer.replyingTo")}
+                    </span>
                     <span className="shrink-0 font-medium">
                         {replyingTo.authorName ?? t("composer.somebodyWhoHasLeft")}
                     </span>
@@ -1458,7 +1482,9 @@ function StagedFile({
         <button
             type="button"
             aria-pressed={covered}
-            aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", { name: file.name })}
+            aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", {
+                name: file.name
+            })}
             title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
             onClick={onCover}
             className={cn(
@@ -1573,16 +1599,19 @@ function StagedFromDrive({
     return (
         <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
             <HardDrive className="size-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[12rem] truncate" title={t("composer.inYourDrive", { name: kept.name })}>
+            <span
+                className="max-w-[12rem] truncate"
+                title={t("composer.inYourDrive", { name: kept.name })}
+            >
                 {kept.name}
             </span>
             <span className="text-muted-foreground">{readableSize(kept.size)}</span>
             <button
                 type="button"
                 aria-pressed={covered}
-                aria-label={
-                    t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", { name: kept.name })
-                }
+                aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", {
+                    name: kept.name
+                })}
                 title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
                 onClick={onCover}
                 className={cn(

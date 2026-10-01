@@ -15,7 +15,11 @@
 
 import { ANSWER_WITHIN_MS, saveFile, sendFile } from "@/components/transfers/move-file";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearTransfer, transferSecondsLeft, transfersNow } from "@/components/transfers/transfer-store";
+import {
+    clearTransfer,
+    transferSecondsLeft,
+    transfersNow
+} from "@/components/transfers/transfer-store";
 
 /** One request, as the sender drives it. */
 class FakeRequest {
@@ -117,7 +121,10 @@ describe("sending one file", () => {
 
     it("shows the sentence the server wrote about a file it refused", async () => {
         const sending = sendFile("/api/chat/channels/c1/uploads?name=holiday.mp4", file());
-        FakeRequest.last!.answer(413, JSON.stringify({ error: "holiday.mp4 is bigger than 25 MB" }));
+        FakeRequest.last!.answer(
+            413,
+            JSON.stringify({ error: "holiday.mp4 is bigger than 25 MB" })
+        );
         const sent = await sending;
         expect(sent.ok).toBe(false);
         expect(sent.status).toBe(413);
@@ -173,7 +180,9 @@ describe("sending one file", () => {
     it("waits as long as it takes for a route whose answer is the work", async () => {
         vi.useFakeTimers();
         try {
-            const sending = sendFile("/api/admin/transfer/upload", file(), { answerWithinMs: null });
+            const sending = sendFile("/api/admin/transfer/upload", file(), {
+                answerWithinMs: null
+            });
             const request = FakeRequest.last!;
             request.sentAll();
             vi.advanceTimersByTime(ANSWER_WITHIN_MS * 10);

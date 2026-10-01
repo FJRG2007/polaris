@@ -66,7 +66,10 @@ export async function GET(
     // Answered before the bytes are fetched: most requests for a picture are a
     // browser checking the one it already has.
     if (request.headers.get("if-none-match") === picture.etag) {
-        return new Response(null, { status: 304, headers: { ETag: picture.etag, "Cache-Control": CACHE } });
+        return new Response(null, {
+            status: 304,
+            headers: { ETag: picture.etag, "Cache-Control": CACHE }
+        });
     }
 
     const bytes = await picture.load();
@@ -110,7 +113,8 @@ export async function POST(
     if (bytes.length > MAX_AVATAR_BYTES) return new Response(TOO_BIG, { status: 413 });
 
     const mime = sniffImageMime(bytes);
-    if (!mime) return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
+    if (!mime)
+        return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
 
     try {
         await storeAvatar({ kind: "orgBanner", id: orgId }, bytes, mime);
@@ -158,9 +162,16 @@ export async function DELETE(
  * organization somebody has no part in must not be confirmable by poking at its
  * pictures.
  */
-async function guard(user: { id: string; isAdmin: boolean }, orgId: string): Promise<Response | null> {
+async function guard(
+    user: { id: string; isAdmin: boolean },
+    orgId: string
+): Promise<Response | null> {
     try {
-        await requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "settings.manage");
+        await requireOrgPermission(
+            { id: user.id, isAdmin: user.isAdmin },
+            orgId,
+            "settings.manage"
+        );
         return null;
     } catch {
         return new Response(null, { status: 404 });

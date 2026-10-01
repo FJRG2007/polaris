@@ -74,7 +74,11 @@ export type TransferProblem =
 
 /** Whether a transfer is still under way, in either of its two halves. */
 export function isUnderWay(transfer: Transfer): boolean {
-    return transfer.state === "waiting" || transfer.state === "moving" || transfer.state === "processing";
+    return (
+        transfer.state === "waiting" ||
+        transfer.state === "moving" ||
+        transfer.state === "processing"
+    );
 }
 
 /** Everything that has not been cleared, newest last. */

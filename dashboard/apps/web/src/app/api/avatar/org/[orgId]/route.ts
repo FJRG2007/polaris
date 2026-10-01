@@ -42,7 +42,10 @@ const CACHE = "private, no-cache";
  *  same statement as "there is no picture", so it is not cached as one. */
 const NO_CACHE = "private, no-store";
 
-export async function GET(request: Request, { params }: { params: Promise<{ orgId: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ orgId: string }> }
+): Promise<Response> {
     // An organization's mark is on its own public page, so a reader with no
     // session is answered when this instance publishes profiles. Nothing here is
     // per-viewer: an organization has one picture and everybody who can reach
@@ -70,7 +73,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
     // Answered before the bytes are fetched, which is the point of the split:
     // most requests for a face are a browser checking the one it already has.
     if (request.headers.get("if-none-match") === picture.etag) {
-        return new Response(null, { status: 304, headers: { ETag: picture.etag, "Cache-Control": CACHE } });
+        return new Response(null, {
+            status: 304,
+            headers: { ETag: picture.etag, "Cache-Control": CACHE }
+        });
     }
 
     const bytes = await picture.load();
@@ -92,7 +98,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
     });
 }
 
-export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }): Promise<Response> {
+export async function POST(
+    request: Request,
+    { params }: { params: Promise<{ orgId: string }> }
+): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const { orgId } = await params;
@@ -111,11 +120,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     if (bytes.length > MAX_AVATAR_BYTES) return new Response(TOO_BIG, { status: 413 });
 
     const mime = sniffImageMime(bytes);
-    if (!mime) return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
+    if (!mime)
+        return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
 
     try {
         await storeAvatar({ kind: "org", id: orgId }, bytes, mime);
-        await recordAudit({ actorId: user.id, orgId, action: "org.photo.set", targetType: "org", targetId: orgId });
+        await recordAudit({
+            actorId: user.id,
+            orgId,
+            action: "org.photo.set",
+            targetType: "org",
+            targetId: orgId
+        });
         return Response.json({ ok: true });
     } catch (error) {
         // The reason is for the operator's log; the person gets a sentence they
@@ -127,7 +143,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
     }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ orgId: string }> }): Promise<Response> {
+export async function DELETE(
+    _request: Request,
+    { params }: { params: Promise<{ orgId: string }> }
+): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const { orgId } = await params;
@@ -135,7 +154,13 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (refused) return refused;
 
     await deleteAvatar({ kind: "org", id: orgId });
-    await recordAudit({ actorId: user.id, orgId, action: "org.photo.clear", targetType: "org", targetId: orgId });
+    await recordAudit({
+        actorId: user.id,
+        orgId,
+        action: "org.photo.clear",
+        targetType: "org",
+        targetId: orgId
+    });
     return Response.json({ ok: true });
 }
 
@@ -147,9 +172,16 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
  * an organization somebody has no part in must not be confirmable by poking at
  * its photo.
  */
-async function guard(user: { id: string; isAdmin: boolean }, orgId: string): Promise<Response | null> {
+async function guard(
+    user: { id: string; isAdmin: boolean },
+    orgId: string
+): Promise<Response | null> {
     try {
-        await requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "settings.manage");
+        await requireOrgPermission(
+            { id: user.id, isAdmin: user.isAdmin },
+            orgId,
+            "settings.manage"
+        );
         return null;
     } catch {
         return new Response(null, { status: 404 });

@@ -1772,9 +1772,7 @@ export function ChannelView({
                 <EmptyState
                     icon={<MessageCircle />}
                     title={t("channelView.thisConversationIsNotYours")}
-                    description={
-                        error || t("channelView.itMayHaveBeenDeleted")
-                    }
+                    description={error || t("channelView.itMayHaveBeenDeleted")}
                 />
             </div>
         );
@@ -1837,7 +1835,9 @@ export function ChannelView({
                     // further back, and is what somebody sees for the
                     // moment it takes.
                     <p className="py-2 text-center text-xs text-muted-foreground">
-                        {loadingOlder ? t("channelView.loadingEarlierMessages") : t("channelView.earlierMessages")}
+                        {loadingOlder
+                            ? t("channelView.loadingEarlierMessages")
+                            : t("channelView.earlierMessages")}
                     </p>
                 )}
 
@@ -2037,7 +2037,12 @@ export function ChannelView({
                         attachable={may.attach}
                         placeholder={
                             canPost
-                                ? t("channelView.messagePlaceholder", { name: channel.kind === "text" ? `#${channel.name}` : channel.name })
+                                ? t("channelView.messagePlaceholder", {
+                                      name:
+                                          channel.kind === "text"
+                                              ? `#${channel.name}`
+                                              : channel.name
+                                  })
                                 : t("channelView.thisConversationIsArchived")
                         }
                         editing={editing}
@@ -2195,8 +2200,7 @@ export function ChannelView({
                             if (session && voice.switchWarning) {
                                 const sure = await confirm({
                                     title: t("channelView.leaveAndJoin", { name: channel.name }),
-                                    description:
-                                        t("channelView.youAreInACall"),
+                                    description: t("channelView.youAreInACall"),
                                     confirmLabel: t("channelView.joinThisRoom")
                                 });
                                 if (!sure) return;

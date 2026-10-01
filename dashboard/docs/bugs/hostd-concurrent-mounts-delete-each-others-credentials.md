@@ -17,7 +17,7 @@ rather than caching that it is already up.
 `run_mount` wrote one SMB share's username and password to a fixed path,
 named only after the share id (`/run/polaris/mount-creds-<id>`), then ran
 `mount.cifs` against it and deleted the file once `mount.cifs` returned.
-Two requests to mount the *same* share arrive on a thread each and run
+Two requests to mount the _same_ share arrive on a thread each and run
 concurrently, both writing to that one name. The first `mount.cifs` call to
 finish deleted the file - as it is supposed to, once its own mount is up -
 while the second call's `mount.cifs`, started a moment later, was still
@@ -38,7 +38,7 @@ Two changes, independent of each other:
   waits for the first. The lock is keyed by share id specifically so that
   a share whose NAS is switched off, and whose `mount` call is sitting out
   the kernel's own connect retries, does not hold up a deploy mounting a
-  *different* share.
+  _different_ share.
 
 ## What stops it coming back
 

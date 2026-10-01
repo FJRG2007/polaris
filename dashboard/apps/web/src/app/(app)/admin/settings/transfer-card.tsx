@@ -41,7 +41,10 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
     const [importPass, setImportPass] = useState("");
     const [uploadId, setUploadId] = useState<string | null>(null);
     const [busy, setBusy] = useState<"upload" | "preview" | "apply" | null>(null);
-    const [preview, setPreview] = useState<{ summary: TransferSummary; refused: string | null } | null>(null);
+    const [preview, setPreview] = useState<{
+        summary: TransferSummary;
+        refused: string | null;
+    } | null>(null);
     const [confirm, setConfirm] = useState("");
     const [error, setError] = useState<string | null>(null);
 
@@ -159,9 +162,15 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                         />
                         <Button
                             onClick={() => void runExport()}
-                            disabled={exporting || !exportPass || exportConfirm !== exportPass || exportProblem !== null}
+                            disabled={
+                                exporting ||
+                                !exportPass ||
+                                exportConfirm !== exportPass ||
+                                exportProblem !== null
+                            }
                         >
-                            {exporting && <Loader2 className="size-4 animate-spin" />} {t("settings.transfer.export")}
+                            {exporting && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {t("settings.transfer.export")}
                         </Button>
                     </div>
                     {exportProblem && <p className="text-xs text-danger">{exportProblem}</p>}
@@ -206,8 +215,12 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             onClick={() => void runPreview()}
                             disabled={busy !== null || !file || importPass.length < MIN_PASSPHRASE}
                         >
-                            {(busy === "upload" || busy === "preview") && <Loader2 className="size-4 animate-spin" />}{" "}
-                            {busy === "upload" ? t("settings.transfer.uploading") : t("settings.transfer.checkFile")}
+                            {(busy === "upload" || busy === "preview") && (
+                                <Loader2 className="size-4 animate-spin" />
+                            )}{" "}
+                            {busy === "upload"
+                                ? t("settings.transfer.uploading")
+                                : t("settings.transfer.checkFile")}
                         </Button>
                     </div>
                     {preview && (
@@ -233,7 +246,9 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                             )}
                             {preview.summary.unknownTables.length > 0 && (
                                 <p className="text-warning">
-                                    {t("settings.transfer.skipped", { tables: preview.summary.unknownTables.join(", ") })}
+                                    {t("settings.transfer.skipped", {
+                                        tables: preview.summary.unknownTables.join(", ")
+                                    })}
                                 </p>
                             )}
                             {preview.refused ? (
@@ -251,7 +266,10 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                                         onClick={() => void runApply()}
                                         disabled={busy !== null || confirm !== "replace"}
                                     >
-                                        {busy === "apply" && <Loader2 className="size-4 animate-spin" />} {t("settings.transfer.import")}
+                                        {busy === "apply" && (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        )}{" "}
+                                        {t("settings.transfer.import")}
                                     </Button>
                                 </div>
                             )}

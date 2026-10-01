@@ -144,9 +144,7 @@ function TransferRow({ transfer }: { transfer: Transfer }) {
                     aria-label={transfer.name}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    {...(fraction === null
-                        ? {}
-                        : { "aria-valuenow": Math.round(fraction * 100) })}
+                    {...(fraction === null ? {} : { "aria-valuenow": Math.round(fraction * 100) })}
                     className="h-1 w-full overflow-hidden rounded-full bg-muted"
                 >
                     <div
@@ -171,13 +169,17 @@ function TransferRow({ transfer }: { transfer: Transfer }) {
 /** What the row says under the bar. */
 function said(transfer: Transfer, secondsLeft: number | null, t: Words): string {
     if (transfer.state === "stopped") return t("transfers.stopped");
-    if (transfer.state === "done") return transfer.way === "up" ? t("transfers.sent") : t("transfers.saved");
+    if (transfer.state === "done")
+        return transfer.way === "up" ? t("transfers.sent") : t("transfers.saved");
     if (transfer.state === "waiting") {
         return transfer.way === "up" ? t("transfers.starting") : t("transfers.waiting");
     }
     if (transfer.state === "processing") return t("transfers.processing");
     const size = transfer.total
-        ? t("transfers.ofTotal", { moved: readable(transfer.moved), total: readable(transfer.total) })
+        ? t("transfers.ofTotal", {
+              moved: readable(transfer.moved),
+              total: readable(transfer.total)
+          })
         : readable(transfer.moved);
     return secondsLeft === null ? size : t("transfers.left", { size, left: clock(secondsLeft) });
 }

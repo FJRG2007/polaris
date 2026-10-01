@@ -126,7 +126,8 @@ export async function POST(
 
     // What the bytes are, not what the upload claimed they are.
     const mime = sniffImageMime(bytes);
-    if (!mime) return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
+    if (!mime)
+        return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
 
     try {
         await storeAvatar({ kind: what, id: subjectId }, bytes, mime);
