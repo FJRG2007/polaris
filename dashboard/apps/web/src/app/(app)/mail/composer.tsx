@@ -614,7 +614,14 @@ export function Composer() {
                                     )}
                                 </label>
 
-                                <RecipientField label={t("compose.to")} value={to} onChange={setTo} autoFocus />
+                                <RecipientField
+                                    label={t("compose.to")}
+                                    value={to}
+                                    onChange={setTo}
+                                    // A reply arrives addressed: the caret belongs in the message,
+                                    // and an autofocused To would take it back from the editor.
+                                    autoFocus={!(composing?.inReplyToId && (composing.to ?? []).length > 0)}
+                                />
                                 {showCopies ? (
                                     <>
                                         <RecipientField label={t("compose.cc")} value={cc} onChange={setCc} />
