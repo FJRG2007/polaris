@@ -33,8 +33,9 @@
  * no make needs a screen of its own for it:
  *
  * - The registry says what the reader is shown (`kind`: a code to scan, a
- *   button to press, or a box for a code sent by email), how often to ask whether it has happened (`pollMs`) and
- *   how long one attempt is given before a new one is offered (`lifetimeMs`).
+ *   button to press, or a box for a code sent by email), how often to ask
+ *   whether it has happened (`pollMs`) and how long one attempt is given
+ *   before a new one is offered (`lifetimeMs`).
  *   Its words are `connections.<id>.pairing.prompt` in the catalogs: the one
  *   line under the code or beside the wait.
  * - The driver implements `pair` (`drivers/contract.ts`): `start` takes the
@@ -56,9 +57,9 @@
  * and the build failed with a webpack error naming neither file.
  */
 
-import { TUYA_REGIONS } from "./integrations/tuya-regions";
-import type { DeviceKind } from "./device-kinds";
 import type { PlacesTranslator } from "./i18n";
+import type { DeviceKind } from "./device-kinds";
+import { TUYA_REGIONS } from "./integrations/tuya-regions";
 import { englishPlaces as en, type PlacesKey } from "../../messages";
 
 /** One thing a connection has to be told. */
