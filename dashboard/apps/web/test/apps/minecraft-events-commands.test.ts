@@ -2489,3 +2489,12 @@ describe("a place that can be walked to", () => {
         expect(lines.at(-1)).toContain('"pe_path"');
     });
 });
+
+describe("a treasure hunt's clock", () => {
+    it("starts with its first chest down, while the rest are still hidden", () => {
+        const preset = catalog.newPreset("treasure-hunt", "t");
+        const run = { preset, place: null, meteors: [], round: -1, stage: null, readyAt: null };
+        expect(catalog.readyToPlay({ ...run, hidden: false, chests: [] })).toBe(false);
+        expect(catalog.readyToPlay({ ...run, hidden: false, chests: [{}] })).toBe(true);
+    });
+});

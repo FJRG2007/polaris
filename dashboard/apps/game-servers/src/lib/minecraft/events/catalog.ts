@@ -1200,6 +1200,7 @@ export function readyToPlay(run: {
     readonly preset: EventPreset;
     readonly place: unknown;
     readonly hidden: boolean;
+    readonly chests: readonly unknown[];
     readonly meteors: readonly unknown[];
     readonly round: number;
     readonly stage: { readonly racers: readonly unknown[] } | null;
@@ -1217,7 +1218,8 @@ export function readyToPlay(run: {
                 (preset.options as EventOptions<"explorer">).mode !== "race" || run.place !== null
             );
         case "treasure-hunt":
-            return run.hidden;
+            // Once the first chest is down: the rest are hidden while it is hunted.
+            return run.chests.length > 0;
         case "meteor-shower":
             return run.meteors.length > 0;
         case "trivia":

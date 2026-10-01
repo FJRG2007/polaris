@@ -2090,20 +2090,15 @@ async function treasureHunt(
 ): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"treasure-hunt">;
     const language = loop.language;
-    if (!loop.run.hidden) {
-        await hideTreasure(installedAppId, loop, server, options);
-        if (!loop.run.hidden) {
-            lines.push(
-                ...hunt.holdChests(loop.run.held),
-                ...hunt.marks(loop.run.chests),
-                `title @a actionbar ${commands.text(messages.huntHiding(language))}`
-            );
-            return null;
-        }
-    }
+    // The rest hidden while the first are hunted: its clock starts with the first.
+    if (!loop.run.hidden) await hideTreasure(installedAppId, loop, server, options);
     lines.push(...hunt.holdChests(loop.run.held));
+    if (loop.run.chests.length === 0) {
+        lines.push(`title @a actionbar ${commands.text(messages.huntHiding(language))}`);
+        return null;
+    }
     // Said once, when every chest is down: nothing more until one is opened.
-    if (loop.run.reveals < 1) {
+    if (loop.run.hidden && loop.run.reveals < 1) {
         lines.push(
             commands.say(messages.tag(language) + messages.huntStart(loop.run.chests.length, language)),
             commands.sound(commands.SOUNDS.tick)
@@ -2142,7 +2137,7 @@ async function treasureHunt(
         await persist(installedAppId, loop);
     }
     const unopened = chests.filter((one) => !one.opened);
-    if (unopened.length === 0) {
+    if (unopened.length === 0 && loop.run.hidden) {
         return `All ${chests.length} ${chests.length === 1 ? "treasure" : "treasures"} found`;
     }
     lines.push(...hunt.marks(chests));
