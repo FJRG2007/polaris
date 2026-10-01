@@ -30,7 +30,11 @@ const USERINFO = "https://www.googleapis.com/oauth2/v3/userinfo";
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
 /** Read the calendar, learn who authorized, and nothing else. */
-export const GOOGLE_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.readonly"];
+export const GOOGLE_SCOPES = [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/calendar.readonly"
+];
 
 /** What a sign-in asks for: who is at the other end. Nothing more belongs on a
  *  consent screen whose whole job is to name an account. */
@@ -49,7 +53,11 @@ export const GOOGLE_SIGN_IN_SCOPES = ["openid", "email"];
  * account linked for the calendar and later used for backups ends up holding
  * both without either authorization having to be repeated.
  */
-export const GOOGLE_DRIVE_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/drive.file"];
+export const GOOGLE_DRIVE_SCOPES = [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/drive.file"
+];
 
 /**
  * What linking a Gmail mailbox asks for.
@@ -61,6 +69,20 @@ export const GOOGLE_DRIVE_SCOPES = ["openid", "email", "https://www.googleapis.c
  * their calendar must never be shown a consent screen asking for their mail.
  */
 export const GOOGLE_MAIL_SCOPES = ["openid", "email", "https://mail.google.com/"];
+
+/**
+ * What linking a calendar to the Calendar app asks for: reading and writing
+ * every calendar the account holds, which is what syncing both ways means.
+ *
+ * Asked for on its own consent screen, like mail: somebody who linked Google to
+ * see their week beside their tasks agreed to a read-only view, and a token that
+ * can change their meetings is a different thing to agree to.
+ */
+export const GOOGLE_CALENDAR_SCOPES = [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/calendar"
+];
 
 export interface GoogleOAuthClient {
     readonly clientId: string;
@@ -97,7 +119,7 @@ export function googleAuthorizeUrl(
     client: GoogleOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" | "storage" | "mail" = "link",
+    flow: "link" | "signin" | "storage" | "mail" | "calendar" = "link",
     /** The account this is being authorized FOR, when something downstream
      *  knows - a mailbox address somebody typed. Google opens on that account
      *  instead of on whichever one the browser happens to be signed into, which
@@ -112,7 +134,9 @@ export function googleAuthorizeUrl(
           ? GOOGLE_DRIVE_SCOPES
           : flow === "mail"
             ? GOOGLE_MAIL_SCOPES
-            : GOOGLE_SCOPES;
+            : flow === "calendar"
+              ? GOOGLE_CALENDAR_SCOPES
+              : GOOGLE_SCOPES;
     const url = new URL(OAUTH_AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -144,15 +168,24 @@ export function googleAuthorizeUrl(
  * about the credentials, and an operator cannot argue with a check that failed
  * because this server was briefly offline.
  */
-export async function verifyGoogleOAuthClient(client: GoogleOAuthClient, redirectUri: string): Promise<string | null> {
-    return (await refusedCredentials(client, redirectUri)) ?? (await refusedRedirectUri(client, redirectUri));
+export async function verifyGoogleOAuthClient(
+    client: GoogleOAuthClient,
+    redirectUri: string
+): Promise<string | null> {
+    return (
+        (await refusedCredentials(client, redirectUri)) ??
+        (await refusedRedirectUri(client, redirectUri))
+    );
 }
 
 /** A code that cannot be valid, so the only thing the answer can be about is who
  *  is asking. Google reads the credentials before it reads the code. */
 const NOT_A_CODE = "polaris-setup-check";
 
-async function refusedCredentials(client: GoogleOAuthClient, redirectUri: string): Promise<string | null> {
+async function refusedCredentials(
+    client: GoogleOAuthClient,
+    redirectUri: string
+): Promise<string | null> {
     const response = await fetch(OAUTH_TOKEN, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -176,7 +209,10 @@ async function refusedCredentials(client: GoogleOAuthClient, redirectUri: string
     return null;
 }
 
-async function refusedRedirectUri(client: GoogleOAuthClient, redirectUri: string): Promise<string | null> {
+async function refusedRedirectUri(
+    client: GoogleOAuthClient,
+    redirectUri: string
+): Promise<string | null> {
     const probe = await fetch(googleAuthorizeUrl(client, redirectUri, NOT_A_CODE), {
         redirect: "manual",
         cache: "no-store"
@@ -239,7 +275,9 @@ export async function exchangeGoogleCode(
         throw new Error((await readerWords("tasks"))("google.noRefreshToken"));
     }
 
-    const who = await fetchJson(USERINFO, userinfoSchema, { Authorization: `Bearer ${token.access_token}` });
+    const who = await fetchJson(USERINFO, userinfoSchema, {
+        Authorization: `Bearer ${token.access_token}`
+    });
     return {
         refreshToken: token.refresh_token,
         accessToken: token.access_token,
@@ -268,7 +306,9 @@ export async function identifyGoogleAccount(
         redirect_uri: redirectUri,
         grant_type: "authorization_code"
     });
-    const who = await fetchJson(USERINFO, userinfoSchema, { Authorization: `Bearer ${token.access_token}` });
+    const who = await fetchJson(USERINFO, userinfoSchema, {
+        Authorization: `Bearer ${token.access_token}`
+    });
     return { accountId: who.sub };
 }
 
@@ -277,15 +317,24 @@ export async function identifyGoogleAccount(
  *  produced it, and never written anywhere. */
 const accessTokens = new Map<string, { token: string; expiresAt: number }>();
 
-export async function googleAccessToken(client: GoogleOAuthClient, refreshToken: string): Promise<string> {
+export async function googleAccessToken(
+    client: GoogleOAuthClient,
+    refreshToken: string
+): Promise<string> {
     const cached = accessTokens.get(refreshToken);
     if (cached && cached.expiresAt > Date.now()) return cached.token;
 
-    const token = await postToken(client, { refresh_token: refreshToken, grant_type: "refresh_token" });
+    const token = await postToken(client, {
+        refresh_token: refreshToken,
+        grant_type: "refresh_token"
+    });
     // A minute of headroom, so a token does not expire between this check and
     // the call it was fetched for.
     const ttl = (token.expires_in ?? 3600) * 1000 - 60_000;
-    accessTokens.set(refreshToken, { token: token.access_token, expiresAt: Date.now() + Math.max(0, ttl) });
+    accessTokens.set(refreshToken, {
+        token: token.access_token,
+        expiresAt: Date.now() + Math.max(0, ttl)
+    });
     return token.access_token;
 }
 
@@ -303,7 +352,11 @@ export function forgetGoogleAccessToken(refreshToken: string): void {
  *  tells them apart - so the reason rides along when there is one. */
 export class GoogleAuthExpiredError extends Error {
     constructor(reason?: string) {
-        super(reason ? `Google no longer accepts this authorization: ${reason}` : "Google no longer accepts this authorization.");
+        super(
+            reason
+                ? `Google no longer accepts this authorization: ${reason}`
+                : "Google no longer accepts this authorization."
+        );
         this.name = "GoogleAuthExpiredError";
     }
 }
@@ -317,8 +370,12 @@ const eventsSchema = z.object({
                 summary: z.string().optional(),
                 location: z.string().optional(),
                 htmlLink: z.string().optional(),
-                start: z.object({ date: z.string().optional(), dateTime: z.string().optional() }).optional(),
-                end: z.object({ date: z.string().optional(), dateTime: z.string().optional() }).optional()
+                start: z
+                    .object({ date: z.string().optional(), dateTime: z.string().optional() })
+                    .optional(),
+                end: z
+                    .object({ date: z.string().optional(), dateTime: z.string().optional() })
+                    .optional()
             })
         )
         .optional()
@@ -359,7 +416,9 @@ export async function listGoogleEvents(
     url.searchParams.set("orderBy", "startTime");
     url.searchParams.set("maxResults", "250");
 
-    const body = await fetchJson(url.toString(), eventsSchema, { Authorization: `Bearer ${accessToken}` });
+    const body = await fetchJson(url.toString(), eventsSchema, {
+        Authorization: `Bearer ${accessToken}`
+    });
     // Read in a request - the events route - so the placeholder for an event
     // with no title is in the reader's language.
     const untitled = (await readerWords("tasksViews"))("calendar.noTitle");
@@ -395,8 +454,10 @@ async function postToken(
         }),
         cache: "no-store"
     });
-    if (response.status === 400 || response.status === 401) throw new GoogleAuthExpiredError(await refusalReason(response));
-    if (!response.ok) throw new Error(await refusalMessage(response, "Google refused the token request"));
+    if (response.status === 400 || response.status === 401)
+        throw new GoogleAuthExpiredError(await refusalReason(response));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Google refused the token request"));
     const parsed = tokenSchema.safeParse(await response.json());
     if (!parsed.success) throw new Error("Google returned a token response Polaris could not read");
     return parsed.data;

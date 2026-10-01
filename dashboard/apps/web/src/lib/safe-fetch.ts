@@ -102,9 +102,10 @@ export async function resolveName(hostname: string): Promise<VettedAddress[]> {
     }
 }
 
-/** An address Polaris is willing to consider at all. */
-export function safeUrl(address: string): URL | null {
-    if (address.length > core.MAX_LINK_LENGTH) return null;
+/** An address Polaris is willing to consider at all. `maxLength` is a pasted
+ *  link's unless the caller says otherwise. */
+export function safeUrl(address: string, maxLength: number = core.MAX_LINK_LENGTH): URL | null {
+    if (address.length > maxLength) return null;
     let url: URL;
     try {
         url = new URL(address);
@@ -274,6 +275,45 @@ export async function follow(
         url = checked;
     }
     return null;
+}
+
+/** The address could not be used: not http(s), carrying credentials, or - for
+ *  somebody who may not reach the local network - resolving to a private one. */
+export class RefusedAddressError extends Error {
+    constructor() {
+        super("That address cannot be reached from here.");
+        this.name = "RefusedAddressError";
+    }
+}
+
+/**
+ * A request to an address somebody configured rather than pasted: a calendar
+ * server, a feed. Any method and body, one hop - the caller decides what a
+ * redirect means for its protocol and re-enters here for the next hop, so every
+ * hop is checked like the first.
+ *
+ * Public addresses only through the vetted dispatcher. `allowPrivate` is for an
+ * administrator linking a server on their own network, which is ordinary for a
+ * self-hosted Polaris and a probe of that network in anybody else's hands.
+ */
+export async function configuredRequest(
+    address: string,
+    init: RequestInit & { timeoutMs?: number },
+    options: { allowPrivate: boolean }
+): Promise<Response> {
+    const url = safeUrl(address, Number.POSITIVE_INFINITY);
+    if (!url) throw new RefusedAddressError();
+    if (!options.allowPrivate && !(await reachable(url.hostname))) throw new RefusedAddressError();
+    const { timeoutMs, ...rest } = init;
+    const request = {
+        ...(rest as Parameters<typeof guardedFetch>[1]),
+        redirect: "manual" as const,
+        signal: AbortSignal.timeout(timeoutMs ?? 20_000),
+        ...(options.allowPrivate ? {} : { dispatcher })
+    };
+    // undici's Response is the platform's in every way a caller reads it; the
+    // cast only reconciles the two packages' declarations of it.
+    return (await guardedFetch(url, request)) as unknown as Response;
 }
 
 /** Read at most `maxBytes`, whatever the other end says it is sending. */

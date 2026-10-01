@@ -47,6 +47,7 @@ on hardware you already own, sharing one account and one interface.
 | CodeRabbit                         | Reviews and coding agents that run here, on your own model keys                                                                                                  |
 | Pterodactyl and a pile of scripts  | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules                                                                    |
 | ClickUp, Jira, Linear              | Spaces, lists, boards, sprints, goals, docs and time tracking - or connect your existing Linear or Jira and keep its issues mirrored in, with status pushed back |
+| Google Calendar, Proton Calendar   | Day to year views, sharing and public links, two-way sync with Google, Microsoft and any CalDAV server, reminders, invitations and booking pages other people can reserve a slot on |
 | Home Assistant, a camera app       | Places: cameras with live views, detections, clips and alerts, plus switches, plugs, lights, locks and air conditioners from a dozen brands, with automations    |
 | Your NAS vendor's web UI           | One file browser across every NAS you own, with sharing and drop points                                                                                          |
 | Bitwarden, 1Password               | A vault your existing Bitwarden apps can point at, encrypted in the browser                                                                                      |
@@ -147,6 +148,10 @@ with one thing does not get the rest.
 
 - **Tasks** - spaces, lists, boards, sprints, goals, docs, custom fields,
   automations, forms and time tracking.
+- **Calendar** - day, week, month and year views, sharing and public links,
+  two-way sync with Google, Microsoft 365 and any CalDAV server or ICS feed,
+  reminders, invitations, free/busy, meeting rooms and booking pages other
+  people can reserve a slot on.
 - **Chat** - servers and channels, direct messages and groups, with calls,
   meetings, screen sharing, voice messages, screen clips recorded in the browser,
   and messages written now and sent at an hour that suits.

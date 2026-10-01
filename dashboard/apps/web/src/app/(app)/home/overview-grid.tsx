@@ -28,6 +28,7 @@ import { useShelfScope } from "@/components/shelf-scope";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { overviewRequestGroups } from "@/lib/overview/request-groups";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
+import { CalendarWidget } from "./widgets/calendar";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
@@ -432,9 +433,7 @@ export function OverviewGrid({
                                 : t("welcomeBack", { name: firstName(name) })
                             : t("title")}
                     </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {t("intro")}
-                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("intro")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -641,6 +640,10 @@ function WidgetBody({
             );
         case "games":
             return <GamesWidget data={data === undefined ? undefined : (data.games ?? null)} />;
+        case "calendar":
+            return (
+                <CalendarWidget data={data === undefined ? undefined : (data.calendar ?? null)} />
+            );
     }
 }
 

@@ -102,6 +102,9 @@
             "channelGone": "Ese canal de correo ya no existe.",
             "noChannel": "Polaris no tiene ningún canal de correo configurado para enviar."
         },
+        "calendar": {
+            "noMeetings": "No puedes crear enlaces de reunión aquí. Un administrador puede permitirlo."
+        },
         "email": {
             "notYours": "Esa dirección no está en tu cuenta.",
             "alreadyVerified": "Esa dirección ya está verificada."

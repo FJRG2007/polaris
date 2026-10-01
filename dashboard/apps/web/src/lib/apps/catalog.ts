@@ -14,6 +14,7 @@
 import { ARK_MAPS, DEFAULT_ARK_MAP, MINECRAFT_SOFTWARE } from "@polaris/core";
 import {
     Bot,
+    CalendarDays,
     Gamepad2,
     House,
     Mails,
@@ -24,7 +25,7 @@ import {
     type LucideIcon
 } from "lucide-react";
 
-export type AppCategory = "Messaging" | "AI" | "Game servers" | "Home" | "Tools";
+export type AppCategory = "Messaging" | "Productivity" | "AI" | "Game servers" | "Home" | "Tools";
 
 /** What an installed app provides, driving derived nav and which adapted
  *  dashboard is mounted. An app may declare several. */
@@ -258,6 +259,26 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Convert, resize, optimize, trim and translate - without leaving Polaris.",
         description:
             "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize pictures, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Everybody's calendars, Polaris's own and the ones people link from
+        // Google, Microsoft, iCloud or any CalDAV server. Installing it runs
+        // nothing: it is the app's screens and its sync job, served by the
+        // dashboard, and uninstalling leaves every calendar where it was for the
+        // day it comes back.
+        id: "calendar",
+        name: "Calendar",
+        category: "Productivity",
+        icon: CalendarDays,
+        opensAt: "/calendar",
+        summary: "Your calendars and the ones you link, with invitations and booking pages.",
+        description:
+            "Keep calendars in Polaris and see Google, Outlook, iCloud and any CalDAV calendar beside them, synced both ways. Day, week, month, year and agenda views, repeating events, reminders, invitations people answer from their inbox, finding a time that suits everybody, sharing with people and teams, public links, and booking pages for anybody outside Polaris.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
@@ -1335,7 +1356,14 @@ function isConsentField(app: AppManifest, field: TemplateEnvVar): boolean {
     return Boolean(app.consent) && field.key === "EULA";
 }
 
-const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "AI", "Game servers", "Home", "Tools"];
+const CATEGORY_ORDER: readonly AppCategory[] = [
+    "Messaging",
+    "Productivity",
+    "AI",
+    "Game servers",
+    "Home",
+    "Tools"
+];
 
 /** Marketplace grouping, in a stable display order. */
 export function appsByCategory(): ReadonlyArray<{ category: AppCategory; apps: AppManifest[] }> {

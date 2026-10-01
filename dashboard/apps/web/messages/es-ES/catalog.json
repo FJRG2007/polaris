@@ -82,6 +82,7 @@
     },
     "categories": {
         "Messaging": "Mensajería",
+        "Productivity": "Productividad",
         "AI": "IA",
         "Home": "Hogar"
     },
@@ -94,6 +95,10 @@
         "tools": {
             "summary": "Convierte, redimensiona, optimiza, recorta y traduce sin salir de Polaris.",
             "description": "Los trabajos para los que se abre una web cualquiera y se le dan los archivos al servidor de otro: pasar un PDF a documento de Word, una imagen a otro formato, una hoja de cálculo a CSV. Redimensiona y optimiza imágenes, mira qué contiene de verdad un archivo, recorta y silencia un vídeo, acorta un enlace, traduce un texto. Los archivos se quedan en tu propio equipo y no se suben a ningún sitio donde no estuvieran ya."
+        },
+        "calendar": {
+            "summary": "Tus calendarios y los que enlaces, con invitaciones y páginas de reserva.",
+            "description": "Ten calendarios en Polaris y ve a su lado los de Google, Outlook, iCloud y cualquier CalDAV, sincronizados en ambos sentidos. Vistas de día, semana, mes, año y agenda, eventos que se repiten, recordatorios, invitaciones que se responden desde el correo, encontrar una hora que convenga a todos, compartir con personas y equipos, enlaces públicos y páginas de reserva para quien no está en Polaris."
         },
         "mail-server": {
             "summary": "Correo en tus propios dominios, con el DNS escrito y comprobado por ti.",

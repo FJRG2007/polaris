@@ -29,7 +29,11 @@ vi.mock("@/lib/apps/install-presence", () => ({
 const DASHBOARD = resolve(__dirname, "../../../..");
 const BUNDLER = pathToFileURL(join(DASHBOARD, "packages/app-host/bundler/build.mjs")).href;
 
-type Built = { manifest: { id: string; shared: { server: string[]; client: string[] } }; digest: string; size: number };
+type Built = {
+    manifest: { id: string; shared: { server: string[]; client: string[] } };
+    digest: string;
+    size: number;
+};
 
 let root = "";
 let built: Built[] = [];
@@ -49,7 +53,10 @@ beforeAll(async () => {
     built = [];
     for (const dir of appPackages(DASHBOARD)) built.push(await buildAppBundle(dir, image, "test"));
     const apps = Object.fromEntries(
-        built.map((bundle) => [bundle.manifest.id, { file: `${bundle.manifest.id}.zip`, digest: bundle.digest, size: bundle.size }])
+        built.map((bundle) => [
+            bundle.manifest.id,
+            { file: `${bundle.manifest.id}.zip`, digest: bundle.digest, size: bundle.size }
+        ])
     );
     writeFileSync(join(image, "index.json"), JSON.stringify({ format: 1, build: "test", apps }));
     process.env.POLARIS_APP_BUNDLES_DIR = image;
@@ -70,15 +77,24 @@ afterAll(() => {
 
 describe("app bundles", () => {
     it("are built for every app package", () => {
-        expect(built.map((bundle) => bundle.manifest.id).sort()).toEqual(["game-servers", "home"]);
+        expect(built.map((bundle) => bundle.manifest.id).sort()).toEqual([
+            "calendar",
+            "game-servers",
+            "home"
+        ]);
     });
 
     it("ask only for libraries the dashboard provides", () => {
         const server = sharedServerModules();
         for (const bundle of built) {
-            expect(bundle.manifest.shared.server.filter((spec) => !server.has(spec)), bundle.manifest.id).toEqual([]);
             expect(
-                bundle.manifest.shared.client.filter((spec) => !SHARED_CLIENT_MODULES.includes(spec)),
+                bundle.manifest.shared.server.filter((spec) => !server.has(spec)),
+                bundle.manifest.id
+            ).toEqual([]);
+            expect(
+                bundle.manifest.shared.client.filter(
+                    (spec) => !SHARED_CLIENT_MODULES.includes(spec)
+                ),
                 bundle.manifest.id
             ).toEqual([]);
         }
@@ -86,7 +102,10 @@ describe("app bundles", () => {
 
     it("carry none of the libraries the dashboard shares", () => {
         for (const bundle of built) {
-            const server = readFileSync(join(root, "image", bundle.manifest.id, "server", "index.cjs"), "utf8");
+            const server = readFileSync(
+                join(root, "image", bundle.manifest.id, "server", "index.cjs"),
+                "utf8"
+            );
             for (const library of ["react", "next", "zod", "@prisma/client"]) {
                 expect(server, `${bundle.manifest.id} carries ${library}`).not.toMatch(
                     new RegExp(`node_modules/${library.replace("/", "\\/")}/`)
@@ -100,7 +119,11 @@ describe("app bundles", () => {
         const { buildAppBundle } = (await import(/* @vite-ignore */ BUNDLER)) as {
             buildAppBundle: (dir: string, out: string, build: string) => Promise<Built>;
         };
-        const again = await buildAppBundle(join(DASHBOARD, "apps/places"), join(root, "again"), "test");
+        const again = await buildAppBundle(
+            join(DASHBOARD, "apps/places"),
+            join(root, "again"),
+            "test"
+        );
         expect(again.digest).toBe(built.find((bundle) => bundle.manifest.id === "home")?.digest);
     }, 60_000);
 
@@ -112,12 +135,15 @@ describe("app bundles", () => {
             expect(bundle.manifest.routes.length).toBeGreaterThan(5);
             for (const route of bundle.manifest.routes) {
                 const module = await bundle.server.routes[route]?.();
-                const handler = route.startsWith("page ") ? module?.default : module?.GET ?? module?.POST;
+                const handler = route.startsWith("page ")
+                    ? module?.default
+                    : (module?.GET ?? module?.POST);
                 expect(typeof handler, `${id} ${route}`).toBe("function");
             }
             for (const [module, names] of Object.entries(bundle.manifest.actions)) {
                 const loaded = await bundle.server.actions[module]?.();
-                for (const name of names) expect(typeof loaded?.[name], `${id} ${module}#${name}`).toBe("function");
+                for (const name of names)
+                    expect(typeof loaded?.[name], `${id} ${module}#${name}`).toBe("function");
             }
         }
     }, 60_000);
@@ -135,11 +161,16 @@ describe("a bundle that is not what the image says", () => {
         const image = join(root, "image");
         const index = JSON.parse(readFileSync(join(image, "index.json"), "utf8"));
         const forged = join(image, "forged.zip");
-        writeFileSync(forged, Buffer.concat([readFileSync(join(image, "home.zip")), Buffer.from("x")]));
+        writeFileSync(
+            forged,
+            Buffer.concat([readFileSync(join(image, "home.zip")), Buffer.from("x")])
+        );
         index.apps.forged = { file: "forged.zip", digest: index.apps.home.digest, size: 1 };
         writeFileSync(join(image, "index.json"), JSON.stringify(index));
         store.forgetBundleIndex();
-        await expect(store.ensureBundle("forged")).rejects.toThrow(/not what this Polaris was built with/);
+        await expect(store.ensureBundle("forged")).rejects.toThrow(
+            /not what this Polaris was built with/
+        );
         expect(existsSync(join(root, "data", "apps", "forged"))).toBe(false);
     });
 
@@ -160,7 +191,10 @@ describe("a bundle that is not what the image says", () => {
         writeFileSync(join(image, "index.json"), JSON.stringify(index));
         store.forgetBundleIndex();
         const dir = await store.ensureBundle("escape").catch(() => null);
-        for (const outside of [join(root, "data", "apps", "outside.txt"), join(root, "data", "apps", "escape", "outside.txt")]) {
+        for (const outside of [
+            join(root, "data", "apps", "outside.txt"),
+            join(root, "data", "apps", "escape", "outside.txt")
+        ]) {
             expect(existsSync(outside), outside).toBe(false);
         }
         if (dir) expect(readdirSync(dir).sort()).toEqual(["manifest.json", "outside.txt"]);

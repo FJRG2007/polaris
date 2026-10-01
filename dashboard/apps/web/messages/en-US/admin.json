@@ -2241,6 +2241,7 @@
             "notes": "Notes",
             "office": "Office",
             "mail": "Mail",
+            "calendar": "Calendar",
             "chat": "Chat",
             "apps": "Apps",
             "gameServers": "Game servers",
@@ -2285,6 +2286,9 @@
             },
             "mailserver": {
                 "manage": "Run a mail server, and manage its domains and mailboxes"
+            },
+            "calendar": {
+                "use": "Keep calendars, link outside ones and take bookings"
             },
             "chat": {
                 "use": "Talk in channels and direct messages",

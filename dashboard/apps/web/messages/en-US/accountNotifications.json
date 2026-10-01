@@ -235,6 +235,34 @@
             "label": "Task reminder",
             "description": "A reminder you set on a task, and work falling due today."
         },
+        "calendarReminder": {
+            "label": "Event reminder",
+            "description": "A reminder set on an event or a task in your calendars."
+        },
+        "calendarInvitation": {
+            "label": "Invitation",
+            "description": "Somebody invited you to an event, or changed or cancelled one you are in."
+        },
+        "calendarReply": {
+            "label": "Invitation answered",
+            "description": "Somebody accepted, declined or answered maybe to an event you organized."
+        },
+        "calendarShared": {
+            "label": "Calendar shared with you",
+            "description": "Somebody shared one of their calendars with you or with a team you are in."
+        },
+        "calendarBooking": {
+            "label": "New booking",
+            "description": "Somebody booked, moved or cancelled time on one of your booking pages."
+        },
+        "calendarProposal": {
+            "label": "Proposal answered",
+            "description": "Somebody voted on the times of a meeting you proposed."
+        },
+        "calendarSyncFailed": {
+            "label": "A linked calendar stopped syncing",
+            "description": "A calendar you linked from Google, Microsoft or a CalDAV server refused Polaris or could not be reached."
+        },
         "watchAlarm": {
             "label": "Alarm fired",
             "description": "A watched service, domain or resource breached its condition."
@@ -388,6 +416,7 @@
         "deploy": "Deploy",
         "watch": "Watch",
         "tasks": "Tasks",
+        "calendar": "Calendar",
         "security": "Security",
         "drive": "Drive",
         "places": "Places",

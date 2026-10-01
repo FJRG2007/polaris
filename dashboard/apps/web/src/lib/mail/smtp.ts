@@ -10,13 +10,17 @@
 
 import { createTransport } from "nodemailer";
 import { formatFrom, type SmtpConfig } from "@polaris/core";
-import type { EmailMessage } from "./types";
+import { INVITE_FILENAME, type EmailMessage } from "./types";
 
 /** Port 465 speaks TLS from the first byte; everything else starts in the clear
  *  and upgrades with STARTTLS. */
 const IMPLICIT_TLS_PORT = 465;
 
-export async function sendWithSmtp(config: SmtpConfig, secret: string, message: EmailMessage): Promise<void> {
+export async function sendWithSmtp(
+    config: SmtpConfig,
+    secret: string,
+    message: EmailMessage
+): Promise<void> {
     const transport = createTransport({
         host: config.host,
         port: config.port,
@@ -35,7 +39,18 @@ export async function sendWithSmtp(config: SmtpConfig, secret: string, message: 
             to: message.to,
             subject: message.subject,
             text: message.text,
-            ...(message.html ? { html: message.html } : {})
+            ...(message.html ? { html: message.html } : {}),
+            // Nodemailer puts the event in both places clients look for it: a
+            // text/calendar alternative with the METHOD, and an .ics attachment.
+            ...(message.calendar
+                ? {
+                      icalEvent: {
+                          method: message.calendar.method,
+                          content: message.calendar.ics,
+                          filename: INVITE_FILENAME
+                      }
+                  }
+                : {})
         });
     } finally {
         transport.close();

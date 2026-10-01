@@ -1,0 +1,75 @@
+{
+    "alarm": {
+        "after": "{time} after",
+        "afterAt": "{time} after {one, select, other {at}} {at}",
+        "afterEnd": "{time} after the end",
+        "atEnd": "At the end",
+        "atStart": "At the start",
+        "before": "{time} before",
+        "beforeAt": "{time} before {one, select, other {at}} {at}",
+        "beforeEnd": "{time} before the end",
+        "days": "{n, plural, one {# day} other {# days}}",
+        "hours": "{n, plural, one {# hour} other {# hours}}",
+        "minutes": "{n, plural, one {# minute} other {# minutes}}",
+        "onDate": "On {date}",
+        "onDay": "On the day {one, select, other {at}} {at}",
+        "weeks": "{n, plural, one {# week} other {# weeks}}"
+    },
+    "every": {
+        "daily": "{interval, plural, one {Daily} other {Every # days}}",
+        "hourly": "{interval, plural, one {Hourly} other {Every # hours}}",
+        "minutely": "{interval, plural, one {Every minute} other {Every # minutes}}",
+        "monthly": "{interval, plural, one {Monthly} other {Every # months}}",
+        "secondly": "{interval, plural, one {Every second} other {Every # seconds}}",
+        "weekly": "{interval, plural, one {Weekly} other {Every # weeks}}",
+        "yearly": "{interval, plural, one {Yearly} other {Every # years}}"
+    },
+    "ordinal": {
+        "last": "last",
+        "n1": "first",
+        "n2": "second",
+        "n3": "third",
+        "n4": "fourth",
+        "n5": "fifth",
+        "other": "number {n}",
+        "secondLast": "second-to-last"
+    },
+    "parse": {
+        "duplicateEvent": "A second copy of \"{name}\" was skipped.",
+        "duplicateOccurrence": "A second copy of one occurrence of \"{name}\" was skipped.",
+        "eventUnreadable": "An event could not be read and was skipped.",
+        "noCalendar": "The file has no calendar in it.",
+        "notJson": "The file looks like jCal but is not valid JSON.",
+        "partUnreadable": "Part of the file could not be read and was skipped.",
+        "todoUnreadable": "A task could not be read and was skipped."
+    },
+    "pattern": {
+        "count": "{base}, {count, plural, one {# time} other {# times}}",
+        "dayItem": "{day}",
+        "days": "{base} on {days}",
+        "fromEnd": "{n, plural, one {the last} other {# from the end}}",
+        "monthDays": "{base} on day {days}",
+        "months": "{base} in {months}",
+        "ordinal": "{base} on the {ordinal} {day}",
+        "ordinalItem": "the {ordinal} {day}",
+        "ordinalKind": "{base} on the {ordinal} {kind, select, day {day} weekday {weekday} other {weekend day}}",
+        "setPos": "{base}, only the {positions}",
+        "until": "{base}, until {date}"
+    },
+    "validation": {
+        "allDayMismatch": "All-day events take dates; timed events take times.",
+        "colorForm": "Use a color like #1a73e8.",
+        "dateForm": "Use the form YYYY-MM-DD.",
+        "dateTimeForm": "Use the form YYYY-MM-DDTHH:mm.",
+        "endBeforeStart": "The end is before the start.",
+        "invitedTwice": "Someone is invited twice.",
+        "linkForm": "Use a link starting with https://.",
+        "noSuchDate": "A date does not exist.",
+        "noSuchDay": "That day does not exist.",
+        "rangesOverlap": "Two ranges overlap.",
+        "timeForm": "Use HH:mm.",
+        "tooManyDates": "Too many dates.",
+        "unknownZone": "Unknown time zone.",
+        "weekdayTwice": "A weekday is listed twice."
+    }
+}

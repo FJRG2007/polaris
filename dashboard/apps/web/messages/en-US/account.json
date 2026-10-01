@@ -320,6 +320,7 @@
                 "notes": "Notes",
                 "office": "Office",
                 "mail": "Mail",
+                "calendar": "Calendar",
                 "chat": "Chat",
                 "deployments": "Deployments",
                 "gameServers": "Game servers",

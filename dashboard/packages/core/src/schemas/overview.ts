@@ -36,7 +36,8 @@ export const OVERVIEW_WIDGET_IDS = [
     "apps",
     "sessions",
     "activity",
-    "games"
+    "games",
+    "calendar"
 ] as const;
 
 export type OverviewWidgetId = (typeof OVERVIEW_WIDGET_IDS)[number];
@@ -125,6 +126,9 @@ export const DEFAULT_OVERVIEW_LAYOUT: readonly OverviewWidgetPreference[] = [
     { id: "services", size: "md", hidden: false },
     { id: "notifications", size: "md", hidden: false },
     { id: "tasks", size: "sm", hidden: false },
+    // Beside the work: what is next in somebody's day. Only on the grid of an
+    // instance that installed the Calendar.
+    { id: "calendar", size: "md", hidden: false },
     { id: "alarms", size: "sm", hidden: false },
     { id: "storage", size: "md", hidden: false },
     // Between the infrastructure cards and the account's own: it belongs with what

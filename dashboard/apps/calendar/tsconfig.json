@@ -1,0 +1,8 @@
+{
+    // The app is type-checked together with the dashboard it runs in: its
+    // `host` services are typed by the dashboard's `lib/app-host/server.ts`
+    // augmenting @polaris/app-host, so the program has to include that side too.
+    "extends": "../web/tsconfig.json",
+    "compilerOptions": { "incremental": false, "noEmit": true },
+    "include": ["../web/next-env.d.ts", "../web/src", "src", "messages", "../web/test/calendar"]
+}

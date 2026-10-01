@@ -198,7 +198,10 @@ export async function connectionEmailTrusted(provider: string): Promise<boolean>
 }
 
 /** Somebody's linked accounts, newest first, optionally for one provider. */
-export async function listConnections(userId: string, provider?: string): Promise<ConnectionView[]> {
+export async function listConnections(
+    userId: string,
+    provider?: string
+): Promise<ConnectionView[]> {
     const rows = await prisma.userConnection.findMany({
         where: { userId, ...(provider ? { provider } : {}) },
         select: VIEW_COLUMNS,
@@ -209,7 +212,10 @@ export async function listConnections(userId: string, provider?: string): Promis
 
 /** One linked account of this person's, or null - id alone is never enough. */
 export async function getConnection(userId: string, id: string): Promise<ConnectionView | null> {
-    const row = await prisma.userConnection.findFirst({ where: { id, userId }, select: VIEW_COLUMNS });
+    const row = await prisma.userConnection.findFirst({
+        where: { id, userId },
+        select: VIEW_COLUMNS
+    });
     return row ? view(row) : null;
 }
 
@@ -235,6 +241,14 @@ export interface SaveConnectionInput {
     signIn?: boolean;
     /** Null keeps whatever is stored; a value replaces it. */
     credential?: ConnectionCredential | null;
+    /**
+     * Linked for something that is not bounded by the operator's per-person cap:
+     * the Calendar app, where one person linking several Google or Microsoft
+     * accounts is the point. The cap exists for the services a link grants
+     * Polaris something through (a GitHub account serving a runner pool), not for
+     * somebody reading their own calendars.
+     */
+    beyondLimit?: boolean;
 }
 
 /**
@@ -245,7 +259,10 @@ export interface SaveConnectionInput {
  * is refused rather than moved: silently reassigning it would change which
  * repositories a pool serves on the word of whoever authorized second.
  */
-export async function saveConnection(userId: string, input: SaveConnectionInput): Promise<ConnectionView> {
+export async function saveConnection(
+    userId: string,
+    input: SaveConnectionInput
+): Promise<ConnectionView> {
     const claimed = await prisma.userConnection.findUnique({
         where: { provider_accountId: { provider: input.provider, accountId: input.accountId } },
         select: { id: true, userId: true }
@@ -254,13 +271,32 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
 
     if (!claimed) {
         const limit = await connectionLimit(input.provider);
-        // A typed name is not counted: the proved account is about to replace it,
-        // and refusing that because the claim was there first would keep the
-        // unverified one over the verified.
-        const held = await prisma.userConnection.count({
-            where: { userId, provider: input.provider, method: { not: "manual" } }
+        // Zero is the operator saying nobody links this service at all, which a
+        // calendar link is no exception to.
+        if (limit === 0) throw new ConnectionLimitError(input.provider, limit);
+        if (!input.beyondLimit) {
+            // A typed name is not counted: the proved account is about to replace
+            // it, and refusing that because the claim was there first would keep
+            // the unverified one over the verified.
+            const held = await prisma.userConnection.count({
+                where: { userId, provider: input.provider, method: { not: "manual" } }
+            });
+            if (held >= limit) throw new ConnectionLimitError(input.provider, limit);
+        }
+    } else if (!input.beyondLimit) {
+        // An account linked for the Calendar past the cap stays a calendar link:
+        // authorized again for anything else - storage, mail - it is counted
+        // like any other, the cap holding the first ones linked.
+        const limit = await connectionLimit(input.provider);
+        const linked = await prisma.userConnection.findMany({
+            where: { userId, provider: input.provider },
+            select: { id: true, method: true, linkedAt: true }
         });
-        if (held >= limit) throw new ConnectionLimitError(input.provider, limit);
+        const own = linked.find((row) => row.id === claimed.id)?.linkedAt;
+        const ahead = own
+            ? linked.filter((row) => row.method !== "manual" && row.linkedAt < own).length
+            : 0;
+        if (ahead >= limit) throw new ConnectionLimitError(input.provider, limit);
     }
 
     const secret = input.credential ? encryptCredential(input.credential) : undefined;
@@ -279,7 +315,8 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
             accountId: input.accountId,
             // Only ever set here, on the row's first write. Re-authorizing an
             // account must not put back a way in its owner turned off.
-            signInEnabled: input.signIn ?? findConnectionProvider(input.provider)?.signInDefault ?? false,
+            signInEnabled:
+                input.signIn ?? findConnectionProvider(input.provider)?.signInDefault ?? false,
             ...stored
         },
         update: stored,
@@ -290,7 +327,9 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
     // typed for this service stops standing in for it. Removed only once the
     // proved one is stored, so a link that fails leaves the typed name where it
     // was rather than leaving nothing.
-    await prisma.userConnection.deleteMany({ where: { userId, provider: input.provider, method: "manual" } });
+    await prisma.userConnection.deleteMany({
+        where: { userId, provider: input.provider, method: "manual" }
+    });
 
     await reserveEmail(userId, input.provider, input.email);
     await audit({
@@ -307,7 +346,9 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
  *  account on. The proved one is the better answer and is not replaced by a claim. */
 export class ConnectionVerifiedError extends Error {
     constructor(provider: string) {
-        super(`Your ${provider} account is already connected and verified. Disconnect it first to type a name instead.`);
+        super(
+            `Your ${provider} account is already connected and verified. Disconnect it first to type a name instead.`
+        );
         this.name = "ConnectionVerifiedError";
     }
 }
@@ -339,11 +380,14 @@ export async function saveTypedConnection(
     label: string
 ): Promise<ConnectionView> {
     const entry = findConnectionProvider(provider);
-    if (!entry?.acceptsTypedName) throw new Error("That service cannot be connected by typing a name");
+    if (!entry?.acceptsTypedName)
+        throw new Error("That service cannot be connected by typing a name");
 
     const limit = await connectionLimit(provider);
     if (limit === 0) throw new ConnectionLimitError(provider, limit);
-    const proved = await prisma.userConnection.count({ where: { userId, provider, method: { not: "manual" } } });
+    const proved = await prisma.userConnection.count({
+        where: { userId, provider, method: { not: "manual" } }
+    });
     if (proved > 0) throw new ConnectionVerifiedError(entry.name);
 
     const accountId = typedAccountId(userId);
@@ -400,9 +444,11 @@ async function reserveEmail(
     if (!email) return;
     const { adoptProviderEmail } = await import("@polaris/auth");
     const verified = await connectionEmailTrusted(provider);
-    const result = await adoptProviderEmail(userId, email, { verified }).catch((error: unknown) => ({
-        error: String(error)
-    }));
+    const result = await adoptProviderEmail(userId, email, { verified }).catch(
+        (error: unknown) => ({
+            error: String(error)
+        })
+    );
     if (result.error) console.warn("linked address not held:", result.error);
 }
 
@@ -436,8 +482,14 @@ export async function readCredential(connectionId: string): Promise<ConnectionCr
 }
 
 /** Replace the credential on a link that was just refreshed against the provider. */
-export async function updateCredential(connectionId: string, credential: ConnectionCredential): Promise<void> {
-    await prisma.userConnection.update({ where: { id: connectionId }, data: encryptCredential(credential) });
+export async function updateCredential(
+    connectionId: string,
+    credential: ConnectionCredential
+): Promise<void> {
+    await prisma.userConnection.update({
+        where: { id: connectionId },
+        data: encryptCredential(credential)
+    });
 }
 
 /**
@@ -501,7 +553,12 @@ export async function signInConnection(
     // A suspended account is reported rather than hidden, so the caller can say
     // what a password sign-in would have said. Nothing is issued either way, and
     // whoever is holding the linked account is its owner.
-    return { userId: row.userId, connectionId: row.id, label: row.label, banned: row.user.bannedAt !== null };
+    return {
+        userId: row.userId,
+        connectionId: row.id,
+        label: row.label,
+        banned: row.user.bannedAt !== null
+    };
 }
 
 /**
@@ -561,7 +618,12 @@ export async function listConnectedAccounts(
         select: { ...VIEW_COLUMNS, userId: true, user: { select: { name: true, email: true } } },
         orderBy: { label: "asc" }
     });
-    return rows.map((row) => ({ ...view(row), userId: row.userId, name: row.user.name, email: row.user.email }));
+    return rows.map((row) => ({
+        ...view(row),
+        userId: row.userId,
+        name: row.user.name,
+        email: row.user.email
+    }));
 }
 
 function encryptCredential(credential: ConnectionCredential): {

@@ -1,0 +1,110 @@
+{
+    "calendars": {
+        "personal": "Personal"
+    },
+    "errors": {
+        "alreadyThere": "That calendar already has this event.",
+        "calendarNotFound": "That calendar is not available.",
+        "changedMeanwhile": "This event changed since you opened it. Reopen it to see the latest.",
+        "checkInput": "Check what you entered and try again.",
+        "emptyImport": "That file has no events or tasks in it.",
+        "eventNotFound": "That event is not available.",
+        "generic": "That did not work. Try again in a moment.",
+        "importTooLarge": "That file has too many events to import at once. Split it and import each part.",
+        "notATask": "That is not a task.",
+        "notAnEvent": "That is not an event.",
+        "notInvited": "You are not invited to this event.",
+        "ownCalendar": "This calendar is yours. Delete it instead.",
+        "readOnly": "This calendar is read-only.",
+        "unreadableEvent": "This event could not be read."
+    },
+    "instance": {
+        "notAllowed": "Only an administrator can change these.",
+        "subscriptionsOff": "Subscribing to calendars by address is switched off on this Polaris.",
+        "bookingOff": "Booking pages are switched off on this Polaris."
+    },
+    "instancePage": {
+        "title": "Calendar for everybody",
+        "description": "What everybody on this Polaris may do in the Calendar.",
+        "back": "Settings",
+        "adminOnly": "Only an administrator can change these.",
+        "noChanges": "No changes to save",
+        "fixSuggested": "Fix the suggested calendars first",
+        "saved": "Saved",
+        "subscriptions": "Subscriptions by address",
+        "subscriptionsHint": "People may subscribe to any calendar that publishes an ICS address.",
+        "booking": "Booking pages",
+        "bookingHint": "People may publish pages where others book time with them.",
+        "suggested": "Suggested calendars",
+        "suggestedHint": "Offered to everybody when they subscribe to a calendar.",
+        "name": "Name",
+        "namePlaceholder": "Team holidays",
+        "nameInvalid": "Use a name of up to 120 characters.",
+        "address": "Address",
+        "addressInvalid": "Use an https:// address of a calendar.",
+        "remove": "Remove",
+        "removeNamed": "Remove {name}",
+        "add": "Add a calendar",
+        "save": "Save"
+    },
+    "invitations": {
+        "cancelledSubject": "Canceled: {title}",
+        "cancelledTitle": "Canceled: {title}",
+        "invitedSubject": "Invitation: {title} - {when}",
+        "invitedTitle": "Invitation: {title}",
+        "mailAnswer": "Answer here:",
+        "mailCancelled": "{organizer} canceled this event.",
+        "mailInvited": "{organizer} invited you to this event.",
+        "reply": {
+            "accepted": "{who} accepted {title}",
+            "declined": "{who} declined {title}",
+            "tentative": "{who} might attend {title}"
+        },
+        "untitled": "Untitled event"
+    },
+    "meeting": {
+        "untitled": "Meeting"
+    },
+    "published": {
+        "busy": "Busy"
+    },
+    "reminders": {
+        "body": "{when}",
+        "mailCalendar": "Calendar: {calendar}",
+        "mailSubject": "Reminder: {title}",
+        "untitledEvent": "Untitled event",
+        "untitledTask": "Untitled task"
+    },
+    "sharing": {
+        "alreadyOwner": "They own this calendar already.",
+        "mailBody": "{who} shared the calendar {calendar} with you. Open it or subscribe to it here:",
+        "mailSubject": "{who} shared {calendar} with you",
+        "noSuchPerson": "That person is not available.",
+        "notFound": "That share no longer exists.",
+        "notPublished": "Publish the calendar first.",
+        "notResources": "Rooms are shared with everybody already.",
+        "notYourTeam": "You can only share with teams you are on.",
+        "onlyOwnerManage": "Only the owner can give or take away managing it.",
+        "sharedTitle": "{who} shared {calendar} with you",
+        "slowDown": "Too many links sent. Try again in an hour.",
+        "tooMany": "This calendar is shared with as many people and teams as it can be."
+    },
+    "sources": {
+        "linkNeedsCalendar": "That account was linked for something else. Connect it again for calendars.",
+        "linkNotFound": "That account is not linked any more.",
+        "notACalendar": "That address did not answer as a calendar.",
+        "notFound": "Nothing was found at that address.",
+        "privateAddress": "That address is on a private network. Only an administrator can link one.",
+        "refusedCredentials": "The server refused that username or password. Use an app password if your provider has them.",
+        "tooMany": "You have linked as many calendars as you can. Remove one to add another.",
+        "unreachable": "That server could not be reached. Check the address and try again."
+    },
+    "sync": {
+        "failedAuth": "Connect the account again from Calendar settings.",
+        "failedOther": "Polaris will keep trying. Open Calendar settings to see why.",
+        "failedTitle": "{label} stopped syncing"
+    },
+    "trash": {
+        "untitled": "Untitled event"
+    }
+}

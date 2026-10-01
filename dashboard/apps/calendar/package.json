@@ -1,0 +1,32 @@
+{
+    "name": "@polaris-app/calendar",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Calendar: Polaris's own calendars and the ones people link from Google, Microsoft and CalDAV, with invitations and booking pages. An installable Polaris app.",
+    "polaris": {
+        "id": "calendar",
+        "extension": "src/lib/calendar-extension.ts#calendarExtension"
+    },
+    "dependencies": {
+        "@fullcalendar/core": "6.1.21",
+        "@fullcalendar/daygrid": "6.1.21",
+        "@fullcalendar/interaction": "6.1.21",
+        "@fullcalendar/list": "6.1.21",
+        "@fullcalendar/multimonth": "6.1.21",
+        "@fullcalendar/react": "6.1.21",
+        "@fullcalendar/timegrid": "6.1.21",
+        "@polaris/app-host": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "@polaris/db": "0.1.0",
+        "@polaris/ui": "0.1.0",
+        "ical.js": "2.2.1",
+        "lucide-react": "0.469.0",
+        "zod": "3.24.1"
+    },
+    "peerDependencies": {
+        "next": "*",
+        "react": "^19",
+        "react-dom": "^19"
+    }
+}

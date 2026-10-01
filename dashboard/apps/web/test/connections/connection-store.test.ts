@@ -39,7 +39,8 @@ const key = (provider: string, accountId: string): string => `${provider}:${acco
 /** The method filters the store asks for: one method, or every method but one. */
 type MethodFilter = string | { not: string } | undefined;
 const methodMatches = (method: string, filter: MethodFilter): boolean =>
-    filter === undefined || (typeof filter === "string" ? method === filter : method !== filter.not);
+    filter === undefined ||
+    (typeof filter === "string" ? method === filter : method !== filter.not);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -52,27 +53,47 @@ vi.mock("@polaris/db", () => ({
                 ),
             findFirst: async ({ where }: { where: { id: string; userId: string } }) =>
                 rows.find((row) => row.id === where.id && row.userId === where.userId) ?? null,
-            findUnique: async ({ where }: { where: { provider_accountId?: { provider: string; accountId: string }; id?: string } }) => {
+            findUnique: async ({
+                where
+            }: {
+                where: {
+                    provider_accountId?: { provider: string; accountId: string };
+                    id?: string;
+                };
+            }) => {
                 const found = where.id
                     ? rows.find((row) => row.id === where.id)
                     : where.provider_accountId
                       ? rows.find(
                             (row) =>
                                 key(row.provider, row.accountId) ===
-                                key(where.provider_accountId!.provider, where.provider_accountId!.accountId)
+                                key(
+                                    where.provider_accountId!.provider,
+                                    where.provider_accountId!.accountId
+                                )
                         )
                       : undefined;
                 // The sign-in lookup reads the owner's standing alongside the row.
-                return found ? { ...found, user: { bannedAt: banned.has(found.userId) ? new Date() : null } } : null;
+                return found
+                    ? { ...found, user: { bannedAt: banned.has(found.userId) ? new Date() : null } }
+                    : null;
             },
-            count: async ({ where }: { where: { userId: string; provider: string; method?: MethodFilter } }) =>
+            count: async ({
+                where
+            }: {
+                where: { userId: string; provider: string; method?: MethodFilter };
+            }) =>
                 rows.filter(
                     (row) =>
                         row.userId === where.userId &&
                         row.provider === where.provider &&
                         methodMatches(row.method, where.method)
                 ).length,
-            deleteMany: async ({ where }: { where: { userId: string; provider: string; method?: MethodFilter } }) => {
+            deleteMany: async ({
+                where
+            }: {
+                where: { userId: string; provider: string; method?: MethodFilter };
+            }) => {
                 const before = rows.length;
                 rows = rows.filter(
                     (row) =>
@@ -93,7 +114,10 @@ vi.mock("@polaris/db", () => ({
                 create: Record<string, unknown>;
                 update: Record<string, unknown>;
             }) => {
-                const wanted = key(where.provider_accountId.provider, where.provider_accountId.accountId);
+                const wanted = key(
+                    where.provider_accountId.provider,
+                    where.provider_accountId.accountId
+                );
                 const existing = rows.find((row) => key(row.provider, row.accountId) === wanted);
                 if (existing) {
                     Object.assign(existing, update);
@@ -113,7 +137,13 @@ vi.mock("@polaris/db", () => ({
                 rows.push(row);
                 return row;
             },
-            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Record<string, unknown>;
+            }) => {
                 const row = rows.find((entry) => entry.id === where.id);
                 if (!row) throw new Error("no such row");
                 Object.assign(row, data);
@@ -132,7 +162,11 @@ vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "test-
 vi.mock("@polaris/storage", () => ({
     // Reversible stand-in for the envelope: the test cares that a payload survives
     // the round trip, not how AES-GCM frames it.
-    encryptSecret: (value: string) => ({ ciphertext: Buffer.from(value, "utf8"), nonce: Buffer.alloc(12), keyId: "k1" }),
+    encryptSecret: (value: string) => ({
+        ciphertext: Buffer.from(value, "utf8"),
+        nonce: Buffer.alloc(12),
+        keyId: "k1"
+    }),
     decryptSecret: (blob: { ciphertext: Buffer }) => blob.ciphertext.toString("utf8"),
     CredentialDecryptError: class CredentialDecryptError extends Error {}
 }));
@@ -207,7 +241,9 @@ describe("how many accounts one person may link", () => {
 
     it("refuses a second account at the default limit", async () => {
         await saveConnection("ana", account("1", "ana"));
-        await expect(saveConnection("ana", account("2", "ana-work"))).rejects.toBeInstanceOf(ConnectionLimitError);
+        await expect(saveConnection("ana", account("2", "ana-work"))).rejects.toBeInstanceOf(
+            ConnectionLimitError
+        );
     });
 
     it("allows the second once the operator raises it", async () => {
@@ -219,7 +255,28 @@ describe("how many accounts one person may link", () => {
 
     it("turns linking off entirely at zero", async () => {
         settings.set("connections.github.limit", "0");
-        await expect(saveConnection("ana", account("1", "ana"))).rejects.toBeInstanceOf(ConnectionLimitError);
+        await expect(saveConnection("ana", account("1", "ana"))).rejects.toBeInstanceOf(
+            ConnectionLimitError
+        );
+    });
+
+    it("counts a calendar link past the cap once it is authorized again for anything else", async () => {
+        const google = (accountId: string) => ({
+            provider: "google",
+            accountId,
+            label: accountId,
+            method: "oauth" as const
+        });
+        await saveConnection("ana", google("work"));
+        await saveConnection("ana", { ...google("home"), beyondLimit: true });
+        rows.find((row) => row.accountId === "home")!.linkedAt = new Date(Date.now() + 1000);
+        await saveConnection("ana", { ...google("home"), beyondLimit: true, scope: "calendar" });
+        await expect(
+            saveConnection("ana", { ...google("home"), scope: "calendar drive.file" })
+        ).rejects.toBeInstanceOf(ConnectionLimitError);
+        expect(rows.find((row) => row.accountId === "home")?.scope).toBe("calendar");
+        await saveConnection("ana", { ...google("work"), scope: "drive.file" });
+        expect(rows.find((row) => row.accountId === "work")?.scope).toBe("drive.file");
     });
 
     it("does not spend a slot re-authorizing an account already held", async () => {
@@ -234,7 +291,9 @@ describe("how many accounts one person may link", () => {
 describe("who an outside account belongs to", () => {
     it("refuses an account already linked by somebody else", async () => {
         await saveConnection("ana", account("1", "ana"));
-        await expect(saveConnection("bruno", account("1", "ana"))).rejects.toBeInstanceOf(ConnectionClaimedError);
+        await expect(saveConnection("bruno", account("1", "ana"))).rejects.toBeInstanceOf(
+            ConnectionClaimedError
+        );
     });
 
     it("leaves the first person's link untouched when the second is refused", async () => {
@@ -262,7 +321,10 @@ describe("whether a linked account may sign its owner in", () => {
 
     it("names the owner of an account that is allowed to sign in", async () => {
         await saveConnection("ana", account("1", "ana"));
-        expect(await signInConnection("github", "1")).toMatchObject({ userId: "ana", label: "ana" });
+        expect(await signInConnection("github", "1")).toMatchObject({
+            userId: "ana",
+            label: "ana"
+        });
     });
 
     it("says nothing at all about an account whose owner has closed it", async () => {
@@ -281,7 +343,10 @@ describe("whether a linked account may sign its owner in", () => {
     it("reports a suspended owner rather than pretending the link is not there", async () => {
         await saveConnection("ana", account("1", "ana"));
         banned.add("ana");
-        expect(await signInConnection("github", "1")).toMatchObject({ userId: "ana", banned: true });
+        expect(await signInConnection("github", "1")).toMatchObject({
+            userId: "ana",
+            banned: true
+        });
     });
 
     it("will not let one person open or close another person's account", async () => {
@@ -332,7 +397,11 @@ describe("the credential behind a link", () => {
     it("survives the round trip as a payload rather than a bare string", async () => {
         const linked = await saveConnection("ana", {
             ...account("1", "ana"),
-            credential: { accessToken: "gho_live", refreshToken: "ghr_renew", expiresAt: 1_700_000_000_000 }
+            credential: {
+                accessToken: "gho_live",
+                refreshToken: "ghr_renew",
+                expiresAt: 1_700_000_000_000
+            }
         });
         expect(await readCredential(linked.id)).toEqual({
             accessToken: "gho_live",
@@ -379,7 +448,11 @@ describe("a Minecraft name typed rather than proved", () => {
         const saved = await saveTypedConnection("ana", "minecraft", "Ana_MC");
         expect(saved).toMatchObject({ provider: "minecraft", label: "Ana_MC", method: "manual" });
         expect(await listConnections("ana", "minecraft")).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ method: "manual", signInEnabled: false, encryptedToken: null });
+        expect(rows[0]).toMatchObject({
+            method: "manual",
+            signInEnabled: false,
+            encryptedToken: null
+        });
     });
 
     it("is changed in place rather than added again", async () => {
@@ -413,7 +486,9 @@ describe("a Minecraft name typed rather than proved", () => {
 
     it("is refused where the operator has turned linking off", async () => {
         settings.set("connections.minecraft.limit", "0");
-        await expect(saveTypedConnection("ana", "minecraft", "Ana_MC")).rejects.toBeInstanceOf(ConnectionLimitError);
+        await expect(saveTypedConnection("ana", "minecraft", "Ana_MC")).rejects.toBeInstanceOf(
+            ConnectionLimitError
+        );
     });
 
     it("gives way to a proved account, which does not count it against the limit", async () => {
@@ -427,7 +502,9 @@ describe("a Minecraft name typed rather than proved", () => {
     it("stays where it was when the proved link is refused", async () => {
         await saveConnection("bruno", proved());
         await saveTypedConnection("ana", "minecraft", "Ana_MC");
-        await expect(saveConnection("ana", proved())).rejects.toBeInstanceOf(ConnectionClaimedError);
+        await expect(saveConnection("ana", proved())).rejects.toBeInstanceOf(
+            ConnectionClaimedError
+        );
         const held = await listConnections("ana", "minecraft");
         expect(held.map((row) => row.label)).toEqual(["Ana_MC"]);
     });

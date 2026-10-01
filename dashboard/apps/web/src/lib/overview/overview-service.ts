@@ -26,7 +26,8 @@ import { listUserSessions } from "@/lib/session-directory";
 import { listRecentAlarmEvents } from "@/lib/watch-service";
 import type { MyWorkTask } from "@/lib/tasks/report-service";
 import type { MetricSubjectType } from "@/lib/metrics-shared";
-import { gameServerSummaries } from "@/lib/app-extensions/registry";
+import { gameServerSummaries, upcomingEventsFor } from "@/lib/app-extensions/registry";
+import type { UpcomingEvent } from "@/lib/app-extensions/types";
 import { getWatchOverview } from "@/lib/watch-overview-service";
 import { inFlightDeployments, listProjects } from "@/lib/deploy-service";
 import { myUrgentTasks, myWorkCounts } from "@/lib/tasks/report-service";
@@ -154,6 +155,12 @@ export interface OverviewData {
     sessions?: OverviewSessions | null;
     activity?: OverviewActivityEntry[] | null;
     games?: OverviewGames | null;
+    calendar?: OverviewCalendar | null;
+}
+
+/** The next events in the reader's calendars. */
+export interface OverviewCalendar {
+    events: UpcomingEvent[];
 }
 
 /** The cards that are read here at all. The rest (pinned links, this browser's
@@ -166,7 +173,8 @@ const SERVER_WIDGETS = [
     "storage",
     "sessions",
     "activity",
-    "games"
+    "games",
+    "calendar"
 ] as const;
 
 type ServerWidgetId = (typeof SERVER_WIDGETS)[number];
@@ -193,13 +201,14 @@ export async function getOverviewData(
     const asked = new Set(wanted.filter(isServerOverviewWidget));
     if (asked.size === 0) return {};
 
-    const [canDeploy, canTasks, canDrive, canGames] = await Promise.all([
+    const [canDeploy, canTasks, canDrive, canGames, canCalendar] = await Promise.all([
         asked.has("services") || asked.has("usage") || asked.has("alarms")
             ? sessionCanAny(user, "deploy.read")
             : Promise.resolve(false),
         asked.has("tasks") ? sessionCanAny(user, "tasks.read") : Promise.resolve(false),
         asked.has("storage") ? sessionCanAny(user, "drive.read") : Promise.resolve(false),
-        asked.has("games") ? sessionCanAny(user, "games.read") : Promise.resolve(false)
+        asked.has("games") ? sessionCanAny(user, "games.read") : Promise.resolve(false),
+        asked.has("calendar") ? sessionCanAny(user, "calendar.use") : Promise.resolve(false)
     ]);
 
     // Services, usage and alarms all come out of the same monitoring read, so
@@ -209,7 +218,7 @@ export async function getOverviewData(
             ? card(() => getWatchOverview(user.id))
             : null;
 
-    const [services, monitoring, events, tasks, storage, sessions, activity, games] =
+    const [services, monitoring, events, tasks, storage, sessions, activity, games, calendar] =
         await Promise.all([
             asked.has("services") && canDeploy
                 ? card(() => deployedServices(user))
@@ -232,6 +241,13 @@ export async function getOverviewData(
                 : Promise.resolve(undefined),
             asked.has("games") && canGames
                 ? card(() => gameServers(user.id))
+                : Promise.resolve(undefined),
+            asked.has("calendar") && canCalendar
+                ? card(async () => {
+                      const upcoming = await upcomingEventsFor(user.id, CARD_ROWS);
+                      if (!upcoming) throw new Error("No installed app keeps calendars");
+                      return { events: upcoming };
+                  })
                 : Promise.resolve(undefined)
         ]);
 
@@ -270,6 +286,7 @@ export async function getOverviewData(
     if (asked.has("sessions")) data.sessions = sessions ?? null;
     if (asked.has("activity")) data.activity = activity ?? null;
     if (asked.has("games")) data.games = canGames ? (games ?? null) : null;
+    if (asked.has("calendar")) data.calendar = canCalendar ? (calendar ?? null) : null;
     return data;
 }
 

@@ -14,6 +14,7 @@
 
 import { prisma } from "@polaris/db";
 import { isGameServerApp } from "@/lib/apps/catalog";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { OverviewFeatures } from "@/lib/overview/catalog";
 
 /**
@@ -31,5 +32,9 @@ async function hasGameServer(userId: string): Promise<boolean> {
 }
 
 export async function overviewFeatures(userId: string): Promise<OverviewFeatures> {
-    return { games: await hasGameServer(userId) };
+    const [games, calendar] = await Promise.all([
+        hasGameServer(userId),
+        isAppInstalled("calendar")
+    ]);
+    return { games, calendar };
 }

@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
+import type { Prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import * as access from "@/lib/tasks/access";
 import { allowedBy } from "@/lib/privacy-service";
@@ -237,14 +238,40 @@ export async function searchAccounts(
 ): Promise<AccountCandidate[]> {
     const term = query.trim();
     const contains = term ? like(term) : undefined;
+    return accountsInReach(
+        actor,
+        contains ? { OR: [{ name: contains }, { email: contains }, { username: contains }] } : {},
+        limit
+    );
+}
+
+/**
+ * The same people as `searchAccounts`, asked by id rather than by what was
+ * typed: which of these accounts this one may pick. One question for any number
+ * of ids, so a caller checking a list never searches by address and never
+ * misses somebody whose address is inside another's.
+ *
+ * @param actor - The caller, already past the permission check.
+ * @param ids - The accounts in question.
+ */
+export async function accountsByIdInReach(
+    actor: access.TaskActor,
+    ids: readonly string[]
+): Promise<AccountCandidate[]> {
+    const wanted = [...new Set(ids)];
+    if (wanted.length === 0) return [];
+    return accountsInReach(actor, { id: { in: wanted } }, wanted.length);
+}
+
+/** The accounts matching `match` that `actor` reaches, as identities. */
+async function accountsInReach(
+    actor: access.TaskActor,
+    match: Prisma.UserWhereInput,
+    limit: number
+): Promise<AccountCandidate[]> {
     const scope = actor.isAdmin ? null : await reachablePeople(actor);
     const users = await prisma.user.findMany({
-        where: {
-            ...(scope ? { id: { in: scope } } : {}),
-            ...(contains
-                ? { OR: [{ name: contains }, { email: contains }, { username: contains }] }
-                : {})
-        },
+        where: { AND: [scope ? { id: { in: scope } } : {}, match] },
         select: { id: true, name: true, username: true, email: true },
         orderBy: { name: "asc" },
         take: limit
@@ -377,6 +404,15 @@ export async function resolveReferences(
     for (const task of tasks) labels[`task/${task.id}`] = task.name;
     for (const doc of docs) labels[`doc/${doc.id}`] = doc.title;
     for (const note of notes) labels[`note/${note.id}`] = note.title;
+    // Events belong to the Calendar app, which names the ones this reader may
+    // read and says nothing about the rest.
+    const events = idsOf("event");
+    if (events.length > 0) {
+        const { eventTitlesFor } = await import("@/lib/app-extensions/registry");
+        for (const [id, title] of Object.entries(await eventTitlesFor(actor.id, events))) {
+            labels[`event/${id}`] = title;
+        }
+    }
     return labels;
 }
 

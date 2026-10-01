@@ -17,6 +17,7 @@ import {
     BookOpen,
     Bug,
     Building2,
+    CalendarDays,
     CalendarRange,
     Camera,
     Cctv,
@@ -291,6 +292,21 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: Mail,
         href: "/mail",
         permission: "mail.use"
+    },
+    {
+        /**
+         * Somebody's own calendars and the ones they link from outside.
+         *
+         * Installable, like Places and Tools: a Polaris nobody schedules
+         * anything in carries no menu entry for it.
+         */
+        id: "calendar",
+        label: "Calendar", // i18n-ignore
+        description: "Your calendars and the ones you link, in one place", // i18n-ignore
+        icon: CalendarDays,
+        href: "/calendar",
+        permission: "calendar.use",
+        requiresApp: "calendar"
     },
     {
         id: "notes",

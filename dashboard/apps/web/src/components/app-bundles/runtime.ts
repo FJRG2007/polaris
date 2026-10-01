@@ -12,6 +12,7 @@
 
 import * as zod from "zod";
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import * as ui from "@polaris/ui";
 import * as core from "@polaris/core";
 import * as nextLink from "next/link";
@@ -35,6 +36,9 @@ const MODULES: Record<string, object> = {
     "next/link": nextLink,
     "next/navigation": nextNavigation,
     react: React,
+    // Already in every page: a library an app draws with (Calendar's grid)
+    // portals and flushes through the dashboard's own copy.
+    "react-dom": ReactDOM,
     "react/jsx-runtime": jsxRuntime,
     zod
 };

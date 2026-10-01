@@ -25,13 +25,17 @@ const REGISTERED = "https://polaris.example.com";
 const BIND = "https://0.0.0.0:3000";
 
 const sent = { redirectUri: "", state: "" };
+/** What each link was saved with. */
+const saved: { provider: string; beyondLimit?: boolean }[] = [];
 
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1", isAdmin: true }) }));
 vi.mock("@/lib/connections/proven", () => ({ markConnectionProven: async () => undefined }));
 vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.7" }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
-vi.mock("@polaris/auth", () => ({ signInWithConnection: async () => ({ challenged: false, cookies: [] }) }));
+vi.mock("@polaris/auth", () => ({
+    signInWithConnection: async () => ({ challenged: false, cookies: [] })
+}));
 
 // The real one is covered in domains/browser-origin; here it only has to answer
 // where the browser is, which is what decides whether the trip has to move.
@@ -46,24 +50,33 @@ vi.mock("@/lib/connections/store", () => ({
     ConnectionClaimedError: class extends Error {},
     ConnectionLimitError: class extends Error {},
     connectionSignInAllowed: async () => true,
-    saveConnection: async () => undefined,
+    saveConnection: async (_userId: string, input: { provider: string; beyondLimit?: boolean }) => {
+        saved.push(input);
+    },
     signInConnection: async () => null
 }));
 
 vi.mock("@/lib/connections/steam", () => ({
     STEAM_PROVIDER: "steam",
     readSteamPersona: async () => null,
-    steamAuthorizeUrl: (returnTo: string) => `https://steamcommunity.com/openid/login?return=${returnTo}`,
+    steamAuthorizeUrl: (returnTo: string) =>
+        `https://steamcommunity.com/openid/login?return=${returnTo}`,
     verifySteamReturn: async () => null
 }));
 
 vi.mock("@/lib/connections/oauth", () => ({
     connectionFlowOrigin: async () => REGISTERED,
-    connectionCallbackUrl: (provider: string, baseUrl: string) => `${baseUrl}/api/connections/${provider}/callback`,
+    connectionCallbackUrl: (provider: string, baseUrl: string) =>
+        `${baseUrl}/api/connections/${provider}/callback`,
     connectionOAuthClient: async () => ({ clientId: "client-id", clientSecret: "client-secret" }),
     connectionLinkAvailable: async () => true,
     connectionSignInOffered: async () => true,
-    connectionAuthorizeUrl: (_provider: string, _client: unknown, redirectUri: string, state: string) => {
+    connectionAuthorizeUrl: (
+        _provider: string,
+        _client: unknown,
+        redirectUri: string,
+        state: string
+    ) => {
         sent.redirectUri = redirectUri;
         sent.state = state;
         return `https://accounts.google.com/o/oauth2/v2/auth?redirect_uri=${encodeURIComponent(redirectUri)}`;
@@ -79,7 +92,9 @@ vi.mock("@/lib/connections/oauth", () => ({
     })
 }));
 
-const { startConnectionLink, startConnectionSignIn } = await import("../../src/lib/connections/link-flow");
+const { finishConnectionCallback, startConnectionLink, startConnectionSignIn } = await import(
+    "../../src/lib/connections/link-flow"
+);
 
 /** A request as this route sees it: the proxy's internal address, with the name
  *  the browser used carried in the headers. */
@@ -94,7 +109,10 @@ describe("where a link is sent", () => {
     });
 
     it("asks the provider to return to the registered address, never to the bind address", async () => {
-        await startConnectionLink(arriving("/api/connections/google/link", "polaris.example.com"), "google");
+        await startConnectionLink(
+            arriving("/api/connections/google/link", "polaris.example.com"),
+            "google"
+        );
 
         expect(sent.redirectUri).toBe(`${REGISTERED}/api/connections/google/callback`);
     });
@@ -110,15 +128,22 @@ describe("where a link is sent", () => {
         // The registered address is https, so a cookie the browser would drop on it
         // would lose the round trip.
         expect(cookie).toContain("Secure");
-        expect(JSON.parse(decodeURIComponent(cookie.split("polaris_connection_state=")[1]!.split(";")[0]!)).state).toBe(
-            sent.state
-        );
+        expect(
+            JSON.parse(
+                decodeURIComponent(cookie.split("polaris_connection_state=")[1]!.split(";")[0]!)
+            ).state
+        ).toBe(sent.state);
     });
 
     it("moves a browser on another of this deployment's names before anything is written", async () => {
-        const response = await startConnectionLink(arriving("/api/connections/google/link", "polaris.local"), "google");
+        const response = await startConnectionLink(
+            arriving("/api/connections/google/link", "polaris.local"),
+            "google"
+        );
 
-        expect(response.headers.get("location")).toBe(`${REGISTERED}/api/connections/google/link?moved=1`);
+        expect(response.headers.get("location")).toBe(
+            `${REGISTERED}/api/connections/google/link?moved=1`
+        );
         expect(response.headers.get("set-cookie")).toBeNull();
         // Nothing was started, so no code exists that a half-moved trip could spend.
         expect(sent.redirectUri).toBe("");
@@ -147,8 +172,52 @@ describe("where a link is sent", () => {
         expect(response.headers.get("set-cookie")).toContain("polaris_connection_state=");
     });
 
+    it("starts a calendar link only for the services the Calendar links, so no other escapes the per-person cap", async () => {
+        const mode = (response: Response) =>
+            JSON.parse(
+                decodeURIComponent(
+                    (response.headers.get("set-cookie") ?? "")
+                        .split("polaris_connection_state=")[1]!
+                        .split(";")[0]!
+                )
+            ).mode;
+        const calendar = await startConnectionLink(
+            arriving("/api/connections/google/link?scope=calendar", "polaris.example.com"),
+            "google"
+        );
+        expect(mode(calendar)).toBe("calendar");
+        const other = await startConnectionLink(
+            arriving("/api/connections/github/link?scope=calendar", "polaris.example.com"),
+            "github"
+        );
+        expect(mode(other)).toBe("link");
+    });
+
+    it("holds a link to the per-person cap when a cookie claims calendars for a service that has none", async () => {
+        saved.length = 0;
+        const callback = (provider: string) =>
+            new Request(
+                `${REGISTERED}/api/connections/${provider}/callback?code=code-1&state=state-1`,
+                {
+                    headers: {
+                        host: "polaris.example.com",
+                        cookie: `polaris_connection_state=${encodeURIComponent(JSON.stringify({ provider, mode: "calendar", state: "state-1" }))}`
+                    }
+                }
+            );
+        await finishConnectionCallback(callback("github"), "github");
+        await finishConnectionCallback(callback("google"), "google");
+        expect(saved.map((input) => [input.provider, input.beyondLimit])).toEqual([
+            ["github", false],
+            ["google", true]
+        ]);
+    });
+
     it("sends a sign-in to the same address a link goes to, which is the one registered", async () => {
-        await startConnectionSignIn(arriving("/api/connections/google/signin", "polaris.example.com"), "google");
+        await startConnectionSignIn(
+            arriving("/api/connections/google/signin", "polaris.example.com"),
+            "google"
+        );
 
         expect(sent.redirectUri).toBe(`${REGISTERED}/api/connections/google/callback`);
     });

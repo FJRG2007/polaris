@@ -49,6 +49,17 @@ export interface GameServerSummary {
     readonly slots: number | null;
 }
 
+/** One event coming up, as the Overview card lists it. */
+export interface UpcomingEvent {
+    readonly id: string;
+    readonly title: string;
+    /** ISO instant; for an all-day event, midnight UTC of its date. */
+    readonly start: string;
+    readonly allDay: boolean;
+    readonly color: string;
+    readonly href: string;
+}
+
 /** The install a panel is drawn for. */
 export interface ExtensionInstall {
     readonly id: string;
@@ -89,6 +100,16 @@ export interface AppExtension {
     /** Fold older install rows into the app's own, when a screen that lists
      *  installs is opened. */
     readonly adopt?: (ownerId: string) => Promise<unknown>;
+
+    /** The titles of the events among these ids that this account may read,
+     *  for a pasted calendar link to show as a named chip. */
+    readonly eventTitles?: (
+        userId: string,
+        ids: readonly string[]
+    ) => Promise<Readonly<Record<string, string>>>;
+
+    /** The reader's next events, for the Overview card, soonest first. */
+    readonly upcomingEvents?: (userId: string, limit: number) => Promise<readonly UpcomingEvent[]>;
 
     /** Its servers, for the overview card. */
     readonly gameServerSummaries?: (userId: string) => Promise<readonly GameServerSummary[]>;

@@ -17,6 +17,7 @@ import type { OverviewWidgetId, OverviewWidgetSize } from "@polaris/core";
 import {
     Activity,
     Bell,
+    CalendarDays,
     Clock,
     Gamepad2,
     HardDrive,
@@ -61,7 +62,7 @@ export interface OverviewWidgetEntry {
 }
 
 /** The things a card can depend on being present, answered once on the server. */
-export type OverviewFeature = "games";
+export type OverviewFeature = "games" | "calendar";
 
 /** Which of those this account actually has. A feature absent from the record is
  *  treated as absent, so a new one is off until something answers for it. */
@@ -183,6 +184,17 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         requires: "games"
     },
     {
+        id: "calendar",
+        label: "Coming up", // i18n-ignore
+        description: "Your next events from every calendar you show.", // i18n-ignore
+        icon: CalendarDays,
+        permission: "calendar.use",
+        href: "/calendar",
+        sizes: ALL_SIZES,
+        // Drawn by the Calendar app, so only where it is installed.
+        requires: "calendar"
+    },
+    {
         id: "sessions",
         label: "Signed in", // i18n-ignore
         description: "The devices your account is open on right now.", // i18n-ignore
@@ -234,7 +246,10 @@ export interface OverviewAccessInput {
  * offered at all, so uninstalling the last game server does not delete how
  * somebody had arranged theirs.
  */
-export async function availableOverviewWidgets({ can, features }: OverviewAccessInput): Promise<OverviewWidgetId[]> {
+export async function availableOverviewWidgets({
+    can,
+    features
+}: OverviewAccessInput): Promise<OverviewWidgetId[]> {
     const decided = await Promise.all(
         OVERVIEW_WIDGETS.map(async (widget) => {
             if (widget.requires && features?.[widget.requires] !== true) return null;

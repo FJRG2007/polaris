@@ -110,7 +110,7 @@ export interface ConnectionIdentity {
  * repeated; the ones that do not are re-authorized per reason, which is the
  * honest behaviour either way.
  */
-export type ConnectionFlow = "link" | "signin" | "storage" | "mail";
+export type ConnectionFlow = "link" | "signin" | "storage" | "mail" | "calendar";
 
 interface ProviderOAuth {
     /** Where the provider returns somebody after they authorize. Registered on

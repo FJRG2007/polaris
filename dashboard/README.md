@@ -29,6 +29,7 @@ dashboard/
 ├── apps/
 │   ├── web/        # the dashboard (Next.js App Router)
 │   ├── places/     # @polaris-app/places, an installable app: cameras, devices, people, alerts
+│   ├── calendar/   # @polaris-app/calendar, an installable app: calendars, sync, booking
 │   ├── landing/    # marketing site (Astro)
 │   └── demo/       # seeded, read-only demo of web
 └── packages/

@@ -27,13 +27,15 @@ vi.mock("@polaris/db", () => ({
 const { SCHEDULED_JOBS: CORE_JOBS } = await import("../../src/lib/cron/jobs");
 const { placesExtension } = await import("@polaris-app/places/src/lib/places-extension");
 const { gameServersExtension } = await import("@polaris-app/game-servers/src/lib/games-extension");
+const { calendarExtension } = await import("@polaris-app/calendar/src/lib/calendar-extension");
 
 /** Polaris' own jobs and the installed apps', as the schedule runs them with both
  *  apps installed. The apps' come from their packages, as their bundles would. */
 const SCHEDULED_JOBS = [
     ...CORE_JOBS,
     ...(placesExtension.jobs?.() ?? []),
-    ...(gameServersExtension.jobs?.() ?? [])
+    ...(gameServersExtension.jobs?.() ?? []),
+    ...(calendarExtension.jobs?.() ?? [])
 ];
 
 describe("the work Polaris runs on a schedule", () => {
@@ -94,6 +96,12 @@ describe("the work Polaris runs on a schedule", () => {
             // A budget crossing its threshold is told to the people running
             // the organization once; two passes would each tell them.
             "billing-budgets",
+            // Two housekeeping passes would purge the same trash; two syncs would
+            // push the same pending change to Google twice, a duplicated meeting;
+            // two reminder passes would send every reminder twice.
+            "calendar-housekeeping",
+            "calendar-reminders",
+            "calendar-sync",
             "chat-scheduled",
             "connection-health",
             // Two passes would take two base backups of the same instance, and
