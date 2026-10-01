@@ -435,6 +435,77 @@ describe("streaming a file to a storage that stops answering", () => {
         expect(isUnreachable(failure)).toBe(true);
         expect((failure as InstanceType<typeof StorageRefused>).storage).toBe("The NAS");
     });
+
+    it("remembers a storage that went away mid-write, so trying again lands on this server", async () => {
+        const box = storage();
+        box.writeStream.mockImplementation(async () => {
+            throw Object.assign(new Error("write EHOSTDOWN"), { code: "EHOSTDOWN" });
+        });
+        getDriverForConnection.mockImplementation(async () => box);
+
+        await stream().catch(() => undefined);
+        await vi.waitFor(() =>
+            expect(reportStorageUnreachable).toHaveBeenCalledWith({ id: NAS, name: "The NAS" })
+        );
+        getDriverForConnection.mockClear();
+        const again = await stream();
+
+        expect(getDriverForConnection).not.toHaveBeenCalled();
+        expect(again.targetId).toBe(LOCAL_TARGET);
+        expect(again.fellBackFrom).toBe("The NAS");
+    });
+
+    it("does not count a storage that answered and refused as gone", async () => {
+        getDriverForConnection.mockImplementation(async () => storage({ refuses: true }));
+
+        await stream().catch(() => undefined);
+        getDriverForConnection.mockClear();
+        await stream().catch(() => undefined);
+
+        expect(getDriverForConnection).toHaveBeenCalled();
+        expect(reportStorageUnreachable).not.toHaveBeenCalled();
+    });
+});
+
+describe("a file when this server will not open either", () => {
+    it("is refused as a storage refusal, not as the disk's own error", async () => {
+        broken = true;
+        const local = { id: LOCAL_TARGET, name: "This server", automatic: false };
+
+        const failure = await placeFile({
+            target: local,
+            localFolder: "chat",
+            folder: "polaris/chat/c1",
+            path: "polaris/chat/c1/file",
+            bytes,
+            mime: "audio/webm",
+            what: "file"
+        }).catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(StorageRefused);
+        expect(await storageRefusal(failure, false)).toBe("No storage would keep that file.");
+    });
+});
+
+describe("placing a file on a storage that goes away mid-write", () => {
+    it("is remembered, so the next file skips it", async () => {
+        const box = storage();
+        box.writeStream.mockImplementation(async () => {
+            throw Object.assign(new Error("write ECONNRESET"), { code: "ECONNRESET" });
+        });
+        getDriverForConnection.mockImplementation(async () => box);
+
+        const first = await put();
+        getDriverForConnection.mockClear();
+        const second = await put();
+
+        expect(first.targetId).toBe(LOCAL_TARGET);
+        expect(second.targetId).toBe(LOCAL_TARGET);
+        expect(getDriverForConnection).not.toHaveBeenCalled();
+        await vi.waitFor(() =>
+            expect(reportStorageUnreachable).toHaveBeenCalledWith({ id: NAS, name: "The NAS" })
+        );
+    });
 });
 
 describe("what the sender is told", () => {
@@ -470,6 +541,14 @@ describe("what the sender is told", () => {
 
         expect(await storageRefusal(failure, false)).toBe(
             "The storage UNAS Pro would not keep that file."
+        );
+    });
+
+    it("does not blame a storage for a failure that is not one", async () => {
+        const failure = new Error("Unique constraint failed on the fields: (`id`)");
+
+        expect(await storageRefusal(failure, false)).toBe(
+            "That file could not be saved. Try again."
         );
     });
 });

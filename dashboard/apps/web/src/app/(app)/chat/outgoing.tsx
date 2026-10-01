@@ -67,10 +67,14 @@ function announce(): void {
     for (const listener of listeners) listener();
 }
 
-/** Start one, or start it again: whatever it said last is replaced. */
-export function putOutgoing(one: Outgoing): void {
+/** Start one, or start it again: whatever it said last is replaced. False, and
+ *  nothing changed, when that one is already on its way - a second press of "Try
+ *  again" must not send the message twice. */
+export function putOutgoing(one: Outgoing): boolean {
+    if (pending.some((entry) => entry.id === one.id && entry.phase === "sending")) return false;
     pending = [...pending.filter((entry) => entry.id !== one.id), one];
     announce();
+    return true;
 }
 
 /** Change one, or take it away by answering null. */

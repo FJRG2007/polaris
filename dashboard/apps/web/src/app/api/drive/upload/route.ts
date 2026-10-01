@@ -8,7 +8,8 @@
 import { normalizeRelPath, parentPath } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
-import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { getDriverForConnection } from "@/lib/storage-service";
 import { recordItemCreator } from "@/lib/drive-meta-service";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
 import { recordAudit } from "@/lib/audit-service";
@@ -42,16 +43,21 @@ export async function PUT(request: Request): Promise<Response> {
     }
 
     const offset = offsetParam ? Number(offsetParam) : undefined;
-    let driver;
     try {
         // Authorize against the destination folder (the parent), where the write lands.
         // That is the folder the normalized target sits in, not the `p` the caller
         // named: a `name` carrying `../` or a nested path moves the write out of
         // `p`, past the access rules and locks that were checked there.
-        driver = await requireDriveDriver(user.id, connectionId, parentPath(target), "write");
+        await authorizeDrive(user.id, connectionId, parentPath(target), "write");
     } catch (caught) {
         if (caught instanceof DriveLockedError) return new Response("Locked", { status: 423 });
         if (caught instanceof DriveAccessError) return new Response("Forbidden", { status: 403 });
+        throw caught;
+    }
+    let driver;
+    try {
+        driver = await getDriverForConnection(connectionId);
+    } catch (caught) {
         // The location would not open - a NAS that is off is the usual one. Said
         // by its name rather than as the framework's bare 500, which is all the
         // uploader used to get.

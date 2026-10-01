@@ -18,6 +18,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import { DEFAULT_CHAT_RULES } from "@polaris/core";
 import { Composer } from "@/app/(app)/chat/composer";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { patchOutgoing, putOutgoing } from "@/app/(app)/chat/outgoing";
 import type { SendOutcome, SendProgress } from "@/app/(app)/chat/outgoing";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
@@ -196,5 +197,21 @@ describe("a message with a file on its way", () => {
         render(box(send, channelId), { wrapper: MessagesWrapper });
         expect((await screen.findByRole("alert")).textContent).toContain("did not answer");
         expect(screen.getByRole("button", { name: "Try sending numbers.csv again" })).toBeTruthy();
+    });
+
+    it("is not sent a second time by a second press while it is still going", () => {
+        const one = {
+            id: "twice",
+            scope: "twice",
+            body: "",
+            files: [sheet()],
+            kept: [],
+            hidden: []
+        };
+        expect(putOutgoing({ ...one, phase: "sending" })).toBe(true);
+        expect(putOutgoing({ ...one, phase: "sending" })).toBe(false);
+        patchOutgoing(one.id, (was) => ({ ...was, phase: "failed", error: "no" }));
+        expect(putOutgoing({ ...one, phase: "sending" })).toBe(true);
+        patchOutgoing(one.id, () => null);
     });
 });

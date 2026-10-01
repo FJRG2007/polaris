@@ -17,13 +17,16 @@ import { isUnreachable, StorageRefused } from "@/lib/storage-target";
 export async function storageRefusal(error: unknown, isAdmin: boolean): Promise<string> {
     const t = await readerWords("common");
     const name = error instanceof StorageRefused ? error.storage : null;
-    const sentence = isUnreachable(error)
-        ? name
-            ? t("storage.unreachable", { name })
-            : t("storage.unreachableHere")
-        : name
-          ? t("storage.refused", { name })
-          : t("storage.refusedHere");
+    const fromStorage = error instanceof StorageRefused || isUnreachable(error);
+    const sentence = !fromStorage
+        ? t("storage.failed")
+        : isUnreachable(error)
+          ? name
+              ? t("storage.unreachable", { name })
+              : t("storage.unreachableHere")
+          : name
+            ? t("storage.refused", { name })
+            : t("storage.refusedHere");
     if (!isAdmin) return sentence;
     const detail = error instanceof Error ? error.message : String(error);
     return t("storage.withDetail", { sentence, detail: detail.slice(0, 300) });

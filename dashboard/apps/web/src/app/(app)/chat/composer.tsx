@@ -549,7 +549,7 @@ export function Composer({
      */
     const deliver = async (one: Omit<Outgoing, "phase" | "error" | "progress">): Promise<void> => {
         const settle = (change: (was: Outgoing) => Outgoing | null) => patchOutgoing(one.id, change);
-        putOutgoing({ ...one, phase: "sending" });
+        if (!putOutgoing({ ...one, phase: "sending" })) return;
         let outcome: SendOutcome;
         try {
             outcome = await onSend(one.body, one.files, one.sounds, one.hidden, one.kept, (progress) =>

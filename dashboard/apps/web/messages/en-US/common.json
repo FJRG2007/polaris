@@ -65,6 +65,7 @@
         "unreachableHere": "Files cannot be saved right now: the storage is not reachable.",
         "refused": "The storage {name} would not keep that file.",
         "refusedHere": "No storage would keep that file.",
+        "failed": "That file could not be saved. Try again.",
         "withDetail": "{sentence} ({detail})"
     }
 }

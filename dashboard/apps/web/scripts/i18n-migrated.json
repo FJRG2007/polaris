@@ -1576,6 +1576,10 @@
         "web/src/app/(app)/apps/installed/[id]/access-actions.ts",
         "web/src/app/(app)/apps/installed/[id]/actions.ts",
         "web/src/app/(app)/apps/installed/[id]/[[...tab]]/page.tsx",
+        "web/src/app/(app)/chat/outgoing.tsx",
+        "web/src/components/transfers/move-file.ts",
+        "web/src/components/transfers/transfer-store.ts",
+        "web/src/components/transfers/transfers-view.tsx",
         "web/src/lib/overview/catalog.ts",
         "web/src/lib/overview/place-labels.ts",
         "web/src/lib/legal/documents.ts",
@@ -1585,6 +1589,8 @@
         "web/src/lib/apps/port-advice.ts",
         "web/src/lib/apps/app-words.ts",
         "web/src/lib/apps/install-service.ts",
+        "web/src/lib/storage-alert.ts",
+        "web/src/lib/storage-refusal.ts",
         "game-servers/src/screens/game-text.ts"
     ]
 }

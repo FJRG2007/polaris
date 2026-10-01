@@ -44,9 +44,11 @@ export interface Sent {
  * wherever files are kept, and a storage that has gone away used to hold that
  * part for ever - a bar at 100% with "0 seconds left" under it, and nothing
  * anybody could do but wait. The server now gives up on a storage that is not
- * answering well inside this, so reaching it means the answer is not coming.
+ * answering well inside this - opening it, writing to it, reading the file back
+ * and cleaning up add up to a little over two minutes at worst - so reaching it
+ * means the answer is not coming.
  */
-export const ANSWER_WITHIN_MS = 120_000;
+export const ANSWER_WITHIN_MS = 180_000;
 
 /**
  * Put one file somewhere, with a bar.
