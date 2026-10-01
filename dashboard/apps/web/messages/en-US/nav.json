@@ -275,7 +275,8 @@
         "Where the room went": "Where the room went",
         "Who gets in": "Who gets in",
         "World": "World",
-        "Developers": "Developers"
+        "Developers": "Developers",
+        "Connectivity": "Connectivity"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",
