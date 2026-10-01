@@ -114,7 +114,12 @@ function MicrophoneCard({
     /** The call's own microphone, when there is a call: the meter reads it rather
      *  than asking the browser for the same device a second time. */
     const held = useHeldCall();
-    const inCall = held?.session ? (held.call.localStream?.getAudioTracks()[0] ?? null) : null;
+    // What the call sends rather than the device behind it: the noise model and
+    // the volume both sit between the two, and a device that reads healthy while
+    // the voice leaves quiet is the case this screen exists to show.
+    const inCall = held?.session
+        ? (held.call.outgoing ?? held.call.localStream?.getAudioTracks()[0] ?? null)
+        : null;
 
     const stop = useCallback(() => {
         // The graph goes before the device does: it holds an audio context, and
@@ -132,6 +137,34 @@ function MicrophoneCard({
     // Never left running. A tab closed on an open microphone is a light that
     // stays on, and this is a screen somebody opens and wanders away from.
     useEffect(() => stop, [stop]);
+
+    // The volume moved during a test is heard in the test, the way it is in a
+    // call: the running graph takes it, and a test with no graph yet gets one.
+    // Only on a change of the volume: the graph a test starts with is built by
+    // the press that starts it, and two builds racing would leave one running.
+    const gainSeen = useRef(gain);
+    useEffect(() => {
+        if (gainSeen.current === gain) return;
+        gainSeen.current = gain;
+        if (filter.current) {
+            filter.current.setGain(gain);
+            return;
+        }
+        const track = tested;
+        if (!track || gain === 1) return;
+        let current = true;
+        void filterMic(track, cleanup, null, gain).then((built) => {
+            if (!current || filter.current) {
+                void built?.stop();
+                return;
+            }
+            filter.current = built;
+            setFilterState(built);
+        });
+        return () => {
+            current = false;
+        };
+    }, [cleanup, gain, tested]);
 
     const start = async () => {
         setError("");
@@ -155,8 +188,13 @@ function MicrophoneCard({
             // this is the screen that finds out, and the reason comes with it.
             if (track) {
                 const built = await filterMic(track, cleanup);
-                setFilterState(built);
-                filter.current = built;
+                // A volume moved while this was building has built its own.
+                if (filter.current) {
+                    void built?.stop();
+                } else {
+                    setFilterState(built);
+                    filter.current = built;
+                }
             }
         } catch (caught) {
             setError(tChat(`media.refused.${refusalOf(caught)}` as const, { device: "microphone" }));
@@ -211,7 +249,7 @@ function MicrophoneCard({
                     {/* Drawn whether or not anything is being measured: an empty
                         row is what says the test is the thing that fills it. */}
                     <MicLevelMeter
-                        track={tested ?? inCall}
+                        track={filterState?.track ?? tested ?? inCall}
                         listen
                         deviceId={chosenId}
                         threshold={showThreshold ? threshold : undefined}

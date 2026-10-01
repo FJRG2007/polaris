@@ -50,6 +50,7 @@ function suppressors() {
 /** The models want 48 kHz, which is what a call runs at anyway. Asked for
  *  explicitly so the graph is never built at a rate the model cannot use. */
 import { micGain } from "./mic-gain";
+import { dbToGain, LEVELLER_START, rmsDb, stepLeveller } from "./mic-leveller";
 
 const SAMPLE_RATE = 48_000;
 
@@ -58,22 +59,22 @@ const SAMPLE_RATE = 48_000;
  *
  * A suppressor is not a fader, but it lowers what comes out all the same: it is
  * trained to leave speech and remove everything else, and "everything else"
- * includes the room tone under the speech and the tail of every word. What
- * arrives at the other end is a voice that is cleaner and quieter, and the whole
- * room turning their speakers up is not a fix - it turns up everybody who did
- * not switch the filter on.
+ * includes the room tone under the speech and the tail of every word - and, on a
+ * microphone that hears the voice badly, a good part of the voice. What arrives
+ * at the other end is a voice that is cleaner and quieter, and the whole room
+ * turning their speakers up is not a fix - it turns up everybody who did not
+ * switch the filter on.
  *
  * So the level comes back here, on the way out, where it is one person's
- * microphone rather than everybody's ears. Four decibels: enough to put a
- * filtered voice back beside an unfiltered one, small enough that it is a
- * correction rather than a boost. It is a chosen starting point rather than a
- * measured match - what "the same loudness" is depends on the voice, the room
- * and the model - which is exactly why the limiter below is not optional.
+ * microphone rather than everybody's ears. It used to be a fixed four decibels,
+ * which is right for an average microphone and wrong for exactly the one
+ * somebody is told is quiet; it is now measured after the model and brought
+ * towards a speaking level - see `mic-leveller`. How often it is measured:
  */
-const MAKEUP_GAIN = 1.6;
+const LEVEL_EVERY_MS = 100;
 
 /**
- * What stops the makeup from clipping.
+ * What stops the lift from clipping.
  *
  * Gain on a signal that was already near full scale does not make it louder, it
  * squares off the peaks - and a squared-off peak is the crackle that sounds
@@ -110,6 +111,15 @@ export interface FilteredMic {
      * suppression is off" into something somebody can act on.
      */
     readonly problem: string | null;
+    /**
+     * Change how loud this microphone goes out, on the graph that is running.
+     *
+     * A change of the volume setting during a call used to wait for the next
+     * time the graph was built - a different microphone, a different noise
+     * setting, the next call - so somebody told they were quiet moved the slider
+     * and nothing happened. Ramped, because a step in gain is a click.
+     */
+    readonly setGain: (gain: number) => void;
 }
 
 /**
@@ -211,13 +221,16 @@ export async function filterMic(
         return null;
     }
 
-    // The model, then the level it cost and the level somebody asked for, then
-    // the guard on both. Multiplied rather than added: they are two reasons for
-    // the same knob, and a doubled voice on top of the model's makeup is what
-    // the limiter below is for.
-    const makeup = context.createGain();
-    monoOnly(makeup);
-    makeup.gain.value = (built ? MAKEUP_GAIN : 1) * gain;
+    // The model, then the level it cost, then the level somebody asked for, then
+    // the guard on all of it. Two nodes rather than one product: the first is
+    // moved by a measurement and the second by a person, and a single node moved
+    // by both would have each undoing the other.
+    const leveller = context.createGain();
+    monoOnly(leveller);
+    leveller.gain.value = built ? dbToGain(LEVELLER_START.gainDb) : 1;
+    const volume = context.createGain();
+    monoOnly(volume);
+    volume.gain.value = gain;
     const limiter = context.createDynamicsCompressor();
     monoOnly(limiter);
     limiter.threshold.value = LIMIT_DBFS;
@@ -226,15 +239,45 @@ export async function filterMic(
     limiter.attack.value = 0.003;
     limiter.release.value = 0.1;
 
+    // What the model left, read before the leveller so the gain never chases its
+    // own output.
+    let probe: AnalyserNode | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
     if (built) {
         monoOnly(built.node);
         source.connect(built.node);
-        built.node.connect(makeup);
+        built.node.connect(leveller);
+        probe = context.createAnalyser();
+        probe.fftSize = 2048;
+        built.node.connect(probe);
+        const samples = new Float32Array(probe.fftSize);
+        const reading = probe;
+        let state = LEVELLER_START;
+        let last = Date.now();
+        timer = setInterval(() => {
+            const now = Date.now();
+            reading.getFloatTimeDomainData(samples);
+            const next = stepLeveller(state, rmsDb(samples), now - last);
+            last = now;
+            if (next.gainDb !== state.gainDb) ramp(leveller.gain, dbToGain(next.gainDb), context);
+            state = next;
+        }, LEVEL_EVERY_MS);
     } else {
-        source.connect(makeup);
+        source.connect(leveller);
     }
-    makeup.connect(limiter);
+    leveller.connect(volume);
+    volume.connect(limiter);
     limiter.connect(sink);
+
+    const teardown = () => {
+        if (timer) clearInterval(timer);
+        built?.dispose();
+        source.disconnect();
+        probe?.disconnect();
+        leveller.disconnect();
+        volume.disconnect();
+        limiter.disconnect();
+    };
 
     const out = sink.stream.getAudioTracks()[0];
     // A context that would not start produces silence, and a suspended one is
@@ -243,8 +286,7 @@ export async function filterMic(
     // else's ears. Handing the microphone back untouched is worse audio and a
     // call people can have.
     if (!out || context.state !== "running") {
-        built?.dispose();
-        source.disconnect();
+        teardown();
         await context.close().catch(() => undefined);
         return null;
     }
@@ -253,15 +295,24 @@ export async function filterMic(
         track: out,
         using: built ? built.using : "gain",
         problem: built ? null : (problem ?? null),
+        setGain: (next: number) => {
+            if (Number.isFinite(next) && next >= 0) ramp(volume.gain, next, context);
+        },
         stop: async () => {
-            built?.dispose();
-            source.disconnect();
-            makeup.disconnect();
-            limiter.disconnect();
+            teardown();
             out.stop();
             await context.close().catch(() => undefined);
         }
     };
+}
+
+/** Move a gain without the click an assignment makes. */
+function ramp(param: AudioParam, value: number, context: AudioContext): void {
+    try {
+        param.setTargetAtTime(value, context.currentTime, 0.05);
+    } catch {
+        param.value = value;
+    }
 }
 
 /**

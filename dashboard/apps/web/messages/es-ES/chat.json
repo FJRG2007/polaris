@@ -381,7 +381,8 @@
             "laugh": "Gracioso",
             "surprise": "Sorpresa",
             "heart": "Me encanta"
-        }
+        },
+        "sentLevel": "Lo que oyen otros"
     },
     "meetingRoom": {
         "meeting": "Reunión",
@@ -809,7 +810,13 @@
         "streamAttenuation": "Atenuación de emisión",
         "howFarOtherVoicesAre": "Cuánto se bajan las otras voces mientras suena una emisión",
         "lowersEverybodyElseWhileA": "Baja a todos los demás mientras suena una emisión.",
-        "howLoud": "Volumen de {name}"
+        "howLoud": "Volumen de {name}",
+        "arrives": {
+            "quieter": "Llega {db} dB más bajo que el resto",
+            "louder": "Llega {db} dB más alto que el resto",
+            "same": "Llega casi igual de alto que el resto",
+            "unknown": "Aún no se ha oído lo bastante"
+        }
     },
     "search": {
         "searchWidth": "Ancho",
@@ -1367,5 +1374,10 @@
         "join": "Entrar",
         "askToJoin": "Pedir acceso",
         "call": "Llamada"
+    },
+    "quietMic": {
+        "quiet": "Llegas unos {db} dB más bajo que los demás. Sube el micrófono, pon Ruido de fondo en Estándar o revisa el nivel de entrada que tu equipo da a este micrófono.",
+        "atMax": "Llegas unos {db} dB más bajo que los demás, con el volumen del micrófono ya al máximo. Acércate a él, pon Ruido de fondo en Estándar o sube el nivel de entrada que tu equipo le da.",
+        "turnUp": "Subir"
     }
 }

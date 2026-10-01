@@ -68,7 +68,8 @@ import {
     UNRESTRICTED,
     type SeatRestriction
 } from "@/lib/chat/voice-moderation";
-import { voiceSettings } from "./voice-settings";
+import { useMicGain } from "./mic-gain";
+import { useVoiceSettings, voiceSettings } from "./voice-settings";
 import { playCallSound } from "@/lib/call-sounds";
 import { shareSound } from "./call-share-sound";
 import { withCameraDevice } from "./camera-device";
@@ -2704,6 +2705,46 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         },
         [outgoingMic, publish, publishLocalPreview, rememberCleanMic, startFilter]
     );
+
+    /**
+     * The microphone volume, followed during the call.
+     *
+     * It used to be read once, when the graph was built, so somebody told they
+     * were quiet moved the slider - in the call's own menu or on the devices
+     * screen - and nothing changed until the next call. A running graph takes
+     * the new level as it is; a microphone with no graph yet (no model, volume
+     * untouched) gets one, which is a swap of the published track like a change
+     * of the noise setting.
+     */
+    const [volumeNow] = useMicGain();
+    const volumeSeen = useRef(volumeNow);
+    useEffect(() => {
+        if (volumeSeen.current === volumeNow) return;
+        volumeSeen.current = volumeNow;
+        const running = filtered.current;
+        if (running) {
+            running.setGain(volumeNow);
+            return;
+        }
+        // Before the call has a microphone up, the graph built while joining
+        // reads the setting for itself.
+        if (!mic.current || room.current?.state !== CONNECTED) return;
+        void (async () => {
+            await startFilter();
+            await publish(MICROPHONE, outgoingMic());
+            settleMic();
+            publishLocalPreview();
+        })();
+    }, [outgoingMic, publish, publishLocalPreview, settleMic, startFilter, volumeNow]);
+
+    /**
+     * The browser's gain control and the bypass, followed during the call too.
+     * Both are constraints on the open track, so nothing is republished.
+     */
+    const [voiceNow] = useVoiceSettings();
+    useEffect(() => {
+        void applyMicCleanup(mic.current);
+    }, [voiceNow.autoGainControl, voiceNow.bypassProcessing]);
 
     /**
      * Change what is drawn behind the camera, mid-call.

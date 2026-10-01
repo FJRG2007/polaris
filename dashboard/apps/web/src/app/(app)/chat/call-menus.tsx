@@ -11,6 +11,7 @@ import { useVoiceSettings } from "./voice-settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ModerationItems, type SeatModeration } from "./call-moderation-menu";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
+import { gapFor, gapWords, useLoudness } from "./call-loudness";
 import { Check, Headphones, PictureInPicture2, Users, Volume2, VolumeX } from "lucide-react";
 import {
     canPopOut,
@@ -71,6 +72,13 @@ export function PersonMenu({
 }) {
     const t = useTranslations("chat");
     const [volume, setVolume] = useCallVolume(volumeKey);
+    // How they arrive against everybody else, measured here while each talks -
+    // see `call-loudness`. What turns "they are quiet" into "they are quiet for
+    // everybody", which is the difference between this slider and their
+    // microphone.
+    const gap = gapFor(useLoudness(), volumeKey);
+    const arrives = gapWords(gap);
+    const db = gap === null ? 0 : Math.round(Math.abs(gap));
 
     return (
         <ContextMenu>
@@ -123,6 +131,15 @@ export function PersonMenu({
                             ? t("callMenus.asTheyWereSent")
                             : t("callMenus.backToHowTheyWere")}
                     </button>
+                    <span className="text-[0.6875rem] text-muted-foreground">
+                        {arrives === "quieter"
+                            ? t("callMenus.arrives.quieter", { db })
+                            : arrives === "louder"
+                              ? t("callMenus.arrives.louder", { db })
+                              : arrives === "same"
+                                ? t("callMenus.arrives.same")
+                                : t("callMenus.arrives.unknown")}
+                    </span>
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setVolume(volume === 0 ? DEFAULT_VOLUME : 0)}>
                     {volume === 0 ? (

@@ -50,6 +50,7 @@ import {
 } from "./camera-background";
 import { searchPeopleAction } from "./actions";
 import { NoAudioNotice } from "./no-audio-notice";
+import { QuietMicNotice } from "./quiet-mic-notice";
 import { SlowConnectionNotice } from "@/components/connection-banner";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
@@ -66,6 +67,7 @@ import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
 import { useCallVolume } from "./call-volumes";
 import { MicLevelMeter } from "./mic-level-meter";
+import { GAIN_MAX, GAIN_MIN, useMicGain } from "./mic-gain";
 import { PersonMenu, StreamMenu } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
@@ -690,6 +692,7 @@ export function CallRoom({
                     device={call.localStream?.getAudioTracks()[0] ?? null}
                     micOn={call.micOn}
                 />
+                <QuietMicNotice micOn={call.micOn} />
 
                 {/* Said before anything else on the screen, and to everybody: a
                 call being written down is the one fact in a room that changes
@@ -1097,6 +1100,7 @@ export function CallRoom({
                     // The call's own microphone, never a second one - see
                     // `MicLevelMeter`.
                     meter={call.localStream?.getAudioTracks()[0] ?? null}
+                    sent={call.outgoing}
                 />
 
                 <Split
@@ -1324,6 +1328,7 @@ function Split({
     mirrored,
     onMirror,
     meter,
+    sent,
     background,
     onBackground,
     backgroundImage,
@@ -1373,6 +1378,11 @@ function Split({
      *  Null while the call has no microphone open yet - the meter then stays
      *  empty rather than opening one of its own. */
     meter?: MediaStreamTrack | null;
+    /** Microphone only: what the call is actually sending, after the noise
+     *  model and the volume. Drawn as a second row when it is not the device
+     *  itself, because a device that reads healthy and a voice that leaves
+     *  quiet is exactly the case one row cannot show. */
+    sent?: MediaStreamTrack | null;
     /** Camera only: what is drawn behind you, and the picture it uses when that
      *  is a picture. The six arrive together or none of them do. */
     background?: CameraBackground;
@@ -1713,6 +1723,15 @@ function Split({
                                 <div className="px-2 pb-2">
                                     <MicLevelMeter track={meter} />
                                 </div>
+                                {sent && sent !== meter && (
+                                    <>
+                                        <DropdownMenuLabel>{t("callRoom.sentLevel")}</DropdownMenuLabel>
+                                        <div className="px-2 pb-2">
+                                            <MicLevelMeter track={sent} />
+                                        </div>
+                                    </>
+                                )}
+                                <MicVolumeItem />
                             </>
                         )}
                     </DropdownMenuContent>
@@ -2636,5 +2655,37 @@ function ReactionMenu({ onReact }: { onReact: (reaction: Reaction) => void }) {
                 ))}
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+}
+
+/**
+ * The microphone volume, in the menu somebody opens when they are told they are
+ * quiet. The same setting as the devices screen's, and it applies to the call
+ * while it runs - see `useSfuCall`.
+ */
+function MicVolumeItem() {
+    const t = useTranslations("chat");
+    const [gain, setGain] = useMicGain();
+    return (
+        <DropdownMenuItem
+            // The menu would otherwise close on the press that moved the slider.
+            onSelect={(event) => event.preventDefault()}
+            className="flex-col items-stretch gap-1.5"
+        >
+            <span className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t("micSettings.microphoneVolume")}</span>
+                <span className="tabular-nums">{Math.round(gain * 100)}%</span>
+            </span>
+            <input
+                type="range"
+                min={GAIN_MIN * 100}
+                max={GAIN_MAX * 100}
+                step={5}
+                value={Math.round(gain * 100)}
+                aria-label={t("micSettings.microphoneVolume")}
+                onChange={(event) => setGain(Number(event.target.value) / 100)}
+                className="w-full accent-primary"
+            />
+        </DropdownMenuItem>
     );
 }
