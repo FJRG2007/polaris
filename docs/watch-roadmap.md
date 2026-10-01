@@ -29,13 +29,27 @@ Worth stating first, because it decides what is worth copying and what is not.
   and republishes the routes when it finds a hostname unrouted
   (`lib/watch/health-probe.ts`), which is the one outage Polaris can end without
   a terminal.
+- **Internet outage history.** Every pass of the address watcher turns into one
+  verdict - up, or down as a dead line, a name that will not resolve, or a silent
+  address - and the worse of the three wins when an outage crosses between them.
+  A restart that lands before the next pass was due continues the same outage
+  rather than splitting it; one closed by a gap nobody watched is marked
+  unobserved rather than counted as downtime; a flap back down within the merge
+  gap reopens the outage instead of starting a second one
+  (`lib/connectivity/outage-tracker.ts`, `lib/connectivity/outages.ts`). Watch >
+  Connectivity shows the live state, uptime over 24h/7d/30d/90d, the count,
+  total, longest and average downtime, a 90-day heatmap and the filterable list
+  with CSV export, and the "answering again" notice says how long it was down.
+  Rows are kept individually for a year and folded into a monthly total after,
+  by the leased `connectivity-outages` job. CheckCle keeps no history of its own
+  downtime at all.
 
 ## The gap, in the order it is worth closing
 
 | Item | Status | Prio | Size | Notes |
 | --- | --- | --- | --- | --- |
 | **The two pollers under the leased scheduler** | ⬜ | P0 | S | `startDomainHealthPoller` and `startAlarmEvaluator` are bare `setInterval`s outside `SCHEDULED_JOBS`, so during a rollover - when two web containers serve at once - both sweep. The probe survives it by writing before it notifies; the alarm evaluator has no such guard, so one alarm can be announced twice. Every other job that touches something shared takes a lease for exactly this reason. |
-| **A check-result history table** | ⬜ | P0 | M | The probe overwrites the last result onto `Domain` and keeps nothing, so there is no uptime percentage, no latency history and no heatmap - none of them are features to design, they are all one table away. Mirror `MetricSample`/`MetricRollup`, including the purge. |
+| **A check-result history table** | ⬜ | P0 | M | The probe overwrites the last result onto `Domain` and keeps nothing, so there is no uptime percentage, no latency history and no heatmap for an individual watched domain - none of them are features to design, they are all one table away. `lib/connectivity/` is the pattern to mirror, not `MetricSample`/`MetricRollup`: it already keeps state-change outages rather than every sample, with the merge, restart and purge rules worked out, for the one signal (this deployment's own reachability) it covers today. |
 | **Uptime over 24h, 7d and 30d, and a bar for it** | ⬜ | P0 | S | Falls out of the row above. The reading everybody wants first and the only one the cards cannot draw today. |
 | **A keyword and the status codes that count as up** | ⬜ | P0 | S | The verdict is `status < 500`, so a page that returns 200 with a stack trace in it reads as healthy. The body is already read for the edge-404 check, so the bounded read exists. |
 | **Certificate expiry, with staged warnings** | 🟡 | P1 | S | `expiresAt` is stored for a managed certificate and nothing warns about it; a certificate the operator supplied has no expiry tracked at all. A lapsed certificate is the classic self-hosted outage. Copy CheckCle's one genuinely good idea here: a per-certificate ledger of which stage has been announced, so a month of daily warnings is one message per stage. |
