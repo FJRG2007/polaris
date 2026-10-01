@@ -2451,3 +2451,41 @@ describe("a gathering in rounds", () => {
         expect(catalog.runMinutes(game)).toBe(12);
     });
 });
+
+describe("a place that can be walked to", () => {
+    const line = (count: number, wetFrom = -1, wetTo = -1, y = 64) =>
+        Array.from({ length: count }, (_, index) => ({
+            x: index * commands.PATH_STEP,
+            y,
+            z: 0,
+            wet: index >= wetFrom && index <= wetTo
+        }));
+    const judge = (path: ReturnType<typeof line>, to = { y: 64 }) =>
+        commands.walkable(
+            { x: 0, z: 0 },
+            path,
+            path.filter((one) => one.wet),
+            to
+        );
+
+    it("crosses a river but not the sea round an island", () => {
+        expect(judge(line(20))).toBe(true);
+        // Two markers on water: twelve blocks, a river.
+        expect(judge(line(20, 5, 6))).toBe(true);
+        // Five in a row: thirty blocks of sea.
+        expect(judge(line(20, 5, 9))).toBe(false);
+    });
+
+    it("is never far above or below where the walk starts", () => {
+        expect(judge(line(10), { y: 64 + commands.MAX_CLIMB })).toBe(true);
+        expect(judge(line(10), { y: 176 })).toBe(false);
+    });
+
+    it("puts a marker on the ground every few blocks, both ends included", () => {
+        const lines = commands.pathLines({ x: 0, z: 0 }, { x: 30, z: 0 });
+        expect(lines[0]).toBe("kill @e[tag=pe_path]");
+        expect(lines).toHaveLength(1 + 6);
+        expect(lines.at(-1)).toContain("positioned 30.5 0 0.5 positioned over motion_blocking_no_leaves run summon");
+        expect(lines.at(-1)).toContain('"pe_path"');
+    });
+});

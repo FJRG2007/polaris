@@ -216,6 +216,9 @@ interface PlaceHow {
     readonly nearHome?: boolean;
     /** The way to look, in radians from north (`commands.pointAway`). */
     readonly bearing?: number;
+    /** Only somewhere the players can walk to from here (`commands.walkable`):
+     *  on an island, the island. */
+    readonly walkFrom?: { x: number; z: number };
 }
 
 /** How many tries a search has, counted from where it starts (`Loop.placeFloor`). */
@@ -1512,7 +1515,12 @@ async function findPlace(
     }
     const { x, z } = loop.run.target!;
     const point = await dropMark(server, x, z);
-    if (point && (chosen || (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground")))) {
+    if (
+        point &&
+        (chosen ||
+            ((!how.walkFrom || (await canWalk(server, how.walkFrom, point))) &&
+                (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground"))))
+    ) {
         // The marker can come down a block or two from the column tried - an
         // older server spreads it - and so in the next chunk: that chunk is
         // the one held from now on, and the one tried let go of.
@@ -1536,6 +1544,23 @@ async function findPlace(
     loop.run = { ...loop.run, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     return loop.run.placeTries >= limit ? "failed" : null;
+}
+
+/** Whether a place can be walked to from a point (`commands.walkable`), judged
+ *  by markers along the way, all summoned and read at once. */
+async function canWalk(
+    server: ServerContainer,
+    from: { x: number; z: number },
+    to: stored.Point
+): Promise<boolean> {
+    try {
+        await server.sayAll(commands.pathLines(from, to));
+        const path = commands.readWhere(await server.say([commands.READ_PATH]));
+        const wet = commands.readWhere(await server.say([commands.READ_PATH_WET]));
+        return commands.walkable(from, path, wet, to);
+    } finally {
+        await server.sayAll([commands.CLEAR_PATH]);
+    }
 }
 
 /** Where players online sleep, as `commands.readHomes` reads them: asked once a
@@ -1799,6 +1824,16 @@ async function retryPlace(
     loop.run = { ...loop.run, place: null, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     if (loop.run.placeTries >= PLACE_TRIES) throw new PlaceNotFound();
+}
+
+/** Where a walk to an event's place starts: the fixed point, or where the
+ *  players in the Overworld are, on average. */
+async function walkStart(
+    server: ServerContainer,
+    place: catalog.EventPlace
+): Promise<{ x: number; z: number } | undefined> {
+    if (place.mode === "fixed") return { x: place.x, z: place.z };
+    return hunt.centerOf(commands.readWhere(await server.say([commands.IN_OVERWORLD]))) ?? undefined;
 }
 
 /** Where to look from: the fixed point, or one of the players in the Overworld. */
@@ -2160,7 +2195,8 @@ async function hideTreasure(
             false,
             {
                 nearHome: true,
-                bearing: hunt.chestBearing(loop.run.id, index, options.chests)
+                bearing: hunt.chestBearing(loop.run.id, index, options.chests),
+                ...(loop.run.origin ? { walkFrom: loop.run.origin } : {})
             }
         );
         if (found === "failed") return enough();
@@ -2731,8 +2767,8 @@ async function meteorShower(
             commands.HOME_CLEARANCE,
             false,
             // Ore put only into air, and taken out again: on an island it comes
-            // down on the island.
-            { nearHome: true }
+            // down on the island, where it can be walked to.
+            { nearHome: true, walkFrom: await walkStart(server, options.place) }
         );
         if (found === "failed") {
             // Nowhere for this one: it is let go, and the next looked for afresh.

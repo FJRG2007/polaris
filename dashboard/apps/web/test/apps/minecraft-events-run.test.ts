@@ -84,6 +84,8 @@ interface World {
     grass: boolean;
     /** The markers a place's columns are judged by, all at once, as `x,z`. */
     samples: [number, number][];
+    /** The markers along the way to a place. */
+    path: [number, number][];
     /** Chests standing in the world, as `x y z`, and the ones opened. */
     chests: string[];
     /** The loot table the chests were put down with. */
@@ -221,6 +223,7 @@ const world: World = {
     plants: new Map(),
     grass: false,
     samples: [],
+    path: [],
     chests: [],
     chestTable: "",
     opened: [],
@@ -1085,6 +1088,23 @@ function answer(sent: string): string {
             : `Can't get value of pe_score for ${name}; none is set`;
     }
     // The heightmap under the trees: water stops it too, and the ground check refuses that.
+    // The way to a place, judged all at once.
+    if (line === "kill @e[tag=pe_path]") {
+        world.path = [];
+        return "";
+    }
+    const pathStep = /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over .* run summon .*"pe_path"/.exec(line);
+    if (pathStep) {
+        world.path.push([Number(pathStep[1]), Number(pathStep[2])]);
+        return "Summoned new Armor Stand";
+    }
+    if (line.startsWith("execute as @e[tag=pe_path]")) {
+        const wet = line.includes("minecraft:water");
+        return world.path
+            .filter(([x, z]) => !wet || (world.sea && !onIsland(String(Math.floor(x)), String(Math.floor(z)))))
+            .map(([x, z]) => `Armor Stand has the following entity data: [${x}d, 70.0d, ${z}d]`)
+            .join("\n");
+    }
     // The columns of a place, judged all at once.
     if (line === "kill @e[tag=pe_samp]") {
         world.samples = [];
@@ -1611,6 +1631,7 @@ beforeEach(() => {
     world.plants = new Map();
     world.grass = false;
     world.samples = [];
+    world.path = [];
     world.chests = [];
     world.chestTable = "";
     world.opened = [];

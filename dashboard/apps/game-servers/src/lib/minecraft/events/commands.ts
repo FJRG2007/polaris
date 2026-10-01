@@ -1000,6 +1000,67 @@ export function samplesIn(output: string): { x: number; y: number; z: number }[]
     }));
 }
 
+// ------------------------------------------------------------------ reachable on foot
+
+/** The markers a walk to a place is judged by (`pathLines`). */
+export const PATH_TAG = "pe_path";
+/** How far apart they stand. */
+export const PATH_STEP = 6;
+/** The most open water a walk may cross: a river can be swum, a strait cannot. */
+export const MAX_SWIM = 12;
+/** How far above or below where the players are a place may be. */
+export const MAX_CLIMB = 24;
+
+/** A marker on the ground every `PATH_STEP` blocks from one point to another,
+ *  both ends included - in chunks not loaded, none. */
+export function pathLines(from: { x: number; z: number }, to: { x: number; z: number }): string[] {
+    const length = Math.hypot(to.x - from.x, to.z - from.z);
+    const steps = Math.max(1, Math.ceil(length / PATH_STEP));
+    const lines = [`kill @e[tag=${PATH_TAG}]`];
+    for (let step = 0; step <= steps; step += 1) {
+        const x = Math.round(from.x + ((to.x - from.x) * step) / steps);
+        const z = Math.round(from.z + ((to.z - from.z) * step) / steps);
+        lines.push(summonOnGround(x, z, PATH_TAG));
+    }
+    return lines;
+}
+
+export const READ_PATH = `execute as @e[tag=${PATH_TAG}] run data get entity @s Pos`;
+export const READ_PATH_WET = `execute as @e[tag=${PATH_TAG}] at @s if block ~ ~-1 ~ minecraft:water run data get entity @s Pos`;
+export const CLEAR_PATH = `kill @e[tag=${PATH_TAG}]`;
+
+/**
+ * Whether a place can be walked to from where the players are: along the
+ * straight line there, no stretch of open water longer than `MAX_SWIM` - the
+ * sea round an island - and the place no more than `MAX_CLIMB` above or below
+ * where the walk starts. Columns not loaded are not known, and not held against it.
+ */
+export function walkable(
+    from: { x: number; z: number },
+    path: readonly { x: number; y: number; z: number }[],
+    wet: readonly { x: number; z: number }[],
+    to: { y: number }
+): boolean {
+    const key = (one: { x: number; z: number }) => `${Math.floor(one.x)},${Math.floor(one.z)}`;
+    const water = new Set(wet.map(key));
+    const along = [...path].sort(
+        (a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z)
+    );
+    let run = 0;
+    let longest = 0;
+    let previous: { x: number; z: number } | null = null;
+    for (const one of along) {
+        if (water.has(key(one))) {
+            run += previous ? Math.hypot(one.x - previous.x, one.z - previous.z) : PATH_STEP;
+            longest = Math.max(longest, run);
+        } else run = 0;
+        previous = one;
+    }
+    if (longest > MAX_SWIM) return false;
+    const start = along[0];
+    return !start || Math.abs(to.y - start.y) <= MAX_CLIMB;
+}
+
 /** Whether the game said nothing: RCON's reply with its color reset and blank
  *  space taken away. */
 export function silent(output: string): boolean {

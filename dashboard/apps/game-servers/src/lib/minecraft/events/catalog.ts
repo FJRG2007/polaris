@@ -609,7 +609,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
 /**
  * Which defaults a server's events were last saved with. Events saved before
  * the defaults were set by kind carry no number, and are brought up to them
- * once (`migratePreset`) - never again after the screen has saved them, so a
+ * once (`toKindDefaults`) - never again after the screen has saved them, so a
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
@@ -791,7 +791,7 @@ export function unitOf(preset: EventPreset): string {
 }
 
 /** What every new competition paid before the prizes were set by kind: an event
- *  still on exactly these is taken to be on its default (`migratePreset`). */
+ *  still on exactly these is taken to be on its default (`toKindDefaults`). */
 export const OLD_DEFAULT_REWARDS: Rewards = {
     first: { items: [{ id: "minecraft:diamond", count: 5 }], levels: 15 },
     second: { items: [{ id: "minecraft:diamond", count: 3 }], levels: 10 },
@@ -917,7 +917,7 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
- *  this is taken to be on its default (`migratePreset`). */
+ *  this is taken to be on its default (`toKindDefaults`). */
 export function oldDefaultMinutes(kind: EventKind): number {
     if (kind === "happy-hour" || kind === "xp-boost" || kind === "rare-catch") return 20;
     return kind === "trivia" ? 5 : 10;
@@ -952,7 +952,7 @@ const same = (left: unknown, right: unknown): boolean =>
  * old default, a meteor shower still on four meteors or six blocks, and the
  * name the first events gave a horde defense, spelled the British way.
  */
-export function migratePreset(preset: EventPreset): EventPreset {
+export function toKindDefaults(preset: EventPreset): EventPreset {
     let next = preset;
     if (KIND_INFO[preset.kind].competitive && same(preset.rewards, OLD_DEFAULT_REWARDS))
         next = { ...next, rewards: DEFAULT_PRIZES[preset.kind] };
@@ -1023,7 +1023,7 @@ export function readEventsConfig(
     const presets = (Array.isArray(value.presets) ? value.presets : []).flatMap((entry) => {
         const parsed = presetSchema.safeParse(entry);
         if (!parsed.success) return [];
-        return [old ? migratePreset(parsed.data) : parsed.data];
+        return [old ? toKindDefaults(parsed.data) : parsed.data];
     });
     const ids = new Set(presets.map((preset) => preset.id));
     const schedules = (Array.isArray(value.schedules) ? value.schedules : []).flatMap((entry) => {
