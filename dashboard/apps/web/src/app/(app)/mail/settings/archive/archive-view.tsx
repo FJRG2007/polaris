@@ -117,6 +117,8 @@ export function ArchiveView({
             // upload in Polaris most worth watching - through the shared sender it
             // has a bar and can be stopped.
             const sent = await sendFile("/api/mail/uploads?kind=archive", form, {
+                // Its answer comes once the archive has been read in.
+                answerWithinMs: null,
                 name: file.name
             });
             let stored: { upload?: { id: string }; error?: string } = {};
@@ -181,7 +183,9 @@ export function ArchiveView({
             <AccountPicker accounts={accounts} value={account.id} onChange={setAccountId} />
 
             <label className="mt-3 block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">{t("archive.folder")}</span>
+                <span className="mb-1 block text-[12px] text-muted-foreground">
+                    {t("archive.folder")}
+                </span>
                 <Select
                     value={target}
                     onValueChange={setFolderId}
@@ -271,7 +275,9 @@ export function ArchiveView({
                     </Button>
                     {exportCount !== null ? (
                         <p className="mt-1 text-[12px] text-foreground-subtle">
-                            {exportCount === 0 ? t("archive.nothingYet") : t("archive.inFile", { count: exportCount })}
+                            {exportCount === 0
+                                ? t("archive.nothingYet")
+                                : t("archive.inFile", { count: exportCount })}
                         </p>
                     ) : null}
                 </div>

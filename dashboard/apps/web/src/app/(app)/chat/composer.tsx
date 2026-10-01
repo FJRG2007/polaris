@@ -67,6 +67,15 @@ import {
 import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@polaris/ui";
 import { SendButton } from "./send-button";
 import { SavedDraftsBar, useSavedDrafts } from "./saved-drafts";
+import {
+    OutgoingList,
+    patchOutgoing,
+    putOutgoing,
+    useOutgoing,
+    type Outgoing,
+    type SendOutcome,
+    type SendProgress
+} from "./outgoing";
 
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
@@ -218,8 +227,11 @@ export function Composer({
         spoilers?: readonly number[],
         /** Files that stay where they are: what travels is where to find them.
          *  Only ever set for a caller that said it can carry them. */
-        fromDrive?: readonly KeptPick[]
-    ) => void | Promise<void>;
+        fromDrive?: readonly KeptPick[],
+        /** Told how far the files have got, for the line under the message
+         *  while it is on its way. */
+        report?: (progress: SendProgress) => void
+    ) => void | Promise<SendOutcome>;
     /**
      * The same message, at an hour that has not happened yet.
      *
@@ -277,6 +289,13 @@ export function Composer({
      *  that does not hold it is how a mark lands on the wrong file. */
     const [coveredKept, setCoveredKept] = useState<ReadonlySet<number>>(() => new Set());
     const [refused, setRefused] = useState("");
+    /** Messages with files in them that have left the box and not yet landed,
+     *  or that failed and are waiting to be tried again or given up on. Keyed by
+     *  the box rather than held in it - see `useOutgoing`. A box with no key of
+     *  its own keeps them for as long as it is on screen. */
+    const ownScope = useRef(`box:${newOutgoingId()}`);
+    const scope = draftKey ?? (channelId ? `channel:${channelId}` : ownScope.current);
+    const outgoing = useOutgoing(scope);
     const [picking, setPicking] = useState(false);
     /** Whether the "when" dialog is open, and what the server said about the
      *  last moment offered to it. */
@@ -517,8 +536,62 @@ export function Composer({
             return;
         }
         setRefused("");
-        void onSend("", [file], [sound]);
+        void deliver({
+            id: newOutgoingId(),
+            scope,
+            body: "",
+            files: [file],
+            kept: [],
+            sounds: [sound],
+            hidden: []
+        });
     });
+
+    /**
+     * Send a message that carries files, and keep it on screen until it lands.
+     *
+     * What comes back decides what happens to it: nothing means it arrived and it
+     * goes; a reason means it did not, and it stays with that reason and a way to
+     * try again. Never sent without its files - the caller refuses the whole
+     * message when one of them does not make it.
+     */
+    const deliver = async (one: Omit<Outgoing, "phase" | "error" | "progress">): Promise<void> => {
+        const settle = (change: (was: Outgoing) => Outgoing | null) =>
+            patchOutgoing(one.id, change);
+        if (!putOutgoing({ ...one, phase: "sending" })) return;
+        let outcome: SendOutcome;
+        try {
+            outcome = await onSend(
+                one.body,
+                one.files,
+                one.sounds,
+                one.hidden,
+                one.kept,
+                (progress) =>
+                    settle((was) => (was.phase === "sending" ? { ...was, progress } : was))
+            );
+        } catch {
+            outcome = { error: t("composer.outgoing.notSent") };
+        }
+        const error = outcome && typeof outcome === "object" ? outcome.error : undefined;
+        if (error) settle((was) => ({ ...was, phase: "failed", error, progress: undefined }));
+        else settle(() => null);
+    };
+
+    /**
+     * Give up on a message that did not go.
+     *
+     * The files go with it - they are what failed - but the words are put back in
+     * the box when it is empty, because somebody who wrote a sentence under a
+     * picture did not decide to delete the sentence by deciding not to retry.
+     */
+    const abandon = (one: Outgoing) => {
+        patchOutgoing(one.id, () => null);
+        if (one.body && isBlankMarkdown(body)) {
+            setBody(one.body);
+            emptyTheBox();
+        }
+    };
 
     const submit = async (value: string) => {
         const text = isBlankMarkdown(value) ? "" : value.trim();
@@ -542,7 +615,16 @@ export function Composer({
         // It is somewhere that is not a browser now.
         if (draftKey && !editing) dropDraft(draftKey);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
-        else await onSend(text, sending, undefined, hidden, staying);
+        else if (sending.length > 0 || staying.length > 0) {
+            await deliver({
+                id: newOutgoingId(),
+                scope,
+                body: text,
+                files: sending,
+                kept: staying,
+                hidden
+            });
+        } else await onSend(text, sending, undefined, hidden, staying);
     };
 
     /**
@@ -777,7 +859,9 @@ export function Composer({
             {replyingTo && !editing && (
                 <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
                     <CornerUpLeft className="size-3 shrink-0 text-muted-foreground" />
-                    <span className="shrink-0 text-muted-foreground">{t("composer.replyingTo")}</span>
+                    <span className="shrink-0 text-muted-foreground">
+                        {t("composer.replyingTo")}
+                    </span>
                     <span className="shrink-0 font-medium">
                         {replyingTo.authorName ?? t("composer.somebodyWhoHasLeft")}
                     </span>
@@ -829,6 +913,12 @@ export function Composer({
                     {refused || voice.error}
                 </p>
             )}
+
+            <OutgoingList
+                outgoing={outgoing}
+                onRetry={(one) => void deliver(one)}
+                onRemove={abandon}
+            />
 
             {(files.length > 0 || kept.length > 0) && (
                 <ul className="mb-2 flex flex-wrap items-end gap-2">
@@ -1392,7 +1482,9 @@ function StagedFile({
         <button
             type="button"
             aria-pressed={covered}
-            aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", { name: file.name })}
+            aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", {
+                name: file.name
+            })}
             title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
             onClick={onCover}
             className={cn(
@@ -1507,16 +1599,19 @@ function StagedFromDrive({
     return (
         <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
             <HardDrive className="size-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[12rem] truncate" title={t("composer.inYourDrive", { name: kept.name })}>
+            <span
+                className="max-w-[12rem] truncate"
+                title={t("composer.inYourDrive", { name: kept.name })}
+            >
                 {kept.name}
             </span>
             <span className="text-muted-foreground">{readableSize(kept.size)}</span>
             <button
                 type="button"
                 aria-pressed={covered}
-                aria-label={
-                    t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", { name: kept.name })
-                }
+                aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", {
+                    name: kept.name
+                })}
                 title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
                 onClick={onCover}
                 className={cn(
@@ -1543,4 +1638,12 @@ function readableSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+let outgoingCount = 0;
+
+/** A key for one message on its way, unique within this tab. */
+function newOutgoingId(): string {
+    outgoingCount += 1;
+    return `outgoing-${Date.now().toString(36)}-${outgoingCount}`;
 }

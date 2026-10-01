@@ -23,6 +23,7 @@
 
 import { z } from "zod";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { storageRefusal } from "@/lib/storage-refusal";
 import { apiPermission } from "@/lib/api-session";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -30,11 +31,7 @@ import { send } from "@/lib/chat/messages";
 
 import { rulesForChannel } from "@/lib/chat/rules";
 import { driveShare } from "@/lib/chat/drive-share";
-import {
-    AttachRefused,
-    openFromDrive,
-    referenceFromDrive
-} from "@/lib/attachments/from-elsewhere";
+import { AttachRefused, openFromDrive, referenceFromDrive } from "@/lib/attachments/from-elsewhere";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
 import {
     AttachmentStorageError,
@@ -129,8 +126,16 @@ const soundsSchema = z
     .array(
         z
             .object({
-                durationMs: z.number().int().positive().max(60 * 60 * 1000).nullable(),
-                waveform: z.string().regex(/^[0-9]{1,64}$/).nullable()
+                durationMs: z
+                    .number()
+                    .int()
+                    .positive()
+                    .max(60 * 60 * 1000)
+                    .nullable(),
+                waveform: z
+                    .string()
+                    .regex(/^[0-9]{1,64}$/)
+                    .nullable()
             })
             .partial()
     )
@@ -174,7 +179,10 @@ export async function POST(
         await requirePostable({ id: user.id }, channelId);
     } catch (caught) {
         if (caught instanceof ChatAccessError) {
-            return Response.json({ error: caught.textIn((await readerWords("chat")).locale) }, { status: 403 });
+            return Response.json(
+                { error: caught.textIn((await readerWords("chat")).locale) },
+                { status: 403 }
+            );
         }
         // A file from Drive that is not theirs, or is a folder, or would not read.
         // Said in the words `borrowAttachment` chose: they name nothing but the
@@ -189,7 +197,10 @@ export async function POST(
     try {
         form = await request.formData();
     } catch {
-        return Response.json({ error: (await readerWords("chat"))("errors.notRead") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.notRead") },
+            { status: 400 }
+        );
     }
 
     // What the browser measured while recording, one entry per file in the same
@@ -203,7 +214,11 @@ export async function POST(
         parentId: form.get("parentId") ? String(form.get("parentId")) : null,
         replyToId: form.get("replyToId") ? String(form.get("replyToId")) : null
     });
-    if (!fields.success) return Response.json({ error: (await readerWords("chat"))("errors.notSent") }, { status: 400 });
+    if (!fields.success)
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.notSent") },
+            { status: 400 }
+        );
 
     const files = form.getAll("files").filter((entry): entry is File => entry instanceof File);
     // One still per file, in the same order, with an empty one standing in for
@@ -238,7 +253,10 @@ export async function POST(
      *  covered list, the stills and the sounds are all indexed over this. */
     const carrying = uploads.length + files.length + borrowed.length;
     if (carrying === 0 && !fields.data.body) {
-        return Response.json({ error: (await readerWords("chat"))("errors.writeOrAttach") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.writeOrAttach") },
+            { status: 400 }
+        );
     }
     // Whether this account may put files in a conversation at all, which is a
     // grant rather than a rule: the rules below are the instance's ceiling for
@@ -255,11 +273,18 @@ export async function POST(
     // a channel and nothing at all in a direct message.
     const rules = await rulesForChannel(channelId);
     if (carrying > 0 && rules.maxAttachments === 0) {
-        return Response.json({ error: (await readerWords("chat"))("errors.noFilesHere") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.noFilesHere") },
+            { status: 400 }
+        );
     }
     if (carrying > rules.maxAttachments) {
         return Response.json(
-            { error: (await readerWords("chat"))("errors.tooManyFiles", { max: rules.maxAttachments }) },
+            {
+                error: (await readerWords("chat"))("errors.tooManyFiles", {
+                    max: rules.maxAttachments
+                })
+            },
             { status: 400 }
         );
     }
@@ -271,7 +296,12 @@ export async function POST(
     for (const file of files) {
         if (file.size > biggest) {
             return Response.json(
-                { error: (await readerWords("chat"))("errors.fileTooBig", { name: file.name, max: rules.maxAttachmentMib }) },
+                {
+                    error: (await readerWords("chat"))("errors.fileTooBig", {
+                        name: file.name,
+                        max: rules.maxAttachmentMib
+                    })
+                },
                 { status: 400 }
             );
         }
@@ -327,11 +357,7 @@ export async function POST(
             stored.push(
                 share === "link"
                     ? borrowedAttachment(
-                          await referenceFromDrive(
-                              user.id,
-                              reference.connectionId,
-                              reference.path
-                          ),
+                          await referenceFromDrive(user.id, reference.connectionId, reference.path),
                           spoiler
                       )
                     : // A copy, made where the bytes already are: from that storage
@@ -340,13 +366,7 @@ export async function POST(
                       // reports, before a byte moves, so a file too big to store is
                       // refused in the words the reader needs rather than after a
                       // copy nobody watched.
-                      await copiedFromDrive(
-                          channelId,
-                          user.id,
-                          reference,
-                          biggest,
-                          spoiler
-                      )
+                      await copiedFromDrive(channelId, user.id, reference, biggest, spoiler)
             );
         }
 
@@ -368,11 +388,12 @@ export async function POST(
         // Nothing points at these bytes now. Best effort: a file left behind is
         // worse than a failed send, and a failed cleanup must not replace the
         // error that caused it.
-        await Promise.all(
-            stored.map((file) => removeQuietly(file))
-        );
+        await Promise.all(stored.map((file) => removeQuietly(file)));
         if (caught instanceof ChatAccessError) {
-            return Response.json({ error: caught.textIn((await readerWords("chat")).locale) }, { status: 403 });
+            return Response.json(
+                { error: caught.textIn((await readerWords("chat")).locale) },
+                { status: 403 }
+            );
         }
         // A file this message named that is not there to claim: swept, already
         // sent, or never this sender's. Whoever pressed send still has it in front
@@ -385,7 +406,10 @@ export async function POST(
         // the network and at the message - anywhere but at the disk.
         if (caught instanceof AttachmentStorageError) {
             console.error(caught);
-            return Response.json({ error: caught.message }, { status: 502 });
+            return Response.json(
+                { error: await storageRefusal(caught.cause ?? caught, user.isAdmin) },
+                { status: 502 }
+            );
         }
         console.error(caught);
         // To an administrator, what actually threw. "That could not be sent" is
@@ -394,7 +418,11 @@ export async function POST(
         // sentence they need is in a log they should not have to go and find.
         const detail = caught instanceof Error ? caught.message : String(caught);
         return Response.json(
-            { error: user.isAdmin ? (await readerWords("chat"))("errors.notSentDetail", { detail }) : (await readerWords("chat"))("errors.notSent") },
+            {
+                error: user.isAdmin
+                    ? (await readerWords("chat"))("errors.notSentDetail", { detail })
+                    : (await readerWords("chat"))("errors.notSent")
+            },
             { status: 500 }
         );
     }

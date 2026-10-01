@@ -31,6 +31,10 @@ export type TransferState =
      *  connection can be many seconds before its first byte. */
     | "waiting"
     | "moving"
+    /** Every byte has gone and the server has not answered yet - it is writing
+     *  the file to wherever files are kept. A bar at 100% with "0s left" under it
+     *  reads as a hang, which is exactly what this is not, until it is. */
+    | "processing"
     | "done"
     | "failed"
     /** Stopped by whoever started it. */
@@ -47,12 +51,34 @@ export interface Transfer {
      *  knows when the server said so. Null is a transfer with no percentage to
      *  show, which is a real state rather than a missing one. */
     readonly total: number | null;
-    /** Why it failed, in the words the reader gets. */
+    /** Why it failed, in the words the reader gets: the server's own sentence,
+     *  when it wrote one. */
     readonly error?: string;
+    /** Why it failed when nobody wrote a sentence - the connection dropped, the
+     *  server never answered - for the screen to say in the reader's language. */
+    readonly problem?: TransferProblem;
     /** Where it started, for the rate and for the "how long left". */
     readonly startedAt: number;
     /** Set while it can still be called off. */
     readonly stop?: () => void;
+}
+
+/** What went wrong with a transfer that has no sentence of its own. */
+export type TransferProblem =
+    /** The request never reached anything: the network, not the server. */
+    | "dropped"
+    /** Every byte went and the answer never came. */
+    | "noAnswer"
+    /** The server said no without saying why. */
+    | "refused";
+
+/** Whether a transfer is still under way, in either of its two halves. */
+export function isUnderWay(transfer: Transfer): boolean {
+    return (
+        transfer.state === "waiting" ||
+        transfer.state === "moving" ||
+        transfer.state === "processing"
+    );
 }
 
 /** Everything that has not been cleared, newest last. */
@@ -114,6 +140,15 @@ export class TransferHandle {
         }));
     }
 
+    /** Every byte has gone; the answer is what is left. */
+    public processing(): void {
+        patch(this.id, (was) =>
+            was.state === "waiting" || was.state === "moving"
+                ? { ...was, state: "processing", moved: was.total ?? was.moved }
+                : was
+        );
+    }
+
     public done(): void {
         patch(this.id, (was) => ({
             ...was,
@@ -126,8 +161,13 @@ export class TransferHandle {
 
     /** It will not finish. The sentence is the reader's, so it must be one they
      *  can act on rather than the exception's own words. */
-    public failed(error: string): void {
-        patch(this.id, (was) => ({ ...was, state: "failed", error, stop: undefined }));
+    public failed(error: string | { readonly problem: TransferProblem }): void {
+        patch(this.id, (was) => ({
+            ...was,
+            state: "failed",
+            ...(typeof error === "string" ? { error } : { problem: error.problem }),
+            stop: undefined
+        }));
     }
 
     public stopped(): void {
@@ -144,9 +184,7 @@ export function clearTransfer(id: string): void {
 
 /** Take every finished one off at once. */
 export function clearSettledTransfers(): void {
-    transfers = transfers.filter(
-        (entry) => entry.state === "waiting" || entry.state === "moving"
-    );
+    transfers = transfers.filter(isUnderWay);
     announce();
 }
 
@@ -204,6 +242,9 @@ export function transferFraction(transfer: Transfer): number | null {
  */
 export function transferSecondsLeft(transfer: Transfer, now = Date.now()): number | null {
     if (!transfer.total || transfer.moved <= 0) return null;
+    // Nothing left to send is not "0 seconds left": what is left is the answer,
+    // and nothing here knows how long that takes.
+    if (transfer.state !== "moving" || transfer.moved >= transfer.total) return null;
     const seconds = (now - transfer.startedAt) / 1000;
     if (seconds < 1.5) return null;
     const rate = transfer.moved / seconds;

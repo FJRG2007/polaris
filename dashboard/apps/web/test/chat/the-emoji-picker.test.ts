@@ -80,8 +80,9 @@ describe("sending what was picked", () => {
     it("empties it the same way everywhere, not only on send", async () => {
         // Sending, scheduling, saving an edit and cancelling one all empty the
         // box, and every one of them left the emoji behind. Putting a draft
-        // aside and bringing one back empty it too.
+        // aside and bringing one back empty it too, and so does putting back the
+        // words of a message with a file that was given up on.
         const source = await composer;
-        expect(source.split("emptyTheBox();").length - 1).toBe(6);
+        expect(source.split("emptyTheBox();").length - 1).toBe(7);
     });
 });

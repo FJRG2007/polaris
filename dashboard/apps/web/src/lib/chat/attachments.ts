@@ -249,8 +249,8 @@ function soundOf(detail: SoundDetail | undefined): {
  * took the bytes and what it said when they were asked for again.
  */
 export class AttachmentStorageError extends Error {
-    constructor(message: string) {
-        super(message);
+    constructor(message: string, options?: { cause?: unknown }) {
+        super(message, options);
         this.name = "AttachmentStorageError";
     }
 }
@@ -297,7 +297,7 @@ export async function storeAttachment(
         // Said as what it is. "That could not be sent" for a storage that took
         // the file and lost it sends whoever reads it looking at the browser, at
         // the network and at the message - anywhere but at the disk.
-        throw new AttachmentStorageError(reason(error));
+        throw new AttachmentStorageError(reason(error), { cause: error });
     }
 
     const still = poster && poster.length > 0 ? await placePoster(folder, path, poster) : null;
@@ -355,7 +355,7 @@ export async function storeStreamedAttachment(
             what: "file"
         });
     } catch (error) {
-        throw new AttachmentStorageError(reason(error));
+        throw new AttachmentStorageError(reason(error), { cause: error });
     }
 
     return {

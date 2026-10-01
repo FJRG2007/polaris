@@ -410,6 +410,10 @@
         "systemUpdated": {
             "label": "Update installed on its own",
             "description": "A scheduled or automatic update ran, and how it went."
+        },
+        "storageUnreachable": {
+            "label": "Upload storage is not reachable",
+            "description": "The storage files are saved to stopped answering, so new uploads are kept on this server. Only reaches administrators."
         }
     },
     "groups": {

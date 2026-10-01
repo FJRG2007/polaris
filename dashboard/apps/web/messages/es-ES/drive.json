@@ -416,7 +416,9 @@
             "placeholder": "p. ej. Personal-Drive, data, home",
             "connecting": "Conectando...",
             "connect": "Conectar"
-        }
+        },
+        "uploadNoAnswer": "Se envió {name}, pero el servidor no respondió.",
+        "uploadDropped": "No se pudo enviar {name}: se cortó la conexión."
     },
     "connection": {
         "fields": {

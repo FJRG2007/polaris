@@ -80,6 +80,13 @@ safe, generic message (internal error detail is never leaked).
   additionally rejected if they contain shell metacharacters or NUL (defense in
   depth). `kind` selects the `-t` filesystem type, so no client string reaches
   it. Ids are held to an `[A-Za-z0-9_-]` allowlist.
+- **One mount id, one call at a time** - `/v1/mounts` requests for the same id
+  are serialized behind a per-id lock, and each call's SMB credentials file
+  gets its own unique name. Two requests to mount the same share (the
+  dashboard asks on every read of it) used to race: the first to finish
+  deleted the credentials file the second's `mount.cifs` had not opened yet.
+  A different id is never held up by it, so a share that is unreachable and
+  retrying its connect does not block an unrelated mount.
 - **Docker proxy least privilege** - the web container is never given the Docker
   socket (it is root-equivalent). `/v1/docker` forwards only a fixed allowlist of
   read and lifecycle calls; `create`, `exec`, image pulls, and arbitrary runs are

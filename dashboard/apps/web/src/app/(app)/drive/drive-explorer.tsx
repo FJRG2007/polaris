@@ -243,7 +243,9 @@ export function DriveExplorer({
                 if (result && typeof result === "object" && result.error) setOpError(result.error);
             } catch (caught) {
                 setOpError(
-                    caught instanceof Error && caught.message ? caught.message : t("explorer.opFailed", { label })
+                    caught instanceof Error && caught.message
+                        ? caught.message
+                        : t("explorer.opFailed", { label })
                 );
             } finally {
                 setOps((prev) => prev.filter((op) => op.id !== id));
@@ -333,7 +335,8 @@ export function DriveExplorer({
      *  is not something anybody can act on: what has to be fixed depends on which
      *  address was tried. */
     const downEndpoint =
-        (connectionId && reachability?.find((entry) => entry.id === connectionId)?.endpoint) || null;
+        (connectionId && reachability?.find((entry) => entry.id === connectionId)?.endpoint) ||
+        null;
     const unreachable = downReason(connectionId);
     /** Whether the source being looked at is the machine Polaris runs on. It
      *  changes what the failure means and what is worth offering about it. */
@@ -461,7 +464,15 @@ export function DriveExplorer({
             const sent = await sendFile(`/api/drive/upload?${query.toString()}`, file, {
                 name: relPath
             });
-            if (!sent.ok && sent.status !== 0) setOpError(sent.body || t("explorer.refused"));
+            if (sent.ok || sent.problem === "stopped") continue;
+            // No answer to read a reason from: the connection dropped, or every
+            // byte went and the server never said what became of them. Said here
+            // too, not only in the corner, because this is where the folder is.
+            if (sent.problem === "noAnswer")
+                setOpError(t("explorer.uploadNoAnswer", { name: relPath }));
+            else if (sent.problem === "dropped")
+                setOpError(t("explorer.uploadDropped", { name: relPath }));
+            else setOpError(sent.body || t("explorer.refused"));
         }
         setUploading(false);
         if (fileInput.current) fileInput.current.value = "";
@@ -474,7 +485,9 @@ export function DriveExplorer({
         if (!connectionId || !name) return;
         setNewFolderOpen(false);
         setNewFolderName("");
-        runOp(t("explorer.ops.creating", { name }), () => driveActions.mkdirAction(connectionId, path, name));
+        runOp(t("explorer.ops.creating", { name }), () =>
+            driveActions.mkdirAction(connectionId, path, name)
+        );
     }
 
     function onRename(entry: DriveEntry, nextName: string) {
@@ -534,7 +547,9 @@ export function DriveExplorer({
         if (!connectionId || !name) return;
         setNewFileOpen(false);
         setNewFileName("Untitled.txt");
-        runOp(t("explorer.ops.creating", { name }), () => driveActions.createFileAction(connectionId, path, name));
+        runOp(t("explorer.ops.creating", { name }), () =>
+            driveActions.createFileAction(connectionId, path, name)
+        );
     }
 
     function onSetNote(entry: DriveEntry, note: string | null) {
@@ -624,7 +639,9 @@ export function DriveExplorer({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
             <aside className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-medium text-muted-foreground">{t("explorer.locations")}</h2>
+                    <h2 className="text-sm font-medium text-muted-foreground">
+                        {t("explorer.locations")}
+                    </h2>
                     <div className="flex items-center gap-1">
                         {anyDown ? (
                             <Button
@@ -643,7 +660,9 @@ export function DriveExplorer({
                 </div>
                 <nav className="flex flex-col gap-1">
                     {connections.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("explorer.noConnections")}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {t("explorer.noConnections")}
+                        </p>
                     ) : (
                         connections.map((connection) => (
                             <div key={connection.id} className="group flex items-center gap-1">
@@ -652,7 +671,9 @@ export function DriveExplorer({
                                     // would only spend its connect timeout to say so.
                                     <span
                                         aria-disabled="true"
-                                        title={t("explorer.notAnswering", { reason: downReason(connection.id) ?? "" })}
+                                        title={t("explorer.notAnswering", {
+                                            reason: downReason(connection.id) ?? ""
+                                        })}
                                         className="flex flex-1 cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
                                     >
                                         <ConnectionLabel
@@ -690,7 +711,9 @@ export function DriveExplorer({
                                         type="button"
                                         onClick={() => setEditConn(connection)}
                                         className="rounded-md p-1 text-warning transition-colors hover:bg-warning-soft"
-                                        aria-label={t("explorer.updateCredentialsFor", { name: connection.name })}
+                                        aria-label={t("explorer.updateCredentialsFor", {
+                                            name: connection.name
+                                        })}
                                         title={t("explorer.updateCredentials")}
                                     >
                                         <KeyRound className="size-4" />
@@ -701,7 +724,9 @@ export function DriveExplorer({
                                         type="button"
                                         onClick={() => setEditConn(connection)}
                                         className="rounded-md p-1 text-muted-foreground transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
-                                        aria-label={t("explorer.editNamed", { name: connection.name })}
+                                        aria-label={t("explorer.editNamed", {
+                                            name: connection.name
+                                        })}
                                     >
                                         <Pencil className="size-4" />
                                     </button>
@@ -711,7 +736,9 @@ export function DriveExplorer({
                                         type="button"
                                         onClick={() => setDeleteConn(connection)}
                                         className="rounded-md p-1 text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                        aria-label={t("explorer.removeNamed", { name: connection.name })}
+                                        aria-label={t("explorer.removeNamed", {
+                                            name: connection.name
+                                        })}
                                     >
                                         <Trash2 className="size-4" />
                                     </button>
@@ -763,7 +790,9 @@ export function DriveExplorer({
                             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
                             <div className="flex flex-col gap-2">
                                 <h3 className="text-sm font-medium">{t("explorer.rekeyTitle")}</h3>
-                                <p className="text-sm text-muted-foreground">{t("explorer.rekeyBody")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {t("explorer.rekeyBody")}
+                                </p>
                                 {selectedConnection.canManageAccess ? (
                                     <div>
                                         <Button
@@ -926,7 +955,9 @@ export function DriveExplorer({
                                             aria-label={t("explorer.access")}
                                         >
                                             <ShieldCheck className="size-4" />
-                                            <span className="hidden sm:inline">{t("explorer.access")}</span>
+                                            <span className="hidden sm:inline">
+                                                {t("explorer.access")}
+                                            </span>
                                         </Button>
                                     ) : null}
                                     {selectedConnection?.kind === "unifi-unas" ? (
@@ -994,9 +1025,7 @@ export function DriveExplorer({
                             <p className="text-xs text-muted-foreground">
                                 {driveJobSummary({ ...job, startedAt: job.startedAt }, tick)}
                             </p>
-                            {job.error ? (
-                                <p className="text-xs text-danger">{job.error}</p>
-                            ) : null}
+                            {job.error ? <p className="text-xs text-danger">{job.error}</p> : null}
                         </div>
                     ))}
                 </div>
@@ -1119,7 +1148,9 @@ export function DriveExplorer({
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {deleteTargets && deleteTargets.length === 1
-                                ? t("explorer.trash.bodyOne", { name: deleteTargets[0]?.name ?? "" })
+                                ? t("explorer.trash.bodyOne", {
+                                      name: deleteTargets[0]?.name ?? ""
+                                  })
                                 : t("explorer.trash.bodyMany")}
                         </DialogDescription>
                     </DialogHeader>
@@ -1152,8 +1183,12 @@ export function DriveExplorer({
                         <DialogDescription className="truncate">
                             {emptyTarget
                                 ? emptyTarget.permanent
-                                    ? t("explorer.empty.bodyPermanent", { name: emptyTarget.entry.name })
-                                    : t("explorer.empty.bodyTrash", { name: emptyTarget.entry.name })
+                                    ? t("explorer.empty.bodyPermanent", {
+                                          name: emptyTarget.entry.name
+                                      })
+                                    : t("explorer.empty.bodyTrash", {
+                                          name: emptyTarget.entry.name
+                                      })
                                 : ""}
                         </DialogDescription>
                     </DialogHeader>
@@ -1162,7 +1197,9 @@ export function DriveExplorer({
                             {t("explorer.cancel")}
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmEmpty}>
-                            {emptyTarget?.permanent ? t("explorer.empty.confirmPermanent") : t("explorer.empty.confirmTrash")}
+                            {emptyTarget?.permanent
+                                ? t("explorer.empty.confirmPermanent")
+                                : t("explorer.empty.confirmTrash")}
                         </Button>
                     </div>
                 </DialogContent>
@@ -1181,7 +1218,9 @@ export function DriveExplorer({
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {permanentTargets && permanentTargets.length === 1
-                                ? t("explorer.delete.bodyOne", { name: permanentTargets[0]?.name ?? "" })
+                                ? t("explorer.delete.bodyOne", {
+                                      name: permanentTargets[0]?.name ?? ""
+                                  })
                                 : t("explorer.delete.bodyMany")}
                         </DialogDescription>
                     </DialogHeader>
@@ -1264,8 +1303,12 @@ function ConnectionLabel({
                     {t("explorer.badges.noAnswer")}
                 </Badge>
             ) : null}
-            {connection.shared ? <Badge variant="neutral">{t("explorer.badges.shared")}</Badge> : null}
-            {connection.requiresHostd ? <Badge variant="neutral">{t("explorer.badges.host")}</Badge> : null}
+            {connection.shared ? (
+                <Badge variant="neutral">{t("explorer.badges.shared")}</Badge>
+            ) : null}
+            {connection.requiresHostd ? (
+                <Badge variant="neutral">{t("explorer.badges.host")}</Badge>
+            ) : null}
         </>
     );
 }
@@ -1366,9 +1409,7 @@ function ScheduleDeleteDialog({
                         />
                         {t("explorer.schedule.permanent")}
                     </label>
-                    <p className="text-xs text-muted-foreground">
-                        {t("explorer.schedule.hint")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("explorer.schedule.hint")}</p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <DialogClose asChild>
@@ -1381,7 +1422,9 @@ function ScheduleDeleteDialog({
                             variant={permanent ? "danger" : undefined}
                             disabled={pending}
                         >
-                            {pending ? t("explorer.schedule.scheduling") : t("explorer.schedule.submit")}
+                            {pending
+                                ? t("explorer.schedule.scheduling")
+                                : t("explorer.schedule.submit")}
                         </Button>
                     </div>
                 </form>
@@ -1484,7 +1527,9 @@ function UnreachableServer({
                         different answer, and saying the first sends somebody to
                         check a machine that is plainly fine. */}
                     <h3 className="text-sm font-medium">
-                        {local ? t("explorer.down.localTitle", { name }) : t("explorer.down.title", { name })}
+                        {local
+                            ? t("explorer.down.localTitle", { name })
+                            : t("explorer.down.title", { name })}
                     </h3>
                     <p className="text-sm text-muted-foreground">
                         {local
@@ -1556,7 +1601,9 @@ function UnreachableServer({
                         ) : null}
                         <Button size="sm" variant="ghost" asChild>
                             <Link href={serverHref ?? "/apps/servers"}>
-                                {serverHref ? t("explorer.down.open", { name }) : t("explorer.down.openServers")}
+                                {serverHref
+                                    ? t("explorer.down.open", { name })
+                                    : t("explorer.down.openServers")}
                             </Link>
                         </Button>
                     </div>
@@ -1640,9 +1687,7 @@ function UnasSmbSetup({ connectionId, onSaved }: { connectionId: string; onSaved
                         ))}
                     </div>
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        {t("explorer.smb.none")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("explorer.smb.none")}</p>
                 )}
 
                 <form

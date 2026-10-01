@@ -7,6 +7,7 @@
  * into whichever storage the instance keeps uploads on.
  */
 
+import { storageRefusal } from "@/lib/storage-refusal";
 import { requireTask } from "@/lib/tasks/access";
 import { apiPermission } from "@/lib/api-session";
 
@@ -45,7 +46,9 @@ export async function POST(request: Request): Promise<Response> {
     const limit = await uploadLimit();
     const declared = Number(request.headers.get("content-length") ?? "0");
     if (declared > limit) {
-        return new Response(`That file is over the ${Math.round(limit / (1024 * 1024))} MB limit`, { status: 413 });
+        return new Response(`That file is over the ${Math.round(limit / (1024 * 1024))} MB limit`, {
+            status: 413
+        });
     }
 
     try {
@@ -66,6 +69,6 @@ export async function POST(request: Request): Promise<Response> {
         // The reason is for the operator's log; the uploader gets a sentence they
         // can act on, without the storage layer's paths in it.
         console.error("tasks: attachment upload failed:", error);
-        return new Response("Could not store that file", { status: 502 });
+        return new Response(await storageRefusal(error, user.isAdmin), { status: 502 });
     }
 }

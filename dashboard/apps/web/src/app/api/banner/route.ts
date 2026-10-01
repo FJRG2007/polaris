@@ -10,6 +10,7 @@
  * so the two are not allowed to be the same thing.
  */
 
+import { storageRefusal } from "@/lib/storage-refusal";
 import { deleteAvatar, MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
 import { apiUser } from "@/lib/api-session";
 
@@ -33,7 +34,8 @@ export async function POST(request: Request): Promise<Response> {
     if (bytes.length > MAX_AVATAR_BYTES) return new Response(TOO_BIG, { status: 413 });
 
     const mime = sniffImageMime(bytes);
-    if (!mime) return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
+    if (!mime)
+        return new Response("That file is not a PNG, JPEG, WebP or GIF image", { status: 415 });
 
     try {
         await storeAvatar({ kind: "banner", id: user.id }, bytes, mime);
@@ -42,12 +44,7 @@ export async function POST(request: Request): Promise<Response> {
         // The reason is for the operator's log; the person gets a sentence they
         // can act on, without the storage layer's paths in it.
         console.error("banners: could not store the picture:", error);
-        return new Response(
-            user.isAdmin
-                ? `Could not store that picture: ${error instanceof Error ? error.message : String(error)}`
-                : "Could not store that picture",
-            { status: 502 }
-        );
+        return new Response(await storageRefusal(error, user.isAdmin), { status: 502 });
     }
 }
 

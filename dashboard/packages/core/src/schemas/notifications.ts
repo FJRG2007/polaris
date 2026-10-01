@@ -652,6 +652,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "storage.unreachable",
+        group: "system",
+        label: "Upload storage is not reachable",
+        description:
+            "The storage files are saved to stopped answering, so new uploads are kept on this server. Only reaches administrators.",
+        // On, mail included: from this moment every upload lands somewhere the
+        // operator did not choose, and nothing else would ever say so.
+        level: "warning",
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "system.update",
         group: "system",
         label: "Update available",

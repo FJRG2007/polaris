@@ -1350,6 +1350,13 @@ fn mount_create<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         Err(e) => return path_error_response(e),
     };
 
+    // One mount of one share at a time. Requests arrive on a thread each, and the
+    // dashboard asks on every read of a share - a wall of avatars is a dozen of
+    // them at once - so two used to race here: both checked the target, both ran
+    // `mount` onto it, and the first to finish deleted the credentials file the
+    // second's `mount.cifs` had not opened yet ("error opening credential file").
+    let lock = mount_lock(&request.id);
+    let _held = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     match run_mount(&request, &target) {
         Ok(created) => {
             state
@@ -1379,6 +1386,8 @@ fn mount_delete(state: &AppState, id: &str) -> Response {
         Some(t) => t,
         None => return Response::not_found(),
     };
+    let lock = mount_lock(id);
+    let _held = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     match run_umount(&target) {
         Ok(()) => {
             state.mounts.lock().unwrap().remove(id);
@@ -1389,6 +1398,31 @@ fn mount_delete(state: &AppState, id: &str) -> Response {
         }
         Err(MountError::Failed(reason)) => Response::text(502, "Bad Gateway", &reason),
     }
+}
+
+/// The lock that serializes everything done to one mount id.
+///
+/// Per id rather than one for the daemon: a NAS that is switched off holds its
+/// `mount` call for as long as the kernel's connect retries take, and that must not
+/// queue a deploy that mounts a different share behind it.
+fn mount_lock(id: &str) -> std::sync::Arc<Mutex<()>> {
+    use std::sync::{Arc, OnceLock};
+    static LOCKS: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = OnceLock::new();
+    let locks = LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut locks = locks
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    locks
+        .entry(id.to_string())
+        .or_insert_with(|| Arc::new(Mutex::new(())))
+        .clone()
+}
+
+/// Where one mount call's CIFS credentials are written: a name of its own per call,
+/// so no other request's cleanup can remove it while `mount.cifs` is reading it.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn mount_creds_path(id: &str) -> PathBuf {
+    std::path::Path::new("/run/polaris").join(staged_name(&format!("mount-creds-{id}")))
 }
 
 enum MountError {
@@ -1453,7 +1487,7 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
     if let (MountKind::Smb, Some(user), Some(pass)) =
         (&request.kind, &request.username, &request.password)
     {
-        let path = std::path::Path::new("/run/polaris").join(format!("mount-creds-{}", request.id));
+        let path = mount_creds_path(&request.id);
         if let Err(error) = write_creds_file(&path, user, pass) {
             eprintln!(
                 "could not write the credentials file for mount {}: {error}",
@@ -1669,6 +1703,36 @@ fn run_umount(_target: &std::path::Path) -> Result<(), MountError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn concurrent_mounts_of_one_share_never_share_a_credentials_file() {
+        // The file is removed the moment its own `mount` returns, so a second call
+        // writing to the same name had its file deleted under it.
+        let first = mount_creds_path("nas");
+        let second = mount_creds_path("nas");
+        assert_ne!(first, second);
+        assert!(first.starts_with("/run/polaris"));
+        assert!(first
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("mount-creds-nas-"));
+    }
+
+    #[test]
+    fn one_share_is_mounted_by_one_request_at_a_time() {
+        // Same id, same lock: the second request waits for the first rather than
+        // running `mount` onto the same target beside it.
+        assert!(std::sync::Arc::ptr_eq(
+            &mount_lock("nas"),
+            &mount_lock("nas")
+        ));
+        // Another share is not held up by it.
+        assert!(!std::sync::Arc::ptr_eq(
+            &mount_lock("nas"),
+            &mount_lock("other")
+        ));
+    }
 
     #[test]
     fn mount_request_parses_and_rejects_unknown_fields() {

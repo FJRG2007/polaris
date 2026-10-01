@@ -58,7 +58,8 @@ import { useAttention } from "@/components/use-attention";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { sendFile } from "@/components/transfers/move-file";
+import { sendFile, type Sent } from "@/components/transfers/move-file";
+import type { SendOutcome, SendProgress } from "./outgoing";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -1345,7 +1346,7 @@ export function ChannelView({
                 );
                 if (!sent.ok) {
                     await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
-                    return { error: refusal(sent.body) ?? t("channelView.fileNotSent", { name: file.name }) };
+                    return { error: notUploaded(sent, file.name) };
                 }
                 const staged: unknown = JSON.parse(sent.body || "{}");
                 uploaded.push(String((staged as { id?: unknown }).id ?? ""));
@@ -1414,13 +1415,29 @@ export function ChannelView({
         return {};
     };
 
+    /**
+     * Why one file did not go, in the sender's language.
+     *
+     * The server's own sentence when it wrote one - it names the storage, the
+     * limit, the rule - and otherwise what this tab saw happen: the connection
+     * dropped, or every byte went and no answer ever came back.
+     */
+    const notUploaded = (sent: Sent, name: string): string => {
+        const said = refusal(sent.body);
+        if (said) return said;
+        if (sent.problem === "noAnswer") return t("channelView.fileNoAnswer", { name });
+        if (sent.problem === "dropped") return t("channelView.fileDropped", { name });
+        return t("channelView.fileNotSent", { name });
+    };
+
     const send = async (
         body: string,
         files: readonly File[] = [],
         sounds: readonly RecordedSound[] = [],
         spoilers: readonly number[] = [],
-        fromDrive: readonly KeptPick[] = []
-    ) => {
+        fromDrive: readonly KeptPick[] = [],
+        report?: (progress: SendProgress) => void
+    ): Promise<SendOutcome> => {
         if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
 
@@ -1437,15 +1454,19 @@ export function ChannelView({
                 if (spoilers.includes(at)) query.set("spoiler", "1");
                 const sent = await sendFile(
                     `/api/chat/channels/${channelId}/uploads?${query.toString()}`,
-                    file
+                    file,
+                    {
+                        onProgress: (moved, total) =>
+                            report?.({ file: at, files: files.length, moved, total })
+                    }
                 );
                 if (!sent.ok) {
                     // Nothing was sent, so nothing is left behind: the files that
                     // did go up are taken off the storage rather than waiting for
-                    // the sweep.
+                    // the sweep. The message is not sent without them - the
+                    // composer keeps it, with this reason on it and a retry.
                     await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
-                    setError(refusal(sent.body) ?? `${file.name} could not be sent`);
-                    return;
+                    return { error: notUploaded(sent, file.name) };
                 }
                 const staged: unknown = JSON.parse(sent.body || "{}");
                 uploaded.push(String((staged as { id?: unknown }).id ?? ""));
@@ -1490,21 +1511,24 @@ export function ChannelView({
             const response = await fetch(`/api/chat/channels/${channelId}/messages`, {
                 method: "POST",
                 body: form
-            });
-            if (!response.ok) {
-                const answer: unknown = await response.json().catch(() => null);
-                const message =
-                    typeof answer === "object" && answer !== null && "error" in answer
-                        ? String((answer as { error: unknown }).error)
-                        : "That could not be sent";
-                setError(message);
-                return;
+            }).catch(() => null);
+            if (!response?.ok) {
+                const answer: unknown = await response?.json().catch(() => null);
+                // The files that went up are this message's; a retry stages them
+                // again, so these would only wait for the sweep.
+                await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
+                return {
+                    error:
+                        typeof answer === "object" && answer !== null && "error" in answer
+                            ? String((answer as { error: unknown }).error)
+                            : t("errors.notSent")
+                };
             }
             await load();
             refresh();
             return;
         }
-        return sendText(body);
+        await sendText(body);
     };
 
     /**
@@ -1748,9 +1772,7 @@ export function ChannelView({
                 <EmptyState
                     icon={<MessageCircle />}
                     title={t("channelView.thisConversationIsNotYours")}
-                    description={
-                        error || t("channelView.itMayHaveBeenDeleted")
-                    }
+                    description={error || t("channelView.itMayHaveBeenDeleted")}
                 />
             </div>
         );
@@ -1813,7 +1835,9 @@ export function ChannelView({
                     // further back, and is what somebody sees for the
                     // moment it takes.
                     <p className="py-2 text-center text-xs text-muted-foreground">
-                        {loadingOlder ? t("channelView.loadingEarlierMessages") : t("channelView.earlierMessages")}
+                        {loadingOlder
+                            ? t("channelView.loadingEarlierMessages")
+                            : t("channelView.earlierMessages")}
                     </p>
                 )}
 
@@ -2013,7 +2037,12 @@ export function ChannelView({
                         attachable={may.attach}
                         placeholder={
                             canPost
-                                ? t("channelView.messagePlaceholder", { name: channel.kind === "text" ? `#${channel.name}` : channel.name })
+                                ? t("channelView.messagePlaceholder", {
+                                      name:
+                                          channel.kind === "text"
+                                              ? `#${channel.name}`
+                                              : channel.name
+                                  })
                                 : t("channelView.thisConversationIsArchived")
                         }
                         editing={editing}
@@ -2171,8 +2200,7 @@ export function ChannelView({
                             if (session && voice.switchWarning) {
                                 const sure = await confirm({
                                     title: t("channelView.leaveAndJoin", { name: channel.name }),
-                                    description:
-                                        t("channelView.youAreInACall"),
+                                    description: t("channelView.youAreInACall"),
                                     confirmLabel: t("channelView.joinThisRoom")
                                 });
                                 if (!sure) return;

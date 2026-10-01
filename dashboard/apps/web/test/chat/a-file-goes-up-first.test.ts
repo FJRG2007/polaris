@@ -22,10 +22,7 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const VIEW = readFileSync(
-    join(process.cwd(), "src/app/(app)/chat/channel-view.tsx"),
-    "utf8"
-);
+const VIEW = readFileSync(join(process.cwd(), "src/app/(app)/chat/channel-view.tsx"), "utf8");
 const ROUTE = readFileSync(
     join(process.cwd(), "src/app/api/chat/channels/[channelId]/messages/route.ts"),
     "utf8"
@@ -37,7 +34,7 @@ const UPLOADS = readFileSync(
 
 describe("the composer", () => {
     it("sends each file to the streaming route, through the shared sender", () => {
-        expect(VIEW).toContain("import { sendFile }");
+        expect(VIEW).toMatch(/import \{ sendFile[ ,]/);
         expect(VIEW).toContain("/api/chat/channels/${channelId}/uploads?");
         expect(VIEW).toMatch(/await sendFile\(/);
     });
@@ -72,7 +69,9 @@ describe("the send route", () => {
     });
 
     it("counts everything a message carries against the instance's limit", () => {
-        expect(ROUTE).toContain("const carrying = uploads.length + files.length + borrowed.length;");
+        expect(ROUTE).toContain(
+            "const carrying = uploads.length + files.length + borrowed.length;"
+        );
         expect(ROUTE).toContain("if (carrying > rules.maxAttachments)");
     });
 

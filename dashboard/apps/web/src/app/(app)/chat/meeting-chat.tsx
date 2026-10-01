@@ -146,7 +146,10 @@ export function MeetingChat({
         [meetingId]
     );
 
-    const send = async (body: string, files: readonly File[] = []): Promise<void> => {
+    const send = async (
+        body: string,
+        files: readonly File[] = []
+    ): Promise<{ error?: string } | void> => {
         // Words alone go through the action; anything carrying a file goes
         // through the route that can write bytes, because the bytes have to be
         // on storage before the line exists.
@@ -163,15 +166,17 @@ export function MeetingChat({
             const response = await fetch(`/api/chat/meetings/${meetingId}/messages`, {
                 method: "POST",
                 body: form
-            });
-            if (!response.ok) {
-                const answer: unknown = await response.json().catch(() => null);
-                setError(
-                    typeof answer === "object" && answer !== null && "error" in answer
-                        ? String((answer as { error: unknown }).error)
-                        : "That could not be sent"
-                );
-                return;
+            }).catch(() => null);
+            if (!response?.ok) {
+                // Answered to the composer, which keeps the files with this on
+                // them and a retry.
+                const answer: unknown = await response?.json().catch(() => null);
+                return {
+                    error:
+                        typeof answer === "object" && answer !== null && "error" in answer
+                            ? String((answer as { error: unknown }).error)
+                            : t("errors.notSent")
+                };
             }
         }
         setError("");

@@ -9,7 +9,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireDriveDriver = vi.fn();
+const authorizeDrive = vi.fn();
+const getDriverForConnection = vi.fn();
 const writeStream = vi.fn(async (path: string) => ({ path, size: 1n }));
 
 vi.mock("@/lib/api-session", () => ({ apiUser: async () => ({ id: "writer-1", isAdmin: false }) }));
@@ -20,8 +21,9 @@ vi.mock("@/lib/drive-folder-size", () => ({ invalidateFolderSizes: async () => u
 vi.mock("@/lib/drive-authz", () => ({
     DriveAccessError: class extends Error {},
     DriveLockedError: class extends Error {},
-    requireDriveDriver
+    authorizeDrive
 }));
+vi.mock("@/lib/storage-service", () => ({ getDriverForConnection }));
 
 const route = await import("../../src/app/api/drive/upload/route");
 
@@ -33,8 +35,10 @@ function upload(p: string, name: string): Promise<Response> {
 }
 
 beforeEach(() => {
-    requireDriveDriver.mockReset();
-    requireDriveDriver.mockResolvedValue({
+    authorizeDrive.mockReset();
+    authorizeDrive.mockResolvedValue(undefined);
+    getDriverForConnection.mockReset();
+    getDriverForConnection.mockResolvedValue({
         mkdir: async () => undefined,
         writeStream,
         dispose: async () => undefined
@@ -45,13 +49,13 @@ beforeEach(() => {
 describe("a drive upload", () => {
     it("is checked against the folder a ../ name escapes to", async () => {
         await upload("team/inbox", "../../hr/payroll.xlsx");
-        expect(requireDriveDriver).toHaveBeenCalledWith("writer-1", "conn-1", "hr", "write");
+        expect(authorizeDrive).toHaveBeenCalledWith("writer-1", "conn-1", "hr", "write");
         expect(writeStream.mock.calls[0]?.[0]).toBe("hr/payroll.xlsx");
     });
 
     it("is checked against the deepest folder of a nested folder upload", async () => {
         await upload("team/inbox", "album/2026/photo.jpg");
-        expect(requireDriveDriver).toHaveBeenCalledWith(
+        expect(authorizeDrive).toHaveBeenCalledWith(
             "writer-1",
             "conn-1",
             "team/inbox/album/2026",
@@ -61,9 +65,10 @@ describe("a drive upload", () => {
 
     it("writes nothing when that folder is refused", async () => {
         const { DriveAccessError } = await import("@/lib/drive-authz");
-        requireDriveDriver.mockRejectedValue(new DriveAccessError());
+        authorizeDrive.mockRejectedValue(new DriveAccessError());
         const answer = await upload("team/inbox", "../../hr/payroll.xlsx");
         expect(answer.status).toBe(403);
+        expect(getDriverForConnection).not.toHaveBeenCalled();
         expect(writeStream).not.toHaveBeenCalled();
     });
 });

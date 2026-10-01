@@ -500,7 +500,18 @@
         "sendUncovered": "Enviar {name} sin tapar",
         "sendSpoiler": "Enviar {name} como spoiler",
         "openNamed": "Abrir {name}",
-        "inYourDrive": "{name} - en tu Drive"
+        "inYourDrive": "{name} - en tu Drive",
+        "outgoing": {
+            "starting": "Enviando",
+            "sending": "Enviando - {percent}%",
+            "sendingOf": "Enviando {file} de {files} - {percent}%",
+            "processing": "Guardándolo en el servidor",
+            "notSent": "Esto no se ha enviado.",
+            "retry": "Reintentar",
+            "retryNamed": "Volver a enviar {name}",
+            "remove": "Quitar",
+            "removeNamed": "Quitar {name} y no enviarlo"
+        }
     },
     "sidebar": {
         "directMessages": "Mensajes directos",
@@ -566,7 +577,9 @@
         "roomCount": "{count, plural, =0 { - no hay nadie} one { - hay una persona} other { - hay {count} personas}}",
         "inRoom": "En {name}",
         "slowMode": "Aquí está activo el modo lento. Podrás volver a enviar en {wait}.",
-        "deleteQuestion": "¿Borrar <strong>{name}</strong>?"
+        "deleteQuestion": "¿Borrar <strong>{name}</strong>?",
+        "fileNoAnswer": "Se envió {name}, pero el servidor no respondió. No se publicó nada.",
+        "fileDropped": "No se pudo enviar {name}: se cortó la conexión. No se publicó nada."
     },
     "channelHeader": {
         "backToConversations": "Volver a conversaciones",

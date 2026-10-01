@@ -17,11 +17,11 @@
 import { prisma } from "@polaris/db";
 import { mkdir } from "node:fs/promises";
 import { loadEnv } from "@polaris/config";
-import { isPersonalKind, LOCAL_TARGET, PERSONAL_KIND, withTimeout } from "@polaris/core";
 import { LocalDriver } from "@polaris/storage";
 import { getSetting } from "@/lib/setting-store";
 import type { StorageDriver } from "@polaris/storage";
 import { getDriverForConnection } from "@/lib/storage-service";
+import { isPersonalKind, LOCAL_TARGET, PERSONAL_KIND, withTimeout } from "@polaris/core";
 
 /** Chosen by nobody, so chosen by the rule below. */
 export const AUTOMATIC_TARGET = "auto";
@@ -167,20 +167,101 @@ export async function openForWriting(
         return { ...(await here(localFolder)), fellBackFrom: target.name };
     }
 
-    try {
-        const opened = {
+    if (target.id === LOCAL_TARGET) {
+        return {
             driver: await driverForTarget(target.id, localFolder),
             targetId: target.id,
             name: target.name,
             fellBackFrom: null
         };
+    }
+
+    try {
+        const opened = {
+            driver: await openWithin(target, localFolder),
+            targetId: target.id,
+            name: target.name,
+            fellBackFrom: null
+        };
         FAILED.delete(target.id);
+        if (DOWN.delete(target.id)) void announce((alert) => alert.storageAnswered(target.id));
         return opened;
     } catch (error) {
-        if (target.id === LOCAL_TARGET) throw error;
-        FAILED.set(target.id, Date.now());
         console.error(`storage: ${target.name} could not be opened for writing:`, error);
+        markUnreachable(target.id, target.name);
         return { ...(await here(localFolder)), fellBackFrom: target.name };
+    }
+}
+
+/**
+ * Remember a storage as gone and tell the administrators.
+ *
+ * Not only for one that would not open: a share whose mount is still trusted can
+ * open and then go quiet on the write, and unless that is remembered too, every
+ * upload and every "Try again" goes back to it and waits out the stall again.
+ */
+function markUnreachable(id: string, name: string): void {
+    if (id === LOCAL_TARGET) return;
+    FAILED.set(id, Date.now());
+    DOWN.add(id);
+    void announce((alert) => alert.reportStorageUnreachable({ id, name }));
+}
+
+/** `openForWriting` for a file on its way: when not even this server will open,
+ *  that is said as a storage refusing the file rather than as whatever the disk
+ *  threw. */
+async function openOrRefuse(
+    target: UploadTarget,
+    localFolder: string,
+    what: string
+): Promise<WritableTarget> {
+    try {
+        return await openForWriting(target, localFolder);
+    } catch (error) {
+        throw new StorageRefused(
+            `this server could not take the ${what}: ${message(error)}`,
+            null,
+            false,
+            { cause: error }
+        );
+    }
+}
+
+/**
+ * How long a storage gets to open before the upload stops waiting for it.
+ *
+ * Opening one is a request to the host daemon for its kernel mount and then, when
+ * that fails, a userspace connect - and a NAS that is switched off answers neither
+ * quickly: the mount helper waits out the kernel's own retries and nothing on this
+ * side used to put a limit on it. That was the whole of "the picture says 0
+ * seconds left and never arrives": the bytes were sent, and the request sat
+ * behind a connect that never came back. Past this, the file goes to this server
+ * instead.
+ */
+const OPEN_TIMEOUT_MS = 20_000;
+
+/** `driverForTarget` with a deadline. A driver that turns up after it has been
+ *  given up on is closed again rather than left holding a session. */
+async function openWithin(target: UploadTarget, localFolder: string): Promise<StorageDriver> {
+    const opening = driverForTarget(target.id, localFolder);
+    try {
+        return await withTimeout(opening, OPEN_TIMEOUT_MS, `${target.name} did not answer in time`);
+    } catch (error) {
+        void opening.then((late) => late.dispose()).catch(() => undefined);
+        throw error;
+    }
+}
+
+/** Tell the administrators, without making the upload wait for it or fail with it.
+ *  Loaded when needed: this module is imported by code that runs where the
+ *  notification layer does not. */
+async function announce(
+    say: (alert: typeof import("@/lib/storage-alert")) => Promise<void> | void
+): Promise<void> {
+    try {
+        await say(await import("@/lib/storage-alert"));
+    } catch {
+        // The upload is what matters here; the log line above already has it.
     }
 }
 
@@ -192,10 +273,33 @@ export async function openForWriting(
  * refused the bytes and what it said.
  */
 export class StorageRefused extends Error {
-    constructor(message: string) {
-        super(message);
+    constructor(
+        message: string,
+        /** The storage that said no, by the name an administrator gave it. */
+        public readonly storage: string | null = null,
+        /** Whether it said no by not answering at all - switched off, unplugged,
+         *  off the network - as opposed to answering and refusing the file. The
+         *  two are different sentences for whoever is sending it. */
+        public readonly unreachable = false,
+        options?: { cause?: unknown }
+    ) {
+        super(message, options);
         this.name = "StorageRefused";
     }
+}
+
+/** What a storage that is not there at all says, across the drivers and the
+ *  network beneath them, as opposed to one that answered and refused. */
+const NOT_THERE =
+    /EHOSTUNREACH|EHOSTDOWN|ENETUNREACH|ETIMEDOUT|ECONNREFUSED|ECONNRESET|EPIPE|connection_failed|socket closed|timed out|did not answer|stopped answering|Host is down/i;
+
+/** Whether an error means the storage is not reachable, read through its causes. */
+export function isUnreachable(error: unknown, depth = 0): boolean {
+    if (depth > 4 || error === null || typeof error !== "object") return false;
+    if (error instanceof StorageRefused && error.unreachable) return true;
+    const said = error as { message?: unknown; code?: unknown; cause?: unknown };
+    const words = `${typeof said.code === "string" ? said.code : ""} ${typeof said.message === "string" ? said.message : ""}`;
+    return NOT_THERE.test(words) || isUnreachable(said.cause, depth + 1);
 }
 
 /** How long one file may take to be written and read back before the storage is
@@ -203,6 +307,17 @@ export class StorageRefused extends Error {
  *  through here over a local network, and short enough that a share which has
  *  stopped answering falls through while somebody is still on the screen. */
 const PLACE_TIMEOUT_MS = 60_000;
+
+/**
+ * The rest of the server's budget for one file, kept small enough that every
+ * step after the last byte - open, make the folder, the storage's close, reading
+ * the file back, cleaning up - adds up to well under `ANSWER_WITHIN_MS`, the
+ * time the sender's screen waits for an answer. A save that lands after the
+ * screen has said "no answer" is a duplicate on the next try.
+ */
+const MKDIR_TIMEOUT_MS = 15_000;
+const READ_BACK_TIMEOUT_MS = 30_000;
+const CLEANUP_TIMEOUT_MS = 5_000;
 
 /**
  * Put bytes somewhere that will give them back, and say where that was.
@@ -240,7 +355,7 @@ export async function placeFile(input: {
     /** What to call this kind of file in a log line. */
     readonly what: string;
 }): Promise<{ targetId: string; fellBackFrom: string | null }> {
-    const chosen = await openForWriting(input.target, input.localFolder);
+    const chosen = await openOrRefuse(input.target, input.localFolder, input.what);
     const attempt = await writeThrough(chosen.driver, input);
     if (attempt.ok) return { targetId: chosen.targetId, fellBackFrom: chosen.fellBackFrom };
 
@@ -255,6 +370,7 @@ export async function placeFile(input: {
     console.warn(
         `storage: ${chosen.name} could not take a ${input.what} (${attempt.detail}); writing it to this server instead.`
     );
+    if (NOT_THERE.test(attempt.detail)) markUnreachable(chosen.targetId, chosen.name);
 
     // Opening this server can fail too - a data directory that is not writable -
     // and that throw has to arrive as the same sentence as any other refusal.
@@ -267,7 +383,9 @@ export async function placeFile(input: {
         .catch((error: unknown) => ({ ok: false, detail: message(error) }));
     if (here.ok) return { targetId: LOCAL_TARGET, fellBackFrom: chosen.name };
     throw new StorageRefused(
-        `${chosen.name} could not take the ${input.what} (${attempt.detail}), and neither could this server (${here.detail}).`
+        `${chosen.name} could not take the ${input.what} (${attempt.detail}), and neither could this server (${here.detail}).`,
+        chosen.name,
+        NOT_THERE.test(attempt.detail)
     );
 }
 
@@ -307,39 +425,33 @@ export async function streamFile(input: {
     /** What to call this kind of file in a log line. */
     readonly what: string;
 }): Promise<{ targetId: string; size: number; fellBackFrom: string | null }> {
-    const chosen = await openForWriting(input.target, input.localFolder);
+    const chosen = await openOrRefuse(input.target, input.localFolder, input.what);
+    const watched = watchStream(input.body);
     try {
-        await chosen.driver.mkdir(input.folder).catch(() => undefined);
-        const written = await chosen.driver.writeStream(input.path, input.body, {
-            mime: input.mime || "application/octet-stream",
-            ...(input.declared !== undefined && input.declared > 0
-                ? { size: BigInt(input.declared) }
-                : {})
-        });
+        await withTimeout(
+            chosen.driver.mkdir(input.folder).catch(() => undefined),
+            MKDIR_TIMEOUT_MS,
+            "it stopped answering before the file could start"
+        );
+        const written = await watched.within(
+            chosen.driver.writeStream(input.path, watched.body, {
+                mime: input.mime || "application/octet-stream",
+                ...(input.declared !== undefined && input.declared > 0
+                    ? { size: BigInt(input.declared) }
+                    : {})
+            }),
+            STALL_MS
+        );
 
         // It took the file. Whether it will give it back is a different question,
         // and the one that has cost people their uploads: a share that has gone
         // away, a mount that accepts writes into nothing and a handle still held
         // open all stat perfectly and refuse the read.
-        const stream = await withTimeout(
-            chosen.driver.readStream(input.path),
-            PLACE_TIMEOUT_MS,
-            "it would not open the file it had just taken"
-        );
-        const reader = stream.getReader();
-        try {
-            const { done, value } = await withTimeout(
-                reader.read(),
-                PLACE_TIMEOUT_MS,
-                "it opened the file and then said nothing"
+        if (Number(written.size) > 0 && !(await givesBack(chosen.driver, input.path))) {
+            throw new StorageRefused(
+                `${chosen.name} took the ${input.what} and gave back nothing.`,
+                chosen.targetId === LOCAL_TARGET ? null : chosen.name
             );
-            if (Number(written.size) > 0 && (done || !value?.length)) {
-                throw new StorageRefused(
-                    `${chosen.name} took the ${input.what} and gave back nothing.`
-                );
-            }
-        } finally {
-            await reader.cancel().catch(() => undefined);
         }
 
         return {
@@ -349,12 +461,93 @@ export async function streamFile(input: {
         };
     } catch (error) {
         // A write that stopped part-way leaves a truncated file under a name that
-        // reads like a whole one.
-        await chosen.driver.delete(input.path).catch(() => undefined);
-        throw error;
+        // reads like a whole one. Not waited on for ever: the storage that just
+        // failed is the one being asked.
+        await discard(chosen.driver, input.path);
+        if (error instanceof StorageRefused) throw error;
+        const unreachable = isUnreachable(error);
+        if (unreachable) markUnreachable(chosen.targetId, chosen.name);
+        // Said as the storage's failure, by its name: a caller can then tell the
+        // sender which disk is not there instead of passing on a socket error.
+        throw new StorageRefused(
+            `${chosen.name} could not take the ${input.what}: ${message(error)}`,
+            chosen.targetId === LOCAL_TARGET ? null : chosen.name,
+            unreachable,
+            { cause: error }
+        );
     } finally {
-        await chosen.driver.dispose().catch(() => undefined);
+        void chosen.driver.dispose().catch(() => undefined);
     }
+}
+
+/**
+ * How long a streamed write may go without a single byte moving before it is
+ * given up on.
+ *
+ * Not a clock over the whole upload - a file large enough to be streamed takes
+ * minutes, and that is fine - but over silence. A share that went away part-way,
+ * or one whose session is half-dead and accepts a connection it then never
+ * finishes, holds the request with nothing moving; so does a write whose bytes
+ * have all gone and whose close the storage never answers. Either way the sender
+ * is looking at a bar that has stopped, and a minute of nothing is an answer.
+ */
+const STALL_MS = 60_000;
+
+/**
+ * A body that reports when it last moved, and a way to give up on a write that
+ * has stopped.
+ *
+ * The clock starts again on every chunk the storage takes, and once the body has
+ * ended it keeps running for the storage's own close: that last wait is where a
+ * dead share actually hangs, because the bytes were already in a buffer.
+ */
+function watchStream(source: ReadableStream<Uint8Array>): {
+    body: ReadableStream<Uint8Array>;
+    within<T>(write: Promise<T>, idleMs: number): Promise<T>;
+} {
+    let last = Date.now();
+    const reader = source.getReader();
+    const body = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+            const { done, value } = await reader.read();
+            last = Date.now();
+            if (done) controller.close();
+            else controller.enqueue(value);
+        },
+        cancel(reason) {
+            return reader.cancel(reason);
+        }
+    });
+    return {
+        body,
+        within<T>(write: Promise<T>, idleMs: number): Promise<T> {
+            last = Date.now();
+            return new Promise<T>((resolve, reject) => {
+                const timer = setInterval(
+                    () => {
+                        if (Date.now() - last < idleMs) return;
+                        clearInterval(timer);
+                        // Ends the request body as well, so a driver still waiting on
+                        // it is woken with an error rather than left parked.
+                        void reader.cancel("stalled").catch(() => undefined);
+                        reject(new Error("it stopped answering part-way through the file"));
+                    },
+                    Math.min(1_000, idleMs)
+                );
+                if (typeof timer.unref === "function") timer.unref();
+                write.then(
+                    (value) => {
+                        clearInterval(timer);
+                        resolve(value);
+                    },
+                    (error: unknown) => {
+                        clearInterval(timer);
+                        reject(error);
+                    }
+                );
+            });
+        }
+    };
 }
 
 /** One attempt on one open storage. Disposes of it either way; leaves nothing
@@ -365,7 +558,11 @@ async function writeThrough(
     input: { folder: string; path: string; bytes: Uint8Array; mime: string }
 ): Promise<{ ok: boolean; detail: string }> {
     try {
-        await driver.mkdir(input.folder).catch(() => undefined);
+        await withTimeout(
+            driver.mkdir(input.folder).catch(() => undefined),
+            MKDIR_TIMEOUT_MS,
+            "it stopped answering before the file could start"
+        );
         const written = await withTimeout(
             driver.writeStream(input.path, streamOf(input.bytes), {
                 mime: input.mime || "application/octet-stream",
@@ -375,39 +572,55 @@ async function writeThrough(
             "it stopped answering part-way through the file"
         );
         if (Number(written.size) !== input.bytes.length) {
-            await driver.delete(input.path).catch(() => undefined);
+            await discard(driver, input.path);
             return {
                 ok: false,
                 detail: `it kept ${Number(written.size)} bytes of ${input.bytes.length}`
             };
         }
 
-        const stream = await withTimeout(
-            driver.readStream(input.path),
-            PLACE_TIMEOUT_MS,
-            "it would not open the file it had just taken"
-        );
-        const reader = stream.getReader();
-        try {
-            const { done, value } = await withTimeout(
-                reader.read(),
-                PLACE_TIMEOUT_MS,
-                "it opened the file and then said nothing"
-            );
-            if (input.bytes.length > 0 && (done || !value?.length)) {
-                await driver.delete(input.path).catch(() => undefined);
-                return { ok: false, detail: "it took the file and gave back nothing" };
-            }
-        } finally {
-            await reader.cancel().catch(() => undefined);
+        if (input.bytes.length > 0 && !(await givesBack(driver, input.path))) {
+            await discard(driver, input.path);
+            return { ok: false, detail: "it took the file and gave back nothing" };
         }
         return { ok: true, detail: "" };
     } catch (error) {
-        await driver.delete(input.path).catch(() => undefined);
+        await discard(driver, input.path);
         return { ok: false, detail: message(error) };
     } finally {
-        await driver.dispose().catch(() => undefined);
+        void driver.dispose().catch(() => undefined);
     }
+}
+
+/**
+ * Whether a file just written comes back: opened and its first bytes read, under
+ * one deadline between them so a storage that answers each step slowly cannot
+ * spend a full timeout on each.
+ */
+async function givesBack(driver: StorageDriver, path: string): Promise<boolean> {
+    const deadline = Date.now() + READ_BACK_TIMEOUT_MS;
+    const stream = await withTimeout(
+        driver.readStream(path),
+        READ_BACK_TIMEOUT_MS,
+        "it would not open the file it had just taken"
+    );
+    const reader = stream.getReader();
+    try {
+        const { done, value } = await withTimeout(
+            reader.read(),
+            Math.max(1, deadline - Date.now()),
+            "it opened the file and then said nothing"
+        );
+        return !done && Boolean(value?.length);
+    } finally {
+        await withTimeout(reader.cancel(), CLEANUP_TIMEOUT_MS, "cancel").catch(() => undefined);
+    }
+}
+
+/** Remove what a failed write left, without waiting for ever on the storage that
+ *  just failed. */
+async function discard(driver: StorageDriver, path: string): Promise<void> {
+    await withTimeout(driver.delete(path), CLEANUP_TIMEOUT_MS, "delete").catch(() => undefined);
 }
 
 function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
@@ -438,6 +651,10 @@ const RETRY_AFTER_MS = 60_000;
 /** When each storage last refused to open. In this process only: it is a
  *  latency shortcut, and a replica working it out for itself is correct. */
 const FAILED = new Map<string, number>();
+
+/** The storages last seen not opening, until one opens again. Apart from FAILED,
+ *  which forgets on a clock: this is what says an outage has ended. */
+const DOWN = new Set<string>();
 
 function failedRecently(targetId: string): boolean {
     const at = FAILED.get(targetId);

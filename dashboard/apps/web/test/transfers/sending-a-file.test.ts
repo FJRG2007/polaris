@@ -13,15 +13,22 @@
  * is the kind of mistake a test has to catch rather than a person.
  */
 
-import { saveFile, sendFile } from "@/components/transfers/move-file";
+import { ANSWER_WITHIN_MS, saveFile, sendFile } from "@/components/transfers/move-file";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearTransfer, transfersNow } from "@/components/transfers/transfer-store";
+import {
+    clearTransfer,
+    transferSecondsLeft,
+    transfersNow
+} from "@/components/transfers/transfer-store";
 
 /** One request, as the sender drives it. */
 class FakeRequest {
     public static last: FakeRequest | null = null;
 
-    public readonly upload = { onprogress: null as ((event: ProgressEvent) => void) | null };
+    public readonly upload = {
+        onprogress: null as ((event: ProgressEvent) => void) | null,
+        onload: null as (() => void) | null
+    };
     public onload: (() => void) | null = null;
     public onerror: (() => void) | null = null;
     public onabort: (() => void) | null = null;
@@ -58,6 +65,11 @@ class FakeRequest {
             loaded,
             total
         } as ProgressEvent);
+    }
+
+    /** What it does once the last byte of the body has gone. */
+    public sentAll(): void {
+        this.upload.onload?.();
     }
 
     /** What it does when the answer arrives. */
@@ -109,7 +121,10 @@ describe("sending one file", () => {
 
     it("shows the sentence the server wrote about a file it refused", async () => {
         const sending = sendFile("/api/chat/channels/c1/uploads?name=holiday.mp4", file());
-        FakeRequest.last!.answer(413, JSON.stringify({ error: "holiday.mp4 is bigger than 25 MB" }));
+        FakeRequest.last!.answer(
+            413,
+            JSON.stringify({ error: "holiday.mp4 is bigger than 25 MB" })
+        );
         const sent = await sending;
         expect(sent.ok).toBe(false);
         expect(sent.status).toBe(413);
@@ -123,7 +138,71 @@ describe("sending one file", () => {
         FakeRequest.last!.onerror?.();
         const sent = await sending;
         expect(sent.status).toBe(0);
-        expect(transfersNow()[0]!.error).toContain("connection");
+        expect(sent.problem).toBe("dropped");
+        expect(transfersNow()[0]!.problem).toBe("dropped");
+    });
+
+    it("says the server is saving it once every byte has gone, not 0 seconds left", async () => {
+        const sending = sendFile("/api/chat/channels/c1/uploads?name=holiday.mp4", file());
+        const request = FakeRequest.last!;
+        request.progress(1000, 1000);
+        request.sentAll();
+        const waiting = transfersNow()[0]!;
+        expect(waiting.state).toBe("processing");
+        expect(transferSecondsLeft(waiting, waiting.startedAt + 10_000)).toBeNull();
+        request.answer(200, "{}");
+        await sending;
+        expect(transfersNow()[0]!.state).toBe("done");
+    });
+
+    it("gives up on an answer that never comes, and says that is what happened", async () => {
+        // The route hangs: a NAS that is switched off held the request open with
+        // every byte already sent. That used to be a bar at 100% for ever.
+        vi.useFakeTimers();
+        try {
+            const sending = sendFile("/api/chat/channels/c1/uploads?name=holiday.mp4", file());
+            const request = FakeRequest.last!;
+            request.progress(1000, 1000);
+            request.sentAll();
+            vi.advanceTimersByTime(ANSWER_WITHIN_MS - 1);
+            expect(transfersNow()[0]!.state).toBe("processing");
+            vi.advanceTimersByTime(1);
+            const sent = await sending;
+            expect(sent.ok).toBe(false);
+            expect(sent.problem).toBe("noAnswer");
+            expect(transfersNow()[0]!.state).toBe("failed");
+            expect(transfersNow()[0]!.problem).toBe("noAnswer");
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("waits as long as it takes for a route whose answer is the work", async () => {
+        vi.useFakeTimers();
+        try {
+            const sending = sendFile("/api/admin/transfer/upload", file(), {
+                answerWithinMs: null
+            });
+            const request = FakeRequest.last!;
+            request.sentAll();
+            vi.advanceTimersByTime(ANSWER_WITHIN_MS * 10);
+            expect(transfersNow()[0]!.state).toBe("processing");
+            request.answer(200, "{}");
+            expect((await sending).ok).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("reports a 5xx with no sentence as refused rather than as nothing", async () => {
+        // What a proxy answers when the app behind it gave up: a bare "Bad
+        // Gateway" page, nothing a reader could use.
+        const sending = sendFile("/api/chat/channels/c1/uploads?name=holiday.mp4", file());
+        FakeRequest.last!.answer(502, "<html>Bad Gateway</html>".repeat(20));
+        const sent = await sending;
+        expect(sent.ok).toBe(false);
+        expect(sent.problem).toBe("refused");
+        expect(transfersNow()[0]!.problem).toBe("refused");
     });
 
     it("can be stopped from the list, and says so", async () => {

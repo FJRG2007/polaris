@@ -59,5 +59,13 @@
         "refused": "El servidor rechazó la sesión: {reason}.",
         "untrusted": "El navegador no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.",
         "retry": "Reintentar"
+    },
+    "storage": {
+        "unreachable": "Ahora no se pueden guardar archivos: el almacenamiento {name} no responde.",
+        "unreachableHere": "Ahora no se pueden guardar archivos: el almacenamiento no responde.",
+        "refused": "El almacenamiento {name} no aceptó ese archivo.",
+        "refusedHere": "Ningún almacenamiento aceptó ese archivo.",
+        "failed": "No se pudo guardar ese archivo. Inténtalo de nuevo.",
+        "withDetail": "{sentence} ({detail})"
     }
 }
