@@ -40,11 +40,13 @@ vi.mock("@polaris/db", () => ({
             findUnique: vi.fn(async () => row),
             findFirst: vi.fn(async () => row),
             findMany: vi.fn(async () => [row]),
-            updateMany: vi.fn(async (args: { where: { config: string }; data: Record<string, unknown> }) => {
-                if (args.where.config !== row.config) return { count: 0 };
-                row = { ...row, ...args.data };
-                return { count: 1 };
-            })
+            updateMany: vi.fn(
+                async (args: { where: { config: string }; data: Record<string, unknown> }) => {
+                    if (args.where.config !== row.config) return { count: 0 };
+                    row = { ...row, ...args.data };
+                    return { count: 1 };
+                }
+            )
         }
     }
 }));
@@ -64,14 +66,24 @@ vi.mock("@polaris/storage", () => ({
     SftpDriver: vi.fn(),
     SmbDriver
 }));
-vi.mock("@/lib/connection-pool", () => ({ borrowSftp: vi.fn(), borrowSmb, dropStorageConnection: vi.fn() }));
+vi.mock("@/lib/connection-pool", () => ({
+    borrowSftp: vi.fn(),
+    borrowSmb,
+    dropStorageConnection: vi.fn()
+}));
 vi.mock("@/lib/smb-shares", () => ({ listSmbShares: vi.fn() }));
 vi.mock("@/lib/deploy/container-driver", () => ({ ContainerDriver: vi.fn() }));
 vi.mock("@/lib/connections/storage-token", () => ({ linkedAccountToken: vi.fn() }));
 vi.mock("@/lib/unifi-unas", () => ({ fetchUnasMetrics: vi.fn() }));
 vi.mock("@/lib/metrics-history-service", () => ({ deleteMetricsForSubject: vi.fn() }));
-vi.mock("@/lib/drive-acl-service", () => ({ grantedConnectionIds: vi.fn(), grantedRootPath: vi.fn() }));
-vi.mock("@/lib/container-files-service", () => ({ resolveContainerName: vi.fn(), resolveLocalContainer: vi.fn() }));
+vi.mock("@/lib/drive-acl-service", () => ({
+    grantedConnectionIds: vi.fn(),
+    grantedRootPath: vi.fn()
+}));
+vi.mock("@/lib/container-files-service", () => ({
+    resolveContainerName: vi.fn(),
+    resolveLocalContainer: vi.fn()
+}));
 vi.mock("@/lib/host-service", () => ({
     getHostConnection: vi.fn(),
     getHostConnectionUnscoped: vi.fn(),
@@ -81,7 +93,9 @@ const reportStorageMoved = vi.fn(async () => undefined);
 vi.mock("@/lib/storage-alert", () => ({ reportStorageMoved }));
 vi.mock("@/lib/storage-target", () => ({ forgetStorageFailure: vi.fn() }));
 vi.mock("@/lib/storage-returns", () => ({ returnFallbackFiles: vi.fn(async () => undefined) }));
-vi.mock("@/lib/storage-whereabouts/neighbours", () => ({ readNeighbourTable: vi.fn(async () => new Map()) }));
+vi.mock("@/lib/storage-whereabouts/neighbours", () => ({
+    readNeighbourTable: vi.fn(async () => new Map())
+}));
 vi.mock("@/lib/storage-whereabouts/smb-probe", () => ({ probeSmbIdentity: vi.fn() }));
 
 const service = await import("@/lib/storage-service");
@@ -124,12 +138,17 @@ beforeEach(() => {
 
 describe("a different SMB server at the old address", () => {
     it("is never signed in to, and the real device is followed instead", async () => {
-        devices.set("192.168.1.129", { serverGuid: "ffffffffffffffffffffffffffff0009", netbiosName: "LAPTOP" });
+        devices.set("192.168.1.129", {
+            serverGuid: "ffffffffffffffffffffffffffff0009",
+            netbiosName: "LAPTOP"
+        });
         table.set("192.168.1.129", "aa:bb:cc:dd:ee:09");
         devices.set("192.168.1.134", NAS);
         table.set("192.168.1.134", NAS.mac!);
 
-        await expect(service.getDriverForConnection(ID)).rejects.toBeInstanceOf(follow.DeviceNotConfirmed);
+        await expect(service.getDriverForConnection(ID)).rejects.toBeInstanceOf(
+            follow.DeviceNotConfirmed
+        );
 
         // Neither sign-in path ran, and the password was never even decrypted.
         expect(createMount).not.toHaveBeenCalled();
@@ -138,7 +157,10 @@ describe("a different SMB server at the old address", () => {
         expect(decryptCredentials).not.toHaveBeenCalled();
 
         // The search the refusal started finds the NAS where it went.
-        await expect(follow.searchFor(ID)).resolves.toMatchObject({ kind: "followed", to: "192.168.1.134" });
+        await expect(follow.searchFor(ID)).resolves.toMatchObject({
+            kind: "followed",
+            to: "192.168.1.134"
+        });
         expect(JSON.parse(row.config as string).host).toBe("192.168.1.134");
         await vi.waitFor(() => expect(reportStorageMoved).toHaveBeenCalledOnce());
 
@@ -150,7 +172,10 @@ describe("a different SMB server at the old address", () => {
     });
 
     it("is not given the password for the console sign-in either", async () => {
-        devices.set("192.168.1.129", { serverGuid: "ffffffffffffffffffffffffffff0009", netbiosName: "LAPTOP" });
+        devices.set("192.168.1.129", {
+            serverGuid: "ffffffffffffffffffffffffffff0009",
+            netbiosName: "LAPTOP"
+        });
         await expect(service.getUnasMetrics(ID, row.ownerId as string)).rejects.toBeInstanceOf(
             follow.DeviceNotConfirmed
         );
@@ -159,7 +184,10 @@ describe("a different SMB server at the old address", () => {
     });
 
     it("is not mounted by the deploy pipeline either", async () => {
-        devices.set("192.168.1.129", { serverGuid: "ffffffffffffffffffffffffffff0009", netbiosName: "LAPTOP" });
+        devices.set("192.168.1.129", {
+            serverGuid: "ffffffffffffffffffffffffffff0009",
+            netbiosName: "LAPTOP"
+        });
         await expect(service.resolveMountTarget(ID, row.ownerId as string)).rejects.toBeInstanceOf(
             follow.DeviceNotConfirmed
         );

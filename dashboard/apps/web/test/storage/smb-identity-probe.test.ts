@@ -48,7 +48,12 @@ function avPair(id: number, value: string): Buffer {
 }
 
 function challengeResponse(names: { netbios: string; dns: string }): Buffer {
-    const info = Buffer.concat([avPair(2, "WORKGROUP"), avPair(1, names.netbios), avPair(3, names.dns), Buffer.alloc(4)]);
+    const info = Buffer.concat([
+        avPair(2, "WORKGROUP"),
+        avPair(1, names.netbios),
+        avPair(3, names.dns),
+        Buffer.alloc(4)
+    ]);
     const challenge = Buffer.alloc(56);
     Buffer.from("NTLMSSP\0", "latin1").copy(challenge, 0);
     challenge.writeUInt32LE(2, 8);

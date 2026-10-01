@@ -77,7 +77,10 @@ const REPOINT: Record<string, (db: Db, path: string, to: string) => Promise<numb
     chat: async (db, path, to) => {
         const where = { connectionId: null, path };
         const data = { connectionId: to };
-        const poster = { where: { posterConnectionId: null, posterPath: path }, data: { posterConnectionId: to } };
+        const poster = {
+            where: { posterConnectionId: null, posterPath: path },
+            data: { posterConnectionId: to }
+        };
         const counts = await Promise.all([
             db.chatAttachment.updateMany({ where, data }),
             db.chatAttachment.updateMany(poster),
@@ -90,8 +93,12 @@ const REPOINT: Record<string, (db: Db, path: string, to: string) => Promise<numb
         return total(counts);
     },
     uploads: async (db, path, to) =>
-        (await db.taskAttachment.updateMany({ where: { connectionId: null, path }, data: { connectionId: to } }))
-            .count,
+        (
+            await db.taskAttachment.updateMany({
+                where: { connectionId: null, path },
+                data: { connectionId: to }
+            })
+        ).count,
     mail: async (db, path, to) => {
         const where = { connectionId: null, path };
         const data = { connectionId: to };
@@ -120,7 +127,11 @@ export function canReturn(localFolder: string): boolean {
  * Never throws: the upload already succeeded, and a file that is not listed only
  * stays where it is - which is where it would be without any of this.
  */
-export async function recordFallback(targetId: string, localFolder: string, path: string): Promise<void> {
+export async function recordFallback(
+    targetId: string,
+    localFolder: string,
+    path: string
+): Promise<void> {
     if (targetId === LOCAL_TARGET || !canReturn(localFolder)) return;
     try {
         await prisma.storageFallbackFile.upsert({
@@ -193,10 +204,14 @@ async function pass(only: string | undefined): Promise<ReturnResult> {
     });
 
     const byTarget = new Map<string, typeof waiting>();
-    for (const row of waiting) byTarget.set(row.targetId, [...(byTarget.get(row.targetId) ?? []), row]);
+    for (const row of waiting)
+        byTarget.set(row.targetId, [...(byTarget.get(row.targetId) ?? []), row]);
 
     for (const [targetId, rows] of byTarget) {
-        const exists = await prisma.storageConnection.findUnique({ where: { id: targetId }, select: { id: true } });
+        const exists = await prisma.storageConnection.findUnique({
+            where: { id: targetId },
+            select: { id: true }
+        });
         if (!exists) {
             // The storage was deleted. Its files stay here, where their rows
             // already point; there is nowhere left to take them.
@@ -218,7 +233,9 @@ async function pass(only: string | undefined): Promise<ReturnResult> {
         }
     }
     if (moved > 0 || failed > 0) {
-        console.info(`storage: moved ${moved} file(s) kept on this server back to their storage, ${failed} failed`);
+        console.info(
+            `storage: moved ${moved} file(s) kept on this server back to their storage, ${failed} failed`
+        );
     }
     return { moved, removed, failed };
 }
@@ -233,7 +250,13 @@ async function openWithin(targetId: string, localFolder: string): Promise<Storag
     }
 }
 
-type Waiting = { id: string; targetId: string; localFolder: string; path: string; attempts: number };
+type Waiting = {
+    id: string;
+    targetId: string;
+    localFolder: string;
+    path: string;
+    attempts: number;
+};
 
 /** Move one file, or say why it did not move. */
 async function moveOne(
@@ -255,15 +278,23 @@ async function moveOne(
             size = (await local.stat(row.path)).size;
         } catch {
             // Gone from here: deleted along with its row, which is the end of it.
-            await prisma.storageFallbackFile.delete({ where: { id: row.id } }).catch(() => undefined);
+            await prisma.storageFallbackFile
+                .delete({ where: { id: row.id } })
+                .catch(() => undefined);
             return "dropped";
         }
 
         try {
-            await withTimeout(remote.mkdir(dirname(row.path)).catch(() => undefined), STALL_MS, "mkdir");
+            await withTimeout(
+                remote.mkdir(dirname(row.path)).catch(() => undefined),
+                STALL_MS,
+                "mkdir"
+            );
             const sent = createHash("sha256");
             const written = await withTimeout(
-                remote.writeStream(row.path, hashing(await local.readStream(row.path), sent), { size }),
+                remote.writeStream(row.path, hashing(await local.readStream(row.path), sent), {
+                    size
+                }),
                 // Generous: a file is copied whole, and a video over a home LAN
                 // can take minutes. What this catches is a storage that stopped.
                 Math.max(STALL_MS, Number(size / 1_000_000n) * 1_000 + STALL_MS),
@@ -277,22 +308,30 @@ async function moveOne(
             }
         } catch (error) {
             await remote.delete(row.path, { recursive: false }).catch(() => undefined);
-            const unreachable = /EHOSTUNREACH|EHOSTDOWN|ETIMEDOUT|ECONNRESET|stopped answering|did not answer/i.test(
-                String(error instanceof Error ? error.message : error)
-            );
+            const unreachable =
+                /EHOSTUNREACH|EHOSTDOWN|ETIMEDOUT|ECONNRESET|stopped answering|did not answer/i.test(
+                    String(error instanceof Error ? error.message : error)
+                );
             await note(row.id, error, unreachable);
             return unreachable ? "unreachable" : "failed";
         }
 
-        const repointed = await prisma.$transaction((tx) => REPOINT[row.localFolder]!(tx, row.path, row.targetId));
+        const repointed = await prisma.$transaction((tx) =>
+            REPOINT[row.localFolder]!(tx, row.path, row.targetId)
+        );
         if (repointed === 0) {
             // Nothing points at it any more: its owner deleted it meanwhile, or the
             // upload never got as far as its row. The copy just made is nobody's.
             await remote.delete(row.path, { recursive: false }).catch(() => undefined);
-            await prisma.storageFallbackFile.delete({ where: { id: row.id } }).catch(() => undefined);
+            await prisma.storageFallbackFile
+                .delete({ where: { id: row.id } })
+                .catch(() => undefined);
             return "dropped";
         }
-        await prisma.storageFallbackFile.update({ where: { id: row.id }, data: { movedAt: new Date(), lastError: null } });
+        await prisma.storageFallbackFile.update({
+            where: { id: row.id },
+            data: { movedAt: new Date(), lastError: null }
+        });
         return "moved";
     } finally {
         await local.dispose().catch(() => undefined);
@@ -329,7 +368,10 @@ async function note(id: string, error: unknown, unreachable: boolean): Promise<v
 }
 
 /** A stream that feeds every chunk it passes through into a hash. */
-function hashing(source: ReadableStream<Uint8Array>, hash: ReturnType<typeof createHash>): ReadableStream<Uint8Array> {
+function hashing(
+    source: ReadableStream<Uint8Array>,
+    hash: ReturnType<typeof createHash>
+): ReadableStream<Uint8Array> {
     return source.pipeThrough(
         new TransformStream<Uint8Array, Uint8Array>({
             transform(chunk, controller) {
@@ -343,7 +385,11 @@ function hashing(source: ReadableStream<Uint8Array>, hash: ReturnType<typeof cre
 async function drain(stream: ReadableStream<Uint8Array>): Promise<void> {
     const reader = stream.getReader();
     for (;;) {
-        const { done } = await withTimeout(reader.read(), STALL_MS, "it stopped answering while reading back");
+        const { done } = await withTimeout(
+            reader.read(),
+            STALL_MS,
+            "it stopped answering while reading back"
+        );
         if (done) return;
     }
 }

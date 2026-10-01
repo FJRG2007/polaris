@@ -59,10 +59,15 @@ export function parseNeighbourTable(output: string): Map<string, string> {
 /** Read the host's neighbour table, or an empty one when it cannot be read. */
 export async function readNeighbourTable(client = new HostdClient()): Promise<NeighbourTable> {
     try {
-        const listing = await client.dockerRequest("GET", `/containers/json?filters=${RESPONDER_FILTER}`);
+        const listing = await client.dockerRequest(
+            "GET",
+            `/containers/json?filters=${RESPONDER_FILTER}`
+        );
         if (listing.status !== 200) return new Map();
         const parsed = JSON.parse(listing.body) as unknown;
-        const first = Array.isArray(parsed) ? (parsed[0] as { Id?: unknown } | undefined) : undefined;
+        const first = Array.isArray(parsed)
+            ? (parsed[0] as { Id?: unknown } | undefined)
+            : undefined;
         if (typeof first?.Id !== "string") return new Map();
         const run = await client.execRun(first.Id, [...READ_TABLE]);
         if (run.code !== 0) return new Map();

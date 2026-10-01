@@ -38,10 +38,7 @@ export default async function UploadsPage() {
         // centred in the content area, header included, rather than left against
         // the rail with the width beside it empty.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader
-                title={t("uploads.title")}
-                description={t("uploads.description")}
-            />
+            <PageHeader title={t("uploads.title")} description={t("uploads.description")} />
             <UploadsView
                 uploads={uploads}
                 avatars={avatars}

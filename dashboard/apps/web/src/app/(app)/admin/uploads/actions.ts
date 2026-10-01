@@ -42,7 +42,8 @@ const avatarSchema = z.object({ target, gravatar: z.boolean() });
 export async function setUploadSettingsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = settingsSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setUploadSettings(parsed.data);
         await recordAudit({
@@ -62,7 +63,8 @@ export async function setUploadSettingsAction(input: unknown): Promise<{ error?:
 export async function setAvatarSettingsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = avatarSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setAvatarSettings(parsed.data);
         await recordAudit({
@@ -96,7 +98,8 @@ export async function setAvatarSettingsAction(input: unknown): Promise<{ error?:
 export async function setFootageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setFootageTarget(parsed.data.target);
         await recordAudit({
@@ -115,7 +118,8 @@ export async function setFootageTargetAction(input: unknown): Promise<{ error?: 
 export async function setChatStorageTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setChatStorageTarget(parsed.data.target);
         await recordAudit({
@@ -164,7 +168,8 @@ export async function tidyChatStorageAction(): Promise<{
 export async function setPersonalDriveTargetAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setPersonalDriveTarget(parsed.data.target);
         await recordAudit({
@@ -186,7 +191,8 @@ export async function setOrganizationDriveTargetAction(
 ): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("uploads.errors.checkSettings") };
     try {
         await setOrganizationDriveTarget(parsed.data.target);
         await recordAudit({
@@ -318,11 +324,16 @@ export async function setStorageAddressAction(input: unknown): Promise<{
             const check = await whereabouts.checkAddress(row, address);
             if (check.kind === "different") {
                 return {
-                    error: t("uploads.network.different", { address, device: check.label ?? address, name: row.name })
+                    error: t("uploads.network.different", {
+                        address,
+                        device: check.label ?? address,
+                        name: row.name
+                    })
                 };
             }
             if (check.kind === "silent") return { error: t("uploads.network.silent", { address }) };
-            if (check.kind === "unproven" && !accept) return { confirm: { device: check.label ?? address } };
+            if (check.kind === "unproven" && !accept)
+                return { confirm: { device: check.label ?? address } };
             if (!(await whereabouts.moveToAddress(row, address, check.identity))) {
                 return { error: t("uploads.network.changed") };
             }

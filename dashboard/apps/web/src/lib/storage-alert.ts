@@ -90,9 +90,14 @@ async function lookFor(id: string): Promise<Outcome | null> {
 /** The body of the unreachable notice, with what the search found in it. */
 export function unreachableBody(t: Words, name: string, outcome: Outcome | null): string {
     if (outcome?.kind === "gone") return t("storage.unreachableGone", { name });
-    if (outcome?.kind === "answering") return t("storage.unreachableAnswering", { name, address: outcome.address });
+    if (outcome?.kind === "answering")
+        return t("storage.unreachableAnswering", { name, address: outcome.address });
     if (outcome?.kind === "impostor") {
-        return t("storage.unreachableImpostor", { name, address: outcome.address, device: outcome.label ?? outcome.address });
+        return t("storage.unreachableImpostor", {
+            name,
+            address: outcome.address,
+            device: outcome.label ?? outcome.address
+        });
     }
     if (outcome?.kind === "candidates") {
         const first = outcome.candidates[0]!;

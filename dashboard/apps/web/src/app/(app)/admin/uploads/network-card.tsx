@@ -23,7 +23,11 @@ import { findStorageAgainAction, setStorageAddressAction } from "./actions";
 import type { SearchOutcome, WhereaboutsView } from "@/lib/storage-whereabouts/follow";
 
 /** What the last look found, in a sentence. */
-function Outcome({ outcome, onUse, busy }: {
+function Outcome({
+    outcome,
+    onUse,
+    busy
+}: {
     outcome: SearchOutcome;
     onUse: (address: string) => void;
     busy: boolean;
@@ -31,42 +35,71 @@ function Outcome({ outcome, onUse, busy }: {
     const t = useTranslations("admin");
     switch (outcome.kind) {
         case "answering":
-            return <p className="text-xs text-muted-foreground">{t("uploads.network.answering", { address: outcome.address })}</p>;
+            return (
+                <p className="text-xs text-muted-foreground">
+                    {t("uploads.network.answering", { address: outcome.address })}
+                </p>
+            );
         case "followed":
             return (
                 <p className="text-xs text-muted-foreground">
                     {outcome.mac
-                        ? t("uploads.network.followed", { from: outcome.from, to: outcome.to, mac: outcome.mac })
-                        : t("uploads.network.followedNoMac", { from: outcome.from, to: outcome.to })}
+                        ? t("uploads.network.followed", {
+                              from: outcome.from,
+                              to: outcome.to,
+                              mac: outcome.mac
+                          })
+                        : t("uploads.network.followedNoMac", {
+                              from: outcome.from,
+                              to: outcome.to
+                          })}
                 </p>
             );
         case "impostor":
             return (
                 <p className="text-xs text-danger">
-                    {t("uploads.network.impostor", { address: outcome.address, device: outcome.label ?? outcome.address })}
+                    {t("uploads.network.impostor", {
+                        address: outcome.address,
+                        device: outcome.label ?? outcome.address
+                    })}
                 </p>
             );
         case "gone":
-            return <p className="text-xs text-danger">{t("uploads.network.gone", { address: outcome.address })}</p>;
+            return (
+                <p className="text-xs text-danger">
+                    {t("uploads.network.gone", { address: outcome.address })}
+                </p>
+            );
         case "unsupported":
             return <p className="text-xs text-danger">{t("uploads.network.unsupported")}</p>;
         case "candidates":
             return (
                 <div className="flex flex-col gap-1.5">
-                    <p className="text-xs text-muted-foreground">{t("uploads.network.candidates")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("uploads.network.candidates")}
+                    </p>
                     <ul className="flex flex-col gap-1">
                         {outcome.candidates.map((candidate) => (
-                            <li key={candidate.address} className="flex min-w-0 items-center justify-between gap-3">
+                            <li
+                                key={candidate.address}
+                                className="flex min-w-0 items-center justify-between gap-3"
+                            >
                                 <span className="flex min-w-0 flex-col">
-                                    <span className="truncate font-mono text-xs" title={candidate.address}>
+                                    <span
+                                        className="truncate font-mono text-xs"
+                                        title={candidate.address}
+                                    >
                                         {candidate.address}
                                     </span>
                                     <span
                                         className="truncate text-xs text-muted-foreground"
-                                        title={[candidate.label, candidate.mac].filter(Boolean).join(" - ")}
+                                        title={[candidate.label, candidate.mac]
+                                            .filter(Boolean)
+                                            .join(" - ")}
                                     >
-                                        {[candidate.label, candidate.mac].filter(Boolean).join(" - ") ||
-                                            t("uploads.network.unnamed")}
+                                        {[candidate.label, candidate.mac]
+                                            .filter(Boolean)
+                                            .join(" - ") || t("uploads.network.unnamed")}
                                     </span>
                                 </span>
                                 <Button
@@ -155,8 +188,13 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
                         {known ? (
                             <>
                                 {known.label && known.mac
-                                    ? t("uploads.network.known", { device: known.label, mac: known.mac })
-                                    : t("uploads.network.knownAs", { device: known.label ?? known.mac ?? view.name })}{" "}
+                                    ? t("uploads.network.known", {
+                                          device: known.label,
+                                          mac: known.mac
+                                      })
+                                    : t("uploads.network.knownAs", {
+                                          device: known.label ?? known.mac ?? view.name
+                                      })}{" "}
                                 {t("uploads.network.lastSeen")} <RelativeTime iso={known.seenAt} />
                             </>
                         ) : (
@@ -164,7 +202,12 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
                         )}
                     </span>
                 </div>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void findAgain()}>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void findAgain()}
+                >
                     {searching && <Loader2 className="size-4 animate-spin" />}
                     {t("uploads.network.findAgain")}
                 </Button>
@@ -173,7 +216,11 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
             {searching ? (
                 <p className="text-xs text-muted-foreground">{t("uploads.network.searching")}</p>
             ) : view.last ? (
-                <Outcome outcome={view.last.outcome} busy={busy} onUse={(next) => void save(next, false)} />
+                <Outcome
+                    outcome={view.last.outcome}
+                    busy={busy}
+                    onUse={(next) => void save(next, false)}
+                />
             ) : null}
 
             <label className="flex flex-col gap-1.5">
@@ -192,29 +239,49 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
                             setError("");
                         }}
                     />
-                    <Button disabled={!dirty || !valid || busy} onClick={() => void save(typed, false)}>
+                    <Button
+                        disabled={!dirty || !valid || busy}
+                        onClick={() => void save(typed, false)}
+                    >
                         {saving && <Loader2 className="size-4 animate-spin" />}
                         {tc("actions.save")}
                     </Button>
                 </div>
                 {typed.length > 0 && !valid ? (
-                    <span className="text-xs text-danger">{t("uploads.network.addressFormat")}</span>
+                    <span className="text-xs text-danger">
+                        {t("uploads.network.addressFormat")}
+                    </span>
                 ) : (
-                    <span className="text-xs text-muted-foreground">{t("uploads.network.addressHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("uploads.network.addressHint")}
+                    </span>
                 )}
             </label>
 
             {asking && (
                 <div className="flex flex-col gap-2 rounded-md bg-muted/50 p-3">
                     <p className="text-xs">
-                        {t("uploads.network.unproven", { device: asking.device, address: asking.address, name: view.name })}
+                        {t("uploads.network.unproven", {
+                            device: asking.device,
+                            address: asking.address,
+                            name: view.name
+                        })}
                     </p>
                     <div className="flex gap-2">
-                        <Button size="sm" disabled={busy} onClick={() => void save(asking.address, true)}>
+                        <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void save(asking.address, true)}
+                        >
                             {saving && <Loader2 className="size-4 animate-spin" />}
                             {t("uploads.network.useIt")}
                         </Button>
-                        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(null)}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => setAsking(null)}
+                        >
                             {tc("actions.cancel")}
                         </Button>
                     </div>
@@ -222,7 +289,9 @@ function StorageRow({ initial }: { initial: WhereaboutsView }) {
             )}
 
             {error && <p className={cn("text-xs text-danger")}>{error}</p>}
-            {saved && !error && <p className="text-xs text-muted-foreground">{t("uploads.saved")}</p>}
+            {saved && !error && (
+                <p className="text-xs text-muted-foreground">{t("uploads.saved")}</p>
+            )}
         </li>
     );
 }

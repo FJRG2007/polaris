@@ -36,7 +36,9 @@ beforeEach(() => {
 });
 
 function said(): { title: string; body: string; event: string } {
-    return (notify.mock.calls.at(-1) as unknown as [{ title: string; body: string; event: string }])[0];
+    return (
+        notify.mock.calls.at(-1) as unknown as [{ title: string; body: string; event: string }]
+    )[0];
 }
 
 describe("the unreachable notice", () => {
@@ -53,11 +55,18 @@ describe("the unreachable notice", () => {
             candidates: [{ address: "192.168.1.134", label: "UNAS-PRO", mac: "6c:63:f8:6e:53:50" }]
         };
         await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
-        expect(said().body).toContain("An SMB server answers on the network, the first at 192.168.1.134 (UNAS-PRO)");
+        expect(said().body).toContain(
+            "An SMB server answers on the network, the first at 192.168.1.134 (UNAS-PRO)"
+        );
     });
 
     it("is not sent at all when the search found it and followed it", async () => {
-        outcome = { kind: "followed", from: "192.168.1.129", to: "192.168.1.134", mac: "6c:63:f8:6e:53:50" };
+        outcome = {
+            kind: "followed",
+            from: "192.168.1.129",
+            to: "192.168.1.134",
+            mac: "6c:63:f8:6e:53:50"
+        };
         await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
         expect(notify).not.toHaveBeenCalled();
     });

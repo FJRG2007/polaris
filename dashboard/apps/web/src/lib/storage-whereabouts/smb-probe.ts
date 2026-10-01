@@ -157,7 +157,8 @@ export function readChallenge(message: Buffer): Pick<DeviceIdentity, "netbiosNam
     }
     const infoLength = challenge.readUInt16LE(40);
     const infoOffset = challenge.readUInt32LE(44);
-    if (infoOffset + infoLength > challenge.length) throw new Error("the NTLM challenge is cut short");
+    if (infoOffset + infoLength > challenge.length)
+        throw new Error("the NTLM challenge is cut short");
     const info = challenge.subarray(infoOffset, infoOffset + infoLength);
 
     const names: { netbiosName?: string; dnsName?: string } = {};
@@ -178,7 +179,8 @@ export function readChallenge(message: Buffer): Pick<DeviceIdentity, "netbiosNam
 /** Collects whole direct-TCP messages from a socket as they arrive. */
 class Messages {
     private buffer = Buffer.alloc(0);
-    private waiting: { resolve: (message: Buffer) => void; reject: (error: Error) => void } | null = null;
+    private waiting: { resolve: (message: Buffer) => void; reject: (error: Error) => void } | null =
+        null;
     private failure: Error | null = null;
 
     push(chunk: Buffer): void {
@@ -233,7 +235,10 @@ export interface ProbeOptions {
  * Never throws: an address with nothing on it is the common answer during a
  * sweep, and it is an answer, not an error.
  */
-export function probeSmbIdentity(address: string, options: ProbeOptions = {}): Promise<SmbProbeResult> {
+export function probeSmbIdentity(
+    address: string,
+    options: ProbeOptions = {}
+): Promise<SmbProbeResult> {
     const port = options.port ?? 445;
     const connectTimeoutMs = options.connectTimeoutMs ?? 1_500;
     const timeoutMs = options.timeoutMs ?? 5_000;
@@ -262,7 +267,8 @@ export function probeSmbIdentity(address: string, options: ProbeOptions = {}): P
         socket.on("data", (chunk: Buffer) => messages.push(chunk));
         socket.on("error", (error: NodeJS.ErrnoException) => {
             messages.fail(error);
-            if (!connected) finish({ ok: false, reason: "closed", detail: error.code ?? error.message });
+            if (!connected)
+                finish({ ok: false, reason: "closed", detail: error.code ?? error.message });
         });
         socket.on("close", () => messages.fail(new Error("the connection closed")));
 

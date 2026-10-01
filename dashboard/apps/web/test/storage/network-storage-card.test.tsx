@@ -20,7 +20,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 const findStorageAgainAction = vi.fn();
 const setStorageAddressAction = vi.fn();
 
-vi.mock("@/app/(app)/admin/uploads/actions", () => ({ findStorageAgainAction, setStorageAddressAction }));
+vi.mock("@/app/(app)/admin/uploads/actions", () => ({
+    findStorageAgainAction,
+    setStorageAddressAction
+}));
 
 const { NetworkStorageCard } = await import("@/app/(app)/admin/uploads/network-card");
 
@@ -50,21 +53,41 @@ describe("storage on the network", () => {
             view: {
                 ...unknown,
                 address: "192.168.1.134",
-                remembered: { mac: "6c:63:f8:6e:53:50", label: "UNAS-PRO", seenAt: "2026-10-01T12:06:00.000Z" },
+                remembered: {
+                    mac: "6c:63:f8:6e:53:50",
+                    label: "UNAS-PRO",
+                    seenAt: "2026-10-01T12:06:00.000Z"
+                },
                 last: null
             }
         });
         render(withMessages(<NetworkStorageCard storages={[unknown]} />));
 
-        expect(screen.getByText("Not known yet: Polaris learns who it is the next time it answers.")).toBeTruthy();
+        expect(
+            screen.getByText("Not known yet: Polaris learns who it is the next time it answers.")
+        ).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Use this one" }));
-        expect(await screen.findByText(/cannot prove this is it, and its password will be sent there/)).toBeTruthy();
-        expect(setStorageAddressAction).toHaveBeenLastCalledWith({ id: ID, address: "192.168.1.134", accept: false });
+        expect(
+            await screen.findByText(/cannot prove this is it, and its password will be sent there/)
+        ).toBeTruthy();
+        expect(setStorageAddressAction).toHaveBeenLastCalledWith({
+            id: ID,
+            address: "192.168.1.134",
+            accept: false
+        });
 
         fireEvent.click(screen.getByRole("button", { name: "Use it" }));
-        expect(await screen.findByText("Known as UNAS-PRO (6c:63:f8:6e:53:50).", { exact: false })).toBeTruthy();
-        expect(setStorageAddressAction).toHaveBeenLastCalledWith({ id: ID, address: "192.168.1.134", accept: true });
-        expect((screen.getByRole("textbox", { name: "Address" }) as HTMLInputElement).value).toBe("192.168.1.134");
+        expect(
+            await screen.findByText("Known as UNAS-PRO (6c:63:f8:6e:53:50).", { exact: false })
+        ).toBeTruthy();
+        expect(setStorageAddressAction).toHaveBeenLastCalledWith({
+            id: ID,
+            address: "192.168.1.134",
+            accept: true
+        });
+        expect((screen.getByRole("textbox", { name: "Address" }) as HTMLInputElement).value).toBe(
+            "192.168.1.134"
+        );
     });
 
     it("says why an address was refused", async () => {
@@ -81,9 +104,15 @@ describe("storage on the network", () => {
 
     it("will not save an address that is not on a local network", () => {
         render(withMessages(<NetworkStorageCard storages={[unknown]} />));
-        fireEvent.change(screen.getByRole("textbox", { name: "Address" }), { target: { value: "8.8.8.8" } });
-        expect(screen.getByText("Write an address on this network, like 192.168.1.30")).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.change(screen.getByRole("textbox", { name: "Address" }), {
+            target: { value: "8.8.8.8" }
+        });
+        expect(
+            screen.getByText("Write an address on this network, like 192.168.1.30")
+        ).toBeTruthy();
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(
+            true
+        );
     });
 
     it("looks again on demand and shows where it was followed to", async () => {
@@ -93,7 +122,12 @@ describe("storage on the network", () => {
                 address: "192.168.1.134",
                 last: {
                     at: "2026-10-01T12:07:00.000Z",
-                    outcome: { kind: "followed", from: "192.168.1.129", to: "192.168.1.134", mac: "6c:63:f8:6e:53:50" }
+                    outcome: {
+                        kind: "followed",
+                        from: "192.168.1.129",
+                        to: "192.168.1.134",
+                        mac: "6c:63:f8:6e:53:50"
+                    }
                 }
             }
         });

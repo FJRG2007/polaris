@@ -29,15 +29,22 @@ let row: {
     deviceIdentity: unknown;
 };
 
-const updateMany = vi.fn(async (args: { where: { config: string }; data: { config?: string; deviceIdentity?: unknown } }) => {
-    if (args.where.config !== row.config) return { count: 0 };
-    row = {
-        ...row,
-        ...(args.data.config ? { config: args.data.config } : {}),
-        ...(args.data.deviceIdentity !== undefined ? { deviceIdentity: args.data.deviceIdentity } : {})
-    };
-    return { count: 1 };
-});
+const updateMany = vi.fn(
+    async (args: {
+        where: { config: string };
+        data: { config?: string; deviceIdentity?: unknown };
+    }) => {
+        if (args.where.config !== row.config) return { count: 0 };
+        row = {
+            ...row,
+            ...(args.data.config ? { config: args.data.config } : {}),
+            ...(args.data.deviceIdentity !== undefined
+                ? { deviceIdentity: args.data.deviceIdentity }
+                : {})
+        };
+        return { count: 1 };
+    }
+);
 
 vi.mock("@polaris/db", () => ({
     Prisma: { DbNull: null },
@@ -58,7 +65,9 @@ vi.mock("@/lib/storage-alert", () => ({ reportStorageMoved }));
 vi.mock("@/lib/storage-service", () => ({ forgetConnectionState }));
 vi.mock("@/lib/storage-target", () => ({ forgetStorageFailure }));
 vi.mock("@/lib/storage-returns", () => ({ returnFallbackFiles }));
-vi.mock("@/lib/storage-whereabouts/neighbours", () => ({ readNeighbourTable: vi.fn(async () => new Map()) }));
+vi.mock("@/lib/storage-whereabouts/neighbours", () => ({
+    readNeighbourTable: vi.fn(async () => new Map())
+}));
 vi.mock("@/lib/storage-whereabouts/smb-probe", () => ({ probeSmbIdentity: vi.fn() }));
 
 const follow = await import("@/lib/storage-whereabouts/follow");
@@ -90,8 +99,16 @@ function connection(identity: DeviceIdentity | null, host = "192.168.1.129") {
         id: ID,
         name: "UNAS Pro",
         kind: "unifi-unas",
-        config: JSON.stringify({ kind: "unifi-unas", host, username: "fixture-user", secure: true, smbShare: "Share" }),
-        deviceIdentity: identity ? { ...identity, address: host, seenAt: "2026-10-01T10:00:00.000Z" } : null
+        config: JSON.stringify({
+            kind: "unifi-unas",
+            host,
+            username: "fixture-user",
+            secure: true,
+            smbShare: "Share"
+        }),
+        deviceIdentity: identity
+            ? { ...identity, address: host, seenAt: "2026-10-01T10:00:00.000Z" }
+            : null
     };
 }
 
@@ -116,7 +133,12 @@ describe("a NAS whose lease moved", () => {
 
         const outcome = await follow.searchFor(ID);
 
-        expect(outcome).toEqual({ kind: "followed", from: "192.168.1.129", to: "192.168.1.134", mac: NAS.mac });
+        expect(outcome).toEqual({
+            kind: "followed",
+            from: "192.168.1.129",
+            to: "192.168.1.134",
+            mac: NAS.mac
+        });
         expect(hostOf()).toBe("192.168.1.134");
         expect(row.deviceIdentity).toMatchObject({ address: "192.168.1.134", mac: NAS.mac });
         await vi.waitFor(() => expect(reportStorageMoved).toHaveBeenCalled());
@@ -135,7 +157,10 @@ describe("a NAS whose lease moved", () => {
 
     it("is found by sweeping the /24 when the host has not spoken to it yet", async () => {
         connection(NAS);
-        devices.set("192.168.1.20", { serverGuid: "ffffffffffffffffffffffffffff0001", netbiosName: "PRINTER" });
+        devices.set("192.168.1.20", {
+            serverGuid: "ffffffffffffffffffffffffffff0001",
+            netbiosName: "PRINTER"
+        });
         devices.set("192.168.1.134", NAS);
 
         const outcome = await follow.searchFor(ID);
@@ -152,14 +177,19 @@ describe("a NAS whose lease moved", () => {
         const outcome = await follow.searchFor(ID);
 
         expect(outcome).toMatchObject({ kind: "followed", to: "192.168.1.134", mac: NAS.mac });
-        expect(row.deviceIdentity).toMatchObject({ serverGuid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+        expect(row.deviceIdentity).toMatchObject({
+            serverGuid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        });
     });
 });
 
 describe("what must not be followed", () => {
     it("a different SMB server under the same name", async () => {
         connection(NAS);
-        devices.set("192.168.1.134", { serverGuid: "ffffffffffffffffffffffffffff0002", netbiosName: "UNAS-PRO" });
+        devices.set("192.168.1.134", {
+            serverGuid: "ffffffffffffffffffffffffffff0002",
+            netbiosName: "UNAS-PRO"
+        });
         learnedBySweep.set("192.168.1.134", "aa:bb:cc:dd:ee:ff");
 
         const outcome = await follow.searchFor(ID);
@@ -265,12 +295,21 @@ describe("before the password goes anywhere", () => {
 
     it("refuses a different SMB server that picked up the old address", async () => {
         connection(NAS);
-        devices.set("192.168.1.129", { serverGuid: "ffffffffffffffffffffffffffff0003", netbiosName: "DESKTOP-7" });
+        devices.set("192.168.1.129", {
+            serverGuid: "ffffffffffffffffffffffffffff0003",
+            netbiosName: "DESKTOP-7"
+        });
         table.set("192.168.1.129", "aa:bb:cc:dd:ee:01");
-        await expect(follow.confirmBeforeCredentials(row)).rejects.toBeInstanceOf(follow.DeviceNotConfirmed);
+        await expect(follow.confirmBeforeCredentials(row)).rejects.toBeInstanceOf(
+            follow.DeviceNotConfirmed
+        );
         // It went looking for the real one instead, found nothing to follow, and
         // says who holds the address rather than calling the NAS off.
-        expect(await follow.searchFor(ID)).toEqual({ kind: "impostor", address: "192.168.1.129", label: "DESKTOP-7" });
+        expect(await follow.searchFor(ID)).toEqual({
+            kind: "impostor",
+            address: "192.168.1.129",
+            label: "DESKTOP-7"
+        });
         expect(hostOf()).toBe("192.168.1.129");
     });
 
@@ -290,7 +329,10 @@ describe("before the password goes anywhere", () => {
 describe("an address somebody typed", () => {
     it("is refused when a different device answers there and the password is kept", async () => {
         connection(NAS);
-        devices.set("192.168.1.50", { serverGuid: "ffffffffffffffffffffffffffff0004", netbiosName: "OTHER" });
+        devices.set("192.168.1.50", {
+            serverGuid: "ffffffffffffffffffffffffffff0004",
+            netbiosName: "OTHER"
+        });
         await expect(
             follow.identityForEdit(row, { kind: "unifi-unas", host: "192.168.1.50" }, false)
         ).rejects.toBeInstanceOf(follow.AddressRefused);
@@ -306,19 +348,27 @@ describe("an address somebody typed", () => {
     it("keeps the identity when the same device answers there", async () => {
         connection(NAS);
         devices.set("192.168.1.134", NAS);
-        const identity = await follow.identityForEdit(row, { kind: "unifi-unas", host: "192.168.1.134" }, false);
+        const identity = await follow.identityForEdit(
+            row,
+            { kind: "unifi-unas", host: "192.168.1.134" },
+            false
+        );
         expect(identity).toMatchObject({ serverGuid: NAS.serverGuid, address: "192.168.1.134" });
     });
 
     it("forgets the identity when new credentials come with the new address", async () => {
         connection(NAS);
-        expect(await follow.identityForEdit(row, { kind: "unifi-unas", host: "10.0.0.5" }, true)).toBeNull();
+        expect(
+            await follow.identityForEdit(row, { kind: "unifi-unas", host: "10.0.0.5" }, true)
+        ).toBeNull();
         expect(probed).toEqual([]);
     });
 
     it("leaves everything alone when the address did not change", async () => {
         connection(NAS);
-        expect(await follow.identityForEdit(row, { kind: "unifi-unas", host: "192.168.1.129" }, false)).toBeUndefined();
+        expect(
+            await follow.identityForEdit(row, { kind: "unifi-unas", host: "192.168.1.129" }, false)
+        ).toBeUndefined();
     });
 });
 

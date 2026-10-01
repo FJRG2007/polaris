@@ -434,7 +434,8 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
             void whereabouts.rememberAfterSuccess(row).catch(() => undefined);
             return driver;
         } catch (error) {
-            if (!(error instanceof SmbShareRequiredError)) void whereabouts.searchFor(row.id).catch(() => undefined);
+            if (!(error instanceof SmbShareRequiredError))
+                void whereabouts.searchFor(row.id).catch(() => undefined);
             throw error;
         }
     }

@@ -31,7 +31,9 @@ describe("whether it is the same device", () => {
     });
 
     it("is on the GUID alone, as in the limited edition with no neighbour table", () => {
-        expect(compareIdentity(NAS, { serverGuid: NAS.serverGuid, netbiosName: "UNAS-PRO" })).toBe("same");
+        expect(compareIdentity(NAS, { serverGuid: NAS.serverGuid, netbiosName: "UNAS-PRO" })).toBe(
+            "same"
+        );
     });
 
     it("is on the hardware address alone", () => {
@@ -92,13 +94,20 @@ describe("the pieces", () => {
     });
 
     it("reads a stored identity defensively", () => {
-        expect(readRemembered({ ...NAS, address: "192.168.1.129", seenAt: "2026-10-01T12:00:00.000Z" })).toMatchObject(NAS);
+        expect(
+            readRemembered({ ...NAS, address: "192.168.1.129", seenAt: "2026-10-01T12:00:00.000Z" })
+        ).toMatchObject(NAS);
         expect(readRemembered({ mac: "not a mac", address: "x", seenAt: "y" })).toBeNull();
         expect(readRemembered(null)).toBeNull();
     });
 
     it("merges a fresh observation over what was remembered", () => {
-        const merged = mergeIdentity(NAS, { serverGuid: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" }, "192.168.1.134", new Date(0));
+        const merged = mergeIdentity(
+            NAS,
+            { serverGuid: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" },
+            "192.168.1.134",
+            new Date(0)
+        );
         expect(merged).toMatchObject({
             mac: NAS.mac,
             serverGuid: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -109,7 +118,12 @@ describe("the pieces", () => {
 
     it("looks through the /24 nearest first, never at itself or past it", () => {
         const order = neighbourhoodOf("192.168.1.129");
-        expect(order.slice(0, 4)).toEqual(["192.168.1.130", "192.168.1.128", "192.168.1.131", "192.168.1.127"]);
+        expect(order.slice(0, 4)).toEqual([
+            "192.168.1.130",
+            "192.168.1.128",
+            "192.168.1.131",
+            "192.168.1.127"
+        ]);
         expect(order).toHaveLength(253);
         expect(order).not.toContain("192.168.1.129");
         expect(order).not.toContain("192.168.1.0");

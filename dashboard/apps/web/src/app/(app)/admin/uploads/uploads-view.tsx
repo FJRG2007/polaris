@@ -84,7 +84,9 @@ function CheckButton({ which }: { which: StorageCheck }) {
             </div>
             {said && (
                 <p className={cn("text-xs", said.ok ? "text-muted-foreground" : "text-danger")}>
-                    {said.where ? t("uploads.check.result", { where: said.where, detail: said.detail }) : said.detail}
+                    {said.where
+                        ? t("uploads.check.result", { where: said.where, detail: said.detail })
+                        : said.detail}
                 </p>
             )}
         </div>
@@ -130,7 +132,8 @@ function TidyButton() {
         }
         const removed = result.removed ?? 0;
         const failed = result.failed ?? 0;
-        const took = removed === 0 ? t("uploads.tidy.nothing") : t("uploads.tidy.took", { count: removed });
+        const took =
+            removed === 0 ? t("uploads.tidy.nothing") : t("uploads.tidy.took", { count: removed });
         setSaid({
             detail: failed === 0 ? took : t("uploads.tidy.refused", { took, count: failed }),
             failed: failed > 0
@@ -203,7 +206,9 @@ function SaveRow({
                     {saving && <Loader2 className="size-4 animate-spin" />}
                     {tc("actions.save")}
                 </Button>
-                {saved && !dirty && <span className="text-xs text-muted-foreground">{t("uploads.saved")}</span>}
+                {saved && !dirty && (
+                    <span className="text-xs text-muted-foreground">{t("uploads.saved")}</span>
+                )}
             </div>
         </>
     );
@@ -242,7 +247,9 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
             <CardBody className="flex flex-col gap-4 p-4">
                 <div>
                     <h2 className="text-sm font-medium">{t("uploads.attachments.title")}</h2>
-                    <p className="text-xs text-muted-foreground">{t("uploads.attachments.intro")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("uploads.attachments.intro")}
+                    </p>
                 </div>
 
                 <ResolvedTarget
@@ -275,7 +282,11 @@ function AttachmentsCard({ settings }: { settings: UploadSettings }) {
                             setSaved(false);
                         }}
                     />
-                    {!limitValid && <span className="text-xs text-danger">{t("uploads.attachments.range")}</span>}
+                    {!limitValid && (
+                        <span className="text-xs text-danger">
+                            {t("uploads.attachments.range")}
+                        </span>
+                    )}
                 </label>
 
                 <CheckButton which="tasks" />
@@ -346,7 +357,9 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
                 <label className="flex items-start justify-between gap-4">
                     <span className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">{t("uploads.photos.gravatar")}</span>
-                        <span className="text-xs text-muted-foreground">{t("uploads.photos.gravatarHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("uploads.photos.gravatarHint")}
+                        </span>
                     </span>
                     <Switch
                         checked={gravatar}

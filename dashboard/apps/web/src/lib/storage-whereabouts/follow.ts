@@ -57,7 +57,9 @@ const realNetwork: Network = {
     probe: (address, fast) =>
         probeSmbIdentity(
             address,
-            fast ? { connectTimeoutMs: 700, timeoutMs: 3_000 } : { connectTimeoutMs: 2_500, timeoutMs: 6_000 }
+            fast
+                ? { connectTimeoutMs: 700, timeoutMs: 3_000 }
+                : { connectTimeoutMs: 2_500, timeoutMs: 6_000 }
         ),
     neighbours: () => readNeighbourTable()
 };
@@ -94,12 +96,18 @@ export function isFollowable(row: Pick<FollowedRow, "kind" | "config">): boolean
 async function observe(
     address: string,
     options: { fast?: boolean; table?: NeighbourTable; withMac?: boolean } = {}
-): Promise<{ answered: false; reason: "closed" | "refused" } | { answered: true; identity: who.DeviceIdentity }> {
+): Promise<
+    | { answered: false; reason: "closed" | "refused" }
+    | { answered: true; identity: who.DeviceIdentity }
+> {
     const probe = await network.probe(address, options.fast ?? false);
     if (!probe.ok) return { answered: false, reason: probe.reason };
     const table = options.table ?? (options.withMac ? await network.neighbours() : undefined);
     const mac = table?.get(address);
-    return { answered: true, identity: who.normalizeIdentity({ ...probe.identity, ...(mac ? { mac } : {}) }) };
+    return {
+        answered: true,
+        identity: who.normalizeIdentity({ ...probe.identity, ...(mac ? { mac } : {}) })
+    };
 }
 
 /** Compare, and when the SMB answer alone cannot decide, add the hardware
@@ -175,7 +183,9 @@ export async function confirmBeforeCredentials(row: FollowedRow): Promise<void> 
         console.error(
             `storage: ${row.name} - the device at ${address} is not the one this connection remembers (${label ?? "unnamed"}); not signing in`
         );
-        throw new DeviceNotConfirmed(`${row.name} did not answer at ${address}: a different device is there now`);
+        throw new DeviceNotConfirmed(
+            `${row.name} did not answer at ${address}: a different device is there now`
+        );
     }
     verified.set(key, Date.now());
 }
@@ -212,7 +222,11 @@ export async function rememberAfterSuccess(row: FollowedRow): Promise<void> {
     if (!seen.answered || !who.canConfirm(seen.identity)) return;
     // A remembered device that is positively someone else is not overwritten
     // here: the check before sign-in is what decides that, and it refused.
-    if (remembered && who.canConfirm(remembered) && who.compareIdentity(remembered, seen.identity) === "different") {
+    if (
+        remembered &&
+        who.canConfirm(remembered) &&
+        who.compareIdentity(remembered, seen.identity) === "different"
+    ) {
         return;
     }
     await saveIdentity(row, who.mergeIdentity(remembered, seen.identity, address, new Date()));
@@ -297,7 +311,10 @@ export function lastSearch(connectionId: string): SearchRecord | null {
  * again") - which still waits out a short floor, so a held key cannot sweep the
  * network in a loop.
  */
-export function searchFor(connectionId: string, options: { force?: boolean } = {}): Promise<SearchOutcome> {
+export function searchFor(
+    connectionId: string,
+    options: { force?: boolean } = {}
+): Promise<SearchOutcome> {
     const entry = searches.get(connectionId);
     if (entry?.running) return entry.running;
     if (entry?.record) {
@@ -308,7 +325,11 @@ export function searchFor(connectionId: string, options: { force?: boolean } = {
     }
     const startedAt = Date.now();
     const stop = new AbortController();
-    const running = withTimeout(search(connectionId, stop.signal), SEARCH_DEADLINE_MS, "the search took too long")
+    const running = withTimeout(
+        search(connectionId, stop.signal),
+        SEARCH_DEADLINE_MS,
+        "the search took too long"
+    )
         .catch((error: unknown): SearchOutcome => {
             console.error(`storage: looking for ${connectionId} on the network failed:`, error);
             return { kind: "unsupported" };
@@ -389,8 +410,14 @@ async function search(connectionId: string, signal: AbortSignal): Promise<Search
     table = await network.neighbours();
     if (provable) {
         for (const candidate of answered) {
-            const { verdict, identity } = await judge(remembered, candidate.address, candidate.identity, table);
-            if (verdict === "same") return follow(row, remembered, candidate.address, identity, signal);
+            const { verdict, identity } = await judge(
+                remembered,
+                candidate.address,
+                candidate.identity,
+                table
+            );
+            if (verdict === "same")
+                return follow(row, remembered, candidate.address, identity, signal);
         }
         return stranger
             ? { kind: "impostor", address, label: who.deviceLabel(stranger) }
@@ -555,7 +582,8 @@ export async function identityForEdit(
     const remembered = who.readRemembered(row.deviceIdentity);
     if (!remembered || !who.canConfirm(remembered) || !isLocalAddress(after)) return null;
     const check = await checkAddress(row, after);
-    if (check.kind === "same") return who.mergeIdentity(remembered, check.identity, after, new Date());
+    if (check.kind === "same")
+        return who.mergeIdentity(remembered, check.identity, after, new Date());
     if (check.kind === "different") throw new AddressRefused("different", after, check.label);
     if (check.kind === "silent") throw new AddressRefused("silent", after, null);
     return null;

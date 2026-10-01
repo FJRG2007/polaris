@@ -70,17 +70,29 @@ const db = {
     storageFallbackFile: {
         findMany: vi.fn(async ({ where }: { where: { movedAt?: null | { lt: Date } } }) =>
             ledger.filter((row) =>
-                where.movedAt === null ? row.movedAt === null : row.movedAt !== null && row.movedAt < where.movedAt!.lt
+                where.movedAt === null
+                    ? row.movedAt === null
+                    : row.movedAt !== null && row.movedAt < where.movedAt!.lt
             )
         ),
-        updateMany: vi.fn(async ({ where, data }: { where: { id: string; attempts: number }; data: unknown }) => {
-            const row = ledger.find((one) => one.id === where.id && one.attempts === where.attempts && !one.movedAt);
-            if (!row || !data) return { count: 0 };
-            row.attempts += 1;
-            return { count: 1 };
-        }),
+        updateMany: vi.fn(
+            async ({ where, data }: { where: { id: string; attempts: number }; data: unknown }) => {
+                const row = ledger.find(
+                    (one) => one.id === where.id && one.attempts === where.attempts && !one.movedAt
+                );
+                if (!row || !data) return { count: 0 };
+                row.attempts += 1;
+                return { count: 1 };
+            }
+        ),
         update: vi.fn(
-            async ({ where, data }: { where: { id: string }; data: Omit<Partial<Ledger>, "attempts"> & { attempts?: { decrement: number } } }) => {
+            async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Omit<Partial<Ledger>, "attempts"> & { attempts?: { decrement: number } };
+            }) => {
                 const row = ledger.find((one) => one.id === where.id)!;
                 const { attempts, ...rest } = data;
                 Object.assign(row, rest);
@@ -93,12 +105,22 @@ const db = {
         deleteMany: vi.fn(async () => ({ count: 0 }))
     },
     chatAttachment: {
-        updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, string> }) => {
-            if (!("path" in where)) return { count: 0 };
-            const hits = attachments.filter((one) => one.path === where.path && one.connectionId === null);
-            for (const hit of hits) hit.connectionId = data.connectionId!;
-            return { count: hits.length };
-        })
+        updateMany: vi.fn(
+            async ({
+                where,
+                data
+            }: {
+                where: Record<string, unknown>;
+                data: Record<string, string>;
+            }) => {
+                if (!("path" in where)) return { count: 0 };
+                const hits = attachments.filter(
+                    (one) => one.path === where.path && one.connectionId === null
+                );
+                for (const hit of hits) hit.connectionId = data.connectionId!;
+                return { count: hits.length };
+            }
+        )
     },
     chatUpload: none,
     chatScheduledFile: none,

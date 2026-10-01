@@ -101,9 +101,12 @@ export async function testUnasConnectionAction(input: {
     secure?: boolean;
 }): Promise<UnasTestResult> {
     await requirePermission("connections.manage");
-    if (!input.host?.trim()) return { ok: false, error: (await getTranslations("drive"))("errors.consoleHost") };
-    if (!input.username?.trim()) return { ok: false, error: (await getTranslations("drive"))("errors.consoleUser") };
-    if (!input.password) return { ok: false, error: (await getTranslations("drive"))("errors.consolePassword") };
+    if (!input.host?.trim())
+        return { ok: false, error: (await getTranslations("drive"))("errors.consoleHost") };
+    if (!input.username?.trim())
+        return { ok: false, error: (await getTranslations("drive"))("errors.consoleUser") };
+    if (!input.password)
+        return { ok: false, error: (await getTranslations("drive"))("errors.consolePassword") };
     try {
         const metrics = await fetchUnasMetrics({
             host: input.host.trim(),
@@ -132,7 +135,12 @@ export async function detectNasAction(host: string): Promise<NasDetection | { er
     try {
         return await detectHost(host);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.detectFailed") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.detectFailed")
+        };
     }
 }
 
@@ -161,7 +169,12 @@ export async function linkedAccountsAction(provider: string): Promise<LinkedAcco
 export async function createConnectionAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("connections.manage");
     const parsed = createConnectionSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidConnection") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidConnection")
+        };
     const created = await createConnection(
         user.id,
         parsed.data.name,
@@ -196,7 +209,11 @@ export async function updateConnectionAction(
 
     const config = storageConfigSchema.safeParse(input.config);
     if (!config.success)
-        return { error: config.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSettings") };
+        return {
+            error:
+                config.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidSettings")
+        };
 
     // Only validate/replace credentials when the form actually supplied some; a
     // payload of just { kind } means "keep the existing secret".
@@ -206,7 +223,11 @@ export async function updateConnectionAction(
     if (hasSecret) {
         const parsed = storageCredentialsSchema.safeParse(rawCreds);
         if (!parsed.success)
-            return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidCredentials") };
+            return {
+                error:
+                    parsed.error.issues[0]?.message ??
+                    (await getTranslations("drive"))("errors.invalidCredentials")
+            };
         credentials = parsed.data;
     }
 
@@ -220,12 +241,18 @@ export async function updateConnectionAction(
             return {
                 error:
                     caught.check === "different"
-                        ? t("errors.addressDifferent", { address: caught.address, device: caught.label ?? caught.address })
+                        ? t("errors.addressDifferent", {
+                              address: caught.address,
+                              device: caught.label ?? caught.address
+                          })
                         : t("errors.addressSilent", { address: caught.address })
             };
         }
         return {
-            error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.updateFailed")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.updateFailed")
         };
     }
     await recordAudit({
@@ -248,7 +275,10 @@ export async function discoverUnasSharesAction(
         return { shares: await discoverUnasShares(user.id, connectionId) };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.smbUnreachable")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.smbUnreachable")
         };
     }
 }
@@ -263,7 +293,12 @@ export async function setUnasShareAction(
     try {
         await setUnasSmbShare(user.id, connectionId, share);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.smbSaveFailed") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.smbSaveFailed")
+        };
     }
     revalidatePath("/drive");
     return {};
@@ -288,7 +323,12 @@ export async function removeConnectionAction(
 ): Promise<RemoveConnectionResult> {
     const user = await requirePermission("connections.manage");
     const parsed = removeConnectionSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidRemoval") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidRemoval")
+        };
 
     const result = await removeConnection(user.id, connectionId, user.id, parsed.data);
     if (result.error) return result;
@@ -321,12 +361,22 @@ export async function mkdirAction(
         // folder that resolves to is the one whose rules and lock apply.
         driver = await requireDriveDriver(user.id, connectionId, parentPath(target), "write");
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.createFolderDenied")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.createFolderDenied")
+            )
+        };
     }
     try {
         await driver.mkdir(target);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.createFolderFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.createFolderFailed")
+            )
+        };
     } finally {
         await driver.dispose();
     }
@@ -360,7 +410,12 @@ export async function createFileAction(
         // The folder the file really lands in - see mkdirAction.
         driver = await requireDriveDriver(user.id, connectionId, parentPath(target), "write");
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.createFileDenied")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.createFileDenied")
+            )
+        };
     }
     try {
         const empty = new ReadableStream<Uint8Array>({
@@ -370,7 +425,12 @@ export async function createFileAction(
         });
         await driver.writeStream(target, empty, {});
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.createFileFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.createFileFailed")
+            )
+        };
     } finally {
         await driver.dispose();
     }
@@ -400,7 +460,12 @@ export async function deleteEntryAction(
             await driver.dispose();
         }
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.deleteFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.deleteFailed")
+            )
+        };
     }
     await invalidateFolderSizes(connectionId, normalizeRelPath(path));
     await recordAudit({
@@ -432,7 +497,8 @@ export async function generateZipAction(
     const sourcePaths = paths
         .map((entry) => normalizeRelPath(entry))
         .filter((entry) => entry.length > 0);
-    if (sourcePaths.length === 0) return { error: (await getTranslations("drive"))("errors.nothingSelected") };
+    if (sourcePaths.length === 0)
+        return { error: (await getTranslations("drive"))("errors.nothingSelected") };
 
     try {
         for (const source of sourcePaths) {
@@ -440,8 +506,10 @@ export async function generateZipAction(
         }
         await authorizeDrive(user.id, connectionId, normalizeRelPath(destFolder), "write");
     } catch (caught) {
-        if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.selectionLocked") };
-        if (caught instanceof DriveAccessError) return { error: (await getTranslations("drive"))("errors.cannotWrite") };
+        if (caught instanceof DriveLockedError)
+            return { error: (await getTranslations("drive"))("errors.selectionLocked") };
+        if (caught instanceof DriveAccessError)
+            return { error: (await getTranslations("drive"))("errors.cannotWrite") };
         throw caught;
     }
 
@@ -465,7 +533,12 @@ export async function generateZipAction(
             }
         );
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.archiveFailed") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.archiveFailed")
+        };
     } finally {
         await driver.dispose();
     }
@@ -498,15 +571,22 @@ export async function previewArchiveAction(
     try {
         await authorizeDrive(user.id, connectionId, src, "download");
     } catch (caught) {
-        if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.itemLocked") };
-        if (caught instanceof DriveAccessError) return { error: (await getTranslations("drive"))("errors.notAllowed") };
+        if (caught instanceof DriveLockedError)
+            return { error: (await getTranslations("drive"))("errors.itemLocked") };
+        if (caught instanceof DriveAccessError)
+            return { error: (await getTranslations("drive"))("errors.notAllowed") };
         throw caught;
     }
     const driver = await getDriver(connectionId, user.id);
     try {
         return { entries: await listArchiveEntries(driver, src, format, password || undefined) };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.archiveRead") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.archiveRead")
+        };
     } finally {
         await driver.dispose();
     }
@@ -532,8 +612,10 @@ export async function extractArchiveAction(
         await authorizeDrive(user.id, connectionId, src, "download");
         await authorizeDrive(user.id, connectionId, dest, "write");
     } catch (caught) {
-        if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.pathLocked") };
-        if (caught instanceof DriveAccessError) return { error: (await getTranslations("drive"))("errors.cannotWrite") };
+        if (caught instanceof DriveLockedError)
+            return { error: (await getTranslations("drive"))("errors.pathLocked") };
+        if (caught instanceof DriveAccessError)
+            return { error: (await getTranslations("drive"))("errors.cannotWrite") };
         throw caught;
     }
     const driver = await getDriver(connectionId, user.id);
@@ -541,7 +623,12 @@ export async function extractArchiveAction(
     try {
         count = await extractArchiveTo(driver, src, format, dest, password || undefined);
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.extractFailed") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.extractFailed")
+        };
     } finally {
         await driver.dispose();
     }
@@ -595,7 +682,12 @@ export async function emptyFolderAction(
             }
         }
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.emptyFolderFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.emptyFolderFailed")
+            )
+        };
     }
     await invalidateFolderSizes(connectionId, normalizeRelPath(path));
     await recordAudit({
@@ -625,11 +717,18 @@ export async function scheduleDeleteAction(
     try {
         await authorizeDrive(user.id, connectionId, path, "delete");
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.deleteDenied")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.deleteDenied")
+            )
+        };
     }
     const when = new Date(deleteAt);
-    if (Number.isNaN(when.getTime())) return { error: (await getTranslations("drive"))("errors.badDate") };
-    if (when.getTime() <= Date.now()) return { error: (await getTranslations("drive"))("errors.pastDate") };
+    if (Number.isNaN(when.getTime()))
+        return { error: (await getTranslations("drive"))("errors.badDate") };
+    if (when.getTime() <= Date.now())
+        return { error: (await getTranslations("drive"))("errors.pastDate") };
 
     await createScheduledDeletion({
         ownerId: user.id,
@@ -668,7 +767,8 @@ export async function startDriveJobAction(
     paths: string[]
 ): Promise<{ job?: DriveJobView; error?: string }> {
     const user = await requireUser();
-    if (paths.length === 0) return { error: (await getTranslations("drive"))("errors.nothingWasSelected") };
+    if (paths.length === 0)
+        return { error: (await getTranslations("drive"))("errors.nothingWasSelected") };
     if (paths.length > DRIVE_JOB_MAX_PATHS) {
         return { error: (await getTranslations("drive"))("errors.tooManyForJob") };
     }
@@ -681,7 +781,12 @@ export async function startDriveJobAction(
         // selection, before a single file had moved.
         await authorizeDrivePaths(user.id, connectionId, paths, "delete");
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.removeFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.removeFailed")
+            )
+        };
     }
 
     try {
@@ -689,9 +794,12 @@ export async function startDriveJobAction(
             ownerId: user.id,
             connectionId,
             kind,
-            label: (await getTranslations("drive"))(kind === "trash" ? "errors.jobTrash" : "errors.jobDelete", {
-                count: paths.length
-            }),
+            label: (await getTranslations("drive"))(
+                kind === "trash" ? "errors.jobTrash" : "errors.jobDelete",
+                {
+                    count: paths.length
+                }
+            ),
             paths
         });
         await recordAudit({
@@ -707,7 +815,12 @@ export async function startDriveJobAction(
         // files already on their way out has done nothing wrong, and the
         // sentence has to say that is what happened.
         if (caught instanceof AlreadyGoingError) return { error: caught.message };
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.startFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.startFailed")
+            )
+        };
     }
 }
 
@@ -763,7 +876,12 @@ export async function moveToTrashAction(
         await authorizeDrive(user.id, connectionId, path, "delete");
         await moveToTrash(user.id, connectionId, path);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.trashFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.trashFailed")
+            )
+        };
     }
     await recordAudit({
         actorId: user.id,
@@ -783,7 +901,12 @@ export async function restoreTrashAction(id: string): Promise<{ error?: string }
     try {
         await restoreTrash(user.id, id);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.restoreFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.restoreFailed")
+            )
+        };
     }
     revalidatePath("/drive");
     revalidatePath("/drive/trash");
@@ -796,7 +919,12 @@ export async function deleteTrashForeverAction(id: string): Promise<{ error?: st
     try {
         await deleteTrashForever(user.id, id);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.deleteFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.deleteFailed")
+            )
+        };
     }
     revalidatePath("/drive/trash");
     return {};
@@ -808,7 +936,12 @@ export async function emptyTrashAction(): Promise<{ error?: string }> {
     try {
         await emptyTrash(user.id);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.emptyBinFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.emptyBinFailed")
+            )
+        };
     }
     revalidatePath("/drive/trash");
     return {};
@@ -845,7 +978,12 @@ export async function renameAction(
         }
         driver = await requireDriveDriver(user.id, connectionId, from, "rename");
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.renameDenied")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.renameDenied")
+            )
+        };
     }
     try {
         // Moving an item onto its own path is a no-op, not an error.
@@ -867,12 +1005,19 @@ export async function renameAction(
         }
         if (destinationTaken) {
             return {
-                error: (await getTranslations("drive"))("errors.nameTaken", { name: baseName(normalizedTo) })
+                error: (await getTranslations("drive"))("errors.nameTaken", {
+                    name: baseName(normalizedTo)
+                })
             };
         }
         await driver.move(normalizedFrom, normalizedTo);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.moveFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.moveFailed")
+            )
+        };
     } finally {
         await driver.dispose();
     }
@@ -1008,7 +1153,12 @@ export async function moveIntoAction(
         await authorizeDrive(user.id, connectionId, destFolder, "write");
         driver = await requireDriveDriver(user.id, connectionId, from, "rename");
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.moveDenied")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.moveDenied")
+            )
+        };
     }
     const base = baseName(source);
     let destination = normalizeRelPath(destParent ? `${destParent}/${base}` : base);
@@ -1019,7 +1169,12 @@ export async function moveIntoAction(
         destination = await freeName(driver, destination);
         await driver.move(source, destination);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.moveFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.moveFailed")
+            )
+        };
     } finally {
         await driver.dispose();
     }
@@ -1065,7 +1220,12 @@ export async function copyAction(
         await authorizeDrive(user.id, connectionId, destFolder, "write");
         driver = await requireDriveDriver(user.id, connectionId, from, "copy");
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.copyDenied")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.copyDenied")
+            )
+        };
     }
     let destination = "";
     try {
@@ -1075,7 +1235,12 @@ export async function copyAction(
         );
         await copyRecursive(driver, source, destination);
     } catch (caught) {
-        return { error: await driveErrorMessage(caught, (await getTranslations("drive"))("errors.copyFailed")) };
+        return {
+            error: await driveErrorMessage(
+                caught,
+                (await getTranslations("drive"))("errors.copyFailed")
+            )
+        };
     } finally {
         await driver.dispose();
     }
