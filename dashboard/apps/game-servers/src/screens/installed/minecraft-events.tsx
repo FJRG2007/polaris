@@ -22,6 +22,7 @@ import { MATERIAL_LABELS } from "./event-options-gathering";
 import { worldBossFacts } from "./event-options-world-boss";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
+import type { SearchSummary } from "../../lib/minecraft/events/place-search";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
@@ -121,6 +122,31 @@ function prizesLine(t: GameText<"minecraft">, rewards: catalog.Rewards): string 
         );
     }
     return parts.join(" · ") || t("events.prizes.none");
+}
+
+/** Where an event looked for its place and what was in the way, when nowhere would do. */
+function searchLine(t: GameText<"minecraft">, found: SearchSummary): string {
+    const lead = found.from?.near
+        ? t("events.placeSearch.fromNear", {
+              tries: found.tries,
+              near: found.from.near,
+              x: found.from.x,
+              z: found.from.z,
+              reach: found.reach
+          })
+        : found.from
+          ? t("events.placeSearch.fromAt", {
+                tries: found.tries,
+                x: found.from.x,
+                z: found.from.z,
+                reach: found.reach
+            })
+          : t("events.placeSearch.nobody");
+    const sea = found.overSea ? ` ${t("events.placeSearch.overSea")}` : "";
+    const why = found.why
+        .map((one) => t(`events.placeSearch.why.${one.why}`, { count: one.count }))
+        .join(", ");
+    return why ? `${lead}${sea}: ${why}.` : `${lead}${sea}.`;
 }
 
 function lowerFirst(text: string): string {
@@ -593,6 +619,7 @@ export function MinecraftEvents({
             if (answer.outcome === "done") setNote(t("events.givenBack", { name: player }));
             else if (answer.outcome === "offline")
                 setError(t("events.stashOffline", { name: player }));
+            else if (answer.outcome === "later") setError(t("events.stashLater", { name: player }));
             else setError(t("events.stashStillFailed", { name: player }));
         });
     }
@@ -1435,15 +1462,27 @@ export function MinecraftEvents({
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {(view.stashFailures ?? []).map((one) => {
                                 const barrel = one.barrels[0];
-                                const where = barrel
-                                    ? t("events.stashStacks", {
-                                          count: one.missing,
-                                          x: barrel.x,
-                                          y: barrel.y,
-                                          z: barrel.z
-                                      })
-                                    : "";
-                                const detail = [one.event, where, one.note]
+                                const where =
+                                    one.missing === 0
+                                        ? ""
+                                        : barrel
+                                          ? t("events.stashStacks", {
+                                                count: one.missing,
+                                                x: barrel.x,
+                                                y: barrel.y,
+                                                z: barrel.z
+                                            })
+                                          : t("events.stashCount", { count: one.missing });
+                                const levels =
+                                    one.levels > 0
+                                        ? t("events.stashLevels", { count: one.levels })
+                                        : "";
+                                // Written by this version as a word; before it, as a sentence.
+                                const note =
+                                    one.note === "notGiven" || one.note === "experience"
+                                        ? t(`events.stashNote.${one.note}`)
+                                        : one.note;
+                                const detail = [one.event, where, levels, note]
                                     .filter(Boolean)
                                     .join(" - ");
                                 return (
@@ -1530,6 +1569,11 @@ export function MinecraftEvents({
                                         {entry.disqualified.length > 0 &&
                                             ` - ${t("events.disqualified", { names: entry.disqualified.join(", ") })}`}
                                     </p>
+                                    {entry.search && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {searchLine(t, entry.search)}
+                                        </p>
+                                    )}
                                     {(entry.delivered ?? []).length > 0 && (
                                         <p className="text-xs text-muted-foreground">
                                             {t("events.delivered", {

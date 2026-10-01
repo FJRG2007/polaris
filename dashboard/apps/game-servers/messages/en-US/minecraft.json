@@ -1583,6 +1583,23 @@
         "prizesWaiting": "Prizes waiting",
         "givenTheNextTimeEach": "Given the next time each player is on. Kept for 14 days.",
         "history": "History",
+        "placeSearch": {
+            "fromNear": "Looked {tries, plural, one {once} other {# times}} around {near} ({x}, {z}), up to {reach} blocks out",
+            "fromAt": "Looked {tries, plural, one {once} other {# times}} around {x}, {z}, up to {reach} blocks out",
+            "nobody": "Nobody was in the Overworld to look around",
+            "overSea": "and over the sea for a platform",
+            "why": {
+                "homes": "{count} too close to a home",
+                "noGround": "{count} with no ground under them",
+                "water": "{count} over water",
+                "built": "{count} on something built",
+                "uneven": "{count} too rough - steep or wooded",
+                "occupied": "{count} with something in the way",
+                "tooHigh": "{count} too high for the world",
+                "refused": "{count} where blocks were refused",
+                "unloaded": "{count} not loaded in time"
+            }
+        },
         "noEventsHaveRunOn": "No events have run on this server yet.",
         "kinds": {
             "mining-rush": {
@@ -1793,7 +1810,7 @@
             "tooFewActive": "{overworld, select, yes {Only {active} of the {count} players on are active in the Overworld; this event waits for {needed}} other {Only {active} of the {count} players on are active; this event waits for {needed}}}",
             "notNow": "Not now: {reason}",
             "peaceful": "The server is on Peaceful, where hostile mobs vanish as soon as they appear. Set the difficulty to Easy or harder under Rules first.",
-            "pvpBlocked": "Player versus player is Blocked on this server, and a duel needs it. Allow it under Settings first.",
+            "pvpBlocked": "Player versus player is Blocked on this server, and this event needs it. Allow it under Settings first.",
             "needsNewer": "{kind} needs Minecraft 1.16 or later, and this server runs an older one.",
             "anotherOn": "Another event is on. Let it finish or cancel it first.",
             "noneOn": "No event is on",
@@ -1849,15 +1866,22 @@
             "bow": "Bow"
         },
         "thingsNotGivenBack": "Things not given back",
-        "thingsNotGivenBackHint": "Kept safe in their barrels under the arena. Give them back while the player is on, or dismiss it once it is dealt with.",
+        "thingsNotGivenBackHint": "Kept safe by Polaris. Give them back while the player is on, or dismiss it once it is dealt with.",
         "stashStacks": "{count, plural, one {# stack} other {# stacks}} in the barrels at {x} {y} {z}",
+        "stashCount": "{count, plural, one {# stack} other {# stacks}}",
+        "stashLevels": "{count, plural, one {# level} other {# levels}}",
+        "stashLater": "{name}'s things could not be reached just now. Try again in a moment.",
+        "stashNote": {
+            "notGiven": "could not be given back and checked",
+            "experience": "experience not given back"
+        },
         "giveBackNow": "Give back now",
         "givenBack": "{name} has their things back.",
         "stashOffline": "{name} is not on the server. Try again when they are.",
         "stashStillFailed": "Some of {name}'s things still could not be given back.",
         "dismissStash": "Dismiss {name}'s kept things",
         "dismissStashTitle": "Dismiss {name}'s kept things?",
-        "dismissStashHint": "It stops showing here. Whatever is still in the barrels stays there.",
+        "dismissStashHint": "It stops showing here. Anything left in an old barrel stays there; empty ones are removed.",
         "dismissIt": "Dismiss",
         "problems": {
             "itemId": "Write the item as namespace:id, like minecraft:diamond",
@@ -1938,6 +1962,8 @@
         "regeneration": "Regeneration",
         "healthComesBackOnIts": "Health comes back on its own.",
         "circleRadiusBlocks": "Circle radius (blocks)",
+        "fistsOnly": "Fists only, nobody dies",
+        "fistsOnlyHint": "Players join and come with nothing: their things are kept and given back after, nobody can die, and pushing wins the circle.",
         "between3And20": "Between 3 and 20.",
         "waves": "Waves",
         "3To10": "3 to 10",

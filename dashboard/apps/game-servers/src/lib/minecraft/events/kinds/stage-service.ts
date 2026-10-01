@@ -20,6 +20,7 @@ import * as speech from "../../speech";
 import * as written from "../messages";
 import type { EventRun, Point } from "../state";
 import type { ServerContainer } from "../../service";
+import type { PlaceRefusal } from "../place-search";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
@@ -40,9 +41,9 @@ export interface StageTools {
     /** A site found by the same rules every event uses; null while still looking.
      *  Throws once it has given up. */
     findSite(place: catalog.EventPlace, radius: number): Promise<Point | null>;
-    /** A site that would not do: let go of, and another looked for. Throws once
-     *  there have been too many. */
-    giveUpSite(point: Point): Promise<void>;
+    /** A site that would not do, for the reason given: let go of, and another
+     *  looked for. Throws once there have been too many. */
+    giveUpSite(point: Point, why?: PlaceRefusal): Promise<void>;
     /** What was said in the chat since the last time this was asked. */
     chat(): Promise<string | null>;
     /** Who, in lower case, is still owed a trip back from an earlier stage or arena. */
@@ -254,7 +255,7 @@ async function raise(
         const over = layoutAt(loop.run, ground, y).volume.y2 - (top - 1);
         if (over > 0) y -= over;
         if (y - ground.y < LEAST_HEIGHT) {
-            await tools.giveUpSite(ground);
+            await tools.giveUpSite(ground, "tooHigh");
             return;
         }
         const area = stage.areaOf(layoutAt(loop.run, ground, y).volume);
@@ -339,7 +340,7 @@ async function provedEmpty(
     change(loop, { origin: null, area: null, waits: 0 });
     await tools.persist();
     if (area) await server.sayAll([stage.releaseArea(area)]);
-    if (ground) await tools.giveUpSite(ground);
+    if (ground) await tools.giveUpSite(ground, unloaded ? "unloaded" : "occupied");
     return false;
 }
 
@@ -398,33 +399,15 @@ async function admit(
     await tools.persist();
     // Nor until what they carry is kept too (`stash`): they come in empty-handed.
     if (await tools.canStash()) {
-        const volume = layout.volume;
-        const candidates = stash.spotsUnder({
-            x1: volume.x1,
-            z1: volume.z1,
-            x2: volume.x2,
-            z2: volume.z2,
-            y: volume.y1
-        });
         for (const one of fresh) {
-            const taken = state(loop).saved.flatMap((each) =>
-                each.stash ? [...each.stash.barrels, ...each.stash.casing] : []
-            );
-            await stashService.stashIn(
-                server,
-                tools.stashOwner,
-                one.name,
-                candidates,
-                taken,
-                async (kept) => {
-                    change(loop, {
-                        saved: state(loop).saved.map((each) =>
-                            same(each.name, one.name) ? { ...each, stash: kept } : each
-                        )
-                    });
-                    await tools.persist();
-                }
-            );
+            await stashService.stashIn(server, tools.stashOwner, one.name, async (kept) => {
+                change(loop, {
+                    saved: state(loop).saved.map((each) =>
+                        same(each.name, one.name) ? { ...each, stash: kept } : each
+                    )
+                });
+                await tools.persist();
+            });
         }
     }
     const places = layout.kind === "spleef" ? spleef.spots(layout.arena, fresh.length) : [];
@@ -483,24 +466,26 @@ async function returnOne(
     language: speech.Speech,
     keep: (kept: stash.Stash | null) => Promise<void>
 ): Promise<boolean> {
-    // The event's items off, then their own things back into their slots, then
-    // home - where anything whose slot was taken is dropped at their feet.
-    let home = false;
-    const goHome = async (): Promise<boolean> =>
-        (home = stage.returned(await server.say([stage.returnLine(saved)])));
-    const giveBack = async (then?: () => Promise<boolean>): Promise<boolean> => {
+    // Their own things back only once they are home and down: nothing is given
+    // back to a player who could still fall with it.
+    const giveBack = async (): Promise<boolean> => {
+        const down = await stashService.settle(server, saved.name, (name) =>
+            stage.fallProof(name, 5)
+        );
         if (!saved.stash) return true;
-        await server.sayAll([stage.clearMarked(saved.name, items)]);
-        const how = await stashService.giveBack(server, saved.name, saved.stash, keep, then);
+        if (!down) return false;
+        const how = await stashService.giveBack(server, saved.name, saved.stash, keep);
         return how === "done" || how === "failed";
     };
     // Nothing from here on can make them fall to their death.
     await server.sayAll(stage.fallProof(saved.name));
-    // Sent back by an end that was stopped before it wrote so: not moved again.
+    // Sent home already, by an end that stopped before it gave everything back:
+    // not moved again, only given what they are still owed.
     const say = (line: string) => server.say([line]);
     if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return giveBack();
-    if (!(await giveBack(goHome))) return false;
-    if (!home && !(await goHome())) return false;
+    // The event's items off, then home, then - there - their own game mode.
+    await server.sayAll([stage.clearMarked(saved.name, items)]);
+    if (!stage.returned(await server.say([stage.returnLine(saved)]))) return false;
     await server.sayAll(
         stage.afterReturnLines(
             saved,
@@ -508,7 +493,7 @@ async function returnOne(
             messages.tag(language) + messages.backWhereYouWere(language)
         )
     );
-    return true;
+    return giveBack();
 }
 
 /** Gone from the arena by their own doing: another world, or far off. */
@@ -870,9 +855,6 @@ export async function settle(
                 .readWhere(await server.say([commands.WHERE]))
                 .map((one) => one.name.toLowerCase())
         );
-        // Their barrels are under the floor: loaded while they are given back.
-        if (leftover.area && saved.some((one) => one.stash))
-            await server.sayAll([stage.holdArea(leftover.area)]);
         const still: stage.Saved[] = [];
         for (const one of saved) {
             let current = one;

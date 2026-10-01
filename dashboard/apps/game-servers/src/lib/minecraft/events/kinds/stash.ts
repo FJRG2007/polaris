@@ -4,36 +4,49 @@
  * An arena or a stage hands out a kit - a sword, a shovel, glass to build with -
  * or asks everybody to come in empty-handed, and a player's own things must never
  * be lost to it: not to a kit cleared at the end, not to a restart, not to a
- * player who logs off halfway. So on the way in, every one of the 41 slots a
- * player has (the hotbar, the bag, the armour and the offhand) is copied - whole,
- * with every enchantment, name and shulker's contents - into two barrels that are
- * the event's own, the copy is read back and checked, and only then is the slot
- * emptied. On the way out, after the kit is taken back, each slot is copied back
- * from its barrel into the same slot if that slot is empty, or dropped at the
- * player's feet as theirs if it is not; the barrel slot is emptied only once the
- * player is seen to have it. Nothing is ever given back twice: a barrel slot that
- * is already empty was already given back.
+ * player who logs off halfway, not to a fall on the way home.
  *
- * The barrels sit under the event's own floor, cased in barrier so nobody can
- * reach them, in air only, in the columns the event keeps loaded. `item` is
- * 1.17's: an older server keeps today's behaviour, the kit beside what they carry.
+ * On the way in, every stack in the 41 slots every version has (the hotbar, the
+ * bag, the armor and the offhand) is written to the database whole - its slot,
+ * id, count and the raw data the server wrote, the same lossless form an
+ * inventory export takes (`inventory-transfer`) - with the player's experience,
+ * and only once that is written is the slot emptied and the experience taken.
+ *
+ * On the way out, once they are home and standing on something, each stack goes
+ * back through the same checked slot write an import uses: into the slot it came
+ * from when that slot is empty, read back and compared; dropped at their feet as
+ * theirs, read back and compared, when it is not. A stack is let go of only once
+ * it is seen given back, and a stack already in its own slot was given back
+ * before a restart - nothing is ever given twice. A player who is not on gets it
+ * all when they are.
+ *
+ * A stack a command cannot carry - one whose data is too long for a command, or
+ * whose reply was too long to read whole - is never taken: it stays where it is.
+ *
+ * Before this, the stacks were copied into two barrels under the event's floor,
+ * cased in barrier. `barrels` and `casing` are kept for a stash written that
+ * way: its stacks are given back from its database copy all the same, and the
+ * blocks it placed are taken away once it is done - only where they still are
+ * the barrel or barrier it placed.
  *
  * Pure: the lines, the layout and the checks. The talking is `stash-service`.
  */
 
 import { z } from "zod";
-import { replaceSlot } from "../../item-argument";
 import type { InventoryItem } from "../../inventory";
+import { itemArgument, replaceSlot } from "../../item-argument";
+import { COMMAND_BYTES_MAX, commandBytes } from "../../command-size";
 
 const pointSchema = z.object({ x: z.number().int(), y: z.number().int(), z: z.number().int() });
 
 export type Spot = z.infer<typeof pointSchema>;
 
-/** One slot kept: where it was, which barrel and slot it sits in, and what it is. */
+/** One slot kept: where it was, and what it is. `barrel` and `container` only
+ *  on a stash kept in barrels, before this. */
 const keptSchema = z.object({
     slot: z.number().int(),
-    barrel: z.number().int().min(0).max(1),
-    container: z.number().int().min(0).max(26),
+    barrel: z.number().int().min(0).max(1).optional(),
+    container: z.number().int().min(0).max(26).optional(),
     id: z.string(),
     count: z.number().int(),
     /** A digest of the stack's own data, to tell it from another of the same id. */
@@ -42,27 +55,34 @@ const keptSchema = z.object({
 
 export type Kept = z.infer<typeof keptSchema>;
 
+/** Experience as the game counts it: whole levels, and the points into the next. */
+const experienceSchema = z.object({
+    levels: z.number().int().min(0),
+    points: z.number().int().min(0)
+});
+
+export type Experience = z.infer<typeof experienceSchema>;
+
 export const stashSchema = z.object({
-    /** The two barrels, in order. */
-    barrels: z.array(pointSchema).max(2),
-    /** The barrier around them: taken away with them, and only what was placed. */
+    /** A stash kept in barrels, before this: the two barrels, in order. */
+    barrels: z.array(pointSchema).max(2).default([]),
+    /** And the barrier round them: taken away with them, and only what was placed. */
     casing: z.array(pointSchema).default([]),
-    /** Every slot still in a barrel. Emptied as each is given back. */
+    /** Every slot still owed. Emptied as each is given back. */
     kept: z.array(keptSchema).default([]),
-    /** `taking` from the moment the copy was checked until the slots are seen
+    /** The experience taken, until it is given back. */
+    experience: experienceSchema.nullable().default(null),
+    /** `taking` from the moment the copy was written until the slots are seen
      *  emptied - a stack still in its slot then was never taken; `stashed` after;
      *  `failed` for a give-back that could not finish. */
     state: z.enum(["taking", "stashed", "failed"]).default("stashed"),
-    /** The snapshot row kept in the database for this stash. */
+    /** The database row that holds each stack whole. */
     record: z.string().nullable().default(null)
 });
 
 export type Stash = z.infer<typeof stashSchema>;
 
-/** A barrel holds 27 stacks; 41 slots take two. */
-export const BARREL_SLOTS = 27;
-
-/** The slots kept, in the order they are laid into the barrels. */
+/** The slots kept, in the game's own numbering. */
 export const SLOTS: readonly number[] = [
     ...Array.from({ length: 36 }, (_unused, index) => index),
     100,
@@ -72,213 +92,21 @@ export const SLOTS: readonly number[] = [
     -106
 ];
 
-/** Where the stack from a slot is kept: its place in `SLOTS`, over two barrels. */
-export function keptAt(slot: number): { barrel: number; container: number } | null {
-    const index = SLOTS.indexOf(slot);
-    if (index < 0) return null;
-    return { barrel: Math.floor(index / BARREL_SLOTS), container: index % BARREL_SLOTS };
-}
-
-/** The stacks that are kept: those in the 41 slots every version has. A modded
- *  slot - a backpack, a ring - is none of this, and is left where it is. */
+/**
+ * The stacks that are kept: those in the 41 slots every version has, that a
+ * command can write back whole. A modded slot - a backpack, a ring - is none of
+ * this and is left where it is, and so is a stack too big for a command.
+ */
 export function keepable(items: readonly InventoryItem[]): InventoryItem[] {
     return items.filter(
         (item) =>
-            keptAt(item.slot) !== null &&
+            SLOTS.includes(item.slot) &&
             replaceSlot(item.slot) !== null &&
+            itemArgument(item).ok &&
             // The event's own kit is the event's, cleared at the end - never kept.
             !(item.data?.snbt.includes("polaris_event") ?? false)
     );
 }
-
-const WORLD = "execute in minecraft:overworld run";
-
-const at = (spot: Spot) => `${spot.x} ${spot.y} ${spot.z}`;
-
-// ------------------------------------------------------------------ where
-
-/**
- * Every block one stash takes, barrels first: two barrels side by side, the
- * barrier under them and round their four sides. What is over them is the
- * event's own floor.
- */
-export function blocksAt(origin: Spot): { barrels: Spot[]; casing: Spot[] } {
-    const { x, y, z } = origin;
-    return {
-        barrels: [
-            { x, y, z },
-            { x: x + 1, y, z }
-        ],
-        casing: [
-            { x, y: y - 1, z },
-            { x: x + 1, y: y - 1, z },
-            { x: x - 1, y, z },
-            { x: x + 2, y, z },
-            { x, y, z: z - 1 },
-            { x: x + 1, y, z: z - 1 },
-            { x, y, z: z + 1 },
-            { x: x + 1, y, z: z + 1 }
-        ]
-    };
-}
-
-/**
- * Where stashes can go under a floor: every fourth column along it, every third
- * row across, one block under the floor's own layer - so two stashes never touch
- * and each is covered by the floor above it.
- */
-export function spotsUnder(floor: {
-    readonly x1: number;
-    readonly z1: number;
-    readonly x2: number;
-    readonly z2: number;
-    readonly y: number;
-}): Spot[] {
-    const spots: Spot[] = [];
-    const [x1, x2] = [Math.min(floor.x1, floor.x2), Math.max(floor.x1, floor.x2)];
-    const [z1, z2] = [Math.min(floor.z1, floor.z2), Math.max(floor.z1, floor.z2)];
-    for (let z = z1 + 1; z <= z2 - 1; z += 3) {
-        for (let x = x1 + 1; x + 2 <= x2; x += 4) spots.push({ x, y: floor.y - 1, z });
-    }
-    return spots;
-}
-
-/** One question: are all of these air? `Test passed` when they are. */
-export function allAir(spots: readonly Spot[]): string {
-    return `execute in minecraft:overworld ${spots.map((spot) => `if block ${at(spot)} minecraft:air`).join(" ")}`;
-}
-
-/** Put down into air only: the barrels, then their casing. */
-export function placeLines(blocks: {
-    barrels: readonly Spot[];
-    casing: readonly Spot[];
-}): string[] {
-    return [
-        ...blocks.barrels.map((spot) => `${WORLD} setblock ${at(spot)} minecraft:barrel keep`),
-        ...blocks.casing.map((spot) => `${WORLD} setblock ${at(spot)} minecraft:barrier keep`)
-    ];
-}
-
-/** Whether a block is still what was put there. */
-export function isBlock(spot: Spot, block: "minecraft:barrel" | "minecraft:barrier"): string {
-    return `execute in minecraft:overworld if block ${at(spot)} ${block}`;
-}
-
-/**
- * Taken away again, and only where the block is still the one placed: an empty
- * barrel (checked first by the caller), the barrier round it.
- */
-export function removeLines(stash: Pick<Stash, "barrels" | "casing">): string[] {
-    return [
-        ...stash.barrels.map(
-            (spot) =>
-                `execute in minecraft:overworld if block ${at(spot)} minecraft:barrel run setblock ${at(spot)} minecraft:air`
-        ),
-        ...stash.casing.map(
-            (spot) =>
-                `execute in minecraft:overworld if block ${at(spot)} minecraft:barrier run setblock ${at(spot)} minecraft:air`
-        )
-    ];
-}
-
-// ------------------------------------------------------------------ in
-
-/** A slot copied into its barrel. */
-export function copyIn(name: string, barrels: readonly Spot[], slot: number): string | null {
-    const where = keptAt(slot);
-    const named = replaceSlot(slot);
-    const barrel = where ? barrels[where.barrel] : undefined;
-    if (!where || !named || !barrel) return null;
-    return `${WORLD} item replace block ${at(barrel)} container.${where.container} from entity ${name} ${named}`;
-}
-
-/** A slot emptied, once its copy was checked. */
-export function emptySlot(name: string, slot: number): string | null {
-    const named = replaceSlot(slot);
-    return named ? `item replace entity ${name} ${named} with minecraft:air` : null;
-}
-
-// ------------------------------------------------------------------ out
-
-/** A kept stack copied back into the slot it came from. */
-export function copyBack(name: string, barrels: readonly Spot[], kept: Kept): string | null {
-    const named = replaceSlot(kept.slot);
-    const barrel = barrels[kept.barrel];
-    if (!named || !barrel) return null;
-    return `${WORLD} item replace entity ${name} ${named} from block ${at(barrel)} container.${kept.container}`;
-}
-
-/** The tag a stack dropped for somebody carries until it is checked. */
-export function dropTag(kept: Kept): string {
-    return `pe_sd${kept.barrel}_${kept.container}`;
-}
-
-/**
- * A kept stack whose slot is taken now, dropped at the player's feet as theirs:
- * an item that never despawns and only they can pick up, holding the barrel's
- * copy exactly. Nobody can pick it up until it is checked (`releaseDrop`): a
- * player standing there would otherwise take the placeholder it starts as.
- */
-export function dropLines(name: string, barrels: readonly Spot[], kept: Kept): string[] {
-    const barrel = barrels[kept.barrel];
-    if (!barrel) return [];
-    const tag = dropTag(kept);
-    const it = `@e[type=minecraft:item,tag=${tag},limit=1]`;
-    return [
-        `execute at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:stone",count:1},Tags:["${tag}"],PickupDelay:32767,Age:-32768}`,
-        `execute as ${it} run item replace entity @s contents from block ${at(barrel)} container.${kept.container}`,
-        `execute as ${it} run data modify entity @s Owner set from entity ${name} UUID`
-    ];
-}
-
-/**
- * The same drop as the game wrote items before 1.20.5, sent after `dropLines`
- * in the same batch: there the summon above makes an empty item (its `count`
- * is not read), which is gone at once. So the placeholder with `Count`, only
- * where no drop is lying, and the copy taken from the barrel's list of items
- * (an item entity has no `contents` slot there), only onto an item written the
- * old way. What the copy carries of its barrel slot is taken off again.
- */
-export function legacyDropLines(name: string, barrels: readonly Spot[], kept: Kept): string[] {
-    const barrel = barrels[kept.barrel];
-    if (!barrel) return [];
-    const tag = dropTag(kept);
-    const it = `@e[type=minecraft:item,tag=${tag},limit=1]`;
-    return [
-        `execute unless entity @e[type=minecraft:item,tag=${tag}] at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:stone",Count:1b},Tags:["${tag}"],PickupDelay:32767,Age:-32768}`,
-        `execute as ${it} unless data entity @s Item.count run data modify entity @s Item set from block ${at(barrel)} Items[{Slot:${kept.container}b}]`,
-        `execute as ${it} run data remove entity @s Item.Slot`,
-        `execute as ${it} run data modify entity @s Owner set from entity ${name} UUID`
-    ];
-}
-
-/** The dropped stack, read back to check it holds the copy. */
-export function readDrop(kept: Kept): string {
-    return `data get entity @e[type=minecraft:item,tag=${dropTag(kept)},limit=1] Item`;
-}
-
-/** Checked: theirs to pick up, and from then on simply their item. */
-export function releaseDrop(kept: Kept): string[] {
-    const tag = dropTag(kept);
-    return [
-        `execute as @e[type=minecraft:item,tag=${tag}] run data modify entity @s PickupDelay set value 0s`,
-        `tag @e[type=minecraft:item,tag=${tag}] remove ${tag}`
-    ];
-}
-
-/** Not what it should hold: taken away again. The stack is still in its barrel. */
-export function discardDrop(kept: Kept): string {
-    return `kill @e[type=minecraft:item,tag=${dropTag(kept)}]`;
-}
-
-/** A barrel slot emptied once the player is seen to have what was in it. */
-export function emptyKept(barrels: readonly Spot[], kept: Kept): string | null {
-    const barrel = barrels[kept.barrel];
-    if (!barrel) return null;
-    return `${WORLD} item replace block ${at(barrel)} container.${kept.container} with minecraft:air`;
-}
-
-// ------------------------------------------------------------------ checks
 
 /** Two stacks the same: id, count and data. `digest` turns a stack's data into
  *  the same short form a `Kept` holds. */
@@ -295,42 +123,159 @@ export function sameStack(
     );
 }
 
-/**
- * What to keep, from what a player carries: each stack with its barrel and slot.
- */
+/** What to keep, from what a player carries. */
 export function keepFrom(
     items: readonly InventoryItem[],
     digest: (item: InventoryItem) => string | null
 ): Kept[] {
-    return keepable(items).map((item) => {
-        const where = keptAt(item.slot)!;
-        return {
-            slot: item.slot,
-            barrel: where.barrel,
-            container: where.container,
-            id: item.id,
-            count: item.count,
-            data: digest(item)
-        };
-    });
+    return keepable(items).map((item) => ({
+        slot: item.slot,
+        id: item.id,
+        count: item.count,
+        data: digest(item)
+    }));
+}
+
+/** A slot emptied, once its copy is written. */
+export function emptySlot(name: string, slot: number): string | null {
+    const named = replaceSlot(slot);
+    return named ? `item replace entity ${name} ${named} with minecraft:air` : null;
+}
+
+// ------------------------------------------------------------------ experience
+
+export function readLevels(name: string): string {
+    return `xp query ${name} levels`;
+}
+
+export function readPoints(name: string): string {
+    return `xp query ${name} points`;
+}
+
+/** `Ana has 12 experience levels` / `Ana has 5 experience points`. Null when
+ *  it is not that answer - the player is not on. */
+export function readExperienceCount(output: string): number | null {
+    const match = /has (\d+) experience (?:levels?|points?)/i.exec(output);
+    return match ? Number(match[1]) : null;
+}
+
+/** Their experience set to exactly this: levels first, then the points into the next. */
+export function setExperience(name: string, experience: Experience): string[] {
+    return [
+        `xp set ${name} ${experience.levels} levels`,
+        `xp set ${name} ${experience.points} points`
+    ];
+}
+
+/** Their experience added to: the levels, then the points - which run on into
+ *  the next level as the game counts them. */
+export function addExperience(name: string, experience: Experience): string[] {
+    return [
+        `xp add ${name} ${experience.levels} levels`,
+        `xp add ${name} ${experience.points} points`
+    ];
+}
+
+// ------------------------------------------------------------------ out
+
+/** The tag a stack dropped for somebody carries until it is checked: one per
+ *  stash and slot, so a drop left by a stopped give-back is found again. */
+export function dropTag(record: string | null, slot: number): string {
+    const owner = (record ?? "x").replace(/[^A-Za-z0-9]/g, "").slice(-8);
+    return `pe_gb${owner}_${SLOTS.indexOf(slot)}`;
 }
 
 /**
- * Whether the barrels hold exactly the copy: every kept stack in its barrel slot,
- * and nothing else in either barrel.
+ * A kept stack whose slot is taken now, dropped at the player's feet as theirs:
+ * an item that never despawns and nobody can pick up until it is checked, then
+ * only they can. Written the way the stack's own data is - a count and
+ * components from 1.20.5, a `Count` and a tag before - and, for a stack with no
+ * data, both: the second only where the first made nothing (an older server
+ * reads no `count` and drops an empty stack at once). Tagged for its stash and
+ * slot (`dropTag`). Null when a line would be longer than a command can be.
  */
-export function copiedWhole(
-    kept: readonly Kept[],
-    barrels: readonly (readonly InventoryItem[])[],
-    digest: (item: InventoryItem) => string | null
-): boolean {
-    for (const [index, held] of barrels.entries()) {
-        const wanted = kept.filter((one) => one.barrel === index);
-        if (held.length !== wanted.length) return false;
-        for (const one of wanted) {
-            const item = held.find((stack) => stack.slot === one.container);
-            if (!sameStack(one, item, digest)) return false;
-        }
-    }
-    return true;
+export function dropLines(
+    name: string,
+    item: InventoryItem,
+    record: string | null
+): string[] | null {
+    const tag = dropTag(record, item.slot);
+    const it = `@e[type=minecraft:item,tag=${tag}]`;
+    const tail = `Tags:["${tag}"],PickupDelay:32767,Age:-32768`;
+    const modern = `execute unless entity ${it} at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"${item.id}",count:${item.count}${item.data?.era === "components" ? `,components:${item.data.snbt}` : ""}},${tail}}`;
+    const legacy = `execute unless entity ${it} at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"${item.id}",Count:${item.count}b${item.data?.era === "tag" ? `,tag:${item.data.snbt}` : ""}},${tail}}`;
+    const lines =
+        item.data === null
+            ? [modern, legacy]
+            : item.data.era === "components"
+              ? [modern]
+              : [legacy];
+    return lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX) ? lines : null;
+}
+
+/** The dropped stack, read back to check it holds the copy. */
+export function readDrop(tag: string): string {
+    return `data get entity @e[type=minecraft:item,tag=${tag},limit=1] Item`;
+}
+
+/** Checked: only they can pick it up, from now. */
+export function releaseDrop(name: string, tag: string): string[] {
+    const it = `@e[type=minecraft:item,tag=${tag}]`;
+    return [
+        `execute as ${it} run data modify entity @s Owner set from entity ${name} UUID`,
+        `execute as ${it} run data modify entity @s PickupDelay set value 0s`,
+        `tag ${it} remove ${tag}`
+    ];
+}
+
+/** Not what it should hold: taken away again. The stack is still owed. */
+export function discardDrop(tag: string): string {
+    return `kill @e[type=minecraft:item,tag=${tag}]`;
+}
+
+// ------------------------------------------------------------------ home, and down
+
+/**
+ * Whether somebody is still in the air: nothing under their feet. Standing,
+ * swimming or sinking in water all count as down - there is nothing left to fall.
+ * `Test passed` while they are up.
+ */
+export function airborne(name: string): string {
+    return `execute as ${name} at @s if block ~ ~-0.2 ~ minecraft:air if block ~ ~-1.2 ~ minecraft:air`;
+}
+
+// ------------------------------------------------------------------ the barrels, before this
+
+/** Whether a block is still what a stash kept in barrels placed there. */
+export function isBlock(spot: Spot, block: "minecraft:barrel" | "minecraft:barrier"): string {
+    return `execute in minecraft:overworld if block ${spot.x} ${spot.y} ${spot.z} ${block}`;
+}
+
+/** A barrel slot emptied once what it held is given back from the database copy. */
+export function emptyBarrelSlot(barrels: readonly Spot[], kept: Kept): string | null {
+    const barrel = kept.barrel === undefined ? undefined : barrels[kept.barrel];
+    if (!barrel || kept.container === undefined) return null;
+    return `execute in minecraft:overworld run item replace block ${barrel.x} ${barrel.y} ${barrel.z} container.${kept.container} with minecraft:air`;
+}
+
+/** A kept stack copied from its barrel slot into the player's slot it came from. */
+export function copyFromBarrel(name: string, barrels: readonly Spot[], kept: Kept): string | null {
+    const barrel = kept.barrel === undefined ? undefined : barrels[kept.barrel];
+    const named = replaceSlot(kept.slot);
+    if (!barrel || kept.container === undefined || !named) return null;
+    return `execute in minecraft:overworld run item replace entity ${name} ${named} from block ${barrel.x} ${barrel.y} ${barrel.z} container.${kept.container}`;
+}
+
+/**
+ * The blocks a stash in barrels placed, taken away - each only where it still is
+ * the block that was placed: a barrel (checked empty first by the caller), the
+ * barrier round it.
+ */
+export function removeLines(stash: Pick<Stash, "barrels" | "casing">): string[] {
+    const air = (spot: Spot, block: string) =>
+        `execute in minecraft:overworld if block ${spot.x} ${spot.y} ${spot.z} ${block} run setblock ${spot.x} ${spot.y} ${spot.z} minecraft:air`;
+    return [
+        ...stash.barrels.map((spot) => air(spot, "minecraft:barrel")),
+        ...stash.casing.map((spot) => air(spot, "minecraft:barrier"))
+    ];
 }

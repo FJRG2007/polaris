@@ -104,7 +104,7 @@ const savedSchema = z.object({
     yaw: z.number(),
     pitch: z.number(),
     mode: z.enum(["survival", "adventure"]),
-    /** What they carried, kept in barrels until it is given back (`stash`). */
+    /** What they carried, kept until it is given back (`stash`). */
     stash: stashSchema.nullable().default(null)
 });
 
