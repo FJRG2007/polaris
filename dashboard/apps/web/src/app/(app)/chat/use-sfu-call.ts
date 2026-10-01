@@ -1487,9 +1487,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             connecting = true;
             const ticket = await actions
                 .callTokenAction(inCall)
-                .catch(
-                    () => ({ error: t("errors.callUnreachable") }) as CallTicket
-                );
+                .catch(() => ({ error: t("errors.callUnreachable") }) as CallTicket);
             // Released on every path that gives up before there is a room to guard
             // the attempt instead. `waiting` in particular: somebody in the lobby is
             // told "not yet", and the next roster change has to be able to try again.

@@ -147,7 +147,9 @@ export function PersonMenu({
                     ) : (
                         <VolumeX className="size-3.5" />
                     )}
-                    {volume === 0 ? t("callMenus.letThemThrough") : t("callMenus.silenceThemForYou")}
+                    {volume === 0
+                        ? t("callMenus.letThemThrough")
+                        : t("callMenus.silenceThemForYou")}
                 </ContextMenuItem>
 
                 {/* The way to combine with somebody this browser did not hear -
@@ -166,7 +168,9 @@ export function PersonMenu({
                         disabled={combineAsked || combineLocked}
                     >
                         <Users className="size-3.5" />
-                        {combineAsked ? t("callMenus.askedToCombine") : t("callMenus.askThemToCombineAudio")}
+                        {combineAsked
+                            ? t("callMenus.askedToCombine")
+                            : t("callMenus.askThemToCombineAudio")}
                     </ContextMenuItem>
                 )}
                 {(onCombine || onAskCombine) && combineLocked && (

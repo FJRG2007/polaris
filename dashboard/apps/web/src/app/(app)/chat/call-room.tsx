@@ -589,7 +589,9 @@ export function CallRoom({
                             type="button"
                             onClick={() => onExpand(!expanded)}
                             aria-pressed={expanded}
-                            aria-label={expanded ? t("callRoom.shrinkTheCall") : t("callRoom.expandTheCall")}
+                            aria-label={
+                                expanded ? t("callRoom.shrinkTheCall") : t("callRoom.expandTheCall")
+                            }
                             title={
                                 expanded
                                     ? t("callRoom.shrinkTheCallTheConversation")
@@ -611,10 +613,16 @@ export function CallRoom({
                                 call.recording ? held?.recording.stop() : setAsking(true)
                             }
                             aria-pressed={call.recording}
-                            aria-label={call.recording ? t("callRoom.stopRecording") : t("callRoom.recordThisCall")}
+                            aria-label={
+                                call.recording
+                                    ? t("callRoom.stopRecording")
+                                    : t("callRoom.recordThisCall")
+                            }
                             title={
                                 call.recording
-                                    ? t("callRoom.stopRecordingAt", { time: clock(held?.recording.seconds ?? 0) })
+                                    ? t("callRoom.stopRecordingAt", {
+                                          time: clock(held?.recording.seconds ?? 0)
+                                      })
                                     : t("callRoom.writeThisCallToA")
                             }
                             className={cn(
@@ -635,8 +643,12 @@ export function CallRoom({
                         <button
                             type="button"
                             onClick={() => setInviting(true)}
-                            aria-label={mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")}
-                            title={mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")}
+                            aria-label={
+                                mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
+                            }
+                            title={
+                                mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
+                            }
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <UserPlus className="size-4" />
@@ -1198,12 +1210,19 @@ export function CallRoom({
                     size="icon"
                     variant={call.handRaised ? "primary" : "secondary"}
                     aria-pressed={call.handRaised}
-                    aria-label={call.handRaised ? t("callRoom.lowerYourHand") : t("callRoom.raiseYourHand")}
+                    aria-label={
+                        call.handRaised ? t("callRoom.lowerYourHand") : t("callRoom.raiseYourHand")
+                    }
                     title={
                         call.hands.length > 0
-                            ? t(call.handRaised ? "callRoom.handsUpLower" : "callRoom.handsUpRaise", {
-                                  count: call.hands.length
-                              })
+                            ? t(
+                                  call.handRaised
+                                      ? "callRoom.handsUpLower"
+                                      : "callRoom.handsUpRaise",
+                                  {
+                                      count: call.hands.length
+                                  }
+                              )
                             : t("callRoom.raiseYourHand")
                     }
                     onClick={() => call.setHandRaised(!call.handRaised)}
@@ -1274,9 +1293,7 @@ export function CallRoom({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t("callRoom.recordThisCall2")}</DialogTitle>
-                        <DialogDescription>
-                            {t("callRoom.theRecordingIsMadeIn")}
-                        </DialogDescription>
+                        <DialogDescription>{t("callRoom.theRecordingIsMadeIn")}</DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setAsking(false)}>
@@ -1500,7 +1517,9 @@ function Split({
                                             reading is the one being sent. */}
                                         <span>{t(showing.label)}</span>
                                         <span className="tabular-nums">
-                                            {showing.detailKey ? t(showing.detailKey) : showing.detail}
+                                            {showing.detailKey
+                                                ? t(showing.detailKey)
+                                                : showing.detail}
                                         </span>
                                     </span>
                                     <input
@@ -1656,7 +1675,9 @@ function Split({
                         )}
                         {onCleanMic && (
                             <>
-                                <DropdownMenuLabel>{t("callRoom.backgroundNoise")}</DropdownMenuLabel>
+                                <DropdownMenuLabel>
+                                    {t("callRoom.backgroundNoise")}
+                                </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 {NOISE_LEVELS.filter(
                                     (level) => level.value !== "licensed" || licensedOffered
@@ -1725,7 +1746,9 @@ function Split({
                                 </div>
                                 {sent && sent !== meter && (
                                     <>
-                                        <DropdownMenuLabel>{t("callRoom.sentLevel")}</DropdownMenuLabel>
+                                        <DropdownMenuLabel>
+                                            {t("callRoom.sentLevel")}
+                                        </DropdownMenuLabel>
                                         <div className="px-2 pb-2">
                                             <MicLevelMeter track={sent} />
                                         </div>
@@ -1902,7 +1925,11 @@ function Face({
                 {hand && (
                     <span
                         className="call-hand-up pointer-events-none absolute -left-1 -top-1 flex items-center gap-1 rounded-full bg-warning py-0.5 pl-1 pr-1.5 text-[0.6875rem] font-semibold text-warning-foreground shadow-sm"
-                        aria-label={handPlace ? t("callRoom.handUpPlace", { place: handPlace }) : t("callRoom.handUp")}
+                        aria-label={
+                            handPlace
+                                ? t("callRoom.handUpPlace", { place: handPlace })
+                                : t("callRoom.handUp")
+                        }
                     >
                         <Hand className="size-3.5 shrink-0" />
                         {handPlace !== null && <span>{handPlace}</span>}
@@ -1914,7 +1941,10 @@ function Face({
                         aria-live="polite"
                     >
                         {reactions.map((shown) => (
-                            <span key={shown.id} aria-label={t(`callRoom.reactions.${shown.reaction}`)}>
+                            <span
+                                key={shown.id}
+                                aria-label={t(`callRoom.reactions.${shown.reaction}`)}
+                            >
                                 {REACTION_GLYPHS[shown.reaction]}
                             </span>
                         ))}
@@ -2302,7 +2332,11 @@ function Tile({
                 // tile the big one.
                 <span
                     className="call-hand-up pointer-events-none absolute left-1 top-1 flex items-center gap-1 rounded-full bg-warning py-0.5 pl-1 pr-1.5 text-[0.6875rem] font-semibold text-warning-foreground shadow-sm"
-                    aria-label={handPlace ? t("callRoom.handUpPlace", { place: handPlace }) : t("callRoom.handUp")}
+                    aria-label={
+                        handPlace
+                            ? t("callRoom.handUpPlace", { place: handPlace })
+                            : t("callRoom.handUp")
+                    }
                 >
                     <Hand className="size-3.5 shrink-0" />
                     {handPlace !== null && <span>{handPlace}</span>}
@@ -2319,12 +2353,21 @@ function Tile({
                     talking louder, and their microphone being off follows from
                     it anyway. */}
                 {blank ? null : deafened ? (
-                    <HeadphoneOff className="size-3 text-danger" aria-label={t("callRoom.notListening")} />
+                    <HeadphoneOff
+                        className="size-3 text-danger"
+                        aria-label={t("callRoom.notListening")}
+                    />
                 ) : muted ? (
-                    <MicOff className="size-3 text-danger" aria-label={t("callRoom.microphoneOff")} />
+                    <MicOff
+                        className="size-3 text-danger"
+                        aria-label={t("callRoom.microphoneOff")}
+                    />
                 ) : null}
                 {volumeKey && volume === 0 && (
-                    <VolumeX className="size-3 text-danger" aria-label={t("callRoom.silencedForYou")} />
+                    <VolumeX
+                        className="size-3 text-danger"
+                        aria-label={t("callRoom.silencedForYou")}
+                    />
                 )}
                 {sameRoom && (
                     <Users
@@ -2370,7 +2413,11 @@ function Tile({
                             type="button"
                             onClick={onGrow}
                             aria-pressed={grown}
-                            aria-label={grown ? t("callRoom.bringTheConversationBack") : t("callRoom.fillTheColumn")}
+                            aria-label={
+                                grown
+                                    ? t("callRoom.bringTheConversationBack")
+                                    : t("callRoom.fillTheColumn")
+                            }
                             title={
                                 grown
                                     ? t("callRoom.shrinkTheCallTheConversation")
@@ -2540,7 +2587,9 @@ function InviteToCallDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{mayInvite ? t("callRoom.addPeople") : t("callRoom.anybodyWithALink")}</DialogTitle>
+                    <DialogTitle>
+                        {mayInvite ? t("callRoom.addPeople") : t("callRoom.anybodyWithALink")}
+                    </DialogTitle>
                     <DialogDescription>
                         {mayInvite
                             ? t("callRoom.theirTelephoneRingsBringingSomebody")
@@ -2564,7 +2613,9 @@ function InviteToCallDialog({
                 {canShare && (
                     <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-sm font-medium">{t("callRoom.anybodyWithALink")}</span>
+                            <span className="text-sm font-medium">
+                                {t("callRoom.anybodyWithALink")}
+                            </span>
                             <Button
                                 size="sm"
                                 variant="secondary"
@@ -2572,7 +2623,11 @@ function InviteToCallDialog({
                                 onClick={() => void share()}
                             >
                                 <Link2 className="size-4" />
-                                {link ? (copied ? t("callRoom.copied") : t("callRoom.copyLink")) : t("callRoom.createALink")}
+                                {link
+                                    ? copied
+                                        ? t("callRoom.copied")
+                                        : t("callRoom.copyLink")
+                                    : t("callRoom.createALink")}
                             </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -2637,7 +2692,12 @@ function ReactionMenu({ onReact }: { onReact: (reaction: Reaction) => void }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="secondary" aria-label={t("callRoom.react")} title={t("callRoom.react")}>
+                <Button
+                    size="icon"
+                    variant="secondary"
+                    aria-label={t("callRoom.react")}
+                    title={t("callRoom.react")}
+                >
                     <Smile className="size-4" />
                 </Button>
             </DropdownMenuTrigger>

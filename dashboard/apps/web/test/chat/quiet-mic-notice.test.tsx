@@ -14,12 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QuietMicNotice } from "@/app/(app)/chat/quiet-mic-notice";
 import { micGain } from "@/app/(app)/chat/mic-gain";
-import {
-    ENOUGH_SPEECH_MS,
-    SELF,
-    setLoudness,
-    type Loudness
-} from "@/app/(app)/chat/call-loudness";
+import { ENOUGH_SPEECH_MS, SELF, setLoudness, type Loudness } from "@/app/(app)/chat/call-loudness";
 
 function voice(db: number, ms = ENOUGH_SPEECH_MS + 1000): Loudness {
     return { speechDb: db, speechMs: ms };
@@ -47,7 +42,14 @@ afterEach(() => {
 describe("the quiet hint", () => {
     it("waits until both sides have been heard for long enough", () => {
         render(<QuietMicNotice micOn />);
-        act(() => setLoudness(new Map([[SELF, voice(-45, 3000)], ["ana", voice(-26)]])));
+        act(() =>
+            setLoudness(
+                new Map([
+                    [SELF, voice(-45, 3000)],
+                    ["ana", voice(-26)]
+                ])
+            )
+        );
         expect(screen.queryByRole("status")).toBeNull();
     });
 
@@ -70,13 +72,27 @@ describe("the quiet hint", () => {
 
     it("says nothing for a voice that is merely a little quieter", () => {
         render(<QuietMicNotice micOn />);
-        act(() => setLoudness(new Map([[SELF, voice(-31)], ["ana", voice(-26)]])));
+        act(() =>
+            setLoudness(
+                new Map([
+                    [SELF, voice(-31)],
+                    ["ana", voice(-26)]
+                ])
+            )
+        );
         expect(screen.queryByRole("status")).toBeNull();
     });
 
     it("says nothing while the microphone is off", () => {
         render(<QuietMicNotice micOn={false} />);
-        act(() => setLoudness(new Map([[SELF, voice(-50)], ["ana", voice(-26)]])));
+        act(() =>
+            setLoudness(
+                new Map([
+                    [SELF, voice(-50)],
+                    ["ana", voice(-26)]
+                ])
+            )
+        );
         expect(screen.queryByRole("status")).toBeNull();
     });
 });

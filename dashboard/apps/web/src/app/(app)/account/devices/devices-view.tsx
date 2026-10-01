@@ -120,7 +120,9 @@ function MicrophoneCard({
     // What the call sends rather than the device behind it: the noise model and
     // the volume both sit between the two, and a device that reads healthy while
     // the voice leaves quiet is the case this screen exists to show.
-    const inCallDevice = held?.session ? (held.call.localStream?.getAudioTracks()[0] ?? null) : null;
+    const inCallDevice = held?.session
+        ? (held.call.localStream?.getAudioTracks()[0] ?? null)
+        : null;
     const inCall = held?.session ? (held.call.outgoing ?? inCallDevice) : null;
     const rawForGate = showThreshold && !gateHearsFiltered;
 
@@ -200,7 +202,9 @@ function MicrophoneCard({
                 }
             }
         } catch (caught) {
-            setError(tChat(`media.refused.${refusalOf(caught)}` as const, { device: "microphone" }));
+            setError(
+                tChat(`media.refused.${refusalOf(caught)}` as const, { device: "microphone" })
+            );
             stop();
         }
     };
@@ -244,7 +248,9 @@ function MicrophoneCard({
                                 : [{ value: "", label: t("devices.mic.pressTest") }]
                         }
                     />
-                    <span className="text-xs text-muted-foreground">{t("devices.mic.namesHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.mic.namesHint")}
+                    </span>
                 </label>
 
                 <div className="flex flex-col gap-1.5">
@@ -312,7 +318,9 @@ function MicrophoneCard({
                         onChange={(event) => setGain(Number(event.target.value) / 100)}
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                     />
-                    <span className="text-xs text-muted-foreground">{t("devices.mic.volumeHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.mic.volumeHint")}
+                    </span>
                 </div>
 
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -462,7 +470,6 @@ function CameraCard() {
         }
     };
 
-
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
@@ -573,8 +580,16 @@ function CameraCard() {
                             underneath them. */}
                         <button
                             type="button"
-                            title={own ? t("devices.camera.changePicture") : t("devices.camera.ownPicture")}
-                            aria-label={own ? t("devices.camera.changePicture") : t("devices.camera.ownPicture")}
+                            title={
+                                own
+                                    ? t("devices.camera.changePicture")
+                                    : t("devices.camera.ownPicture")
+                            }
+                            aria-label={
+                                own
+                                    ? t("devices.camera.changePicture")
+                                    : t("devices.camera.ownPicture")
+                            }
                             aria-pressed={own}
                             onClick={() => picker.current?.click()}
                             className={cn(
@@ -591,7 +606,9 @@ function CameraCard() {
                             )}
                         </button>
                     </div>
-                    <span className="text-xs text-muted-foreground">{t("devices.camera.pictureStays")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.camera.pictureStays")}
+                    </span>
                 </div>
                 <input
                     ref={picker}
@@ -689,7 +706,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                         >
                             {listening ? t("devices.input.pressKey") : keyName(voice.pttKey, t)}
                         </Button>
-                        <span className="text-xs text-muted-foreground">{t("devices.input.keyHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.input.keyHint")}
+                        </span>
                     </div>
                 ) : null}
 
@@ -713,7 +732,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">{t("devices.input.thresholdHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.input.thresholdHint")}
+                        </span>
                     </div>
                 ) : null}
 
@@ -737,7 +758,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">{t("devices.input.releaseHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.input.releaseHint")}
+                        </span>
                     </div>
                 ) : null}
             </CardBody>
@@ -812,7 +835,9 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">{t("devices.advanced.howFarHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.advanced.howFarHint")}
+                        </span>
                     </div>
                 ) : null}
                 <div className="flex flex-col gap-1">
@@ -834,7 +859,9 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                         }
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                     />
-                    <span className="text-xs text-muted-foreground">{t("devices.advanced.streamHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.advanced.streamHint")}
+                    </span>
                 </div>
             </CardBody>
         </Card>
