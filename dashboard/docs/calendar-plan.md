@@ -134,7 +134,7 @@ Phase 1 = this build. Status is tracked in the ledger, not here.
 | Copy internal link (NC-45) | NC | copy `/calendar?c=<id>` | 1 |
 | Public link on/off, copy, webcal link, email it, embed code (NC-46..49; G, P limited/full) | NC G P | token link, `limited` (busy only) or `full` view, `.ics` feed, iframe | 1 |
 | Public page and embed page (NC-50..52,149) | NC G | `/cal/p/<token>`, `/cal/embed/<token>` | 1 |
-| Subscribe by URL (http/https/webcal) (NC-54; G, P, TB) | all | ICS source, refresh interval, SSRF-guarded fetch | 1 |
+| Subscribe by URL (http/https/webcal) (NC-54; G, P, TB) | all | ICS source, refresh interval, SSRF-guarded fetch; an ICS feed's address can be replaced in place without losing the subscription, prompted automatically once it falls into `auth` status | 1 |
 | Holiday calendars by region (NC-55; G, P) | NC G P | catalogue of public ICS feeds per country | 1 |
 | Admin-suggested public calendars, disable link subscriptions (NC-56,57) | NC | instance setting | 1 |
 | Birthday calendar (NC-143; G) | NC G | Polaris profiles carry no birthday and Polaris has no contacts app, so there is nothing to derive one from; a linked Google account's own birthdays calendar syncs like any other | n/a (no source) |
