@@ -1373,7 +1373,10 @@ async function play(
         case "king-of-the-hill":
             // With fists only it is played in an arena of its own (`kinds/hill`).
             decided = catalog.hillFistsOnly(preset)
-                ? await arenaService.arenaTick(kindContext(installedAppId, loop, server, now), lines)
+                ? await arenaService.arenaTick(
+                      kindContext(installedAppId, loop, server, now),
+                      lines
+                  )
                 : await hillService.walkInTick(
                       kindContext(installedAppId, loop, server, now),
                       TICK_MS / 1000,
@@ -1736,10 +1739,20 @@ function kindContext(
         },
         persist: () => persist(installedAppId, loop),
         findPlace: (place, distance, radius, surface, nearHome) =>
-            findPlace(installedAppId, loop, server, place, distance, radius, commands.HOME_CLEARANCE, true, {
-                surface: surface ?? "ground",
-                nearHome: nearHome === true
-            }),
+            findPlace(
+                installedAppId,
+                loop,
+                server,
+                place,
+                distance,
+                radius,
+                commands.HOME_CLEARANCE,
+                true,
+                {
+                    surface: surface ?? "ground",
+                    nearHome: nearHome === true
+                }
+            ),
         giveUpPlace: (point, why) => retryPlace(installedAppId, loop, server, point, why),
         chat: () => chatSince(loop, server),
         atLeast: (wanted) => serverAtLeast(server, wanted),

@@ -3,7 +3,12 @@ import * as stash from "@polaris-app/game-servers/src/lib/minecraft/events/kinds
 import type { InventoryItem } from "@polaris-app/game-servers/src/lib/minecraft/inventory";
 import { COMMAND_BYTES_MAX } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
 
-const item = (slot: number, id: string, snbt: string | null = null, era: "components" | "tag" = "components"): InventoryItem => ({
+const item = (
+    slot: number,
+    id: string,
+    snbt: string | null = null,
+    era: "components" | "tag" = "components"
+): InventoryItem => ({
     slot,
     id,
     count: 1,
@@ -19,7 +24,11 @@ describe("keeping a player's things", () => {
 
     it("never keeps the event's own kit, a slot vanilla does not have, or a stack no command can carry", () => {
         const kept = stash.keepable([
-            item(0, "minecraft:diamond_sword", '{"minecraft:enchantments": {levels: {"minecraft:sharpness": 5}}}'),
+            item(
+                0,
+                "minecraft:diamond_sword",
+                '{"minecraft:enchantments": {levels: {"minecraft:sharpness": 5}}}'
+            ),
             item(1, "minecraft:stone_sword", '{"minecraft:custom_data": {polaris_event: 1b}}'),
             item(150, "curios:ring"),
             item(2, "minecraft:written_book", `{"minecraft:custom_name": '"${"x".repeat(600)}"'}`),
@@ -30,9 +39,16 @@ describe("keeping a player's things", () => {
 
     it("tells two stacks of one id apart by their data", () => {
         const digest = (one: InventoryItem) => one.data?.snbt ?? null;
-        const [kept] = stash.keepFrom([item(0, "minecraft:bow", '{"minecraft:damage": 1}')], digest);
-        expect(stash.sameStack(kept!, item(0, "minecraft:bow", '{"minecraft:damage": 1}'), digest)).toBe(true);
-        expect(stash.sameStack(kept!, item(0, "minecraft:bow", '{"minecraft:damage": 2}'), digest)).toBe(false);
+        const [kept] = stash.keepFrom(
+            [item(0, "minecraft:bow", '{"minecraft:damage": 1}')],
+            digest
+        );
+        expect(
+            stash.sameStack(kept!, item(0, "minecraft:bow", '{"minecraft:damage": 1}'), digest)
+        ).toBe(true);
+        expect(
+            stash.sameStack(kept!, item(0, "minecraft:bow", '{"minecraft:damage": 2}'), digest)
+        ).toBe(false);
         expect(stash.sameStack(kept!, undefined, digest)).toBe(false);
     });
 
@@ -51,20 +67,40 @@ describe("keeping a player's things", () => {
         const record = "00000000-0000-7000-8000-000000000123";
         const tag = stash.dropTag(record, 103);
         expect(tag).toBe("pe_gb00000123_39");
-        const modern = stash.dropLines("Ana", item(103, "minecraft:diamond_helmet", '{"minecraft:damage": 3}'), record)!;
+        const modern = stash.dropLines(
+            "Ana",
+            item(103, "minecraft:diamond_helmet", '{"minecraft:damage": 3}'),
+            record
+        )!;
         expect(modern).toEqual([
             `execute unless entity @e[type=minecraft:item,tag=${tag}] at Ana run summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:diamond_helmet",count:1,components:{"minecraft:damage": 3}},Tags:["${tag}"],PickupDelay:32767,Age:-32768}`
         ]);
-        const legacy = stash.dropLines("Ana", item(103, "minecraft:diamond_helmet", "{Damage:3}", "tag"), record)!;
+        const legacy = stash.dropLines(
+            "Ana",
+            item(103, "minecraft:diamond_helmet", "{Damage:3}", "tag"),
+            record
+        )!;
         expect(legacy).toHaveLength(1);
-        expect(legacy[0]).toContain('{Item:{id:"minecraft:diamond_helmet",Count:1b,tag:{Damage:3}}');
+        expect(legacy[0]).toContain(
+            '{Item:{id:"minecraft:diamond_helmet",Count:1b,tag:{Damage:3}}'
+        );
         // No data: both ways, the second only where the first made nothing.
         const plain = stash.dropLines("Ana", item(4, "minecraft:bread"), record)!;
         expect(plain).toHaveLength(2);
         const own = stash.dropTag(record, 4);
-        expect(plain.every((line) => line.startsWith(`execute unless entity @e[type=minecraft:item,tag=${own}]`))).toBe(true);
+        expect(
+            plain.every((line) =>
+                line.startsWith(`execute unless entity @e[type=minecraft:item,tag=${own}]`)
+            )
+        ).toBe(true);
         // Too long for a command: not dropped at all.
-        expect(stash.dropLines("Ana", item(4, "minecraft:book", `{"a": "${"x".repeat(COMMAND_BYTES_MAX)}"}`), record)).toBeNull();
+        expect(
+            stash.dropLines(
+                "Ana",
+                item(4, "minecraft:book", `{"a": "${"x".repeat(COMMAND_BYTES_MAX)}"}`),
+                record
+            )
+        ).toBeNull();
     });
 
     it("lets a checked drop go to its owner only", () => {
@@ -97,11 +133,15 @@ describe("keeping a player's things", () => {
             "execute in minecraft:overworld run item replace block 1 2 3 container.0 with minecraft:air"
         );
         // One kept in the database only has no barrel to empty.
-        expect(stash.emptyBarrelSlot([], { slot: 0, id: "minecraft:bow", count: 1, data: null })).toBeNull();
+        expect(
+            stash.emptyBarrelSlot([], { slot: 0, id: "minecraft:bow", count: 1, data: null })
+        ).toBeNull();
     });
 
     it("takes a block away only while it is still the one put there", () => {
-        expect(stash.removeLines({ barrels: [{ x: 1, y: 2, z: 3 }], casing: [{ x: 0, y: 2, z: 3 }] })).toEqual([
+        expect(
+            stash.removeLines({ barrels: [{ x: 1, y: 2, z: 3 }], casing: [{ x: 0, y: 2, z: 3 }] })
+        ).toEqual([
             "execute in minecraft:overworld if block 1 2 3 minecraft:barrel run setblock 1 2 3 minecraft:air",
             "execute in minecraft:overworld if block 0 2 3 minecraft:barrier run setblock 0 2 3 minecraft:air"
         ]);

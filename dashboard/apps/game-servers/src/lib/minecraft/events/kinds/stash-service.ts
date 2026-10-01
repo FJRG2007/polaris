@@ -49,8 +49,12 @@ async function experienceOf(
     server: ServerContainer,
     name: string
 ): Promise<stash.Experience | null> {
-    const levels = stash.readExperienceCount(stripFormatting(await server.say([stash.readLevels(name)])));
-    const points = stash.readExperienceCount(stripFormatting(await server.say([stash.readPoints(name)])));
+    const levels = stash.readExperienceCount(
+        stripFormatting(await server.say([stash.readLevels(name)]))
+    );
+    const points = stash.readExperienceCount(
+        stripFormatting(await server.say([stash.readPoints(name)]))
+    );
     return levels === null || points === null ? null : { levels, points };
 }
 
@@ -96,7 +100,11 @@ export async function stashIn(
             })
         ).id;
     } catch (error) {
-        console.warn("polaris: keeping a copy of a bag failed", owner.installedAppId, String(error));
+        console.warn(
+            "polaris: keeping a copy of a bag failed",
+            owner.installedAppId,
+            String(error)
+        );
         return null;
     }
     const taking: stash.Stash = {
@@ -272,9 +280,7 @@ export async function giveBack(
         await server.sayAll(
             copy.items
                 .filter((item) => !owed.has(item.slot))
-                .flatMap((item) =>
-                    stash.releaseDrop(name, stash.dropTag(kept.record, item.slot))
-                )
+                .flatMap((item) => stash.releaseDrop(name, stash.dropTag(kept.record, item.slot)))
         );
     }
     const stackOf = (one: stash.Kept) =>
@@ -491,7 +497,11 @@ async function fail(
                 }
             })
             .catch((error: unknown) =>
-                console.warn("polaris: marking a kept bag failed", server.installedAppId, String(error))
+                console.warn(
+                    "polaris: marking a kept bag failed",
+                    server.installedAppId,
+                    String(error)
+                )
             );
     }
     await save(null);

@@ -158,7 +158,12 @@ export function platformCleanup(run: stored.EventRun): string[] {
 }
 
 /** Everybody told how far the circle is and which way, in their own action bar. */
-async function guide(ctx: KindContext, place: stored.Point, radius: number, lines: string[]): Promise<void> {
+async function guide(
+    ctx: KindContext,
+    place: stored.Point,
+    radius: number,
+    lines: string[]
+): Promise<void> {
     for (const one of commands.readWhere(await ctx.server.say([commands.IN_OVERWORLD]))) {
         const away = Math.hypot(one.x - (place.x + 0.5), one.z - (place.z + 0.5));
         lines.push(
@@ -180,7 +185,11 @@ async function guide(ctx: KindContext, place: stored.Point, radius: number, line
  * One tick of the king of the hill anybody walks to: the circle found, then
  * drawn, everybody in it given the time, and everybody told the way.
  */
-export async function walkInTick(ctx: KindContext, seconds: number, lines: string[]): Promise<string | null> {
+export async function walkInTick(
+    ctx: KindContext,
+    seconds: number,
+    lines: string[]
+): Promise<string | null> {
     if (!(await raiseHill(ctx))) return null;
     const place = ctx.run.place!;
     const { radius } = optionsOf(ctx.run);
@@ -205,7 +214,11 @@ export function enterLines(
     const spot = entrySpotsFor(run)[index % Math.max(1, run.joined.length)]!;
     return [
         ...hill.enterLines(name, spot, overGround),
-        ...arena.titleTo(name, hillMessages.enterTitle(language), hillMessages.enterSubtitle(language)),
+        ...arena.titleTo(
+            name,
+            hillMessages.enterTitle(language),
+            hillMessages.enterSubtitle(language)
+        ),
         arena.tellTo(name, messages.tag(language) + hillMessages.enterLine(language))
     ];
 }
@@ -239,7 +252,9 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         if (hill.strayed(at, place, radius)) {
             const spot = spots[index % spots.length]!;
             lines.push(
-                ...hill.enterLines(one.name, spot, overGround).filter((line) => line.includes(" tp ")),
+                ...hill
+                    .enterLines(one.name, spot, overGround)
+                    .filter((line) => line.includes(" tp ")),
                 arena.actionbarTo(one.name, hillMessages.backOnHill(ctx.language))
             );
             continue;
@@ -261,7 +276,9 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
     const scores = commands.readScores(await ctx.server.say([commands.READ_SCORES]));
     const points: Record<string, number> = {};
     for (const one of run.entrants) {
-        const score = [...scores].find(([name]) => name.toLowerCase() === one.name.toLowerCase())?.[1];
+        const score = [...scores].find(
+            ([name]) => name.toLowerCase() === one.name.toLowerCase()
+        )?.[1];
         if (score !== undefined) points[one.name] = score;
     }
     if (JSON.stringify(points) !== JSON.stringify(run.points) && Object.keys(points).length > 0) {

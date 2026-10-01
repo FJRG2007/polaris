@@ -433,9 +433,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
     } else if (hillside) {
         const overGround = await ctx.atLeast([1, 19, 4]);
         for (const one of entrants) {
-            out.push(
-                ...hillService.enterLines(ctx.run, one.name, one.side, overGround, language)
-            );
+            out.push(...hillService.enterLines(ctx.run, one.name, one.side, overGround, language));
         }
     } else {
         const options = run.preset.options as catalog.EventOptions<"build-battle">;
@@ -918,9 +916,14 @@ export async function closeArena(
                 );
                 if (!one.stash) return true;
                 if (!down) return false;
-                const how = await stashService.giveBack(server, one.name, one.stash, async (kept) => {
-                    one = { ...one, stash: kept };
-                });
+                const how = await stashService.giveBack(
+                    server,
+                    one.name,
+                    one.stash,
+                    async (kept) => {
+                        one = { ...one, stash: kept };
+                    }
+                );
                 return how === "done" || how === "failed";
             };
             // Sent home already, by an end that stopped before it gave everything

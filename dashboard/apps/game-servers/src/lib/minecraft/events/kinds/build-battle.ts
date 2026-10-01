@@ -311,5 +311,8 @@ export function themeFor(
     if (options.themeMode === "mine" && options.themes.length > 0) {
         return shuffled(options.themes, random)[0] as string;
     }
-    return speech.pickIn(shuffled(THEMES, random)[0] as Readonly<Record<Language, string>>, language);
+    return speech.pickIn(
+        shuffled(THEMES, random)[0] as Readonly<Record<Language, string>>,
+        language
+    );
 }

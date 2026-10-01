@@ -1194,7 +1194,10 @@ function answer(sent: string): string {
         return `Set ${setXp[2]} experience ${setXp[3]} on ${setXp[1]}`;
     }
     // Somebody sent home is on the ground, unless still in the air.
-    const airborne = /^execute as (\w+) at @s if block ~ ~-0\.2 ~ minecraft:air if block ~ ~-1\.2 ~ minecraft:air$/.exec(line);
+    const airborne =
+        /^execute as (\w+) at @s if block ~ ~-0\.2 ~ minecraft:air if block ~ ~-1\.2 ~ minecraft:air$/.exec(
+            line
+        );
     if (airborne) return world.aloft.includes(airborne[1]!) ? "Test passed" : "Test failed";
     if (line === "data get entity @e[tag=pe_boss,limit=1] Health")
         return world.bossAlive
@@ -2965,7 +2968,11 @@ describe("the others", () => {
         const hill = {
             ...walkInHill(),
             minutes: 3,
-            options: { place: { mode: "fixed" as const, x: 300, z: 0 }, radius: 6, fistsOnly: false }
+            options: {
+                place: { mode: "fixed" as const, x: 300, z: 0 },
+                radius: 6,
+                fistsOnly: false
+            }
         };
         setUp([hill]);
         await events.startEvent({
@@ -4467,7 +4474,8 @@ describe("a meteor shower", () => {
         // them. A try's distance inside its reach is drawn at random too, so only
         // the clearance is a promise.
         const from = state().history[0]!.search!.from!;
-        const far = (point: readonly [number, number]) => Math.hypot(point[0] - from.x, point[1] - from.z);
+        const far = (point: readonly [number, number]) =>
+            Math.hypot(point[0] - from.x, point[1] - from.z);
         expect(Math.min(...tried.slice(0, 3).map(far))).toBeGreaterThanOrEqual(48 - 20);
         expect(far(tried[tried.length - 1]!)).toBeLessThan(48);
     });
@@ -5248,7 +5256,9 @@ describe("players' own things through an arena", () => {
         }[];
         expect(items.find((one) => one.slot === 0)?.data?.snbt).toContain("sharpness");
         // Written down, then emptied; all before the kit and the move in.
-        const kit = world.sent.findIndex((line) => line.startsWith("give Ana minecraft:stone_sword"));
+        const kit = world.sent.findIndex((line) =>
+            line.startsWith("give Ana minecraft:stone_sword")
+        );
         const emptied = world.sent.indexOf("item replace entity Ana hotbar.0 with minecraft:air");
         expect(emptied).toBeGreaterThan(-1);
         expect(kit).toBeGreaterThan(emptied);
@@ -5271,8 +5281,12 @@ describe("players' own things through an arena", () => {
         // The kit off, home, down, their things back - and only then the prize.
         const end = world.sent.slice(from);
         const kitOff = end.findIndex((line) => line.startsWith("clear Ana minecraft:stone_sword"));
-        const home = end.findIndex((line) => line.startsWith("execute in minecraft:overworld run tp Ana "));
-        const down = end.findIndex((line) => line.startsWith("execute as Ana at @s if block ~ ~-0.2 ~"));
+        const home = end.findIndex((line) =>
+            line.startsWith("execute in minecraft:overworld run tp Ana ")
+        );
+        const down = end.findIndex((line) =>
+            line.startsWith("execute as Ana at @s if block ~ ~-0.2 ~")
+        );
         const back = end.findIndex((line) =>
             line.startsWith("item replace entity Ana hotbar.0 with minecraft:diamond_sword[")
         );
@@ -5316,14 +5330,17 @@ describe("players' own things through an arena", () => {
         await play(3 * 60_000 + 10_000);
         expect(state().run).toBeNull();
         expect(world.inv.Ana!.get(0)).toEqual({ id: "minecraft:dirt", count: 3 });
-        for (const slot of [9, 20, 103, -106]) expect(world.inv.Ana!.get(slot)).toEqual(ana.get(slot));
+        for (const slot of [9, 20, 103, -106])
+            expect(world.inv.Ana!.get(slot)).toEqual(ana.get(slot));
         const lying = [...world.drops.values()];
         expect(lying).toEqual([{ stack: ana.get(0), owner: "Ana" }]);
         // Dropped once home, never in the arena.
         const home = world.sent.findLastIndex((line) =>
             line.startsWith("execute in minecraft:overworld run tp Ana ")
         );
-        const drop = world.sent.findIndex((line) => / at Ana run summon minecraft:item /.test(line));
+        const drop = world.sent.findIndex((line) =>
+            / at Ana run summon minecraft:item /.test(line)
+        );
         expect(home).toBeGreaterThan(-1);
         expect(drop).toBeGreaterThan(home);
         expect(stashRows.size).toBe(0);
@@ -5341,9 +5358,9 @@ describe("players' own things through an arena", () => {
         await play(3 * 60_000 + 10_000);
         expect(state().run).toBeNull();
         expect([...world.drops.values()]).toEqual([{ stack: ana.get(20), owner: "Ana" }]);
-        expect(world.sent.some((line) => line.includes('{Item:{id:"minecraft:cooked_beef",Count:12b}'))).toBe(
-            true
-        );
+        expect(
+            world.sent.some((line) => line.includes('{Item:{id:"minecraft:cooked_beef",Count:12b}'))
+        ).toBe(true);
         expect(stashRows.size).toBe(0);
     });
 
@@ -5374,11 +5391,20 @@ describe("players' own things through an arena", () => {
         const stashService = await import(
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
-        const how = await stashService.giveBack(fakeServer(), "Ana", { ...kept, state: "taking" }, async () => undefined);
+        const how = await stashService.giveBack(
+            fakeServer(),
+            "Ana",
+            { ...kept, state: "taking" },
+            async () => undefined
+        );
         expect(how).toBe("done");
         expect(world.inv.Ana).toEqual(ana);
         expect(world.drops.size).toBe(0);
-        expect(world.sent.some((line) => /^item replace entity Ana \S+ with minecraft:(?!air)/.test(line))).toBe(false);
+        expect(
+            world.sent.some((line) =>
+                /^item replace entity Ana \S+ with minecraft:(?!air)/.test(line)
+            )
+        ).toBe(false);
     });
 
     it("keeps an offline player's things until they are back, then gives them back before their prize", async () => {
@@ -5423,7 +5449,9 @@ describe("players' own things through an arena", () => {
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
         // A give-back that ran to the end once...
-        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe("done");
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
+            "done"
+        );
         expect(world.inv.Ana).toEqual(ana);
         // ...and again from the same stale record: nothing more is given.
         world.inv.Ana!.clear();
@@ -5449,10 +5477,14 @@ describe("players' own things through an arena", () => {
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
         const from = world.sent.length;
-        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe("done");
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
+            "done"
+        );
         expect(world.inv.Ana).toEqual(ana);
         expect(world.drops.size).toBe(0);
-        const writes = world.sent.slice(from).filter((line) => /^item replace entity Ana (hotbar\.0|armor\.head) with/.test(line));
+        const writes = world.sent
+            .slice(from)
+            .filter((line) => /^item replace entity Ana (hotbar\.0|armor\.head) with/.test(line));
         expect(writes).toEqual([]);
     });
 
@@ -5470,8 +5502,12 @@ describe("players' own things through an arena", () => {
         const stashService = await import(
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
-        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe("done");
-        expect([...world.inv.Ana!.values()].filter((stack) => stack.id === ana.get(0)!.id)).toHaveLength(2);
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
+            "done"
+        );
+        expect(
+            [...world.inv.Ana!.values()].filter((stack) => stack.id === ana.get(0)!.id)
+        ).toHaveLength(2);
     });
 
     it("adds their experience to what they earned since, and never sets it over it", async () => {
@@ -5489,7 +5525,9 @@ describe("players' own things through an arena", () => {
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
         const from = world.sent.length;
-        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe("done");
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
+            "done"
+        );
         expect(world.levels.Ana).toBe(17);
         expect(world.points.Ana).toBe(7);
         expect(world.sent.slice(from).some((line) => line.startsWith("xp set Ana"))).toBe(false);
@@ -5505,7 +5543,9 @@ describe("players' own things through an arena", () => {
         await play(3 * 60_000 + 30_000);
         expect(state().run).toBeNull();
         expect(world.inv.Ana!.size).toBe(0);
-        expect(state().arenaLeftovers.flatMap((one) => one.entrants.map((e) => e.name))).toContain("Ana");
+        expect(state().arenaLeftovers.flatMap((one) => one.entrants.map((e) => e.name))).toContain(
+            "Ana"
+        );
         expect(stashRows.size).toBe(1);
         // Down: the sweep gives it all back.
         world.aloft = [];
@@ -5518,10 +5558,31 @@ describe("players' own things through an arena", () => {
     it("gives worn armor back into the armor slots, checked", async () => {
         world.online = ["Ana", "Ben"];
         const armor = new Map<number, Stack>([
-            [100, { id: "minecraft:leather_boots", count: 1, components: '{"minecraft:dyed_color": {rgb: 16711680}}' }],
-            [101, { id: "minecraft:golden_leggings", count: 1, components: '{"minecraft:damage": 10}' }],
+            [
+                100,
+                {
+                    id: "minecraft:leather_boots",
+                    count: 1,
+                    components: '{"minecraft:dyed_color": {rgb: 16711680}}'
+                }
+            ],
+            [
+                101,
+                {
+                    id: "minecraft:golden_leggings",
+                    count: 1,
+                    components: '{"minecraft:damage": 10}'
+                }
+            ],
             [102, { id: "minecraft:elytra", count: 1 }],
-            [103, { id: "minecraft:diamond_helmet", count: 1, components: '{"minecraft:enchantments": {levels: {"minecraft:protection": 4}}}' }]
+            [
+                103,
+                {
+                    id: "minecraft:diamond_helmet",
+                    count: 1,
+                    components: '{"minecraft:enchantments": {levels: {"minecraft:protection": 4}}}'
+                }
+            ]
         ]);
         world.inv = { Ana: copyOf(armor), Ben: new Map() };
         setUp([duelOf()]);
@@ -5531,14 +5592,28 @@ describe("players' own things through an arena", () => {
         expect(state().run).toBeNull();
         expect(world.inv.Ana).toEqual(armor);
         for (const slot of ["armor.feet", "armor.legs", "armor.head"])
-            expect(world.sent.some((line) => line.startsWith(`item replace entity Ana ${slot} with minecraft:`))).toBe(true);
+            expect(
+                world.sent.some((line) =>
+                    line.startsWith(`item replace entity Ana ${slot} with minecraft:`)
+                )
+            ).toBe(true);
         expect(stashRows.size).toBe(0);
     });
 
     it("leaves a stack no command can carry where it is, and keeps the rest", async () => {
         world.online = ["Ana", "Ben"];
-        const huge = { id: "minecraft:written_book", count: 1, components: `{"minecraft:custom_name": '"${"x".repeat(600)}"'}` };
-        world.inv = { Ana: new Map<number, Stack>([[3, huge], [4, { id: "minecraft:bread", count: 2 }]]), Ben: new Map() };
+        const huge = {
+            id: "minecraft:written_book",
+            count: 1,
+            components: `{"minecraft:custom_name": '"${"x".repeat(600)}"'}`
+        };
+        world.inv = {
+            Ana: new Map<number, Stack>([
+                [3, huge],
+                [4, { id: "minecraft:bread", count: 2 }]
+            ]),
+            Ben: new Map()
+        };
         setUp([duelOf()]);
         await joinAndStart("duel");
         expect(world.inv.Ana!.get(3)).toEqual(huge);
@@ -5554,7 +5629,10 @@ describe("players' own things through an arena", () => {
         world.inv = { Ana: new Map() };
         const sword = stuffed().get(0)!;
         const barrel = { x: 10, y: 90, z: 10 };
-        const casing = [{ x: 10, y: 89, z: 10 }, { x: 9, y: 90, z: 10 }];
+        const casing = [
+            { x: 10, y: 89, z: 10 },
+            { x: 9, y: 90, z: 10 }
+        ];
         world.blocks.set("10 90 10", "minecraft:barrel");
         world.containers.set("10 90 10", new Map([[0, { ...sword }]]));
         world.blocks.set("10 89 10", "minecraft:barrier");
@@ -5565,7 +5643,14 @@ describe("players' own things through an arena", () => {
             installedAppId: SERVER,
             player: "Ana",
             event: "Build battle",
-            items: JSON.stringify([{ slot: 0, id: sword.id, count: 1, data: { era: "components", snbt: sword.components } }]),
+            items: JSON.stringify([
+                {
+                    slot: 0,
+                    id: sword.id,
+                    count: 1,
+                    data: { era: "components", snbt: sword.components }
+                }
+            ]),
             barrels: JSON.stringify([barrel, { x: 11, y: 90, z: 10 }]),
             casing: JSON.stringify(casing),
             status: "failed",
@@ -5579,8 +5664,18 @@ describe("players' own things through an arena", () => {
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
         const failed = await stashService.failedStashes(SERVER);
-        expect(failed[0]).toMatchObject({ player: "Ana", missing: 1, barrels: [barrel, { x: 11, y: 90, z: 10 }] });
-        expect(await stashService.retryStash(fakeServer(), SERVER, "00000000-0000-7000-8000-000000000099")).toBe("done");
+        expect(failed[0]).toMatchObject({
+            player: "Ana",
+            missing: 1,
+            barrels: [barrel, { x: 11, y: 90, z: 10 }]
+        });
+        expect(
+            await stashService.retryStash(
+                fakeServer(),
+                SERVER,
+                "00000000-0000-7000-8000-000000000099"
+            )
+        ).toBe("done");
         expect(world.inv.Ana!.get(0)).toEqual(sword);
         expect(stashRows.size).toBe(0);
         expect(world.blocks.has("10 90 10")).toBe(false);
@@ -5629,7 +5724,10 @@ describe("a king of the hill", () => {
     });
 
     it("reads one saved on the old ten minutes as four, and leaves any other length alone", () => {
-        const old = (minutes: number, options: Record<string, unknown> = { place: { mode: "players" }, radius: 6 }) => ({
+        const old = (
+            minutes: number,
+            options: Record<string, unknown> = { place: { mode: "players" }, radius: 6 }
+        ) => ({
             ...catalog.newPreset("king-of-the-hill", `hill-${minutes}`),
             minutes,
             options
@@ -5657,7 +5755,10 @@ describe("a king of the hill", () => {
 
     it("with fists only: who joined is brought to the circle empty-handed, cannot die, and gets it all back", async () => {
         world.online = ["Ana", "Ben", "Cy"];
-        world.inv = { Ana: stuffed(), Ben: new Map([[4, { id: "minecraft:iron_sword", count: 1 }]]) };
+        world.inv = {
+            Ana: stuffed(),
+            Ben: new Map([[4, { id: "minecraft:iron_sword", count: 1 }]])
+        };
         const ana = copyOf(world.inv.Ana!);
         const ben = copyOf(world.inv.Ben!);
         setUp([fists()]);
@@ -5671,7 +5772,11 @@ describe("a king of the hill", () => {
         expect(world.sent.some((line) => /^give (Ana|Ben) /.test(line))).toBe(false);
         // Round the circle, in adventure mode.
         expect(world.sent).toContain("gamemode adventure Ana");
-        expect(world.sent.some((line) => / positioned over motion_blocking_no_leaves run tp Ana ~ ~ ~ /.test(line))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                / positioned over motion_blocking_no_leaves run tp Ana ~ ~ ~ /.test(line)
+            )
+        ).toBe(true);
         // keepInventory held.
         expect(world.sent).toContain("gamerule keepInventory true");
         await play(2_100);
@@ -5679,7 +5784,13 @@ describe("a king of the hill", () => {
         expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 4 true");
         expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:saturation 10 0 true");
         // Only those it brought score.
-        expect(world.sent.some((line) => line.includes("gamemode=!spectator,tag=pe_arena] run scoreboard players add @s pe_score 2"))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                line.includes(
+                    "gamemode=!spectator,tag=pe_arena] run scoreboard players add @s pe_score 2"
+                )
+            )
+        ).toBe(true);
         // Knocked off, far down: brought back to the edge.
         const place = state().run!.place!;
         world.at = { Ana: [place.x, place.y - 20, place.z], Ben: [place.x + 1, place.y, place.z] };
@@ -5717,7 +5828,9 @@ describe("a king of the hill", () => {
         expect(build).toBeDefined();
         await play(4 * 60_000);
         expect(state().run).toBeNull();
-        expect(world.sent.some((line) => / minecraft:air replace minecraft:smooth_stone$/.test(line))).toBe(true);
+        expect(
+            world.sent.some((line) => / minecraft:air replace minecraft:smooth_stone$/.test(line))
+        ).toBe(true);
         keptTheRules();
     });
 
@@ -5736,10 +5849,14 @@ describe("a king of the hill", () => {
         const run = state().run!;
         expect(run.arena?.blocks).toEqual(["minecraft:smooth_stone"]);
         expect(run.place!.y).toBe(run.arena!.box.y1 + 1);
-        expect(world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))).toBe(true);
+        expect(
+            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))
+        ).toBe(true);
         await play(4 * 60_000);
         expect(state().run).toBeNull();
-        expect(world.sent.some((line) => / minecraft:air replace minecraft:smooth_stone$/.test(line))).toBe(true);
+        expect(
+            world.sent.some((line) => / minecraft:air replace minecraft:smooth_stone$/.test(line))
+        ).toBe(true);
         keptTheRules();
     });
 });

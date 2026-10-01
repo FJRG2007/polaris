@@ -7,9 +7,23 @@ const place = { x: 100, y: 64, z: -40 };
 
 describe("a king of the hill's platform", () => {
     it("is one layer round the circle, with room to be pushed out onto", () => {
-        expect(hill.platformBox(place, 6)).toEqual({ x1: 91, y1: 64, z1: -49, x2: 109, y2: 64, z2: -31 });
+        expect(hill.platformBox(place, 6)).toEqual({
+            x1: 91,
+            y1: 64,
+            z1: -49,
+            x2: 109,
+            y2: 64,
+            z2: -31
+        });
         // The air over it is proven empty too before anything goes in.
-        expect(hill.proofBox(place, 6)).toEqual({ x1: 91, y1: 64, z1: -49, x2: 109, y2: 68, z2: -31 });
+        expect(hill.proofBox(place, 6)).toEqual({
+            x1: 91,
+            y1: 64,
+            z1: -49,
+            x2: 109,
+            y2: 68,
+            z2: -31
+        });
     });
 
     it("brings everybody in round the circle, just outside it, facing the middle", () => {

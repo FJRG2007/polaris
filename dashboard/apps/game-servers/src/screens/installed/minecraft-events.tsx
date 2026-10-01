@@ -619,8 +619,7 @@ export function MinecraftEvents({
             if (answer.outcome === "done") setNote(t("events.givenBack", { name: player }));
             else if (answer.outcome === "offline")
                 setError(t("events.stashOffline", { name: player }));
-            else if (answer.outcome === "later")
-                setError(t("events.stashLater", { name: player }));
+            else if (answer.outcome === "later") setError(t("events.stashLater", { name: player }));
             else setError(t("events.stashStillFailed", { name: player }));
         });
     }

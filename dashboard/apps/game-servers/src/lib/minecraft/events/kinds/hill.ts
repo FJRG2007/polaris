@@ -111,7 +111,11 @@ export function enterLines(name: string, spot: Spot, overGround: boolean): strin
 }
 
 /** Knocked right off - into the sea, down a slope, far out: time to come back. */
-export function strayed(at: { x: number; y: number; z: number }, place: Point, radius: number): boolean {
+export function strayed(
+    at: { x: number; y: number; z: number },
+    place: Point,
+    radius: number
+): boolean {
     const reach = radius + MARGIN + STRAY;
     return (
         at.y < place.y - DROP ||

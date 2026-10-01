@@ -194,14 +194,22 @@ export function dropTag(record: string | null, slot: number): string {
  * reads no `count` and drops an empty stack at once). Tagged for its stash and
  * slot (`dropTag`). Null when a line would be longer than a command can be.
  */
-export function dropLines(name: string, item: InventoryItem, record: string | null): string[] | null {
+export function dropLines(
+    name: string,
+    item: InventoryItem,
+    record: string | null
+): string[] | null {
     const tag = dropTag(record, item.slot);
     const it = `@e[type=minecraft:item,tag=${tag}]`;
     const tail = `Tags:["${tag}"],PickupDelay:32767,Age:-32768`;
     const modern = `execute unless entity ${it} at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"${item.id}",count:${item.count}${item.data?.era === "components" ? `,components:${item.data.snbt}` : ""}},${tail}}`;
     const legacy = `execute unless entity ${it} at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"${item.id}",Count:${item.count}b${item.data?.era === "tag" ? `,tag:${item.data.snbt}` : ""}},${tail}}`;
     const lines =
-        item.data === null ? [modern, legacy] : item.data.era === "components" ? [modern] : [legacy];
+        item.data === null
+            ? [modern, legacy]
+            : item.data.era === "components"
+              ? [modern]
+              : [legacy];
     return lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX) ? lines : null;
 }
 
