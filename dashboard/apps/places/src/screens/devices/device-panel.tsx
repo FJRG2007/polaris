@@ -24,12 +24,13 @@ import { usePlacesT } from "../use-places-t";
 import { placesRefusalText } from "../../lib/refusal-text";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
-    ClimateCommand,
     DeviceAction,
+    DeviceCommand,
     DeviceEventView,
     DeviceView
 } from "../../lib/device-kinds";
 import { DeviceSwitch } from "./device-switch";
+import { AirControls, FilterChip } from "./air-controls";
 import { ClimateControls } from "./climate-controls";
 import {
     Badge,
@@ -47,6 +48,7 @@ import {
     BatteryLow,
     DoorClosed,
     DoorOpen,
+    Droplets,
     Gauge,
     Lightbulb,
     Loader2,
@@ -57,7 +59,8 @@ import {
     Plug,
     Power,
     PowerOff,
-    ToggleRight
+    ToggleRight,
+    Wind
 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
 import { AutoOffShortcut } from "../automations/auto-off-shortcut";
@@ -78,7 +81,8 @@ const ACTION_ICONS: Record<DeviceAction, typeof Lock> = {
     "set-mode": AirVent,
     "set-temperature": AirVent,
     "set-fan": AirVent,
-    "set-option": AirVent
+    "set-option": AirVent,
+    "set-humidity": Droplets
 };
 
 /** What each sort of device looks like in a list. A row of doors and a row of
@@ -88,6 +92,7 @@ const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
     lock: DoorClosed,
     opener: DoorOpen,
     climate: AirVent,
+    air: Wind,
     switch: ToggleRight,
     outlet: Plug,
     light: Lightbulb,
@@ -151,7 +156,7 @@ export function DeviceControls({
     device: DeviceView;
     canControl: boolean;
     busy: DeviceAction | null;
-    onAct: (action: DeviceAction, command?: ClimateCommand) => void;
+    onAct: (action: DeviceAction, command?: DeviceCommand) => void;
     /** The panel's version, where a kind has more than fits on a row. */
     detailed?: boolean;
     className?: string;
@@ -160,6 +165,18 @@ export function DeviceControls({
     if (kinds.deviceKind(device.kind) === "climate") {
         return (
             <ClimateControls
+                device={device}
+                canControl={canControl}
+                busy={busy}
+                onAct={onAct}
+                detailed={detailed}
+                className={className}
+            />
+        );
+    }
+    if (kinds.deviceKind(device.kind) === "air") {
+        return (
+            <AirControls
                 device={device}
                 canControl={canControl}
                 busy={busy}
@@ -238,7 +255,7 @@ export function DevicePanel({
     canControl: boolean;
     canManage: boolean;
     onClose: () => void;
-    onAct: (device: DeviceView, action: DeviceAction, command?: ClimateCommand) => Promise<void>;
+    onAct: (device: DeviceView, action: DeviceAction, command?: DeviceCommand) => Promise<void>;
     onEdit: (device: DeviceView) => void;
 }) {
     const format = useDisplayFormat();
@@ -279,7 +296,7 @@ export function DevicePanel({
         [used, format.preferences.timeZone]
     );
 
-    const act = async (action: DeviceAction, command?: ClimateCommand) => {
+    const act = async (action: DeviceAction, command?: DeviceCommand) => {
         if (!device) return;
         setBusy(action);
         setError("");
@@ -304,6 +321,7 @@ export function DevicePanel({
                         <header className="flex flex-wrap items-center gap-3 border-b border-border py-3 pl-5 pr-14">
                             <DialogTitle className="text-sm font-medium">{device.name}</DialogTitle>
                             <StatePill device={device} />
+                            <FilterChip air={device.air} />
                             {device.doorState !== "none" && (
                                 <span className="text-xs text-muted-foreground">
                                     {kinds.doorText(device.doorState, t)}

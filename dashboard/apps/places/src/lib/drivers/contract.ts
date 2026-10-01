@@ -12,8 +12,9 @@
  */
 
 import type {
-    ClimateCommand,
+    AirSettings,
     ClimateSettings,
+    DeviceCommand,
     DeviceAction,
     DeviceKind,
     DeviceState,
@@ -67,6 +68,9 @@ export interface DeviceSnapshot {
     /** How an air conditioner is set and what it can be set to. Its room
      *  temperature is `value`, in `unit`, like any other thermometer's. */
     readonly climate?: ClimateSettings | null;
+    /** How a purifier or humidifier is set, what it can be set to and what it
+     *  measures. Its headline figure is also `value`, in `unit`. */
+    readonly air?: AirSettings | null;
 }
 
 /** One thing that happened, as the vendor's own record of it. */
@@ -160,8 +164,9 @@ export interface DeviceDriver {
         device: { readonly externalId: string; readonly kind: string },
         action: DeviceAction,
         /** What to set, for the actions that set something - a mode, a
-         *  temperature. Already checked against the unit's own settings. */
-        command?: ClimateCommand
+         *  temperature. Already checked against the unit's own settings, and
+         *  always the device's own kind's. */
+        command?: DeviceCommand
     ): Promise<void>;
     /** Present on a connection made by pairing rather than by typing. */
     readonly pair?: DevicePairing;

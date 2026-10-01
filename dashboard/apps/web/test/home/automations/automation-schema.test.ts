@@ -640,3 +640,223 @@ describe("an air conditioner in an automation", () => {
         expect(words.valueText("mode", "climate", "fan", en)).toBe("Fan only");
     });
 });
+describe("an air purifier", () => {
+    const purifier = device("air", "air", {
+        state: "on",
+        reading: { value: "12", unit: "µg/m³" },
+        air: {
+            mode: "auto",
+            modes: ["auto", "sleep", "turbo"],
+            speed: null,
+            speeds: ["speed_1", "speed_2"],
+            humidity: { target: 50, min: 40, max: 70, step: 10 },
+            options: { childLock: false },
+            readings: { pm25: 12, humidity: 45 },
+            filters: [{ kind: "hepa", percent: 12, hours: 540, state: "soon" }]
+        }
+    });
+    const issues = (definition: Partial<auto.AutomationDefinition>) => {
+        const parsed = parse(input(definition));
+        if (!parsed.success) throw new Error(JSON.stringify(parsed.error.issues));
+        return auto
+            .deviceIssues(parsed.data.definition, [...DEVICES, purifier], {
+                automationIds: [],
+                selfId: null
+            })
+            .map((issue) => issue.message);
+    };
+
+    it("watches its power, its preset and its filters, and offers each figure to compare", () => {
+        expect(auto.attributesFor("air")).toEqual(["state", "mode", "filter"]);
+        expect(auto.measures("air")).toBe(true);
+        expect(auto.measuresFor("air")).toEqual([
+            "pm25",
+            "allergen",
+            "humidity",
+            "temperature",
+            "filter"
+        ]);
+        expect(auto.measuresFor("sensor")).toEqual([]);
+        expect(
+            issues({
+                triggers: [
+                    {
+                        id: "trig01",
+                        kind: "threshold",
+                        deviceId: "air",
+                        direction: "above",
+                        value: 35,
+                        measure: "pm25"
+                    },
+                    {
+                        id: "trig02",
+                        kind: "threshold",
+                        deviceId: "air",
+                        direction: "below",
+                        value: 10,
+                        measure: "filter"
+                    },
+                    {
+                        id: "trig03",
+                        kind: "change",
+                        deviceId: "air",
+                        attribute: "filter",
+                        from: "",
+                        to: "now"
+                    },
+                    {
+                        id: "trig04",
+                        kind: "change",
+                        deviceId: "air",
+                        attribute: "mode",
+                        from: "",
+                        to: "sleep"
+                    }
+                ],
+                conditions: {
+                    match: "all",
+                    groups: [
+                        {
+                            id: "group01",
+                            match: "all",
+                            items: [
+                                {
+                                    id: "cond01",
+                                    kind: "reading",
+                                    deviceId: "air",
+                                    op: "gt",
+                                    value: 60,
+                                    measure: "humidity"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            })
+        ).toEqual([]);
+    });
+
+    it("refuses a figure on a device that does not report it, and a word that is not a filter state", () => {
+        expect(
+            issues({
+                triggers: [
+                    {
+                        id: "trig01",
+                        kind: "threshold",
+                        deviceId: "temp",
+                        direction: "above",
+                        value: 25,
+                        measure: "pm25"
+                    }
+                ]
+            })
+        ).toEqual(["automations.errors.measure"]);
+        expect(
+            parse(
+                input({
+                    triggers: [
+                        {
+                            id: "trig01",
+                            kind: "change",
+                            deviceId: "air",
+                            attribute: "filter",
+                            from: "",
+                            to: "dirty"
+                        }
+                    ]
+                })
+            ).success
+        ).toBe(false);
+    });
+
+    it("takes its own settings and refuses an air conditioner's, or one it does not have", () => {
+        const set = (setting: auto.StepSetting) =>
+            issues({
+                actions: [
+                    { id: "step01", kind: "device", deviceId: "air", do: setting.action, setting }
+                ]
+            });
+        expect(set({ action: "set-mode", mode: "sleep" })).toEqual([]);
+        expect(set({ action: "set-fan", speed: "speed_2" })).toEqual([]);
+        expect(set({ action: "set-humidity", target: 60 })).toEqual([]);
+        expect(set({ action: "set-option", option: "childLock", on: true })).toEqual([]);
+        expect(set({ action: "set-mode", mode: "allergen" })).toEqual([
+            "automations.errors.setting"
+        ]);
+        expect(set({ action: "set-fan", speed: "turbo" })).toEqual(["automations.errors.setting"]);
+        expect(set({ action: "set-humidity", target: 65 })).toEqual(["automations.errors.setting"]);
+        expect(set({ action: "set-fan", fan: "high" })).toEqual(["automations.errors.setting"]);
+        // Not something a purifier is told at all.
+        expect(set({ action: "set-temperature", target: 22 })).toEqual([
+            "automations.errors.cannotDo"
+        ]);
+    });
+
+    it("starts a new setting where the unit already is", () => {
+        const air = { kind: "air", settings: purifier.air };
+        expect(auto.blankSetting("set-mode", null, air)).toEqual({
+            action: "set-mode",
+            mode: "auto"
+        });
+        expect(auto.blankSetting("set-fan", null, air)).toEqual({
+            action: "set-fan",
+            speed: "speed_1"
+        });
+        expect(auto.blankSetting("set-humidity", null, air)).toEqual({
+            action: "set-humidity",
+            target: 50
+        });
+        expect(auto.blankSetting("set-option", null, air)).toEqual({
+            action: "set-option",
+            option: "childLock",
+            on: true
+        });
+    });
+
+    it("says its triggers and steps in words, in both languages", () => {
+        const es = placesCatalogs.translator("es-ES", "places");
+        const en = placesCatalogs.translator("en-US", "places");
+        const lookup = (id: string) =>
+            id === "air" ? { name: "Bedroom purifier", kind: "air" } : undefined;
+        const dusty: auto.Trigger = {
+            id: "trig01",
+            kind: "threshold",
+            deviceId: "air",
+            direction: "above",
+            value: 35,
+            measure: "pm25"
+        };
+        expect(words.describeTrigger(dusty, lookup, en)).toBe(
+            "PM2.5 of Bedroom purifier goes above 35"
+        );
+        expect(
+            words.describeTrigger(
+                { ...dusty, measure: "filter", direction: "below", value: 10 },
+                lookup,
+                en
+            )
+        ).toBe("Filter life left of Bedroom purifier goes below 10");
+        expect(
+            words.describeTrigger(
+                { ...dusty, measure: "filter", direction: "below", value: 10 },
+                lookup,
+                es
+            )
+        ).toBe("Vida del filtro de Bedroom purifier pasa por debajo de 10");
+        const step: auto.Step = {
+            id: "step01",
+            kind: "device",
+            deviceId: "air",
+            do: "set-fan",
+            setting: { action: "set-fan", speed: "speed_2" }
+        };
+        expect(words.describeStep(step, lookup, () => undefined, en)).toBe(
+            "Set Bedroom purifier to Speed 2"
+        );
+        expect(words.describeStep(step, lookup, () => undefined, es)).toBe(
+            "Poner Bedroom purifier en Nivel 2"
+        );
+        expect(words.valueText("mode", "air", "sleep", es)).toBe("Sueño");
+        expect(words.valueText("filter", "air", "soon", en)).toBe("Replace soon");
+    });
+});

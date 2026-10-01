@@ -119,7 +119,12 @@ const SERVICE_IMAGES: Record<string, string> = {
     // Gree's emblem, cut from their own logo file (Wikimedia Commons, credited to
     // gree.com) without the wordmark, which is unreadable at icon size. Their
     // blue and orange, as published.
-    gree: "/logos/gree.svg"
+    gree: "/logos/gree.svg",
+    // The Philips shield as Philips publish it in their 2019 annual report
+    // (Wikimedia Commons, "Philips shield (2013).svg", public domain), editor
+    // metadata stripped. Not in any icon registry; the wordmark is unreadable
+    // at icon size. Their blue, with the stars and waves in white.
+    philips: "/logos/philips.svg"
 };
 
 /**

@@ -9939,6 +9939,10 @@ model PlaceDevice {
     /// range, fan, extras), as `device-kinds` validates it. Null for every other
     /// kind. Its room temperature is `value`, like any other thermometer's.
     climate        Json?
+    /// How an air purifier or humidifier is set, what it can be set to, what it
+    /// measures and how worn its filters are, as `air-kinds` validates it. Null
+    /// for every other kind. Its headline figure is also `value`.
+    air            Json?
     /// open | closed | unknown | none - the door itself, when a sensor is paired.
     /// `none` is no sensor, which is not the same as not knowing.
     doorState      String    @default("none")
@@ -10081,6 +10085,10 @@ model PlaceDeviceObservation {
     /// An air conditioner's mode (cool, heat...), or empty for anything else.
     mode         String   @default("")
     modeSince    DateTime @default(now())
+    /// A purifier's figures by measure (pm25, humidity, filter life...) and its
+    /// most worn filter's state, each with when it last changed. Empty for
+    /// anything else.
+    figures      Json     @default("{}")
     /// One more on every change: what names each change, and what the swap
     /// compares, so two readers of the same change fire it once.
     version      Int      @default(0)

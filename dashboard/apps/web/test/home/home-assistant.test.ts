@@ -25,6 +25,9 @@ let states: unknown[] = [];
 let tokenValid = true;
 let serviceStatus = 200;
 let configUnit = "°C";
+/** What `/api/template` renders: each fan's and humidifier's device-mates. */
+let devices: [string, string[]][] = [];
+let templateStatus = 200;
 
 vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) => {
     const actual =
@@ -71,6 +74,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
                 return found ? reply(200, found) : reply(404, {});
             }
             if (path.startsWith("/api/services/")) return reply(serviceStatus, []);
+            if (path === "/api/template") return reply(templateStatus, devices);
             return reply(404, {});
         }
     };
@@ -85,6 +89,8 @@ beforeEach(() => {
     tokenValid = true;
     serviceStatus = 200;
     configUnit = "°C";
+    devices = [];
+    templateStatus = 200;
     states = [
         {
             entity_id: "switch.kettle",
@@ -354,5 +360,219 @@ describe("the token", () => {
         await expect(homeAssistantDriver.verify(HOME)).rejects.toMatchObject({
             kind: "unauthorized"
         });
+    });
+});
+describe("an air purifier", () => {
+    const PURIFIER = [
+        "fan.bedroom_purifier",
+        "humidifier.bedroom_purifier",
+        "sensor.bedroom_purifier_pm2_5",
+        "sensor.bedroom_purifier_indoor_allergen_index",
+        "sensor.bedroom_purifier_humidity",
+        "sensor.bedroom_purifier_temperature",
+        "sensor.bedroom_purifier_hepa_filter",
+        "sensor.bedroom_purifier_pre_filter",
+        "switch.bedroom_purifier_child_lock",
+        "light.bedroom_purifier_display_backlight"
+    ];
+
+    beforeEach(() => {
+        // As the Philips integration names and describes them.
+        states = [
+            {
+                entity_id: "fan.bedroom_purifier",
+                state: "on",
+                attributes: {
+                    friendly_name: "Bedroom purifier",
+                    preset_mode: "sleep",
+                    preset_modes: ["auto", "allergen", "sleep", "speed_1", "turbo", "focus"],
+                    percentage: 25,
+                    percentage_step: 25,
+                    supported_features: 57
+                }
+            },
+            {
+                entity_id: "humidifier.bedroom_purifier",
+                state: "off",
+                attributes: {
+                    humidity: 50,
+                    min_humidity: 40,
+                    max_humidity: 70,
+                    current_humidity: 44
+                }
+            },
+            {
+                entity_id: "sensor.bedroom_purifier_pm2_5",
+                state: "9",
+                attributes: { device_class: "pm25", unit_of_measurement: "µg/m³" }
+            },
+            {
+                entity_id: "sensor.bedroom_purifier_indoor_allergen_index",
+                state: "3",
+                attributes: {}
+            },
+            {
+                entity_id: "sensor.bedroom_purifier_humidity",
+                state: "45",
+                attributes: { device_class: "humidity", unit_of_measurement: "%" }
+            },
+            {
+                entity_id: "sensor.bedroom_purifier_temperature",
+                state: "71.6",
+                attributes: { device_class: "temperature", unit_of_measurement: "°F" }
+            },
+            {
+                entity_id: "sensor.bedroom_purifier_hepa_filter",
+                state: "4",
+                attributes: { unit_of_measurement: "%" }
+            },
+            {
+                entity_id: "sensor.bedroom_purifier_pre_filter",
+                state: "300",
+                attributes: { unit_of_measurement: "h" }
+            },
+            { entity_id: "switch.bedroom_purifier_child_lock", state: "off", attributes: {} },
+            { entity_id: "light.bedroom_purifier_display_backlight", state: "on", attributes: {} },
+            // A ceiling fan: nothing on its device a purifier has.
+            {
+                entity_id: "fan.ceiling",
+                state: "on",
+                attributes: {
+                    friendly_name: "Ceiling",
+                    percentage: 50,
+                    percentage_step: 33.33,
+                    supported_features: 1
+                }
+            },
+            // A humidifier on its own.
+            {
+                entity_id: "humidifier.nursery",
+                state: "on",
+                attributes: {
+                    friendly_name: "Nursery",
+                    humidity: 55,
+                    min_humidity: 30,
+                    max_humidity: 70,
+                    target_humidity_step: 5,
+                    mode: "sleep",
+                    available_modes: ["auto", "sleep", "boost"],
+                    current_humidity: 41
+                }
+            }
+        ];
+        devices = [
+            ["fan.bedroom_purifier", PURIFIER],
+            ["humidifier.bedroom_purifier", PURIFIER],
+            ["fan.ceiling", ["fan.ceiling"]],
+            ["humidifier.nursery", ["humidifier.nursery"]]
+        ];
+    });
+
+    it("is one row per purifier, with its device's sensors, and a ceiling fan is left out", async () => {
+        const rows = (await homeAssistantDriver.list(HOME)).filter((row) => row.kind === "air");
+        expect(rows.map((row) => [row.externalId, row.name, row.state])).toEqual([
+            ["fan.bedroom_purifier", "Bedroom purifier", "on"],
+            ["humidifier.nursery", "Nursery", "on"]
+        ]);
+        const purifier = rows[0]!;
+        expect(purifier).toMatchObject({ value: "9", unit: "µg/m³", online: true });
+        expect(purifier.air).toMatchObject({
+            mode: "sleep",
+            modes: ["auto", "allergen", "sleep", "speed_1", "turbo"],
+            speed: "speed_1",
+            speeds: ["speed_1", "speed_2", "speed_3", "speed_4"],
+            humidity: { target: 50, min: 40, max: 70, step: 1 },
+            options: { childLock: false, light: true, humidify: false },
+            readings: { pm25: 9, allergen: 3, humidity: 45, temperature: 22 }
+        });
+        expect(purifier.air?.filters).toEqual([
+            { kind: "hepa", percent: 4, hours: null, state: "now" },
+            { kind: "pre", percent: null, hours: 300, state: "ok" }
+        ]);
+        // Asked which entities share a device, with Home Assistant's own functions.
+        const template = sent.find((request) => new URL(request.url).pathname === "/api/template");
+        expect(JSON.parse(template!.body).template).toContain("device_entities(d)");
+    });
+
+    it("reads a humidifier on its own by its modes and its target", async () => {
+        const row = (await homeAssistantDriver.list(HOME)).find(
+            (entry) => entry.externalId === "humidifier.nursery"
+        );
+        expect(row?.air).toMatchObject({
+            mode: "sleep",
+            modes: ["auto", "sleep"],
+            speeds: [],
+            humidity: { target: 55, min: 30, max: 70, step: 5 },
+            readings: { humidity: 41 }
+        });
+        expect(row).toMatchObject({ value: "41", unit: "%" });
+    });
+
+    it("leaves fans out, rather than guessing, when Home Assistant will not say what shares a device", async () => {
+        templateStatus = 400;
+        const rows = (await homeAssistantDriver.list(HOME)).filter((row) => row.kind === "air");
+        expect(rows.map((row) => row.externalId)).toEqual([
+            "humidifier.bedroom_purifier",
+            "humidifier.nursery"
+        ]);
+    });
+
+    const act = (action: Parameters<typeof homeAssistantDriver.act>[2], command?: unknown) =>
+        homeAssistantDriver.act(
+            HOME,
+            { externalId: "fan.bedroom_purifier", kind: "air" },
+            action,
+            command as Parameters<typeof homeAssistantDriver.act>[3]
+        );
+    const lastService = () => {
+        const request = sent
+            .filter((entry) => new URL(entry.url).pathname.startsWith("/api/services/"))
+            .at(-1)!;
+        return [new URL(request.url).pathname, JSON.parse(request.body)];
+    };
+
+    it("sets a preset, a speed, a humidity and its switches through the right entity", async () => {
+        await act("set-mode", { action: "set-mode", mode: "turbo" });
+        expect(lastService()).toEqual([
+            "/api/services/fan/set_preset_mode",
+            { preset_mode: "turbo", entity_id: "fan.bedroom_purifier" }
+        ]);
+        await act("set-fan", { action: "set-fan", speed: "speed_3" });
+        expect(lastService()).toEqual([
+            "/api/services/fan/set_percentage",
+            { percentage: 75, entity_id: "fan.bedroom_purifier" }
+        ]);
+        await act("set-humidity", { action: "set-humidity", target: 60 });
+        expect(lastService()).toEqual([
+            "/api/services/humidifier/set_humidity",
+            { humidity: 60, entity_id: "humidifier.bedroom_purifier" }
+        ]);
+        await act("set-option", { action: "set-option", option: "childLock", on: true });
+        expect(lastService()).toEqual([
+            "/api/services/switch/turn_on",
+            { entity_id: "switch.bedroom_purifier_child_lock" }
+        ]);
+        await act("set-option", { action: "set-option", option: "humidify", on: true });
+        expect(lastService()).toEqual([
+            "/api/services/humidifier/turn_on",
+            { entity_id: "humidifier.bedroom_purifier" }
+        ]);
+        await act("turn-off");
+        expect(lastService()).toEqual([
+            "/api/services/fan/turn_off",
+            { entity_id: "fan.bedroom_purifier" }
+        ]);
+    });
+
+    it("refuses a preset or a speed the entity does not have, before sending anything", async () => {
+        await expect(act("set-mode", { action: "set-mode", mode: "gas" })).rejects.toThrow(
+            "That mode is not one this device has"
+        );
+        await expect(act("set-fan", { action: "set-fan", speed: "speed_5" })).rejects.toThrow(
+            "That fan speed is not one this device has"
+        );
+        expect(sent.some((entry) => new URL(entry.url).pathname.startsWith("/api/services/"))).toBe(
+            false
+        );
     });
 });

@@ -13,6 +13,7 @@
  */
 
 import { HomeError } from "../home-error";
+import { climateCommandOf } from "../device-kinds";
 import * as tuya from "../integrations/tuya-api";
 import type { Credentials, DeviceDriver } from "./contract";
 import { tuyaActionFor, tuyaSnapshots, tuyaSpecsFor, tuyaSpeaking } from "./tuya-vocabulary";
@@ -54,8 +55,11 @@ export const tuyaCloudDriver: DeviceDriver = {
     async act(credentials, device, action, command) {
         const keys = credentialsOf(credentials);
         await tuyaSpeaking(async () => {
-            const { deviceId, commands } = await tuyaActionFor(device, action, command, (id) =>
-                tuya.tuyaSpecification(keys, id)
+            const { deviceId, commands } = await tuyaActionFor(
+                device,
+                action,
+                climateCommandOf(command),
+                (id) => tuya.tuyaSpecification(keys, id)
             );
             await tuya.tuyaCommand(keys, deviceId, commands);
         });

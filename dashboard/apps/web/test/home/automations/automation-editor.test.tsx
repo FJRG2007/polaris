@@ -70,6 +70,20 @@ const DEVICES = [
             options: {},
             current: 24
         }
+    }),
+    device("air", "air", {
+        state: "on",
+        reading: { value: "12", unit: "µg/m³" },
+        air: {
+            mode: "auto",
+            modes: ["auto", "sleep"],
+            speed: null,
+            speeds: ["speed_1", "speed_2"],
+            humidity: { target: 50, min: 40, max: 70, step: 10 },
+            options: { childLock: false },
+            readings: { pm25: 12, humidity: 45 },
+            filters: []
+        }
     })
 ];
 
@@ -109,6 +123,35 @@ const CLIMATE_SAVED: AutomationView = {
     }
 };
 
+/** A purifier that goes to its second speed when the dust rises. */
+const AIR_SAVED: AutomationView = {
+    ...SAVED,
+    id: "auto-air",
+    name: "Clean the air",
+    definition: {
+        ...SAVED.definition,
+        triggers: [
+            {
+                id: "trig01",
+                kind: "threshold",
+                deviceId: "air",
+                direction: "above",
+                value: 35,
+                measure: "pm25"
+            }
+        ],
+        actions: [
+            {
+                id: "step01",
+                kind: "device",
+                deviceId: "air",
+                do: "set-fan",
+                setting: { action: "set-fan", speed: "speed_2" }
+            }
+        ]
+    }
+};
+
 const RUNS: RunView[] = [
     {
         id: "run-1",
@@ -133,7 +176,14 @@ const RUNS: RunView[] = [
 
 vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     getAutomationAction: async (id: string | null) => ({
-        automation: id === "auto-climate" ? CLIMATE_SAVED : id ? SAVED : undefined,
+        automation:
+            id === "auto-climate"
+                ? CLIMATE_SAVED
+                : id === "auto-air"
+                  ? AIR_SAVED
+                  : id
+                    ? SAVED
+                    : undefined,
         runs: id ? RUNS : [],
         context: {
             placeId: "place-1",
@@ -407,6 +457,46 @@ describe("a step that sets an air conditioner", () => {
                 deviceId: "ac",
                 do: "set-temperature",
                 setting: { action: "set-temperature", target: 21 }
+            })
+        ]);
+    });
+});
+
+describe("an automation on an air purifier", () => {
+    it("compares the figure it names, and sets a speed the unit has", async () => {
+        render(
+            <AutomationEditor
+                automationId="auto-air"
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
+        await painted();
+        expect(screen.getByRole("combobox", { name: /^Reading/ }).textContent).toContain("PM2.5");
+        expect(screen.getByText("µg/m³")).toBeDefined();
+        expect(screen.getByRole("combobox", { name: /^Fan speed/ }).textContent).toContain(
+            "Speed 2"
+        );
+        const value = screen.getByLabelText(/^Value/) as HTMLInputElement;
+        fireEvent.change(value, { target: { value: "50" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as { definition: { triggers: unknown[]; actions: unknown[] } };
+        expect(input.definition.triggers).toEqual([
+            expect.objectContaining({
+                kind: "threshold",
+                deviceId: "air",
+                value: 50,
+                measure: "pm25"
+            })
+        ]);
+        expect(input.definition.actions).toEqual([
+            expect.objectContaining({
+                do: "set-fan",
+                setting: { action: "set-fan", speed: "speed_2" }
             })
         ]);
     });

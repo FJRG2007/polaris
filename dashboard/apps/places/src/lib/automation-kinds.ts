@@ -22,8 +22,9 @@ import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
 /** What about a device a trigger, a condition or a wait looks at. A lock has a
  *  bolt and often a door sensor beside it, and "the door opened" is not "the
  *  lock opened"; a sensor has neither and is its reading. An air conditioner
- *  is on or off, and separately cooling or heating - its mode. */
-export const AUTOMATION_ATTRIBUTES = ["state", "door", "reading", "mode"] as const;
+ *  is on or off, and separately cooling or heating - its mode. A purifier has a
+ *  mode too, and filters that wear: `filter` is the most worn one's state. */
+export const AUTOMATION_ATTRIBUTES = ["state", "door", "reading", "mode", "filter"] as const;
 export type AutomationAttribute = (typeof AUTOMATION_ATTRIBUTES)[number];
 
 /** The door sensor's words that can be waited for. `unknown` and `none` are not
@@ -36,6 +37,7 @@ const WATCHED_STATES: Readonly<Record<DeviceKind, readonly kinds.DeviceState[]>>
     lock: ["locked", "unlocked", "unlatched", "jammed"],
     opener: ["locked", "unlatched"],
     climate: ["on", "off"],
+    air: ["on", "off"],
     switch: ["on", "off"],
     outlet: ["on", "off"],
     light: ["on", "off"],
@@ -52,15 +54,35 @@ export function attributesFor(kind: string): readonly AutomationAttribute[] {
     if (which === "sensor") return ["reading"];
     if (which === "lock" || which === "opener") return ["state", "door"];
     if (which === "climate") return ["state", "mode"];
+    if (which === "air") return ["state", "mode", "filter"];
     return ["state"];
 }
 
-/** Whether a kind of device has a number to compare - a sensor's reading, or
- *  the room temperature an air conditioner reads. What a threshold trigger and
- *  a reading condition can watch. */
+/**
+ * The figures a threshold or a reading condition can compare on a device that
+ * reports more than one. A purifier has the dust, the allergen index, the
+ * humidity and the room's temperature, and `filter` - the least life left in
+ * any of its filters, as a share. Anything else has its one reading and no
+ * choice to make.
+ */
+export const READING_MEASURES = [...kinds.AIR_MEASURES, "filter"] as const;
+export type ReadingMeasure = (typeof READING_MEASURES)[number];
+
+export function measuresFor(kind: string): readonly ReadingMeasure[] {
+    return kinds.deviceKind(kind) === "air" ? READING_MEASURES : [];
+}
+
+/** The words a mode can be, whichever kind of device it is on. */
+const MODE_WORDS: readonly string[] = [
+    ...new Set<string>([...kinds.CLIMATE_MODES, ...kinds.AIR_MODES])
+];
+
+/** Whether a kind of device has a number to compare - a sensor's reading, the
+ *  room temperature an air conditioner reads, or a purifier's figures. What a
+ *  threshold trigger and a reading condition can watch. */
 export function measures(kind: string): boolean {
     const which = kinds.deviceKind(kind);
-    return which === "sensor" || which === "climate";
+    return which === "sensor" || which === "climate" || which === "air";
 }
 
 /** A step may flip something rather than name where it should end up. Only for
@@ -158,12 +180,13 @@ const amount = z
     .max(1e9, "automations.errors.tooBig");
 
 /**
- * What a step that sets something sets it to. The same shape as a device
- * command (`climateCommandSchema`), with this editor's own messages; whether the
- * unit has it is for `deviceIssues` to say, against the unit itself.
+ * What a step that sets something sets it to. The same shapes as a device
+ * command (`climateCommandSchema`, `airCommandSchema`), with this editor's own
+ * messages; whether the unit has it - and whether it is that unit's kind's - is
+ * for `deviceIssues` to say, against the unit itself.
  */
 const settingError = { errorMap: () => ({ message: "automations.errors.setting" }) };
-const settingSchema = z.discriminatedUnion(
+const climateSettingSchema = z.discriminatedUnion(
     "action",
     [
         z.object({
@@ -180,17 +203,62 @@ const settingSchema = z.discriminatedUnion(
     ],
     settingError
 );
+const airSettingSchema = z.discriminatedUnion(
+    "action",
+    [
+        z.object({ action: z.literal("set-mode"), mode: z.enum(kinds.AIR_MODES, settingError) }),
+        z.object({ action: z.literal("set-fan"), speed: z.enum(kinds.AIR_SPEEDS, settingError) }),
+        z.object({
+            action: z.literal("set-option"),
+            option: z.enum(kinds.AIR_OPTIONS, settingError),
+            on: z.boolean(settingError)
+        }),
+        z.object({ action: z.literal("set-humidity"), target: amount })
+    ],
+    settingError
+);
+type ClimateSetting = z.infer<typeof climateSettingSchema>;
+type AirSetting = z.infer<typeof airSettingSchema>;
 
-export type StepSetting = z.infer<typeof settingSchema>;
+/** Whether a setting is shaped as a purifier's: it carries what only a purifier
+ *  has. A mode both kinds share reads as an air conditioner's here and is
+ *  checked as the device's own kind's by `deviceIssues`. */
+function airShaped(value: unknown): boolean {
+    if (!value || typeof value !== "object") return false;
+    const setting = value as Record<string, unknown>;
+    if ("speed" in setting || setting.action === "set-humidity") return true;
+    if (setting.action === "set-option")
+        return (kinds.AIR_OPTIONS as readonly unknown[]).includes(setting.option);
+    if (setting.action === "set-mode") {
+        return (
+            (kinds.AIR_MODES as readonly unknown[]).includes(setting.mode) &&
+            !(kinds.CLIMATE_MODES as readonly unknown[]).includes(setting.mode)
+        );
+    }
+    return false;
+}
+
+/** Either kind's setting, checked by the one it is shaped as - so a complaint
+ *  is about the field that is wrong rather than "neither kind". */
+const settingSchema = z.unknown().transform((value, context): ClimateSetting | AirSetting => {
+    const parsed = (airShaped(value) ? airSettingSchema : climateSettingSchema).safeParse(value);
+    if (parsed.success) return parsed.data;
+    for (const issue of parsed.error.issues)
+        context.addIssue({ ...issue, message: issue.message } as z.IssueData);
+    return z.NEVER;
+});
+
+export type StepSetting = ClimateSetting | AirSetting;
 
 /** The field of a setting its value is in, which is where a complaint about it
  *  is drawn. */
-export const SETTING_FIELDS: Readonly<Record<StepSetting["action"], string>> = {
-    "set-mode": "mode",
-    "set-temperature": "target",
-    "set-fan": "fan",
-    "set-option": "option"
-};
+export function settingField(setting: StepSetting): string {
+    if ("mode" in setting) return "mode";
+    if ("fan" in setting) return "fan";
+    if ("speed" in setting) return "speed";
+    if ("option" in setting) return "option";
+    return "target";
+}
 
 export const triggerSchema = z.discriminatedUnion("kind", [
     z.object({ id: nodeId, kind: z.literal("time"), at: clock, days }),
@@ -216,7 +284,9 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         kind: z.literal("threshold"),
         deviceId: deviceRef,
         direction: z.enum(["above", "below"]),
-        value: amount
+        value: amount,
+        /** Which of a purifier's figures; absent for a device's one reading. */
+        measure: z.enum(READING_MEASURES).optional()
     }),
     z.object({ id: nodeId, kind: z.literal("manual") })
 ]);
@@ -235,7 +305,8 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         kind: z.literal("reading"),
         deviceId: deviceRef,
         op: z.enum(COMPARISONS),
-        value: amount
+        value: amount,
+        measure: z.enum(READING_MEASURES).optional()
     }),
     z.object({ id: nodeId, kind: z.literal("time"), from: clock, to: clock }),
     z.object({ id: nodeId, kind: z.literal("weekday"), days })
@@ -413,8 +484,10 @@ function checkWord(
             : attribute === "door"
               ? (DOOR_WORDS as readonly string[]).includes(value)
               : attribute === "mode"
-                ? (kinds.CLIMATE_MODES as readonly string[]).includes(value)
-                : true;
+                ? MODE_WORDS.includes(value)
+                : attribute === "filter"
+                  ? (kinds.FILTER_STATES as readonly string[]).includes(value)
+                  : true;
     if (!known) context.addIssue({ code: "custom", path, message: "automations.errors.state" });
 }
 
@@ -569,6 +642,8 @@ export interface AutomationIssue {
 export type AutomationDevice = Pick<DeviceView, "id" | "kind" | "name" | "controllable"> & {
     /** What an air conditioner accepts, where it is known. */
     readonly climate?: kinds.ClimateSettings | null;
+    /** What a purifier accepts, where it is known. */
+    readonly air?: kinds.AirSettings | null;
 };
 
 /**
@@ -595,12 +670,15 @@ export function deviceIssues(
             issues.push({ path: [...path, "attribute"], message: "automations.errors.attribute" });
         }
     };
-    const sensor = (deviceId: string, path: (string | number)[]) => {
+    const sensor = (deviceId: string, path: (string | number)[], measure?: ReadingMeasure) => {
         const device = byId.get(deviceId);
         if (!device)
             issues.push({ path: [...path, "deviceId"], message: "automations.errors.deviceGone" });
         else if (!measures(device.kind)) {
             issues.push({ path: [...path, "deviceId"], message: "automations.errors.notSensor" });
+        } else if (measure !== undefined && !measuresFor(device.kind).includes(measure)) {
+            // A figure only a purifier has, named on something that is not one.
+            issues.push({ path: [...path, "measure"], message: "automations.errors.measure" });
         }
     };
 
@@ -609,13 +687,13 @@ export function deviceIssues(
         if (trigger.kind === "change" || trigger.kind === "stays") {
             watched(trigger.deviceId, trigger.attribute, at);
         }
-        if (trigger.kind === "threshold") sensor(trigger.deviceId, at);
+        if (trigger.kind === "threshold") sensor(trigger.deviceId, at, trigger.measure);
     });
     definition.conditions.groups.forEach((group, index) =>
         group.items.forEach((condition, item) => {
             const at = ["definition", "conditions", "groups", index, "items", item];
             if (condition.kind === "device") watched(condition.deviceId, condition.attribute, at);
-            if (condition.kind === "reading") sensor(condition.deviceId, at);
+            if (condition.kind === "reading") sensor(condition.deviceId, at, condition.measure);
         })
     );
     definition.actions.forEach((step, index) => {
@@ -632,13 +710,21 @@ export function deviceIssues(
                 issues.push({ path: [...at, "deviceId"], message: "automations.errors.watchOnly" });
             } else if (!stepActionsFor(device.kind).includes(step.do)) {
                 issues.push({ path: [...at, "do"], message: "automations.errors.cannotDo" });
-            } else if (step.setting && device.climate) {
+            } else if (step.setting) {
                 // Checked against the unit as it was last read: a mode it does
-                // not have, or a target past its range, is refused at the save
-                // rather than at seven in the morning.
-                if (kinds.climateCommandIssue(device.climate, step.setting)) {
+                // not have, a target past its range, or a setting of the other
+                // kind's, is refused at the save rather than at seven in the
+                // morning. A unit that has not said yet is checked for its kind.
+                const target = {
+                    kind: device.kind,
+                    climate: device.climate ?? null,
+                    air: device.air ?? null
+                };
+                const read = kinds.commandFor(device.kind, step.setting);
+                const known = read && (read.kind === "climate" ? target.climate : target.air);
+                if (!read || (known && kinds.commandIssue(target, step.setting))) {
                     issues.push({
-                        path: [...at, "setting", SETTING_FIELDS[step.setting.action]],
+                        path: [...at, "setting", settingField(step.setting)],
                         message: "automations.errors.setting"
                     });
                 }
@@ -727,8 +813,10 @@ export function blankCondition(kind: ConditionKind): Condition {
  *  which is a value it is known to accept. */
 export function blankSetting(
     action: StepDeviceAction,
-    climate: kinds.ClimateSettings | null | undefined
+    climate: kinds.ClimateSettings | null | undefined,
+    air?: { readonly kind: string; readonly settings: kinds.AirSettings | null | undefined }
 ): StepSetting | undefined {
+    if (air && kinds.deviceKind(air.kind) === "air") return blankAirSetting(action, air.settings);
     switch (action) {
         case "set-mode":
             return { action, mode: climate?.mode ?? climate?.modes[0] ?? "cool" };
@@ -740,6 +828,28 @@ export function blankSetting(
             const option =
                 kinds.CLIMATE_OPTIONS.find((entry) => climate?.options[entry] !== undefined) ??
                 "swing";
+            return { action, option, on: true };
+        }
+        default:
+            return undefined;
+    }
+}
+
+/** The same for a purifier. */
+function blankAirSetting(
+    action: StepDeviceAction,
+    air: kinds.AirSettings | null | undefined
+): StepSetting | undefined {
+    switch (action) {
+        case "set-mode":
+            return { action, mode: air?.mode ?? air?.modes[0] ?? "auto" };
+        case "set-fan":
+            return { action, speed: air?.speed ?? air?.speeds[0] ?? "speed_1" };
+        case "set-humidity":
+            return { action, target: air?.humidity?.target ?? air?.humidity?.min ?? Number.NaN };
+        case "set-option": {
+            const option =
+                kinds.AIR_OPTIONS.find((entry) => air?.options[entry] !== undefined) ?? "childLock";
             return { action, option, on: true };
         }
         default:
@@ -801,7 +911,13 @@ export type TemplateId = (typeof TEMPLATES)[number];
  *  light left on is switched off, a door left unlocked is locked. */
 export function autoOffPlan(kind: string): { is: kinds.DeviceState; do: DeviceAction } | null {
     const which = kinds.deviceKind(kind);
-    if (which === "switch" || which === "outlet" || which === "light" || which === "climate")
+    if (
+        which === "switch" ||
+        which === "outlet" ||
+        which === "light" ||
+        which === "climate" ||
+        which === "air"
+    )
         return { is: "on", do: "turn-off" };
     if (which === "lock") return { is: "unlocked", do: "lock" };
     return null;
@@ -895,6 +1011,8 @@ export interface RunCause {
     readonly triggerId?: string;
     readonly deviceId?: string;
     readonly attribute?: AutomationAttribute;
+    /** Which of a purifier's figures crossed, for a threshold on one. */
+    readonly measure?: ReadingMeasure;
     readonly from?: string;
     readonly to?: string;
     readonly minutes?: number;

@@ -11,14 +11,56 @@
  * Server-only.
  */
 
+import { z } from "zod";
 import { prisma, type Prisma } from "@polaris/db";
 import * as auto from "./automation-kinds";
 import type {
     AutomationRecord,
     AutomationStore,
+    Figure,
     Observation,
     RunRecord
 } from "./automation-engine";
+
+/** Where a purifier's most worn filter is kept among its figures. Not a measure
+ *  name, so it can never be taken for one. */
+const FILTER_KEY = "@filter";
+
+const storedFigure = z.object({ value: z.string().max(200), since: z.string().datetime() });
+
+/** The figures column, read back: each figure with when it changed, and the
+ *  filter's state among them. Anything unreadable is left out. */
+function figuresOf(
+    stored: Prisma.JsonValue
+): Pick<Observation, "figures" | "filter" | "filterSince"> {
+    const parsed = z.record(z.string(), z.unknown()).safeParse(stored);
+    if (!parsed.success) return {};
+    const figures: Record<string, Figure> = {};
+    let filter: Figure | undefined;
+    for (const [key, value] of Object.entries(parsed.data)) {
+        const read = storedFigure.safeParse(value);
+        if (!read.success) continue;
+        const figure = { value: read.data.value, since: new Date(read.data.since) };
+        if (key === FILTER_KEY) filter = figure;
+        else figures[key] = figure;
+    }
+    return {
+        ...(Object.keys(figures).length > 0 ? { figures } : {}),
+        ...(filter ? { filter: filter.value, filterSince: filter.since } : {})
+    };
+}
+
+/** An observation as the row takes it: its figures folded into one column. */
+function rowOf(observation: Observation) {
+    const { figures, filter, filterSince, ...rest } = observation;
+    const stored: Record<string, { value: string; since: string }> = {};
+    for (const [key, figure] of Object.entries(figures ?? {})) {
+        stored[key] = { value: figure.value, since: figure.since.toISOString() };
+    }
+    if (filter)
+        stored[FILTER_KEY] = { value: filter, since: (filterSince ?? new Date()).toISOString() };
+    return { ...rest, figures: stored as Prisma.InputJsonValue };
+}
 
 const RUN_FIELDS = {
     id: true,
@@ -223,26 +265,33 @@ export const prismaAutomationStore: AutomationStore = {
     },
 
     async observation(deviceId) {
-        return prisma.placeDeviceObservation.findUnique({
-            where: { deviceId },
-            select: {
-                state: true,
-                stateSince: true,
-                door: true,
-                doorSince: true,
-                reading: true,
-                readingSince: true,
-                mode: true,
-                modeSince: true,
-                version: true
-            }
-        });
+        return prisma.placeDeviceObservation
+            .findUnique({
+                where: { deviceId },
+                select: {
+                    state: true,
+                    stateSince: true,
+                    door: true,
+                    doorSince: true,
+                    reading: true,
+                    readingSince: true,
+                    mode: true,
+                    modeSince: true,
+                    figures: true,
+                    version: true
+                }
+            })
+            .then((row) => {
+                if (!row) return null;
+                const { figures, ...rest } = row;
+                return { ...rest, ...figuresOf(figures) };
+            });
     },
 
     async swapObservation(deviceId, previous, next: Observation) {
         if (!previous) {
             try {
-                await prisma.placeDeviceObservation.create({ data: { deviceId, ...next } });
+                await prisma.placeDeviceObservation.create({ data: { deviceId, ...rowOf(next) } });
                 return true;
             } catch (error) {
                 if (duplicate(error)) return false;
@@ -251,7 +300,7 @@ export const prismaAutomationStore: AutomationStore = {
         }
         const swapped = await prisma.placeDeviceObservation.updateMany({
             where: { deviceId, version: previous.version },
-            data: next
+            data: rowOf(next)
         });
         return swapped.count === 1;
     },

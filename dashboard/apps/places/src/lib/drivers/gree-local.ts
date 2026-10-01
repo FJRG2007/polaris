@@ -22,20 +22,17 @@
  */
 
 import { z } from "zod";
-import { isIP } from "node:net";
-import { host } from "@polaris/app-host";
 import { HomeError } from "../home-error";
-import { lookup } from "node:dns/promises";
-import { hostsInCidr } from "../discovery";
 import * as gree from "../integrations/gree-api";
-import { deviceHost } from "../integrations/lan-http";
 import { GREE_BROADCAST } from "../integrations/gree-udp";
-import { forbiddenAddress, forbiddenError } from "../integrations/lan-address";
+import { forbiddenAddress } from "../integrations/lan-address";
+import { subnetTargets, unitAddressOf } from "../integrations/lan-unit";
 import {
     CLIMATE_FANS,
     type ClimateCommand,
     type ClimateFan,
     type ClimateMode,
+    climateCommandOf,
     type ClimateSettings,
     type DeviceAction
 } from "../device-kinds";
@@ -245,29 +242,10 @@ function unitsOf(credentials: Credentials): gree.GreeUnit[] {
     return parsed.data;
 }
 
-/** A typed address, as the IPv4 address it is, refused when it is one no unit
- *  is ever at. */
-async function addressOf(typed: string): Promise<string> {
-    const name = deviceHost(typed);
-    if (!name) throw new HomeError("Write the address as 192.168.1.30, with no path");
-    let address = name;
-    if (isIP(name) !== 4) {
-        try {
-            address = (await lookup(name, { family: 4 })).address;
-        } catch {
-            throw new DriverError("The device could not be reached.", "unreachable");
-        }
-    }
-    if (forbiddenAddress(address)) throw forbiddenError();
-    return address;
-}
-
 /** Where a scan for units is sent when nobody typed an address: the broadcast,
  *  and every address on this server's own network. */
 async function scanTargets(): Promise<string[]> {
-    const own = await host.hostAddress.getHostLanIp().catch(() => null);
-    const subnet = own ? hostsInCidr(`${own}/24`).filter((address) => address !== own) : [];
-    return [GREE_BROADCAST, ...subnet];
+    return [GREE_BROADCAST, ...(await subnetTargets())];
 }
 
 /** Units that stopped answering at their address, found again by MAC. Kept per
@@ -316,7 +294,7 @@ export const greeLocalDriver: DeviceDriver = {
      */
     async verify(credentials) {
         const typed = credentials.host?.trim() ?? "";
-        const targets = typed ? [await addressOf(typed)] : await scanTargets();
+        const targets = typed ? [await unitAddressOf(typed)] : await scanTargets();
         const found = (await gree.scanGree(targets)).filter(
             (unit) => !forbiddenAddress(unit.address)
         );
@@ -384,7 +362,7 @@ export const greeLocalDriver: DeviceDriver = {
                     ? "F"
                     : "C"
                 : "C";
-        await gree.commandGree(unit, greeValues(action, command, unitOfMeasure));
+        await gree.commandGree(unit, greeValues(action, climateCommandOf(command), unitOfMeasure));
     },
 
     /** Keep a unit's new address once it has been found there. */

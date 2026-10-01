@@ -64,6 +64,7 @@ const DEVICE_FIELDS = {
     value: true,
     unit: true,
     climate: true,
+    air: true,
     stateAt: true
 } as const;
 
@@ -86,6 +87,7 @@ type DeviceRow = {
     value: string | null;
     unit: string | null;
     climate: Prisma.JsonValue | null;
+    air: Prisma.JsonValue | null;
     stateAt: Date | null;
 };
 
@@ -95,6 +97,19 @@ function climateColumn(
     settings: kinds.ClimateSettings | null | undefined
 ): Prisma.InputJsonValue | typeof Prisma.DbNull {
     return settings ? (settings as Prisma.InputJsonValue) : Prisma.DbNull;
+}
+
+/** A purifier's settings, as stored. Null for every other kind. */
+function airOf(row: Pick<DeviceRow, "kind" | "air">): kinds.AirSettings | null {
+    return kinds.deviceKind(row.kind) === "air" ? kinds.airSettings(row.air) : null;
+}
+
+/** A purifier's settings to store, as the column takes them. */
+function airColumn(
+    settings: kinds.AirSettings | null | undefined
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    const storable = kinds.storableAir(settings);
+    return storable ? (storable as Prisma.InputJsonValue) : Prisma.DbNull;
 }
 
 /** An air conditioner's settings with its room temperature beside them. */
@@ -124,7 +139,8 @@ function toView(row: DeviceRow): kinds.DeviceView {
         // and a screen that drew one would print a bare "C".
         reading: row.value ? { value: row.value, unit: row.unit ?? "" } : null,
         stateAt: row.stateAt?.toISOString() ?? null,
-        climate: climateOf(row)
+        climate: climateOf(row),
+        air: airOf(row)
     };
 }
 
@@ -221,7 +237,7 @@ export async function actOnDevice(
     id: string,
     action: kinds.DeviceAction,
     actor: string = "",
-    command?: kinds.ClimateCommand
+    command?: kinds.DeviceCommand
 ): Promise<kinds.DeviceView> {
     const device = await requireDevice(installedAppId, id);
     if (!kinds.actionsFor(device.kind).includes(action)) {
@@ -235,11 +251,17 @@ export async function actOnDevice(
         throw new HomeError(`${device.name} was not answering when it was last checked`);
     // A setting is checked against the unit before anything is sent: a
     // temperature its own remote would not offer is refused here, in a sentence,
-    // rather than sent and answered with silence or a beep.
-    const settings = kinds.climateSettings(device.climate);
+    // rather than sent and answered with silence or a beep. It is checked as the
+    // device's own kind's, so a purifier's preset never reaches an air
+    // conditioner because the two happen to share a word.
+    const target: kinds.CommandTarget = {
+        kind: device.kind,
+        climate: kinds.climateSettings(device.climate),
+        air: airOf(device)
+    };
     if (kinds.needsCommand(action)) {
         if (!command || command.action !== action) throw new HomeError("Say what to set it to");
-        const issue = kinds.climateCommandIssue(settings, command);
+        const issue = kinds.commandIssue(target, command);
         if (issue) throw new HomeError(issue);
     } else if (command) {
         throw new HomeError("Say what to set it to");
@@ -294,10 +316,15 @@ export async function actOnDevice(
 
     // A setting lands where it was told, like a switch; the power stays as it
     // was. A lock is turning, and where it gets to is the account's to report.
-    const settled =
-        command && settings && kinds.needsCommand(action)
-            ? { climate: climateColumn(kinds.applyClimate(settings, command)) }
-            : { state: kinds.settledState(action) ?? "moving" };
+    const applied =
+        command && kinds.needsCommand(action) ? kinds.applyCommand(target, command) : null;
+    const settled = applied
+        ? "climate" in applied
+            ? { climate: climateColumn(applied.climate) }
+            : { air: airColumn(applied.air) }
+        : kinds.needsCommand(action)
+          ? {}
+          : { state: kinds.settledState(action) ?? "moving" };
     const row = await prisma.placeDevice.update({
         where: { id: device.id },
         data: { ...settled, stateAt: new Date() },
@@ -389,6 +416,7 @@ async function syncAccount(
                 value: snapshot.value ?? null,
                 unit: snapshot.unit ?? null,
                 climate: climateColumn(snapshot.climate),
+                air: airColumn(snapshot.air),
                 stateAt: new Date()
             };
             const saved = await prisma.placeDevice.upsert({

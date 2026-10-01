@@ -21,7 +21,7 @@ import { homeInstall } from "./access";
 import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
 import { readsDevices } from "./automation-kinds";
-import { climateSettings } from "./device-kinds";
+import { airSettings, climateSettings, filterLife, wornFilter } from "./device-kinds";
 import { prismaAutomationStore } from "./automation-store";
 import {
     createEngine,
@@ -50,9 +50,29 @@ export interface ObservedRow {
     readonly online: boolean;
     /** An air conditioner's settings, as stored; anything else for the rest. */
     readonly climate?: unknown;
+    /** A purifier's settings and readings, as stored. */
+    readonly air?: unknown;
+}
+
+/** A purifier's figures as the engine compares them: each measure it reports,
+ *  and the least filter life left as a share. */
+function figuresOf(air: ReturnType<typeof airSettings>): Record<string, string> | undefined {
+    if (!air) return undefined;
+    const figures: Record<string, string> = {};
+    for (const [measure, value] of Object.entries(air.readings)) {
+        if (typeof value === "number") figures[measure] = String(value);
+    }
+    const life = filterLife(air);
+    if (life !== null) figures.filter = String(life);
+    return figures;
 }
 
 function readout(row: ObservedRow): DeviceReadout {
+    const air = row.kind === "air" ? airSettings(row.air) : null;
+    const mode =
+        row.kind === "air" ? (air?.mode ?? "") : (climateSettings(row.climate)?.mode ?? "");
+    const filter = wornFilter(air)?.state;
+    const figures = figuresOf(air);
     return {
         id: row.id,
         kind: row.kind,
@@ -60,7 +80,9 @@ function readout(row: ObservedRow): DeviceReadout {
         state: row.state,
         door: row.doorState,
         reading: row.value ?? "",
-        mode: row.state === "on" ? (climateSettings(row.climate)?.mode ?? "") : "",
+        mode: row.state === "on" ? mode : "",
+        ...(filter ? { filter } : {}),
+        ...(figures ? { figures } : {}),
         online: row.online
     };
 }
@@ -83,6 +105,7 @@ export function automationEngine(): AutomationEngine {
                         doorState: true,
                         value: true,
                         climate: true,
+                        air: true,
                         online: true
                     }
                 });
