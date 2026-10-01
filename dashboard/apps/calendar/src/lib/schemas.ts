@@ -31,9 +31,10 @@ export const colorSchema = z
     .toLowerCase()
     .pipe(z.string().regex(/^#[0-9a-f]{6}$/));
 
-/** The colours offered for a calendar, Nextcloud's palette order. */
+/** The colours offered for a calendar: the blue a new calendar gets, d3's ten
+ *  categorical colours, and a lighter blue. */
 export const CALENDAR_COLORS = [
-    "#0082c9",
+    "#2563eb",
     "#1f77b4",
     "#2ca02c",
     "#17becf",

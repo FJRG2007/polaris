@@ -109,7 +109,7 @@
         "subscriptionsOff": "Suscribirse a calendarios por dirección está desactivado en este Polaris.",
         "subscriptionsOn": "Activarlo",
         "suggested": {
-            "add": "Suscribirse a {name}",
+            "add": "Añadir {name}",
             "lead": "Calendarios recomendados en este Polaris.",
             "title": "Sugeridos"
         },

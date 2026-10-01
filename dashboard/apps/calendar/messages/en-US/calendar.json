@@ -56,21 +56,18 @@
         "yourColor": "Your color"
     },
     "categories": {
-        "anniversary": "Anniversary",
-        "appointment": "Appointment",
-        "business": "Business",
-        "education": "Education",
-        "holiday": "Holiday",
+        "work": "Work",
         "meeting": "Meeting",
-        "miscellaneous": "Miscellaneous",
-        "nonWorkingHours": "Non-working hours",
-        "notInOffice": "Not in office",
-        "personal": "Personal",
-        "phoneCall": "Phone call",
-        "sickDay": "Sick day",
-        "specialOccasion": "Special occasion",
+        "call": "Call",
+        "deadline": "Deadline",
         "travel": "Travel",
-        "vacation": "Vacation"
+        "personal": "Personal",
+        "family": "Family",
+        "health": "Health",
+        "birthday": "Birthday",
+        "holiday": "Holiday",
+        "education": "Education",
+        "social": "Social"
     },
     "editor": {
         "addAttachment": "Attach",

@@ -109,7 +109,7 @@
         "subscriptionsOff": "Subscribing to calendars by address is switched off on this Polaris.",
         "subscriptionsOn": "Switch it on",
         "suggested": {
-            "add": "Subscribe to {name}",
+            "add": "Add {name}",
             "lead": "Calendars recommended on this Polaris.",
             "title": "Suggested"
         },

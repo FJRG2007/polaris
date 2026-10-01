@@ -68,23 +68,22 @@ export interface EditorForm {
     readonly kind: engine.EventKind;
 }
 
-/** Nextcloud's default categories. */
+/** The categories offered before somebody types their own: the everyday
+ *  kinds of time a calendar holds. Stored as the reader's words, the way every
+ *  other client writes CATEGORIES. */
 export const DEFAULT_CATEGORIES = [
-    "anniversary",
-    "appointment",
-    "business",
-    "education",
-    "holiday",
+    "work",
     "meeting",
-    "miscellaneous",
-    "nonWorkingHours",
-    "notInOffice",
-    "personal",
-    "phoneCall",
-    "sickDay",
-    "specialOccasion",
+    "call",
+    "deadline",
     "travel",
-    "vacation"
+    "personal",
+    "family",
+    "health",
+    "birthday",
+    "holiday",
+    "education",
+    "social"
 ] as const;
 
 /** Durations offered beside the end, in minutes. */

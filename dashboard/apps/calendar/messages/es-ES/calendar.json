@@ -56,21 +56,18 @@
         "yourColor": "Tu color"
     },
     "categories": {
-        "anniversary": "Aniversario",
-        "appointment": "Cita",
-        "business": "Negocios",
-        "education": "Formación",
-        "holiday": "Festivo",
+        "work": "Trabajo",
         "meeting": "Reunión",
-        "miscellaneous": "Varios",
-        "nonWorkingHours": "Fuera de horario",
-        "notInOffice": "Fuera de oficina",
-        "personal": "Personal",
-        "phoneCall": "Llamada",
-        "sickDay": "Baja",
-        "specialOccasion": "Ocasión especial",
+        "call": "Llamada",
+        "deadline": "Plazo",
         "travel": "Viaje",
-        "vacation": "Vacaciones"
+        "personal": "Personal",
+        "family": "Familia",
+        "health": "Salud",
+        "birthday": "Cumpleaños",
+        "holiday": "Festivo",
+        "education": "Formación",
+        "social": "Social"
     },
     "editor": {
         "addAttachment": "Adjuntar",

@@ -153,7 +153,7 @@ Phase 1 = this build. Status is tracked in the ledger, not here.
 | Status confirmed/tentative/cancelled (NC-68) | NC TB | | 1 |
 | Show as free/busy (NC-69; G) | NC G | TRANSP | 1 |
 | Visibility public/confidential/private (NC-70; G) | NC G | CLASS; sharees below "read" see busy only | 1 |
-| Categories (NC-71) | NC TB | 15 defaults + custom | 1 |
+| Categories (NC-71) | NC TB | 12 everyday defaults of our own + custom | 1 |
 | Event colour (NC-72; G) | NC G | COLOR property | 1 |
 | Attachments (NC-73; G Drive) | NC G | link attachments + upload into Polaris Drive | 1 |
 | Conference link (NC-74 Talk; G Meet; P Meet/Zoom) | NC G P | "Add a Polaris meeting" creates a Chat meeting link | 1 |

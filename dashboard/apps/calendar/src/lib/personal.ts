@@ -11,7 +11,7 @@ import { prisma } from "@polaris/db";
 import { calendarTFor } from "./i18n";
 
 /** The colour a first calendar gets: the first of the palette. */
-const FIRST_COLOR = "#0082c9";
+const FIRST_COLOR = "#2563eb";
 
 /** This person's first own calendar, made (named in their language) when they
  *  have none. Answers its id. */
