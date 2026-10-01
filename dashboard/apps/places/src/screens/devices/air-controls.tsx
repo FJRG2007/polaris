@@ -33,6 +33,54 @@ const FILTER_TONES: Readonly<Record<kinds.FilterState, string>> = {
     now: "border-danger-edge bg-danger-soft text-danger-ink"
 };
 
+/** Each air-quality level's colours. The level's name is always written in the
+ *  chip, so the colour only repeats what the words already say. */
+const QUALITY_TONES: Readonly<Record<kinds.AirQualityLevel, string>> = {
+    good: "border-success-edge bg-success-soft text-success-ink",
+    fair: "border-border bg-muted text-muted-foreground",
+    moderate: "border-warning-edge bg-warning-soft text-warning-ink",
+    poor: "border-warning-edge bg-warning-soft text-warning-ink",
+    veryPoor: "border-danger-edge bg-danger-soft text-danger-ink",
+    extremelyPoor: "border-danger-edge bg-danger-soft text-danger-ink"
+};
+
+/** How good the air is, as a word next to the figure it was judged from, with
+ *  what to do about it on hover - or, in the panel, written underneath. */
+export function AirQualityChip({
+    air,
+    detailed = false,
+    className
+}: {
+    air: AirSettings | null | undefined;
+    detailed?: boolean;
+    className?: string;
+}) {
+    const t = usePlacesT();
+    const quality = kinds.airQuality(air);
+    if (!quality) return null;
+    const level = kinds.airQualityText(quality.level, t);
+    const hint = kinds.airQualityHint(quality.level, t);
+    const chip = (
+        <Badge
+            className={cn("shrink-0", QUALITY_TONES[quality.level], !detailed && className)}
+            title={detailed ? undefined : hint}
+        >
+            <span className="sr-only">{t("devicePanel.air.quality")}: </span>
+            {level}
+        </Badge>
+    );
+    if (!detailed) return chip;
+    return (
+        <div className={cn("flex min-w-0 flex-col gap-1", className)}>
+            <span className="text-xs text-muted-foreground">{t("devicePanel.air.quality")}</span>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {chip}
+                <span className="text-xs text-muted-foreground">{hint}</span>
+            </span>
+        </div>
+    );
+}
+
 /** The chip a worn filter gets, on the row and in the panel. Nothing while every
  *  filter is fine: a row of "OK" chips would be noise. */
 export function FilterChip({
@@ -261,6 +309,7 @@ export function AirControls({
             >
                 {switchControl}
                 {reading}
+                {!detailed && <AirQualityChip air={air} />}
                 {mode}
                 {speed}
                 {detailed && humidity}
@@ -270,6 +319,7 @@ export function AirControls({
                     </span>
                 )}
             </div>
+            {detailed && <AirQualityChip air={air} detailed />}
             {detailed && switches.length > 0 && (
                 <fieldset className="flex flex-col gap-2" aria-describedby={describedBy}>
                     <legend className="mb-1 text-xs text-muted-foreground">

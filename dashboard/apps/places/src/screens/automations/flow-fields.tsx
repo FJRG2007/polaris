@@ -278,6 +278,7 @@ export function measureSuffix(
 ): string | undefined {
     if (!measure) return fallback || undefined;
     if (measure === "filter") return "%";
+    if (measure === "quality") return undefined;
     return kinds.MEASURE_UNITS[measure] || undefined;
 }
 
@@ -479,6 +480,63 @@ export function NumberField({
                         <span className="shrink-0 text-xs text-muted-foreground">{suffix}</span>
                     )}
                 </div>
+            )}
+        </Field>
+    );
+}
+
+/**
+ * The value a figure is compared with: a number, or - for air quality - one of
+ * its levels, kept as the rank the engine compares.
+ */
+export function FigureField({
+    measure,
+    label,
+    path,
+    value,
+    onChange,
+    suffix,
+    disabled
+}: {
+    measure: auto.ReadingMeasure | undefined;
+    label: string;
+    path: readonly (string | number)[];
+    value: number;
+    onChange: (value: number) => void;
+    suffix?: string;
+    disabled?: boolean;
+}) {
+    const t = usePlacesT();
+    if (measure !== "quality") {
+        return (
+            <NumberField
+                label={label}
+                path={path}
+                field="value"
+                value={value}
+                step="any"
+                suffix={suffix}
+                disabled={disabled}
+                onChange={onChange}
+            />
+        );
+    }
+    const level = kinds.airQualityAt(value);
+    return (
+        <Field label={label} path={[...path, "value"]} required>
+            {(id, invalid) => (
+                <Select
+                    id={id}
+                    value={level ? String(value) : ""}
+                    disabled={disabled}
+                    placeholder={t("automations.fields.chooseValue")}
+                    className={invalid ? "border-danger-edge" : undefined}
+                    options={kinds.AIR_QUALITY_LEVELS.map((entry) => ({
+                        value: String(kinds.airQualityRank(entry)),
+                        label: kinds.airQualityText(entry, t)
+                    }))}
+                    onValueChange={(next) => onChange(Number(next))}
+                />
             )}
         </Field>
     );

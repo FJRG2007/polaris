@@ -214,6 +214,109 @@ export function filterLife(settings: AirSettings | null | undefined): number | n
 }
 
 /**
+ * How good the air is, as words rather than a figure: best first.
+ *
+ * The six levels of the European Air Quality Index (European Environment
+ * Agency), which is also the order a rank compares in - 1 is Good, 6 is
+ * Extremely poor - so "Poor or worse" is a rank of 4 or more.
+ */
+export const AIR_QUALITY_LEVELS = [
+    "good",
+    "fair",
+    "moderate",
+    "poor",
+    "veryPoor",
+    "extremelyPoor"
+] as const;
+export type AirQualityLevel = (typeof AIR_QUALITY_LEVELS)[number];
+
+/**
+ * PM2.5 bands in µg/m³: the highest concentration each level still covers.
+ *
+ * The EEA's revised European Air Quality Index (ETC HE Report 2024/17, "EEA's
+ * revision of the European air quality index bands", published 2025; the bands
+ * on airindex.eea.europa.eu): Good 0-5, Fair 6-15, Moderate 16-50, Poor 51-90,
+ * Very poor 91-140, Extremely poor above 140. Good and Fair are the WHO 2021 Air
+ * Quality Guidelines (5 µg/m³ annual, 15 µg/m³ over 24 hours); the upper bands
+ * follow the WHO interim targets. A purifier reports a whole number, and a
+ * fraction is read against the same edges (5.4 is still Good, 5.6 is Fair).
+ */
+const PM25_BANDS: readonly (readonly [number, AirQualityLevel])[] = [
+    [5, "good"],
+    [15, "fair"],
+    [50, "moderate"],
+    [90, "poor"],
+    [140, "veryPoor"]
+];
+
+/**
+ * Philips' Indoor Allergen Index bands, for a unit that reports the index and
+ * no PM2.5: 1-3 Good, 4-6 Fair, 7-9 Poor, 10-12 Very poor - the four colours of
+ * the air-quality light in Philips' own manuals (Series 1000 AC1711: blue,
+ * blue-purple, purple-red, red). Its scale has no Moderate and no Extremely
+ * poor, so those are never said from it.
+ */
+const ALLERGEN_BANDS: readonly (readonly [number, AirQualityLevel])[] = [
+    [3, "good"],
+    [6, "fair"],
+    [9, "poor"]
+];
+
+function banded(
+    value: number,
+    bands: readonly (readonly [number, AirQualityLevel])[],
+    above: AirQualityLevel
+): AirQualityLevel {
+    const rounded = Math.round(value);
+    return bands.find(([edge]) => rounded <= edge)?.[1] ?? above;
+}
+
+/** How good the air is, judged by PM2.5. */
+export function pm25Quality(microgramsPerCubicMetre: number): AirQualityLevel {
+    return banded(microgramsPerCubicMetre, PM25_BANDS, "extremelyPoor");
+}
+
+/** How good the air is, judged by Philips' allergen index. */
+export function allergenQuality(index: number): AirQualityLevel {
+    return banded(index, ALLERGEN_BANDS, "veryPoor");
+}
+
+/**
+ * How good the air is where a unit is, and which figure said so: PM2.5 where it
+ * measures it, since the index is a scale of the maker's own, and the allergen
+ * index where it is all there is. Null on a unit that measures neither - a
+ * humidifier is not a judge of dust.
+ */
+export function airQuality(
+    settings: AirSettings | null | undefined
+): { level: AirQualityLevel; measure: "pm25" | "allergen" } | null {
+    const pm25 = settings?.readings.pm25;
+    if (pm25 !== undefined) return { level: pm25Quality(pm25), measure: "pm25" };
+    const allergen = settings?.readings.allergen;
+    if (allergen !== undefined) return { level: allergenQuality(allergen), measure: "allergen" };
+    return null;
+}
+
+/** A level's place in the order, 1 for Good: what an automation compares. */
+export function airQualityRank(level: AirQualityLevel): number {
+    return AIR_QUALITY_LEVELS.indexOf(level) + 1;
+}
+
+/** The level at a rank, or null for a number that is not one. */
+export function airQualityAt(rank: number): AirQualityLevel | null {
+    return Number.isInteger(rank) ? (AIR_QUALITY_LEVELS[rank - 1] ?? null) : null;
+}
+
+export function airQualityText(level: AirQualityLevel, t: PlacesTranslator = en): string {
+    return t(`devices.air.quality.${level}`);
+}
+
+/** What to do about it, in one line: open the windows, or keep the unit on. */
+export function airQualityHint(level: AirQualityLevel, t: PlacesTranslator = en): string {
+    return t(`devices.air.qualityHints.${level}`);
+}
+
+/**
  * One change to a purifier, with what it is changed to.
  *
  * The same action words as an air conditioner's where they mean the same thing

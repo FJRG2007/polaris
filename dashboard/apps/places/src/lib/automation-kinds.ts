@@ -61,11 +61,12 @@ export function attributesFor(kind: string): readonly AutomationAttribute[] {
 /**
  * The figures a threshold or a reading condition can compare on a device that
  * reports more than one. A purifier has the dust, the allergen index, the
- * humidity and the room's temperature, and `filter` - the least life left in
- * any of its filters, as a share. Anything else has its one reading and no
- * choice to make.
+ * humidity and the room's temperature, `filter` - the least life left in any
+ * of its filters, as a share - and `quality`, how good the air is as a rank from
+ * 1 (Good) to 6 (Extremely poor), so "Poor or worse" is "at least 4". Anything
+ * else has its one reading and no choice to make.
  */
-export const READING_MEASURES = [...kinds.AIR_MEASURES, "filter"] as const;
+export const READING_MEASURES = [...kinds.AIR_MEASURES, "filter", "quality"] as const;
 export type ReadingMeasure = (typeof READING_MEASURES)[number];
 
 export function measuresFor(kind: string): readonly ReadingMeasure[] {
@@ -426,6 +427,7 @@ export const definitionSchema = z
             if (trigger.kind === "stays") {
                 checkWord(context, trigger.attribute, trigger.is, [...at, "is"], false);
             }
+            if (trigger.kind === "threshold") checkFigure(context, trigger, at);
         });
 
         definition.conditions.groups.forEach((group, index) =>
@@ -434,6 +436,7 @@ export const definitionSchema = z
                 if (condition.kind === "device") {
                     checkWord(context, condition.attribute, condition.is, [...at, "is"], false);
                 }
+                if (condition.kind === "reading") checkFigure(context, condition, at);
                 if (condition.kind === "time" && condition.from === condition.to) {
                     context.addIssue({
                         code: "custom",
@@ -463,6 +466,22 @@ export const definitionSchema = z
             }
         });
     });
+
+/** Air quality is compared as a level's rank, so it has to be one: a 3.5 is
+ *  no level at all. */
+function checkFigure(
+    context: z.RefinementCtx,
+    node: { readonly measure?: ReadingMeasure; readonly value: number },
+    path: (string | number)[]
+): void {
+    if (node.measure === "quality" && kinds.airQualityAt(node.value) === null) {
+        context.addIssue({
+            code: "custom",
+            path: [...path, "value"],
+            message: "automations.errors.state"
+        });
+    }
+}
 
 /** A state or door word has to be one this app knows; a reading is whatever the
  *  sensor sends. Empty is allowed where "any" is meant. */

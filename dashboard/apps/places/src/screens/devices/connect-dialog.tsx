@@ -15,12 +15,14 @@
  * genuinely is not Polaris' to do. Adding a make adds no markup here.
  *
  * Some ways in are done rather than typed: a code scanned with the maker's app, a
- * button pressed on a bridge. Those declare `pairing` in the registry, and this
- * dialog draws the step for them - the code to scan, or the wait - and asks on
- * its own every few seconds whether it has happened, so nobody has to press
- * anything once they have scanned. An attempt that runs out stops asking and
- * offers a new one. Which kind of step, how often and for how long are the
- * registry's; nothing here names a make.
+ * button pressed on a bridge, a code the maker emails. Those declare `pairing`
+ * in the registry, and this dialog draws the step for them - the code to scan,
+ * the wait, or a box for the emailed code. A scan or a button is asked about on
+ * its own every few seconds, so nobody has to press anything once they have
+ * scanned; an emailed code is sent once it is typed, and a wrong one leaves the
+ * box there to try again. An attempt that runs out stops and offers a new one.
+ * Which kind of step, how often and for how long are the registry's; nothing
+ * here names a make.
  *
  * A credential is written once and never shown again. There is no reveal and no
  * masked copy of it in a field on the next visit: it is a key to somebody's front
@@ -120,7 +122,13 @@ function Field({
                 />
             ) : (
                 <Input
-                    type={field.secret === true ? "password" : "text"}
+                    type={
+                        field.secret === true
+                            ? "password"
+                            : field.format === "email"
+                              ? "email"
+                              : "text"
+                    }
                     value={value}
                     spellCheck={false}
                     autoComplete="off"
@@ -161,6 +169,8 @@ export function ConnectDialog({
     /** The attempt being waited on, for a connection made by pairing. */
     const [pairing, setPairing] = useState<Pairing | null>(null);
     const [expired, setExpired] = useState(false);
+    /** The code typed for a pairing that is emailed one. */
+    const [code, setCode] = useState("");
 
     const connectionId = reconnect ? reconnect.connection : chosen;
     const connection = registry.deviceConnection(connectionId);
@@ -186,6 +196,7 @@ export function ConnectDialog({
         if (open) return;
         setPairing(null);
         setExpired(false);
+        setCode("");
     }, [open]);
 
     // Ask whether the other side has agreed, every few seconds, until it has, it
@@ -193,6 +204,11 @@ export function ConnectDialog({
     useEffect(() => {
         const steps = connection?.pairing;
         if (!open || !pairing || expired || !connection || !steps) return;
+        // An emailed code is not waited on: it is sent when it is typed.
+        if (steps.kind === "code") {
+            const lapse = window.setTimeout(() => setExpired(true), steps.lifetimeMs);
+            return () => window.clearTimeout(lapse);
+        }
         let stopped = false;
         let asking = false;
         const ask = async () => {
@@ -278,7 +294,41 @@ export function ConnectDialog({
             return;
         }
         setExpired(false);
+        setCode("");
         setPairing({ state: result.state, qr: result.qr });
+    };
+
+    /** Send the emailed code. A wrong one leaves the box where it is, saying why,
+     *  so it can be typed again or a new one asked for. */
+    const sendCode = async () => {
+        const typed = code.replace(/\s+/g, "");
+        if (!connection || !pairing || !typed || saving || expired) return;
+        setSaving(true);
+        setError("");
+        const result = await runAction(
+            () =>
+                actions.pollDevicePairingAction({
+                    connection: connection.id,
+                    label,
+                    fields,
+                    state: { ...pairing.state, code: typed },
+                    accountId: reconnect?.id
+                }),
+            setError
+        );
+        setSaving(false);
+        if (!result) return;
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        if (result.waiting) return;
+        setPairing(null);
+        setExpired(false);
+        setCode("");
+        setFields({});
+        setLabel("");
+        onConnected({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
     };
 
     const submit = async () => {
@@ -451,7 +501,51 @@ export function ConnectDialog({
                         </ol>
                     )}
 
-                    {pairing && connection?.pairing && (
+                    {pairing && connection?.pairing?.kind === "code" && (
+                        <div className="flex flex-col gap-3">
+                            {said?.pairingPrompt && (
+                                <p className="text-xs text-muted-foreground">
+                                    {said.pairingPrompt}
+                                </p>
+                            )}
+                            <label className="flex flex-col gap-1.5">
+                                <span className="text-xs text-muted-foreground">
+                                    {t("connect.pair.codeField")}
+                                    <span className="text-danger"> *</span>
+                                </span>
+                                <Input
+                                    value={code}
+                                    maxLength={32}
+                                    spellCheck={false}
+                                    autoComplete="one-time-code"
+                                    autoFocus
+                                    disabled={expired}
+                                    onChange={(event) => setCode(event.target.value)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter") void sendCode();
+                                    }}
+                                    aria-label={t("connect.pair.codeField")}
+                                />
+                            </label>
+                            {expired && (
+                                <p className="text-xs text-muted-foreground">
+                                    {t("connect.pair.codeExpired")}
+                                </p>
+                            )}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="self-start"
+                                onClick={() => void startPairing()}
+                                disabled={saving}
+                            >
+                                <RefreshCw className="size-4" />
+                                {t("connect.pair.resend")}
+                            </Button>
+                        </div>
+                    )}
+
+                    {pairing && connection?.pairing && connection.pairing.kind !== "code" && (
                         <div className="flex flex-col items-center gap-3 text-center">
                             {connection.pairing.kind === "qr" && pairing.qr && (
                                 <div
@@ -558,9 +652,21 @@ export function ConnectDialog({
                         {t("common.cancel")}
                     </Button>
                     {pairing ? (
-                        <Button variant="outline" onClick={() => setPairing(null)}>
-                            {t("connect.pair.back")}
-                        </Button>
+                        <>
+                            <Button variant="outline" onClick={() => setPairing(null)}>
+                                {t("connect.pair.back")}
+                            </Button>
+                            {connection?.pairing?.kind === "code" && (
+                                <Button
+                                    onClick={() => void sendCode()}
+                                    disabled={!code.trim() || saving || expired}
+                                    aria-disabled={!code.trim() || saving || expired}
+                                >
+                                    {saving && <Loader2 className="size-4 animate-spin" />}
+                                    {saving ? t("connect.checking") : t("connect.connect")}
+                                </Button>
+                            )}
+                        </>
                     ) : (
                         <Button
                             onClick={() => void (connection?.pairing ? startPairing() : submit())}
@@ -573,7 +679,9 @@ export function ConnectDialog({
                                 : connection?.pairing
                                   ? connection.pairing.kind === "qr"
                                       ? t("connect.pair.showCode")
-                                      : t("connect.pair.start")
+                                      : connection.pairing.kind === "code"
+                                        ? t("connect.pair.getCode")
+                                        : t("connect.pair.start")
                                   : t("connect.connect")}
                         </Button>
                     )}

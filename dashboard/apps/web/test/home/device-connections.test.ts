@@ -110,6 +110,17 @@ describe("a connection made by pairing", () => {
         }
     });
 
+    it("asks for an emailed code where the maker sends one", () => {
+        const philips = registry.deviceConnection("philips-cloud");
+        expect(philips?.pairing?.kind).toBe("code");
+        const email = philips!.fields[0]!;
+        expect(registry.fieldIssue(email, "owner@")).not.toBeNull();
+        expect(registry.fieldIssue(email, "owner@example.com")).toBeNull();
+        expect(registry.fieldIssue(email, "")).toBeNull();
+        expect(registry.fieldsComplete(philips!, { email: "owner@example" })).toBe(false);
+        expect(registry.fieldsComplete(philips!, { email: " owner@example.com " })).toBe(true);
+    });
+
     it("keeps the typed Tuya project as a second way in", () => {
         expect(registry.connectionsOfBrand("Tuya").map((connection) => connection.id)).toEqual([
             "tuya-app",
@@ -137,6 +148,14 @@ describe("the recommended way in", () => {
     it("is the app sign-in for Tuya and the web account for Nuki", () => {
         expect(registry.recommendedConnection("Tuya")?.id).toBe("tuya-app");
         expect(registry.recommendedConnection("Nuki")?.id).toBe("nuki-web");
+    });
+
+    it("stays local for Philips, with the unofficial account second", () => {
+        expect(registry.connectionsOfBrand("Philips").map((connection) => connection.id)).toEqual([
+            "philips-coap",
+            "philips-cloud"
+        ]);
+        expect(registry.recommendedConnection("Philips")?.id).toBe("philips-coap");
     });
 
     it("is nothing for a brand that does not exist", () => {

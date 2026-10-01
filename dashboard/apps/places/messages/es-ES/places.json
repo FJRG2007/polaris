@@ -536,13 +536,25 @@
         "airNoHumidity": "Ese dispositivo no humidifica",
         "airHumidity": "Este dispositivo no admite esa humedad",
         "philipsQuiet": "El purificador no respondió.",
-        "philipsLocalOff": "El firmware de este modelo no permite el control local. Responde en tu red, pero no al protocolo local que usa Polaris, así que solo se puede manejar desde la app Philips Air+.",
+        "philipsLocalOff": "El firmware de este modelo no permite el control local. Responde en tu red, pero no al protocolo local que usa Polaris. Prueba a conectarlo con una cuenta Philips Air+.",
         "philipsGarbled": "El purificador respondió de una forma que Polaris no pudo leer.",
         "philipsRefused": "El purificador lo rechazó.",
         "philipsLost": "Polaris ha perdido la pista de estos purificadores. Vuelve a conectarlos.",
         "philipsNoneThere": "Ningún purificador Philips respondió en esa dirección. Comprueba que está encendido y en la misma red que Polaris.",
         "philipsNoneFound": "Ningún purificador Philips respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
-        "philipsNoRead": "Los purificadores de esta red dijeron quiénes son pero no respondieron a una lectura. Apágalos y enciéndelos, y vuelve a intentarlo."
+        "philipsNoRead": "Los purificadores de esta red dijeron quiénes son pero no respondieron a una lectura. Apágalos y enciéndelos, y vuelve a intentarlo.",
+        "philipsCloudUnreachable": "No se ha podido llegar a la nube de Philips.",
+        "philipsCloudGarbled": "La nube de Philips ha respondido de una forma que Polaris no entiende.",
+        "philipsCloudSignedOut": "Philips ya no acepta este inicio de sesión. Vuelve a conectar la cuenta.",
+        "philipsCloudNoCode": "Philips no ha enviado un código a esa dirección. Comprueba que es la que usas en la app Air+.",
+        "philipsCloudUnfinished": "Esa dirección aún no es una cuenta Philips completa. Entra una vez en la app Philips Air+ y vuelve a intentarlo.",
+        "philipsCloudBadCode": "Ese código no es correcto o ha caducado. Pide otro.",
+        "philipsCloudEmpty": "No hay ningún purificador en esta cuenta Philips. Añádelo antes en la app Air+.",
+        "philipsCloudQuiet": "El purificador no ha respondido a través de la nube de Philips.",
+        "philipsCloudBusy": "El purificador está ocupado. Vuelve a intentarlo en un momento.",
+        "philipsCloudLinkRefused": "La nube de Philips no deja a Polaris llegar a este purificador. Vuelve a conectar la cuenta.",
+        "philipsCloudNotOnAccount": "Ese dispositivo no está en esta cuenta Philips.",
+        "philipsCloudEnterCode": "Escribe el código del email"
     },
     "connections": {
         "nuki-web": {
@@ -853,7 +865,7 @@
         "philips-coap": {
             "label": "Philips Air+ (red local)",
             "summary": "Los purificadores y humidificadores que usas con la app Philips Air+, directamente por tu red. Sin cuenta y sin pasar por la nube.",
-            "note": "Polaris busca los aparatos en tu red y los lee como hace Home Assistant. Antes tienen que estar configurados en la app Philips Air+ y en la misma red que Polaris. Algunos firmwares nuevos desactivan el control local; ese aparato solo se puede usar desde la app, y Polaris lo indica.",
+            "note": "Polaris busca los aparatos en tu red y los lee como hace Home Assistant. Antes tienen que estar configurados en la app Philips Air+ y en la misma red que Polaris. Algunos firmwares nuevos desactivan el control local; ese aparato puede funcionar con una cuenta Philips Air+, y Polaris lo indica.",
             "steps": {
                 "s0": "Configura el purificador en la app Philips Air+, en la misma red wifi que Polaris.",
                 "s1": "Pulsa Conectar. Deja la dirección vacía para buscar todos los aparatos, o escribe una para añadir solo ese."
@@ -865,7 +877,28 @@
                     "placeholder": "192.168.1.40"
                 }
             }
-        }
+        },
+        "philips-cloud": {
+            "label": "Cuenta Philips Air+",
+            "summary": "Los purificadores de tu cuenta Philips Air+, por la nube de Philips como la app. Funciona desde cualquier red.",
+            "note": "No oficial: Philips no publica una API para esto, así que podría dejar de funcionar si Philips cambia su nube. Entra con un código que Philips te envía por email, y no se guarda ninguna contraseña. Modelos que conoce: AC0650, AC0651, AC1715 y AC3221; los demás solo muestran lecturas y encendido. Si el aparato está en la misma red que Polaris, la conexión local no depende de Philips.",
+            "steps": {
+                "s0": "Configura el purificador en la app Philips Air+ y entra en ella con tu email.",
+                "s1": "Escribe ese email y pulsa Pedir código. Philips te envía un código de un solo uso.",
+                "s2": "Escribe aquí el código. Polaris muestra los purificadores de la cuenta."
+            },
+            "fields": {
+                "email": {
+                    "label": "Email",
+                    "hint": "El que usas para entrar en la app Philips Air+.",
+                    "placeholder": "tu@ejemplo.com"
+                }
+            },
+            "pairing": {
+                "prompt": "Philips ha enviado un código de un solo uso a ese email. Puede tardar un minuto; mira también en spam."
+            }
+        },
+        "notEmail": "Escribe un email completo, como nombre@ejemplo.com."
     },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",
@@ -1312,6 +1345,22 @@
                 "allergen": "Índice alérgenos",
                 "humidity": "Humedad",
                 "temperature": "Temperatura"
+            },
+            "quality": {
+                "good": "Buena",
+                "fair": "Pasable",
+                "moderate": "Regular",
+                "poor": "Mala",
+                "veryPoor": "Muy mala",
+                "extremelyPoor": "Pésima"
+            },
+            "qualityHints": {
+                "good": "Puedes abrir las ventanas.",
+                "fair": "Bien para casi todos. En Auto se mantiene.",
+                "moderate": "Deja el purificador puesto y las ventanas cerradas.",
+                "poor": "Déjalo puesto, súbelo y cierra las ventanas.",
+                "veryPoor": "Ponlo alto y pasa poco tiempo en la habitación.",
+                "extremelyPoor": "Ponlo en turbo y evita la habitación si puedes."
             }
         }
     },
@@ -1389,7 +1438,8 @@
             "readings": "Lecturas",
             "filters": "Filtros",
             "lifePercent": "Queda {percent}%",
-            "lifeHours": "Quedan {hours} h"
+            "lifeHours": "Quedan {hours} h",
+            "quality": "Calidad"
         }
     },
     "deviceDialog": {
@@ -1424,7 +1474,11 @@
             "expired": "Este código ha caducado.",
             "newCode": "Otro código",
             "codeLabel": "Código para escanear con la app",
-            "back": "Atrás"
+            "back": "Atrás",
+            "getCode": "Pedir código",
+            "codeField": "Código del email",
+            "resend": "Pedir otro código",
+            "codeExpired": "Este código ha caducado. Pide otro."
         }
     },
     "discover": {
@@ -1542,7 +1596,9 @@
             "notify": "Avisar: {message}",
             "run": "Lanzar {name}",
             "set": "Poner {device} en {value}",
-            "figure": "{measure} de {device}"
+            "figure": "{measure} de {device}",
+            "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}",
+            "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -1750,7 +1806,9 @@
             "optionTo": "Ponerlo",
             "measure": "Lectura",
             "speed": "Velocidad",
-            "humidity": "Humedad"
+            "humidity": "Humedad",
+            "worse": "Pasa a peor que",
+            "better": "Pasa a mejor que"
         },
         "log": {
             "title": "Qué hizo",
@@ -1786,7 +1844,16 @@
         "settingOn": "{option} activado",
         "settingOff": "{option} desactivado",
         "measures": {
-            "filter": "Vida del filtro"
+            "filter": "Vida del filtro",
+            "quality": "Calidad"
+        },
+        "qualityCompare": {
+            "gt": "Peor que",
+            "gte": "Esta o peor",
+            "lt": "Mejor que",
+            "lte": "Esta o mejor",
+            "eq": "Justo",
+            "ne": "No es"
         }
     }
 }

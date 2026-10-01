@@ -142,6 +142,28 @@ describe("an air purifier's row", () => {
         expect(screen.queryByText("Change filter")).toBeNull();
     });
 
+    it("says how good the air is in words, with what to do on hover", async () => {
+        await drawn([purifier({ air: { ...AIR, readings: { pm25: 60 } } })]);
+        const chip = screen.getByText("Poor").closest("[title]");
+        expect(chip?.getAttribute("title")).toBe(
+            "Keep it on, turn it up and keep the windows shut."
+        );
+        // The word is the verdict; the colour only repeats it.
+        expect(screen.getByText("Air quality:", { exact: false })).toBeTruthy();
+    });
+
+    it("judges by the allergen index where there is no PM2.5, and says nothing with neither", async () => {
+        await drawn([
+            purifier({ air: { ...AIR, readings: { allergen: 2 } } }),
+            purifier({
+                id: "air-2",
+                name: "Hall humidifier",
+                air: { ...AIR, readings: { humidity: 50 } }
+            })
+        ]);
+        expect(screen.getAllByText("Good")).toHaveLength(1);
+    });
+
     it("is off limits, saying why, when it is not answering", async () => {
         await drawn([purifier({ online: false, state: "unknown" })]);
         const mode = screen.getByRole("combobox", {
@@ -167,6 +189,7 @@ describe("an air purifier's row", () => {
             screen.getByRole("combobox", { name: "Modo de Bedroom purifier" }).textContent
         ).toContain("Sueño");
         expect(screen.getByText("Filtro: cambiar pronto")).toBeTruthy();
+        expect(screen.getByText("Pasable")).toBeTruthy();
     });
 });
 
@@ -181,6 +204,9 @@ describe("an air purifier's panel", () => {
         expect(panel.getByText("12% left")).toBeTruthy();
         expect(panel.getByText("300 h left")).toBeTruthy();
         expect(panel.getByText("Replace soon")).toBeTruthy();
+        // PM2.5 of 12 is Fair, with what to do written out rather than hidden.
+        expect(panel.getByText("Fair")).toBeTruthy();
+        expect(panel.getByText("Fine for most people. Auto keeps it there.")).toBeTruthy();
     });
 
     it("gathers presses of the humidity stepper into one change", async () => {
