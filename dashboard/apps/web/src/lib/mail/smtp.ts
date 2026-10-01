@@ -16,7 +16,11 @@ import { INVITE_FILENAME, type EmailMessage } from "./types";
  *  and upgrades with STARTTLS. */
 const IMPLICIT_TLS_PORT = 465;
 
-export async function sendWithSmtp(config: SmtpConfig, secret: string, message: EmailMessage): Promise<void> {
+export async function sendWithSmtp(
+    config: SmtpConfig,
+    secret: string,
+    message: EmailMessage
+): Promise<void> {
     const transport = createTransport({
         host: config.host,
         port: config.port,

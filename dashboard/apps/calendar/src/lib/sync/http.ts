@@ -9,10 +9,21 @@
  * travel to the origin they were given for (or a host under it).
  */
 
-import { SyncAuthError, SyncConflictError, SyncGoneError, SyncNotFoundError, SyncRefusedError, SyncUnreachableError, safeReason } from "./errors";
+import {
+    SyncAuthError,
+    SyncConflictError,
+    SyncGoneError,
+    SyncNotFoundError,
+    SyncRefusedError,
+    SyncUnreachableError,
+    safeReason
+} from "./errors";
 
 /** How a client reaches the network. The dashboard injects an SSRF-guarded one. */
-export type Fetcher = (url: string, init: RequestInit & { timeoutMs?: number }) => Promise<Response>;
+export type Fetcher = (
+    url: string,
+    init: RequestInit & { timeoutMs?: number }
+) => Promise<Response>;
 
 /** Past this a server is treated as unreachable rather than slow. */
 export const DEFAULT_TIMEOUT_MS = 30_000;
@@ -36,7 +47,9 @@ export interface SendOptions {
  * `caldav.icloud.com` and keeps each account on `pNN-caldav.icloud.com`, which
  * needs the same password.
  */
-const PARTITIONS: readonly { host: string; partition: RegExp }[] = [{ host: "caldav.icloud.com", partition: /^p\d+-caldav\.icloud\.com$/ }];
+const PARTITIONS: readonly { host: string; partition: RegExp }[] = [
+    { host: "caldav.icloud.com", partition: /^p\d+-caldav\.icloud\.com$/ }
+];
 
 /**
  * Whether credentials given for `from` may be sent to `to`.
@@ -49,7 +62,9 @@ export function sameSite(from: URL, to: URL): boolean {
     if (from.origin === to.origin) return true;
     if (to.protocol !== "https:" || to.port !== from.port) return false;
     if (to.hostname.endsWith(`.${from.hostname}`)) return true;
-    return PARTITIONS.some((entry) => entry.host === from.hostname && entry.partition.test(to.hostname));
+    return PARTITIONS.some(
+        (entry) => entry.host === from.hostname && entry.partition.test(to.hostname)
+    );
 }
 
 /** Parses Retry-After (seconds or an HTTP date) into seconds, or null. */
@@ -69,7 +84,8 @@ export function requireHttpUrl(raw: string): URL {
     } catch {
         throw new SyncRefusedError("Not a valid address", null);
     }
-    if (url.protocol !== "https:" && url.protocol !== "http:") throw new SyncRefusedError("Only http and https addresses are supported", null);
+    if (url.protocol !== "https:" && url.protocol !== "http:")
+        throw new SyncRefusedError("Only http and https addresses are supported", null);
     return url;
 }
 
@@ -86,7 +102,11 @@ export function redactUrl(url: URL): string {
  * (a WebDAV PROPFIND or REPORT is only meaningful as itself) except 303, which
  * turns into a GET as HTTP says.
  */
-export async function send(fetcher: Fetcher, rawUrl: string, options: SendOptions = {}): Promise<{ response: Response; url: URL }> {
+export async function send(
+    fetcher: Fetcher,
+    rawUrl: string,
+    options: SendOptions = {}
+): Promise<{ response: Response; url: URL }> {
     let url = requireHttpUrl(rawUrl);
     let method = options.method ?? "GET";
     let body = options.body;
@@ -107,25 +127,43 @@ export async function send(fetcher: Fetcher, rawUrl: string, options: SendOption
         } catch (error) {
             if (error instanceof SyncRefusedError || error instanceof SyncAuthError) throw error;
             if (error instanceof Error && error.name === "RefusedAddressError") throw error;
-            const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-            throw new SyncUnreachableError(timedOut ? `No answer from ${url.host} in time` : `Could not reach ${url.host}`, null);
+            const timedOut =
+                error instanceof Error &&
+                (error.name === "TimeoutError" || error.name === "AbortError");
+            throw new SyncUnreachableError(
+                timedOut ? `No answer from ${url.host} in time` : `Could not reach ${url.host}`,
+                null
+            );
         }
         if (![301, 302, 303, 307, 308].includes(response.status)) return { response, url };
         const location = response.headers.get("location");
         if (!location) return { response, url };
         await response.body?.cancel().catch(() => undefined);
-        if (hop >= MAX_REDIRECTS) throw new SyncUnreachableError(`Too many redirects from ${url.host}`, response.status);
+        if (hop >= MAX_REDIRECTS)
+            throw new SyncUnreachableError(`Too many redirects from ${url.host}`, response.status);
         let next: URL;
         try {
             next = new URL(location, url);
         } catch {
-            throw new SyncRefusedError("The server redirected to an invalid address", response.status);
+            throw new SyncRefusedError(
+                "The server redirected to an invalid address",
+                response.status
+            );
         }
-        if (next.protocol !== "https:" && next.protocol !== "http:") throw new SyncRefusedError("The server redirected to an unsupported address", response.status);
-        if (url.protocol === "https:" && next.protocol === "http:") throw new SyncRefusedError("The server redirected from https to http", response.status);
+        if (next.protocol !== "https:" && next.protocol !== "http:")
+            throw new SyncRefusedError(
+                "The server redirected to an unsupported address",
+                response.status
+            );
+        if (url.protocol === "https:" && next.protocol === "http:")
+            throw new SyncRefusedError("The server redirected from https to http", response.status);
         if (!sameSite(origin, next)) {
-            const drop = new Set((options.credentialHeaders ?? ["authorization"]).map((h) => h.toLowerCase()));
-            headers = Object.fromEntries(Object.entries(headers).filter(([name]) => !drop.has(name.toLowerCase())));
+            const drop = new Set(
+                (options.credentialHeaders ?? ["authorization"]).map((h) => h.toLowerCase())
+            );
+            headers = Object.fromEntries(
+                Object.entries(headers).filter(([name]) => !drop.has(name.toLowerCase()))
+            );
         }
         if (response.status === 303) {
             method = "GET";
@@ -187,11 +225,18 @@ export const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 export function errorFor(response: Response, reason = ""): Error {
     const status = response.status;
     const said = reason ? `: ${reason}` : "";
-    if (status === 401 || status === 403) return new SyncAuthError(`The server refused the credentials (${status})${said}`, status);
+    if (status === 401 || status === 403)
+        return new SyncAuthError(`The server refused the credentials (${status})${said}`, status);
     if (status === 404) return new SyncNotFoundError(`Not found on the server${said}`, status);
-    if (status === 410) return new SyncGoneError(`The server discarded the sync state${said}`, status);
+    if (status === 410)
+        return new SyncGoneError(`The server discarded the sync state${said}`, status);
     if (status === 412) return new SyncConflictError(status);
-    if (status === 429 || status >= 500) return new SyncUnreachableError(`The server is unavailable (${status})${said}`, status, retryAfter(response));
+    if (status === 429 || status >= 500)
+        return new SyncUnreachableError(
+            `The server is unavailable (${status})${said}`,
+            status,
+            retryAfter(response)
+        );
     return new SyncRefusedError(`The server refused the request (${status})${said}`, status);
 }
 
@@ -231,6 +276,9 @@ export async function readJson(response: Response): Promise<unknown> {
     try {
         return JSON.parse(text) as unknown;
     } catch {
-        throw new SyncUnreachableError("The server answered with something that is not JSON", response.status);
+        throw new SyncUnreachableError(
+            "The server answered with something that is not JSON",
+            response.status
+        );
     }
 }

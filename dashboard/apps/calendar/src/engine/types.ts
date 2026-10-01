@@ -40,7 +40,14 @@ export interface WallTime {
 
 export type Weekday = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
 
-export type Frequency = "SECONDLY" | "MINUTELY" | "HOURLY" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+export type Frequency =
+    | "SECONDLY"
+    | "MINUTELY"
+    | "HOURLY"
+    | "DAILY"
+    | "WEEKLY"
+    | "MONTHLY"
+    | "YEARLY";
 
 /**
  * A recurrence rule, as structured as the editor needs it.

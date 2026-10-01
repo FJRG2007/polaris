@@ -18,7 +18,13 @@ import { CalendarRefusal } from "./errors";
 import { forgetReminders } from "./reminders";
 import type { CalendarInput, CalendarPatch } from "./schemas";
 import type { CalendarSummary, DefaultAlarms, ResourceInfo, SourceKind } from "./wire";
-import { reachableCalendars, requireCalendar, reaches, type Reach, type SessionUser } from "./access";
+import {
+    reachableCalendars,
+    requireCalendar,
+    reaches,
+    type Reach,
+    type SessionUser
+} from "./access";
 
 const NO_ALARMS: DefaultAlarms = { timed: [], allDay: [] };
 
@@ -27,7 +33,9 @@ export function readDefaultAlarms(raw: string): DefaultAlarms {
     try {
         const parsed = JSON.parse(raw) as { timed?: unknown; allDay?: unknown };
         const list = (value: unknown) =>
-            Array.isArray(value) ? value.filter((entry): entry is number => Number.isInteger(entry)).slice(0, 5) : [];
+            Array.isArray(value)
+                ? value.filter((entry): entry is number => Number.isInteger(entry)).slice(0, 5)
+                : [];
         return { timed: list(parsed.timed), allDay: list(parsed.allDay) };
     } catch {
         return NO_ALARMS;
@@ -93,7 +101,13 @@ type SummaryRow = {
     resource: string;
     createdAt: Date;
     owner: { id: string; name: string };
-    source: { id: string; kind: string; label: string; status: string; lastSyncAt: Date | null } | null;
+    source: {
+        id: string;
+        kind: string;
+        label: string;
+        status: string;
+        lastSyncAt: Date | null;
+    } | null;
     _count: { shares: number };
 };
 
@@ -111,8 +125,13 @@ function summarize(
         color: display?.color ?? row.color,
         ownColor: row.color,
         timezone: row.timezone,
-        components: row.components.split(",").filter((part): part is "VEVENT" | "VTODO" => part === "VEVENT" || part === "VTODO"),
-        kind: (["local", "remote", "resource", "birthdays"] as const).find((kind) => kind === row.kind) ?? "local",
+        components: row.components
+            .split(",")
+            .filter((part): part is "VEVENT" | "VTODO" => part === "VEVENT" || part === "VTODO"),
+        kind:
+            (["local", "remote", "resource", "birthdays"] as const).find(
+                (kind) => kind === row.kind
+            ) ?? "local",
         source: row.source
             ? {
                   id: row.source.id,
@@ -131,7 +150,9 @@ function summarize(
         alarmsMuted: row.alarmsMuted,
         defaultAlarms: readDefaultAlarms(row.defaultAlarms),
         // What only the owner and managers see: whether and how it is published.
-        publicMode: reaches(reach, "manage") ? ((row.publicMode as CalendarSummary["publicMode"]) ?? "") : "",
+        publicMode: reaches(reach, "manage")
+            ? ((row.publicMode as CalendarSummary["publicMode"]) ?? "")
+            : "",
         publicToken: reaches(reach, "manage") ? row.publicToken : null,
         resource: readResource(row.resource),
         shareCount: reaches(reach, "manage") ? row._count.shares : 0
@@ -163,12 +184,17 @@ export async function listCalendars(user: SessionUser): Promise<CalendarSummary[
     ]);
     const byId = new Map(displays.map((display) => [display.calendarId, display]));
     return rows
-        .map((row, index) => summarize(row as SummaryRow, reach.get(row.id)!, byId.get(row.id), index))
+        .map((row, index) =>
+            summarize(row as SummaryRow, reach.get(row.id)!, byId.get(row.id), index)
+        )
         .sort((left, right) => left.position - right.position);
 }
 
 /** One calendar as the sidebar draws it, for a screen that has just changed it. */
-export async function calendarSummary(user: SessionUser, calendarId: string): Promise<CalendarSummary> {
+export async function calendarSummary(
+    user: SessionUser,
+    calendarId: string
+): Promise<CalendarSummary> {
     const found = (await listCalendars(user)).find((calendar) => calendar.id === calendarId);
     if (!found) throw new CalendarRefusal((await calendarT())("errors.calendarNotFound"));
     return found;
@@ -196,11 +222,16 @@ export async function createCalendar(user: SessionUser, input: CalendarInput): P
  * from a provider keeps the provider's name, so only its colour, reminders and
  * how it counts toward busy are Polaris's to change.
  */
-export async function updateCalendar(user: SessionUser, calendarId: string, patch: CalendarPatch): Promise<void> {
+export async function updateCalendar(
+    user: SessionUser,
+    calendarId: string,
+    patch: CalendarPatch
+): Promise<void> {
     const calendar = await requireCalendar(user.id, calendarId, "manage");
     const data: Record<string, unknown> = {};
     if (patch.name !== undefined && calendar.kind !== "remote") data.name = patch.name;
-    if (patch.description !== undefined && calendar.kind !== "remote") data.description = patch.description;
+    if (patch.description !== undefined && calendar.kind !== "remote")
+        data.description = patch.description;
     if (patch.color !== undefined) data.color = patch.color;
     if (patch.timezone !== undefined) data.timezone = patch.timezone;
     if (patch.transparent !== undefined) data.transparent = patch.transparent;
@@ -219,7 +250,12 @@ export async function setDisplay(
     await requireCalendar(user.id, calendarId, "freebusy");
     await prisma.calendarDisplay.upsert({
         where: { calendarId_userId: { calendarId, userId: user.id } },
-        create: { calendarId, userId: user.id, hidden: patch.hidden ?? false, color: patch.color ?? null },
+        create: {
+            calendarId,
+            userId: user.id,
+            hidden: patch.hidden ?? false,
+            color: patch.color ?? null
+        },
         update: {
             ...(patch.hidden !== undefined ? { hidden: patch.hidden } : {}),
             ...(patch.color !== undefined ? { color: patch.color } : {})
@@ -228,7 +264,10 @@ export async function setDisplay(
 }
 
 /** This reader's order of their calendars. Ids they do not reach are ignored. */
-export async function reorderCalendars(user: SessionUser, orderedIds: readonly string[]): Promise<void> {
+export async function reorderCalendars(
+    user: SessionUser,
+    orderedIds: readonly string[]
+): Promise<void> {
     const reach = await reachableCalendars(user.id);
     const ids = orderedIds.filter((id) => reach.has(id));
     await prisma.$transaction(
@@ -260,10 +299,14 @@ export async function trashCalendar(user: SessionUser, calendarId: string): Prom
  */
 export async function leaveCalendar(user: SessionUser, calendarId: string): Promise<void> {
     const calendar = await requireCalendar(user.id, calendarId, "freebusy");
-    if (calendar.reach === "owner") throw new CalendarRefusal((await calendarT())("errors.ownCalendar"));
-    const removed = await prisma.calendarShare.deleteMany({ where: { calendarId, userId: user.id } });
+    if (calendar.reach === "owner")
+        throw new CalendarRefusal((await calendarT())("errors.ownCalendar"));
+    const removed = await prisma.calendarShare.deleteMany({
+        where: { calendarId, userId: user.id }
+    });
     const still = await reachableCalendars(user.id);
-    if (removed.count === 0 || still.has(calendarId)) await setDisplay(user, calendarId, { hidden: true });
+    if (removed.count === 0 || still.has(calendarId))
+        await setDisplay(user, calendarId, { hidden: true });
     await forgetReminders(calendarId, [user.id]);
 }
 

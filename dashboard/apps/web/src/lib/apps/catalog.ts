@@ -1356,7 +1356,14 @@ function isConsentField(app: AppManifest, field: TemplateEnvVar): boolean {
     return Boolean(app.consent) && field.key === "EULA";
 }
 
-const CATEGORY_ORDER: readonly AppCategory[] = ["Messaging", "Productivity", "AI", "Game servers", "Home", "Tools"];
+const CATEGORY_ORDER: readonly AppCategory[] = [
+    "Messaging",
+    "Productivity",
+    "AI",
+    "Game servers",
+    "Home",
+    "Tools"
+];
 
 /** Marketplace grouping, in a stable display order. */
 export function appsByCategory(): ReadonlyArray<{ category: AppCategory; apps: AppManifest[] }> {

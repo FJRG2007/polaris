@@ -77,7 +77,11 @@ export async function calendarBusy(
     if (calendars.length === 0) return [];
     const self = new Set((options.selfEmails ?? []).map((email) => email.toLowerCase()));
     const occurrences: engine.Occurrence[] = [];
-    for await (const row of objectsReaching(calendars.map((calendar) => calendar.id), window, options.skipUid)) {
+    for await (const row of objectsReaching(
+        calendars.map((calendar) => calendar.id),
+        window,
+        options.skipUid
+    )) {
         const item = tryItemOf(row.ics);
         if (!item) continue;
         try {
@@ -105,7 +109,12 @@ export async function personBusy(
 ): Promise<engine.BusyInterval[]> {
     const [calendars, emails] = await Promise.all([
         prisma.calendar.findMany({
-            where: { ownerId: person.id, trashedAt: null, transparent: false, kind: { in: ["local", "remote"] } },
+            where: {
+                ownerId: person.id,
+                trashedAt: null,
+                transparent: false,
+                kind: { in: ["local", "remote"] }
+            },
             select: { id: true }
         }),
         verifiedAddresses(person.id, person.email)
@@ -130,7 +139,9 @@ export function awayIntervals(
 ): { start: Date; end: Date }[] {
     const away: { start: Date; end: Date }[] = [];
     for (const date of engine.localDays(window.from, window.to, zone)) {
-        const ranges = [...(workingHours[String(engine.weekdayIndex(date))] ?? [])].sort((a, b) => (a.from < b.from ? -1 : 1));
+        const ranges = [...(workingHours[String(engine.weekdayIndex(date))] ?? [])].sort((a, b) =>
+            a.from < b.from ? -1 : 1
+        );
         let cursor = 0;
         const gaps: [number, number][] = [];
         for (const range of ranges) {
@@ -140,7 +151,10 @@ export function awayIntervals(
         }
         if (cursor < 1440) gaps.push([cursor, 1440]);
         for (const [from, to] of gaps) {
-            const start = Math.max(engine.instantAt(date, from, zone).getTime(), window.from.getTime());
+            const start = Math.max(
+                engine.instantAt(date, from, zone).getTime(),
+                window.from.getTime()
+            );
             const end = Math.min(engine.instantAt(date, to, zone).getTime(), window.to.getTime());
             if (end > start) away.push({ start: new Date(start), end: new Date(end) });
         }
@@ -158,7 +172,14 @@ export async function reachablePeople(
     people: readonly { id: string; email: string }[]
 ): Promise<Set<string>> {
     const others = people.map((person) => person.id).filter((id) => id !== actor.id);
-    const allowed = new Set(others.length > 0 ? await host.calendarHost.peopleInReach({ id: actor.id, isAdmin: actor.isAdmin }, others) : []);
+    const allowed = new Set(
+        others.length > 0
+            ? await host.calendarHost.peopleInReach(
+                  { id: actor.id, isAdmin: actor.isAdmin },
+                  others
+              )
+            : []
+    );
     if (people.some((person) => person.id === actor.id)) allowed.add(actor.id);
     return allowed;
 }
@@ -169,7 +190,10 @@ function workZone(setting: string, fallback: string): string {
     return setting !== "auto" && engine.resolveZone(setting) ? setting : fallback;
 }
 
-const iso = (interval: { start: Date; end: Date }) => ({ start: interval.start.toISOString(), end: interval.end.toISOString() });
+const iso = (interval: { start: Date; end: Date }) => ({
+    start: interval.start.toISOString(),
+    end: interval.end.toISOString()
+});
 
 /** Answer a free/busy question for the reader. */
 export async function freeBusy(
@@ -190,18 +214,27 @@ export async function freeBusy(
         host.calendarHost.peopleByIds(request.userIds)
     ]);
     const idOfEmail = new Map(byEmail.map((account) => [account.email, account.id]));
-    const ids = [...new Set([...byEmail.map((account) => account.id), ...byId.map((person) => person.id)])];
+    const ids = [
+        ...new Set([...byEmail.map((account) => account.id), ...byId.map((person) => person.id)])
+    ];
     const people = await host.calendarHost.peopleByIds(ids);
     const personById = new Map(people.map((person) => [person.id, person]));
     const allowed = await reachablePeople(actor, people);
 
-    const answers = new Map<string, FreeBusyPerson & { busyRaw: engine.BusyInterval[]; awayRaw: { start: Date; end: Date }[] }>();
+    const answers = new Map<
+        string,
+        FreeBusyPerson & { busyRaw: engine.BusyInterval[]; awayRaw: { start: Date; end: Date }[] }
+    >();
     for (const id of ids) {
         const person = personById.get(id);
         if (!person || !allowed.has(id)) continue;
         const preferences = await loadPreferences(id);
         const busy = await personBusy(person, window, request.zone);
-        const away = awayIntervals(preferences.workingHours, window, workZone(preferences.timezone, request.zone));
+        const away = awayIntervals(
+            preferences.workingHours,
+            window,
+            workZone(preferences.timezone, request.zone)
+        );
         answers.set(id, {
             key: id,
             name: person.name,
@@ -213,8 +246,18 @@ export async function freeBusy(
         });
     }
 
-    const unavailable = (key: string, name: string): FreeBusyPerson => ({ key, name, status: "unavailable", busy: [], away: [] });
-    const strip = ({ busyRaw: _busy, awayRaw: _away, ...answer }: FreeBusyPerson & { busyRaw: unknown; awayRaw: unknown }): FreeBusyPerson => answer;
+    const unavailable = (key: string, name: string): FreeBusyPerson => ({
+        key,
+        name,
+        status: "unavailable",
+        busy: [],
+        away: []
+    });
+    const strip = ({
+        busyRaw: _busy,
+        awayRaw: _away,
+        ...answer
+    }: FreeBusyPerson & { busyRaw: unknown; awayRaw: unknown }): FreeBusyPerson => answer;
     const result: FreeBusyPerson[] = [];
     for (const email of request.emails) {
         const id = idOfEmail.get(email);
@@ -230,7 +273,10 @@ export async function freeBusy(
     if (request.durationMinutes && answers.size > 0) {
         const lists = [...answers.values()].map((answer) => [
             ...answer.busyRaw,
-            ...answer.awayRaw.map((interval) => ({ ...interval, type: "BUSY-UNAVAILABLE" as const }))
+            ...answer.awayRaw.map((interval) => ({
+                ...interval,
+                type: "BUSY-UNAVAILABLE" as const
+            }))
         ]);
         suggestions = engine
             .suggestTimes({
@@ -246,7 +292,12 @@ export async function freeBusy(
             })
             .map(iso);
     }
-    return { from: request.from.toISOString(), to: request.to.toISOString(), people: result, suggestions };
+    return {
+        from: request.from.toISOString(),
+        to: request.to.toISOString(),
+        people: result,
+        suggestions
+    };
 }
 
 /** Whether somebody is free right now, for a person's card: taken until when,
@@ -268,9 +319,13 @@ export async function availabilityNow(
     const person = view.people[0];
     if (!person || person.status !== "ok") return { status: "unavailable", until: null };
     const at = now.getTime();
-    const current = person.busy.find((interval) => Date.parse(interval.start) <= at && Date.parse(interval.end) > at);
+    const current = person.busy.find(
+        (interval) => Date.parse(interval.start) <= at && Date.parse(interval.end) > at
+    );
     if (current) return { status: "busy", until: current.end };
-    const away = person.away.find((interval) => Date.parse(interval.start) <= at && Date.parse(interval.end) > at);
+    const away = person.away.find(
+        (interval) => Date.parse(interval.start) <= at && Date.parse(interval.end) > at
+    );
     if (away) return { status: "away", until: away.end };
     const next = person.busy.find((interval) => Date.parse(interval.start) > at);
     return { status: "free", until: next?.start ?? null };

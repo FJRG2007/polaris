@@ -49,7 +49,11 @@ export async function scheduleTaskAction(input: unknown): Promise<Outcome<object
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => {
         const user = await requireCalendarUser();
-        await host.calendarHost.scheduleTask({ id: user.id, isAdmin: user.isAdmin }, parsed.data.taskId, parsed.data.due);
+        await host.calendarHost.scheduleTask(
+            { id: user.id, isAdmin: user.isAdmin },
+            parsed.data.taskId,
+            parsed.data.due
+        );
         return {};
     });
 }
@@ -81,7 +85,12 @@ export async function saveTodoAction(input: unknown): Promise<Outcome<object>> {
             percent: done ? 100 : item.todo.percent === 100 ? 0 : item.todo.percent,
             completed: done ? (item.todo.completed ?? new Date().toISOString()) : null
         };
-        await writeItem(row.calendarId, row, { ...item, todo }, { actor: user, floatingZone: parsed.data.zone });
+        await writeItem(
+            row.calendarId,
+            row,
+            { ...item, todo },
+            { actor: user, floatingZone: parsed.data.zone }
+        );
         return {};
     });
 }

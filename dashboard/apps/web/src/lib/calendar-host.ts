@@ -32,7 +32,11 @@ import { sendAuthEmail } from "@/lib/auth-mail";
 import { configuredRequest } from "@/lib/safe-fetch";
 import type { EmailMessage } from "@/lib/mail/types";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
-import { accountsByIdInReach, searchAccounts, type AccountCandidate } from "@/lib/rich-text/mention-service";
+import {
+    accountsByIdInReach,
+    searchAccounts,
+    type AccountCandidate
+} from "@/lib/rich-text/mention-service";
 
 /** The providers a calendar can be linked from through a linked account. */
 export type CalendarLinkProvider = "google" | "microsoft";
@@ -57,7 +61,9 @@ const CALENDAR_SCOPE: Record<CalendarLinkProvider, string> = {
 /** Whether a granted scope string carries calendar read and write access. */
 export function grantsCalendar(provider: CalendarLinkProvider, scope: string): boolean {
     const wanted = CALENDAR_SCOPE[provider];
-    return scope.split(/\s+/).some((granted) => granted === wanted || granted.endsWith(`/${wanted}`));
+    return scope
+        .split(/\s+/)
+        .some((granted) => granted === wanted || granted.endsWith(`/${wanted}`));
 }
 
 /** Every Google and Microsoft account this person linked. */
@@ -120,7 +126,10 @@ export async function calendarAccessToken(userId: string, connectionId: string):
             MICROSOFT_CALENDAR_SCOPES.filter((scope) => scope !== "openid" && scope !== "email")
         );
     } catch (caught) {
-        if (caught instanceof GoogleAuthExpiredError || caught instanceof MicrosoftAuthExpiredError) {
+        if (
+            caught instanceof GoogleAuthExpiredError ||
+            caught instanceof MicrosoftAuthExpiredError
+        ) {
             throw new CalendarLinkExpiredError();
         }
         throw caught;
@@ -253,7 +262,11 @@ export async function teamsOf(userId: string): Promise<CalendarTeam[]> {
         where: { userId },
         select: { team: { select: { id: true, name: true, org: { select: { name: true } } } } }
     });
-    return rows.map((row) => ({ id: row.team.id, name: row.team.name, orgName: row.team.org.name }));
+    return rows.map((row) => ({
+        id: row.team.id,
+        name: row.team.name,
+        orgName: row.team.org.name
+    }));
 }
 
 /** Who is on a team, for a share or an invitation to it. */
@@ -280,9 +293,7 @@ export async function displayTimeZone(userId: string): Promise<string> {
  * refused - the caller records it and tells the organizer, since an invitation
  * that never left is worth knowing about.
  */
-export async function sendCalendarEmail(
-    message: EmailMessage
-): Promise<{ error?: string }> {
+export async function sendCalendarEmail(message: EmailMessage): Promise<{ error?: string }> {
     return sendAuthEmail(message);
 }
 
@@ -374,9 +385,14 @@ export async function createMeetingLink(
     const meetings = await import("@/lib/chat/meetings");
     const { readerWords } = await import("@/lib/i18n/reader-words");
     const allowed =
-        (await userHasPermission(userId, "chat.use")) && (await userHasPermission(userId, "chat.meetings"));
-    const admin = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
-    if (!allowed && !admin?.isAdmin) return { refused: (await readerWords("api"))("refusals.calendar.noMeetings") };
+        (await userHasPermission(userId, "chat.use")) &&
+        (await userHasPermission(userId, "chat.meetings"));
+    const admin = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true }
+    });
+    if (!allowed && !admin?.isAdmin)
+        return { refused: (await readerWords("api"))("refusals.calendar.noMeetings") };
     const off = await calls.callsUnavailable();
     if (off) return { refused: off };
     const created = await meetings.createMeeting(

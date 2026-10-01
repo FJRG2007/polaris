@@ -28,7 +28,11 @@ const PER_MINUTE = 120;
 
 async function allowed(): Promise<boolean> {
     const ip = (await host.requestContext.clientIp()) ?? "unknown";
-    const result = await host.rateLimitService.rateLimit(`calendar.public:${ip}`, PER_MINUTE, 60_000);
+    const result = await host.rateLimitService.rateLimit(
+        `calendar.public:${ip}`,
+        PER_MINUTE,
+        60_000
+    );
     return result.ok;
 }
 
@@ -36,7 +40,8 @@ export async function GET(
     request: Request,
     context: { params: Promise<{ token: string; path?: string[] }> }
 ): Promise<Response> {
-    if (!(await allowed())) return new Response(null, { status: 429, headers: { "retry-after": "60" } });
+    if (!(await allowed()))
+        return new Response(null, { status: 429, headers: { "retry-after": "60" } });
     const { token, path = [] } = await context.params;
     const what = path.join("/");
     try {
@@ -55,7 +60,11 @@ export async function GET(
         if (what === "range") {
             const parsed = window.safeParse(Object.fromEntries(new URL(request.url).searchParams));
             if (!parsed.success) return Response.json({ error: "window" }, { status: 400 });
-            const view = await publishedRange(token, { from: parsed.data.from, to: parsed.data.to }, parsed.data.zone);
+            const view = await publishedRange(
+                token,
+                { from: parsed.data.from, to: parsed.data.to },
+                parsed.data.zone
+            );
             if (!view) return new Response(null, { status: 404 });
             return Response.json(view, { headers: { "cache-control": "no-store" } });
         }

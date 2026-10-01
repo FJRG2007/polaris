@@ -57,6 +57,9 @@ export interface CalendarProvider {
     listCalendars(): Promise<RemoteCalendar[]>;
     pull(state: PullState): Promise<ChangeSet>;
     /** Creates (`href` null) or replaces an object; a stale `etag` is a `SyncConflictError`. */
-    put(target: WriteTarget, object: { href: string | null; etag: string | null; ics: string; uid: string }): Promise<{ href: string; etag: string }>;
+    put(
+        target: WriteTarget,
+        object: { href: string | null; etag: string | null; ics: string; uid: string }
+    ): Promise<{ href: string; etag: string }>;
     remove(target: WriteTarget, object: { href: string; etag: string | null }): Promise<void>;
 }

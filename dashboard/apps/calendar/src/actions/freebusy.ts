@@ -31,5 +31,7 @@ export async function availabilityNowAction(
 ): Promise<Outcome<{ status: "free" | "busy" | "away" | "unavailable"; until: string | null }>> {
     const parsed = nowInput.safeParse(input);
     if (!parsed.success) return refusedInput(parsed.error.issues);
-    return outcome(async () => freebusy.availabilityNow(await requireCalendarUser(), parsed.data.userId, parsed.data.zone));
+    return outcome(async () =>
+        freebusy.availabilityNow(await requireCalendarUser(), parsed.data.userId, parsed.data.zone)
+    );
 }

@@ -42,14 +42,20 @@ export function MiniMonth({
 
     useEffect(() => {
         if (!autoFocus) return;
-        const timer = setTimeout(() => grid.current?.querySelector<HTMLButtonElement>("[data-focus='true']")?.focus(), 0);
+        const timer = setTimeout(
+            () => grid.current?.querySelector<HTMLButtonElement>("[data-focus='true']")?.focus(),
+            0
+        );
         return () => clearTimeout(timer);
     }, [autoFocus]);
 
     const moveFocus = (day: string) => {
         setFocus(day);
         if (time.firstOfMonth(day) !== month) setMonth(time.firstOfMonth(day));
-        setTimeout(() => grid.current?.querySelector<HTMLButtonElement>(`[data-day='${day}']`)?.focus(), 0);
+        setTimeout(
+            () => grid.current?.querySelector<HTMLButtonElement>(`[data-day='${day}']`)?.focus(),
+            0
+        );
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -78,20 +84,46 @@ export function MiniMonth({
     return (
         <div className="flex flex-col gap-1 select-none">
             <div className="flex items-center gap-1">
-                <p className="min-w-0 flex-1 truncate px-1 text-[0.8125rem] font-medium first-letter:uppercase" aria-live="polite">
+                <p
+                    className="min-w-0 flex-1 truncate px-1 text-[0.8125rem] font-medium first-letter:uppercase"
+                    aria-live="polite"
+                >
                     {title}
                 </p>
-                <Button size="icon-xs" variant="ghost" aria-label={t("header.previousMonth")} title={t("header.previousMonth")} onClick={() => setMonth(time.addMonths(month, -1))}>
+                <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label={t("header.previousMonth")}
+                    title={t("header.previousMonth")}
+                    onClick={() => setMonth(time.addMonths(month, -1))}
+                >
                     <ChevronLeft />
                 </Button>
-                <Button size="icon-xs" variant="ghost" aria-label={t("header.nextMonth")} title={t("header.nextMonth")} onClick={() => setMonth(time.addMonths(month, 1))}>
+                <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label={t("header.nextMonth")}
+                    title={t("header.nextMonth")}
+                    onClick={() => setMonth(time.addMonths(month, 1))}
+                >
                     <ChevronRight />
                 </Button>
             </div>
-            <div ref={grid} role="grid" aria-label={title} onKeyDown={onKeyDown} className="grid grid-cols-7 text-center text-[11px] tabular-nums">
+            <div
+                ref={grid}
+                role="grid"
+                aria-label={title}
+                onKeyDown={onKeyDown}
+                className="grid grid-cols-7 text-center text-[11px] tabular-nums"
+            >
                 <div role="row" className="contents">
                     {names.map((name, index) => (
-                        <span key={index} role="columnheader" aria-label={longNames[index]} className="py-1 text-foreground-subtle">
+                        <span
+                            key={index}
+                            role="columnheader"
+                            aria-label={longNames[index]}
+                            className="py-1 text-foreground-subtle"
+                        >
                             {name}
                         </span>
                     ))}
@@ -100,9 +132,14 @@ export function MiniMonth({
                     <div role="row" key={week[0]} className="contents">
                         {week.map((day) => {
                             const inMonth = day.slice(0, 7) === month.slice(0, 7);
-                            const inWindow = highlight !== null && day >= highlight.start && day < highlight.end;
+                            const inWindow =
+                                highlight !== null && day >= highlight.start && day < highlight.end;
                             return (
-                                <span role="gridcell" key={day} className={cn("p-px", inWindow && "bg-muted")}>
+                                <span
+                                    role="gridcell"
+                                    key={day}
+                                    className={cn("p-px", inWindow && "bg-muted")}
+                                >
                                     <button
                                         type="button"
                                         data-day={day}
@@ -110,13 +147,17 @@ export function MiniMonth({
                                         tabIndex={day === focus ? 0 : -1}
                                         aria-current={day === today ? "date" : undefined}
                                         aria-selected={day === value}
-                                        aria-label={time.formatDay(day, locale, { dateStyle: "full" })}
+                                        aria-label={time.formatDay(day, locale, {
+                                            dateStyle: "full"
+                                        })}
                                         onClick={() => onPick(day)}
                                         className={cn(
                                             "flex h-6 w-full items-center justify-center rounded transition-colors duration-fast hover:bg-card-hover",
                                             !inMonth && "text-foreground-subtle",
-                                            day === today && "font-semibold text-foreground underline decoration-2 underline-offset-2",
-                                            day === value && "bg-foreground text-background hover:bg-foreground"
+                                            day === today &&
+                                                "font-semibold text-foreground underline decoration-2 underline-offset-2",
+                                            day === value &&
+                                                "bg-foreground text-background hover:bg-foreground"
                                         )}
                                     >
                                         {Number(day.slice(8))}

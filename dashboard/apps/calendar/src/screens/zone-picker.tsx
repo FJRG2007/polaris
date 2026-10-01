@@ -26,10 +26,15 @@ let zoneCache: { locale: string; hour: number; options: ZoneOption[] } | null = 
 
 function zoneOptions(locale: string, now: Date): ZoneOption[] {
     const hour = Math.floor(now.getTime() / 3_600_000);
-    if (zoneCache && zoneCache.locale === locale && zoneCache.hour === hour) return zoneCache.options;
+    if (zoneCache && zoneCache.locale === locale && zoneCache.hour === hour)
+        return zoneCache.options;
     const options = engine.listZones().map((zone) => {
         const label = engine.zoneLabel(zone, now, locale);
-        return { value: zone, label, haystack: `${label} ${zone.replace(/[_/]/g, " ")}`.toLowerCase() };
+        return {
+            value: zone,
+            label,
+            haystack: `${label} ${zone.replace(/[_/]/g, " ")}`.toLowerCase()
+        };
     });
     zoneCache = { locale, hour, options };
     return options;
@@ -63,11 +68,20 @@ export function ZonePicker({
     const input = useRef<HTMLInputElement>(null);
     const options = useMemo(() => zoneOptions(locale, new Date()), [locale]);
 
-    const shownValue = value === "" ? t("zonePicker.floating") : (options.find((option) => option.value === value)?.label ?? value);
+    const shownValue =
+        value === ""
+            ? t("zonePicker.floating")
+            : (options.find((option) => option.value === value)?.label ?? value);
     const matches = useMemo(() => {
         const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        const found = words.length === 0 ? options : options.filter((option) => words.every((word) => option.haystack.includes(word)));
-        const floating: ZoneOption[] = allowFloating && words.length === 0 ? [{ value: "", label: t("zonePicker.floating"), haystack: "" }] : [];
+        const found =
+            words.length === 0
+                ? options
+                : options.filter((option) => words.every((word) => option.haystack.includes(word)));
+        const floating: ZoneOption[] =
+            allowFloating && words.length === 0
+                ? [{ value: "", label: t("zonePicker.floating"), haystack: "" }]
+                : [];
         return [...floating, ...found].slice(0, MOST_SHOWN);
     }, [options, query, allowFloating, t]);
 
@@ -103,7 +117,10 @@ export function ZonePicker({
     return (
         <div className="flex min-w-0 flex-col gap-1">
             <div className="relative">
-                <Globe aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle" />
+                <Globe
+                    aria-hidden
+                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                />
                 <Input
                     ref={input}
                     id={id}
@@ -112,7 +129,9 @@ export function ZonePicker({
                     aria-expanded={open}
                     aria-controls={listId}
                     aria-autocomplete="list"
-                    aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined}
+                    aria-activedescendant={
+                        open && matches[active] ? `${listId}-${active}` : undefined
+                    }
                     disabled={disabled}
                     className="pl-8"
                     value={open ? query : shownValue}
@@ -127,7 +146,11 @@ export function ZonePicker({
                     }}
                     onKeyDown={onKeyDown}
                     onBlur={(event) => {
-                        if (!event.currentTarget.parentElement?.parentElement?.contains(event.relatedTarget as Node | null)) {
+                        if (
+                            !event.currentTarget.parentElement?.parentElement?.contains(
+                                event.relatedTarget as Node | null
+                            )
+                        ) {
                             setOpen(false);
                             setQuery("");
                         }
@@ -135,9 +158,16 @@ export function ZonePicker({
                 />
             </div>
             {open ? (
-                <ul id={listId} role="listbox" aria-label={label ?? t("zonePicker.search")} className="max-h-56 overflow-y-auto rounded-md border border-border bg-elevated p-1">
+                <ul
+                    id={listId}
+                    role="listbox"
+                    aria-label={label ?? t("zonePicker.search")}
+                    className="max-h-56 overflow-y-auto rounded-md border border-border bg-elevated p-1"
+                >
                     {matches.length === 0 ? (
-                        <li className="px-2 py-1.5 text-xs text-muted-foreground">{t("zonePicker.none")}</li>
+                        <li className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {t("zonePicker.none")}
+                        </li>
                     ) : (
                         matches.map((option, index) => (
                             <li
@@ -151,10 +181,17 @@ export function ZonePicker({
                                     choose(option.value);
                                 }}
                                 onMouseEnter={() => setActive(index)}
-                                className={cn("flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] tabular-nums", index === active && "bg-option-hover")}
+                                className={cn(
+                                    "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] tabular-nums",
+                                    index === active && "bg-option-hover"
+                                )}
                             >
-                                <span className="min-w-0 flex-1 truncate" title={option.label}>{option.label}</span>
-                                {option.value === value ? <Check aria-hidden className="size-4 text-primary" /> : null}
+                                <span className="min-w-0 flex-1 truncate" title={option.label}>
+                                    {option.label}
+                                </span>
+                                {option.value === value ? (
+                                    <Check aria-hidden className="size-4 text-primary" />
+                                ) : null}
                             </li>
                         ))
                     )}

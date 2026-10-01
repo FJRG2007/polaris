@@ -49,26 +49,45 @@ interface MutableElement {
     scope: Map<string, string>;
 }
 
-const PREDEFINED: Readonly<Record<string, string>> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'" };
+const PREDEFINED: Readonly<Record<string, string>> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'"
+};
 
 /** Decodes the five predefined entities and character references; anything else stays literal. */
 export function decodeEntities(text: string): string {
     if (!text.includes("&")) return text;
-    return text.replace(/&(#x[0-9a-fA-F]{1,6}|#[0-9]{1,7}|[A-Za-z][A-Za-z0-9._-]*);/g, (whole, body: string) => {
-        if (body.startsWith("#")) {
-            const code = body[1] === "x" ? Number.parseInt(body.slice(2), 16) : Number.parseInt(body.slice(1), 10);
-            const valid = code === 0x9 || code === 0xa || code === 0xd
-                || (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd) || (code >= 0x10000 && code <= 0x10ffff);
-            return valid ? String.fromCodePoint(code) : whole;
+    return text.replace(
+        /&(#x[0-9a-fA-F]{1,6}|#[0-9]{1,7}|[A-Za-z][A-Za-z0-9._-]*);/g,
+        (whole, body: string) => {
+            if (body.startsWith("#")) {
+                const code =
+                    body[1] === "x"
+                        ? Number.parseInt(body.slice(2), 16)
+                        : Number.parseInt(body.slice(1), 10);
+                const valid =
+                    code === 0x9 ||
+                    code === 0xa ||
+                    code === 0xd ||
+                    (code >= 0x20 && code <= 0xd7ff) ||
+                    (code >= 0xe000 && code <= 0xfffd) ||
+                    (code >= 0x10000 && code <= 0x10ffff);
+                return valid ? String.fromCodePoint(code) : whole;
+            }
+            return PREDEFINED[body] ?? whole;
         }
-        return PREDEFINED[body] ?? whole;
-    });
+    );
 }
 
 /** Splits `p:local` into its prefix ("" for none) and local name. */
 function splitName(qname: string): { prefix: string; local: string } {
     const colon = qname.indexOf(":");
-    return colon < 0 ? { prefix: "", local: qname } : { prefix: qname.slice(0, colon), local: qname.slice(colon + 1) };
+    return colon < 0
+        ? { prefix: "", local: qname }
+        : { prefix: qname.slice(0, colon), local: qname.slice(colon + 1) };
 }
 
 const NAME = /^[A-Za-z_À-￿][A-Za-z0-9._:·À-￿-]*/;
@@ -138,7 +157,7 @@ export function parseXml(input: string): XmlElement {
                 const c = src[i];
                 if (quote) {
                     if (c === quote) quote = "";
-                } else if (c === "\"" || c === "'") quote = c;
+                } else if (c === '"' || c === "'") quote = c;
                 else if (c === "[") depth++;
                 else if (c === "]") depth--;
                 else if (c === ">" && depth <= 0) break;
@@ -186,7 +205,7 @@ export function parseXml(input: string): XmlElement {
             pos++;
             while (pos < src.length && /\s/.test(src[pos]!)) pos++;
             const quote = src[pos];
-            if (quote !== "\"" && quote !== "'") fail("Unquoted attribute value");
+            if (quote !== '"' && quote !== "'") fail("Unquoted attribute value");
             const close = src.indexOf(quote!, pos + 1);
             if (close < 0) fail("Unclosed attribute value");
             const value = src.slice(pos + 1, close);
@@ -221,7 +240,15 @@ export function parseXml(input: string): XmlElement {
                 attrs.set(`{${attrNs}}${split.local}`, value);
             }
         }
-        const element: MutableElement = { ns: ns ?? "", local, attrs, children: [], text: "", qname, scope };
+        const element: MutableElement = {
+            ns: ns ?? "",
+            local,
+            attrs,
+            children: [],
+            text: "",
+            qname,
+            scope
+        };
         if (parent) parent.children.push(element);
         else root = element;
         if (!selfClosing) stack.push(element);
@@ -233,12 +260,20 @@ export function parseXml(input: string): XmlElement {
 }
 
 /** The first child named `(ns, local)`, or null. */
-export function child(element: XmlElement | null | undefined, ns: string, local: string): XmlElement | null {
+export function child(
+    element: XmlElement | null | undefined,
+    ns: string,
+    local: string
+): XmlElement | null {
     return element?.children.find((c) => c.ns === ns && c.local === local) ?? null;
 }
 
 /** Every child named `(ns, local)`. */
-export function childrenOf(element: XmlElement | null | undefined, ns: string, local: string): XmlElement[] {
+export function childrenOf(
+    element: XmlElement | null | undefined,
+    ns: string,
+    local: string
+): XmlElement[] {
     return element ? element.children.filter((c) => c.ns === ns && c.local === local) : [];
 }
 
@@ -253,5 +288,9 @@ export function textContent(element: XmlElement | null | undefined): string {
 
 /** Escapes text for use inside an element or a double-quoted attribute. */
 export function escapeXml(text: string): string {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }

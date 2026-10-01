@@ -13,10 +13,20 @@ import { StatusNote } from "../public/kit";
 import { hostUi } from "@polaris/app-host/client";
 import type { BookingPageView } from "../../lib/scheduling-wire";
 import { BookingOffNote } from "./booking-off-note";
-import { bookingUrl, forgetBookingPages, useBookingPages, useBookingSwitch, useLinkBase } from "./reads";
+import {
+    bookingUrl,
+    forgetBookingPages,
+    useBookingPages,
+    useBookingSwitch,
+    useLinkBase
+} from "./reads";
 import { CalendarClock, Copy, CopyPlus, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, CopyButton, EmptyState, Skeleton, Switch, buttonVariants, cn } from "@polaris/ui";
-import { deleteBookingPageAction, duplicateBookingPageAction, updateBookingPageAction } from "../../actions/booking";
+import {
+    deleteBookingPageAction,
+    duplicateBookingPageAction,
+    updateBookingPageAction
+} from "../../actions/booking";
 
 export function BookingPagesView() {
     const t = useCalendarT();
@@ -31,7 +41,9 @@ export function BookingPagesView() {
     const list = pages.data ?? [];
     const put = (next: BookingPageView[]) => pages.replace(next);
 
-    async function run<T extends { ok: boolean }>(call: () => Promise<T>): Promise<Extract<T, { ok: true }> | null> {
+    async function run<T extends { ok: boolean }>(
+        call: () => Promise<T>
+    ): Promise<Extract<T, { ok: true }> | null> {
         setProblem(null);
         const answer = await hostUi.runAction.runAction(call, setProblem);
         if (!answer) return null;
@@ -45,7 +57,9 @@ export function BookingPagesView() {
     async function toggle(page: BookingPageView, enabled: boolean) {
         const before = list;
         put(list.map((entry) => (entry.id === page.id ? { ...entry, enabled } : entry)));
-        const answer = await run(() => updateBookingPageAction(page.id, inputOf({ ...draftOf(page), enabled })));
+        const answer = await run(() =>
+            updateBookingPageAction(page.id, inputOf({ ...draftOf(page), enabled }))
+        );
         if (!answer) put(before);
         else put(before.map((entry) => (entry.id === page.id ? answer.page : entry)));
     }
@@ -93,13 +107,20 @@ export function BookingPagesView() {
             {pages.error && !pages.data ? (
                 <StatusNote tone="danger">
                     <span>{pages.error}</span>{" "}
-                    <button type="button" className="underline underline-offset-2" onClick={pages.refresh}>
+                    <button
+                        type="button"
+                        className="underline underline-offset-2"
+                        onClick={pages.refresh}
+                    >
                         {t("bookingPage.retry")}
                     </button>
                 </StatusNote>
             ) : null}
             {pages.loading ? (
-                <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card" aria-busy>
+                <ul
+                    className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card"
+                    aria-busy
+                >
                     {[0, 1, 2].map((row) => (
                         <li key={row} className="flex items-center gap-3 px-3 py-3">
                             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -117,7 +138,10 @@ export function BookingPagesView() {
                     description={t("bookingPage.emptyBody")}
                     action={
                         off ? undefined : (
-                            <Link href="/calendar/booking/new" className={buttonVariants({ size: "sm" })}>
+                            <Link
+                                href="/calendar/booking/new"
+                                className={buttonVariants({ size: "sm" })}
+                            >
                                 <Plus />
                                 {t("bookingPage.new")}
                             </Link>
@@ -127,15 +151,24 @@ export function BookingPagesView() {
             ) : list.length > 0 ? (
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
                     {list.map((page) => (
-                        <li key={page.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+                        <li
+                            key={page.id}
+                            className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5"
+                        >
                             <div className="flex min-w-0 flex-1 flex-col">
-                                <Link href={`/calendar/booking/${page.id}`} className="truncate font-medium text-foreground hover:underline" title={page.title}>
+                                <Link
+                                    href={`/calendar/booking/${page.id}`}
+                                    className="truncate font-medium text-foreground hover:underline"
+                                    title={page.title}
+                                >
                                     {page.title}
                                 </Link>
                                 <span className="truncate text-xs text-muted-foreground">
                                     {t("bookingPage.minutes", { n: page.durationMinutes })},{" "}
-                                    {page.visibility === "public" ? t("bookingPage.visibilityPublic") : t("bookingPage.visibilityLink")},{" "}
-                                    {t("bookingPage.upcoming", { n: page.upcoming })}
+                                    {page.visibility === "public"
+                                        ? t("bookingPage.visibilityPublic")
+                                        : t("bookingPage.visibilityLink")}
+                                    , {t("bookingPage.upcoming", { n: page.upcoming })}
                                 </span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -146,9 +179,18 @@ export function BookingPagesView() {
                                     aria-label={t("bookingPage.enabledFor", { title: page.title })}
                                 />
                                 {base ? (
-                                    <CopyButton value={bookingUrl(base, page.slug)} label={t("bookingPage.copyLink")} />
+                                    <CopyButton
+                                        value={bookingUrl(base, page.slug)}
+                                        label={t("bookingPage.copyLink")}
+                                    />
                                 ) : (
-                                    <Button size="icon-sm" variant="ghost" disabled aria-label={t("bookingPage.copyLink")} title={t("bookingPage.copyLink")}>
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        disabled
+                                        aria-label={t("bookingPage.copyLink")}
+                                        title={t("bookingPage.copyLink")}
+                                    >
                                         <Copy />
                                     </Button>
                                 )}
@@ -158,7 +200,9 @@ export function BookingPagesView() {
                                     rel="noopener noreferrer"
                                     aria-label={t("bookingPage.preview")}
                                     title={t("bookingPage.preview")}
-                                    className={cn(buttonVariants({ size: "icon-sm", variant: "ghost" }))}
+                                    className={cn(
+                                        buttonVariants({ size: "icon-sm", variant: "ghost" })
+                                    )}
                                 >
                                     <ExternalLink />
                                 </a>
@@ -176,7 +220,9 @@ export function BookingPagesView() {
                                     href={`/calendar/booking/${page.id}`}
                                     aria-label={t("bookingPage.edit")}
                                     title={t("bookingPage.edit")}
-                                    className={cn(buttonVariants({ size: "icon-sm", variant: "ghost" }))}
+                                    className={cn(
+                                        buttonVariants({ size: "icon-sm", variant: "ghost" })
+                                    )}
                                 >
                                     <Pencil />
                                 </Link>

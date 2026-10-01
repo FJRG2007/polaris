@@ -16,7 +16,11 @@ import { Button, buttonVariants } from "@polaris/ui";
 import { formatRange, PublicFrame, StatusNote } from "./kit";
 import { CalendarCheck, CalendarX, Repeat } from "lucide-react";
 import type { ManagedBooking, SlotView } from "../../lib/scheduling-wire";
-import { cancelBookingAction, confirmBookingAction, rescheduleBookingAction } from "../../actions/booking";
+import {
+    cancelBookingAction,
+    confirmBookingAction,
+    rescheduleBookingAction
+} from "../../actions/booking";
 
 type Outcome =
     | { kind: "none" }
@@ -42,7 +46,9 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
     const page = booking.page;
     const bookAgain = `/cal/book/${page.slug}`;
 
-    async function call<T extends { ok: boolean }>(work: () => Promise<T>): Promise<Extract<T, { ok: true }> | null> {
+    async function call<T extends { ok: boolean }>(
+        work: () => Promise<T>
+    ): Promise<Extract<T, { ok: true }> | null> {
         setBusy(true);
         setProblem(null);
         const answer = await hostUi.runAction.runAction(work, setProblem);
@@ -111,10 +117,15 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
     );
 
     return (
-        <PublicFrame title={page.title} subtitle={page.ownerName ? t("booking.with", { name: page.ownerName }) : undefined}>
+        <PublicFrame
+            title={page.title}
+            subtitle={page.ownerName ? t("booking.with", { name: page.ownerName }) : undefined}
+        >
             {confirmNode}
             <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-                <span className="font-medium">{formatRange(when.start, when.end, zone, locale)}</span>
+                <span className="font-medium">
+                    {formatRange(when.start, when.end, zone, locale)}
+                </span>
                 <BookingSummary page={page} />
             </div>
 
@@ -124,18 +135,27 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
                 <StatusNote tone="success">
                     <span>{t("booking.confirmedNow")}</span>{" "}
                     {outcome.manageToken ? (
-                        <a href={`/cal/booking/${outcome.manageToken}`} className="underline underline-offset-2">
+                        <a
+                            href={`/cal/booking/${outcome.manageToken}`}
+                            className="underline underline-offset-2"
+                        >
                             {t("booking.manageLink")}
                         </a>
                     ) : null}
                 </StatusNote>
             ) : null}
-            {outcome.kind === "moved" ? <StatusNote tone="success">{t("booking.movedNow")}</StatusNote> : null}
-            {outcome.kind === "taken" ? <StatusNote tone="warning">{t("booking.takenMeanwhile")}</StatusNote> : null}
+            {outcome.kind === "moved" ? (
+                <StatusNote tone="success">{t("booking.movedNow")}</StatusNote>
+            ) : null}
+            {outcome.kind === "taken" ? (
+                <StatusNote tone="warning">{t("booking.takenMeanwhile")}</StatusNote>
+            ) : null}
 
             {state === "pending" && booking.via === "confirm" ? (
                 <div className="flex flex-col gap-2">
-                    <p className="text-muted-foreground">{t("booking.confirmPrompt", { name: booking.name })}</p>
+                    <p className="text-muted-foreground">
+                        {t("booking.confirmPrompt", { name: booking.name })}
+                    </p>
                     <div>
                         <Button onClick={() => void confirm()} disabled={busy}>
                             <CalendarCheck />
@@ -145,7 +165,9 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
                 </div>
             ) : null}
 
-            {state === "pending" && booking.via === "manage" ? <StatusNote tone="warning">{t("booking.notConfirmed")}</StatusNote> : null}
+            {state === "pending" && booking.via === "manage" ? (
+                <StatusNote tone="warning">{t("booking.notConfirmed")}</StatusNote>
+            ) : null}
 
             {state === "expired" ? (
                 <div className="flex flex-col gap-2">
@@ -156,18 +178,27 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
 
             {state === "cancelled" ? (
                 <div className="flex flex-col gap-2">
-                    {outcome.kind === "taken" ? null : <StatusNote tone="neutral">{t("booking.isCancelled")}</StatusNote>}
+                    {outcome.kind === "taken" ? null : (
+                        <StatusNote tone="neutral">{t("booking.isCancelled")}</StatusNote>
+                    )}
                     <div>{again}</div>
                 </div>
             ) : null}
 
-            {state === "past" ? <StatusNote tone="neutral">{t("booking.alreadyPast")}</StatusNote> : null}
+            {state === "past" ? (
+                <StatusNote tone="neutral">{t("booking.alreadyPast")}</StatusNote>
+            ) : null}
 
             {state === "confirmed" && booking.via === "confirm" && outcome.kind !== "confirmed" ? (
                 <div className="flex flex-col gap-2">
                     <StatusNote tone="success">{t("booking.alreadyConfirmed")}</StatusNote>
                     <div>
-                        <Button variant="outline" size="sm" disabled={busy} onClick={() => void openManage()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void openManage()}
+                        >
                             {t("booking.manageLink")}
                         </Button>
                     </div>
@@ -177,11 +208,22 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
             {state === "confirmed" && booking.via === "manage" ? (
                 <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" disabled={busy} onClick={() => setMoving((open) => !open)} aria-expanded={moving}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => setMoving((open) => !open)}
+                            aria-expanded={moving}
+                        >
                             <Repeat />
                             {t("booking.reschedule")}
                         </Button>
-                        <Button variant="outline" size="sm" disabled={busy} onClick={() => void cancel()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void cancel()}
+                        >
                             <CalendarX />
                             {t("booking.cancelBooking")}
                         </Button>
@@ -199,7 +241,9 @@ export function BookingManage({ token, booking }: { token: string; booking: Mana
                             />
                             {picked ? (
                                 <div className="flex flex-wrap items-center justify-end gap-2">
-                                    <span className="mr-auto text-muted-foreground">{formatRange(picked.start, picked.end, zone, locale)}</span>
+                                    <span className="mr-auto text-muted-foreground">
+                                        {formatRange(picked.start, picked.end, zone, locale)}
+                                    </span>
                                     <Button size="sm" disabled={busy} onClick={() => void move()}>
                                         {t("booking.moveHere")}
                                     </Button>

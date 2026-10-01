@@ -96,7 +96,9 @@ const WINDOWS_ZONES: Readonly<Record<string, string>> = {
     "Tonga Standard Time": "Pacific/Tongatapu"
 };
 
-const WINDOWS_LOWER = new Map(Object.entries(WINDOWS_ZONES).map(([name, zone]) => [name.toLowerCase(), zone]));
+const WINDOWS_LOWER = new Map(
+    Object.entries(WINDOWS_ZONES).map(([name, zone]) => [name.toLowerCase(), zone])
+);
 
 /** Formatters by zone. Building one is the expensive part of every conversion. */
 const formatters = new Map<string, Intl.DateTimeFormat>();
@@ -125,7 +127,8 @@ function formatterFor(zone: string): Intl.DateTimeFormat {
 /** The name as `Intl` accepts it, or null when it throws on it. */
 function intlZone(name: string): string | null {
     try {
-        const canonical = new Intl.DateTimeFormat("en-US", { timeZone: name }).resolvedOptions().timeZone;
+        const canonical = new Intl.DateTimeFormat("en-US", { timeZone: name }).resolvedOptions()
+            .timeZone;
         // Keep the name as written unless only its case differed: engines do not
         // agree on which alias is canonical, and a TZID that changes spelling
         // between browsers would make a round trip look like an edit.
@@ -156,7 +159,8 @@ export function resolveZone(tzid: string | null | undefined): string | null {
     if (!found && name.includes("/")) {
         // Vendor prefixes: try the longest trailing run of segments Intl knows.
         const segments = name.split("/").filter(Boolean);
-        for (let from = 1; from < segments.length && !found; from++) found = intlZone(segments.slice(from).join("/"));
+        for (let from = 1; from < segments.length && !found; from++)
+            found = intlZone(segments.slice(from).join("/"));
     }
     resolved.set(name, found);
     return found;
@@ -175,7 +179,8 @@ function wallUtcMs(wall: WallTime): number {
 export function instantToWall(instant: Date, zone: string): WallTime {
     if (zone === "UTC") return wallFromUtcDate(instant);
     const parts = formatterFor(zone).formatToParts(instant);
-    const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+        Number(parts.find((part) => part.type === type)?.value ?? 0);
     const era = parts.find((part) => part.type === "era")?.value ?? "AD";
     const year = value("year");
     return {
@@ -231,7 +236,11 @@ export function wallToInstant(wall: WallTime, zone: string): Date {
     if (zone === "UTC") return new Date(utc);
     const day = 86_400_000;
     const before = zoneOffsetMinutes(new Date(utc - day), zone);
-    const offsets = new Set([before, zoneOffsetMinutes(new Date(utc), zone), zoneOffsetMinutes(new Date(utc + day), zone)]);
+    const offsets = new Set([
+        before,
+        zoneOffsetMinutes(new Date(utc), zone),
+        zoneOffsetMinutes(new Date(utc + day), zone)
+    ]);
     const matches: number[] = [];
     for (const offset of offsets) {
         const candidate = utc - offset * 60_000;
@@ -245,7 +254,9 @@ const pad = (value: number, width = 2) => String(value).padStart(width, "0");
 
 /** Read `YYYY-MM-DDTHH:mm:ss` (seconds optional; a bare date is midnight). */
 export function parseWall(text: string): WallTime {
-    const match = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(text.trim());
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(
+        text.trim()
+    );
     if (!match) throw new Error(`Not a wall time: ${text}`);
     const [, year, month, day, hour, minute, second] = match;
     return {
@@ -268,7 +279,9 @@ export function formatWall(wall: WallTime): string {
  * normalised the way a clock would: 23:30 plus 60 minutes is 00:30 next day.
  */
 export function addToWall(wall: WallTime, change: { days?: number; seconds?: number }): WallTime {
-    const date = new Date(wallUtcMs(wall) + (change.days ?? 0) * 86_400_000 + (change.seconds ?? 0) * 1000);
+    const date = new Date(
+        wallUtcMs(wall) + (change.days ?? 0) * 86_400_000 + (change.seconds ?? 0) * 1000
+    );
     return wallFromUtcDate(date);
 }
 
@@ -279,7 +292,8 @@ export function wallDifferenceSeconds(from: WallTime, to: WallTime): number {
 
 /** Every IANA zone this runtime knows, sorted, with UTC. */
 export function listZones(): string[] {
-    const supported = (Intl as { supportedValuesOf?: (key: "timeZone") => string[] }).supportedValuesOf;
+    const supported = (Intl as { supportedValuesOf?: (key: "timeZone") => string[] })
+        .supportedValuesOf;
     const zones = new Set(supported ? supported("timeZone") : []);
     zones.add("UTC");
     return [...zones].sort();

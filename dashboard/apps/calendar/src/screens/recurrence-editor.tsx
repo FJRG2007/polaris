@@ -21,7 +21,15 @@ import { AlertTriangle, Repeat } from "lucide-react";
 type Model = engine.RuleEditorModel;
 
 const ORDINALS: readonly engine.RuleOrdinal[] = [1, 2, 3, 4, 5, -2, -1];
-const ORDINAL_KEY: Record<string, "n1" | "n2" | "n3" | "n4" | "n5" | "secondLast" | "last"> = { "1": "n1", "2": "n2", "3": "n3", "4": "n4", "5": "n5", "-2": "secondLast", "-1": "last" };
+const ORDINAL_KEY: Record<string, "n1" | "n2" | "n3" | "n4" | "n5" | "secondLast" | "last"> = {
+    "1": "n1",
+    "2": "n2",
+    "3": "n3",
+    "4": "n4",
+    "5": "n5",
+    "-2": "secondLast",
+    "-1": "last"
+};
 
 function weekdayName(day: engine.Weekday, locale: string, width: "long" | "short"): string {
     // 2024-01-01 was a Monday.
@@ -30,7 +38,9 @@ function weekdayName(day: engine.Weekday, locale: string, width: "long" | "short
 }
 
 function monthName(month: number, locale: string): string {
-    return new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2024, month - 1, 1)));
+    return new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(
+        new Date(Date.UTC(2024, month - 1, 1))
+    );
 }
 
 function toggled<T>(list: readonly T[], item: T): T[] {
@@ -90,12 +100,19 @@ export function RecurrenceEditor({
                     <AlertTriangle aria-hidden className="mt-0.5 size-4" />
                     <span>{t("repeat.unsupported")}</span>
                 </p>
-                <p className="text-[0.8125rem] font-medium">{engine.summarizeRule(rule, words, locale)}</p>
+                <p className="text-[0.8125rem] font-medium">
+                    {engine.summarizeRule(rule, words, locale)}
+                </p>
                 {!disabled ? (
-                    <Button size="sm" variant="outline" className="self-start" onClick={() => {
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="self-start"
+                        onClick={() => {
                             setReplacing(true);
                             onReplace?.();
-                        }}>
+                        }}
+                    >
                         {t("repeat.replace")}
                     </Button>
                 ) : null}
@@ -104,7 +121,9 @@ export function RecurrenceEditor({
     }
 
     const set = (change: Partial<Model>) => onChange({ ...value, ...change });
-    const frequencyOptions = (["NONE", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"] as const).map((frequency) => ({ value: frequency, label: t(`repeat.frequency.${frequency}`) }));
+    const frequencyOptions = (["NONE", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"] as const).map(
+        (frequency) => ({ value: frequency, label: t(`repeat.frequency.${frequency}`) })
+    );
     const unit = value.frequency === "NONE" ? null : (`repeat.unit.${value.frequency}` as const);
     const ordinalControls = (
         <div className="flex flex-wrap items-center gap-2">
@@ -114,17 +133,27 @@ export function RecurrenceEditor({
                 aria-label={t("repeat.ordinal")}
                 disabled={disabled}
                 value={String(value.ordinal)}
-                onValueChange={(next) => set({ ordinal: Number(next) as engine.RuleOrdinal, monthlyMode: "ordinal" })}
-                options={ORDINALS.map((ordinal) => ({ value: String(ordinal), label: words(`ordinal.${ORDINAL_KEY[String(ordinal)]}`) }))}
+                onValueChange={(next) =>
+                    set({ ordinal: Number(next) as engine.RuleOrdinal, monthlyMode: "ordinal" })
+                }
+                options={ORDINALS.map((ordinal) => ({
+                    value: String(ordinal),
+                    label: words(`ordinal.${ORDINAL_KEY[String(ordinal)]}`)
+                }))}
             />
             <Select
                 className="w-44"
                 aria-label={t("repeat.ordinalDay")}
                 disabled={disabled}
                 value={value.ordinalDay}
-                onValueChange={(next) => set({ ordinalDay: next as Model["ordinalDay"], monthlyMode: "ordinal" })}
+                onValueChange={(next) =>
+                    set({ ordinalDay: next as Model["ordinalDay"], monthlyMode: "ordinal" })
+                }
                 options={[
-                    ...engine.WEEKDAYS.map((day) => ({ value: day, label: weekdayName(day, locale, "long") })),
+                    ...engine.WEEKDAYS.map((day) => ({
+                        value: day,
+                        label: weekdayName(day, locale, "long")
+                    })),
                     { value: "day", label: words("dayKind.day") },
                     { value: "weekday", label: words("dayKind.weekday") },
                     { value: "weekend", label: words("dayKind.weekend") }
@@ -136,7 +165,14 @@ export function RecurrenceEditor({
     return (
         <div className="flex flex-col gap-3" aria-label={t("repeat.label")} role="group">
             <div className="flex flex-wrap items-center gap-2">
-                <Select className="w-44" aria-label={t("repeat.label")} disabled={disabled} value={value.frequency} onValueChange={(next) => set({ frequency: next as Model["frequency"] })} options={frequencyOptions} />
+                <Select
+                    className="w-44"
+                    aria-label={t("repeat.label")}
+                    disabled={disabled}
+                    value={value.frequency}
+                    onValueChange={(next) => set({ frequency: next as Model["frequency"] })}
+                    options={frequencyOptions}
+                />
                 {unit ? (
                     <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         {t("repeat.every")}
@@ -148,7 +184,14 @@ export function RecurrenceEditor({
                             className="w-16 tabular-nums"
                             disabled={disabled}
                             value={Number.isFinite(value.interval) ? value.interval : ""}
-                            onChange={(event) => set({ interval: Math.max(1, Math.min(999, Math.floor(Number(event.target.value) || 1))) })}
+                            onChange={(event) =>
+                                set({
+                                    interval: Math.max(
+                                        1,
+                                        Math.min(999, Math.floor(Number(event.target.value) || 1))
+                                    )
+                                })
+                            }
                         />
                         {t(unit, { count: value.interval })}
                     </label>
@@ -156,9 +199,19 @@ export function RecurrenceEditor({
             </div>
 
             {value.frequency === "WEEKLY" ? (
-                <div role="group" aria-label={t("repeat.weekdays")} className="flex flex-wrap gap-1">
+                <div
+                    role="group"
+                    aria-label={t("repeat.weekdays")}
+                    className="flex flex-wrap gap-1"
+                >
                     {engine.WEEKDAYS.map((day) => (
-                        <ToggleChip key={day} label={weekdayName(day, locale, "long")} pressed={value.weekdays.includes(day)} disabled={disabled} onPressedChange={() => set({ weekdays: toggled(value.weekdays, day) })}>
+                        <ToggleChip
+                            key={day}
+                            label={weekdayName(day, locale, "long")}
+                            pressed={value.weekdays.includes(day)}
+                            disabled={disabled}
+                            onPressedChange={() => set({ weekdays: toggled(value.weekdays, day) })}
+                        >
                             {weekdayName(day, locale, "short")}
                         </ToggleChip>
                     ))}
@@ -167,18 +220,40 @@ export function RecurrenceEditor({
 
             {value.frequency === "MONTHLY" ? (
                 <div className="flex flex-col gap-2">
-                    <div role="radiogroup" aria-label={t("repeat.monthlyMode")} className="flex flex-wrap gap-3 text-xs">
+                    <div
+                        role="radiogroup"
+                        aria-label={t("repeat.monthlyMode")}
+                        className="flex flex-wrap gap-3 text-xs"
+                    >
                         {(["day", "ordinal"] as const).map((mode) => (
                             <label key={mode} className="flex items-center gap-1.5">
-                                <input type="radio" name={`${ids}-mode`} checked={value.monthlyMode === mode} disabled={disabled} onChange={() => set({ monthlyMode: mode })} className="accent-[hsl(var(--primary))]" />
+                                <input
+                                    type="radio"
+                                    name={`${ids}-mode`}
+                                    checked={value.monthlyMode === mode}
+                                    disabled={disabled}
+                                    onChange={() => set({ monthlyMode: mode })}
+                                    className="accent-[hsl(var(--primary))]"
+                                />
                                 {t(`repeat.mode.${mode}`)}
                             </label>
                         ))}
                     </div>
                     {value.monthlyMode === "day" ? (
-                        <div role="group" aria-label={t("repeat.monthDays")} className="grid max-w-xs grid-cols-7 gap-1">
+                        <div
+                            role="group"
+                            aria-label={t("repeat.monthDays")}
+                            className="grid max-w-xs grid-cols-7 gap-1"
+                        >
                             {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
-                                <ToggleChip key={day} pressed={value.monthDays.includes(day)} disabled={disabled} onPressedChange={() => set({ monthDays: toggled(value.monthDays, day) })}>
+                                <ToggleChip
+                                    key={day}
+                                    pressed={value.monthDays.includes(day)}
+                                    disabled={disabled}
+                                    onPressedChange={() =>
+                                        set({ monthDays: toggled(value.monthDays, day) })
+                                    }
+                                >
                                     {day}
                                 </ToggleChip>
                             ))}
@@ -191,15 +266,34 @@ export function RecurrenceEditor({
 
             {value.frequency === "YEARLY" ? (
                 <div className="flex flex-col gap-2">
-                    <div role="group" aria-label={t("repeat.months")} className="grid max-w-sm grid-cols-4 gap-1 sm:grid-cols-6">
+                    <div
+                        role="group"
+                        aria-label={t("repeat.months")}
+                        className="grid max-w-sm grid-cols-4 gap-1 sm:grid-cols-6"
+                    >
                         {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                            <ToggleChip key={month} pressed={value.months.includes(month)} disabled={disabled} onPressedChange={() => set({ months: toggled(value.months, month) })}>
+                            <ToggleChip
+                                key={month}
+                                pressed={value.months.includes(month)}
+                                disabled={disabled}
+                                onPressedChange={() =>
+                                    set({ months: toggled(value.months, month) })
+                                }
+                            >
                                 {monthName(month, locale)}
                             </ToggleChip>
                         ))}
                     </div>
                     <label className="flex items-center gap-1.5 text-xs">
-                        <input type="checkbox" checked={value.monthlyMode === "ordinal"} disabled={disabled} onChange={(event) => set({ monthlyMode: event.target.checked ? "ordinal" : "day" })} className="accent-[hsl(var(--primary))]" />
+                        <input
+                            type="checkbox"
+                            checked={value.monthlyMode === "ordinal"}
+                            disabled={disabled}
+                            onChange={(event) =>
+                                set({ monthlyMode: event.target.checked ? "ordinal" : "day" })
+                            }
+                            className="accent-[hsl(var(--primary))]"
+                        />
                         {t("repeat.yearlyOrdinal")}
                     </label>
                     {value.monthlyMode === "ordinal" ? ordinalControls : null}
@@ -217,16 +311,38 @@ export function RecurrenceEditor({
                             set({
                                 end:
                                     kind === "until"
-                                        ? { kind: "until", date: start ? engine.addDays("date" in start ? start.date : start.dateTime.slice(0, 10), 30) : "" }
+                                        ? {
+                                              kind: "until",
+                                              date: start
+                                                  ? engine.addDays(
+                                                        "date" in start
+                                                            ? start.date
+                                                            : start.dateTime.slice(0, 10),
+                                                        30
+                                                    )
+                                                  : ""
+                                          }
                                         : kind === "count"
                                           ? { kind: "count", count: 10 }
                                           : { kind: "never" }
                             })
                         }
-                        options={(["never", "until", "count"] as const).map((kind) => ({ value: kind, label: t(`repeat.end.${kind}`) }))}
+                        options={(["never", "until", "count"] as const).map((kind) => ({
+                            value: kind,
+                            label: t(`repeat.end.${kind}`)
+                        }))}
                     />
                     {value.end.kind === "until" ? (
-                        <Input type="date" aria-label={t("repeat.untilDate")} className="w-40 tabular-nums" disabled={disabled} value={value.end.date} onChange={(event) => set({ end: { kind: "until", date: event.target.value } })} />
+                        <Input
+                            type="date"
+                            aria-label={t("repeat.untilDate")}
+                            className="w-40 tabular-nums"
+                            disabled={disabled}
+                            value={value.end.date}
+                            onChange={(event) =>
+                                set({ end: { kind: "until", date: event.target.value } })
+                            }
+                        />
                     ) : null}
                     {value.end.kind === "count" ? (
                         <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -239,16 +355,34 @@ export function RecurrenceEditor({
                                 className="w-20 tabular-nums"
                                 disabled={disabled}
                                 value={value.end.count}
-                                onChange={(event) => set({ end: { kind: "count", count: Math.max(1, Math.min(1000, Math.floor(Number(event.target.value) || 1))) } })}
+                                onChange={(event) =>
+                                    set({
+                                        end: {
+                                            kind: "count",
+                                            count: Math.max(
+                                                1,
+                                                Math.min(
+                                                    1000,
+                                                    Math.floor(Number(event.target.value) || 1)
+                                                )
+                                            )
+                                        }
+                                    })
+                                }
                             />
-                            {t("repeat.times", { count: value.end.kind === "count" ? value.end.count : 0 })}
+                            {t("repeat.times", {
+                                count: value.end.kind === "count" ? value.end.count : 0
+                            })}
                         </label>
                     ) : null}
                 </div>
             ) : null}
 
             {summary ? (
-                <p className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
+                <p
+                    className="flex items-center gap-2 text-xs text-muted-foreground"
+                    aria-live="polite"
+                >
                     <Repeat aria-hidden className="size-4 text-foreground-subtle" />
                     {summary}
                 </p>

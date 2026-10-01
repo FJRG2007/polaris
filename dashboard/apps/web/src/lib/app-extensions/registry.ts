@@ -146,7 +146,10 @@ export async function adoptAppInstalls(ownerId: string): Promise<void> {
 
 /** The titles of the calendar events this account may read, by id. Empty when
  *  no installed app keeps calendars, or when it could not answer. */
-export async function eventTitlesFor(userId: string, ids: readonly string[]): Promise<Record<string, string>> {
+export async function eventTitlesFor(
+    userId: string,
+    ids: readonly string[]
+): Promise<Record<string, string>> {
     for (const extension of await installedWith("eventTitles")) {
         return { ...(await extension.eventTitles!(userId, ids).catch(() => ({}))) };
     }
@@ -155,7 +158,10 @@ export async function eventTitlesFor(userId: string, ids: readonly string[]): Pr
 
 /** This account's next events, from the app that keeps calendars, or null when
  *  no installed app does. */
-export async function upcomingEventsFor(userId: string, limit: number): Promise<UpcomingEvent[] | null> {
+export async function upcomingEventsFor(
+    userId: string,
+    limit: number
+): Promise<UpcomingEvent[] | null> {
     for (const extension of await installedWith("upcomingEvents")) {
         return [...(await extension.upcomingEvents!(userId, limit))];
     }

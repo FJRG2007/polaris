@@ -46,7 +46,8 @@ export const calendarExtension: AppExtension = {
         }
     ],
 
-    upcomingEvents: async (userId, limit) => (await import("./upcoming")).upcomingEvents(userId, limit),
+    upcomingEvents: async (userId, limit) =>
+        (await import("./upcoming")).upcomingEvents(userId, limit),
 
     eventTitles: async (userId, ids) => (await import("./event-titles")).eventTitles(userId, ids)
 };

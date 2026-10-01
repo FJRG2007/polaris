@@ -69,7 +69,7 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
     let token = 1;
     const p = options.davPrefix ?? "d";
     const d = (name: string) => (p ? `${p}:${name}` : name);
-    const rootAttrs = `${p ? `xmlns:${p}="DAV:"` : "xmlns=\"DAV:\""} xmlns:C="${CALDAV}" xmlns:CS="http://calendarserver.org/ns/" xmlns:A="http://apple.com/ns/ical/"`;
+    const rootAttrs = `${p ? `xmlns:${p}="DAV:"` : 'xmlns="DAV:"'} xmlns:C="${CALDAV}" xmlns:CS="http://calendarserver.org/ns/" xmlns:A="http://apple.com/ns/ical/"`;
     const expectedAuth = `Basic ${Buffer.from(`${options.username}:${options.password}`).toString("base64")}`;
     const supportsSync = options.supportsSync ?? true;
 
@@ -84,10 +84,14 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
         }</${d("response")}>`;
 
     const reply = (status: number, body = "", headers: Record<string, string> = {}) =>
-        new Response(status === 204 || status === 304 ? null : body, { status, headers: { "Content-Type": "application/xml; charset=utf-8", ...headers } });
+        new Response(status === 204 || status === 304 ? null : body, {
+            status,
+            headers: { "Content-Type": "application/xml; charset=utf-8", ...headers }
+        });
 
     const pathOf = (url: string) => new URL(url).pathname;
-    const calendarAt = (path: string) => calendars.find((c) => c.path === path || c.path === `${path}/`);
+    const calendarAt = (path: string) =>
+        calendars.find((c) => c.path === path || c.path === `${path}/`);
     const objectAt = (path: string) => {
         const slash = path.lastIndexOf("/");
         const calendar = calendarAt(path.slice(0, slash + 1));
@@ -116,7 +120,8 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
         return null;
     };
 
-    const hrefsIn = (root: XmlElement): string[] => root.children.filter((c) => c.ns === DAV && c.local === "href").map((c) => c.text.trim());
+    const hrefsIn = (root: XmlElement): string[] =>
+        root.children.filter((c) => c.ns === DAV && c.local === "href").map((c) => c.text.trim());
 
     const calendarProps = (calendar: FakeCalendar) => {
         const comps = calendar.components.map((c) => `<C:comp name="${c}"/>`).join("");
@@ -134,9 +139,17 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
         ].join("");
     };
 
-    const fetcher = async (url: string, init: RequestInit & { timeoutMs?: number }): Promise<Response> => {
+    const fetcher = async (
+        url: string,
+        init: RequestInit & { timeoutMs?: number }
+    ): Promise<Response> => {
         const method = (init.method ?? "GET").toUpperCase();
-        const headers = Object.fromEntries(Object.entries((init.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v]));
+        const headers = Object.fromEntries(
+            Object.entries((init.headers ?? {}) as Record<string, string>).map(([k, v]) => [
+                k.toLowerCase(),
+                v
+            ])
+        );
         const body = typeof init.body === "string" ? init.body : "";
         requests.push({ method, url, headers, body });
         if (!options.origins.includes(new URL(url).origin)) throw new TypeError("fetch failed");
@@ -146,40 +159,86 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
             if (options.wellKnown) return reply(301, "", { Location: options.wellKnown });
             return reply(404);
         }
-        if (headers.authorization !== expectedAuth) return reply(401, "", { "WWW-Authenticate": "Basic realm=\"fake\"" });
+        if (headers.authorization !== expectedAuth)
+            return reply(401, "", { "WWW-Authenticate": 'Basic realm="fake"' });
 
         if (method === "PROPFIND") {
             const depth = headers.depth ?? "0";
             if (pathMatches(url, options.principal)) {
-                return reply(207, multistatus([response(path, `<C:calendar-home-set><${d("href")}>${options.home}</${d("href")}></C:calendar-home-set>`)]));
+                return reply(
+                    207,
+                    multistatus([
+                        response(
+                            path,
+                            `<C:calendar-home-set><${d("href")}>${options.home}</${d("href")}></C:calendar-home-set>`
+                        )
+                    ])
+                );
             }
             if (pathMatches(url, options.home)) {
-                const rows = [response(pathOf(new URL(options.home, options.origins[0]).href), `<${d("resourcetype")}><${d("collection")}/></${d("resourcetype")}>`)];
+                const rows = [
+                    response(
+                        pathOf(new URL(options.home, options.origins[0]).href),
+                        `<${d("resourcetype")}><${d("collection")}/></${d("resourcetype")}>`
+                    )
+                ];
                 if (depth === "1") {
-                    for (const calendar of calendars) rows.push(response(calendar.path, calendarProps(calendar)));
-                    rows.push(response(`${pathOf(new URL(options.home, options.origins[0]).href)}inbox/`, `<${d("resourcetype")}><${d("collection")}/><C:schedule-inbox/></${d("resourcetype")}>`));
+                    for (const calendar of calendars)
+                        rows.push(response(calendar.path, calendarProps(calendar)));
+                    rows.push(
+                        response(
+                            `${pathOf(new URL(options.home, options.origins[0]).href)}inbox/`,
+                            `<${d("resourcetype")}><${d("collection")}/><C:schedule-inbox/></${d("resourcetype")}>`
+                        )
+                    );
                 }
                 return reply(207, multistatus(rows));
             }
             const calendar = calendarAt(path);
             if (calendar) {
-                if (depth === "0") return reply(207, multistatus([response(calendar.path, calendarProps(calendar))]));
-                const rows = [response(calendar.path, `<${d("resourcetype")}><${d("collection")}/><C:calendar/></${d("resourcetype")}>`)];
+                if (depth === "0")
+                    return reply(
+                        207,
+                        multistatus([response(calendar.path, calendarProps(calendar))])
+                    );
+                const rows = [
+                    response(
+                        calendar.path,
+                        `<${d("resourcetype")}><${d("collection")}/><C:calendar/></${d("resourcetype")}>`
+                    )
+                ];
                 for (const [name, object] of calendar.objects) {
                     const href = `${calendar.path}${encodeURIComponent(name)}`;
-                    if (withoutEtag.has(name)) rows.push(response(href, `<${d("resourcetype")}/>`, `<${d("getetag")}/>`));
-                    else rows.push(response(href, `<${d("resourcetype")}/><${d("getetag")}>${object.etag}</${d("getetag")}>`));
+                    if (withoutEtag.has(name))
+                        rows.push(response(href, `<${d("resourcetype")}/>`, `<${d("getetag")}/>`));
+                    else
+                        rows.push(
+                            response(
+                                href,
+                                `<${d("resourcetype")}/><${d("getetag")}>${object.etag}</${d("getetag")}>`
+                            )
+                        );
                 }
                 return reply(207, multistatus(rows));
             }
             const target = objectAt(path);
             const object = target?.calendar.objects.get(target.name);
-            if (object) return reply(207, multistatus([response(path, `<${d("getetag")}>${object.etag}</${d("getetag")}>`)]));
+            if (object)
+                return reply(
+                    207,
+                    multistatus([
+                        response(path, `<${d("getetag")}>${object.etag}</${d("getetag")}>`)
+                    ])
+                );
             // Anything else is a context root: it names the principal.
             return reply(
                 207,
                 multistatus([
-                    response(path, `<${d("current-user-principal")}><${d("href")}>${options.principal}</${d("href")}></${d("current-user-principal")}><${d("resourcetype")}><${d("collection")}/></${d("resourcetype")}>`, "<C:calendar-home-set/>")
+                    response(
+                        path,
+                        `<${d("current-user-principal")}><${d("href")}>${options.principal}</${d("href")}></${d("current-user-principal")}><${d("resourcetype")}><${d("collection")}/></${d("resourcetype")}>`,
+                        "<C:calendar-home-set/>"
+                    )
                 ])
             );
         }
@@ -193,27 +252,44 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
                 const given = findText(root, DAV, "sync-token") ?? "";
                 const match = /\/sync\/(\d+)$/.exec(given);
                 if (given !== "" && (!match || Number(match[1]) > token || Number(match[1]) < 0)) {
-                    return reply(403, `<?xml version="1.0"?><${d("error")} ${rootAttrs}><${d("valid-sync-token")}/></${d("error")}>`);
+                    return reply(
+                        403,
+                        `<?xml version="1.0"?><${d("error")} ${rootAttrs}><${d("valid-sync-token")}/></${d("error")}>`
+                    );
                 }
                 const since = match ? Number(match[1]) : 0;
                 const latest = new Map<string, boolean>();
-                for (const entry of calendar.log) if (entry.token > since) latest.set(entry.name, entry.deleted);
+                for (const entry of calendar.log)
+                    if (entry.token > since) latest.set(entry.name, entry.deleted);
                 const rows: string[] = [];
                 for (const [name, deleted] of latest) {
                     const href = `${calendar.path}${encodeURIComponent(name)}`;
                     const object = calendar.objects.get(name);
-                    if (deleted || !object) rows.push(`<${d("response")}><${d("href")}>${href}</${d("href")}><${d("status")}>HTTP/1.1 404 Not Found</${d("status")}></${d("response")}>`);
-                    else rows.push(response(href, `<${d("getetag")}>${object.etag}</${d("getetag")}>`));
+                    if (deleted || !object)
+                        rows.push(
+                            `<${d("response")}><${d("href")}>${href}</${d("href")}><${d("status")}>HTTP/1.1 404 Not Found</${d("status")}></${d("response")}>`
+                        );
+                    else
+                        rows.push(
+                            response(href, `<${d("getetag")}>${object.etag}</${d("getetag")}>`)
+                        );
                 }
-                return reply(207, multistatus(rows, `<${d("sync-token")}>${syncToken()}</${d("sync-token")}>`));
+                return reply(
+                    207,
+                    multistatus(rows, `<${d("sync-token")}>${syncToken()}</${d("sync-token")}>`)
+                );
             }
             if (root.local === "calendar-multiget") {
                 if (options.supportsMultiget === false) return reply(400, "Unsupported report");
                 const rows = hrefsIn(root).map((href) => {
                     const target = objectAt(new URL(href, url).pathname);
                     const object = target?.calendar.objects.get(target.name);
-                    if (!object) return `<${d("response")}><${d("href")}>${href}</${d("href")}><${d("status")}>HTTP/1.1 404 Not Found</${d("status")}></${d("response")}>`;
-                    return response(href, `<${d("getetag")}>${object.etag}</${d("getetag")}><C:calendar-data><![CDATA[${object.ics}]]></C:calendar-data>`);
+                    if (!object)
+                        return `<${d("response")}><${d("href")}>${href}</${d("href")}><${d("status")}>HTTP/1.1 404 Not Found</${d("status")}></${d("response")}>`;
+                    return response(
+                        href,
+                        `<${d("getetag")}>${object.etag}</${d("getetag")}><C:calendar-data><![CDATA[${object.ics}]]></C:calendar-data>`
+                    );
                 });
                 return reply(207, multistatus(rows));
             }
@@ -225,7 +301,10 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
         const existing = target.calendar.objects.get(target.name);
         if (method === "GET") {
             if (!existing) return reply(404);
-            return new Response(existing.ics, { status: 200, headers: { "Content-Type": "text/calendar", ETag: existing.etag } });
+            return new Response(existing.ics, {
+                status: 200,
+                headers: { "Content-Type": "text/calendar", ETag: existing.etag }
+            });
         }
         if (method === "PUT") {
             if (headers["if-none-match"] === "*" && existing) return reply(412);
@@ -233,7 +312,11 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
             const etag = `"e${++etagCounter}"`;
             target.calendar.objects.set(target.name, { etag, ics: body });
             change(target.calendar, target.name, false);
-            return reply(existing ? 204 : 201, "", options.etagOnPut === false ? {} : { ETag: etag });
+            return reply(
+                existing ? 204 : 201,
+                "",
+                options.etagOnPut === false ? {} : { ETag: etag }
+            );
         }
         if (method === "DELETE") {
             if (!existing) return reply(404);
@@ -251,8 +334,18 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
         requests,
         /** Members a Depth 1 listing names with their getetag as 404. */
         withoutEtag,
-        addCalendar(calendar: Partial<FakeCalendar> & { path: string; name: string }): FakeCalendar {
-            const full: FakeCalendar = { color: null, components: ["VEVENT", "VTODO"], readOnly: false, objects: new Map(), ctag: 1, log: [], ...calendar };
+        addCalendar(
+            calendar: Partial<FakeCalendar> & { path: string; name: string }
+        ): FakeCalendar {
+            const full: FakeCalendar = {
+                color: null,
+                components: ["VEVENT", "VTODO"],
+                readOnly: false,
+                objects: new Map(),
+                ctag: 1,
+                log: [],
+                ...calendar
+            };
             calendars.push(full);
             return full;
         },
@@ -272,5 +365,18 @@ export function createFakeCalDav(options: FakeCalDavOptions) {
 
 /** A minimal event object. */
 export function vevent(uid: string, summary: string): string {
-    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Fake//EN", "BEGIN:VEVENT", `UID:${uid}`, "DTSTAMP:20260101T000000Z", "DTSTART:20261001T090000Z", "DTEND:20261001T100000Z", `SUMMARY:${summary}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
+    return [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Fake//EN",
+        "BEGIN:VEVENT",
+        `UID:${uid}`,
+        "DTSTAMP:20260101T000000Z",
+        "DTSTART:20261001T090000Z",
+        "DTEND:20261001T100000Z",
+        `SUMMARY:${summary}`,
+        "END:VEVENT",
+        "END:VCALENDAR",
+        ""
+    ].join("\r\n");
 }

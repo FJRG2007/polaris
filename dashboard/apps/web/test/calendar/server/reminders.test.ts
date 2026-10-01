@@ -58,8 +58,14 @@ describe("calendar reminders", () => {
                 end: world.at("2026-10-01T12:15:00"),
                 rule: world.weekly(),
                 alarms: [
-                    { action: "DISPLAY", trigger: { kind: "relative", minutes: -10, related: "START" } },
-                    { action: "EMAIL", trigger: { kind: "relative", minutes: -60, related: "START" } }
+                    {
+                        action: "DISPLAY",
+                        trigger: { kind: "relative", minutes: -10, related: "START" }
+                    },
+                    {
+                        action: "EMAIL",
+                        trigger: { kind: "relative", minutes: -60, related: "START" }
+                    }
                 ]
             }),
             floatingZone: ZONE
@@ -83,7 +89,15 @@ describe("calendar reminders", () => {
     it("plans nothing when the calendar's alarms are muted, and clears what was planned", async () => {
         const id = await weeklyWithAlarms();
         db.byId("calendar", calendar)!.alarmsMuted = true;
-        await objects.shiftEvent(alice, { objectId: id, recurrenceKey: null, startDeltaMs: 0, endDeltaMs: 60_000, scope: "all", version: null, floatingZone: ZONE });
+        await objects.shiftEvent(alice, {
+            objectId: id,
+            recurrenceKey: null,
+            startDeltaMs: 0,
+            endDeltaMs: 60_000,
+            scope: "all",
+            version: null,
+            floatingZone: ZONE
+        });
         expect(db.rows("calendarReminder")).toEqual([]);
     });
 
@@ -91,18 +105,34 @@ describe("calendar reminders", () => {
         const id = await weeklyWithAlarms();
         const result = await fireDueReminders(new Date("2026-10-01T09:50:30Z"));
         expect(result).toEqual({ sent: 6, dropped: 0 });
-        expect(fake.notices.map((notice) => notice.userId).sort()).toEqual([alice.id, bob.id, erin.id].sort());
-        expect(fake.notices[0]).toMatchObject({ event: "calendar.reminder", title: "Standup", href: `/calendar/e/${id}` });
+        expect(fake.notices.map((notice) => notice.userId).sort()).toEqual(
+            [alice.id, bob.id, erin.id].sort()
+        );
+        expect(fake.notices[0]).toMatchObject({
+            event: "calendar.reminder",
+            title: "Standup",
+            href: `/calendar/e/${id}`
+        });
         // In the event's own zone, named - not the server's.
         expect(fake.notices[0]?.body).toContain("12:00");
         expect(fake.notices[0]?.body).toContain("GMT+2");
-        expect(fake.mails.map((mail) => mail.to).sort()).toEqual([alice.email, bob.email, erin.email].sort());
-        expect(fake.mails[0]?.subject).toBe(world.en("reminders.mailSubject", { title: "Standup" }));
-        expect(fake.mails[0]?.text).toContain(world.en("reminders.mailCalendar", { calendar: "Team" }));
+        expect(fake.mails.map((mail) => mail.to).sort()).toEqual(
+            [alice.email, bob.email, erin.email].sort()
+        );
+        expect(fake.mails[0]?.subject).toBe(
+            world.en("reminders.mailSubject", { title: "Standup" })
+        );
+        expect(fake.mails[0]?.text).toContain(
+            world.en("reminders.mailCalendar", { calendar: "Team" })
+        );
 
         const next = db.rows("calendarReminder").filter((row) => row.objectId === id);
         expect(next).toHaveLength(6);
-        expect(next.every((row) => (row.occurrence as Date).toISOString() === "2026-10-08T10:00:00.000Z")).toBe(true);
+        expect(
+            next.every(
+                (row) => (row.occurrence as Date).toISOString() === "2026-10-08T10:00:00.000Z"
+            )
+        ).toBe(true);
     });
 
     it("drops a reminder that is hours overdue instead of sending it, and still plans the next one", async () => {
@@ -116,7 +146,9 @@ describe("calendar reminders", () => {
 
     it("keeps the due reminders one pass had no room for, and plans the next once they are sent", async () => {
         const id = await weeklyWithAlarms();
-        const planned = db.rows("calendarReminder").find((row) => row.objectId === id && row.action === "DISPLAY")!;
+        const planned = db
+            .rows("calendarReminder")
+            .find((row) => row.objectId === id && row.action === "DISPLAY")!;
         for (let index = 0; index < 600; index += 1) {
             const userId = `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
             world.addShare(calendar, { userId }, "read");
@@ -125,13 +157,23 @@ describe("calendar reminders", () => {
         const at = new Date("2026-10-01T09:50:30Z");
         const first = await fireDueReminders(at);
         expect(first.sent).toBe(500);
-        expect(db.rows("calendarReminder").filter((row) => row.objectId === id && (row.fireAt as Date) <= at)).toHaveLength(106);
+        expect(
+            db
+                .rows("calendarReminder")
+                .filter((row) => row.objectId === id && (row.fireAt as Date) <= at)
+        ).toHaveLength(106);
         const second = await fireDueReminders(at);
         expect(second.sent).toBe(106);
         expect(fake.notices).toHaveLength(603);
         const next = db.rows("calendarReminder").filter((row) => row.objectId === id);
-        expect(next.filter((row) => [alice.id, bob.id, erin.id].includes(row.userId as string))).toHaveLength(6);
-        expect(next.every((row) => (row.occurrence as Date).toISOString() === "2026-10-08T10:00:00.000Z")).toBe(true);
+        expect(
+            next.filter((row) => [alice.id, bob.id, erin.id].includes(row.userId as string))
+        ).toHaveLength(6);
+        expect(
+            next.every(
+                (row) => (row.occurrence as Date).toISOString() === "2026-10-08T10:00:00.000Z"
+            )
+        ).toBe(true);
     });
 
     it("sends a claimed reminder once even when two passes run at the same time", async () => {
@@ -150,7 +192,9 @@ describe("calendar reminders", () => {
         const result = await fireDueReminders(new Date("2026-10-01T09:50:30Z"));
         expect(result.sent).toBe(0);
         expect(fake.notices).toEqual([]);
-        expect(db.rows("calendarReminder").filter((reminder) => reminder.objectId === id)).toEqual([]);
+        expect(db.rows("calendarReminder").filter((reminder) => reminder.objectId === id)).toEqual(
+            []
+        );
     });
 
     /** A private one-off event at 12:00 Madrid on 1 October, with a notification
@@ -167,8 +211,14 @@ describe("calendar reminders", () => {
                 start: world.at("2026-10-01T12:00:00"),
                 end: world.at("2026-10-01T12:30:00"),
                 alarms: [
-                    { action: "DISPLAY", trigger: { kind: "relative", minutes: -10, related: "START" } },
-                    { action: "EMAIL", trigger: { kind: "relative", minutes: -60, related: "START" } }
+                    {
+                        action: "DISPLAY",
+                        trigger: { kind: "relative", minutes: -10, related: "START" }
+                    },
+                    {
+                        action: "EMAIL",
+                        trigger: { kind: "relative", minutes: -60, related: "START" }
+                    }
                 ]
             }),
             floatingZone: ZONE
@@ -177,28 +227,55 @@ describe("calendar reminders", () => {
     }
 
     it("names a private event only to those who see it in full, and tells readers it is busy", async () => {
-        db.rows("calendarShare").find((row) => row.userId === dave.id && row.access === "freebusy")!.access = "write";
+        db
+            .rows("calendarShare")
+            .find((row) => row.userId === dave.id && row.access === "freebusy")!.access = "write";
         await privateWithAlarms();
         await fireDueReminders(new Date("2026-10-01T09:50:30Z"));
-        const titleOf = (userId: string) => fake.notices.find((notice) => notice.userId === userId)?.title;
+        const titleOf = (userId: string) =>
+            fake.notices.find((notice) => notice.userId === userId)?.title;
         expect(titleOf(alice.id)).toBe("Doctor");
         expect(titleOf(dave.id)).toBe("Doctor");
         expect(titleOf(bob.id)).toBe(world.en("published.busy"));
         expect(titleOf(erin.id)).toBe(world.en("published.busy"));
         const mailTo = (email: string) => fake.mails.find((mail) => mail.to === email)!;
-        expect(mailTo(alice.email).subject).toBe(world.en("reminders.mailSubject", { title: "Doctor" }));
-        expect(mailTo(bob.email).subject).toBe(world.en("reminders.mailSubject", { title: world.en("published.busy") }));
-        expect(fake.mails.filter((mail) => mail.to !== alice.email && mail.to !== dave.email).every((mail) => !mail.text.includes("Doctor"))).toBe(true);
+        expect(mailTo(alice.email).subject).toBe(
+            world.en("reminders.mailSubject", { title: "Doctor" })
+        );
+        expect(mailTo(bob.email).subject).toBe(
+            world.en("reminders.mailSubject", { title: world.en("published.busy") })
+        );
+        expect(
+            fake.mails
+                .filter((mail) => mail.to !== alice.email && mail.to !== dave.email)
+                .every((mail) => !mail.text.includes("Doctor"))
+        ).toBe(true);
     });
 
     it("stops reminding somebody whose share is removed or cut down to free/busy", async () => {
         const id = await weeklyWithAlarms();
         const bobShare = db.rows("calendarShare").find((row) => row.userId === bob.id)!;
-        await sharing.share(alice, { calendarId: calendar, target: { kind: "user", id: bob.id }, access: "freebusy" });
-        const reminded = () => [...new Set(db.rows("calendarReminder").filter((row) => row.objectId === id).map((row) => row.userId))].sort();
+        await sharing.share(alice, {
+            calendarId: calendar,
+            target: { kind: "user", id: bob.id },
+            access: "freebusy"
+        });
+        const reminded = () =>
+            [
+                ...new Set(
+                    db
+                        .rows("calendarReminder")
+                        .filter((row) => row.objectId === id)
+                        .map((row) => row.userId)
+                )
+            ].sort();
         expect(reminded()).toEqual([alice.id, erin.id].sort());
 
-        await sharing.share(alice, { calendarId: calendar, target: { kind: "user", id: bob.id }, access: "read" });
+        await sharing.share(alice, {
+            calendarId: calendar,
+            target: { kind: "user", id: bob.id },
+            access: "read"
+        });
         await planObject(id, world.itemIn(db.byId("calendarObject", id)));
         expect(reminded()).toContain(bob.id);
         await sharing.unshare(alice, String(bobShare.id));
@@ -221,7 +298,12 @@ describe("calendar reminders", () => {
     it("forgets a calendar's reminders for whoever leaves it", async () => {
         const id = await weeklyWithAlarms();
         await leaveCalendar(bob, calendar);
-        expect(db.rows("calendarReminder").filter((row) => row.objectId === id).map((row) => row.userId)).not.toContain(bob.id);
+        expect(
+            db
+                .rows("calendarReminder")
+                .filter((row) => row.objectId === id)
+                .map((row) => row.userId)
+        ).not.toContain(bob.id);
     });
 
     it("clears an object's reminders when planned with nothing", async () => {

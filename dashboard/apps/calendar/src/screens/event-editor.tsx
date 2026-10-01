@@ -30,9 +30,42 @@ import type { CalendarPreferences } from "../lib/preferences";
 import type { CalendarSummary, EventDetail } from "../lib/wire";
 import { ColorDot, FieldRow, GroupHeading, Linkified } from "./ui";
 import { describeAlarm, RemindersEditor } from "./reminders-editor";
-import { useCallback, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
-import { AlertTriangle, CalendarClock, Copy, Download, ExternalLink, Globe, Link2, MapPin, Paperclip, RefreshCw, Trash2, Video } from "lucide-react";
-import { Badge, Button, cn, Dialog, DialogContent, DialogTitle, Input, Select, Skeleton, Textarea, useToast } from "@polaris/ui";
+import {
+    useCallback,
+    useEffect,
+    useId,
+    useMemo,
+    useState,
+    type KeyboardEvent,
+    type ReactNode
+} from "react";
+import {
+    AlertTriangle,
+    CalendarClock,
+    Copy,
+    Download,
+    ExternalLink,
+    Globe,
+    Link2,
+    MapPin,
+    Paperclip,
+    RefreshCw,
+    Trash2,
+    Video
+} from "lucide-react";
+import {
+    Badge,
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    Input,
+    Select,
+    Skeleton,
+    Textarea,
+    useToast
+} from "@polaris/ui";
 
 export type EditorTarget =
     | { readonly kind: "open"; readonly objectId: string; readonly recurrenceKey: string | null }
@@ -70,7 +103,11 @@ export function EventEditor({
     const [busy, setBusy] = useState(false);
     const [turn, setTurn] = useState(0);
 
-    const targetKey = target ? (target.kind === "open" ? `${target.objectId}|${target.recurrenceKey ?? ""}` : "new") : null;
+    const targetKey = target
+        ? target.kind === "open"
+            ? `${target.objectId}|${target.recurrenceKey ?? ""}`
+            : "new"
+        : null;
 
     useEffect(() => {
         setDetail(null);
@@ -88,7 +125,15 @@ export function EventEditor({
         setForm(null);
         setInitial(null);
         let live = true;
-        unwrap(() => eventActions.openEventAction({ objectId: target.objectId, recurrenceKey: target.recurrenceKey, zone }), t("screen.failed"))
+        unwrap(
+            () =>
+                eventActions.openEventAction({
+                    objectId: target.objectId,
+                    recurrenceKey: target.recurrenceKey,
+                    zone
+                }),
+            t("screen.failed")
+        )
             .then((answer) => {
                 if (!live) return;
                 const loaded = model.formFromDetail(answer.detail);
@@ -96,7 +141,10 @@ export function EventEditor({
                 setForm(loaded);
                 setInitial(loaded);
             })
-            .catch((caught: unknown) => live && setFailure(caught instanceof Error ? caught.message : String(caught)));
+            .catch(
+                (caught: unknown) =>
+                    live && setFailure(caught instanceof Error ? caught.message : String(caught))
+            );
         return () => {
             live = false;
         };
@@ -107,21 +155,44 @@ export function EventEditor({
     const writable = isNew || (detail?.writable ?? false);
     const check = useMemo(() => (form ? model.checkForm(form) : null), [form]);
     const dirty = form !== null && initial !== null && (isNew || !model.sameForm(form, initial));
-    const blocked = !dirty ? t("editor.noChanges") : check?.incomplete ? t("editor.incomplete") : check && !check.input ? t("editor.fixErrors") : null;
+    const blocked = !dirty
+        ? t("editor.noChanges")
+        : check?.incomplete
+          ? t("editor.incomplete")
+          : check && !check.input
+            ? t("editor.fixErrors")
+            : null;
 
     const close = useCallback(async () => {
         if (busy) return;
         const changed = form !== null && initial !== null && !model.sameForm(form, initial);
-        if (writable && changed && !(await confirm({ title: t("editor.discardTitle"), description: t("editor.discardBody"), confirmLabel: t("editor.discard"), danger: true }))) return;
+        if (
+            writable &&
+            changed &&
+            !(await confirm({
+                title: t("editor.discardTitle"),
+                description: t("editor.discardBody"),
+                confirmLabel: t("editor.discard"),
+                danger: true
+            }))
+        )
+            return;
         onClose();
     }, [busy, writable, form, initial, confirm, t, onClose]);
 
     const save = async () => {
         if (!form || !check?.input || blocked || busy || !writable) return;
         let scope: engine.EditScope = "all";
-        const repeating = detail !== null && detail.recurrenceKey !== null && detail.series !== null && (detail.series.rule !== null || detail.series.rdates.length > 0);
+        const repeating =
+            detail !== null &&
+            detail.recurrenceKey !== null &&
+            detail.series !== null &&
+            (detail.series.rule !== null || detail.series.rdates.length > 0);
         if (repeating && initial) {
-            const answer = await askScope({ action: "save", allowThis: model.sameRule(form, initial) });
+            const answer = await askScope({
+                action: "save",
+                allowThis: model.sameRule(form, initial)
+            });
             if (!answer) return;
             scope = answer;
         }
@@ -139,11 +210,18 @@ export function EventEditor({
                     }),
                 t("screen.failed")
             );
-            toast.show({ key: "calendar-saved", title: isNew ? t("editor.created") : t("editor.saved") });
+            toast.show({
+                key: "calendar-saved",
+                title: isNew ? t("editor.created") : t("editor.saved")
+            });
             onChanged();
             onClose();
         } catch (caught) {
-            toast.show({ key: "calendar-save-failed", title: t("editor.saveFailed"), body: caught instanceof Error ? caught.message : undefined });
+            toast.show({
+                key: "calendar-save-failed",
+                title: t("editor.saveFailed"),
+                body: caught instanceof Error ? caught.message : undefined
+            });
         } finally {
             setBusy(false);
         }
@@ -152,22 +230,47 @@ export function EventEditor({
     const remove = async () => {
         if (!detail || !writable || busy) return;
         let scope: engine.EditScope = "all";
-        const repeating = detail.recurrenceKey !== null && detail.series !== null && (detail.series.rule !== null || detail.series.rdates.length > 0);
+        const repeating =
+            detail.recurrenceKey !== null &&
+            detail.series !== null &&
+            (detail.series.rule !== null || detail.series.rdates.length > 0);
         if (repeating) {
             const answer = await askScope({ action: "delete" });
             if (!answer) return;
             scope = answer;
-        } else if (!(await confirm({ title: t("editor.deleteTitle"), description: t("editor.deleteBody", { title: detail.event.summary || t("screen.untitled") }), confirmLabel: t("screen.delete"), danger: true }))) {
+        } else if (
+            !(await confirm({
+                title: t("editor.deleteTitle"),
+                description: t("editor.deleteBody", {
+                    title: detail.event.summary || t("screen.untitled")
+                }),
+                confirmLabel: t("screen.delete"),
+                danger: true
+            }))
+        ) {
             return;
         }
         setBusy(true);
         try {
-            await unwrap(() => eventActions.deleteEventAction({ objectId: detail.objectId, recurrenceKey: detail.recurrenceKey, scope, zone }), t("screen.failed"));
+            await unwrap(
+                () =>
+                    eventActions.deleteEventAction({
+                        objectId: detail.objectId,
+                        recurrenceKey: detail.recurrenceKey,
+                        scope,
+                        zone
+                    }),
+                t("screen.failed")
+            );
             toast.show({ key: "calendar-deleted", title: t("editor.deleted") });
             onChanged();
             onClose();
         } catch (caught) {
-            toast.show({ key: "calendar-delete-failed", title: t("editor.deleteFailed"), body: caught instanceof Error ? caught.message : undefined });
+            toast.show({
+                key: "calendar-delete-failed",
+                title: t("editor.deleteFailed"),
+                body: caught instanceof Error ? caught.message : undefined
+            });
         } finally {
             setBusy(false);
         }
@@ -177,12 +280,19 @@ export function EventEditor({
         if (!detail || busy || dirty) return;
         setBusy(true);
         try {
-            const answer = await unwrap(() => eventActions.duplicateEventAction({ objectId: detail.objectId, zone }), t("screen.failed"));
+            const answer = await unwrap(
+                () => eventActions.duplicateEventAction({ objectId: detail.objectId, zone }),
+                t("screen.failed")
+            );
             toast.show({ key: "calendar-duplicated", title: t("editor.duplicated") });
             onChanged();
             onOpen(answer.objectId);
         } catch (caught) {
-            toast.show({ key: "calendar-duplicate-failed", title: t("editor.duplicateFailed"), body: caught instanceof Error ? caught.message : undefined });
+            toast.show({
+                key: "calendar-duplicate-failed",
+                title: t("editor.duplicateFailed"),
+                body: caught instanceof Error ? caught.message : undefined
+            });
         } finally {
             setBusy(false);
         }
@@ -197,7 +307,11 @@ export function EventEditor({
         else void duplicate();
     };
 
-    const title = isNew ? t("editor.newTitle") : writable ? t("editor.editTitle") : t("editor.viewTitle");
+    const title = isNew
+        ? t("editor.newTitle")
+        : writable
+          ? t("editor.editTitle")
+          : t("editor.viewTitle");
 
     return (
         <>
@@ -218,9 +332,15 @@ export function EventEditor({
                     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                         {failure ? (
                             <div role="alert" className="flex flex-col items-start gap-2 py-8">
-                                <p className="text-[0.8125rem] text-foreground">{t("editor.loadFailed")}</p>
+                                <p className="text-[0.8125rem] text-foreground">
+                                    {t("editor.loadFailed")}
+                                </p>
                                 <p className="text-xs text-muted-foreground">{failure}</p>
-                                <Button size="sm" variant="outline" onClick={() => setTurn((value) => value + 1)}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setTurn((value) => value + 1)}
+                                >
                                     <RefreshCw />
                                     {t("screen.retry")}
                                 </Button>
@@ -228,9 +348,24 @@ export function EventEditor({
                         ) : !form ? (
                             <EditorSkeleton />
                         ) : writable ? (
-                            <EditForm form={form} setForm={setForm} detail={detail} calendars={calendars} zone={zone} preferences={preferences} errors={check?.errors ?? {}} onChanged={onChanged} />
+                            <EditForm
+                                form={form}
+                                setForm={setForm}
+                                detail={detail}
+                                calendars={calendars}
+                                zone={zone}
+                                preferences={preferences}
+                                errors={check?.errors ?? {}}
+                                onChanged={onChanged}
+                            />
                         ) : detail ? (
-                            <ViewMode detail={detail} form={form} calendars={calendars} zone={zone} onChanged={onChanged} />
+                            <ViewMode
+                                detail={detail}
+                                form={form}
+                                calendars={calendars}
+                                zone={zone}
+                                onChanged={onChanged}
+                            />
                         ) : null}
                     </div>
                     {form ? (
@@ -238,29 +373,64 @@ export function EventEditor({
                             {detail ? (
                                 <div className="flex items-center gap-1">
                                     {writable ? (
-                                        <Button size="icon-sm" variant="ghost" aria-label={t("editor.delete")} title={t("editor.delete")} disabled={busy} onClick={() => void remove()}>
+                                        <Button
+                                            size="icon-sm"
+                                            variant="ghost"
+                                            aria-label={t("editor.delete")}
+                                            title={t("editor.delete")}
+                                            disabled={busy}
+                                            onClick={() => void remove()}
+                                        >
                                             <Trash2 />
                                         </Button>
                                     ) : null}
                                     {writable ? (
-                                        <Button size="icon-sm" variant="ghost" aria-label={t("editor.duplicate")} title={dirty ? t("editor.duplicateSaveFirst") : t("editor.duplicate")} aria-disabled={dirty || busy} onClick={() => void duplicate()}>
+                                        <Button
+                                            size="icon-sm"
+                                            variant="ghost"
+                                            aria-label={t("editor.duplicate")}
+                                            title={
+                                                dirty
+                                                    ? t("editor.duplicateSaveFirst")
+                                                    : t("editor.duplicate")
+                                            }
+                                            aria-disabled={dirty || busy}
+                                            onClick={() => void duplicate()}
+                                        >
                                             <Copy />
                                         </Button>
                                     ) : null}
                                     <Button asChild size="icon-sm" variant="ghost">
-                                        <a href={`/api/calendar/export/event/${detail.objectId}`} download aria-label={t("editor.export")} title={t("editor.export")}>
+                                        <a
+                                            href={`/api/calendar/export/event/${detail.objectId}`}
+                                            download
+                                            aria-label={t("editor.export")}
+                                            title={t("editor.export")}
+                                        >
                                             <Download />
                                         </a>
                                     </Button>
-                                    <CopyLink objectId={detail.objectId} label={t("editor.copyLink")} />
+                                    <CopyLink
+                                        objectId={detail.objectId}
+                                        label={t("editor.copyLink")}
+                                    />
                                 </div>
                             ) : null}
                             <div className="ml-auto flex items-center gap-2">
-                                <Button variant="ghost" onClick={() => void close()} disabled={busy}>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => void close()}
+                                    disabled={busy}
+                                >
                                     {writable ? t("screen.cancel") : t("screen.close")}
                                 </Button>
                                 {writable ? (
-                                    <Button aria-disabled={blocked !== null || busy} title={blocked ?? undefined} className={cn(blocked !== null && "opacity-50")} onClick={() => void save()}>
+                                    <Button
+                                        aria-disabled={blocked !== null || busy}
+                                        title={blocked ?? undefined}
+                                        className={cn(blocked !== null && "opacity-50")}
+                                        onClick={() => void save()}
+                                    >
                                         {busy ? t("screen.saving") : t("screen.save")}
                                     </Button>
                                 ) : null}
@@ -289,7 +459,13 @@ function CopyLink({ objectId, label }: { objectId: string; label: string }) {
     };
     const shown = copied ? t("screen.copied") : label;
     return (
-        <Button size="icon-sm" variant="ghost" aria-label={shown} title={shown} onClick={() => void copy()}>
+        <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={shown}
+            title={shown}
+            onClick={() => void copy()}
+        >
             <Link2 />
         </Button>
     );
@@ -308,7 +484,15 @@ function EditorSkeleton() {
 
 function Banner({ tone, children }: { tone: "warning" | "neutral"; children: ReactNode }) {
     return (
-        <div role="status" className={cn("flex items-start gap-2 rounded-md border p-2.5 text-xs", tone === "warning" ? "border-warning-edge bg-warning-soft text-warning-ink" : "border-border bg-muted text-muted-foreground")}>
+        <div
+            role="status"
+            className={cn(
+                "flex items-start gap-2 rounded-md border p-2.5 text-xs",
+                tone === "warning"
+                    ? "border-warning-edge bg-warning-soft text-warning-ink"
+                    : "border-border bg-muted text-muted-foreground"
+            )}
+        >
             <AlertTriangle aria-hidden className="mt-0.5 size-4" />
             <span>{children}</span>
         </div>
@@ -317,8 +501,16 @@ function Banner({ tone, children }: { tone: "warning" | "neutral"; children: Rea
 
 function calendarOptions(calendars: readonly CalendarSummary[], currentId: string) {
     return calendars
-        .filter((calendar) => (calendar.writable && calendar.components.includes("VEVENT")) || calendar.id === currentId)
-        .map((calendar) => ({ value: calendar.id, label: calendar.name, icon: <ColorDot color={calendar.color} /> }));
+        .filter(
+            (calendar) =>
+                (calendar.writable && calendar.components.includes("VEVENT")) ||
+                calendar.id === currentId
+        )
+        .map((calendar) => ({
+            value: calendar.id,
+            label: calendar.name,
+            icon: <ColorDot color={calendar.color} />
+        }));
 }
 
 function EditForm({
@@ -343,31 +535,53 @@ function EditForm({
     const t = useCalendarT();
     const { t: ruleT, locale } = useRuleT();
     const ids = useId();
-    const [zonesShown, setZonesShown] = useState(() => (form.startZone !== "" && form.startZone !== zone) || form.endZone !== form.startZone);
+    const [zonesShown, setZonesShown] = useState(
+        () => (form.startZone !== "" && form.startZone !== zone) || form.endZone !== form.startZone
+    );
     const [customCategory, setCustomCategory] = useState("");
     const set = (change: Partial<model.EditorForm>) => setForm({ ...form, ...change });
     const errorText = (field: model.FieldName) => {
         const key = errors[field];
         if (!key) return null;
-        return key === "checkInput" ? t("editor.checkField") : ruleT(`validation.${key}` as Parameters<typeof ruleT>[0]);
+        return key === "checkInput"
+            ? t("editor.checkField")
+            : ruleT(`validation.${key}` as Parameters<typeof ruleT>[0]);
     };
 
-    const inSeries = detail !== null && detail.recurrenceKey !== null && detail.series !== null && (detail.series.rule !== null || detail.series.rdates.length > 0);
+    const inSeries =
+        detail !== null &&
+        detail.recurrenceKey !== null &&
+        detail.series !== null &&
+        (detail.series.rule !== null || detail.series.rdates.length > 0);
     const exception = detail !== null && detail.event.recurrenceId !== null;
     const loadedRule = detail ? model.ruleOf(detail) : null;
     const duration = model.durationOf(form, zone);
     const startInstant = model.formInstant(form.startDate, form.startTime, form.startZone, zone);
     const endInstant = model.formInstant(form.endDate, form.endTime, form.endZone, zone);
-    const otherZone = !form.allDay && ((form.startZone !== "" && form.startZone !== zone) || (form.endZone !== "" && form.endZone !== zone));
-    const startValue: engine.DateValue | null = form.allDay ? { date: form.startDate } : startInstant ? { dateTime: `${form.startDate}T${form.startTime}:00`, tzid: form.startZone || null } : null;
+    const otherZone =
+        !form.allDay &&
+        ((form.startZone !== "" && form.startZone !== zone) ||
+            (form.endZone !== "" && form.endZone !== zone));
+    const startValue: engine.DateValue | null = form.allDay
+        ? { date: form.startDate }
+        : startInstant
+          ? { dateTime: `${form.startDate}T${form.startTime}:00`, tzid: form.startZone || null }
+          : null;
     const categoryWords = model.DEFAULT_CATEGORIES.map((key) => t(`categories.${key}`));
-    const readableZone = (value: string) => (value === "" ? t("zonePicker.floating") : engine.zoneLabel(value, startInstant ?? new Date(), locale));
+    const readableZone = (value: string) =>
+        value === ""
+            ? t("zonePicker.floating")
+            : engine.zoneLabel(value, startInstant ?? new Date(), locale);
 
     return (
         <div className="flex flex-col gap-4">
             {detail?.conflict ? <Banner tone="warning">{t("editor.conflict")}</Banner> : null}
-            {detail && !detail.isOrganizer && form.attendees.length > 0 ? <Banner tone="neutral">{t("editor.notOrganizer")}</Banner> : null}
-            {detail && !detail.isOrganizer ? <RespondBar detail={detail} zone={zone} onChanged={onChanged} /> : null}
+            {detail && !detail.isOrganizer && form.attendees.length > 0 ? (
+                <Banner tone="neutral">{t("editor.notOrganizer")}</Banner>
+            ) : null}
+            {detail && !detail.isOrganizer ? (
+                <RespondBar detail={detail} zone={zone} onChanged={onChanged} />
+            ) : null}
 
             <Input
                 aria-label={t("editor.titleField")}
@@ -385,33 +599,125 @@ function EditForm({
                             <span id={`${ids}-when`}>{t("editor.when")}</span>
                         </GroupHeading>
                         <div className="flex flex-wrap items-center gap-3">
-                            <label className="flex items-center gap-2 text-[0.8125rem]" title={inSeries ? t("editor.allDayLocked") : undefined}>
-                                <input type="checkbox" checked={form.allDay} disabled={inSeries} onChange={(event) => setForm(model.withAllDay(form, event.target.checked, zone))} className="accent-[hsl(var(--primary))]" />
+                            <label
+                                className="flex items-center gap-2 text-[0.8125rem]"
+                                title={inSeries ? t("editor.allDayLocked") : undefined}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={form.allDay}
+                                    disabled={inSeries}
+                                    onChange={(event) =>
+                                        setForm(model.withAllDay(form, event.target.checked, zone))
+                                    }
+                                    className="accent-[hsl(var(--primary))]"
+                                />
                                 {t("editor.allDay")}
                             </label>
                             {!form.allDay ? (
-                                <Button size="xs" variant="ghost" aria-expanded={zonesShown} onClick={() => setZonesShown(!zonesShown)}>
+                                <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    aria-expanded={zonesShown}
+                                    onClick={() => setZonesShown(!zonesShown)}
+                                >
                                     <Globe />
                                     {t("editor.timeZones")}
                                 </Button>
                             ) : null}
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2">
-                            <FieldRow label={t("editor.starts")} htmlFor={`${ids}-start`} error={errorText("start") ?? errorText("allDay")}>
+                            <FieldRow
+                                label={t("editor.starts")}
+                                htmlFor={`${ids}-start`}
+                                error={errorText("start") ?? errorText("allDay")}
+                            >
                                 <div className="flex gap-2">
-                                    <Input id={`${ids}-start`} type="date" className="min-w-0 flex-1 tabular-nums" value={form.startDate} onChange={(event) => setForm(model.withStart(form, event.target.value, form.startTime, zone))} />
+                                    <Input
+                                        id={`${ids}-start`}
+                                        type="date"
+                                        className="min-w-0 flex-1 tabular-nums"
+                                        value={form.startDate}
+                                        onChange={(event) =>
+                                            setForm(
+                                                model.withStart(
+                                                    form,
+                                                    event.target.value,
+                                                    form.startTime,
+                                                    zone
+                                                )
+                                            )
+                                        }
+                                    />
                                     {!form.allDay ? (
-                                        <Input type="time" aria-label={t("editor.startTime")} className="w-28 tabular-nums" value={form.startTime} onChange={(event) => setForm(model.withStart(form, form.startDate, event.target.value, zone))} />
+                                        <Input
+                                            type="time"
+                                            aria-label={t("editor.startTime")}
+                                            className="w-28 tabular-nums"
+                                            value={form.startTime}
+                                            onChange={(event) =>
+                                                setForm(
+                                                    model.withStart(
+                                                        form,
+                                                        form.startDate,
+                                                        event.target.value,
+                                                        zone
+                                                    )
+                                                )
+                                            }
+                                        />
                                     ) : null}
                                 </div>
-                                {zonesShown && !form.allDay ? <ZonePicker value={form.startZone} onChange={(value) => set({ startZone: value, endZone: form.endZone === form.startZone ? value : form.endZone })} allowFloating label={t("editor.startZone")} /> : null}
+                                {zonesShown && !form.allDay ? (
+                                    <ZonePicker
+                                        value={form.startZone}
+                                        onChange={(value) =>
+                                            set({
+                                                startZone: value,
+                                                endZone:
+                                                    form.endZone === form.startZone
+                                                        ? value
+                                                        : form.endZone
+                                            })
+                                        }
+                                        allowFloating
+                                        label={t("editor.startZone")}
+                                    />
+                                ) : null}
                             </FieldRow>
-                            <FieldRow label={t("editor.ends")} htmlFor={`${ids}-end`} error={errorText("end")}>
+                            <FieldRow
+                                label={t("editor.ends")}
+                                htmlFor={`${ids}-end`}
+                                error={errorText("end")}
+                            >
                                 <div className="flex gap-2">
-                                    <Input id={`${ids}-end`} type="date" className="min-w-0 flex-1 tabular-nums" value={form.endDate} onChange={(event) => set({ endDate: event.target.value })} />
-                                    {!form.allDay ? <Input type="time" aria-label={t("editor.endTime")} className="w-28 tabular-nums" value={form.endTime} onChange={(event) => set({ endTime: event.target.value })} /> : null}
+                                    <Input
+                                        id={`${ids}-end`}
+                                        type="date"
+                                        className="min-w-0 flex-1 tabular-nums"
+                                        value={form.endDate}
+                                        onChange={(event) => set({ endDate: event.target.value })}
+                                    />
+                                    {!form.allDay ? (
+                                        <Input
+                                            type="time"
+                                            aria-label={t("editor.endTime")}
+                                            className="w-28 tabular-nums"
+                                            value={form.endTime}
+                                            onChange={(event) =>
+                                                set({ endTime: event.target.value })
+                                            }
+                                        />
+                                    ) : null}
                                 </div>
-                                {zonesShown && !form.allDay ? <ZonePicker value={form.endZone} onChange={(value) => set({ endZone: value })} allowFloating label={t("editor.endZone")} /> : null}
+                                {zonesShown && !form.allDay ? (
+                                    <ZonePicker
+                                        value={form.endZone}
+                                        onChange={(value) => set({ endZone: value })}
+                                        allowFloating
+                                        label={t("editor.endZone")}
+                                    />
+                                ) : null}
                             </FieldRow>
                         </div>
                         {!form.allDay ? (
@@ -420,14 +726,30 @@ function EditForm({
                                     className="w-40"
                                     aria-label={t("editor.duration")}
                                     placeholder={t("editor.duration")}
-                                    value={duration !== null && (model.DURATION_PRESETS as readonly number[]).includes(duration) ? String(duration) : ""}
-                                    onValueChange={(minutes) => setForm(model.withDuration(form, Number(minutes), zone))}
-                                    options={model.DURATION_PRESETS.map((minutes) => ({ value: String(minutes), label: t("editor.minutes", { count: minutes }) }))}
+                                    value={
+                                        duration !== null &&
+                                        (model.DURATION_PRESETS as readonly number[]).includes(
+                                            duration
+                                        )
+                                            ? String(duration)
+                                            : ""
+                                    }
+                                    onValueChange={(minutes) =>
+                                        setForm(model.withDuration(form, Number(minutes), zone))
+                                    }
+                                    options={model.DURATION_PRESETS.map((minutes) => ({
+                                        value: String(minutes),
+                                        label: t("editor.minutes", { count: minutes })
+                                    }))}
                                 />
                                 {otherZone && startInstant && endInstant ? (
                                     <p className="text-xs text-muted-foreground tabular-nums">
                                         {t("editor.localTime", {
-                                            range: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: zone }).formatRange(startInstant, endInstant),
+                                            range: new Intl.DateTimeFormat(locale, {
+                                                dateStyle: "medium",
+                                                timeStyle: "short",
+                                                timeZone: zone
+                                            }).formatRange(startInstant, endInstant),
                                             zone: readableZone(zone)
                                         })}
                                     </p>
@@ -455,18 +777,44 @@ function EditForm({
 
                     <FieldRow label={t("editor.location")} htmlFor={`${ids}-location`}>
                         <div className="relative">
-                            <MapPin aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle" />
-                            <Input id={`${ids}-location`} className="pl-8" value={form.location} maxLength={1000} onChange={(event) => set({ location: event.target.value })} />
+                            <MapPin
+                                aria-hidden
+                                className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                            />
+                            <Input
+                                id={`${ids}-location`}
+                                className="pl-8"
+                                value={form.location}
+                                maxLength={1000}
+                                onChange={(event) => set({ location: event.target.value })}
+                            />
                         </div>
                     </FieldRow>
 
-                    <ConferenceField id={`${ids}-conference`} value={form.conference} onChange={(conference) => set({ conference })} error={errorText("conference")} title={form.summary} start={startInstant} />
+                    <ConferenceField
+                        id={`${ids}-conference`}
+                        value={form.conference}
+                        onChange={(conference) => set({ conference })}
+                        error={errorText("conference")}
+                        title={form.summary}
+                        start={startInstant}
+                    />
 
                     <FieldRow label={t("editor.description")} htmlFor={`${ids}-description`}>
-                        <Textarea id={`${ids}-description`} rows={4} value={form.description} maxLength={20_000} onChange={(event) => set({ description: event.target.value })} />
+                        <Textarea
+                            id={`${ids}-description`}
+                            rows={4}
+                            value={form.description}
+                            maxLength={20_000}
+                            onChange={(event) => set({ description: event.target.value })}
+                        />
                     </FieldRow>
 
-                    <Attachments attachments={form.attachments} onChange={(attachments) => set({ attachments })} error={errorText("attachments")} />
+                    <Attachments
+                        attachments={form.attachments}
+                        onChange={(attachments) => set({ attachments })}
+                        error={errorText("attachments")}
+                    />
 
                     <section className="flex flex-col gap-2">
                         <GroupHeading>{t("editor.attendees")}</GroupHeading>
@@ -482,9 +830,17 @@ function EditForm({
                                           end: endInstant.toISOString(),
                                           zone,
                                           onPick: (start, end) => {
-                                              const startWall = wallOf(start, form.startZone || zone);
+                                              const startWall = wallOf(
+                                                  start,
+                                                  form.startZone || zone
+                                              );
                                               const endWall = wallOf(end, form.endZone || zone);
-                                              set({ startDate: startWall.slice(0, 10), startTime: startWall.slice(11, 16), endDate: endWall.slice(0, 10), endTime: endWall.slice(11, 16) });
+                                              set({
+                                                  startDate: startWall.slice(0, 10),
+                                                  startTime: startWall.slice(11, 16),
+                                                  endDate: endWall.slice(0, 10),
+                                                  endTime: endWall.slice(11, 16)
+                                              });
                                           }
                                       }
                                     : null
@@ -500,36 +856,68 @@ function EditForm({
 
                 <div className="flex min-w-0 flex-col gap-4">
                     <FieldRow label={t("editor.calendar")} error={errorText("calendarId")}>
-                        <Select aria-label={t("editor.calendar")} placeholder={t("editor.chooseCalendar")} value={form.calendarId} onValueChange={(calendarId) => set({ calendarId })} options={calendarOptions(calendars, form.calendarId)} />
+                        <Select
+                            aria-label={t("editor.calendar")}
+                            placeholder={t("editor.chooseCalendar")}
+                            value={form.calendarId}
+                            onValueChange={(calendarId) => set({ calendarId })}
+                            options={calendarOptions(calendars, form.calendarId)}
+                        />
                     </FieldRow>
 
                     <section className="flex flex-col gap-2">
                         <GroupHeading>{t("editor.reminders")}</GroupHeading>
-                        <RemindersEditor value={form.alarms} onChange={(alarms) => set({ alarms })} allDay={form.allDay} zone={zone} />
+                        <RemindersEditor
+                            value={form.alarms}
+                            onChange={(alarms) => set({ alarms })}
+                            allDay={form.allDay}
+                            zone={zone}
+                        />
                     </section>
 
                     <FieldRow label={t("editor.status")}>
                         <Select
                             aria-label={t("editor.status")}
                             value={form.status ?? NONE}
-                            onValueChange={(status) => set({ status: status === NONE ? null : (status as engine.EventStatus) })}
-                            options={[NONE, "CONFIRMED", "TENTATIVE", "CANCELLED"].map((status) => ({ value: status, label: t(`editor.statusOption.${status as "none"}`) }))}
+                            onValueChange={(status) =>
+                                set({
+                                    status: status === NONE ? null : (status as engine.EventStatus)
+                                })
+                            }
+                            options={[NONE, "CONFIRMED", "TENTATIVE", "CANCELLED"].map(
+                                (status) => ({
+                                    value: status,
+                                    label: t(`editor.statusOption.${status as "none"}`)
+                                })
+                            )}
                         />
                     </FieldRow>
                     <FieldRow label={t("editor.showAs")}>
                         <Select
                             aria-label={t("editor.showAs")}
                             value={form.transparency}
-                            onValueChange={(transparency) => set({ transparency: transparency as engine.Transparency })}
-                            options={(["OPAQUE", "TRANSPARENT"] as const).map((value) => ({ value, label: t(`editor.transparency.${value}`) }))}
+                            onValueChange={(transparency) =>
+                                set({ transparency: transparency as engine.Transparency })
+                            }
+                            options={(["OPAQUE", "TRANSPARENT"] as const).map((value) => ({
+                                value,
+                                label: t(`editor.transparency.${value}`)
+                            }))}
                         />
                     </FieldRow>
-                    <FieldRow label={t("editor.visibility")} hint={t(`editor.visibilityHint.${form.classification}`)}>
+                    <FieldRow
+                        label={t("editor.visibility")}
+                        hint={t(`editor.visibilityHint.${form.classification}`)}
+                    >
                         <Select
                             aria-label={t("editor.visibility")}
                             value={form.classification}
-                            onValueChange={(classification) => set({ classification: classification as engine.Classification })}
-                            options={(["PUBLIC", "PRIVATE", "CONFIDENTIAL"] as const).map((value) => ({ value, label: t(`editor.classification.${value}`) }))}
+                            onValueChange={(classification) =>
+                                set({ classification: classification as engine.Classification })
+                            }
+                            options={(["PUBLIC", "PRIVATE", "CONFIDENTIAL"] as const).map(
+                                (value) => ({ value, label: t(`editor.classification.${value}`) })
+                            )}
                         />
                     </FieldRow>
                     <FieldRow label={t("editor.kind")}>
@@ -537,12 +925,25 @@ function EditForm({
                             aria-label={t("editor.kind")}
                             value={form.kind}
                             onValueChange={(kind) => set({ kind: kind as engine.EventKind })}
-                            options={(["default", "outOfOffice", "focusTime", ...(form.kind === "workingLocation" ? (["workingLocation"] as const) : [])] as const).map((value) => ({ value, label: t(`editor.kinds.${value}`) }))}
+                            options={(
+                                [
+                                    "default",
+                                    "outOfOffice",
+                                    "focusTime",
+                                    ...(form.kind === "workingLocation"
+                                        ? (["workingLocation"] as const)
+                                        : [])
+                                ] as const
+                            ).map((value) => ({ value, label: t(`editor.kinds.${value}`) }))}
                         />
                     </FieldRow>
 
                     <FieldRow label={t("editor.color")} error={errorText("color")}>
-                        <div role="radiogroup" aria-label={t("editor.color")} className="flex flex-wrap gap-1.5">
+                        <div
+                            role="radiogroup"
+                            aria-label={t("editor.color")}
+                            className="flex flex-wrap gap-1.5"
+                        >
                             <button
                                 type="button"
                                 role="radio"
@@ -550,9 +951,18 @@ function EditForm({
                                 aria-label={t("editor.calendarColor")}
                                 title={t("editor.calendarColor")}
                                 onClick={() => set({ color: null })}
-                                className={cn("flex size-6 items-center justify-center rounded-full border", form.color === null ? "border-foreground" : "border-border")}
+                                className={cn(
+                                    "flex size-6 items-center justify-center rounded-full border",
+                                    form.color === null ? "border-foreground" : "border-border"
+                                )}
                             >
-                                <ColorDot color={calendars.find((calendar) => calendar.id === form.calendarId)?.color ?? "#7f7f7f"} />
+                                <ColorDot
+                                    color={
+                                        calendars.find(
+                                            (calendar) => calendar.id === form.calendarId
+                                        )?.color ?? "#7f7f7f"
+                                    }
+                                />
                             </button>
                             {model.EVENT_COLORS.map((color) => (
                                 <button
@@ -563,7 +973,12 @@ function EditForm({
                                     aria-label={color}
                                     title={color}
                                     onClick={() => set({ color })}
-                                    className={cn("size-6 rounded-full border-2", form.color?.toLowerCase() === color ? "border-foreground" : "border-transparent")}
+                                    className={cn(
+                                        "size-6 rounded-full border-2",
+                                        form.color?.toLowerCase() === color
+                                            ? "border-foreground"
+                                            : "border-transparent"
+                                    )}
                                     style={{ backgroundColor: color }}
                                 />
                             ))}
@@ -580,7 +995,13 @@ function EditForm({
                                             className="inline-flex max-w-full items-center gap-1 truncate rounded border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground"
                                             aria-label={t("editor.removeCategory", { category })}
                                             title={t("editor.removeCategory", { category })}
-                                            onClick={() => set({ categories: form.categories.filter((entry) => entry !== category) })}
+                                            onClick={() =>
+                                                set({
+                                                    categories: form.categories.filter(
+                                                        (entry) => entry !== category
+                                                    )
+                                                })
+                                            }
                                         >
                                             {category}
                                             <span aria-hidden>×</span>
@@ -596,8 +1017,12 @@ function EditForm({
                                     aria-label={t("editor.addCategory")}
                                     placeholder={t("editor.addCategory")}
                                     value=""
-                                    onValueChange={(category) => set({ categories: [...form.categories, category] })}
-                                    options={categoryWords.filter((word) => !form.categories.includes(word)).map((word) => ({ value: word, label: word }))}
+                                    onValueChange={(category) =>
+                                        set({ categories: [...form.categories, category] })
+                                    }
+                                    options={categoryWords
+                                        .filter((word) => !form.categories.includes(word))
+                                        .map((word) => ({ value: word, label: word }))}
                                 />
                             </div>
                         ) : null}
@@ -612,25 +1037,51 @@ function EditForm({
                                     if (event.key !== "Enter") return;
                                     event.preventDefault();
                                     const word = customCategory.trim();
-                                    if (word && !form.categories.includes(word)) set({ categories: [...form.categories, word] });
+                                    if (word && !form.categories.includes(word))
+                                        set({ categories: [...form.categories, word] });
                                     setCustomCategory("");
                                 }}
                             />
                         ) : null}
                     </FieldRow>
 
-                    <FieldRow label={t("editor.url")} htmlFor={`${ids}-url`} error={errorText("url")}>
-                        <Input id={`${ids}-url`} type="url" inputMode="url" placeholder="https://" value={form.url} onChange={(event) => set({ url: event.target.value })} />
+                    <FieldRow
+                        label={t("editor.url")}
+                        htmlFor={`${ids}-url`}
+                        error={errorText("url")}
+                    >
+                        <Input
+                            id={`${ids}-url`}
+                            type="url"
+                            inputMode="url"
+                            placeholder="https://"
+                            value={form.url}
+                            onChange={(event) => set({ url: event.target.value })}
+                        />
                     </FieldRow>
                 </div>
             </div>
-            <p className="sr-only">{preferences.keyboardShortcuts ? t("editor.shortcutsHint") : ""}</p>
+            <p className="sr-only">
+                {preferences.keyboardShortcuts ? t("editor.shortcutsHint") : ""}
+            </p>
         </div>
     );
 }
 
 /** An event this reader may only look at, or answer. */
-function ViewMode({ detail, form, calendars, zone, onChanged }: { detail: EventDetail; form: model.EditorForm; calendars: readonly CalendarSummary[]; zone: string; onChanged: () => void }) {
+function ViewMode({
+    detail,
+    form,
+    calendars,
+    zone,
+    onChanged
+}: {
+    detail: EventDetail;
+    form: model.EditorForm;
+    calendars: readonly CalendarSummary[];
+    zone: string;
+    onChanged: () => void;
+}) {
     const t = useCalendarT();
     const { words, locale } = useRuleT();
     const event = detail.event;
@@ -640,8 +1091,15 @@ function ViewMode({ detail, form, calendars, zone, onChanged }: { detail: EventD
     const start = engine.valueToInstant(event.start, zone);
     const end = engine.valueToInstant(event.end, zone);
     const when = allDay
-        ? new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" }).formatRange(new Date(`${form.startDate}T12:00:00Z`), new Date(`${form.endDate}T12:00:00Z`))
-        : new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short", timeZone: zone }).formatRange(start, end);
+        ? new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" }).formatRange(
+              new Date(`${form.startDate}T12:00:00Z`),
+              new Date(`${form.endDate}T12:00:00Z`)
+          )
+        : new Intl.DateTimeFormat(locale, {
+              dateStyle: "full",
+              timeStyle: "short",
+              timeZone: zone
+          }).formatRange(start, end);
 
     return (
         <div className="flex flex-col gap-4">
@@ -649,15 +1107,28 @@ function ViewMode({ detail, form, calendars, zone, onChanged }: { detail: EventD
             <div className="flex items-start gap-2">
                 <ColorDot color={event.color ?? calendar?.color ?? "#7f7f7f"} className="mt-2" />
                 <div className="min-w-0">
-                    <p className={cn("break-words text-[0.9375rem] font-medium", event.status === "CANCELLED" && "line-through")}>{detail.busyOnly ? t("screen.busy") : event.summary || t("screen.untitled")}</p>
+                    <p
+                        className={cn(
+                            "break-words text-[0.9375rem] font-medium",
+                            event.status === "CANCELLED" && "line-through"
+                        )}
+                    >
+                        {detail.busyOnly ? t("screen.busy") : event.summary || t("screen.untitled")}
+                    </p>
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
                         <CalendarClock aria-hidden className="size-4" />
                         {when}
                     </p>
-                    {rule ? <p className="text-xs text-muted-foreground">{engine.summarizeRule(rule, words, locale)}</p> : null}
+                    {rule ? (
+                        <p className="text-xs text-muted-foreground">
+                            {engine.summarizeRule(rule, words, locale)}
+                        </p>
+                    ) : null}
                 </div>
             </div>
-            {!detail.busyOnly ? <RespondBar detail={detail} zone={zone} onChanged={onChanged} /> : null}
+            {!detail.busyOnly ? (
+                <RespondBar detail={detail} zone={zone} onChanged={onChanged} />
+            ) : null}
             {event.location ? (
                 <p className="flex items-start gap-2 text-[0.8125rem]">
                     <MapPin aria-hidden className="mt-0.5 size-4 text-foreground-subtle" />
@@ -672,7 +1143,12 @@ function ViewMode({ detail, form, calendars, zone, onChanged }: { detail: EventD
                     </a>
                 </Button>
             ) : null}
-            {event.description ? <Linkified text={event.description} className="text-[0.8125rem] text-muted-foreground" /> : null}
+            {event.description ? (
+                <Linkified
+                    text={event.description}
+                    className="text-[0.8125rem] text-muted-foreground"
+                />
+            ) : null}
             {event.attachments.length > 0 ? <Attachments attachments={event.attachments} /> : null}
             {calendar ? (
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -693,25 +1169,52 @@ function ViewMode({ detail, form, calendars, zone, onChanged }: { detail: EventD
             {event.attendees.length > 0 ? (
                 <section className="flex flex-col gap-2">
                     <GroupHeading>{t("editor.attendees")}</GroupHeading>
-                    <AttendeesEditor value={form.attendees} onChange={() => undefined} readOnly organizer={event.organizer} when={null} />
+                    <AttendeesEditor
+                        value={form.attendees}
+                        onChange={() => undefined}
+                        readOnly
+                        organizer={event.organizer}
+                        when={null}
+                    />
                 </section>
             ) : null}
             {event.url && model.isWebLink(event.url) ? (
-                <a href={event.url} target="_blank" rel="noopener noreferrer" className="truncate text-xs text-muted-foreground underline underline-offset-2">
+                <a
+                    href={event.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate text-xs text-muted-foreground underline underline-offset-2"
+                >
                     {event.url}
                 </a>
             ) : null}
-            {!allDay ? <p className="text-xs text-foreground-subtle">{t("editor.shownIn", { zone: engine.zoneLabel(zone, start, locale), time: formatInstant(start, locale, zone, { timeStyle: "short" }) })}</p> : null}
+            {!allDay ? (
+                <p className="text-xs text-foreground-subtle">
+                    {t("editor.shownIn", {
+                        zone: engine.zoneLabel(zone, start, locale),
+                        time: formatInstant(start, locale, zone, { timeStyle: "short" })
+                    })}
+                </p>
+            ) : null}
         </div>
     );
 }
 
 /** The invited reader's own answer: for this occurrence, or the whole series. */
-export function RespondBar({ detail, zone, onChanged }: { detail: EventDetail; zone: string; onChanged: () => void }) {
+export function RespondBar({
+    detail,
+    zone,
+    onChanged
+}: {
+    detail: EventDetail;
+    zone: string;
+    onChanged: () => void;
+}) {
     const t = useCalendarT();
     const toast = useToast();
     const mine = model.myAttendee(detail);
-    const repeating = detail.series !== null && (detail.series.rule !== null || detail.series.rdates.length > 0);
+    const repeating =
+        detail.series !== null && (detail.series.rule !== null || detail.series.rdates.length > 0);
     const [reach, setReach] = useState<"this" | "series">("this");
     const [answer, setAnswer] = useState<engine.PartStat | null>(mine?.partstat ?? null);
     const [busy, setBusy] = useState(false);
@@ -736,17 +1239,32 @@ export function RespondBar({ detail, zone, onChanged }: { detail: EventDetail; z
             onChanged();
         } catch (caught) {
             setAnswer(previous);
-            toast.show({ key: "calendar-respond-failed", title: t("respond.failed"), body: caught instanceof Error ? caught.message : undefined });
+            toast.show({
+                key: "calendar-respond-failed",
+                title: t("respond.failed"),
+                body: caught instanceof Error ? caught.message : undefined
+            });
         } finally {
             setBusy(false);
         }
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("respond.label")}>
+        <div
+            className="flex flex-wrap items-center gap-2"
+            role="group"
+            aria-label={t("respond.label")}
+        >
             <span className="text-xs text-muted-foreground">{t("respond.question")}</span>
             {(["ACCEPTED", "TENTATIVE", "DECLINED"] as const).map((partstat) => (
-                <Button key={partstat} size="sm" variant={answer === partstat ? "secondary" : "outline"} aria-pressed={answer === partstat} disabled={busy} onClick={() => void respond(partstat)}>
+                <Button
+                    key={partstat}
+                    size="sm"
+                    variant={answer === partstat ? "secondary" : "outline"}
+                    aria-pressed={answer === partstat}
+                    disabled={busy}
+                    onClick={() => void respond(partstat)}
+                >
                     {t(`respond.${partstat}`)}
                 </Button>
             ))}
@@ -767,7 +1285,21 @@ export function RespondBar({ detail, zone, onChanged }: { detail: EventDetail; z
 }
 
 /** The meeting link, and the button that makes a Polaris one. */
-function ConferenceField({ id, value, onChange, error, title, start }: { id: string; value: string; onChange: (link: string) => void; error: string | null; title: string; start: Date | null }) {
+function ConferenceField({
+    id,
+    value,
+    onChange,
+    error,
+    title,
+    start
+}: {
+    id: string;
+    value: string;
+    onChange: (link: string) => void;
+    error: string | null;
+    title: string;
+    start: Date | null;
+}) {
     const t = useCalendarT();
     const [busy, setBusy] = useState(false);
     const [refused, setRefused] = useState<string | null>(null);
@@ -776,7 +1308,14 @@ function ConferenceField({ id, value, onChange, error, title, start }: { id: str
         setBusy(true);
         setRefused(null);
         try {
-            const answer = await unwrap(() => meetingActions.createMeetingLinkAction({ title, start: start ? start.toISOString() : null }), t("screen.failed"));
+            const answer = await unwrap(
+                () =>
+                    meetingActions.createMeetingLinkAction({
+                        title,
+                        start: start ? start.toISOString() : null
+                    }),
+                t("screen.failed")
+            );
             onChange(answer.link);
         } catch (caught) {
             setRefused(caught instanceof Error ? caught.message : String(caught));
@@ -788,11 +1327,27 @@ function ConferenceField({ id, value, onChange, error, title, start }: { id: str
         <FieldRow label={t("editor.conference")} htmlFor={id} error={error ?? refused}>
             <div className="flex flex-wrap gap-2">
                 <div className="relative min-w-0 flex-1">
-                    <Video aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle" />
-                    <Input id={id} type="url" inputMode="url" className="pl-8" placeholder="https://" value={value} onChange={(event) => onChange(event.target.value)} />
+                    <Video
+                        aria-hidden
+                        className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                    />
+                    <Input
+                        id={id}
+                        type="url"
+                        inputMode="url"
+                        className="pl-8"
+                        placeholder="https://"
+                        value={value}
+                        onChange={(event) => onChange(event.target.value)}
+                    />
                 </div>
                 {value === "" ? (
-                    <Button size="sm" variant="outline" aria-disabled={busy} onClick={() => void create()}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        aria-disabled={busy}
+                        onClick={() => void create()}
+                    >
                         <Video />
                         {busy ? t("editor.addingMeeting") : t("editor.addMeeting")}
                     </Button>
@@ -804,13 +1359,28 @@ function ConferenceField({ id, value, onChange, error, title, start }: { id: str
 
 /** Links attached to the event, opened after saying where they lead; added and
  *  removed here when the event can be changed. */
-function Attachments({ attachments, onChange, error }: { attachments: readonly model.AttachmentDraft[]; onChange?: (attachments: model.AttachmentDraft[]) => void; error?: string | null }) {
+function Attachments({
+    attachments,
+    onChange,
+    error
+}: {
+    attachments: readonly model.AttachmentDraft[];
+    onChange?: (attachments: model.AttachmentDraft[]) => void;
+    error?: string | null;
+}) {
     const t = useCalendarT();
     const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
     const [link, setLink] = useState("");
     const [name, setName] = useState("");
     const linkOk = model.isWebLink(link.trim());
-    const addBlocked = link.trim() === "" ? t("editor.attachmentIncomplete") : !linkOk ? t("editor.attachmentBadLink") : attachments.some((entry) => entry.uri === link.trim()) ? t("editor.attachmentTwice") : null;
+    const addBlocked =
+        link.trim() === ""
+            ? t("editor.attachmentIncomplete")
+            : !linkOk
+              ? t("editor.attachmentBadLink")
+              : attachments.some((entry) => entry.uri === link.trim())
+                ? t("editor.attachmentTwice")
+                : null;
     const add = () => {
         if (!onChange || addBlocked) return;
         onChange([...attachments, { uri: link.trim(), name: name.trim(), mime: "" }]);
@@ -825,7 +1395,13 @@ function Attachments({ attachments, onChange, error }: { attachments: readonly m
         } catch {
             return;
         }
-        if (await confirm({ title: t("editor.openLinkTitle"), description: t("editor.openLinkBody", { host }), confirmLabel: t("editor.openLink") })) {
+        if (
+            await confirm({
+                title: t("editor.openLinkTitle"),
+                description: t("editor.openLinkBody", { host }),
+                confirmLabel: t("editor.openLink")
+            })
+        ) {
             window.open(uri, "_blank", "noopener,noreferrer");
         }
     };
@@ -837,18 +1413,35 @@ function Attachments({ attachments, onChange, error }: { attachments: readonly m
                     const name = attachment.name || attachment.uri;
                     const linkable = model.isWebLink(attachment.uri);
                     return (
-                        <li key={`${attachment.uri}-${index}`} className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover">
+                        <li
+                            key={`${attachment.uri}-${index}`}
+                            className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover"
+                        >
                             <Paperclip aria-hidden className="size-4 text-foreground-subtle" />
                             <span className="min-w-0 flex-1 truncate text-[0.8125rem]" title={name}>
                                 {name}
                             </span>
                             {linkable ? (
-                                <Button size="icon-sm" variant="ghost" aria-label={t("editor.openAttachment", { name })} title={t("editor.openAttachment", { name })} onClick={() => void open(attachment.uri)}>
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    aria-label={t("editor.openAttachment", { name })}
+                                    title={t("editor.openAttachment", { name })}
+                                    onClick={() => void open(attachment.uri)}
+                                >
                                     <ExternalLink />
                                 </Button>
                             ) : null}
                             {onChange ? (
-                                <Button size="icon-sm" variant="ghost" aria-label={t("editor.removeAttachment", { name })} title={t("editor.removeAttachment", { name })} onClick={() => onChange(attachments.filter((_, at) => at !== index))}>
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    aria-label={t("editor.removeAttachment", { name })}
+                                    title={t("editor.removeAttachment", { name })}
+                                    onClick={() =>
+                                        onChange(attachments.filter((_, at) => at !== index))
+                                    }
+                                >
                                     <Trash2 />
                                 </Button>
                             ) : null}
@@ -858,9 +1451,31 @@ function Attachments({ attachments, onChange, error }: { attachments: readonly m
             </ul>
             {onChange && attachments.length < 20 ? (
                 <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input type="url" inputMode="url" aria-label={t("editor.attachmentLink")} placeholder="https://" className="min-w-0 flex-1" value={link} onChange={(event) => setLink(event.target.value)} />
-                    <Input aria-label={t("editor.attachmentName")} placeholder={t("editor.attachmentName")} className="min-w-0 sm:w-40" value={name} maxLength={300} onChange={(event) => setName(event.target.value)} />
-                    <Button size="sm" variant="outline" aria-disabled={addBlocked !== null} title={addBlocked ?? undefined} className={cn(addBlocked !== null && "opacity-50")} onClick={add}>
+                    <Input
+                        type="url"
+                        inputMode="url"
+                        aria-label={t("editor.attachmentLink")}
+                        placeholder="https://"
+                        className="min-w-0 flex-1"
+                        value={link}
+                        onChange={(event) => setLink(event.target.value)}
+                    />
+                    <Input
+                        aria-label={t("editor.attachmentName")}
+                        placeholder={t("editor.attachmentName")}
+                        className="min-w-0 sm:w-40"
+                        value={name}
+                        maxLength={300}
+                        onChange={(event) => setName(event.target.value)}
+                    />
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        aria-disabled={addBlocked !== null}
+                        title={addBlocked ?? undefined}
+                        className={cn(addBlocked !== null && "opacity-50")}
+                        onClick={add}
+                    >
                         {t("editor.addAttachment")}
                     </Button>
                 </div>

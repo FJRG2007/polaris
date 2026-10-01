@@ -11,7 +11,11 @@ import { ProposalDetail } from "../../../../screens/proposals/proposal-detail";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProposalPage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function ProposalPage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     await requireCalendarUser();
     const { id } = await params;
     const parsed = uuidSchema.safeParse(id);
@@ -23,7 +27,11 @@ export default async function ProposalPage({ params }: { params: Promise<Record<
                 title={t("proposals.detailTitle")}
                 actions={
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/calendar/proposals" aria-label={t("proposals.backToList")} title={t("proposals.backToList")}>
+                        <Link
+                            href="/calendar/proposals"
+                            aria-label={t("proposals.backToList")}
+                            title={t("proposals.backToList")}
+                        >
                             <ArrowLeft />
                             <span className="hidden sm:inline">{t("proposals.backToList")}</span>
                         </Link>

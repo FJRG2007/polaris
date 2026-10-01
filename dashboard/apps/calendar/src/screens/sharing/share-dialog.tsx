@@ -37,12 +37,19 @@ import * as sharing from "../../actions/sharing";
 
 const LEVELS: readonly ShareLevel[] = ["freebusy", "read", "write", "manage"];
 
-type Target = { kind: "user"; id: string; name: string; detail: string } | { kind: "team"; id: string; name: string; detail: string };
+type Target =
+    | { kind: "user"; id: string; name: string; detail: string }
+    | { kind: "team"; id: string; name: string; detail: string };
 
 // ---------------------------------------------------------------- sharing
 
 /** Who a calendar is shared with, and how far. */
-export function ShareCalendarDialog({ calendar, open, onOpenChange, onChanged }: CalendarDialogSlotProps) {
+export function ShareCalendarDialog({
+    calendar,
+    open,
+    onOpenChange,
+    onChanged
+}: CalendarDialogSlotProps) {
     const t = useCalendarT();
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,7 +61,11 @@ export function ShareCalendarDialog({ calendar, open, onOpenChange, onChanged }:
                 {calendar.kind === "resource" ? (
                     <StatusNote tone="neutral">{t("shareDialog.notForRooms")}</StatusNote>
                 ) : open ? (
-                    <SharePanel calendarId={calendar.id} isOwner={calendar.reach === "owner"} onChanged={onChanged} />
+                    <SharePanel
+                        calendarId={calendar.id}
+                        isOwner={calendar.reach === "owner"}
+                        onChanged={onChanged}
+                    />
                 ) : null}
             </DialogContent>
         </Dialog>
@@ -62,14 +73,27 @@ export function ShareCalendarDialog({ calendar, open, onOpenChange, onChanged }:
 }
 
 function levelOptions(t: ReturnType<typeof useCalendarT>, isOwner: boolean) {
-    return LEVELS.filter((level) => level !== "manage" || isOwner).map((level) => ({ value: level, label: t(`shareDialog.levels.${level}`) }));
+    return LEVELS.filter((level) => level !== "manage" || isOwner).map((level) => ({
+        value: level,
+        label: t(`shareDialog.levels.${level}`)
+    }));
 }
 
-function SharePanel({ calendarId, isOwner, onChanged }: { calendarId: string; isOwner: boolean; onChanged: () => void }) {
+function SharePanel({
+    calendarId,
+    isOwner,
+    onChanged
+}: {
+    calendarId: string;
+    isOwner: boolean;
+    onChanged: () => void;
+}) {
     const t = useCalendarT();
     const generic = t("errors.generic");
     const key = cacheKey("shares", calendarId);
-    const shares = useCachedRead<ShareView[]>(key, () => unwrap(() => sharing.listSharesAction(calendarId), generic).then((answer) => answer.shares));
+    const shares = useCachedRead<ShareView[]>(key, () =>
+        unwrap(() => sharing.listSharesAction(calendarId), generic).then((answer) => answer.shares)
+    );
     const [error, setError] = useState<string | null>(null);
     const [target, setTarget] = useState<Target | null>(null);
     const [level, setLevel] = useState<ShareLevel>("read");
@@ -91,7 +115,12 @@ function SharePanel({ calendarId, isOwner, onChanged }: { calendarId: string; is
         setError(null);
         try {
             const answer = await unwrap(
-                () => sharing.shareCalendarAction({ calendarId, target: { kind: target.kind, id: target.id }, access: level }),
+                () =>
+                    sharing.shareCalendarAction({
+                        calendarId,
+                        target: { kind: target.kind, id: target.id },
+                        access: level
+                    }),
                 generic
             );
             shares.replace(answer.shares);
@@ -108,11 +137,18 @@ function SharePanel({ calendarId, isOwner, onChanged }: { calendarId: string; is
     async function change(share: ShareView, access: ShareLevel): Promise<void> {
         if (access === share.access) return;
         const before = list;
-        shares.replace(before.map((entry) => (entry.id === share.id ? { ...entry, access } : entry)));
+        shares.replace(
+            before.map((entry) => (entry.id === share.id ? { ...entry, access } : entry))
+        );
         setError(null);
         try {
             const answer = await unwrap(
-                () => sharing.shareCalendarAction({ calendarId, target: { kind: share.target.kind, id: share.target.id }, access }),
+                () =>
+                    sharing.shareCalendarAction({
+                        calendarId,
+                        target: { kind: share.target.kind, id: share.target.id },
+                        access
+                    }),
                 generic
             );
             shares.replace(answer.shares);
@@ -156,13 +192,17 @@ function SharePanel({ calendarId, isOwner, onChanged }: { calendarId: string; is
                         {t("shareDialog.add")}
                     </Button>
                 </div>
-                {!isOwner ? <p className="text-xs text-foreground-subtle">{t("shareDialog.manageHint")}</p> : null}
+                {!isOwner ? (
+                    <p className="text-xs text-foreground-subtle">{t("shareDialog.manageHint")}</p>
+                ) : null}
             </form>
 
             {error ? <StatusNote tone="danger">{error}</StatusNote> : null}
 
             <section className="flex flex-col gap-2">
-                <h3 className="text-[11px] font-medium uppercase tracking-wider text-foreground-subtle">{t("shareDialog.sharedWith")}</h3>
+                <h3 className="text-[11px] font-medium uppercase tracking-wider text-foreground-subtle">
+                    {t("shareDialog.sharedWith")}
+                </h3>
                 {shares.loading ? (
                     <div className="flex flex-col gap-2" aria-hidden>
                         {[0, 1].map((row) => (
@@ -193,19 +233,32 @@ function SharePanel({ calendarId, isOwner, onChanged }: { calendarId: string; is
                             return (
                                 <li key={share.id} className="flex items-center gap-2 px-2.5 py-2">
                                     {share.target.kind === "team" ? (
-                                        <UsersRound className="size-4 text-foreground-subtle" aria-hidden />
+                                        <UsersRound
+                                            className="size-4 text-foreground-subtle"
+                                            aria-hidden
+                                        />
                                     ) : (
-                                        <User className="size-4 text-foreground-subtle" aria-hidden />
+                                        <User
+                                            className="size-4 text-foreground-subtle"
+                                            aria-hidden
+                                        />
                                     )}
-                                    <span className="min-w-0 flex-1 truncate" title={share.target.name}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate"
+                                        title={share.target.name}
+                                    >
                                         {share.target.name}
                                     </span>
                                     <Select
                                         value={share.access}
-                                        onValueChange={(value) => void change(share, value as ShareLevel)}
+                                        onValueChange={(value) =>
+                                            void change(share, value as ShareLevel)
+                                        }
                                         options={locked ? levelOptions(t, true) : options}
                                         disabled={locked || pending}
-                                        aria-label={t("shareDialog.levelFor", { name: share.target.name })}
+                                        aria-label={t("shareDialog.levelFor", {
+                                            name: share.target.name
+                                        })}
                                         className="w-36 shrink-0 sm:w-44"
                                     />
                                     <Button
@@ -213,7 +266,9 @@ function SharePanel({ calendarId, isOwner, onChanged }: { calendarId: string; is
                                         size="icon-sm"
                                         variant="ghost"
                                         disabled={locked || pending}
-                                        aria-label={t("shareDialog.remove", { name: share.target.name })}
+                                        aria-label={t("shareDialog.remove", {
+                                            name: share.target.name
+                                        })}
                                         title={t("shareDialog.remove", { name: share.target.name })}
                                         onClick={() => void remove(share)}
                                     >
@@ -230,7 +285,13 @@ function SharePanel({ calendarId, isOwner, onChanged }: { calendarId: string; is
 }
 
 /** A field that finds people and teams, with the matches as a listbox under it. */
-function TargetSearch({ value, onChange }: { value: Target | null; onChange: (target: Target | null) => void }) {
+function TargetSearch({
+    value,
+    onChange
+}: {
+    value: Target | null;
+    onChange: (target: Target | null) => void;
+}) {
     const t = useCalendarT();
     const listId = useId();
     const [query, setQuery] = useState("");
@@ -247,7 +308,10 @@ function TargetSearch({ value, onChange }: { value: Target | null; onChange: (ta
         setSearching(true);
         const timer = setTimeout(() => {
             void hostUi.runAction
-                .runAction(() => sharing.shareTargetsAction(term), () => undefined)
+                .runAction(
+                    () => sharing.shareTargetsAction(term),
+                    () => undefined
+                )
                 .then((answer) => {
                     if (mine !== turn.current) return;
                     setSearching(false);
@@ -256,8 +320,22 @@ function TargetSearch({ value, onChange }: { value: Target | null; onChange: (ta
                         return;
                     }
                     setResults([
-                        ...answer.people.map((person): Target => ({ kind: "user", id: person.id, name: person.name, detail: person.username ? `@${person.username}` : "" })),
-                        ...answer.teams.map((team): Target => ({ kind: "team", id: team.id, name: team.name, detail: t("shareDialog.teamOf", { org: team.orgName }) }))
+                        ...answer.people.map(
+                            (person): Target => ({
+                                kind: "user",
+                                id: person.id,
+                                name: person.name,
+                                detail: person.username ? `@${person.username}` : ""
+                            })
+                        ),
+                        ...answer.teams.map(
+                            (team): Target => ({
+                                kind: "team",
+                                id: team.id,
+                                name: team.name,
+                                detail: t("shareDialog.teamOf", { org: team.orgName })
+                            })
+                        )
                     ]);
                     setActive(0);
                 });
@@ -273,7 +351,10 @@ function TargetSearch({ value, onChange }: { value: Target | null; onChange: (ta
 
     return (
         <div className="relative flex flex-col gap-1">
-            <label htmlFor={`${listId}-input`} className="text-xs font-medium text-muted-foreground">
+            <label
+                htmlFor={`${listId}-input`}
+                className="text-xs font-medium text-muted-foreground"
+            >
                 {t("shareDialog.searchLabel")}
             </label>
             <Input
@@ -320,7 +401,9 @@ function TargetSearch({ value, onChange }: { value: Target | null; onChange: (ta
                             {t("shareDialog.searching")}
                         </li>
                     ) : results.length === 0 ? (
-                        <li className="px-2.5 py-1.5 text-muted-foreground">{t("shareDialog.noMatches")}</li>
+                        <li className="px-2.5 py-1.5 text-muted-foreground">
+                            {t("shareDialog.noMatches")}
+                        </li>
                     ) : (
                         results.map((result, index) => (
                             <li
@@ -333,12 +416,24 @@ function TargetSearch({ value, onChange }: { value: Target | null; onChange: (ta
                                 className={`flex cursor-pointer items-center gap-2 px-2.5 py-1.5 ${index === active ? "bg-card-hover" : ""}`}
                             >
                                 {result.kind === "team" ? (
-                                    <UsersRound className="size-4 text-foreground-subtle" aria-hidden />
+                                    <UsersRound
+                                        className="size-4 text-foreground-subtle"
+                                        aria-hidden
+                                    />
                                 ) : (
                                     <User className="size-4 text-foreground-subtle" aria-hidden />
                                 )}
-                                <span className="min-w-0 flex-1 truncate" title={result.name}>{result.name}</span>
-                                {result.detail ? <span className="max-w-[45%] shrink truncate text-xs text-foreground-subtle" title={result.detail}>{result.detail}</span> : null}
+                                <span className="min-w-0 flex-1 truncate" title={result.name}>
+                                    {result.name}
+                                </span>
+                                {result.detail ? (
+                                    <span
+                                        className="max-w-[45%] shrink truncate text-xs text-foreground-subtle"
+                                        title={result.detail}
+                                    >
+                                        {result.detail}
+                                    </span>
+                                ) : null}
                             </li>
                         ))
                     )}
@@ -362,7 +457,10 @@ export function publicLinks(base: string, token: string, title: string) {
     const root = base.replace(/\/+$/, "");
     const page = `${root}/cal/p/${token}`;
     const embedSrc = `${root}/cal/embed/${token}`;
-    const safeTitle = title.replace(/[&"<>]/g, (ch) => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" })[ch] ?? ch);
+    const safeTitle = title.replace(
+        /[&"<>]/g,
+        (ch) => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" })[ch] ?? ch
+    );
     return {
         page,
         subscribe: subscriptionLink(base, token),
@@ -371,13 +469,20 @@ export function publicLinks(base: string, token: string, title: string) {
 }
 
 /** Publishing a calendar by link: off, busy times only, or full details. */
-export function PublishCalendarDialog({ calendar, open, onOpenChange, onChanged }: CalendarDialogSlotProps) {
+export function PublishCalendarDialog({
+    calendar,
+    open,
+    onOpenChange,
+    onChanged
+}: CalendarDialogSlotProps) {
     const t = useCalendarT();
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{t("shareDialog.publishTitle", { name: calendar.name })}</DialogTitle>
+                    <DialogTitle>
+                        {t("shareDialog.publishTitle", { name: calendar.name })}
+                    </DialogTitle>
                     <DialogDescription>{t("shareDialog.publishLead")}</DialogDescription>
                 </DialogHeader>
                 {open ? (
@@ -414,14 +519,23 @@ function PublishPanel({
     const [token, setToken] = useState<string | null>(initialMode ? initialToken : null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
-    const base = useCachedRead<string>(cacheKey("link-base"), () => unwrap(() => linkBaseAction(), generic).then((answer) => answer.base), {
-        freshMs: 10 * 60_000
-    });
+    const base = useCachedRead<string>(
+        cacheKey("link-base"),
+        () => unwrap(() => linkBaseAction(), generic).then((answer) => answer.base),
+        {
+            freshMs: 10 * 60_000
+        }
+    );
 
     async function choose(next: Mode): Promise<void> {
         if (next === mode || busy) return;
         if (next === "" && mode !== "") {
-            const sure = await confirm({ title: t("shareDialog.offTitle"), description: t("shareDialog.offBody"), confirmLabel: t("shareDialog.offConfirm"), danger: true });
+            const sure = await confirm({
+                title: t("shareDialog.offTitle"),
+                description: t("shareDialog.offBody"),
+                confirmLabel: t("shareDialog.offConfirm"),
+                danger: true
+            });
             if (!sure) return;
         }
         const before = { mode, token };
@@ -430,7 +544,10 @@ function PublishPanel({
         setBusy(true);
         setError(null);
         try {
-            const answer = await unwrap(() => sharing.publishCalendarAction({ calendarId, mode: next }), generic);
+            const answer = await unwrap(
+                () => sharing.publishCalendarAction({ calendarId, mode: next }),
+                generic
+            );
             setToken(answer.token);
             onChanged();
         } catch (caught) {
@@ -443,7 +560,11 @@ function PublishPanel({
     }
 
     async function rotate(): Promise<void> {
-        const sure = await confirm({ title: t("shareDialog.rotateTitle"), description: t("shareDialog.rotateBody"), confirmLabel: t("shareDialog.rotateConfirm") });
+        const sure = await confirm({
+            title: t("shareDialog.rotateTitle"),
+            description: t("shareDialog.rotateBody"),
+            confirmLabel: t("shareDialog.rotateConfirm")
+        });
         if (!sure) return;
         setBusy(true);
         setError(null);
@@ -459,7 +580,10 @@ function PublishPanel({
     }
 
     const links = useMemo(
-        () => (token && base.data ? publicLinks(base.data, token, t("shareDialog.embedTitle", { name })) : null),
+        () =>
+            token && base.data
+                ? publicLinks(base.data, token, t("shareDialog.embedTitle", { name }))
+                : null,
         [token, base.data, name, t]
     );
 
@@ -467,7 +591,9 @@ function PublishPanel({
         <div className="flex flex-col gap-4">
             {confirmNode}
             <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">{t("shareDialog.modeLabel")}</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                    {t("shareDialog.modeLabel")}
+                </span>
                 <SegmentedControl<Mode>
                     value={mode}
                     onValueChange={(value) => void choose(value)}
@@ -479,7 +605,11 @@ function PublishPanel({
                     ]}
                 />
                 <p className="text-xs text-foreground-subtle">
-                    {mode === "" ? t("shareDialog.modeHints.off") : mode === "busy" ? t("shareDialog.modeHints.busy") : t("shareDialog.modeHints.full")}
+                    {mode === ""
+                        ? t("shareDialog.modeHints.off")
+                        : mode === "busy"
+                          ? t("shareDialog.modeHints.busy")
+                          : t("shareDialog.modeHints.full")}
                 </p>
             </div>
 
@@ -489,11 +619,25 @@ function PublishPanel({
                 links ? (
                     <div className="flex flex-col gap-3">
                         <LinkRow label={t("shareDialog.publicLink")} value={links.page} />
-                        <LinkRow label={t("shareDialog.subscribeLink")} value={links.subscribe} hint={t("shareDialog.subscribeHint")} />
-                        <LinkRow label={t("shareDialog.embedCode")} value={links.embed} hint={t("shareDialog.embedHint")} />
+                        <LinkRow
+                            label={t("shareDialog.subscribeLink")}
+                            value={links.subscribe}
+                            hint={t("shareDialog.subscribeHint")}
+                        />
+                        <LinkRow
+                            label={t("shareDialog.embedCode")}
+                            value={links.embed}
+                            hint={t("shareDialog.embedHint")}
+                        />
                         <MailLink calendarId={calendarId} />
                         <div>
-                            <Button type="button" size="sm" variant="outline" onClick={() => void rotate()} disabled={busy}>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void rotate()}
+                                disabled={busy}
+                            >
                                 <RefreshCw aria-hidden />
                                 {t("shareDialog.rotate")}
                             </Button>
@@ -524,8 +668,18 @@ function LinkRow({ label, value, hint }: { label: string; value: string; hint?: 
                 {label}
             </label>
             <div className="flex items-center gap-2">
-                <Input id={id} readOnly value={value} onFocus={(event) => event.currentTarget.select()} className="font-mono text-xs" />
-                <CopyButton value={value} label={label} className="inline-flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-card-hover" />
+                <Input
+                    id={id}
+                    readOnly
+                    value={value}
+                    onFocus={(event) => event.currentTarget.select()}
+                    className="font-mono text-xs"
+                />
+                <CopyButton
+                    value={value}
+                    label={label}
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-card-hover"
+                />
             </div>
             {hint ? <p className="text-xs text-foreground-subtle">{hint}</p> : null}
         </div>
@@ -540,7 +694,8 @@ function MailLink({ calendarId }: { calendarId: string }) {
     const [state, setState] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
     const [busy, setBusy] = useState(false);
     const parsed = emailSchema.safeParse(email);
-    const problem = touched && email.trim() !== "" && !parsed.success ? t("booking.validation.email") : null;
+    const problem =
+        touched && email.trim() !== "" && !parsed.success ? t("booking.validation.email") : null;
 
     async function send(event: FormEvent): Promise<void> {
         event.preventDefault();
@@ -550,7 +705,10 @@ function MailLink({ calendarId }: { calendarId: string }) {
         setState(null);
         const generic = t("errors.generic");
         try {
-            await unwrap(() => sharing.mailPublicLinkAction({ calendarId, email: parsed.data }), generic);
+            await unwrap(
+                () => sharing.mailPublicLinkAction({ calendarId, email: parsed.data }),
+                generic
+            );
             setState({ tone: "success", text: t("shareDialog.sent", { email: parsed.data }) });
             setEmail("");
             setTouched(false);
@@ -576,7 +734,13 @@ function MailLink({ calendarId }: { calendarId: string }) {
                     onBlur={() => setTouched(true)}
                     aria-invalid={problem ? true : undefined}
                 />
-                <Button type="submit" size="md" variant="outline" disabled={busy} aria-disabled={!parsed.success}>
+                <Button
+                    type="submit"
+                    size="md"
+                    variant="outline"
+                    disabled={busy}
+                    aria-disabled={!parsed.success}
+                >
                     {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Send aria-hidden />}
                     {t("shareDialog.send")}
                 </Button>

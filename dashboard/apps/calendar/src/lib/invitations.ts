@@ -37,7 +37,9 @@ type EventItem = Extract<engine.CalendarItem, { component: "VEVENT" }>;
 /** Every component of an event item, master first. */
 function eventsOf(item: engine.CalendarItem | null): engine.CalendarEvent[] {
     if (!item || item.component !== "VEVENT") return [];
-    return [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent => Boolean(event));
+    return [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent =>
+        Boolean(event)
+    );
 }
 
 /** The organizer of an item, as its master (or first override) names them. */
@@ -135,7 +137,10 @@ async function requestFor(
     organizerId: string
 ): Promise<void> {
     const internal = new Map(
-        (await host.calendarHost.accountsByEmail(emails)).map((account) => [account.email, account.id])
+        (await host.calendarHost.accountsByEmail(emails)).map((account) => [
+            account.email,
+            account.id
+        ])
     );
     const now = new Date();
     for (const email of emails) {
@@ -168,7 +173,10 @@ async function cancelFor(
 ): Promise<void> {
     if (!item || emails.length === 0) return;
     const internal = new Map(
-        (await host.calendarHost.accountsByEmail(emails)).map((account) => [account.email, account.id])
+        (await host.calendarHost.accountsByEmail(emails)).map((account) => [
+            account.email,
+            account.id
+        ])
     );
     for (const email of emails) {
         const roomId = resourceIdOf(email);
@@ -177,7 +185,8 @@ async function cancelFor(
             continue;
         }
         const userId = internal.get(email) ?? null;
-        if (userId && userId !== organizerId) await deliverInternal(userId, organizerId, item, "CANCEL");
+        if (userId && userId !== organizerId)
+            await deliverInternal(userId, organizerId, item, "CANCEL");
         else if (!userId) await mailInvitation(email, item, "CANCEL", null, organizerId);
     }
     await prisma.calendarInvitation.deleteMany({ where: { objectId, email: { in: [...emails] } } });
@@ -198,7 +207,9 @@ async function answerAsRoom(
     const resources = await import("./resources");
     await resources
         .answerForRoom(organizerId, roomId, item, method)
-        .catch((caught: unknown) => console.error("polaris: a room did not answer an invitation:", caught));
+        .catch((caught: unknown) =>
+            console.error("polaris: a room did not answer an invitation:", caught)
+        );
 }
 
 const STORED_COLUMNS = {
@@ -226,7 +237,11 @@ async function copyFrom(
     live: boolean
 ): Promise<{ copy: StoredObject | null; taken: boolean }> {
     const rows = await prisma.calendarObject.findMany({
-        where: { uid, ...(live ? { deletedAt: null } : {}), calendar: { ownerId: userId, trashedAt: null } },
+        where: {
+            uid,
+            ...(live ? { deletedAt: null } : {}),
+            calendar: { ownerId: userId, trashedAt: null }
+        },
         select: STORED_COLUMNS
     });
     const copy = rows.find((row) => {
@@ -251,14 +266,17 @@ async function deliverInternal(
     if (item.component !== "VEVENT") return;
     const calendarId = await invitationCalendarOf(userId);
     if (!calendarId) return;
-    const { copy: existing, taken } = await copyFrom(userId, item.uid, await ownerAddresses(organizerId), false);
+    const { copy: existing, taken } = await copyFrom(
+        userId,
+        item.uid,
+        await ownerAddresses(organizerId),
+        false
+    );
     if (taken && !existing) return;
     const mine = existing ? tryItemOf(existing.ics) : null;
     const emails = await ownerAddresses(userId);
     let copy: engine.CalendarItem =
-        method === "CANCEL"
-            ? cancelled(mine ?? item)
-            : keepAnswers(item, mine, emails);
+        method === "CANCEL" ? cancelled(mine ?? item) : keepAnswers(item, mine, emails);
     copy = { ...copy, method: null };
     // A copy the attendee already put in the trash stays there: writing the
     // cancellation would bring it back.
@@ -271,14 +289,25 @@ async function deliverInternal(
     const event = eventsOf(item)[0];
     const locale = await localeOf(userId);
     const t = calendarTIn(locale);
-    const objectId = existing?.id ?? (await prisma.calendarObject.findFirst({
-        where: { calendarId, uid: item.uid },
-        select: { id: true }
-    }))?.id;
+    const objectId =
+        existing?.id ??
+        (
+            await prisma.calendarObject.findFirst({
+                where: { calendarId, uid: item.uid },
+                select: { id: true }
+            })
+        )?.id;
     await host.notificationsDispatch.notify({
         userId,
         event: "calendar.invitation",
-        title: method === "CANCEL" ? t("invitations.cancelledTitle", { title: event?.summary || t("invitations.untitled") }) : t("invitations.invitedTitle", { title: event?.summary || t("invitations.untitled") }),
+        title:
+            method === "CANCEL"
+                ? t("invitations.cancelledTitle", {
+                      title: event?.summary || t("invitations.untitled")
+                  })
+                : t("invitations.invitedTitle", {
+                      title: event?.summary || t("invitations.untitled")
+                  }),
         body: event ? whenText(event, locale, item.timezones) : null,
         href: objectId ? `/calendar/e/${objectId}` : "/calendar"
     });
@@ -290,7 +319,9 @@ function keepAnswers(
     mine: engine.CalendarItem | null,
     emails: ReadonlySet<string>
 ): engine.CalendarItem {
-    const previous = new Map(eventsOf(mine).map((event) => [JSON.stringify(event.recurrenceId), event]));
+    const previous = new Map(
+        eventsOf(mine).map((event) => [JSON.stringify(event.recurrenceId), event])
+    );
     const carry = (event: engine.CalendarEvent): engine.CalendarEvent => {
         const held = previous.get(JSON.stringify(event.recurrenceId)) ?? previous.get("null");
         return {
@@ -298,7 +329,9 @@ function keepAnswers(
             alarms: held?.alarms ?? event.alarms,
             attendees: event.attendees.map((attendee) => {
                 if (!emails.has(attendee.email)) return attendee;
-                const answer = held?.attendees.find((own) => own.email === attendee.email)?.partstat;
+                const answer = held?.attendees.find(
+                    (own) => own.email === attendee.email
+                )?.partstat;
                 return answer ? { ...attendee, partstat: answer } : attendee;
             })
         };
@@ -313,8 +346,15 @@ function keepAnswers(
 /** A copy marked as not happening. */
 function cancelled(item: engine.CalendarItem): engine.CalendarItem {
     if (item.component !== "VEVENT") return item;
-    const mark = (event: engine.CalendarEvent): engine.CalendarEvent => ({ ...event, status: "CANCELLED" });
-    return { ...item, master: item.master ? mark(item.master) : null, overrides: item.overrides.map(mark) };
+    const mark = (event: engine.CalendarEvent): engine.CalendarEvent => ({
+        ...event,
+        status: "CANCELLED"
+    });
+    return {
+        ...item,
+        master: item.master ? mark(item.master) : null,
+        overrides: item.overrides.map(mark)
+    };
 }
 
 /** Where invitations land for this person: the calendar they chose, else their
@@ -323,7 +363,12 @@ async function invitationCalendarOf(userId: string): Promise<string | null> {
     const preferences = await loadPreferences(userId);
     if (preferences.invitationCalendarId) {
         const chosen = await prisma.calendar.findFirst({
-            where: { id: preferences.invitationCalendarId, ownerId: userId, trashedAt: null, readOnly: false },
+            where: {
+                id: preferences.invitationCalendarId,
+                ownerId: userId,
+                trashedAt: null,
+                readOnly: false
+            },
             select: { id: true }
         });
         if (chosen) return chosen.id;
@@ -332,9 +377,16 @@ async function invitationCalendarOf(userId: string): Promise<string | null> {
 }
 
 /** One line saying when an event is, in a locale. */
-function whenText(event: engine.CalendarEvent, locale: string, timezones: readonly string[]): string {
+function whenText(
+    event: engine.CalendarEvent,
+    locale: string,
+    timezones: readonly string[]
+): string {
     const start = engine.valueToInstant(event.start, "UTC", timezones);
-    const zone = "tzid" in event.start && event.start.tzid ? engine.resolveZone(event.start.tzid) ?? "UTC" : "UTC";
+    const zone =
+        "tzid" in event.start && event.start.tzid
+            ? (engine.resolveZone(event.start.tzid) ?? "UTC")
+            : "UTC";
     // Intl refuses timeZoneName next to dateStyle/timeStyle, so the timed form
     // names its parts one by one.
     const format =
@@ -364,7 +416,9 @@ async function mailInvitation(
     const event = eventsOf(item)[0];
     if (!event) return;
     if (!(await mayMailOutside(organizerId))) {
-        console.error("polaris: a calendar invitation was not sent: the organizer's mail limit is spent");
+        console.error(
+            "polaris: a calendar invitation was not sent: the organizer's mail limit is spent"
+        );
         return;
     }
     const locale = await localeOf(organizerId);
@@ -375,7 +429,9 @@ async function mailInvitation(
     const answer = token ? `${base}/cal/rsvp/${token}` : null;
     const organizer = event.organizer?.name || event.organizer?.email || "";
     const lines = [
-        method === "CANCEL" ? t("invitations.mailCancelled", { organizer }) : t("invitations.mailInvited", { organizer }),
+        method === "CANCEL"
+            ? t("invitations.mailCancelled", { organizer })
+            : t("invitations.mailInvited", { organizer }),
         "",
         title,
         when,
@@ -444,9 +500,20 @@ export async function applyAnswer(
 ): Promise<void> {
     const { copy: row } = await copyFrom(organizerId, uid, await ownerAddresses(organizerId), true);
     const item = row ? tryItemOf(row.ics) : null;
-    if (!row || !item || !eventsOf(item).some((event) => event.attendees.some((attendee) => attendee.email === email))) return;
+    if (
+        !row ||
+        !item ||
+        !eventsOf(item).some((event) =>
+            event.attendees.some((attendee) => attendee.email === email)
+        )
+    )
+        return;
     const answered = engine.applyReply(item, email, partstat, recurrenceKey);
-    await writeItem(row.calendarId, row, answered, { actor: null, floatingZone: "UTC", fromImport: true });
+    await writeItem(row.calendarId, row, answered, {
+        actor: null,
+        floatingZone: "UTC",
+        fromImport: true
+    });
     await prisma.calendarInvitation.updateMany({
         where: { objectId: row.id, email },
         data: { partstat, respondedAt: new Date() }
@@ -474,7 +541,14 @@ export async function invitationByToken(token: string) {
             email: true,
             partstat: true,
             objectId: true,
-            object: { select: { uid: true, ics: true, deletedAt: true, calendar: { select: { ownerId: true } } } }
+            object: {
+                select: {
+                    uid: true,
+                    ics: true,
+                    deletedAt: true,
+                    calendar: { select: { ownerId: true } }
+                }
+            }
         }
     });
 }

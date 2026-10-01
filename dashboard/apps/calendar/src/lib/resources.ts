@@ -31,16 +31,34 @@ const MAX_ROOMS = 500;
 /** How far ahead a repeating booking is checked against a room. */
 const HORIZON_MS = 366 * 86_400_000;
 
-const ROOM_COLUMNS = { id: true, name: true, description: true, color: true, resource: true } as const;
+const ROOM_COLUMNS = {
+    id: true,
+    name: true,
+    description: true,
+    color: true,
+    resource: true
+} as const;
 
-function roomView(row: { id: string; name: string; description: string; color: string; resource: string }): RoomView {
+function roomView(row: {
+    id: string;
+    name: string;
+    description: string;
+    color: string;
+    resource: string;
+}): RoomView {
     return {
         id: row.id,
         name: row.name,
         description: row.description,
         color: row.color,
         email: resourceAddress(row.id),
-        resource: readResource(row.resource) ?? { type: "room", capacity: null, building: "", floor: "", features: [] }
+        resource: readResource(row.resource) ?? {
+            type: "room",
+            capacity: null,
+            building: "",
+            floor: "",
+            features: []
+        }
     };
 }
 
@@ -50,7 +68,8 @@ export async function mayManageRooms(user: SessionUser): Promise<boolean> {
 }
 
 async function requireRoomManager(user: SessionUser): Promise<void> {
-    if (!(await mayManageRooms(user))) throw new CalendarRefusal((await calendarT())("rooms.notAllowed"));
+    if (!(await mayManageRooms(user)))
+        throw new CalendarRefusal((await calendarT())("rooms.notAllowed"));
 }
 
 /** Every room and piece of equipment, by name. */
@@ -91,15 +110,26 @@ export async function createRoom(user: SessionUser, input: RoomInput): Promise<R
 }
 
 async function existingRoom(id: string) {
-    const row = await prisma.calendar.findFirst({ where: { id, kind: "resource", trashedAt: null }, select: { id: true } });
+    const row = await prisma.calendar.findFirst({
+        where: { id, kind: "resource", trashedAt: null },
+        select: { id: true }
+    });
     if (!row) throw new CalendarRefusal((await calendarT())("rooms.notFound"));
     return row;
 }
 
-export async function updateRoom(user: SessionUser, id: string, input: RoomInput): Promise<RoomView> {
+export async function updateRoom(
+    user: SessionUser,
+    id: string,
+    input: RoomInput
+): Promise<RoomView> {
     await requireRoomManager(user);
     await existingRoom(id);
-    const row = await prisma.calendar.update({ where: { id }, data: stored(input), select: ROOM_COLUMNS });
+    const row = await prisma.calendar.update({
+        where: { id },
+        data: stored(input),
+        select: ROOM_COLUMNS
+    });
     return roomView(row);
 }
 
@@ -124,11 +154,18 @@ export async function roomsFor(window: { from: Date; to: Date }): Promise<RoomAv
 
 /** The stretches of time an event takes, within the horizon a room checks. */
 function takenBy(item: engine.CalendarItem, now: Date): { start: Date; end: Date }[] {
-    const window = { from: new Date(now.getTime() - 86_400_000), to: new Date(now.getTime() + HORIZON_MS) };
+    const window = {
+        from: new Date(now.getTime() - 86_400_000),
+        to: new Date(now.getTime() + HORIZON_MS)
+    };
     try {
         return engine
             .expandItem(item, window, { floatingZone: "UTC", limit: 500 })
-            .filter((occurrence) => occurrence.event.status !== "CANCELLED" && occurrence.event.transparency !== "TRANSPARENT")
+            .filter(
+                (occurrence) =>
+                    occurrence.event.status !== "CANCELLED" &&
+                    occurrence.event.transparency !== "TRANSPARENT"
+            )
             .map((occurrence) => ({ start: occurrence.start, end: occurrence.end }));
     } catch {
         return [];
@@ -166,13 +203,21 @@ function answerOnCopy(item: engine.CalendarItem, email: string): engine.PartStat
  * the organizer's and their guests', not the room keeper's - the title only
  * when the event is public, as any reader of the organizer's calendar sees it.
  */
-function bookingOf(item: Extract<engine.CalendarItem, { component: "VEVENT" }>, email: string): engine.CalendarItem {
+function bookingOf(
+    item: Extract<engine.CalendarItem, { component: "VEVENT" }>,
+    email: string
+): engine.CalendarItem {
     const hold = (event: engine.CalendarEvent): engine.CalendarEvent => ({
         ...busyBlock(event, event.classification === "PUBLIC" ? event.summary : ""),
         organizer: event.organizer,
         attendees: event.attendees.filter((attendee) => attendee.email === email)
     });
-    return { ...item, method: null, master: item.master ? hold(item.master) : null, overrides: item.overrides.map(hold) };
+    return {
+        ...item,
+        method: null,
+        master: item.master ? hold(item.master) : null,
+        overrides: item.overrides.map(hold)
+    };
 }
 
 /** Room answers in progress, by room. */
@@ -196,7 +241,8 @@ async function withLease<T>(key: string, work: () => Promise<T>): Promise<T> {
     for (;;) {
         const now = Date.now();
         until = now + LEASE_MS;
-        const taken = await prisma.$executeRaw`INSERT INTO "CalendarLease" ("key", "until") VALUES (${key}, ${BigInt(until)}) ON CONFLICT ("key") DO UPDATE SET "until" = EXCLUDED."until" WHERE "CalendarLease"."until" < ${BigInt(now)}`;
+        const taken =
+            await prisma.$executeRaw`INSERT INTO "CalendarLease" ("key", "until") VALUES (${key}, ${BigInt(until)}) ON CONFLICT ("key") DO UPDATE SET "until" = EXCLUDED."until" WHERE "CalendarLease"."until" < ${BigInt(now)}`;
         if (taken > 0) break;
         if (now >= deadline) throw new Error(`polaris: the lease on ${key} was not free in time`);
         await new Promise((resolve) => setTimeout(resolve, LEASE_POLL_MS));
@@ -204,8 +250,9 @@ async function withLease<T>(key: string, work: () => Promise<T>): Promise<T> {
     try {
         return await work();
     } finally {
-        await prisma.$executeRaw`DELETE FROM "CalendarLease" WHERE "key" = ${key} AND "until" = ${BigInt(until)}`.catch((caught: unknown) =>
-            console.error("polaris: a calendar lease was not given back:", caught)
+        await prisma.$executeRaw`DELETE FROM "CalendarLease" WHERE "key" = ${key} AND "until" = ${BigInt(until)}`.catch(
+            (caught: unknown) =>
+                console.error("polaris: a calendar lease was not given back:", caught)
         );
     }
 }
@@ -218,7 +265,9 @@ async function withLease<T>(key: string, work: () => Promise<T>): Promise<T> {
  */
 async function oneAtATime<T>(roomId: string, work: () => Promise<T>): Promise<T> {
     const locked = () =>
-        process.env.POLARIS_DB_PROVIDER === "sqlite" ? work() : withLease(`polaris.calendar.room:${roomId}`, work);
+        process.env.POLARIS_DB_PROVIDER === "sqlite"
+            ? work()
+            : withLease(`polaris.calendar.room:${roomId}`, work);
     const run = (answering.get(roomId) ?? Promise.resolve()).catch(() => undefined).then(locked);
     answering.set(roomId, run);
     try {
@@ -261,8 +310,13 @@ async function answerAlone(
     const invitations = await import("./invitations");
     const found = await roomCopy(roomId, item.uid);
     const booking = found ? tryItemOf(found.ics) : null;
-    const booker = booking?.component === "VEVENT" ? (booking.master ?? booking.overrides[0])?.organizer?.email : undefined;
-    const theirs = found !== null && !(booker !== undefined && (await invitations.ownerAddresses(organizerId)).has(booker));
+    const booker =
+        booking?.component === "VEVENT"
+            ? (booking.master ?? booking.overrides[0])?.organizer?.email
+            : undefined;
+    const theirs =
+        found !== null &&
+        !(booker !== undefined && (await invitations.ownerAddresses(organizerId)).has(booker));
     const existing = theirs ? null : found;
     const context = { actor: null, floatingZone: "UTC", fromImport: true } as const;
 
@@ -287,14 +341,19 @@ async function answerAlone(
         };
         const busy = await calendarBusy([roomId], window, { skipUid: item.uid });
         free = !taken.some((slot) =>
-            busy.some((interval) => interval.start.getTime() < slot.end.getTime() && interval.end.getTime() > slot.start.getTime())
+            busy.some(
+                (interval) =>
+                    interval.start.getTime() < slot.end.getTime() &&
+                    interval.end.getTime() > slot.start.getTime()
+            )
         );
     }
 
     const answer: engine.PartStat = free ? "ACCEPTED" : "DECLINED";
     if (free) {
         const accepted = engine.applyReply(item, email, "ACCEPTED", null);
-        if (accepted.component === "VEVENT") await writeItem(roomId, existing, bookingOf(accepted, email), context);
+        if (accepted.component === "VEVENT")
+            await writeItem(roomId, existing, bookingOf(accepted, email), context);
     } else {
         await release();
     }

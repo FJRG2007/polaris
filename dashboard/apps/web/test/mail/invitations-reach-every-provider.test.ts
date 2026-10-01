@@ -43,7 +43,12 @@ const ICS = [
     ""
 ].join("\r\n");
 
-const PLAIN = { to: "guest@example.test", subject: "Weekly planning", text: "See you there.", html: "<p>See you there.</p>" };
+const PLAIN = {
+    to: "guest@example.test",
+    subject: "Weekly planning",
+    text: "See you there.",
+    html: "<p>See you there.</p>"
+};
 const INVITE = { ...PLAIN, calendar: { method: "REQUEST" as const, ics: ICS } };
 const CONTENT_TYPE = "text/calendar; charset=utf-8; method=REQUEST";
 
@@ -52,11 +57,14 @@ const requests: Array<{ url: string; headers: Record<string, string>; body: stri
 beforeEach(() => {
     sent.length = 0;
     requests.length = 0;
-    vi.stubGlobal("fetch", async (url: string, init: { headers: Record<string, string>; body: string }) => {
-        requests.push({ url, headers: init.headers, body: init.body });
-        const payload = url.includes("mailjet") ? { Messages: [{ Status: "success" }] } : {};
-        return new Response(JSON.stringify(payload), { status: 200 });
-    });
+    vi.stubGlobal(
+        "fetch",
+        async (url: string, init: { headers: Record<string, string>; body: string }) => {
+            requests.push({ url, headers: init.headers, body: init.body });
+            const payload = url.includes("mailjet") ? { Messages: [{ Status: "success" }] } : {};
+            return new Response(JSON.stringify(payload), { status: 200 });
+        }
+    );
 });
 
 afterEach(() => {
@@ -68,19 +76,36 @@ const lastBody = () => JSON.parse(requests[requests.length - 1].body) as Record<
 
 const ACCOUNTS = {
     smtp: {
-        config: { provider: "smtp", settings: { host: "smtp.example.test", port: 587, user: "u", from: "cal@example.test" } },
+        config: {
+            provider: "smtp",
+            settings: { host: "smtp.example.test", port: 587, user: "u", from: "cal@example.test" }
+        },
         secret: "fixture-secret"
     },
-    resend: { config: { provider: "resend", settings: { from: "cal@example.test" } }, secret: "fixture-secret" },
-    brevo: { config: { provider: "brevo", settings: { from: "cal@example.test" } }, secret: "fixture-secret" },
+    resend: {
+        config: { provider: "resend", settings: { from: "cal@example.test" } },
+        secret: "fixture-secret"
+    },
+    brevo: {
+        config: { provider: "brevo", settings: { from: "cal@example.test" } },
+        secret: "fixture-secret"
+    },
     mailjet: {
-        config: { provider: "mailjet", settings: { apiKey: "fixture-key", from: "cal@example.test" } },
+        config: {
+            provider: "mailjet",
+            settings: { apiKey: "fixture-key", from: "cal@example.test" }
+        },
         secret: "fixture-secret"
     },
     ses: {
         config: {
             provider: "ses",
-            settings: { accessKeyId: "FIXTUREKEY", region: "eu-west-1", from: "cal@example.test", fromName: "Calendario Ñandú" }
+            settings: {
+                accessKeyId: "FIXTUREKEY",
+                region: "eu-west-1",
+                from: "cal@example.test",
+                fromName: "Calendario Ñandú"
+            }
         },
         secret: "fixture-secret"
     }
@@ -89,7 +114,11 @@ const ACCOUNTS = {
 describe("SMTP", () => {
     it("hands nodemailer the event with its method and file name", async () => {
         await sendEmail(ACCOUNTS.smtp, INVITE);
-        expect(sent[0].icalEvent).toEqual({ method: "REQUEST", content: ICS, filename: "invite.ics" });
+        expect(sent[0].icalEvent).toEqual({
+            method: "REQUEST",
+            content: ICS,
+            filename: "invite.ics"
+        });
     });
 
     it("sends a plain message as before", async () => {
@@ -185,10 +214,14 @@ describe("SES", () => {
         await sendEmail(ACCOUNTS.ses, { ...INVITE, subject: "Planificación semanal" });
         const request = requests[0];
         expect(request.url).toBe("https://email.eu-west-1.amazonaws.com/v2/email/outbound-emails");
-        expect(request.headers["x-amz-content-sha256"]).toBe(createHash("sha256").update(request.body).digest("hex"));
+        expect(request.headers["x-amz-content-sha256"]).toBe(
+            createHash("sha256").update(request.body).digest("hex")
+        );
         expect(request.headers.Authorization).toMatch(/^AWS4-HMAC-SHA256 Credential=FIXTUREKEY\//);
 
-        const body = JSON.parse(request.body) as { Content: { Raw?: { Data: string }; Simple?: unknown } };
+        const body = JSON.parse(request.body) as {
+            Content: { Raw?: { Data: string }; Simple?: unknown };
+        };
         expect(body.Content.Simple).toBeUndefined();
         const raw = Buffer.from(body.Content.Raw!.Data, "base64").toString("utf8");
         // Every line ends in CRLF, and none is longer than SES accepts.
@@ -200,7 +233,9 @@ describe("SES", () => {
         expect(headers).toContain("To: guest@example.test");
         expect(headers).toContain("MIME-Version: 1.0");
         expect(headers).toContain(`Subject: =?UTF-8?B?${base64("Planificación semanal")}?=`);
-        expect(headers).toContain(`From: =?UTF-8?B?${base64("Calendario Ñandú")}?= <cal@example.test>`);
+        expect(headers).toContain(
+            `From: =?UTF-8?B?${base64("Calendario Ñandú")}?= <cal@example.test>`
+        );
         expect(headers).toMatch(/Content-Type: multipart\/mixed; boundary="/);
 
         const [alternative, attachment] = parts(raw.slice(split + 4), boundaryOf(headers));
@@ -214,19 +249,27 @@ describe("SES", () => {
         expect(calendar.headers).toContain("Content-Transfer-Encoding: base64");
         expect(decode(calendar.body)).toBe(ICS);
 
-        expect(attachment.headers).toContain('Content-Disposition: attachment; filename="invite.ics"');
+        expect(attachment.headers).toContain(
+            'Content-Disposition: attachment; filename="invite.ics"'
+        );
         expect(decode(attachment.body)).toBe(ICS);
     });
 
     it("folds a long non-ASCII subject into encoded words that each decode back", async () => {
-        const subject = "Reunión de planificación trimestral con todo el equipo de producto y diseño";
+        const subject =
+            "Reunión de planificación trimestral con todo el equipo de producto y diseño";
         await sendEmail(ACCOUNTS.ses, { ...INVITE, subject });
-        const raw = Buffer.from((lastBody().Content as { Raw: { Data: string } }).Raw.Data, "base64").toString("utf8");
+        const raw = Buffer.from(
+            (lastBody().Content as { Raw: { Data: string } }).Raw.Data,
+            "base64"
+        ).toString("utf8");
         const header = /\r\nSubject: ((?:.|\r\n )+?)\r\n(?! )/.exec(raw)![1];
         const words = header.split("\r\n ");
         expect(words.length).toBeGreaterThan(1);
         for (const word of words) expect(word.length).toBeLessThanOrEqual(75);
-        const decoded = words.map((word) => Buffer.from(/^=\?UTF-8\?B\?(.*)\?=$/.exec(word)![1], "base64").toString("utf8"));
+        const decoded = words.map((word) =>
+            Buffer.from(/^=\?UTF-8\?B\?(.*)\?=$/.exec(word)![1], "base64").toString("utf8")
+        );
         expect(decoded.join("")).toBe(subject);
     });
 

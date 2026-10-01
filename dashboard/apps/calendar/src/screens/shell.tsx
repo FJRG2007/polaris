@@ -23,9 +23,13 @@ export function CalendarShell({ words }: { words: ShellWords }) {
     return (
         <div className="flex h-full min-h-0 flex-col" aria-busy="true" aria-label={words.loading}>
             <div className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2">
-                <span className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[0.8125rem] text-muted-foreground">{words.today}</span>
+                <span className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[0.8125rem] text-muted-foreground">
+                    {words.today}
+                </span>
                 <Block className="h-5 w-40" />
-                <span className="ml-auto inline-flex h-7 items-center rounded-md bg-primary px-2.5 text-[0.8125rem] font-medium text-primary-foreground opacity-60">{words.newEvent}</span>
+                <span className="ml-auto inline-flex h-7 items-center rounded-md bg-primary px-2.5 text-[0.8125rem] font-medium text-primary-foreground opacity-60">
+                    {words.newEvent}
+                </span>
             </div>
             <div className="flex min-h-0 flex-1">
                 <div className="hidden w-64 shrink-0 flex-col gap-3 border-r border-border bg-surface p-3 lg:flex">

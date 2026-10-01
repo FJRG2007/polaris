@@ -15,7 +15,9 @@ import {
 } from "../lib/instance-settings";
 
 /** Everybody with the Calendar reads them: the screens hide what is switched off. */
-export async function loadInstanceSettingsAction(): Promise<Outcome<{ settings: InstanceSettings; canManage: boolean }>> {
+export async function loadInstanceSettingsAction(): Promise<
+    Outcome<{ settings: InstanceSettings; canManage: boolean }>
+> {
     return outcome(async () => {
         const user = await requireCalendarUser();
         return {
@@ -26,7 +28,9 @@ export async function loadInstanceSettingsAction(): Promise<Outcome<{ settings: 
 }
 
 /** Only somebody who changes instance settings. */
-export async function saveInstanceSettingsAction(input: unknown): Promise<Outcome<{ settings: InstanceSettings }>> {
+export async function saveInstanceSettingsAction(
+    input: unknown
+): Promise<Outcome<{ settings: InstanceSettings }>> {
     const parsed = instanceSettingsSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => {

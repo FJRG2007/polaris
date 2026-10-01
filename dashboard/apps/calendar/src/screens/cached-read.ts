@@ -49,10 +49,20 @@ export function dropCached(...parts: readonly string[]): void {
     hostUi.snapshotCache.dropSnapshots(cacheKey(...parts));
 }
 
-export function useCachedRead<T>(key: string | null, load: (signal: AbortSignal) => Promise<T>, options: { freshMs?: number } = {}): CachedRead<T> {
+export function useCachedRead<T>(
+    key: string | null,
+    load: (signal: AbortSignal) => Promise<T>,
+    options: { freshMs?: number } = {}
+): CachedRead<T> {
     const freshMs = options.freshMs ?? FRESH_MS;
-    const kept = (target: string | null) => (target ? hostUi.snapshotCache.readSnapshot<T>(target, KEEP_MS) : null);
-    const [state, setState] = useState<{ key: string | null; data: T | null; error: string | null; stale: boolean }>(() => ({
+    const kept = (target: string | null) =>
+        target ? hostUi.snapshotCache.readSnapshot<T>(target, KEEP_MS) : null;
+    const [state, setState] = useState<{
+        key: string | null;
+        data: T | null;
+        error: string | null;
+        stale: boolean;
+    }>(() => ({
         key,
         data: kept(key)?.value ?? null,
         error: null,
@@ -89,7 +99,11 @@ export function useCachedRead<T>(key: string | null, load: (signal: AbortSignal)
                 if (current.signal.aborted) return;
                 const message = caught instanceof Error ? caught.message : String(caught);
                 setState((previous) =>
-                    previous.key !== key ? previous : previous.data === null ? { ...previous, error: message } : { ...previous, stale: true }
+                    previous.key !== key
+                        ? previous
+                        : previous.data === null
+                          ? { ...previous, error: message }
+                          : { ...previous, stale: true }
                 );
             });
         return () => current.abort();
@@ -120,7 +134,10 @@ export function useCachedRead<T>(key: string | null, load: (signal: AbortSignal)
 }
 
 /** An action's `{ ok, error }` answer as a value or a thrown sentence. */
-export async function unwrap<T extends { ok: boolean }>(call: () => Promise<T>, fallback: string): Promise<Extract<T, { ok: true }>> {
+export async function unwrap<T extends { ok: boolean }>(
+    call: () => Promise<T>,
+    fallback: string
+): Promise<Extract<T, { ok: true }>> {
     let failure = fallback;
     const answer = await hostUi.runAction.runAction(call, (message) => {
         failure = message;

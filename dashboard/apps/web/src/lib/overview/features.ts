@@ -32,6 +32,9 @@ async function hasGameServer(userId: string): Promise<boolean> {
 }
 
 export async function overviewFeatures(userId: string): Promise<OverviewFeatures> {
-    const [games, calendar] = await Promise.all([hasGameServer(userId), isAppInstalled("calendar")]);
+    const [games, calendar] = await Promise.all([
+        hasGameServer(userId),
+        isAppInstalled("calendar")
+    ]);
     return { games, calendar };
 }

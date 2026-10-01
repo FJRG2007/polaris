@@ -17,7 +17,13 @@ import { host } from "@polaris/app-host";
 import { CalendarRefusal } from "./errors";
 import { calendarT, ruleTIn } from "./i18n";
 import { createCalendar } from "./calendars";
-import { forReader, reaches, requireCalendar, requireWritableCalendar, type SessionUser } from "./access";
+import {
+    forReader,
+    reaches,
+    requireCalendar,
+    requireWritableCalendar,
+    type SessionUser
+} from "./access";
 
 /** Events one import may bring in. A decade of somebody's work calendar is a
  *  few thousand; more than this is a file that is not a calendar. */
@@ -34,14 +40,17 @@ export interface ImportResult {
 export async function importCalendar(
     user: SessionUser,
     input: {
-        target: { kind: "existing"; calendarId: string } | { kind: "new"; name: string; color: string };
+        target:
+            | { kind: "existing"; calendarId: string }
+            | { kind: "new"; name: string; color: string };
         text: string;
         floatingZone: string;
     }
 ): Promise<ImportResult> {
     const parsed = engine.parseCalendarText(input.text);
     const t = await calendarT();
-    if (parsed.items.length === 0 && parsed.errors.length === 0) throw new CalendarRefusal(t("errors.emptyImport"));
+    if (parsed.items.length === 0 && parsed.errors.length === 0)
+        throw new CalendarRefusal(t("errors.emptyImport"));
     if (parsed.items.length > MAX_IMPORT) throw new CalendarRefusal(t("errors.importTooLarge"));
 
     const calendarId =
@@ -52,7 +61,9 @@ export async function importCalendar(
                   color: input.target.color,
                   description: "",
                   timezone: parsed.timezone ?? "",
-                  components: parsed.items.some((item) => item.component === "VTODO") ? "VEVENT,VTODO" : "VEVENT"
+                  components: parsed.items.some((item) => item.component === "VTODO")
+                      ? "VEVENT,VTODO"
+                      : "VEVENT"
               });
 
     const held = new Set(
@@ -72,17 +83,25 @@ export async function importCalendar(
         }
         // An import is a copy, not a scheduling message: a METHOD from an
         // invitation file is dropped so the event is stored as an event.
-        await writeItem(calendarId, null, { ...item, method: null }, {
-            actor: user,
-            floatingZone: input.floatingZone,
-            fromImport: true
-        });
+        await writeItem(
+            calendarId,
+            null,
+            { ...item, method: null },
+            {
+                actor: user,
+                floatingZone: input.floatingZone,
+                fromImport: true
+            }
+        );
         held.add(item.uid);
         imported += 1;
     }
     const words = ruleTIn(await host.i18nRequest.getLocale());
-    const problems = (parsed.problems ?? parsed.errors.map((key) => ({ key, values: {} }))).map((problem) =>
-        words.has(problem.key) ? words(problem.key, problem.values as never) : t("errors.unreadableEvent")
+    const problems = (parsed.problems ?? parsed.errors.map((key) => ({ key, values: {} }))).map(
+        (problem) =>
+            words.has(problem.key)
+                ? words(problem.key, problem.values as never)
+                : t("errors.unreadableEvent")
     );
     return { calendarId, imported, skipped, problems: problems.slice(0, 50) };
 }
@@ -115,7 +134,12 @@ export function combineCalendars(
                 depth += 1;
             }
             current?.push(line);
-            if (depth === 1 && current?.[0] && /^BEGIN:VTIMEZONE$/i.test(current[0]) && /^TZID[:;]/i.test(line)) {
+            if (
+                depth === 1 &&
+                current?.[0] &&
+                /^BEGIN:VTIMEZONE$/i.test(current[0]) &&
+                /^TZID[:;]/i.test(line)
+            ) {
                 zoneId = line.slice(line.indexOf(":") + 1);
             }
             if (/^END:/i.test(line)) {
@@ -138,7 +162,9 @@ export function combineCalendars(
         "CALSCALE:GREGORIAN",
         engine.foldLine(`X-WR-CALNAME:${escapeText(header.name)}`),
         engine.foldLine(`NAME:${escapeText(header.name)}`),
-        ...(header.color ? [`X-APPLE-CALENDAR-COLOR:${header.color}`, `COLOR:${header.color}`] : []),
+        ...(header.color
+            ? [`X-APPLE-CALENDAR-COLOR:${header.color}`, `COLOR:${header.color}`]
+            : []),
         ...(header.timezone ? [`X-WR-TIMEZONE:${header.timezone}`] : []),
         ...[...zones.values()].flat(),
         ...components.flat(),
@@ -148,7 +174,11 @@ export function combineCalendars(
 }
 
 function escapeText(value: string): string {
-    return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+    return value
+        .replace(/\\/g, "\\\\")
+        .replace(/;/g, "\\;")
+        .replace(/,/g, "\\,")
+        .replace(/\n/g, "\\n");
 }
 
 /** What a reader below `write` may take of a stored resource: what the
@@ -162,9 +192,14 @@ function readerCopy(ics: string): string | null {
 /** A calendar this person may read, as one file: everything for whoever may
  *  change it, and what the calendar view shows for a reader. A free/busy
  *  reader gets nothing. */
-export async function exportCalendar(user: SessionUser, calendarId: string): Promise<{ name: string; ics: string }> {
+export async function exportCalendar(
+    user: SessionUser,
+    calendarId: string
+): Promise<{ name: string; ics: string }> {
     const calendar = await requireCalendar(user.id, calendarId, "read");
-    return reaches(calendar.reach, "write") ? exportCalendarRow(calendar.id) : exportCalendarRow(calendar.id, readerCopy);
+    return reaches(calendar.reach, "write")
+        ? exportCalendarRow(calendar.id)
+        : exportCalendarRow(calendar.id, readerCopy);
 }
 
 /** The export of a calendar by id, with no reader check - for the public feed,
@@ -183,26 +218,39 @@ export async function exportCalendarRow(
         select: { ics: true },
         orderBy: { startsAt: "asc" }
     });
-    const texts = rows.map((row) => filter(row.ics)).filter((text): text is string => text !== null);
+    const texts = rows
+        .map((row) => filter(row.ics))
+        .filter((text): text is string => text !== null);
     return {
         name: calendar.name,
-        ics: combineCalendars(texts, { name: calendar.name, color: calendar.color, timezone: calendar.timezone || null })
+        ics: combineCalendars(texts, {
+            name: calendar.name,
+            color: calendar.color,
+            timezone: calendar.timezone || null
+        })
     };
 }
 
 /** One event as a file. */
-export async function exportEvent(user: SessionUser, objectId: string): Promise<{ name: string; ics: string }> {
+export async function exportEvent(
+    user: SessionUser,
+    objectId: string
+): Promise<{ name: string; ics: string }> {
     const row = await prisma.calendarObject.findUnique({
         where: { id: objectId },
         select: { calendarId: true, ics: true, summary: true, deletedAt: true }
     });
-    if (!row || row.deletedAt) throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
+    if (!row || row.deletedAt)
+        throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
     const calendar = await requireCalendar(user.id, row.calendarId, "read");
     if (reaches(calendar.reach, "write")) return { name: row.summary || "event", ics: row.ics };
     const ics = readerCopy(row.ics);
     if (!ics) throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
     const shown = tryItemOf(ics);
-    const name = shown?.component === "VEVENT" ? (shown.master ?? shown.overrides[0])?.summary : shown?.todo.summary;
+    const name =
+        shown?.component === "VEVENT"
+            ? (shown.master ?? shown.overrides[0])?.summary
+            : shown?.todo.summary;
     return { name: name || "event", ics };
 }
 

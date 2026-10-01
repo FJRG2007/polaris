@@ -30,18 +30,39 @@ export function useIssueText(): (issues: readonly { message: string }[]) => stri
 }
 
 /** "Tuesday 4 March, 10:00 - 10:30" in a zone, in the reader's language. */
-export function formatRange(start: string, end: string, zone: string, locale: string, allDay = false): string {
+export function formatRange(
+    start: string,
+    end: string,
+    zone: string,
+    locale: string,
+    allDay = false
+): string {
     const from = new Date(start);
     const to = new Date(end);
-    if (allDay) return new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" }).format(from);
-    const day = new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: zone }).format(from);
-    const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: zone });
+    if (allDay)
+        return new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: "UTC" }).format(from);
+    const day = new Intl.DateTimeFormat(locale, {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: zone
+    }).format(from);
+    const time = new Intl.DateTimeFormat(locale, {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: zone
+    });
     return `${day}, ${time.format(from)} - ${time.format(to)}`;
 }
 
 /** "10:00" in a zone. */
 export function formatTime(instant: string, zone: string, locale: string): string {
-    return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: zone }).format(new Date(instant));
+    return new Intl.DateTimeFormat(locale, {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: zone
+    }).format(new Date(instant));
 }
 
 /** The frame of a page somebody outside Polaris opens from a link. */
@@ -58,7 +79,12 @@ export function PublicFrame({
 }) {
     return (
         <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:py-12">
-            <div className={cn("mx-auto flex w-full flex-col gap-5", wide ? "max-w-5xl" : "max-w-xl")}>
+            <div
+                className={cn(
+                    "mx-auto flex w-full flex-col gap-5",
+                    wide ? "max-w-5xl" : "max-w-xl"
+                )}
+            >
                 <header className="flex flex-col gap-1">
                     <h1 className="text-[17px] font-semibold tracking-tight">{title}</h1>
                     {subtitle ? <div className="text-muted-foreground">{subtitle}</div> : null}
@@ -70,7 +96,15 @@ export function PublicFrame({
 }
 
 /** A line saying how something stands, in the status colours. */
-export function StatusNote({ tone, children, className }: { tone: "success" | "warning" | "danger" | "neutral"; children: ReactNode; className?: string }) {
+export function StatusNote({
+    tone,
+    children,
+    className
+}: {
+    tone: "success" | "warning" | "danger" | "neutral";
+    children: ReactNode;
+    className?: string;
+}) {
     const tones = {
         success: "border-success-edge bg-success-soft text-success-ink",
         warning: "border-warning-edge bg-warning-soft text-warning-ink",
@@ -78,7 +112,10 @@ export function StatusNote({ tone, children, className }: { tone: "success" | "w
         neutral: "border-border bg-card text-muted-foreground"
     } as const;
     return (
-        <div role={tone === "danger" ? "alert" : "status"} className={cn("rounded-md border px-3 py-2 text-[13px]", tones[tone], className)}>
+        <div
+            role={tone === "danger" ? "alert" : "status"}
+            className={cn("rounded-md border px-3 py-2 text-[13px]", tones[tone], className)}
+        >
             {children}
         </div>
     );

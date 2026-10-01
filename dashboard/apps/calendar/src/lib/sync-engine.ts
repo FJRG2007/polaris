@@ -96,7 +96,10 @@ export async function sealFeedAddress(sourceId: string, address: string): Promis
         data: { remoteId: sync.FEED_REMOTE_ID }
     });
     const sealed = await host.calendarHost.sealCalendarSecret(sync.feedUrl(address));
-    await prisma.calendarSource.update({ where: { id: sourceId }, data: { ...sealed, url: sync.maskFeedAddress(address) } });
+    await prisma.calendarSource.update({
+        where: { id: sourceId },
+        data: { ...sealed, url: sync.maskFeedAddress(address) }
+    });
 }
 
 /**
@@ -104,7 +107,9 @@ export async function sealFeedAddress(sourceId: string, address: string): Promis
  * subscribed before addresses were sealed holds it in the clear, and is sealed
  * the first time it is read.
  */
-export async function feedAddressOf(source: Pick<SourceRow, "id" | "url" | "encryptedSecret" | "secretNonce" | "secretKeyId">): Promise<string | null> {
+export async function feedAddressOf(
+    source: Pick<SourceRow, "id" | "url" | "encryptedSecret" | "secretNonce" | "secretKeyId">
+): Promise<string | null> {
     if (source.encryptedSecret) return host.calendarHost.openCalendarSecret(source);
     if (!source.url) return null;
     await sealFeedAddress(source.id, source.url);
@@ -124,7 +129,10 @@ export async function providerFor(source: SourceRow): Promise<sync.CalendarProvi
                     return await host.calendarHost.calendarAccessToken(source.userId, connectionId);
                 } catch (caught) {
                     if (caught instanceof Error && caught.name === "CalendarLinkExpiredError") {
-                        throw new sync.SyncAuthError("The linked account needs authorizing again", null);
+                        throw new sync.SyncAuthError(
+                            "The linked account needs authorizing again",
+                            null
+                        );
                     }
                     throw caught;
                 }
@@ -136,14 +144,27 @@ export async function providerFor(source: SourceRow): Promise<sync.CalendarProvi
         case "caldav": {
             const password = await host.calendarHost.openCalendarSecret(source);
             if (!password) throw new sync.SyncAuthError("The password needs entering again", null);
-            return sync.createCalDavProvider({ serverUrl: source.url, username: source.username, password, fetcher });
+            return sync.createCalDavProvider({
+                serverUrl: source.url,
+                username: source.username,
+                password,
+                fetcher
+            });
         }
         default: {
             const address = await feedAddressOf(source);
             if (!address) throw new sync.SyncAuthError("The address needs entering again", null);
-            const held = await prisma.calendar.findFirst({ where: { sourceId: source.id }, select: { syncToken: true, ctag: true } });
+            const held = await prisma.calendar.findFirst({
+                where: { sourceId: source.id },
+                select: { syncToken: true, ctag: true }
+            });
             const validators = held ? { etag: held.syncToken, lastModified: held.ctag } : undefined;
-            return sync.createIcsProvider({ url: address, fetcher, name: source.label, validators });
+            return sync.createIcsProvider({
+                url: address,
+                fetcher,
+                name: source.label,
+                validators
+            });
         }
     }
 }
@@ -157,9 +178,15 @@ function statusFor(caught: unknown): "auth" | "unreachable" | "error" {
 }
 
 /** Record a failed pass, and tell the owner the first time it starts failing. */
-async function recordFailure(source: { id: string; userId: string; label: string }, caught: unknown): Promise<void> {
+async function recordFailure(
+    source: { id: string; userId: string; label: string },
+    caught: unknown
+): Promise<void> {
     const status = statusFor(caught);
-    const before = await prisma.calendarSource.findUnique({ where: { id: source.id }, select: { status: true } });
+    const before = await prisma.calendarSource.findUnique({
+        where: { id: source.id },
+        select: { status: true }
+    });
     await prisma.calendarSource.update({
         where: { id: source.id },
         data: {
@@ -193,7 +220,10 @@ function isUniqueClash(caught: unknown): boolean {
  * keeps the name it was subscribed under. A listing with nothing in it removes
  * nothing.
  */
-export async function refreshCalendars(source: SourceRow, provider: sync.CalendarProvider): Promise<void> {
+export async function refreshCalendars(
+    source: SourceRow,
+    provider: sync.CalendarProvider
+): Promise<void> {
     const remote = await provider.listCalendars();
     const local = await prisma.calendar.findMany({
         where: { sourceId: source.id },
@@ -207,7 +237,9 @@ export async function refreshCalendars(source: SourceRow, provider: sync.Calenda
             description: calendar.description.slice(0, 2000),
             readOnly: calendar.readOnly || feed,
             components: calendar.components.join(",") || "VEVENT",
-            ...(feed && !calendar.timezone ? {} : { timezone: (calendar.timezone && engine.resolveZone(calendar.timezone)) || "" })
+            ...(feed && !calendar.timezone
+                ? {}
+                : { timezone: (calendar.timezone && engine.resolveZone(calendar.timezone)) || "" })
         };
         const id = known.get(calendar.remoteId);
         if (id) {
@@ -223,17 +255,25 @@ export async function refreshCalendars(source: SourceRow, provider: sync.Calenda
                     sourceId: source.id,
                     kind: "remote",
                     remoteId: calendar.remoteId,
-                    color: calendar.color && /^#[0-9a-f]{6}$/i.test(calendar.color) ? calendar.color.toLowerCase() : "#3b82f6"
+                    color:
+                        calendar.color && /^#[0-9a-f]{6}$/i.test(calendar.color)
+                            ? calendar.color.toLowerCase()
+                            : "#3b82f6"
                 }
             });
         } catch (caught) {
             if (!isUniqueClash(caught)) throw caught;
-            await prisma.calendar.updateMany({ where: { sourceId: source.id, remoteId: calendar.remoteId }, data: feed ? data : { ...data, name } });
+            await prisma.calendar.updateMany({
+                where: { sourceId: source.id, remoteId: calendar.remoteId },
+                data: feed ? data : { ...data, name }
+            });
         }
     }
     if (remote.length === 0) return;
     const still = new Set(remote.map((calendar) => calendar.remoteId));
-    const gone = local.filter((calendar) => !still.has(calendar.remoteId)).map((calendar) => calendar.id);
+    const gone = local
+        .filter((calendar) => !still.has(calendar.remoteId))
+        .map((calendar) => calendar.id);
     if (gone.length > 0) await prisma.calendar.deleteMany({ where: { id: { in: gone } } });
 }
 
@@ -249,12 +289,22 @@ export async function pullCalendar(
     const known = new Map(rows.map((row) => [row.href, row.etag]));
     let changes: sync.ChangeSet;
     try {
-        changes = await provider.pull({ remoteId: calendar.remoteId, syncToken: calendar.syncToken, ctag: calendar.ctag, known });
+        changes = await provider.pull({
+            remoteId: calendar.remoteId,
+            syncToken: calendar.syncToken,
+            ctag: calendar.ctag,
+            known
+        });
     } catch (caught) {
         if (!(caught instanceof sync.SyncGoneError)) throw caught;
         // The token expired: start again from nothing, which the provider
         // answers with the whole calendar.
-        changes = await provider.pull({ remoteId: calendar.remoteId, syncToken: "", ctag: "", known });
+        changes = await provider.pull({
+            remoteId: calendar.remoteId,
+            syncToken: "",
+            ctag: "",
+            known
+        });
     }
 
     const zone = calendar.timezone || "UTC";
@@ -271,8 +321,12 @@ export async function pullCalendar(
         const present = new Set(changes.changed.map((object) => object.href));
         const window = changes.window;
         const inside = (row: { startsAt: Date | null; endsAt: Date | null }) =>
-            !window || (row.startsAt !== null && row.startsAt < window.end && (row.endsAt === null || row.endsAt > window.start));
-        for (const row of rows) if (!present.has(row.href) && inside(row)) removedHrefs.add(row.href);
+            !window ||
+            (row.startsAt !== null &&
+                row.startsAt < window.end &&
+                (row.endsAt === null || row.endsAt > window.start));
+        for (const row of rows)
+            if (!present.has(row.href) && inside(row)) removedHrefs.add(row.href);
     }
     let removed = 0;
     if (removedHrefs.size > 0) {
@@ -282,10 +336,18 @@ export async function pullCalendar(
         });
         for (const row of doomed) {
             // A local change still on its way there is not undone by the pull.
-            const pending = await prisma.calendarObject.findUnique({ where: { id: row.id }, select: { pendingPush: true } });
+            const pending = await prisma.calendarObject.findUnique({
+                where: { id: row.id },
+                select: { pendingPush: true }
+            });
             if (pending?.pendingPush === "put") continue;
-            await prisma.calendarObject.update({ where: { id: row.id }, data: { deletedAt: new Date(), pendingPush: "" } });
-            await (await import("./effects")).afterObjectChange({
+            await prisma.calendarObject.update({
+                where: { id: row.id },
+                data: { deletedAt: new Date(), pendingPush: "" }
+            });
+            await (
+                await import("./effects")
+            ).afterObjectChange({
                 objectId: row.id,
                 calendarId: row.calendarId,
                 before: tryItemOf(row.ics),
@@ -307,9 +369,17 @@ export async function pullCalendar(
  * pushed loses to it - the provider is the one every other device reads - and
  * is kept aside so the person can re-apply it.
  */
-async function storeRemote(calendarId: string, remote: sync.RemoteObject, item: engine.CalendarItem, zone: string): Promise<void> {
+async function storeRemote(
+    calendarId: string,
+    remote: sync.RemoteObject,
+    item: engine.CalendarItem,
+    zone: string
+): Promise<void> {
     const existing =
-        (await prisma.calendarObject.findFirst({ where: { calendarId, href: remote.href }, select: { ...STORED, pendingPush: true } })) ??
+        (await prisma.calendarObject.findFirst({
+            where: { calendarId, href: remote.href },
+            select: { ...STORED, pendingPush: true }
+        })) ??
         (await prisma.calendarObject.findUnique({
             where: { calendarId_uid: { calendarId, uid: item.uid } },
             select: { ...STORED, pendingPush: true }
@@ -332,7 +402,11 @@ async function storeRemote(calendarId: string, remote: sync.RemoteObject, item: 
               deletedAt: existing.deletedAt
           }
         : null;
-    const id = await writeItem(calendarId, stored, item, { actor: null, floatingZone: zone, fromProvider: true });
+    const id = await writeItem(calendarId, stored, item, {
+        actor: null,
+        floatingZone: zone,
+        fromProvider: true
+    });
     await prisma.calendarObject.update({
         where: { id },
         data: {
@@ -346,7 +420,10 @@ async function storeRemote(calendarId: string, remote: sync.RemoteObject, item: 
 
 /** Pull everything one source has. */
 export async function syncSource(sourceId: string, now = new Date()): Promise<void> {
-    const source = await prisma.calendarSource.findUnique({ where: { id: sourceId }, select: { ...SOURCE_COLUMNS, refreshMinutes: true } });
+    const source = await prisma.calendarSource.findUnique({
+        where: { id: sourceId },
+        select: { ...SOURCE_COLUMNS, refreshMinutes: true }
+    });
     if (!source) return;
     try {
         const provider = await providerFor(source);
@@ -366,7 +443,10 @@ export async function syncSource(sourceId: string, now = new Date()): Promise<vo
             }
         });
     } catch (caught) {
-        console.error(`polaris: calendar source ${source.id} did not sync:`, caught instanceof Error ? caught.message : caught);
+        console.error(
+            `polaris: calendar source ${source.id} did not sync:`,
+            caught instanceof Error ? caught.message : caught
+        );
         await recordFailure(source, caught);
     }
 }
@@ -375,10 +455,20 @@ export async function syncSource(sourceId: string, now = new Date()): Promise<vo
  * A local change to a provider calendar: marked, then sent in the background.
  * The mark is what makes it survive a restart - the next pass sends it.
  */
-export async function pushChange(objectId: string, sourceId: string, removed: boolean): Promise<void> {
-    await prisma.calendarObject.update({ where: { id: objectId }, data: { pendingPush: removed ? "delete" : "put" } });
+export async function pushChange(
+    objectId: string,
+    sourceId: string,
+    removed: boolean
+): Promise<void> {
+    await prisma.calendarObject.update({
+        where: { id: objectId },
+        data: { pendingPush: removed ? "delete" : "put" }
+    });
     void pushNow(objectId, sourceId).catch((caught: unknown) =>
-        console.error("polaris: a calendar change was not pushed yet:", caught instanceof Error ? caught.message : caught)
+        console.error(
+            "polaris: a calendar change was not pushed yet:",
+            caught instanceof Error ? caught.message : caught
+        )
     );
 }
 
@@ -415,9 +505,18 @@ type PushedRow = { id: string; calendarId: string; ics: string; pendingPush: str
  * the new href and etag, so the next send replaces it with `If-Match` on them.
  * Answers whether the row was still that version.
  */
-async function settlePush(row: PushedRow, held: { href: string; etag: string }, extra: { conflictIcs?: null } = {}): Promise<boolean> {
+async function settlePush(
+    row: PushedRow,
+    held: { href: string; etag: string },
+    extra: { conflictIcs?: null } = {}
+): Promise<boolean> {
     const settled = await prisma.calendarObject.updateMany({
-        where: { id: row.id, calendarId: row.calendarId, ics: row.ics, pendingPush: row.pendingPush },
+        where: {
+            id: row.id,
+            calendarId: row.calendarId,
+            ics: row.ics,
+            pendingPush: row.pendingPush
+        },
         data: { ...held, ...extra, pendingPush: "" }
     });
     if (settled.count > 0) return true;
@@ -432,10 +531,17 @@ async function settlePush(row: PushedRow, held: { href: string; etag: string }, 
 async function pushOnce(objectId: string, sourceId: string): Promise<boolean> {
     const row = await prisma.calendarObject.findUnique({
         where: { id: objectId },
-        select: { ...STORED, pendingPush: true, calendar: { select: { id: true, remoteId: true, timezone: true } } }
+        select: {
+            ...STORED,
+            pendingPush: true,
+            calendar: { select: { id: true, remoteId: true, timezone: true } }
+        }
     });
     if (!row || !row.pendingPush) return true;
-    const source = await prisma.calendarSource.findUnique({ where: { id: sourceId }, select: SOURCE_COLUMNS });
+    const source = await prisma.calendarSource.findUnique({
+        where: { id: sourceId },
+        select: SOURCE_COLUMNS
+    });
     if (!source) return true;
     const provider = await providerFor(source);
     const target = { remoteId: row.calendar.remoteId };
@@ -450,7 +556,11 @@ async function pushOnce(objectId: string, sourceId: string): Promise<boolean> {
             ics: row.ics,
             uid: row.uid
         });
-        return await settlePush(row, { href: written.href, etag: written.etag }, { conflictIcs: null });
+        return await settlePush(
+            row,
+            { href: written.href, etag: written.etag },
+            { conflictIcs: null }
+        );
     } catch (caught) {
         if (caught instanceof sync.SyncNotFoundError && row.pendingPush === "delete") {
             return await settlePush(row, { href: "", etag: "" });
@@ -476,8 +586,15 @@ async function pushOnce(objectId: string, sourceId: string): Promise<boolean> {
  * Keep the local version the provider refused, or drop it: the conflict banner's
  * two buttons. Re-applying writes it again, which pushes it with the fresh etag.
  */
-export async function resolveConflict(objectId: string, keep: "mine" | "theirs", floatingZone: string): Promise<void> {
-    const row = await prisma.calendarObject.findUnique({ where: { id: objectId }, select: { ...STORED, conflictIcs: true } });
+export async function resolveConflict(
+    objectId: string,
+    keep: "mine" | "theirs",
+    floatingZone: string
+): Promise<void> {
+    const row = await prisma.calendarObject.findUnique({
+        where: { id: objectId },
+        select: { ...STORED, conflictIcs: true }
+    });
     if (!row?.conflictIcs) return;
     if (keep === "theirs") {
         await prisma.calendarObject.update({ where: { id: row.id }, data: { conflictIcs: null } });
@@ -489,7 +606,9 @@ export async function resolveConflict(objectId: string, keep: "mine" | "theirs",
 }
 
 /** The scheduled pass: pull what is due, retry what did not push. */
-export async function syncDueSources(now = new Date()): Promise<{ pulled: number; pushed: number }> {
+export async function syncDueSources(
+    now = new Date()
+): Promise<{ pulled: number; pushed: number }> {
     const due = await prisma.calendarSource.findMany({
         where: { nextSyncAt: { lte: now } },
         orderBy: { nextSyncAt: "asc" },

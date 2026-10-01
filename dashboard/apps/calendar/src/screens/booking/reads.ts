@@ -23,12 +23,18 @@ export function useLinkBase(): string | null {
 
 export function useBookingPages() {
     const t = useCalendarT();
-    return useCachedRead(cacheKey("booking-pages"), async () => (await unwrap(() => listBookingPagesAction(), t("errors.generic"))).pages);
+    return useCachedRead(
+        cacheKey("booking-pages"),
+        async () => (await unwrap(() => listBookingPagesAction(), t("errors.generic"))).pages
+    );
 }
 
 export function useCalendarList() {
     const t = useCalendarT();
-    return useCachedRead(cacheKey("booking-calendars"), async () => (await unwrap(() => listCalendarsAction(), t("errors.generic"))).calendars);
+    return useCachedRead(
+        cacheKey("booking-calendars"),
+        async () => (await unwrap(() => listCalendarsAction(), t("errors.generic"))).calendars
+    );
 }
 
 /** Whether the operator lets people run booking pages here, and whether this

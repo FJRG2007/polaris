@@ -36,20 +36,35 @@ describe("calendar invitations", () => {
         calendar = world.addCalendar(alice.id, { timezone: ZONE });
     });
 
-    async function save(attendees: string[], fields: Record<string, unknown> = {}, objectId: string | null = null): Promise<string> {
+    async function save(
+        attendees: string[],
+        fields: Record<string, unknown> = {},
+        objectId: string | null = null
+    ): Promise<string> {
         const saved = await objects.saveEvent(alice, {
             objectId,
             recurrenceKey: null,
             scope: "all",
             version: null,
-            event: world.input(calendar, { summary: "Kickoff", location: "Room 1", attendees: attendees.map((email) => ({ email })), ...fields }),
+            event: world.input(calendar, {
+                summary: "Kickoff",
+                location: "Room 1",
+                attendees: attendees.map((email) => ({ email })),
+                ...fields
+            }),
             floatingZone: ZONE
         });
         return saved.objectId;
     }
 
     function copyOf(userId: string, uid: unknown) {
-        return db.rows("calendarObject").find((row) => row.uid === uid && db.byId("calendar", String(row.calendarId))?.ownerId === userId);
+        return db
+            .rows("calendarObject")
+            .find(
+                (row) =>
+                    row.uid === uid &&
+                    db.byId("calendar", String(row.calendarId))?.ownerId === userId
+            );
     }
 
     it("mails an outside guest an iMIP REQUEST with the link to answer", async () => {
@@ -62,7 +77,9 @@ describe("calendar invitations", () => {
         const invitation = db.rows("calendarInvitation").find((row) => row.objectId === id)!;
         expect(invitation.email).toBe(GUEST);
         expect(invitation.userId).toBeNull();
-        expect(mail.text).toContain(`https://polaris.example.test/cal/rsvp/${String(invitation.token)}`);
+        expect(mail.text).toContain(
+            `https://polaris.example.test/cal/rsvp/${String(invitation.token)}`
+        );
         expect(mail.text).toContain("Kickoff");
         expect(mail.text).toContain("Room 1");
         expect(mail.text).toMatch(/Thursday, October 8, 2026 at 10:00\sAM GMT\+2/);
@@ -83,12 +100,22 @@ describe("calendar invitations", () => {
         const copy = copyOf(bob.id, uid);
         expect(copy).toBeDefined();
         expect(world.eventIn(copy).summary).toBe("Kickoff");
-        expect(db.byId("calendar", String(copy!.calendarId))?.name).toBe(world.en("calendars.personal"));
+        expect(db.byId("calendar", String(copy!.calendarId))?.name).toBe(
+            world.en("calendars.personal")
+        );
         expect(fake.notices).toEqual([
-            expect.objectContaining({ userId: bob.id, event: "calendar.invitation", href: `/calendar/e/${String(copy!.id)}` })
+            expect.objectContaining({
+                userId: bob.id,
+                event: "calendar.invitation",
+                href: `/calendar/e/${String(copy!.id)}`
+            })
         ]);
-        expect(fake.notices[0]?.title).toBe(world.en("invitations.invitedTitle", { title: "Kickoff" }));
-        expect(db.rows("calendarInvitation").find((row) => row.objectId === id)?.userId).toBe(bob.id);
+        expect(fake.notices[0]?.title).toBe(
+            world.en("invitations.invitedTitle", { title: "Kickoff" })
+        );
+        expect(db.rows("calendarInvitation").find((row) => row.objectId === id)?.userId).toBe(
+            bob.id
+        );
     });
 
     it("cancels for a guest who was removed, and forgets their invitation", async () => {
@@ -97,8 +124,12 @@ describe("calendar invitations", () => {
         await save(["other@outside.test"], {}, id);
         expect(fake.mails).toHaveLength(1);
         expect(fake.mails[0]).toMatchObject({ to: GUEST, calendar: { method: "CANCEL" } });
-        expect(fake.mails[0]?.subject).toBe(world.en("invitations.cancelledSubject", { title: "Kickoff" }));
-        expect(db.rows("calendarInvitation").map((row) => row.email)).toEqual(["other@outside.test"]);
+        expect(fake.mails[0]?.subject).toBe(
+            world.en("invitations.cancelledSubject", { title: "Kickoff" })
+        );
+        expect(db.rows("calendarInvitation").map((row) => row.email)).toEqual([
+            "other@outside.test"
+        ]);
     });
 
     it("sends nothing for an edit nobody invited would care about, and a new REQUEST when the time moves", async () => {
@@ -106,7 +137,11 @@ describe("calendar invitations", () => {
         fake.mails.length = 0;
         await save([GUEST], { description: "Agenda attached" }, id);
         expect(fake.mails).toEqual([]);
-        await save([GUEST], { start: world.at("2026-10-08T15:00:00"), end: world.at("2026-10-08T16:00:00") }, id);
+        await save(
+            [GUEST],
+            { start: world.at("2026-10-08T15:00:00"), end: world.at("2026-10-08T16:00:00") },
+            id
+        );
         expect(fake.mails).toHaveLength(1);
         expect(fake.mails[0]?.calendar?.method).toBe("REQUEST");
     });
@@ -116,19 +151,38 @@ describe("calendar invitations", () => {
         const uid = db.byId("calendarObject", id)!.uid;
         fake.mails.length = 0;
         fake.notices.length = 0;
-        await objects.deleteEvent(alice, { objectId: id, recurrenceKey: null, scope: "all", floatingZone: ZONE });
-        expect(fake.mails.map((mail) => [mail.to, mail.calendar?.method])).toEqual([[GUEST, "CANCEL"]]);
+        await objects.deleteEvent(alice, {
+            objectId: id,
+            recurrenceKey: null,
+            scope: "all",
+            floatingZone: ZONE
+        });
+        expect(fake.mails.map((mail) => [mail.to, mail.calendar?.method])).toEqual([
+            [GUEST, "CANCEL"]
+        ]);
         expect(world.eventIn(copyOf(bob.id, uid)).status).toBe("CANCELLED");
-        expect(fake.notices).toEqual([expect.objectContaining({ userId: bob.id, event: "calendar.invitation" })]);
+        expect(fake.notices).toEqual([
+            expect.objectContaining({ userId: bob.id, event: "calendar.invitation" })
+        ]);
     });
 
     it("does not bring back a copy the attendee already put in the trash when the event is cancelled", async () => {
         const id = await save([bob.email]);
         const uid = db.byId("calendarObject", id)!.uid;
         const copy = copyOf(bob.id, uid)!;
-        await objects.deleteEvent(bob, { objectId: String(copy.id), recurrenceKey: null, scope: "all", floatingZone: ZONE });
+        await objects.deleteEvent(bob, {
+            objectId: String(copy.id),
+            recurrenceKey: null,
+            scope: "all",
+            floatingZone: ZONE
+        });
         fake.notices.length = 0;
-        await objects.deleteEvent(alice, { objectId: id, recurrenceKey: null, scope: "all", floatingZone: ZONE });
+        await objects.deleteEvent(alice, {
+            objectId: id,
+            recurrenceKey: null,
+            scope: "all",
+            floatingZone: ZONE
+        });
         expect(db.byId("calendarObject", String(copy.id))?.deletedAt).toBeInstanceOf(Date);
         expect(fake.notices).toEqual([]);
     });
@@ -147,7 +201,11 @@ describe("calendar invitations", () => {
                 summary: "Kickoff (mine)",
                 start: world.at("2026-10-08T18:00:00"),
                 end: world.at("2026-10-08T19:00:00"),
-                attendees: [{ email: bob.email }, { email: GUEST }, { email: "friend@outside.test" }]
+                attendees: [
+                    { email: bob.email },
+                    { email: GUEST },
+                    { email: "friend@outside.test" }
+                ]
             }),
             floatingZone: ZONE
         });
@@ -160,11 +218,27 @@ describe("calendar invitations", () => {
         const id = await save([bob.email]);
         const copy = copyOf(bob.id, db.byId("calendarObject", id)!.uid)!;
         fake.notices.length = 0;
-        await objects.respondToEvent(bob, { objectId: String(copy.id), recurrenceKey: null, partstat: "ACCEPTED", emails: [bob.email], floatingZone: ZONE });
+        await objects.respondToEvent(bob, {
+            objectId: String(copy.id),
+            recurrenceKey: null,
+            partstat: "ACCEPTED",
+            emails: [bob.email],
+            floatingZone: ZONE
+        });
         const organizerCopy = world.eventIn(db.byId("calendarObject", id));
-        expect(organizerCopy.attendees.find((attendee) => attendee.email === bob.email)?.partstat).toBe("ACCEPTED");
-        expect(db.rows("calendarInvitation").find((row) => row.objectId === id)?.partstat).toBe("ACCEPTED");
-        expect(fake.notices).toEqual([expect.objectContaining({ userId: alice.id, event: "calendar.reply", href: `/calendar/e/${id}` })]);
+        expect(
+            organizerCopy.attendees.find((attendee) => attendee.email === bob.email)?.partstat
+        ).toBe("ACCEPTED");
+        expect(db.rows("calendarInvitation").find((row) => row.objectId === id)?.partstat).toBe(
+            "ACCEPTED"
+        );
+        expect(fake.notices).toEqual([
+            expect.objectContaining({
+                userId: alice.id,
+                event: "calendar.reply",
+                href: `/calendar/e/${id}`
+            })
+        ]);
         expect(fake.mails).toEqual([]);
     });
 
@@ -173,7 +247,9 @@ describe("calendar invitations", () => {
         const uid = String(db.byId("calendarObject", id)!.uid);
         fake.mails.length = 0;
         await applyAnswer(alice.id, uid, GUEST, "DECLINED", null);
-        expect(world.eventIn(db.byId("calendarObject", id)).attendees[0]?.partstat).toBe("DECLINED");
+        expect(world.eventIn(db.byId("calendarObject", id)).attendees[0]?.partstat).toBe(
+            "DECLINED"
+        );
         expect(db.rows("calendarInvitation")[0]?.partstat).toBe("DECLINED");
         expect(db.rows("calendarInvitation")[0]?.respondedAt).toBeInstanceOf(Date);
         expect(fake.notices[0]?.event).toBe("calendar.reply");
@@ -189,20 +265,41 @@ describe("calendar invitations", () => {
                     start: world.at("2026-10-12T10:00:00"),
                     end: world.at("2026-10-12T11:00:00"),
                     organizer: { email: alice.email, name: "Alice" },
-                    attendees: [{ email: GUEST, name: "", role: "REQ-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "INDIVIDUAL" }]
+                    attendees: [
+                        {
+                            email: GUEST,
+                            name: "",
+                            role: "REQ-PARTICIPANT",
+                            partstat: "NEEDS-ACTION",
+                            rsvp: true,
+                            type: "INDIVIDUAL"
+                        }
+                    ]
                 })
             ),
             { method: "REQUEST" }
         );
-        const result = await importCalendar(alice, { target: { kind: "existing", calendarId: calendar }, text: invite, floatingZone: ZONE });
+        const result = await importCalendar(alice, {
+            target: { kind: "existing", calendarId: calendar },
+            text: invite,
+            floatingZone: ZONE
+        });
         expect(result.imported).toBe(1);
         expect(fake.mails).toEqual([]);
         expect(db.rows("calendarInvitation")).toEqual([]);
     });
 
     it("never sends for what a provider calendar holds", async () => {
-        const source = db.insert("calendarSource", { userId: alice.id, kind: "google", label: "Google" }).id as string;
-        const remote = world.addCalendar(alice.id, { kind: "remote", sourceId: source, remoteId: "primary" });
+        const source = db.insert("calendarSource", {
+            userId: alice.id,
+            kind: "google",
+            label: "Google"
+        }).id as string;
+        const remote = world.addCalendar(alice.id, {
+            kind: "remote",
+            sourceId: source,
+            remoteId: "primary"
+        });
         await objects.saveEvent(alice, {
             objectId: null,
             recurrenceKey: null,
@@ -232,15 +329,41 @@ describe("calendar invitations", () => {
                     start: world.at("2026-10-12T10:00:00"),
                     end: world.at("2026-10-12T11:00:00"),
                     organizer: { email: alice.email, name: "Alice" },
-                    attendees: [{ email: bob.email, name: "", role: "REQ-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "INDIVIDUAL" }]
+                    attendees: [
+                        {
+                            email: bob.email,
+                            name: "",
+                            role: "REQ-PARTICIPANT",
+                            partstat: "NEEDS-ACTION",
+                            rsvp: true,
+                            type: "INDIVIDUAL"
+                        }
+                    ]
                 })
             )
         );
-        await importCalendar(alice, { target: { kind: "existing", calendarId: calendar }, text: forged, floatingZone: ZONE });
-        const imported = db.rows("calendarObject").find((row) => row.calendarId === calendar && row.uid === "bobs-own")!;
-        await save([bob.email], { start: world.at("2026-10-13T10:00:00"), end: world.at("2026-10-13T11:00:00") }, String(imported.id));
-        expect(db.rows("calendarObject").filter((row) => row.uid === "bobs-own" && row.calendarId !== calendar)).toHaveLength(1);
-        expect(world.eventIn(db.byId("calendarObject", String(own.id)))).toMatchObject({ summary: "Bob's dentist", organizer: { email: bob.email } });
+        await importCalendar(alice, {
+            target: { kind: "existing", calendarId: calendar },
+            text: forged,
+            floatingZone: ZONE
+        });
+        const imported = db
+            .rows("calendarObject")
+            .find((row) => row.calendarId === calendar && row.uid === "bobs-own")!;
+        await save(
+            [bob.email],
+            { start: world.at("2026-10-13T10:00:00"), end: world.at("2026-10-13T11:00:00") },
+            String(imported.id)
+        );
+        expect(
+            db
+                .rows("calendarObject")
+                .filter((row) => row.uid === "bobs-own" && row.calendarId !== calendar)
+        ).toHaveLength(1);
+        expect(world.eventIn(db.byId("calendarObject", String(own.id)))).toMatchObject({
+            summary: "Bob's dentist",
+            organizer: { email: bob.email }
+        });
         expect(fake.notices).toEqual([]);
     });
 
@@ -258,10 +381,21 @@ describe("calendar invitations", () => {
             start: world.at("2026-10-09T19:00:00"),
             end: world.at("2026-10-09T22:00:00"),
             organizer: { email: alice.email, name: "Alice" },
-            attendees: [{ email: GUEST, name: "", role: "REQ-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "INDIVIDUAL" }]
+            attendees: [
+                {
+                    email: GUEST,
+                    name: "",
+                    role: "REQ-PARTICIPANT",
+                    partstat: "NEEDS-ACTION",
+                    rsvp: true,
+                    type: "INDIVIDUAL"
+                }
+            ]
         });
         await applyAnswer(bob.id, "alices-invite", GUEST, "DECLINED", null);
-        expect(world.eventIn(db.byId("calendarObject", String(theirs.id))).attendees[0]?.partstat).toBe("NEEDS-ACTION");
+        expect(
+            world.eventIn(db.byId("calendarObject", String(theirs.id))).attendees[0]?.partstat
+        ).toBe("NEEDS-ACTION");
         expect(fake.notices).toEqual([]);
     });
 });

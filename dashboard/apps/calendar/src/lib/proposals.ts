@@ -42,7 +42,9 @@ function readVotes(raw: string): Record<string, Vote> {
         const parsed = JSON.parse(raw) as unknown;
         if (!parsed || typeof parsed !== "object") return {};
         return Object.fromEntries(
-            Object.entries(parsed).filter((entry): entry is [string, Vote] => (VOTES as readonly unknown[]).includes(entry[1]))
+            Object.entries(parsed).filter((entry): entry is [string, Vote] =>
+                (VOTES as readonly unknown[]).includes(entry[1])
+            )
         );
     } catch {
         return {};
@@ -75,7 +77,10 @@ function view(row: ProposalRow): ProposalView {
 }
 
 async function ownProposal(user: SessionUser, id: string): Promise<ProposalRow> {
-    const found = await prisma.calendarProposal.findFirst({ where: { id, ownerId: user.id }, select: { id: true } });
+    const found = await prisma.calendarProposal.findFirst({
+        where: { id, ownerId: user.id },
+        select: { id: true }
+    });
     if (!found) throw new CalendarRefusal((await calendarT())("proposals.notFound"));
     return loadRow(found.id);
 }
@@ -83,7 +88,10 @@ async function ownProposal(user: SessionUser, id: string): Promise<ProposalRow> 
 export async function listProposals(user: SessionUser): Promise<ProposalSummary[]> {
     const rows = await prisma.calendarProposal.findMany({
         where: { ownerId: user.id },
-        include: { participants: { select: { respondedAt: true } }, _count: { select: { dates: true } } },
+        include: {
+            participants: { select: { respondedAt: true } },
+            _count: { select: { dates: true } }
+        },
         orderBy: { updatedAt: "desc" },
         take: 200
     });
@@ -104,11 +112,17 @@ export async function proposal(user: SessionUser, id: string): Promise<ProposalV
 
 /** Tell participants they have been asked: the bell for an account, mail for
  *  anybody else. One that cannot be reached does not stop the rest. */
-async function invite(owner: SessionUser, row: ProposalRow, participantIds: readonly string[]): Promise<void> {
+async function invite(
+    owner: SessionUser,
+    row: ProposalRow,
+    participantIds: readonly string[]
+): Promise<void> {
     if (!row.notify || participantIds.length === 0) return;
     const base = await host.domainService.appBaseUrl();
     const locale = await localeOf(owner.id);
-    for (const participant of row.participants.filter((entry) => participantIds.includes(entry.id))) {
+    for (const participant of row.participants.filter((entry) =>
+        participantIds.includes(entry.id)
+    )) {
         const link = `${base}/cal/vote/${participant.token}`;
         try {
             if (participant.userId) {
@@ -137,7 +151,8 @@ async function invite(owner: SessionUser, row: ProposalRow, participantIds: read
                     link
                 ].join("\n")}\n`
             });
-            if (result.error) console.error("polaris: a proposal email was not sent:", result.error);
+            if (result.error)
+                console.error("polaris: a proposal email was not sent:", result.error);
         } catch (caught) {
             console.error("polaris: a proposal participant was not told:", caught);
         }
@@ -152,13 +167,24 @@ async function accountsFor(emails: readonly string[]): Promise<Map<string, strin
 
 /** Spend the owner's allowance of mail to people outside Polaris on the people
  *  about to be asked, before anything is written. */
-async function spendMail(user: SessionUser, notify: boolean, emails: readonly string[], accounts: Map<string, string>): Promise<void> {
+async function spendMail(
+    user: SessionUser,
+    notify: boolean,
+    emails: readonly string[],
+    accounts: Map<string, string>
+): Promise<void> {
     const outside = notify ? emails.filter((email) => !accounts.has(email)).length : 0;
-    if (!(await mayMailOutside(user.id, outside))) throw new CalendarRefusal((await calendarT())("proposals.slowDown"));
+    if (!(await mayMailOutside(user.id, outside)))
+        throw new CalendarRefusal((await calendarT())("proposals.slowDown"));
 }
 
-export async function createProposal(user: SessionUser, input: ProposalInput): Promise<ProposalView> {
-    const open = await prisma.calendarProposal.count({ where: { ownerId: user.id, status: "open" } });
+export async function createProposal(
+    user: SessionUser,
+    input: ProposalInput
+): Promise<ProposalView> {
+    const open = await prisma.calendarProposal.count({
+        where: { ownerId: user.id, status: "open" }
+    });
     if (open >= MAX_OPEN) throw new CalendarRefusal((await calendarT())("proposals.tooMany"));
     const emails = input.participants.map((participant) => participant.email);
     const accounts = await accountsFor(emails);
@@ -198,18 +224,30 @@ export async function createProposal(user: SessionUser, input: ProposalInput): P
  * Change an open proposal. Dates kept keep their votes; a date taken away takes
  * its votes with it; people added are asked, people removed lose their link.
  */
-export async function updateProposal(user: SessionUser, id: string, input: ProposalInput): Promise<ProposalView> {
+export async function updateProposal(
+    user: SessionUser,
+    id: string,
+    input: ProposalInput
+): Promise<ProposalView> {
     const row = await ownProposal(user, id);
     if (row.status !== "open") throw new CalendarRefusal((await calendarT())("proposals.closed"));
 
     const wanted = new Set(input.dates.map((date) => new Date(date).getTime()));
     const keptDates = row.dates.filter((date) => wanted.has(date.start.getTime()));
-    const droppedDates = row.dates.filter((date) => !wanted.has(date.start.getTime())).map((date) => date.id);
-    const newDates = [...wanted].filter((time) => !keptDates.some((date) => date.start.getTime() === time));
+    const droppedDates = row.dates
+        .filter((date) => !wanted.has(date.start.getTime()))
+        .map((date) => date.id);
+    const newDates = [...wanted].filter(
+        (time) => !keptDates.some((date) => date.start.getTime() === time)
+    );
 
-    const byEmail = new Map(row.participants.map((participant) => [participant.email, participant]));
+    const byEmail = new Map(
+        row.participants.map((participant) => [participant.email, participant])
+    );
     const wantedEmails = new Set(input.participants.map((participant) => participant.email));
-    const removed = row.participants.filter((participant) => !wantedEmails.has(participant.email)).map((participant) => participant.id);
+    const removed = row.participants
+        .filter((participant) => !wantedEmails.has(participant.email))
+        .map((participant) => participant.id);
     const added = input.participants.filter((participant) => !byEmail.has(participant.email));
     const accounts = await accountsFor(added.map((participant) => participant.email));
     await spendMail(
@@ -232,7 +270,9 @@ export async function updateProposal(user: SessionUser, id: string, input: Propo
             }
         }),
         prisma.calendarProposalDate.deleteMany({ where: { id: { in: droppedDates } } }),
-        prisma.calendarProposalDate.createMany({ data: newDates.map((time) => ({ proposalId: row.id, start: new Date(time) })) }),
+        prisma.calendarProposalDate.createMany({
+            data: newDates.map((time) => ({ proposalId: row.id, start: new Date(time) }))
+        }),
         prisma.calendarProposalParticipant.deleteMany({ where: { id: { in: removed } } }),
         ...input.participants
             .filter((participant) => byEmail.has(participant.email))
@@ -258,9 +298,14 @@ export async function updateProposal(user: SessionUser, id: string, input: Propo
     if (droppedDates.length > 0) {
         for (const participant of row.participants.filter((entry) => !removed.includes(entry.id))) {
             const votes = readVotes(participant.votes);
-            const left = Object.fromEntries(Object.entries(votes).filter(([dateId]) => !droppedDates.includes(dateId)));
+            const left = Object.fromEntries(
+                Object.entries(votes).filter(([dateId]) => !droppedDates.includes(dateId))
+            );
             if (Object.keys(left).length !== Object.keys(votes).length) {
-                await prisma.calendarProposalParticipant.update({ where: { id: participant.id }, data: { votes: JSON.stringify(left) } });
+                await prisma.calendarProposalParticipant.update({
+                    where: { id: participant.id },
+                    data: { votes: JSON.stringify(left) }
+                });
             }
         }
     }
@@ -268,7 +313,9 @@ export async function updateProposal(user: SessionUser, id: string, input: Propo
     await invite(
         user,
         updated,
-        updated.participants.filter((participant) => added.some((entry) => entry.email === participant.email)).map((participant) => participant.id)
+        updated.participants
+            .filter((participant) => added.some((entry) => entry.email === participant.email))
+            .map((participant) => participant.id)
     );
     return view(updated);
 }
@@ -295,7 +342,10 @@ export async function chooseDate(
     const calendar = await requireWritableCalendar(user.id, input.calendarId);
     const zone = engine.resolveZone(row.timezone) ?? "UTC";
     const end = new Date(date.start.getTime() + row.durationMinutes * 60_000);
-    const at = (instant: Date) => ({ dateTime: engine.formatWall(engine.instantToWall(instant, zone)), tzid: zone });
+    const at = (instant: Date) => ({
+        dateTime: engine.formatWall(engine.instantToWall(instant, zone)),
+        tzid: zone
+    });
     const item = engine.eventItem(
         engine.newEvent({
             summary: row.title,
@@ -323,7 +373,10 @@ export async function chooseDate(
     try {
         objectId = await writeItem(calendar.id, null, item, { actor: user, floatingZone: zone });
     } catch (caught) {
-        await prisma.calendarProposal.update({ where: { id: row.id }, data: { status: "open", calendarId: row.calendarId } });
+        await prisma.calendarProposal.update({
+            where: { id: row.id },
+            data: { status: "open", calendarId: row.calendarId }
+        });
         throw caught;
     }
     await prisma.calendarProposal.update({ where: { id: row.id }, data: { objectId } });
@@ -334,7 +387,10 @@ export async function chooseDate(
 
 async function participantByToken(token: string) {
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
-    return prisma.calendarProposalParticipant.findUnique({ where: { token }, include: { proposal: { include: INCLUDE } } });
+    return prisma.calendarProposalParticipant.findUnique({
+        where: { token },
+        include: { proposal: { include: INCLUDE } }
+    });
 }
 
 /** A proposal as one participant's link shows it. Other people's votes and
@@ -346,7 +402,10 @@ export async function votePage(token: string): Promise<VotePageView | null> {
     const [owner] = await host.calendarHost.peopleByIds([row.ownerId]);
     let chosen: string | null = null;
     if (row.status === "closed" && row.objectId) {
-        const object = await prisma.calendarObject.findUnique({ where: { id: row.objectId }, select: { startsAt: true, deletedAt: true } });
+        const object = await prisma.calendarObject.findUnique({
+            where: { id: row.objectId },
+            select: { startsAt: true, deletedAt: true }
+        });
         chosen = object && !object.deletedAt ? (object.startsAt?.toISOString() ?? null) : null;
     }
     return {
@@ -365,7 +424,10 @@ export async function votePage(token: string): Promise<VotePageView | null> {
 }
 
 /** Record one participant's ballot and tell the owner. */
-export async function castVotes(token: string, votes: Readonly<Record<string, Vote>>): Promise<void> {
+export async function castVotes(
+    token: string,
+    votes: Readonly<Record<string, Vote>>
+): Promise<void> {
     const t = await calendarT();
     await throttle(`calendar.vote:${await callerAddress()}`, 60, 3_600_000);
     await throttle(`calendar.vote-token:${token}`, 20, 3_600_000);
@@ -374,7 +436,9 @@ export async function castVotes(token: string, votes: Readonly<Record<string, Vo
     const row = participant.proposal;
     if (row.status !== "open") throw new CalendarRefusal(t("proposals.closed"));
     const known = new Set(row.dates.map((date) => date.id));
-    const ballot = Object.fromEntries(Object.entries(votes).filter(([dateId]) => known.has(dateId)));
+    const ballot = Object.fromEntries(
+        Object.entries(votes).filter(([dateId]) => known.has(dateId))
+    );
     const first = participant.respondedAt === null;
     await prisma.calendarProposalParticipant.update({
         where: { id: participant.id },
@@ -391,5 +455,7 @@ export async function castVotes(token: string, votes: Readonly<Record<string, Vo
             }),
             href: `/calendar/proposals/${row.id}`
         })
-        .catch((caught: unknown) => console.error("polaris: a proposal notice was not sent:", caught));
+        .catch((caught: unknown) =>
+            console.error("polaris: a proposal notice was not sent:", caught)
+        );
 }

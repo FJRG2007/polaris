@@ -36,11 +36,17 @@ function busyOnly(event: engine.CalendarEvent): engine.CalendarEvent {
 
 export async function eventDetail(
     user: SessionUser,
-    input: { objectId: string; recurrenceKey: string | null; floatingZone: string; emails: readonly string[] }
+    input: {
+        objectId: string;
+        recurrenceKey: string | null;
+        floatingZone: string;
+        emails: readonly string[];
+    }
 ): Promise<EventDetail> {
     const { row, calendar } = await readableObject(user, input.objectId);
     const item = await itemOf(row);
-    if (item.component !== "VEVENT") throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
+    if (item.component !== "VEVENT")
+        throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
     const series = item.master;
     let event: engine.CalendarEvent | null = series ?? item.overrides[0] ?? null;
     if (input.recurrenceKey) {
@@ -50,8 +56,18 @@ export async function eventDetail(
                 ? occurrence.event
                 : {
                       ...occurrence.event,
-                      start: engine.instantToValue(occurrence.start, occurrence.event.start, input.floatingZone, item.timezones),
-                      end: engine.instantToValue(occurrence.end, occurrence.event.end, input.floatingZone, item.timezones)
+                      start: engine.instantToValue(
+                          occurrence.start,
+                          occurrence.event.start,
+                          input.floatingZone,
+                          item.timezones
+                      ),
+                      end: engine.instantToValue(
+                          occurrence.end,
+                          occurrence.event.end,
+                          input.floatingZone,
+                          item.timezones
+                      )
                   };
         }
     }
@@ -62,12 +78,20 @@ export async function eventDetail(
         where: { id: row.id },
         select: { conflictIcs: true, pendingPush: true }
     });
-    const full = reaches(calendar.reach, "write") || (calendar.reach !== "freebusy" && event.classification === "PUBLIC");
+    const full =
+        reaches(calendar.reach, "write") ||
+        (calendar.reach !== "freebusy" && event.classification === "PUBLIC");
     const emails = input.emails.map((email) => email.toLowerCase());
     const invitations = full
         ? await prisma.calendarInvitation.findMany({
               where: { objectId: row.id },
-              select: { email: true, partstat: true, sentAt: true, respondedAt: true, userId: true },
+              select: {
+                  email: true,
+                  partstat: true,
+                  sentAt: true,
+                  respondedAt: true,
+                  userId: true
+              },
               orderBy: { createdAt: "asc" }
           })
         : [];
@@ -97,9 +121,11 @@ export async function eventDetail(
 
 export async function todoDetail(user: SessionUser, objectId: string): Promise<TodoDetail> {
     const { row, calendar } = await readableObject(user, objectId);
-    if (calendar.reach === "freebusy") throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
+    if (calendar.reach === "freebusy")
+        throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
     const item = await itemOf(row);
-    if (item.component !== "VTODO") throw new CalendarRefusal((await calendarT())("errors.notATask"));
+    if (item.component !== "VTODO")
+        throw new CalendarRefusal((await calendarT())("errors.notATask"));
     if (!reaches(calendar.reach, "write") && todoClassification(item.todo) !== "PUBLIC") {
         throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
     }

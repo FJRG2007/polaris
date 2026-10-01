@@ -14,7 +14,10 @@ export default async function BookingPagesPage() {
     const t = await calendarT();
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col">
-            <PageHeader title={t("bookingPage.pageTitle")} description={t("bookingPage.pageDescription")} />
+            <PageHeader
+                title={t("bookingPage.pageTitle")}
+                description={t("bookingPage.pageDescription")}
+            />
             <BookingPagesView />
         </div>
     );

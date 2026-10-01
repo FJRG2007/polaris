@@ -246,7 +246,10 @@ export interface OverviewAccessInput {
  * offered at all, so uninstalling the last game server does not delete how
  * somebody had arranged theirs.
  */
-export async function availableOverviewWidgets({ can, features }: OverviewAccessInput): Promise<OverviewWidgetId[]> {
+export async function availableOverviewWidgets({
+    can,
+    features
+}: OverviewAccessInput): Promise<OverviewWidgetId[]> {
     const decided = await Promise.all(
         OVERVIEW_WIDGETS.map(async (widget) => {
             if (widget.requires && features?.[widget.requires] !== true) return null;

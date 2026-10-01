@@ -139,7 +139,9 @@ describe("the event editor's Save", () => {
         await screen.findByRole("textbox", { name: "Title" });
         fireEvent.change(screen.getByLabelText("Web page"), { target: { value: "not a link" } });
         expect(screen.getByRole("alert").textContent).toBe("Use a link starting with https://.");
-        expect(screen.getByRole("button", { name: "Save" }).getAttribute("title")).toBe("Fix the fields marked in red");
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("title")).toBe(
+            "Fix the fields marked in red"
+        );
     });
 
     it("saves with Ctrl+S once something changed", async () => {
@@ -148,7 +150,11 @@ describe("the event editor's Save", () => {
         fireEvent.change(title, { target: { value: "Retro" } });
         fireEvent.keyDown(title, { key: "s", ctrlKey: true });
         await vi.waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
-        const input = saved.mock.calls[0]![0] as { objectId: string; scope: string; event: { summary: string; calendarId: string } };
+        const input = saved.mock.calls[0]![0] as {
+            objectId: string;
+            scope: string;
+            event: { summary: string; calendarId: string };
+        };
         expect(input.objectId).toBe(OBJECT_ID);
         expect(input.scope).toBe("all");
         expect(input.event.summary).toBe("Retro");

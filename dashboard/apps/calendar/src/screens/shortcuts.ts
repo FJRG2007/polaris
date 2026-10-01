@@ -96,11 +96,17 @@ export function isTyping(target: EventTarget | null): boolean {
     if (!target || typeof (target as HTMLElement).closest !== "function") return false;
     const element = target as HTMLElement;
     if (element.isContentEditable) return true;
-    return element.closest("input, textarea, select, [contenteditable=''], [contenteditable='true'], [role='textbox'], [role='combobox'], [role='listbox']") !== null;
+    return (
+        element.closest(
+            "input, textarea, select, [contenteditable=''], [contenteditable='true'], [role='textbox'], [role='combobox'], [role='listbox']"
+        ) !== null
+    );
 }
 
 /** What a key press means on the calendar, or null. */
-export function shortcutFor(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "target">): ShortcutAction | null {
+export function shortcutFor(
+    event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "target">
+): ShortcutAction | null {
     if (event.ctrlKey || event.metaKey || event.altKey) return null;
     if (isTyping(event.target)) return null;
     return KEYS[event.key] ?? KEYS[event.key.toLowerCase()] ?? null;
@@ -109,7 +115,9 @@ export function shortcutFor(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "meta
 /** The editor's Ctrl/Cmd shortcuts. */
 export type EditorShortcut = "save" | "delete" | "duplicate";
 
-export function editorShortcutFor(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">): EditorShortcut | null {
+export function editorShortcutFor(
+    event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">
+): EditorShortcut | null {
     if (!(event.ctrlKey || event.metaKey) || event.altKey) return null;
     const key = event.key.toLowerCase();
     if (key === "enter" || key === "s") return "save";
@@ -132,7 +140,9 @@ export function useShortcuts(enabled: boolean, handle: (action: ShortcutAction) 
             if (event.defaultPrevented) return;
             const action = shortcutFor(event);
             if (!action) return;
-            const dialog = document.querySelector("[role='dialog'][data-state='open'], [role='alertdialog'][data-state='open']");
+            const dialog = document.querySelector(
+                "[role='dialog'][data-state='open'], [role='alertdialog'][data-state='open']"
+            );
             if (dialog) return;
             if (handler.current(action)) event.preventDefault();
         };

@@ -40,7 +40,11 @@ describe("calendar trash", () => {
         calendar = world.addCalendar(alice.id, { name: "Work" });
     });
 
-    async function create(calendarId: string, summary: string, alarms: unknown[] = []): Promise<string> {
+    async function create(
+        calendarId: string,
+        summary: string,
+        alarms: unknown[] = []
+    ): Promise<string> {
         const saved = await objects.saveEvent(alice, {
             objectId: null,
             recurrenceKey: null,
@@ -53,7 +57,12 @@ describe("calendar trash", () => {
     }
 
     async function remove(objectId: string) {
-        await objects.deleteEvent(alice, { objectId, recurrenceKey: null, scope: "all", floatingZone: ZONE });
+        await objects.deleteEvent(alice, {
+            objectId,
+            recurrenceKey: null,
+            scope: "all",
+            floatingZone: ZONE
+        });
     }
 
     it("lists trashed calendars to their owner and trashed events to whoever may write the calendar", async () => {
@@ -70,14 +79,21 @@ describe("calendar trash", () => {
         db.rows("calendarShare")[0]!.access = "write";
         expect((await trash.listTrash(bob)).map((item) => item.id)).toEqual([id]);
         const listed = (await trash.listTrash(alice)).find((item) => item.id === id)!;
-        expect(new Date(listed.purgeAt).getTime() - new Date(listed.deletedAt).getTime()).toBe(30 * DAY);
+        expect(new Date(listed.purgeAt).getTime() - new Date(listed.deletedAt).getTime()).toBe(
+            30 * DAY
+        );
     });
 
     it("restores an event by writing it again, and a provider calendar gets it back as new", async () => {
         const remote = createFakeProvider();
         slot.provider = remote.provider;
         remote.addCalendar({ remoteId: "primary", name: "Google" });
-        const source = db.insert("calendarSource", { userId: alice.id, kind: "google", label: "Google", connectionId: "018f2b7a-0000-7000-8000-00000000c0de" }).id as string;
+        const source = db.insert("calendarSource", {
+            userId: alice.id,
+            kind: "google",
+            label: "Google",
+            connectionId: "018f2b7a-0000-7000-8000-00000000c0de"
+        }).id as string;
         await syncSource(source);
         const google = String(db.rows("calendar").find((row) => row.sourceId === source)!.id);
 
@@ -100,7 +116,9 @@ describe("calendar trash", () => {
     });
 
     it("restores a calendar with its events' reminders planned again", async () => {
-        const id = await create(calendar, "Standup", [{ action: "DISPLAY", trigger: { kind: "relative", minutes: -10, related: "START" } }]);
+        const id = await create(calendar, "Standup", [
+            { action: "DISPLAY", trigger: { kind: "relative", minutes: -10, related: "START" } }
+        ]);
         expect(db.rows("calendarReminder").filter((row) => row.objectId === id)).toHaveLength(1);
         await calendars.trashCalendar(alice, calendar);
         expect(db.rows("calendarReminder")).toEqual([]);
@@ -113,10 +131,16 @@ describe("calendar trash", () => {
         const id = await create(calendar, "Private");
         await remove(id);
         world.addShare(calendar, { userId: bob.id }, "read");
-        await expect(trash.restoreTrash(bob, "event", id, ZONE)).rejects.toThrow(world.en("errors.eventNotFound"));
-        await expect(trash.purgeTrash(bob, "event", id)).rejects.toThrow(world.en("errors.eventNotFound"));
+        await expect(trash.restoreTrash(bob, "event", id, ZONE)).rejects.toThrow(
+            world.en("errors.eventNotFound")
+        );
+        await expect(trash.purgeTrash(bob, "event", id)).rejects.toThrow(
+            world.en("errors.eventNotFound")
+        );
         await calendars.trashCalendar(alice, calendar);
-        await expect(trash.purgeTrash(bob, "calendar", calendar)).rejects.toThrow(world.en("errors.calendarNotFound"));
+        await expect(trash.purgeTrash(bob, "calendar", calendar)).rejects.toThrow(
+            world.en("errors.calendarNotFound")
+        );
         expect(db.byId("calendar", calendar)).toBeDefined();
     });
 
@@ -124,7 +148,9 @@ describe("calendar trash", () => {
         const id = await create(calendar, "Planning");
         await remove(id);
         db.byId("calendar", calendar)!.readOnly = true;
-        await expect(trash.restoreTrash(alice, "event", id, ZONE)).rejects.toThrow(world.en("errors.readOnly"));
+        await expect(trash.restoreTrash(alice, "event", id, ZONE)).rejects.toThrow(
+            world.en("errors.readOnly")
+        );
         expect(db.byId("calendarObject", id)?.deletedAt).toBeInstanceOf(Date);
     });
 
@@ -150,7 +176,15 @@ describe("calendar trash", () => {
         const other = world.addCalendar(alice.id, { name: "Old" });
         await calendars.trashCalendar(alice, other);
         const bobs = world.addCalendar(bob.id, { name: "Bob's" });
-        const bobsEvent = world.storeEvent(bobs, { summary: "Bob's deleted", start: world.at("2026-10-05T10:00:00"), end: world.at("2026-10-05T11:00:00") }, { deletedAt: new Date() });
+        const bobsEvent = world.storeEvent(
+            bobs,
+            {
+                summary: "Bob's deleted",
+                start: world.at("2026-10-05T10:00:00"),
+                end: world.at("2026-10-05T11:00:00")
+            },
+            { deletedAt: new Date() }
+        );
         expect(await trash.emptyTrash(alice)).toBe(2);
         expect(db.byId("calendarObject", mine)).toBeUndefined();
         expect(db.byId("calendar", other)).toBeUndefined();
@@ -161,8 +195,18 @@ describe("calendar trash", () => {
     it("purges what has been in the trash longer than the retention, every account's", async () => {
         const recent = await create(calendar, "Recent");
         await remove(recent);
-        const old = world.storeEvent(calendar, { summary: "Old", start: world.at("2026-08-05T10:00:00"), end: world.at("2026-08-05T11:00:00") }, { deletedAt: new Date(world.NOW.getTime() - 31 * DAY) });
-        const oldCalendar = world.addCalendar(bob.id, { trashedAt: new Date(world.NOW.getTime() - 40 * DAY) });
+        const old = world.storeEvent(
+            calendar,
+            {
+                summary: "Old",
+                start: world.at("2026-08-05T10:00:00"),
+                end: world.at("2026-08-05T11:00:00")
+            },
+            { deletedAt: new Date(world.NOW.getTime() - 31 * DAY) }
+        );
+        const oldCalendar = world.addCalendar(bob.id, {
+            trashedAt: new Date(world.NOW.getTime() - 40 * DAY)
+        });
         expect(await trash.purgeExpiredTrash(world.NOW)).toBe(2);
         expect(db.byId("calendarObject", String(old.id))).toBeUndefined();
         expect(db.byId("calendar", oldCalendar)).toBeUndefined();

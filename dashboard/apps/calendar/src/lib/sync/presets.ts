@@ -25,10 +25,31 @@ export interface CalDavPreset {
 }
 
 export const CALDAV_PRESETS: readonly CalDavPreset[] = [
-    { id: "icloud", url: "https://caldav.icloud.com", path: null, appPasswordHelp: "https://support.apple.com/en-us/102654" },
-    { id: "fastmail", url: "https://caldav.fastmail.com/dav/", path: null, appPasswordHelp: "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords" },
-    { id: "yahoo", url: "https://caldav.calendar.yahoo.com", path: null, appPasswordHelp: "https://help.yahoo.com/kb/SLN15241.html" },
-    { id: "nextcloud", url: null, path: "/remote.php/dav", appPasswordHelp: "https://docs.nextcloud.com/server/latest/user_manual/en/session_management.html" }
+    {
+        id: "icloud",
+        url: "https://caldav.icloud.com",
+        path: null,
+        appPasswordHelp: "https://support.apple.com/en-us/102654"
+    },
+    {
+        id: "fastmail",
+        url: "https://caldav.fastmail.com/dav/",
+        path: null,
+        appPasswordHelp: "https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords"
+    },
+    {
+        id: "yahoo",
+        url: "https://caldav.calendar.yahoo.com",
+        path: null,
+        appPasswordHelp: "https://help.yahoo.com/kb/SLN15241.html"
+    },
+    {
+        id: "nextcloud",
+        url: null,
+        path: "/remote.php/dav",
+        appPasswordHelp:
+            "https://docs.nextcloud.com/server/latest/user_manual/en/session_management.html"
+    }
 ];
 
 /** The address a preset starts discovery from, given the host a self-hosted one lives on. */

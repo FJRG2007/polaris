@@ -21,7 +21,8 @@ export async function exportEverything(user: SessionUser): Promise<Uint8Array> {
     for (const calendar of calendars) {
         const file = await exportCalendarRow(calendar.id);
         let name = fileName(file.name, "ics");
-        for (let copy = 2; taken.has(name); copy += 1) name = fileName(`${file.name}-${copy}`, "ics");
+        for (let copy = 2; taken.has(name); copy += 1)
+            name = fileName(`${file.name}-${copy}`, "ics");
         taken.add(name);
         files.push({ name, text: file.ics });
     }

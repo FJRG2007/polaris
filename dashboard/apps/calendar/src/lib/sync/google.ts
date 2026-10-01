@@ -21,9 +21,17 @@ import { SyncAuthError, SyncError, SyncRefusedError, SyncUnreachableError } from
 
 export const GOOGLE_API = "https://www.googleapis.com/calendar/v3";
 
-const EventDateTime = z.object({ date: z.string().optional(), dateTime: z.string().optional(), timeZone: z.string().optional() });
+const EventDateTime = z.object({
+    date: z.string().optional(),
+    dateTime: z.string().optional(),
+    timeZone: z.string().optional()
+});
 
-const GooglePerson = z.object({ email: z.string().optional(), displayName: z.string().optional(), self: z.boolean().optional() });
+const GooglePerson = z.object({
+    email: z.string().optional(),
+    displayName: z.string().optional(),
+    self: z.boolean().optional()
+});
 
 const GoogleAttendee = GooglePerson.extend({
     responseStatus: z.string().optional(),
@@ -59,11 +67,25 @@ const GoogleEvent = z.object({
     colorId: z.string().optional(),
     hangoutLink: z.string().optional(),
     conferenceData: z
-        .object({ entryPoints: z.array(z.object({ entryPointType: z.string().optional(), uri: z.string().optional() })).optional() })
+        .object({
+            entryPoints: z
+                .array(
+                    z.object({ entryPointType: z.string().optional(), uri: z.string().optional() })
+                )
+                .optional()
+        })
         .optional(),
     htmlLink: z.string().optional(),
     eventType: z.string().optional(),
-    attachments: z.array(z.object({ fileUrl: z.string().optional(), title: z.string().optional(), mimeType: z.string().optional() })).optional(),
+    attachments: z
+        .array(
+            z.object({
+                fileUrl: z.string().optional(),
+                title: z.string().optional(),
+                mimeType: z.string().optional()
+            })
+        )
+        .optional(),
     sequence: z.number().optional(),
     created: z.string().optional(),
     updated: z.string().optional()
@@ -109,7 +131,12 @@ const ErrorBody = z.object({
 const RATE_REASONS = new Set(["rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"]);
 
 /** Reasons on a 403 that mean the grant itself is not enough: connect again. */
-const AUTH_REASONS = new Set(["insufficientPermissions", "authError", "forbidden", "accessNotConfigured"]);
+const AUTH_REASONS = new Set([
+    "insufficientPermissions",
+    "authError",
+    "forbidden",
+    "accessNotConfigured"
+]);
 
 /** The sync error for a failed Google response, read from its error body. */
 async function googleError(response: Response): Promise<Error> {
@@ -128,7 +155,8 @@ async function googleError(response: Response): Promise<Error> {
     if (status === 429 || (status === 403 && RATE_REASONS.has(reason))) {
         return new SyncUnreachableError("Google asked to slow down", status, retryAfter(response));
     }
-    if (status === 403 && reason && !AUTH_REASONS.has(reason)) return new SyncRefusedError(`Google refused the request: ${message || reason}`, status);
+    if (status === 403 && reason && !AUTH_REASONS.has(reason))
+        return new SyncRefusedError(`Google refused the request: ${message || reason}`, status);
     return errorFor(response, message);
 }
 
@@ -139,7 +167,8 @@ async function tokenFrom(accessToken: () => Promise<string>): Promise<string> {
     } catch (error) {
         if (error instanceof SyncError) throw error;
         const text = error instanceof Error ? error.message : "";
-        if (/invalid_grant|unauthorized|revoked/i.test(text)) throw new SyncAuthError("The account's sign-in expired or was revoked", null);
+        if (/invalid_grant|unauthorized|revoked/i.test(text))
+            throw new SyncAuthError("The account's sign-in expired or was revoked", null);
         throw new SyncUnreachableError("Could not refresh the account's sign-in", null);
     }
 }
@@ -169,11 +198,17 @@ function googleInstant(dateTime: string, timeZone: string | undefined): Date {
     if (/(Z|[+-]\d{2}:?\d{2})$/i.test(dateTime)) return new Date(dateTime);
     const wall = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?)/.exec(dateTime)?.[1];
     if (!wall) return new Date(Number.NaN);
-    return bridge.toInstant({ dateTime: wall.length === 16 ? `${wall}:00` : wall, tzid: timeZone ?? "UTC" });
+    return bridge.toInstant({
+        dateTime: wall.length === 16 ? `${wall}:00` : wall,
+        tzid: timeZone ?? "UTC"
+    });
 }
 
 /** A Google start/end as the engine's value, in the zone Google names. */
-function fromGoogleTime(value: z.infer<typeof EventDateTime> | undefined, fallbackZone: string | null): types.DateValue | null {
+function fromGoogleTime(
+    value: z.infer<typeof EventDateTime> | undefined,
+    fallbackZone: string | null
+): types.DateValue | null {
     if (!value) return null;
     if (value.date) return { date: value.date };
     if (!value.dateTime) return null;
@@ -187,11 +222,18 @@ function fromGoogleTime(value: z.infer<typeof EventDateTime> | undefined, fallba
  * it in. A floating time, or a zone nothing here resolves, is sent as UTC
  * rather than as a name Google would refuse.
  */
-function toGoogleTime(value: types.DateValue): { date?: string; dateTime?: string; timeZone?: string } {
+function toGoogleTime(value: types.DateValue): {
+    date?: string;
+    dateTime?: string;
+    timeZone?: string;
+} {
     if (bridge.isDate(value)) return { date: value.date };
     const zone = bridge.zoneOrUtc(value.tzid);
     if (value.tzid !== null && zone === "UTC" && !/^(utc|z|gmt)$/i.test(value.tzid)) {
-        return { dateTime: bridge.wallValue(bridge.toInstant(value), "UTC").dateTime, timeZone: "UTC" };
+        return {
+            dateTime: bridge.wallValue(bridge.toInstant(value), "UTC").dateTime,
+            timeZone: "UTC"
+        };
     }
     return { dateTime: value.dateTime, timeZone: zone };
 }
@@ -200,27 +242,45 @@ function toGoogleTime(value: types.DateValue): { date?: string; dateTime?: strin
 type Palette = ReadonlyMap<string, string>;
 
 /** One Google event as an engine event. */
-export function googleToEvent(event: GoogleEventJson, palette: Palette, recurrenceId: types.DateValue | null, fallbackZone: string | null): types.CalendarEvent | null {
+export function googleToEvent(
+    event: GoogleEventJson,
+    palette: Palette,
+    recurrenceId: types.DateValue | null,
+    fallbackZone: string | null
+): types.CalendarEvent | null {
     const start = fromGoogleTime(event.start, fallbackZone);
     if (!start) return null;
-    const end = (event.endTimeUnspecified ? null : fromGoogleTime(event.end, fallbackZone)) ?? start;
+    const end =
+        (event.endTimeUnspecified ? null : fromGoogleTime(event.end, fallbackZone)) ?? start;
     const draft = bridge.blankEvent(event.iCalUID ?? event.id, start, end);
     const extra: types.ExtraProperty[] = [];
     draft.recurrenceId = recurrenceId;
     draft.summary = event.summary ?? "";
     draft.description = event.description ?? "";
     draft.location = event.location ?? "";
-    draft.status = event.status === "tentative" ? "TENTATIVE" : event.status === "cancelled" ? "CANCELLED" : event.status === "confirmed" ? "CONFIRMED" : null;
+    draft.status =
+        event.status === "tentative"
+            ? "TENTATIVE"
+            : event.status === "cancelled"
+              ? "CANCELLED"
+              : event.status === "confirmed"
+                ? "CONFIRMED"
+                : null;
     draft.transparency = event.transparency === "transparent" ? "TRANSPARENT" : "OPAQUE";
     if (event.visibility === "private") draft.classification = "PRIVATE";
     else if (event.visibility === "confidential") draft.classification = "CONFIDENTIAL";
-    else if (event.visibility === "public") extra.push({ line: "X-POLARIS-GOOGLE-VISIBILITY:public" });
+    else if (event.visibility === "public")
+        extra.push({ line: "X-POLARIS-GOOGLE-VISIBILITY:public" });
     if (event.colorId) {
         extra.push({ line: `X-GOOGLE-COLOR-ID:${event.colorId}` });
         draft.color = palette.get(event.colorId) ?? null;
     }
     draft.url = event.htmlLink ?? "";
-    if (event.organizer?.email) draft.organizer = { email: event.organizer.email.toLowerCase(), name: event.organizer.displayName ?? "" };
+    if (event.organizer?.email)
+        draft.organizer = {
+            email: event.organizer.email.toLowerCase(),
+            name: event.organizer.displayName ?? ""
+        };
     draft.attendees = (event.attendees ?? [])
         .filter((a) => a.email)
         .map((a) => ({
@@ -237,28 +297,39 @@ export function googleToEvent(event: GoogleEventJson, palette: Palette, recurren
         trigger: { kind: "relative", minutes: -r.minutes, related: "START" },
         description: draft.summary
     }));
-    const video = event.conferenceData?.entryPoints?.find((p) => p.entryPointType === "video" && p.uri)?.uri;
+    const video = event.conferenceData?.entryPoints?.find(
+        (p) => p.entryPointType === "video" && p.uri
+    )?.uri;
     draft.conference = video ?? event.hangoutLink ?? "";
-    if (event.eventType && KINDS.has(event.eventType)) draft.kind = event.eventType as types.EventKind;
-    draft.attachments = (event.attachments ?? []).filter((a) => a.fileUrl).map((a) => ({ uri: a.fileUrl!, name: a.title ?? "", mime: a.mimeType ?? "" }));
+    if (event.eventType && KINDS.has(event.eventType))
+        draft.kind = event.eventType as types.EventKind;
+    draft.attachments = (event.attachments ?? [])
+        .filter((a) => a.fileUrl)
+        .map((a) => ({ uri: a.fileUrl!, name: a.title ?? "", mime: a.mimeType ?? "" }));
     draft.sequence = event.sequence ?? 0;
     draft.created = bridge.stampOf(event.created);
     draft.lastModified = bridge.stampOf(event.updated);
-    if (!recurrenceId && event.recurrence?.length) Object.assign(draft, bridge.readRecurrence(event.recurrence, start));
+    if (!recurrenceId && event.recurrence?.length)
+        Object.assign(draft, bridge.readRecurrence(event.recurrence, start));
     draft.extra = extra;
     return draft;
 }
 
 /** The original start of an exception, in the master's form (date or zone). */
-function originalStart(exception: GoogleEventJson, master: types.CalendarEvent | null): types.DateValue | null {
+function originalStart(
+    exception: GoogleEventJson,
+    master: types.CalendarEvent | null
+): types.DateValue | null {
     const original = exception.originalStartTime;
     if (!original) return null;
     if (original.date) return { date: original.date };
     if (!original.dateTime) return null;
     const instant = googleInstant(original.dateTime, original.timeZone);
     if (Number.isNaN(instant.getTime())) return null;
-    if (master && bridge.isDate(master.start)) return { date: bridge.wallValue(instant, "UTC").dateTime.slice(0, 10) };
-    const zone = master && !bridge.isDate(master.start) ? master.start.tzid : (original.timeZone ?? null);
+    if (master && bridge.isDate(master.start))
+        return { date: bridge.wallValue(instant, "UTC").dateTime.slice(0, 10) };
+    const zone =
+        master && !bridge.isDate(master.start) ? master.start.tzid : (original.timeZone ?? null);
     return bridge.wallValue(instant, zone);
 }
 
@@ -266,14 +337,20 @@ function originalStart(exception: GoogleEventJson, master: types.CalendarEvent |
 function groupEtag(items: readonly GoogleEventJson[]): string {
     const master = items.find((i) => !i.recurringEventId);
     const rest = items.filter((i) => i !== master).sort((a, b) => a.id.localeCompare(b.id));
-    return [master, ...rest].filter((i): i is GoogleEventJson => Boolean(i)).map((i) => i.etag ?? "").join(",");
+    return [master, ...rest]
+        .filter((i): i is GoogleEventJson => Boolean(i))
+        .map((i) => i.etag ?? "")
+        .join(",");
 }
 
 /**
  * One UID's Google events as one object, or `{ removed }` when nothing of it is
  * left. `href` is the master's id; an exception with no master uses its own.
  */
-export function groupToObject(items: readonly GoogleEventJson[], palette: Palette): RemoteObject | { removed: string } | null {
+export function groupToObject(
+    items: readonly GoogleEventJson[],
+    palette: Palette
+): RemoteObject | { removed: string } | null {
     const masterJson = items.find((i) => !i.recurringEventId) ?? null;
     const exceptions = items.filter((i) => i.recurringEventId);
     const href = masterJson?.id ?? exceptions[0]?.recurringEventId ?? exceptions[0]?.id;
@@ -294,14 +371,34 @@ export function groupToObject(items: readonly GoogleEventJson[], palette: Palett
         if (override) overrides.push({ ...override, uid: master?.uid ?? override.uid });
     }
     if (!master && overrides.length === 0) return { removed: href };
-    const objectHref = master ? href : (exceptions.find((e) => e.status !== "cancelled")?.id ?? href);
-    const finalMaster = master ? { ...master, exdates: [...master.exdates, ...exdates.filter((d) => !master.exdates.some((x) => JSON.stringify(x) === JSON.stringify(d)))] } : null;
+    const objectHref = master
+        ? href
+        : (exceptions.find((e) => e.status !== "cancelled")?.id ?? href);
+    const finalMaster = master
+        ? {
+              ...master,
+              exdates: [
+                  ...master.exdates,
+                  ...exdates.filter(
+                      (d) => !master.exdates.some((x) => JSON.stringify(x) === JSON.stringify(d))
+                  )
+              ]
+          }
+        : null;
     const uid = finalMaster?.uid ?? overrides[0]!.uid;
-    return { href: objectHref, etag: groupEtag(items), ics: bridge.writeItem(bridge.eventItem(uid, finalMaster, overrides)) };
+    return {
+        href: objectHref,
+        etag: groupEtag(items),
+        ics: bridge.writeItem(bridge.eventItem(uid, finalMaster, overrides))
+    };
 }
 
 /** An engine event as the body of an insert or a patch. */
-export function eventToGoogle(event: types.CalendarEvent, palette: Palette, options: { instance: boolean; insert: boolean }): Record<string, unknown> {
+export function eventToGoogle(
+    event: types.CalendarEvent,
+    palette: Palette,
+    options: { instance: boolean; insert: boolean }
+): Record<string, unknown> {
     const body: Record<string, unknown> = {
         summary: event.summary,
         description: event.description,
@@ -324,19 +421,37 @@ export function eventToGoogle(event: types.CalendarEvent, palette: Palette, opti
             ...(a.type === "RESOURCE" || a.type === "ROOM" ? { resource: true } : {}),
             responseStatus: PARTSTAT_TO_GOOGLE[a.partstat] ?? "needsAction"
         })),
-        attachments: event.attachments.map((a) => ({ fileUrl: a.uri, ...(a.name ? { title: a.name } : {}), ...(a.mime ? { mimeType: a.mime } : {}) }))
+        attachments: event.attachments.map((a) => ({
+            fileUrl: a.uri,
+            ...(a.name ? { title: a.name } : {}),
+            ...(a.mime ? { mimeType: a.mime } : {})
+        }))
     };
     if (event.status) body.status = event.status.toLowerCase();
-    const colorId = bridge.extraValue(event, "X-GOOGLE-COLOR-ID") ?? [...palette].find(([, hex]) => event.color && hex.toLowerCase() === event.color.toLowerCase())?.[0];
+    const colorId =
+        bridge.extraValue(event, "X-GOOGLE-COLOR-ID") ??
+        [...palette].find(
+            ([, hex]) => event.color && hex.toLowerCase() === event.color.toLowerCase()
+        )?.[0];
     // null clears a colour on a patch; an insert simply has none.
     if (colorId) body.colorId = colorId;
     else if (!options.insert) body.colorId = null;
     const popupOrEmail = event.alarms
-        .filter((a) => a.trigger.kind === "relative" && a.trigger.related === "START" && a.trigger.minutes <= 0 && a.action !== "AUDIO")
+        .filter(
+            (a) =>
+                a.trigger.kind === "relative" &&
+                a.trigger.related === "START" &&
+                a.trigger.minutes <= 0 &&
+                a.action !== "AUDIO"
+        )
         .slice(0, 5)
-        .map((a) => ({ method: a.action === "EMAIL" ? "email" : "popup", minutes: a.trigger.kind === "relative" ? -a.trigger.minutes : 0 }));
+        .map((a) => ({
+            method: a.action === "EMAIL" ? "email" : "popup",
+            minutes: a.trigger.kind === "relative" ? -a.trigger.minutes : 0
+        }));
     body.reminders =
-        popupOrEmail.length === 0 && bridge.extraValue(event, "X-POLARIS-GOOGLE-DEFAULT-REMINDERS") === "1"
+        popupOrEmail.length === 0 &&
+        bridge.extraValue(event, "X-POLARIS-GOOGLE-DEFAULT-REMINDERS") === "1"
             ? { useDefault: true }
             : { useDefault: false, overrides: popupOrEmail };
     if (!options.instance) {
@@ -349,13 +464,24 @@ export function eventToGoogle(event: types.CalendarEvent, palette: Palette, opti
 }
 
 /** A Google Calendar account as a `CalendarProvider`. */
-export function createGoogleProvider(input: { accessToken: () => Promise<string>; fetcher: Fetcher }): CalendarProvider {
+export function createGoogleProvider(input: {
+    accessToken: () => Promise<string>;
+    fetcher: Fetcher;
+}): CalendarProvider {
     let palette: Palette | null = null;
 
-    const call = async (method: string, path: string, options: { query?: Record<string, string>; body?: unknown; ifMatch?: string } = {}): Promise<Response> => {
+    const call = async (
+        method: string,
+        path: string,
+        options: { query?: Record<string, string>; body?: unknown; ifMatch?: string } = {}
+    ): Promise<Response> => {
         const url = new URL(`${GOOGLE_API}${path}`);
-        for (const [key, value] of Object.entries(options.query ?? {})) url.searchParams.set(key, value);
-        const headers: Record<string, string> = { Authorization: `Bearer ${await tokenFrom(input.accessToken)}`, Accept: "application/json" };
+        for (const [key, value] of Object.entries(options.query ?? {}))
+            url.searchParams.set(key, value);
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${await tokenFrom(input.accessToken)}`,
+            Accept: "application/json"
+        };
         if (options.body !== undefined) headers["Content-Type"] = "application/json";
         if (options.ifMatch) headers["If-Match"] = options.ifMatch;
         const { response } = await send(input.fetcher, url.href, {
@@ -369,7 +495,11 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
     const json = async <T>(response: Response, schema: z.ZodType<T>): Promise<T> => {
         if (!response.ok) throw await googleError(response);
         const parsed = schema.safeParse(await readJson(response));
-        if (!parsed.success) throw new SyncUnreachableError("Google answered in an unexpected shape", response.status);
+        if (!parsed.success)
+            throw new SyncUnreachableError(
+                "Google answered in an unexpected shape",
+                response.status
+            );
         return parsed.data;
     };
 
@@ -377,7 +507,12 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
         if (palette) return palette;
         try {
             const colors = await json(await call("GET", "/colors"), Colors);
-            palette = new Map(Object.entries(colors.event ?? {}).map(([id, c]) => [id, c.background.toLowerCase()]));
+            palette = new Map(
+                Object.entries(colors.event ?? {}).map(([id, c]) => [
+                    id,
+                    c.background.toLowerCase()
+                ])
+            );
         } catch (error) {
             if (error instanceof SyncAuthError) throw error;
             palette = new Map();
@@ -388,12 +523,21 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
     const calendarPath = (remoteId: string) => `/calendars/${encodeURIComponent(remoteId)}/events`;
 
     /** Every page of an events listing. */
-    const listEvents = async (remoteId: string, query: Record<string, string>): Promise<{ items: GoogleEventJson[]; nextSyncToken: string }> => {
+    const listEvents = async (
+        remoteId: string,
+        query: Record<string, string>
+    ): Promise<{ items: GoogleEventJson[]; nextSyncToken: string }> => {
         const items: GoogleEventJson[] = [];
         let pageToken = "";
         for (let page = 0; page < 1000; page++) {
             const response = await call("GET", calendarPath(remoteId), {
-                query: { ...query, showDeleted: "true", singleEvents: "false", maxResults: "2500", ...(pageToken ? { pageToken } : {}) }
+                query: {
+                    ...query,
+                    showDeleted: "true",
+                    singleEvents: "false",
+                    maxResults: "2500",
+                    ...(pageToken ? { pageToken } : {})
+                }
             });
             const data = await json(response, EventsPage);
             items.push(...(data.items ?? []));
@@ -407,7 +551,8 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
     };
 
     /** Every event sharing a UID: the master and all its exceptions. */
-    const group = (remoteId: string, uid: string) => listEvents(remoteId, { iCalUID: uid }).then((r) => r.items);
+    const group = (remoteId: string, uid: string) =>
+        listEvents(remoteId, { iCalUID: uid }).then((r) => r.items);
 
     const getEvent = async (remoteId: string, id: string): Promise<GoogleEventJson | null> => {
         const response = await call("GET", `${calendarPath(remoteId)}/${encodeURIComponent(id)}`);
@@ -441,7 +586,9 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
             const calendars: RemoteCalendar[] = [];
             let pageToken = "";
             for (let page = 0; page < 100; page++) {
-                const response = await call("GET", "/users/me/calendarList", { query: { maxResults: "250", ...(pageToken ? { pageToken } : {}) } });
+                const response = await call("GET", "/users/me/calendarList", {
+                    query: { maxResults: "250", ...(pageToken ? { pageToken } : {}) }
+                });
                 const data = await json(response, CalendarListPage);
                 for (const entry of data.items ?? []) {
                     if (entry.deleted) continue;
@@ -451,7 +598,8 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
                         color: entry.backgroundColor?.toLowerCase() ?? null,
                         description: entry.description ?? "",
                         timezone: entry.timeZone ?? null,
-                        readOnly: entry.accessRole === "reader" || entry.accessRole === "freeBusyReader",
+                        readOnly:
+                            entry.accessRole === "reader" || entry.accessRole === "freeBusyReader",
                         components: ["VEVENT"]
                     });
                 }
@@ -463,7 +611,10 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
 
         async pull(state): Promise<ChangeSet> {
             const colors = await loadPalette();
-            const listing = await listEvents(state.remoteId, state.syncToken ? { syncToken: state.syncToken } : {});
+            const listing = await listEvents(
+                state.remoteId,
+                state.syncToken ? { syncToken: state.syncToken } : {}
+            );
             const changed: RemoteObject[] = [];
             const removed: string[] = [];
 
@@ -501,19 +652,28 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
             }
             for (const [uid, seriesHref] of uids) {
                 const members = await group(state.remoteId, uid);
-                const object = members.length > 0 ? groupToObject(members, colors) : { removed: seriesHref };
+                const object =
+                    members.length > 0 ? groupToObject(members, colors) : { removed: seriesHref };
                 if (object && "ics" in object) changed.push(object);
                 else if (object) removed.push(object.removed);
             }
             const fresh = changed.filter((object) => state.known.get(object.href) !== object.etag);
-            return { changed: fresh, removed: [...new Set(removed)], syncToken: listing.nextSyncToken || state.syncToken, ctag: "", full: false };
+            return {
+                changed: fresh,
+                removed: [...new Set(removed)],
+                syncToken: listing.nextSyncToken || state.syncToken,
+                ctag: "",
+                full: false
+            };
         },
 
         async put(target, object) {
             const colors = await loadPalette();
             const item = bridge.readEventItem(object.ics, object.uid);
             const master = item.master;
-            const everyone = [master, ...item.overrides].filter((e): e is types.CalendarEvent => Boolean(e));
+            const everyone = [master, ...item.overrides].filter((e): e is types.CalendarEvent =>
+                Boolean(e)
+            );
             const sendUpdates = everyone.some((e) => e.attendees.length > 0) ? "all" : "none";
             const query = { sendUpdates, supportsAttachments: "true" };
             const masterEtag = object.etag?.split(",")[0] || undefined;
@@ -522,20 +682,39 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
 
             if (master) {
                 let response = href
-                    ? await call("PATCH", `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`, {
+                    ? await call(
+                          "PATCH",
+                          `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`,
+                          {
+                              query,
+                              body: eventToGoogle(master, colors, {
+                                  instance: false,
+                                  insert: false
+                              }),
+                              ifMatch: masterEtag
+                          }
+                      )
+                    : await call("POST", calendarPath(target.remoteId), {
                           query,
-                          body: eventToGoogle(master, colors, { instance: false, insert: false }),
-                          ifMatch: masterEtag
-                      })
-                    : await call("POST", calendarPath(target.remoteId), { query, body: eventToGoogle(master, colors, { instance: false, insert: true }) });
+                          body: eventToGoogle(master, colors, { instance: false, insert: true })
+                      });
                 if (!href && response.status === 409) {
-                    const existing = (await group(target.remoteId, object.uid)).find((e) => !e.recurringEventId && e.status !== "cancelled");
+                    const existing = (await group(target.remoteId, object.uid)).find(
+                        (e) => !e.recurringEventId && e.status !== "cancelled"
+                    );
                     if (existing) {
                         await response.body?.cancel().catch(() => undefined);
-                        response = await call("PATCH", `${calendarPath(target.remoteId)}/${encodeURIComponent(existing.id)}`, {
-                            query,
-                            body: eventToGoogle(master, colors, { instance: false, insert: false })
-                        });
+                        response = await call(
+                            "PATCH",
+                            `${calendarPath(target.remoteId)}/${encodeURIComponent(existing.id)}`,
+                            {
+                                query,
+                                body: eventToGoogle(master, colors, {
+                                    instance: false,
+                                    insert: false
+                                })
+                            }
+                        );
                     }
                 }
                 const saved = await json(response, GoogleEvent);
@@ -545,30 +724,47 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
                 // An exception whose master is not here: it is written as itself.
                 const only = item.overrides[0];
                 if (only) {
-                    const response = await call("PATCH", `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`, {
-                        query,
-                        body: eventToGoogle(only, colors, { instance: true, insert: false }),
-                        ifMatch: masterEtag
-                    });
+                    const response = await call(
+                        "PATCH",
+                        `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`,
+                        {
+                            query,
+                            body: eventToGoogle(only, colors, { instance: true, insert: false }),
+                            ifMatch: masterEtag
+                        }
+                    );
                     firstEtag = (await json(response, GoogleEvent)).etag ?? "";
                 }
                 return { href, etag: await writeEtag(target.remoteId, object.uid, firstEtag) };
             } else {
-                throw new SyncRefusedError("An occurrence cannot be created without its series", null);
+                throw new SyncRefusedError(
+                    "An occurrence cannot be created without its series",
+                    null
+                );
             }
 
-            const floating = master && !bridge.isDate(master.start) && master.start.tzid ? master.start.tzid : "UTC";
+            const floating =
+                master && !bridge.isDate(master.start) && master.start.tzid
+                    ? master.start.tzid
+                    : "UTC";
             const etags = [firstEtag];
             for (const override of item.overrides) {
                 if (!override.recurrenceId) continue;
                 const instanceId = `${href}_${bridge.compactUtc(override.recurrenceId, bridge.zoneOrUtc(floating))}`;
-                const response = await call("PATCH", `${calendarPath(target.remoteId)}/${encodeURIComponent(instanceId)}`, {
-                    query,
-                    body: eventToGoogle(override, colors, { instance: true, insert: false })
-                });
+                const response = await call(
+                    "PATCH",
+                    `${calendarPath(target.remoteId)}/${encodeURIComponent(instanceId)}`,
+                    {
+                        query,
+                        body: eventToGoogle(override, colors, { instance: true, insert: false })
+                    }
+                );
                 if (response.status === 404) {
                     await response.body?.cancel().catch(() => undefined);
-                    throw new SyncRefusedError("A changed occurrence is not part of the series on Google", 404);
+                    throw new SyncRefusedError(
+                        "A changed occurrence is not part of the series on Google",
+                        404
+                    );
                 }
                 etags.push((await json(response, GoogleEvent)).etag ?? "");
             }
@@ -576,10 +772,14 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
         },
 
         async remove(target, object) {
-            const response = await call("DELETE", `${calendarPath(target.remoteId)}/${encodeURIComponent(object.href)}`, {
-                query: { sendUpdates: "all" },
-                ifMatch: object.etag?.split(",")[0] || undefined
-            });
+            const response = await call(
+                "DELETE",
+                `${calendarPath(target.remoteId)}/${encodeURIComponent(object.href)}`,
+                {
+                    query: { sendUpdates: "all" },
+                    ifMatch: object.etag?.split(",")[0] || undefined
+                }
+            );
             if (response.ok || response.status === 404 || response.status === 410) {
                 await response.body?.cancel().catch(() => undefined);
                 return;
@@ -588,4 +788,3 @@ export function createGoogleProvider(input: { accessToken: () => Promise<string>
         }
     };
 }
-

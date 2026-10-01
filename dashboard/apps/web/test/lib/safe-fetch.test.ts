@@ -48,7 +48,9 @@ vi.mock("node:dns/promises", () => ({
     }
 }));
 
-const { configuredRequest, fetchImage, safeUrl, vettedAddresses } = await import("@/lib/safe-fetch");
+const { configuredRequest, fetchImage, safeUrl, vettedAddresses } = await import(
+    "@/lib/safe-fetch"
+);
 
 const CAP = 1024;
 const fetched = network.fetched;
@@ -154,7 +156,9 @@ describe("a request to an address somebody configured", () => {
     });
 
     it("still refuses one that resolves inside the network", async () => {
-        await expect(configuredRequest("https://inside.test/cal", {}, { allowPrivate: false })).rejects.toThrow("cannot be reached");
+        await expect(
+            configuredRequest("https://inside.test/cal", {}, { allowPrivate: false })
+        ).rejects.toThrow("cannot be reached");
         expect(fetched).toEqual([]);
     });
 });

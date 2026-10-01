@@ -9,13 +9,19 @@ import type { ShareView } from "../lib/wire";
 import { requireCalendarUser } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 
-export async function listSharesAction(calendarId: unknown): Promise<Outcome<{ shares: ShareView[] }>> {
+export async function listSharesAction(
+    calendarId: unknown
+): Promise<Outcome<{ shares: ShareView[] }>> {
     const parsed = schemas.uuidSchema.safeParse(calendarId);
     if (!parsed.success) return invalid(parsed.error.issues);
-    return outcome(async () => ({ shares: await sharing.listShares(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        shares: await sharing.listShares(await requireCalendarUser(), parsed.data)
+    }));
 }
 
-export async function shareCalendarAction(input: unknown): Promise<Outcome<{ shares: ShareView[] }>> {
+export async function shareCalendarAction(
+    input: unknown
+): Promise<Outcome<{ shares: ShareView[] }>> {
     const parsed = schemas.shareInputSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => {
@@ -34,9 +40,7 @@ export async function unshareCalendarAction(shareId: unknown): Promise<Outcome<o
     });
 }
 
-export async function shareTargetsAction(
-    query: unknown
-): Promise<
+export async function shareTargetsAction(query: unknown): Promise<
     Outcome<{
         people: { id: string; name: string; username: string | null }[];
         teams: { id: string; name: string; orgName: string }[];
@@ -47,18 +51,28 @@ export async function shareTargetsAction(
     return outcome(async () => sharing.shareTargets(await requireCalendarUser(), parsed.data));
 }
 
-export async function publishCalendarAction(input: unknown): Promise<Outcome<{ token: string | null }>> {
+export async function publishCalendarAction(
+    input: unknown
+): Promise<Outcome<{ token: string | null }>> {
     const parsed = schemas.publishInputSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => ({
-        token: await sharing.publish(await requireCalendarUser(), parsed.data.calendarId, parsed.data.mode)
+        token: await sharing.publish(
+            await requireCalendarUser(),
+            parsed.data.calendarId,
+            parsed.data.mode
+        )
     }));
 }
 
-export async function rotatePublicLinkAction(calendarId: unknown): Promise<Outcome<{ token: string }>> {
+export async function rotatePublicLinkAction(
+    calendarId: unknown
+): Promise<Outcome<{ token: string }>> {
     const parsed = schemas.uuidSchema.safeParse(calendarId);
     if (!parsed.success) return invalid(parsed.error.issues);
-    return outcome(async () => ({ token: await sharing.rotatePublicLink(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        token: await sharing.rotatePublicLink(await requireCalendarUser(), parsed.data)
+    }));
 }
 
 const mailInput = z.object({
@@ -70,7 +84,11 @@ export async function mailPublicLinkAction(input: unknown): Promise<Outcome<obje
     const parsed = mailInput.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => {
-        await sharing.mailPublicLink(await requireCalendarUser(), parsed.data.calendarId, parsed.data.email);
+        await sharing.mailPublicLink(
+            await requireCalendarUser(),
+            parsed.data.calendarId,
+            parsed.data.email
+        );
         return {};
     });
 }

@@ -20,7 +20,10 @@ export function instantAt(date: string, minutes: number, zone: string): Date {
     const day = Math.floor(minutes / 1440);
     const rest = minutes - day * 1440;
     const wall = parseWall(addDays(date, day));
-    return wallToInstant({ ...wall, hour: Math.floor(rest / 60), minute: rest % 60, second: 0 }, zone);
+    return wallToInstant(
+        { ...wall, hour: Math.floor(rest / 60), minute: rest % 60, second: 0 },
+        zone
+    );
 }
 
 /** The local date an instant falls on in a zone. */
@@ -32,7 +35,8 @@ export function localDate(instant: Date, zone: string): string {
 export function localDays(from: Date, to: Date, zone: string): string[] {
     const days: string[] = [];
     const last = localDate(to, zone);
-    for (let day = localDate(from, zone); day <= last && days.length < 3700; day = addDays(day, 1)) days.push(day);
+    for (let day = localDate(from, zone); day <= last && days.length < 3700; day = addDays(day, 1))
+        days.push(day);
     return days;
 }
 

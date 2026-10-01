@@ -8,7 +8,17 @@
 
 import { SyncRefusedError } from "./errors";
 import { XmlError, child, childrenOf, parseXml, textContent, type XmlElement } from "./xml";
-import { MAX_RESPONSE_BYTES, basicAuth, errorFor, readCapped, reasonOf, requireHttpUrl, sameSite, send, type Fetcher } from "./http";
+import {
+    MAX_RESPONSE_BYTES,
+    basicAuth,
+    errorFor,
+    readCapped,
+    reasonOf,
+    requireHttpUrl,
+    sameSite,
+    send,
+    type Fetcher
+} from "./http";
 
 export const DAV = "DAV:";
 export const CALDAV = "urn:ietf:params:xml:ns:caldav";
@@ -70,10 +80,12 @@ export function parseMultistatus(xml: string, base: string | URL): Multistatus {
     try {
         root = parseXml(xml);
     } catch (error) {
-        if (error instanceof XmlError) throw new SyncRefusedError("The server answered with malformed XML", 207);
+        if (error instanceof XmlError)
+            throw new SyncRefusedError("The server answered with malformed XML", 207);
         throw error;
     }
-    if (root.ns !== DAV || root.local !== "multistatus") throw new SyncRefusedError("The server did not answer with a multistatus", 207);
+    if (root.ns !== DAV || root.local !== "multistatus")
+        throw new SyncRefusedError("The server did not answer with a multistatus", 207);
     const responses: DavResponse[] = [];
     for (const response of childrenOf(root, DAV, "response")) {
         const hrefText = textContent(child(response, DAV, "href")).trim();
@@ -89,14 +101,22 @@ export function parseMultistatus(xml: string, base: string | URL): Multistatus {
             status: statusCode(textContent(child(propstat, DAV, "status"))) ?? 0,
             props: child(propstat, DAV, "prop")?.children ?? []
         }));
-        responses.push({ href, status: statusEl ? statusCode(textContent(statusEl)) : null, propstats });
+        responses.push({
+            href,
+            status: statusEl ? statusCode(textContent(statusEl)) : null,
+            propstats
+        });
     }
     const token = child(root, DAV, "sync-token");
     return { responses, syncToken: token ? textContent(token).trim() : null };
 }
 
 /** A property a member returned with a 2xx status, or null. */
-export function prop(response: DavResponse | undefined, ns: string, local: string): XmlElement | null {
+export function prop(
+    response: DavResponse | undefined,
+    ns: string,
+    local: string
+): XmlElement | null {
     if (!response) return null;
     for (const propstat of response.propstats) {
         if (propstat.status < 200 || propstat.status > 299) continue;
@@ -107,7 +127,11 @@ export function prop(response: DavResponse | undefined, ns: string, local: strin
 }
 
 /** The trimmed text of a 2xx property, or null. */
-export function propText(response: DavResponse | undefined, ns: string, local: string): string | null {
+export function propText(
+    response: DavResponse | undefined,
+    ns: string,
+    local: string
+): string | null {
     const found = prop(response, ns, local);
     return found ? textContent(found).trim() : null;
 }
@@ -118,7 +142,12 @@ export function hasType(response: DavResponse | undefined, ns: string, local: st
 }
 
 /** The first `href` inside a property, resolved, or null. */
-export function propHref(response: DavResponse | undefined, ns: string, local: string, base: string | URL): string | null {
+export function propHref(
+    response: DavResponse | undefined,
+    ns: string,
+    local: string,
+    base: string | URL
+): string | null {
     const href = textContent(child(prop(response, ns, local), DAV, "href")).trim();
     if (!href) return null;
     try {
@@ -150,11 +179,20 @@ export async function davRequest(
     options: { depth?: "0" | "1"; body?: string; headers?: Record<string, string> } = {}
 ): Promise<DavResult> {
     const origin = requireHttpUrl(credentials.origin);
-    if (!sameSite(origin, requireHttpUrl(url))) throw new SyncRefusedError("The server pointed at an address on another host", null);
-    const headers: Record<string, string> = { Authorization: basicAuth(credentials.username, credentials.password), ...options.headers };
+    if (!sameSite(origin, requireHttpUrl(url)))
+        throw new SyncRefusedError("The server pointed at an address on another host", null);
+    const headers: Record<string, string> = {
+        Authorization: basicAuth(credentials.username, credentials.password),
+        ...options.headers
+    };
     if (options.depth !== undefined) headers.Depth = options.depth;
     if (options.body !== undefined) headers["Content-Type"] = "application/xml; charset=utf-8";
-    return send(credentials.fetcher, url, { method, headers, body: options.body, credentialOrigin: origin });
+    return send(credentials.fetcher, url, {
+        method,
+        headers,
+        body: options.body,
+        credentialOrigin: origin
+    });
 }
 
 /**

@@ -19,7 +19,11 @@ export default async function NewProposalPage() {
                 description={t("proposals.newDescription")}
                 actions={
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/calendar/proposals" aria-label={t("proposals.backToList")} title={t("proposals.backToList")}>
+                        <Link
+                            href="/calendar/proposals"
+                            aria-label={t("proposals.backToList")}
+                            title={t("proposals.backToList")}
+                        >
                             <ArrowLeft />
                             <span className="hidden sm:inline">{t("proposals.backToList")}</span>
                         </Link>

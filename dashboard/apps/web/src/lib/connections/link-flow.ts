@@ -366,7 +366,8 @@ export async function startConnectionLink(request: Request, provider: string): P
         );
     }
     const scope = url.searchParams.get("scope");
-    if (scope === "calendar" && linksCalendars(provider)) return begin(request, provider, "calendar");
+    if (scope === "calendar" && linksCalendars(provider))
+        return begin(request, provider, "calendar");
     if (scope !== "mail") {
         return begin(request, provider, scope === "storage" ? "storage" : "link");
     }
@@ -442,7 +443,15 @@ export async function finishConnectionCallback(
     const back = mailReturn(held);
     if (!code) return endLink(origin, provider, "cancelled", screen, back);
     if (!valid) return endLink(origin, provider, "state_error", screen, back);
-    return finishLink(origin, provider, code, screen, back, held?.wanted, held?.mode === "calendar" && linksCalendars(provider));
+    return finishLink(
+        origin,
+        provider,
+        code,
+        screen,
+        back,
+        held?.wanted,
+        held?.mode === "calendar" && linksCalendars(provider)
+    );
 }
 
 /**

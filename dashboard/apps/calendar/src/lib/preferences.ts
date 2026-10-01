@@ -47,7 +47,11 @@ const fields = {
     /** Zones listed as clocks in the sidebar. */
     worldClock: z.array(zone).max(8),
     /** Length of a new event, in minutes. */
-    defaultDuration: z.number().int().min(5).max(24 * 60),
+    defaultDuration: z
+        .number()
+        .int()
+        .min(5)
+        .max(24 * 60),
     /** Meetings end early (Google's speedy meetings): 25 instead of 30, 50 instead of 60. */
     speedyMeetings: z.boolean(),
     /** Reminders a new event starts with, in minutes relative to the start. */

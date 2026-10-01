@@ -12,7 +12,9 @@ import * as engine from "@polaris-app/calendar/src/engine";
 /** The UTC offset, in minutes, that a client reading only the block gives a
  *  local wall time. */
 function offsetFromBlock(block: string, wall: string): number {
-    const component = new ICAL.Component(ICAL.parse(`BEGIN:VCALENDAR\r\n${block}\r\nEND:VCALENDAR`));
+    const component = new ICAL.Component(
+        ICAL.parse(`BEGIN:VCALENDAR\r\n${block}\r\nEND:VCALENDAR`)
+    );
     const timezone = new ICAL.Timezone(component.getFirstSubcomponent("vtimezone")!);
     const time = ICAL.Time.fromDateTimeString(wall);
     return timezone.utcOffset(time) / 60;
@@ -37,11 +39,21 @@ const SAMPLES = [
 ];
 
 describe("a VTIMEZONE written from Intl", () => {
-    for (const zone of ["Europe/Madrid", "America/New_York", "Australia/Sydney", "America/Santiago", "Asia/Tokyo", "Asia/Kolkata"]) {
+    for (const zone of [
+        "Europe/Madrid",
+        "America/New_York",
+        "Australia/Sydney",
+        "America/Santiago",
+        "Asia/Tokyo",
+        "Asia/Kolkata"
+    ]) {
         it(`gives ${zone} the offsets Intl does`, () => {
             const block = engine.vtimezoneFor(zone, 2026)!;
             expect(block).toContain(`TZID:${zone}`);
-            for (const wall of SAMPLES) expect(offsetFromBlock(block, wall), `${zone} ${wall}`).toBe(offsetFromIntl(zone, wall));
+            for (const wall of SAMPLES)
+                expect(offsetFromBlock(block, wall), `${zone} ${wall}`).toBe(
+                    offsetFromIntl(zone, wall)
+                );
         });
     }
 
@@ -56,12 +68,16 @@ describe("a VTIMEZONE written from Intl", () => {
         // Israel: the Friday before the last Sunday of March (Fri>=23), which
         // is not the last Friday in 2028 or 2029.
         const block = engine.vtimezoneFor("Asia/Jerusalem", 2026)!;
-        expect(block).toContain("RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=FR;BYMONTHDAY=23,24,25,26,27,28,29");
+        expect(block).toContain(
+            "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=FR;BYMONTHDAY=23,24,25,26,27,28,29"
+        );
         expect(block).toContain("RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU");
         for (let year = 2026; year <= 2037; year++) {
             for (let day = 22; day <= 31; day++) {
                 const wall = `${year}-03-${day}T12:00:00`;
-                expect(offsetFromBlock(block, wall), wall).toBe(offsetFromIntl("Asia/Jerusalem", wall));
+                expect(offsetFromBlock(block, wall), wall).toBe(
+                    offsetFromIntl("Asia/Jerusalem", wall)
+                );
             }
         }
     });

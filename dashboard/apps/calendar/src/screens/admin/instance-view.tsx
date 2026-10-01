@@ -75,7 +75,10 @@ export function InstanceView() {
         setMessage(null);
         const result = await saveInstanceSettingsAction({
             ...draft,
-            suggested: draft.suggested.map((entry) => ({ name: entry.name.trim(), url: entry.url.trim() }))
+            suggested: draft.suggested.map((entry) => ({
+                name: entry.name.trim(),
+                url: entry.url.trim()
+            }))
         });
         setSaving(false);
         if (!result.ok) {
@@ -98,25 +101,37 @@ export function InstanceView() {
                     <>
                         <label className="flex items-start justify-between gap-4">
                             <span className="flex min-w-0 flex-col">
-                                <span className="text-sm font-medium">{t("instancePage.subscriptions")}</span>
-                                <span className="text-xs text-muted-foreground">{t("instancePage.subscriptionsHint")}</span>
+                                <span className="text-sm font-medium">
+                                    {t("instancePage.subscriptions")}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("instancePage.subscriptionsHint")}
+                                </span>
                             </span>
                             <Switch
                                 checked={draft.allowSubscriptions}
                                 disabled={!canManage}
-                                onChange={(value: boolean) => setDraft({ ...draft, allowSubscriptions: value })}
+                                onChange={(value: boolean) =>
+                                    setDraft({ ...draft, allowSubscriptions: value })
+                                }
                                 aria-label={t("instancePage.subscriptions")}
                             />
                         </label>
                         <label className="flex items-start justify-between gap-4">
                             <span className="flex min-w-0 flex-col">
-                                <span className="text-sm font-medium">{t("instancePage.booking")}</span>
-                                <span className="text-xs text-muted-foreground">{t("instancePage.bookingHint")}</span>
+                                <span className="text-sm font-medium">
+                                    {t("instancePage.booking")}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("instancePage.bookingHint")}
+                                </span>
                             </span>
                             <Switch
                                 checked={draft.allowBooking}
                                 disabled={!canManage}
-                                onChange={(value: boolean) => setDraft({ ...draft, allowBooking: value })}
+                                onChange={(value: boolean) =>
+                                    setDraft({ ...draft, allowBooking: value })
+                                }
                                 aria-label={t("instancePage.booking")}
                             />
                         </label>
@@ -132,7 +147,10 @@ export function InstanceView() {
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {draft.suggested.map((entry, index) => (
-                            <li key={index} className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                            <li
+                                key={index}
+                                className="flex flex-col gap-2 sm:flex-row sm:items-start"
+                            >
                                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                                     <Input
                                         value={entry.name}
@@ -142,12 +160,17 @@ export function InstanceView() {
                                         aria-invalid={problems[index]?.name || undefined}
                                         onChange={(event) => {
                                             const suggested = [...draft.suggested];
-                                            suggested[index] = { ...entry, name: event.target.value };
+                                            suggested[index] = {
+                                                ...entry,
+                                                name: event.target.value
+                                            };
                                             setDraft({ ...draft, suggested });
                                         }}
                                     />
                                     {problems[index]?.name ? (
-                                        <span className="text-xs text-danger">{t("instancePage.nameInvalid")}</span>
+                                        <span className="text-xs text-danger">
+                                            {t("instancePage.nameInvalid")}
+                                        </span>
                                     ) : null}
                                 </div>
                                 <div className="flex min-w-0 flex-[2] flex-col gap-1">
@@ -163,12 +186,17 @@ export function InstanceView() {
                                         aria-invalid={problems[index]?.url || undefined}
                                         onChange={(event) => {
                                             const suggested = [...draft.suggested];
-                                            suggested[index] = { ...entry, url: event.target.value };
+                                            suggested[index] = {
+                                                ...entry,
+                                                url: event.target.value
+                                            };
                                             setDraft({ ...draft, suggested });
                                         }}
                                     />
                                     {problems[index]?.url ? (
-                                        <span className="text-xs text-danger">{t("instancePage.addressInvalid")}</span>
+                                        <span className="text-xs text-danger">
+                                            {t("instancePage.addressInvalid")}
+                                        </span>
                                     ) : null}
                                 </div>
                                 <Button
@@ -177,12 +205,16 @@ export function InstanceView() {
                                     variant="ghost"
                                     className="shrink-0"
                                     disabled={!canManage}
-                                    aria-label={t("instancePage.removeNamed", { name: entry.name || entry.url })}
+                                    aria-label={t("instancePage.removeNamed", {
+                                        name: entry.name || entry.url
+                                    })}
                                     title={t("instancePage.remove")}
                                     onClick={() =>
                                         setDraft({
                                             ...draft,
-                                            suggested: draft.suggested.filter((_, at) => at !== index)
+                                            suggested: draft.suggested.filter(
+                                                (_, at) => at !== index
+                                            )
                                         })
                                     }
                                 >
@@ -198,7 +230,12 @@ export function InstanceView() {
                             type="button"
                             size="sm"
                             variant="ghost"
-                            onClick={() => setDraft({ ...draft, suggested: [...draft.suggested, { name: "", url: "" }] })}
+                            onClick={() =>
+                                setDraft({
+                                    ...draft,
+                                    suggested: [...draft.suggested, { name: "", url: "" }]
+                                })
+                            }
                         >
                             <Plus aria-hidden="true" className="size-4 shrink-0" />
                             {t("instancePage.add")}

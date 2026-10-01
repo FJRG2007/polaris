@@ -26,18 +26,33 @@ export function createFakeGraph() {
     let etagCounter = 0;
     let idCounter = 0;
 
-    const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-    const error = (status: number, code: string, message: string) => json(status, { error: { code, message } });
+    const json = (status: number, body: unknown) =>
+        new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" }
+        });
+    const error = (status: number, code: string, message: string) =>
+        json(status, { error: { code, message } });
     const nextEtag = () => `W/"etag-${++etagCounter}"`;
 
-    const fetcher = async (raw: string, init: RequestInit & { timeoutMs?: number }): Promise<Response> => {
+    const fetcher = async (
+        raw: string,
+        init: RequestInit & { timeoutMs?: number }
+    ): Promise<Response> => {
         const url = new URL(raw);
         const method = (init.method ?? "GET").toUpperCase();
-        const headers = Object.fromEntries(Object.entries((init.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v]));
-        const body = typeof init.body === "string" && init.body ? (JSON.parse(init.body) as Json) : null;
+        const headers = Object.fromEntries(
+            Object.entries((init.headers ?? {}) as Record<string, string>).map(([k, v]) => [
+                k.toLowerCase(),
+                v
+            ])
+        );
+        const body =
+            typeof init.body === "string" && init.body ? (JSON.parse(init.body) as Json) : null;
         requests.push({ method, url, headers, body });
         if (url.origin !== "https://graph.microsoft.com") throw new TypeError("fetch failed");
-        if (headers.authorization !== "Bearer graph-token") return error(401, "InvalidAuthenticationToken", "Access token is empty.");
+        if (headers.authorization !== "Bearer graph-token")
+            return error(401, "InvalidAuthenticationToken", "Access token is empty.");
         const path = decodeURIComponent(url.pathname.replace(/^\/v1\.0/, ""));
 
         if (path === "/me/calendars" && method === "GET") {
@@ -56,32 +71,58 @@ export function createFakeGraph() {
             let page = 0;
             if (skip) [roundName, page] = [skip.split(".")[0]!, Number(skip.split(".")[1])];
             else if (token) roundName = token;
-            else if (!url.searchParams.get("startDateTime") || !url.searchParams.get("endDateTime")) return error(400, "ErrorInvalidParameter", "startDateTime and endDateTime are required");
-            if (token === "expired") return error(410, "SyncStateNotFound", "The sync state generation is not found.");
+            else if (!url.searchParams.get("startDateTime") || !url.searchParams.get("endDateTime"))
+                return error(
+                    400,
+                    "ErrorInvalidParameter",
+                    "startDateTime and endDateTime are required"
+                );
+            if (token === "expired")
+                return error(410, "SyncStateNotFound", "The sync state generation is not found.");
             const round = rounds.get(roundName);
             if (!round) return error(400, "ErrorInvalidParameter", "Unknown token");
             const base = `${GRAPH}/me/calendars/${delta[1]}/calendarView/delta`;
             const last = page >= round.pages.length - 1;
             return json(200, {
                 value: round.pages[page] ?? [],
-                ...(last ? { "@odata.deltaLink": `${base}?$deltatoken=${round.next}` } : { "@odata.nextLink": `${base}?$skiptoken=${roundName}.${page + 1}` })
+                ...(last
+                    ? { "@odata.deltaLink": `${base}?$deltatoken=${round.next}` }
+                    : { "@odata.nextLink": `${base}?$skiptoken=${roundName}.${page + 1}` })
             });
         }
         const instanceList = /^\/me\/events\/([^/]+)\/instances$/.exec(path);
-        if (instanceList && method === "GET") return json(200, { value: instances.get(instanceList[1]!) ?? [] });
+        if (instanceList && method === "GET")
+            return json(200, { value: instances.get(instanceList[1]!) ?? [] });
         const create = /^\/me\/calendars\/([^/]+)\/events$/.exec(path);
         if (create && method === "POST") {
             const id = `new-${++idCounter}`;
-            const created = { ...(body as Json), id, "@odata.etag": nextEtag(), iCalUId: `server-uid-${id}`, type: (body as Json).recurrence ? "seriesMaster" : "singleInstance" };
+            const created = {
+                ...(body as Json),
+                id,
+                "@odata.etag": nextEtag(),
+                iCalUId: `server-uid-${id}`,
+                type: (body as Json).recurrence ? "seriesMaster" : "singleInstance"
+            };
             events.set(id, created);
             return json(201, created);
         }
         const one = /^\/me\/events\/([^/]+)$/.exec(path);
         if (one) {
             const id = one[1]!;
-            const current = events.get(id) ?? [...instances.values()].flat().find((i) => i.id === id);
-            if (!current) return error(404, "ErrorItemNotFound", "The specified object was not found in the store.");
-            if (headers["if-match"] && headers["if-match"] !== current["@odata.etag"]) return error(412, "ErrorIrresolvableConflict", "The change key passed in the request does not match the current change key for the item.");
+            const current =
+                events.get(id) ?? [...instances.values()].flat().find((i) => i.id === id);
+            if (!current)
+                return error(
+                    404,
+                    "ErrorItemNotFound",
+                    "The specified object was not found in the store."
+                );
+            if (headers["if-match"] && headers["if-match"] !== current["@odata.etag"])
+                return error(
+                    412,
+                    "ErrorIrresolvableConflict",
+                    "The change key passed in the request does not match the current change key for the item."
+                );
             if (method === "GET") return json(200, current);
             if (method === "PATCH") {
                 const merged = { ...current, ...(body as Json), id, "@odata.etag": nextEtag() };

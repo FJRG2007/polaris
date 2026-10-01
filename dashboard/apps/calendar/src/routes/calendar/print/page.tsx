@@ -14,7 +14,11 @@ function one(value: string | string[] | undefined): string | null {
     return first && first.length <= 20 ? first : null;
 }
 
-export default async function CalendarPrintPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function CalendarPrintPage({
+    searchParams
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     await requireCalendarUser();
     const t = await calendarT();
     const query = await searchParams;

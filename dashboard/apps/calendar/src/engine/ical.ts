@@ -18,7 +18,14 @@ import { parseRule } from "./rule";
 import { addToWall, formatWall, resolveZone } from "./tz";
 import { vtimezoneFor } from "./vtimezone";
 import { addDays, clockFor, isDateOnly, valueToInstant, valueWall, vtimezoneId } from "./zones";
-import { expandItem, generateStarts, isRecurring, placeEvent, thisAndFutureReach, type ExpandContext } from "./expand";
+import {
+    expandItem,
+    generateStarts,
+    isRecurring,
+    placeEvent,
+    thisAndFutureReach,
+    type ExpandContext
+} from "./expand";
 
 export { valueToInstant } from "./zones";
 
@@ -70,11 +77,33 @@ export interface ParseProblem {
 export const DEFAULT_PRODID = "-//Polaris//Calendar//EN";
 
 const EVENT_STATUSES: readonly T.EventStatus[] = ["CONFIRMED", "TENTATIVE", "CANCELLED"];
-const TODO_STATUSES: readonly T.TodoStatus[] = ["NEEDS-ACTION", "IN-PROCESS", "COMPLETED", "CANCELLED"];
+const TODO_STATUSES: readonly T.TodoStatus[] = [
+    "NEEDS-ACTION",
+    "IN-PROCESS",
+    "COMPLETED",
+    "CANCELLED"
+];
 const CLASSES: readonly T.Classification[] = ["PUBLIC", "PRIVATE", "CONFIDENTIAL"];
-const ROLES: readonly T.AttendeeRole[] = ["CHAIR", "REQ-PARTICIPANT", "OPT-PARTICIPANT", "NON-PARTICIPANT"];
-const PARTSTATS: readonly T.PartStat[] = ["NEEDS-ACTION", "ACCEPTED", "DECLINED", "TENTATIVE", "DELEGATED"];
-const USER_TYPES: readonly T.CalendarUserType[] = ["INDIVIDUAL", "GROUP", "RESOURCE", "ROOM", "UNKNOWN"];
+const ROLES: readonly T.AttendeeRole[] = [
+    "CHAIR",
+    "REQ-PARTICIPANT",
+    "OPT-PARTICIPANT",
+    "NON-PARTICIPANT"
+];
+const PARTSTATS: readonly T.PartStat[] = [
+    "NEEDS-ACTION",
+    "ACCEPTED",
+    "DECLINED",
+    "TENTATIVE",
+    "DELEGATED"
+];
+const USER_TYPES: readonly T.CalendarUserType[] = [
+    "INDIVIDUAL",
+    "GROUP",
+    "RESOURCE",
+    "ROOM",
+    "UNKNOWN"
+];
 const ACTIONS: readonly T.AlarmAction[] = ["DISPLAY", "EMAIL", "AUDIO"];
 const KINDS: readonly T.EventKind[] = ["default", "outOfOffice", "focusTime", "workingLocation"];
 
@@ -106,7 +135,12 @@ function readStructure(text: string): RawComponent[] {
         const begin = /^BEGIN:(.+)$/i.exec(line);
         const end = /^END:(.+)$/i.exec(line);
         if (begin) {
-            const component: RawComponent = { name: (begin[1] ?? "").trim().toUpperCase(), lines: [], children: [], broken: null };
+            const component: RawComponent = {
+                name: (begin[1] ?? "").trim().toUpperCase(),
+                lines: [],
+                children: [],
+                broken: null
+            };
             const parent = stack[stack.length - 1];
             if (parent) parent.children.push(component);
             else roots.push(component);
@@ -144,7 +178,12 @@ function readJcal(text: string, problems: ParseProblem[]): RawComponent[] {
         problems.push({ key: "parse.notJson", values: {}, detail: "Invalid JSON." });
         return [];
     }
-    const list = Array.isArray(data) && typeof data[0] === "string" ? [data] : Array.isArray(data) ? data : [];
+    const list =
+        Array.isArray(data) && typeof data[0] === "string"
+            ? [data]
+            : Array.isArray(data)
+              ? data
+              : [];
     const convert = (component: ICAL.Component): RawComponent => ({
         name: component.name.toUpperCase(),
         lines: component.getAllProperties().map((property) => property.toICALString()),
@@ -156,7 +195,11 @@ function readJcal(text: string, problems: ParseProblem[]): RawComponent[] {
         try {
             roots.push(convert(new ICAL.Component(entry as unknown[])));
         } catch (error) {
-            problems.push({ key: "parse.partUnreadable", values: {}, detail: (error as Error).message });
+            problems.push({
+                key: "parse.partUnreadable",
+                values: {},
+                detail: (error as Error).message
+            });
         }
     }
     return roots;
@@ -164,7 +207,12 @@ function readJcal(text: string, problems: ParseProblem[]): RawComponent[] {
 
 function parseLine(line: string): ParsedLine {
     const property = ICAL.Property.fromString(line);
-    const [name, params, type, ...values] = property.jCal as [string, Record<string, string | string[]>, string, ...unknown[]];
+    const [name, params, type, ...values] = property.jCal as [
+        string,
+        Record<string, string | string[]>,
+        string,
+        ...unknown[]
+    ];
     return { name: name.toUpperCase(), params, type, values };
 }
 
@@ -203,7 +251,9 @@ function mailtoless(value: string): string {
 const PERSON_PARAMS = ["cn", "role", "partstat", "rsvp", "cutype"];
 
 function restParams(params: Params, known: readonly string[]): Params | undefined {
-    const rest = Object.fromEntries(Object.entries(params).filter(([name]) => !known.includes(name)));
+    const rest = Object.fromEntries(
+        Object.entries(params).filter(([name]) => !known.includes(name))
+    );
     return Object.keys(rest).length > 0 ? rest : undefined;
 }
 
@@ -212,14 +262,19 @@ function withParams<T extends object>(value: T, params: Params | undefined): T {
 }
 
 function readPerson(parsed: ParsedLine): T.Person {
-    return withParams({ email: mailtoless(textOf(parsed)), name: paramText(parsed.params, "cn") ?? "" }, restParams(parsed.params, ["cn"]));
+    return withParams(
+        { email: mailtoless(textOf(parsed)), name: paramText(parsed.params, "cn") ?? "" },
+        restParams(parsed.params, ["cn"])
+    );
 }
 
 function readAttendee(parsed: ParsedLine): T.Attendee {
     const params = parsed.params;
     const role = (paramText(params, "role") ?? "REQ-PARTICIPANT").toUpperCase() as T.AttendeeRole;
     const partstat = (paramText(params, "partstat") ?? "NEEDS-ACTION").toUpperCase() as T.PartStat;
-    const cutype = (paramText(params, "cutype") ?? "INDIVIDUAL").toUpperCase() as T.CalendarUserType;
+    const cutype = (
+        paramText(params, "cutype") ?? "INDIVIDUAL"
+    ).toUpperCase() as T.CalendarUserType;
     // A value outside the model's set stays among the kept parameters, so it is
     // written back as it came.
     const known = PERSON_PARAMS.filter((name) => {
@@ -262,7 +317,10 @@ function readAlarm(raw: RawComponent): T.Alarm | null {
                 trigger = { kind: "absolute", at: value.endsWith("Z") ? value : `${value}Z` };
             } else {
                 const seconds = ICAL.Duration.fromString(value).toSeconds();
-                const related = (paramText(parsed.params, "related") ?? "START").toUpperCase() === "END" ? "END" : "START";
+                const related =
+                    (paramText(parsed.params, "related") ?? "START").toUpperCase() === "END"
+                        ? "END"
+                        : "START";
                 trigger = { kind: "relative", minutes: seconds / 60, related };
             }
         } else if (name === "DESCRIPTION" && description === null) {
@@ -285,7 +343,12 @@ function derivedUid(raw: RawComponent): string {
 
 /** Text of a nested component as written: unfolded lines joined with CRLF. */
 function componentText(raw: RawComponent): string {
-    const lines = [`BEGIN:${raw.name}`, ...raw.lines, ...raw.children.map(componentText), `END:${raw.name}`];
+    const lines = [
+        `BEGIN:${raw.name}`,
+        ...raw.lines,
+        ...raw.children.map(componentText),
+        `END:${raw.name}`
+    ];
     return lines.join("\r\n");
 }
 
@@ -333,7 +396,8 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
     let googleConference = "";
     for (const line of raw.lines) {
         const name = lineName(line);
-        if (name === "X-GOOGLE-CONFERENCE" && !googleConference) googleConference = textOf(parseLine(line));
+        if (name === "X-GOOGLE-CONFERENCE" && !googleConference)
+            googleConference = textOf(parseLine(line));
         if (!EVENT_FIELDS.has(name)) {
             extra.push({ line });
             continue;
@@ -344,7 +408,9 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
                 attendees.push(readAttendee(parsed));
                 break;
             case "CATEGORIES":
-                categories.push(...parsed.values.map((value) => String(value).trim()).filter(Boolean));
+                categories.push(
+                    ...parsed.values.map((value) => String(value).trim()).filter(Boolean)
+                );
                 break;
             case "EXDATE":
                 // A date list this model cannot read is kept as written rather
@@ -374,7 +440,11 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
                 }
                 attachments.push(
                     withParams(
-                        { uri: textOf(parsed), name: paramText(parsed.params, "filename") ?? "", mime: paramText(parsed.params, "fmttype") ?? "" },
+                        {
+                            uri: textOf(parsed),
+                            name: paramText(parsed.params, "filename") ?? "",
+                            mime: paramText(parsed.params, "fmttype") ?? ""
+                        },
                         restParams(parsed.params, ["filename", "fmttype"])
                     )
                 );
@@ -405,7 +475,10 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
     let rule = null;
     const ruleLine = single.get("RRULE");
     if (ruleLine) {
-        const rawRule = /^RRULE(?:;[^:]*)?:(.*)$/i.exec(raw.lines.find((line) => lineName(line) === "RRULE") ?? "")?.[1] ?? "";
+        const rawRule =
+            /^RRULE(?:;[^:]*)?:(.*)$/i.exec(
+                raw.lines.find((line) => lineName(line) === "RRULE") ?? ""
+            )?.[1] ?? "";
         try {
             rule = parseRule(rawRule);
         } catch {
@@ -417,8 +490,10 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
     const kind = text("X-POLARIS-KIND");
     const organizer = single.get("ORGANIZER");
     const sequence = Number.parseInt(text("SEQUENCE"), 10);
-    if (status && !EVENT_STATUSES.includes(status as T.EventStatus)) extra.push({ line: property("status", {}, "text", status) });
-    if (classification && !CLASSES.includes(classification as T.Classification)) extra.push({ line: property("class", {}, "text", classification) });
+    if (status && !EVENT_STATUSES.includes(status as T.EventStatus))
+        extra.push({ line: property("status", {}, "text", status) });
+    if (classification && !CLASSES.includes(classification as T.Classification))
+        extra.push({ line: property("class", {}, "text", classification) });
     const stamp = (name: string) => {
         const parsed = single.get(name);
         const value = parsed ? String(parsed.values[0] ?? "") : "";
@@ -427,7 +502,9 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
     return {
         uid: text("UID") || derivedUid(raw),
         recurrenceId,
-        thisAndFuture: recurrenceLine ? (paramText(recurrenceLine.params, "range") ?? "").toUpperCase() === "THISANDFUTURE" : false,
+        thisAndFuture: recurrenceLine
+            ? (paramText(recurrenceLine.params, "range") ?? "").toUpperCase() === "THISANDFUTURE"
+            : false,
         summary: text("SUMMARY"),
         description: text("DESCRIPTION"),
         location: text("LOCATION"),
@@ -435,7 +512,9 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
         end,
         status: EVENT_STATUSES.includes(status as T.EventStatus) ? (status as T.EventStatus) : null,
         transparency: text("TRANSP").toUpperCase() === "TRANSPARENT" ? "TRANSPARENT" : "OPAQUE",
-        classification: CLASSES.includes(classification as T.Classification) ? (classification as T.Classification) : "PUBLIC",
+        classification: CLASSES.includes(classification as T.Classification)
+            ? (classification as T.Classification)
+            : "PUBLIC",
         categories,
         color: text("COLOR") || null,
         url: text("URL"),
@@ -461,14 +540,22 @@ function readEvent(raw: RawComponent, zones: Set<string>): T.CalendarEvent {
  * a timed event, the next day for an all-day one. An end of the other kind, or
  * one before the start, is read as that default too.
  */
-function eventEnd(start: T.DateValue, endLine: ParsedLine | undefined, durationLine: ParsedLine | undefined, zones: Set<string>): T.DateValue {
+function eventEnd(
+    start: T.DateValue,
+    endLine: ParsedLine | undefined,
+    durationLine: ParsedLine | undefined,
+    zones: Set<string>
+): T.DateValue {
     const fallback: T.DateValue = isDateOnly(start) ? { date: addDays(start.date, 1) } : start;
     if (endLine) {
         const end = dateValues(endLine, zones)[0];
         if (!end || isDateOnly(end) !== isDateOnly(start)) return fallback;
         if (isDateOnly(end) && isDateOnly(start)) return end.date > start.date ? end : fallback;
         if (isDateOnly(end) || isDateOnly(start)) return fallback;
-        const before = end.tzid === start.tzid ? end.dateTime < start.dateTime : valueToInstant(end, "UTC") < valueToInstant(start, "UTC");
+        const before =
+            end.tzid === start.tzid
+                ? end.dateTime < start.dateTime
+                : valueToInstant(end, "UTC") < valueToInstant(start, "UTC");
         return before ? fallback : end;
     }
     if (durationLine) {
@@ -477,12 +564,27 @@ function eventEnd(start: T.DateValue, endLine: ParsedLine | undefined, durationL
         const days = duration.weeks * 7 + duration.days;
         if (isDateOnly(start)) return { date: addDays(start.date, Math.max(1, days)) };
         const seconds = duration.hours * 3600 + duration.minutes * 60 + duration.seconds;
-        return { dateTime: formatWall(addToWall(valueWall(start), { days, seconds })), tzid: start.tzid };
+        return {
+            dateTime: formatWall(addToWall(valueWall(start), { days, seconds })),
+            tzid: start.tzid
+        };
     }
     return fallback;
 }
 
-const TODO_FIELDS = new Set(["UID", "SUMMARY", "DESCRIPTION", "DTSTART", "DUE", "COMPLETED", "STATUS", "PERCENT-COMPLETE", "PRIORITY", "CATEGORIES", "RRULE"]);
+const TODO_FIELDS = new Set([
+    "UID",
+    "SUMMARY",
+    "DESCRIPTION",
+    "DTSTART",
+    "DUE",
+    "COMPLETED",
+    "STATUS",
+    "PERCENT-COMPLETE",
+    "PRIORITY",
+    "CATEGORIES",
+    "RRULE"
+]);
 
 function readTodo(raw: RawComponent, zones: Set<string>): T.CalendarTodo {
     if (raw.broken) throw new Error(raw.broken);
@@ -499,7 +601,8 @@ function readTodo(raw: RawComponent, zones: Set<string>): T.CalendarTodo {
             continue;
         }
         const parsed = parseLine(line);
-        if (name === "CATEGORIES") categories.push(...parsed.values.map((value) => String(value).trim()).filter(Boolean));
+        if (name === "CATEGORIES")
+            categories.push(...parsed.values.map((value) => String(value).trim()).filter(Boolean));
         else single.set(name, parsed);
         if (name === "RRULE") ruleText = /^RRULE(?:;[^:]*)?:(.*)$/i.exec(line)?.[1] ?? "";
     }
@@ -525,7 +628,8 @@ function readTodo(raw: RawComponent, zones: Set<string>): T.CalendarTodo {
         }
     }
     const status = text("STATUS").toUpperCase();
-    if (status && !TODO_STATUSES.includes(status as T.TodoStatus)) extra.push({ line: property("status", {}, "text", status) });
+    if (status && !TODO_STATUSES.includes(status as T.TodoStatus))
+        extra.push({ line: property("status", {}, "text", status) });
     const percent = Number.parseInt(text("PERCENT-COMPLETE"), 10);
     const priority = Number.parseInt(text("PRIORITY"), 10);
     const completed = single.get("COMPLETED");
@@ -536,7 +640,9 @@ function readTodo(raw: RawComponent, zones: Set<string>): T.CalendarTodo {
         start: date("DTSTART"),
         due: date("DUE"),
         completed: completed ? String(completed.values[0] ?? "") || null : null,
-        status: TODO_STATUSES.includes(status as T.TodoStatus) ? (status as T.TodoStatus) : "NEEDS-ACTION",
+        status: TODO_STATUSES.includes(status as T.TodoStatus)
+            ? (status as T.TodoStatus)
+            : "NEEDS-ACTION",
         percent: Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0,
         priority: Number.isFinite(priority) ? Math.min(9, Math.max(0, priority)) : 0,
         categories,
@@ -555,7 +661,9 @@ function timezonesFor(zones: ReadonlySet<string>, blocks: readonly string[]): st
         const id = vtimezoneId(block);
         if (!id) return false;
         const resolved = resolveZone(id);
-        return wanted.some((tzid) => tzid === id || (resolved !== null && resolveZone(tzid) === resolved));
+        return wanted.some(
+            (tzid) => tzid === id || (resolved !== null && resolveZone(tzid) === resolved)
+        );
     });
 }
 
@@ -572,11 +680,21 @@ export function parseCalendarText(text: string): ParsedCalendar {
     const trimmed = text.replace(/^﻿/, "").trimStart();
     const roots = trimmed.startsWith("[") ? readJcal(trimmed, problems) : readStructure(trimmed);
     const calendars = roots.filter((root) => root.name === "VCALENDAR");
-    if (calendars.length === 0 && trimmed && problems.length === 0) problems.push({ key: "parse.noCalendar", values: {}, detail: "No VCALENDAR." });
+    if (calendars.length === 0 && trimmed && problems.length === 0)
+        problems.push({ key: "parse.noCalendar", values: {}, detail: "No VCALENDAR." });
     let name: string | null = null;
     let color: string | null = null;
     let timezone: string | null = null;
-    const events = new Map<string, { master: T.CalendarEvent | null; overrides: T.CalendarEvent[]; zones: Set<string>; method: string | null; blocks: string[] }>();
+    const events = new Map<
+        string,
+        {
+            master: T.CalendarEvent | null;
+            overrides: T.CalendarEvent[];
+            zones: Set<string>;
+            method: string | null;
+            blocks: string[];
+        }
+    >();
     // Items in the order the file first mentions them: an event's place is
     // where its first component was.
     const order: (string | T.CalendarItem)[] = [];
@@ -591,38 +709,79 @@ export function parseCalendarText(text: string): ParsedCalendar {
                     return null;
                 }
             };
-            if (property === "X-WR-CALNAME" || (property === "NAME" && name === null)) name = read() ?? name;
-            else if (property === "X-APPLE-CALENDAR-COLOR" || (property === "COLOR" && color === null)) color = read() ?? color;
+            if (property === "X-WR-CALNAME" || (property === "NAME" && name === null))
+                name = read() ?? name;
+            else if (
+                property === "X-APPLE-CALENDAR-COLOR" ||
+                (property === "COLOR" && color === null)
+            )
+                color = read() ?? color;
             else if (property === "X-WR-TIMEZONE") timezone = resolveZone(read()) ?? read();
             else if (property === "METHOD") method = read()?.toUpperCase() ?? null;
         }
-        const blocks = calendar.children.filter((child) => child.name === "VTIMEZONE" && !child.broken).map(componentText);
+        const blocks = calendar.children
+            .filter((child) => child.name === "VTIMEZONE" && !child.broken)
+            .map(componentText);
         for (const child of calendar.children) {
             if (child.name === "VEVENT") {
                 const zones = new Set<string>();
                 try {
                     const event = readEvent(child, zones);
-                    const entry = events.get(event.uid) ?? { master: null, overrides: [], zones: new Set<string>(), method, blocks: [] };
+                    const entry = events.get(event.uid) ?? {
+                        master: null,
+                        overrides: [],
+                        zones: new Set<string>(),
+                        method,
+                        blocks: []
+                    };
                     for (const zone of zones) entry.zones.add(zone);
                     entry.blocks.push(...blocks.filter((block) => !entry.blocks.includes(block)));
                     if (event.recurrenceId) {
-                        const duplicate = entry.overrides.some((other) => JSON.stringify(other.recurrenceId) === JSON.stringify(event.recurrenceId));
-                        if (duplicate) problems.push({ key: "parse.duplicateOccurrence", values: { name: event.summary || event.uid }, detail: event.uid });
+                        const duplicate = entry.overrides.some(
+                            (other) =>
+                                JSON.stringify(other.recurrenceId) ===
+                                JSON.stringify(event.recurrenceId)
+                        );
+                        if (duplicate)
+                            problems.push({
+                                key: "parse.duplicateOccurrence",
+                                values: { name: event.summary || event.uid },
+                                detail: event.uid
+                            });
                         else entry.overrides.push(event);
-                    } else if (entry.master) problems.push({ key: "parse.duplicateEvent", values: { name: event.summary || event.uid }, detail: event.uid });
+                    } else if (entry.master)
+                        problems.push({
+                            key: "parse.duplicateEvent",
+                            values: { name: event.summary || event.uid },
+                            detail: event.uid
+                        });
                     else entry.master = event;
                     if (!events.has(event.uid)) order.push(event.uid);
                     events.set(event.uid, entry);
                 } catch (error) {
-                    problems.push({ key: "parse.eventUnreadable", values: {}, detail: (error as Error).message });
+                    problems.push({
+                        key: "parse.eventUnreadable",
+                        values: {},
+                        detail: (error as Error).message
+                    });
                 }
             } else if (child.name === "VTODO") {
                 const zones = new Set<string>();
                 try {
                     const todo = readTodo(child, zones);
-                    order.push({ component: "VTODO", uid: todo.uid, todo, timezones: timezonesFor(zones, blocks), method });
+                    order.push({
+                        component: "VTODO",
+                        uid: todo.uid,
+                        todo,
+                        timezones: timezonesFor(zones, blocks),
+                        method
+                    });
                 } catch (error) {
-                    problems.push({ key: "parse.todoUnreadable", values: {}, detail: (error as Error).message });
+                    problems.push({
+                        key: "parse.todoUnreadable",
+                        values: {},
+                        detail: (error as Error).message
+                    });
                 }
             }
         }
@@ -631,9 +790,23 @@ export function parseCalendarText(text: string): ParsedCalendar {
         if (typeof entry !== "string") return entry;
         const found = events.get(entry);
         if (!found) throw new Error(`Lost the event ${entry}.`);
-        return { component: "VEVENT", uid: entry, master: found.master, overrides: found.overrides, timezones: timezonesFor(found.zones, found.blocks), method: found.method };
+        return {
+            component: "VEVENT",
+            uid: entry,
+            master: found.master,
+            overrides: found.overrides,
+            timezones: timezonesFor(found.zones, found.blocks),
+            method: found.method
+        };
     });
-    return { items, name, color, timezone, errors: problems.map((problem) => problem.key), problems };
+    return {
+        items,
+        name,
+        color,
+        timezone,
+        errors: problems.map((problem) => problem.key),
+        problems
+    };
 }
 
 /* ------------------------------------------------------------------ writing */
@@ -673,9 +846,15 @@ function lineSafe(value: string, text: boolean): string {
 function property(name: string, params: Params, type: string, ...values: unknown[]): string {
     const clean: Record<string, string | string[]> = {};
     for (const [key, value] of Object.entries(params)) {
-        if (value !== "" && value !== undefined) clean[key] = typeof value === "string" ? lineSafe(value, true) : value.map((entry) => lineSafe(entry, true));
+        if (value !== "" && value !== undefined)
+            clean[key] =
+                typeof value === "string"
+                    ? lineSafe(value, true)
+                    : value.map((entry) => lineSafe(entry, true));
     }
-    const safe = values.map((value) => (typeof value === "string" ? lineSafe(value, type === "text") : value));
+    const safe = values.map((value) =>
+        typeof value === "string" ? lineSafe(value, type === "text") : value
+    );
     return new ICAL.Property([name.toLowerCase(), clean, type, ...safe]).toICALString();
 }
 
@@ -705,17 +884,40 @@ function attendeeLine(attendee: T.Attendee): string {
     params.partstat = attendee.partstat;
     if (attendee.rsvp) params.rsvp = "TRUE";
     if (attendee.type !== "INDIVIDUAL") params.cutype = attendee.type;
-    return property("attendee", { ...params, ...(attendee.params ?? {}) }, "cal-address", address(attendee.email));
+    return property(
+        "attendee",
+        { ...params, ...(attendee.params ?? {}) },
+        "cal-address",
+        address(attendee.email)
+    );
 }
 
 function alarmLines(alarm: T.Alarm): string[] {
     const lines = ["BEGIN:VALARM", property("action", {}, "text", alarm.action)];
-    if (alarm.trigger.kind === "absolute") lines.push(property("trigger", {}, "date-time", `${absoluteInstant(alarm.trigger.at).toISOString().slice(0, 19)}Z`));
+    if (alarm.trigger.kind === "absolute")
+        lines.push(
+            property(
+                "trigger",
+                {},
+                "date-time",
+                `${absoluteInstant(alarm.trigger.at).toISOString().slice(0, 19)}Z`
+            )
+        );
     else {
-        const duration = ICAL.Duration.fromSeconds(Math.round(alarm.trigger.minutes * 60)).toString();
-        lines.push(property("trigger", alarm.trigger.related === "END" ? { related: "END" } : {}, "duration", duration));
+        const duration = ICAL.Duration.fromSeconds(
+            Math.round(alarm.trigger.minutes * 60)
+        ).toString();
+        lines.push(
+            property(
+                "trigger",
+                alarm.trigger.related === "END" ? { related: "END" } : {},
+                "duration",
+                duration
+            )
+        );
     }
-    if (alarm.description || alarm.action !== "AUDIO") lines.push(property("description", {}, "text", alarm.description));
+    if (alarm.description || alarm.action !== "AUDIO")
+        lines.push(property("description", {}, "text", alarm.description));
     lines.push(...(alarm.extra ?? []).map((extra) => extra.line));
     lines.push("END:VALARM");
     return lines;
@@ -732,44 +934,84 @@ function splitLines(block: string): string[] {
  * is required. Returns the DTSTAMP to write up front (when not among the
  * extra lines) and the extra lines to write later.
  */
-function stamped(extra: readonly T.ExtraProperty[], fallback: string | null, now: Date | undefined): { head: string[]; rest: string[] } {
+function stamped(
+    extra: readonly T.ExtraProperty[],
+    fallback: string | null,
+    now: Date | undefined
+): { head: string[]; rest: string[] } {
     const nowLine = now ? stampLine("dtstamp", `${now.toISOString().slice(0, 19)}Z`) : null;
     const lines = extra.map((entry) => entry.line);
     const at = lines.findIndex((line) => lineName(line) === "DTSTAMP");
-    if (at >= 0) return { head: [], rest: lines.map((line, index) => (index === at && nowLine ? nowLine : line)) };
-    return { head: [nowLine ?? stampLine("dtstamp", fallback && fallback.endsWith("Z") ? fallback : "1970-01-01T00:00:00Z")], rest: lines };
+    if (at >= 0)
+        return {
+            head: [],
+            rest: lines.map((line, index) => (index === at && nowLine ? nowLine : line))
+        };
+    return {
+        head: [
+            nowLine ??
+                stampLine(
+                    "dtstamp",
+                    fallback && fallback.endsWith("Z") ? fallback : "1970-01-01T00:00:00Z"
+                )
+        ],
+        rest: lines
+    };
 }
 
 function eventLines(event: T.CalendarEvent, now: Date | undefined): string[] {
     const lines = ["BEGIN:VEVENT", property("uid", {}, "text", event.uid)];
     const dtstamp = stamped(event.extra, event.lastModified ?? event.created, now);
     lines.push(...dtstamp.head);
-    if (event.recurrenceId) lines.push(dateLine("recurrence-id", event.recurrenceId, event.thisAndFuture ? { range: "THISANDFUTURE" } : {}));
+    if (event.recurrenceId)
+        lines.push(
+            dateLine(
+                "recurrence-id",
+                event.recurrenceId,
+                event.thisAndFuture ? { range: "THISANDFUTURE" } : {}
+            )
+        );
     lines.push(dateLine("dtstart", event.start), dateLine("dtend", event.end));
     if (event.sequence !== 0) lines.push(property("sequence", {}, "integer", event.sequence));
     if (event.summary) lines.push(property("summary", {}, "text", event.summary));
     if (event.description) lines.push(property("description", {}, "text", event.description));
     if (event.location) lines.push(property("location", {}, "text", event.location));
     if (event.status) lines.push(property("status", {}, "text", event.status));
-    if (event.transparency !== "OPAQUE") lines.push(property("transp", {}, "text", event.transparency));
-    if (event.classification !== "PUBLIC") lines.push(property("class", {}, "text", event.classification));
-    if (event.categories.length > 0) lines.push(property("categories", {}, "text", ...event.categories));
+    if (event.transparency !== "OPAQUE")
+        lines.push(property("transp", {}, "text", event.transparency));
+    if (event.classification !== "PUBLIC")
+        lines.push(property("class", {}, "text", event.classification));
+    if (event.categories.length > 0)
+        lines.push(property("categories", {}, "text", ...event.categories));
     if (event.color) lines.push(property("color", {}, "text", event.color));
     if (event.url) lines.push(property("url", {}, "uri", event.url));
-    if (event.organizer) lines.push(property("organizer", personParams(event.organizer), "cal-address", address(event.organizer.email)));
+    if (event.organizer)
+        lines.push(
+            property(
+                "organizer",
+                personParams(event.organizer),
+                "cal-address",
+                address(event.organizer.email)
+            )
+        );
     lines.push(...event.attendees.map(attendeeLine));
     if (event.rule) lines.push(`RRULE:${lineSafe(event.rule.raw, false)}`);
     lines.push(...event.rdates.map((value) => dateLine("rdate", value)));
     lines.push(...event.exdates.map((value) => dateLine("exdate", value)));
     for (const attachment of event.attachments) {
-        const params = { ...(attachment.mime ? { fmttype: attachment.mime } : {}), ...(attachment.name ? { filename: attachment.name } : {}), ...(attachment.params ?? {}) };
+        const params = {
+            ...(attachment.mime ? { fmttype: attachment.mime } : {}),
+            ...(attachment.name ? { filename: attachment.name } : {}),
+            ...(attachment.params ?? {})
+        };
         lines.push(property("attach", params, "uri", attachment.uri));
     }
     const google = event.extra.find((entry) => lineName(entry.line) === "X-GOOGLE-CONFERENCE");
     // Google's own line already says it; a second, standard one would be read
     // back as the same link.
     const googleUrl = google ? textOf(parseLine(google.line)) : undefined;
-    if (event.conference && event.conference !== googleUrl) lines.push(property("conference", {}, "uri", event.conference));
+    if (event.conference && event.conference !== googleUrl)
+        lines.push(property("conference", {}, "uri", event.conference));
     if (event.kind !== "default") lines.push(property("x-polaris-kind", {}, "unknown", event.kind));
     if (event.created) lines.push(stampLine("created", event.created));
     if (event.lastModified) lines.push(stampLine("last-modified", event.lastModified));
@@ -792,7 +1034,8 @@ function todoLines(todo: T.CalendarTodo, now: Date | undefined): string[] {
     lines.push(property("status", {}, "text", todo.status));
     if (todo.percent > 0) lines.push(property("percent-complete", {}, "integer", todo.percent));
     if (todo.priority > 0) lines.push(property("priority", {}, "integer", todo.priority));
-    if (todo.categories.length > 0) lines.push(property("categories", {}, "text", ...todo.categories));
+    if (todo.categories.length > 0)
+        lines.push(property("categories", {}, "text", ...todo.categories));
     if (todo.rule) lines.push(`RRULE:${lineSafe(todo.rule.raw, false)}`);
     lines.push(...dtstamp.rest);
     for (const alarm of todo.alarms) lines.push(...alarmLines(alarm));
@@ -810,14 +1053,23 @@ function todoLines(todo: T.CalendarTodo, now: Date | undefined): string[] {
  * kept. METHOD is never copied from the item: a stored object must not carry
  * one (RFC 4791 4.1), only a message does.
  */
-export function serializeItem(item: T.CalendarItem, options: { method?: string; prodId?: string; now?: Date } = {}): string {
-    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", property("prodid", {}, "text", options.prodId ?? DEFAULT_PRODID), "CALSCALE:GREGORIAN"];
+export function serializeItem(
+    item: T.CalendarItem,
+    options: { method?: string; prodId?: string; now?: Date } = {}
+): string {
+    const lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        property("prodid", {}, "text", options.prodId ?? DEFAULT_PRODID),
+        "CALSCALE:GREGORIAN"
+    ];
     if (options.method) lines.push(property("method", {}, "text", options.method.toUpperCase()));
     for (const block of item.timezones) lines.push(...splitLines(block));
     const components: string[] = [];
     if (item.component === "VEVENT") {
         if (item.master) components.push(...eventLines(item.master, options.now));
-        for (const override of item.overrides) components.push(...eventLines(override, options.now));
+        for (const override of item.overrides)
+            components.push(...eventLines(override, options.now));
     } else components.push(...todoLines(item.todo, options.now));
     lines.push(...missingTimezones(components, item.timezones), ...components);
     lines.push("END:VCALENDAR");
@@ -830,7 +1082,9 @@ export function serializeItem(item: T.CalendarItem, options: { method?: string; 
  * events start in. A zone the file defined itself keeps its own block.
  */
 function missingTimezones(components: readonly string[], timezones: readonly string[]): string[] {
-    const defined = new Set(timezones.map((block) => vtimezoneId(block)).filter((id): id is string => Boolean(id)));
+    const defined = new Set(
+        timezones.map((block) => vtimezoneId(block)).filter((id): id is string => Boolean(id))
+    );
     const years = new Map<string, number>();
     for (const line of components) {
         for (const match of line.matchAll(/;TZID=("[^"]+"|[^;:]+)[^:]*:(\d{4})/g)) {
@@ -854,7 +1108,9 @@ function newUid(): string {
 }
 
 /** A new event with every field at its default and a fresh UID. */
-export function newEvent(input: Partial<T.CalendarEvent> & { start: T.DateValue; end: T.DateValue }): T.CalendarEvent {
+export function newEvent(
+    input: Partial<T.CalendarEvent> & { start: T.DateValue; end: T.DateValue }
+): T.CalendarEvent {
     return {
         uid: newUid(),
         recurrenceId: null,
@@ -908,8 +1164,18 @@ export function newTodo(input: Partial<T.CalendarTodo> = {}): T.CalendarTodo {
 }
 
 /** An item holding one event (no overrides). */
-export function eventItem(event: T.CalendarEvent, timezones: readonly string[] = []): T.CalendarItem {
-    return { component: "VEVENT", uid: event.uid, master: event, overrides: [], timezones, method: null };
+export function eventItem(
+    event: T.CalendarEvent,
+    timezones: readonly string[] = []
+): T.CalendarItem {
+    return {
+        component: "VEVENT",
+        uid: event.uid,
+        master: event,
+        overrides: [],
+        timezones,
+        method: null
+    };
 }
 
 /** An item holding one task. */
@@ -958,8 +1224,19 @@ export function itemBounds(item: T.CalendarItem, floatingZone: string): ItemBoun
     }
     const context: ExpandContext = { floatingZone, timezones: item.timezones };
     const headline = item.master ?? item.overrides[0];
-    if (!headline) return { startsAt: null, endsAt: null, recurring: false, allDay: false, summary: "", location: "", status: "" };
-    const spans = [item.master, ...item.overrides].filter((event): event is T.CalendarEvent => event !== null).map((event) => placeEvent(event, context));
+    if (!headline)
+        return {
+            startsAt: null,
+            endsAt: null,
+            recurring: false,
+            allDay: false,
+            summary: "",
+            location: "",
+            status: ""
+        };
+    const spans = [item.master, ...item.overrides]
+        .filter((event): event is T.CalendarEvent => event !== null)
+        .map((event) => placeEvent(event, context));
     let startsAt = new Date(Math.min(...spans.map((span) => span.start.getTime())));
     let endsAt: Date | null = new Date(Math.max(...spans.map((span) => span.end.getTime())));
     const master = item.master;
@@ -972,12 +1249,26 @@ export function itemBounds(item: T.CalendarItem, floatingZone: string): ItemBoun
             const last = starts[starts.length - 1];
             if (starts.length > BOUNDS_CAP || !last) endsAt = null;
             else {
-                const lastStart = clockFor(isDateOnly(master.start) ? null : master.start.tzid, floatingZone, item.timezones).toInstant(last.wall);
+                const lastStart = clockFor(
+                    isDateOnly(master.start) ? null : master.start.tzid,
+                    floatingZone,
+                    item.timezones
+                ).toInstant(last.wall);
                 // A THISANDFUTURE override may have moved the last ones later,
                 // by up to its wall-clock shift and a clock change.
                 const reach = thisAndFutureReach(item, context) * 1000 + 3_600_000;
-                const occurrences = expandItem(item, { from: new Date(lastStart.getTime() - 1), to: new Date(lastStart.getTime() + reach) }, { floatingZone, limit: BOUNDS_CAP + item.overrides.length + 1 });
-                const lastEnd = Math.max(...occurrences.map((occurrence) => occurrence.end.getTime()), lastStart.getTime());
+                const occurrences = expandItem(
+                    item,
+                    {
+                        from: new Date(lastStart.getTime() - 1),
+                        to: new Date(lastStart.getTime() + reach)
+                    },
+                    { floatingZone, limit: BOUNDS_CAP + item.overrides.length + 1 }
+                );
+                const lastEnd = Math.max(
+                    ...occurrences.map((occurrence) => occurrence.end.getTime()),
+                    lastStart.getTime()
+                );
                 endsAt = new Date(Math.max(lastEnd, endsAt?.getTime() ?? 0));
             }
         }

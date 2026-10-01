@@ -19,7 +19,13 @@ import { host } from "@polaris/app-host";
 import type { SourceView } from "./wire";
 import { CalendarRefusal } from "./errors";
 import type { SessionUser } from "./access";
-import { feedAddressOf, fetcherFor, ownerMayReachLan, sealFeedAddress, syncSource } from "./sync-engine";
+import {
+    feedAddressOf,
+    fetcherFor,
+    ownerMayReachLan,
+    sealFeedAddress,
+    syncSource
+} from "./sync-engine";
 
 /** Sources one person may link. More than anybody reads; a bound all the same. */
 const MAX_SOURCES = 50;
@@ -57,7 +63,10 @@ function view(row: {
         label: row.label,
         url: row.url,
         username: row.username,
-        status: (["ok", "auth", "unreachable", "error"] as const).find((status) => status === row.status) ?? "error",
+        status:
+            (["ok", "auth", "unreachable", "error"] as const).find(
+                (status) => status === row.status
+            ) ?? "error",
         lastError: row.lastError,
         lastSyncAt: row.lastSyncAt?.toISOString() ?? null,
         refreshMinutes: row.refreshMinutes,
@@ -66,12 +75,21 @@ function view(row: {
     };
 }
 
-const FEED_SECRET = { id: true, url: true, encryptedSecret: true, secretNonce: true, secretKeyId: true } as const;
+const FEED_SECRET = {
+    id: true,
+    url: true,
+    encryptedSecret: true,
+    secretNonce: true,
+    secretKeyId: true
+} as const;
 
 /** The addresses of this person's feeds, opened. A feed subscribed before
  *  addresses were sealed is sealed on the way. */
 async function feedAddresses(user: SessionUser): Promise<string[]> {
-    const feeds = await prisma.calendarSource.findMany({ where: { userId: user.id, kind: "ics" }, select: FEED_SECRET });
+    const feeds = await prisma.calendarSource.findMany({
+        where: { userId: user.id, kind: "ics" },
+        select: FEED_SECRET
+    });
     const addresses: string[] = [];
     for (const feed of feeds) {
         const address = await feedAddressOf(feed);
@@ -82,7 +100,10 @@ async function feedAddresses(user: SessionUser): Promise<string[]> {
 
 /** Which of these public addresses - the holiday list, the operator's
  *  suggestions - this person already subscribes to. */
-export async function subscribedAmong(user: SessionUser, catalog: readonly string[]): Promise<string[]> {
+export async function subscribedAmong(
+    user: SessionUser,
+    catalog: readonly string[]
+): Promise<string[]> {
     const held = new Set(await feedAddresses(user));
     return catalog.filter((address) => held.has(sync.feedUrl(address)));
 }
@@ -104,7 +125,9 @@ async function roomForAnother(user: SessionUser): Promise<void> {
 
 /** Pull a new source's calendars without holding the screen. */
 function firstPull(sourceId: string): void {
-    void syncSource(sourceId).catch((caught: unknown) => console.error("polaris: a new calendar source did not sync:", caught));
+    void syncSource(sourceId).catch((caught: unknown) =>
+        console.error("polaris: a new calendar source did not sync:", caught)
+    );
 }
 
 /**
@@ -112,7 +135,9 @@ function firstPull(sourceId: string): void {
  * on a private network: the protocol clients report every failed fetch as the
  * server being unreachable, and that one deserves its own sentence.
  */
-async function checkingFetcher(user: SessionUser): Promise<{ fetcher: sync.Fetcher; refusedAddress: () => boolean }> {
+async function checkingFetcher(
+    user: SessionUser
+): Promise<{ fetcher: sync.Fetcher; refusedAddress: () => boolean }> {
     const guarded = fetcherFor(await ownerMayReachLan(user.id));
     let refused = false;
     const fetcher: sync.Fetcher = async (url, init) => {
@@ -131,9 +156,12 @@ async function refusalFor(caught: unknown, refusedAddress = false): Promise<Cale
     const t = await calendarT();
     if (refusedAddress) return new CalendarRefusal(t("sources.privateAddress"));
     if (caught instanceof CalendarRefusal) return caught;
-    if (caught instanceof sync.SyncAuthError) return new CalendarRefusal(t("sources.refusedCredentials"));
-    if (caught instanceof sync.SyncUnreachableError) return new CalendarRefusal(t("sources.unreachable"));
-    if (caught instanceof Error && caught.name === "RefusedAddressError") return new CalendarRefusal(t("sources.privateAddress"));
+    if (caught instanceof sync.SyncAuthError)
+        return new CalendarRefusal(t("sources.refusedCredentials"));
+    if (caught instanceof sync.SyncUnreachableError)
+        return new CalendarRefusal(t("sources.unreachable"));
+    if (caught instanceof Error && caught.name === "RefusedAddressError")
+        return new CalendarRefusal(t("sources.privateAddress"));
     if (caught instanceof sync.SyncNotFoundError) return new CalendarRefusal(t("sources.notFound"));
     if (caught instanceof sync.SyncError) return new CalendarRefusal(t("sources.notACalendar"));
     console.error("polaris: a calendar source could not be checked:", caught);
@@ -149,7 +177,12 @@ async function checkFeed(user: SessionUser, url: string): Promise<void> {
     }
     const check = await checkingFetcher(user);
     try {
-        const first = await sync.fetchIcsFeed({ url, etag: null, lastModified: null, fetcher: check.fetcher });
+        const first = await sync.fetchIcsFeed({
+            url,
+            etag: null,
+            lastModified: null,
+            fetcher: check.fetcher
+        });
         if (first.notModified) throw new sync.SyncRefusedError("empty", null);
     } catch (caught) {
         throw await refusalFor(caught, check.refusedAddress());
@@ -199,7 +232,12 @@ export async function addCalDav(
     const check = await checkingFetcher(user);
     let found: Awaited<ReturnType<typeof sync.discoverCalDav>>;
     try {
-        found = await sync.discoverCalDav({ url: input.url, username: input.username, password: input.password, fetcher: check.fetcher });
+        found = await sync.discoverCalDav({
+            url: input.url,
+            username: input.username,
+            password: input.password,
+            fetcher: check.fetcher
+        });
     } catch (caught) {
         throw await refusalFor(caught, check.refusedAddress());
     }
@@ -251,7 +289,10 @@ export async function addLinkedAccount(user: SessionUser, connectionId: string):
 }
 
 async function ownSource(user: SessionUser, id: string) {
-    const row = await prisma.calendarSource.findFirst({ where: { id, userId: user.id }, select: { id: true, kind: true } });
+    const row = await prisma.calendarSource.findFirst({
+        where: { id, userId: user.id },
+        select: { id: true, kind: true }
+    });
     if (!row) throw new CalendarRefusal((await calendarT())("sources.notFound"));
     return row;
 }
@@ -260,7 +301,10 @@ async function ownSource(user: SessionUser, id: string) {
 export async function refreshSource(user: SessionUser, id: string): Promise<SourceView> {
     const source = await ownSource(user, id);
     await syncSource(source.id);
-    const row = await prisma.calendarSource.findUniqueOrThrow({ where: { id: source.id }, select: VIEW });
+    const row = await prisma.calendarSource.findUniqueOrThrow({
+        where: { id: source.id },
+        select: VIEW
+    });
     return view(row);
 }
 
@@ -278,11 +322,17 @@ export async function updateSource(
         await checkFeed(user, patch.url);
         await sealFeedAddress(id, patch.url);
         // The validators belong to the old address.
-        await prisma.calendar.updateMany({ where: { sourceId: id }, data: { syncToken: "", ctag: "" } });
+        await prisma.calendar.updateMany({
+            where: { sourceId: id },
+            data: { syncToken: "", ctag: "" }
+        });
         Object.assign(data, { status: "ok", lastError: null, nextSyncAt: new Date() });
     }
     if (patch.password !== undefined && source.kind === "caldav") {
-        const row = await prisma.calendarSource.findUniqueOrThrow({ where: { id }, select: { url: true, username: true } });
+        const row = await prisma.calendarSource.findUniqueOrThrow({
+            where: { id },
+            select: { url: true, username: true }
+        });
         const check = await checkingFetcher(user);
         try {
             await sync.discoverCalDav({

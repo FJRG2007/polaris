@@ -9,7 +9,11 @@ import { VoteForm } from "../../../../screens/public/vote-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function VotePage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function VotePage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     const { token } = await params;
     if (typeof token !== "string") notFound();
     const view = await votePage(token);

@@ -11,7 +11,8 @@
  */
 
 const DOMAIN = "resource.invalid";
-const PATTERN = /^room-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@resource\.invalid$/;
+const PATTERN =
+    /^room-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@resource\.invalid$/;
 
 /** The address a resource calendar is invited at. */
 export function resourceAddress(calendarId: string): string {

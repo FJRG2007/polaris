@@ -25,13 +25,17 @@ export interface SearchResult {
 }
 
 /** Occurrences on screen whose title or place has every typed word. Pure. */
-export function localMatches(occurrences: readonly OccurrenceView[], query: string): OccurrenceView[] {
+export function localMatches(
+    occurrences: readonly OccurrenceView[],
+    query: string
+): OccurrenceView[] {
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (words.length === 0) return [];
     const seen = new Set<string>();
     return occurrences.filter((occurrence) => {
         if (occurrence.busyOnly || seen.has(occurrence.objectId)) return false;
-        const haystack = `${occurrence.summary} ${occurrence.location} ${occurrence.categories.join(" ")}`.toLowerCase();
+        const haystack =
+            `${occurrence.summary} ${occurrence.location} ${occurrence.categories.join(" ")}`.toLowerCase();
         if (!words.every((word) => haystack.includes(word))) return false;
         seen.add(occurrence.objectId);
         return true;
@@ -83,7 +87,10 @@ export function CalendarSearch({
         const controller = new AbortController();
         setSearching(true);
         const timer = setTimeout(() => {
-            fetch(`/api/calendar/search?q=${encodeURIComponent(text)}&zone=${encodeURIComponent(zone)}`, { cache: "no-store", signal: controller.signal })
+            fetch(
+                `/api/calendar/search?q=${encodeURIComponent(text)}&zone=${encodeURIComponent(zone)}`,
+                { cache: "no-store", signal: controller.signal }
+            )
                 .then(async (response) => {
                     if (!response.ok) throw new Error(String(response.status));
                     const body = (await response.json()) as { hits?: SearchHit[] };
@@ -107,7 +114,13 @@ export function CalendarSearch({
             objectId: occurrence.objectId,
             recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null,
             title: occurrence.summary || t("screen.untitled"),
-            when: occurrence.allDay && occurrence.startDate ? formatDay(occurrence.startDate, locale, { dateStyle: "medium" }) : formatInstant(occurrence.start, locale, zone, { dateStyle: "medium", timeStyle: "short" }),
+            when:
+                occurrence.allDay && occurrence.startDate
+                    ? formatDay(occurrence.startDate, locale, { dateStyle: "medium" })
+                    : formatInstant(occurrence.start, locale, zone, {
+                          dateStyle: "medium",
+                          timeStyle: "short"
+                      }),
             color: colorOf(occurrence.calendarId, occurrence.color),
             day: occurrence.startDate ?? wallOf(occurrence.start, zone).slice(0, 10)
         }));
@@ -118,7 +131,16 @@ export function CalendarSearch({
                 objectId: hit.objectId,
                 recurrenceKey: null,
                 title: hit.summary || t("screen.untitled"),
-                when: hit.start ? (hit.allDay ? formatDay(wallOf(hit.start, zone).slice(0, 10), locale, { dateStyle: "medium" }) : formatInstant(hit.start, locale, zone, { dateStyle: "medium", timeStyle: "short" })) : "",
+                when: hit.start
+                    ? hit.allDay
+                        ? formatDay(wallOf(hit.start, zone).slice(0, 10), locale, {
+                              dateStyle: "medium"
+                          })
+                        : formatInstant(hit.start, locale, zone, {
+                              dateStyle: "medium",
+                              timeStyle: "short"
+                          })
+                    : "",
                 color: colorOf(hit.calendarId, hit.color),
                 day: hit.start ? wallOf(hit.start, zone).slice(0, 10) : null
             }));
@@ -160,15 +182,25 @@ export function CalendarSearch({
     return (
         <div className={cn("relative min-w-0", expanded ? "flex-1 sm:w-64 sm:flex-none" : "")}>
             {!expanded ? (
-                <Button size="icon-sm" variant="ghost" className="sm:hidden" aria-label={t("search.label")} title={t("search.label")} onClick={() => {
-                    setExpanded(true);
-                    setTimeout(() => input.current?.focus(), 0);
-                }}>
+                <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="sm:hidden"
+                    aria-label={t("search.label")}
+                    title={t("search.label")}
+                    onClick={() => {
+                        setExpanded(true);
+                        setTimeout(() => input.current?.focus(), 0);
+                    }}
+                >
                     <SearchIcon />
                 </Button>
             ) : null}
             <div className={cn("relative", expanded ? "block" : "hidden sm:block")}>
-                <SearchIcon aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle" />
+                <SearchIcon
+                    aria-hidden
+                    className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-foreground-subtle"
+                />
                 <Input
                     ref={input}
                     type="search"
@@ -176,7 +208,9 @@ export function CalendarSearch({
                     aria-label={t("search.label")}
                     aria-expanded={showList}
                     aria-controls={listId}
-                    aria-activedescendant={showList && results[active] ? `${listId}-${active}` : undefined}
+                    aria-activedescendant={
+                        showList && results[active] ? `${listId}-${active}` : undefined
+                    }
                     placeholder={t("search.placeholder")}
                     className="h-7 w-full pl-8 pr-7 sm:w-56"
                     value={query}
@@ -190,14 +224,25 @@ export function CalendarSearch({
                     onKeyDown={onKeyDown}
                 />
                 {query ? (
-                    <button type="button" aria-label={t("search.clear")} title={t("search.clear")} className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground" onClick={() => setQuery("")}>
+                    <button
+                        type="button"
+                        aria-label={t("search.clear")}
+                        title={t("search.clear")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground"
+                        onClick={() => setQuery("")}
+                    >
                         <X className="size-3.5" />
                     </button>
                 ) : null}
             </div>
             {showList ? (
                 <div className="absolute right-0 top-full z-40 mt-1 w-[min(24rem,calc(100vw-1.5rem))] rounded-lg border border-border-strong bg-elevated p-1 shadow-popover">
-                    <ul id={listId} role="listbox" aria-label={t("search.results")} className="max-h-80 overflow-y-auto">
+                    <ul
+                        id={listId}
+                        role="listbox"
+                        aria-label={t("search.results")}
+                        className="max-h-80 overflow-y-auto"
+                    >
                         {results.map((result, index) => (
                             <li
                                 key={`${result.objectId}-${result.recurrenceKey ?? ""}`}
@@ -209,13 +254,21 @@ export function CalendarSearch({
                                     pick(result);
                                 }}
                                 onMouseEnter={() => setActive(index)}
-                                className={cn("flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1.5", index === active && "bg-option-hover")}
+                                className={cn(
+                                    "flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1.5",
+                                    index === active && "bg-option-hover"
+                                )}
                             >
                                 <ColorDot color={result.color} />
-                                <span className="min-w-0 flex-1 truncate text-[0.8125rem]" title={result.title}>
+                                <span
+                                    className="min-w-0 flex-1 truncate text-[0.8125rem]"
+                                    title={result.title}
+                                >
                                     {result.title}
                                 </span>
-                                <span className="shrink-0 text-xs text-foreground-subtle tabular-nums">{result.when}</span>
+                                <span className="shrink-0 text-xs text-foreground-subtle tabular-nums">
+                                    {result.when}
+                                </span>
                             </li>
                         ))}
                     </ul>
@@ -225,9 +278,13 @@ export function CalendarSearch({
                             {t("search.searching")}
                         </p>
                     ) : failed ? (
-                        <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("search.failed")}</p>
+                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {t("search.failed")}
+                        </p>
                     ) : results.length === 0 ? (
-                        <p className="px-2 py-1.5 text-xs text-muted-foreground">{query.trim().length < 2 ? t("search.keepTyping") : t("search.none")}</p>
+                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {query.trim().length < 2 ? t("search.keepTyping") : t("search.none")}
+                        </p>
                     ) : null}
                 </div>
             ) : null}

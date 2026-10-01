@@ -12,7 +12,11 @@ import { PublicCalendar } from "../../../../screens/public/public-calendar";
 
 export const dynamic = "force-dynamic";
 
-export default async function PublishedCalendarPage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function PublishedCalendarPage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     const { token } = await params;
     const calendar = typeof token === "string" ? await publishedCalendar(token) : null;
     if (!calendar || typeof token !== "string") notFound();

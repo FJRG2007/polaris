@@ -21,7 +21,11 @@ export async function POST(request: Request): Promise<Response> {
     const parsed = freeBusyRequestSchema.safeParse(body);
     if (!parsed.success) return Response.json({ error: "input" }, { status: 400 });
     try {
-        const view = await freeBusy(user, { ...parsed.data, from: new Date(parsed.data.from), to: new Date(parsed.data.to) });
+        const view = await freeBusy(user, {
+            ...parsed.data,
+            from: new Date(parsed.data.from),
+            to: new Date(parsed.data.to)
+        });
         return Response.json(view, { headers: { "cache-control": "no-store" } });
     } catch (caught) {
         console.error("polaris: free/busy could not be answered:", caught);

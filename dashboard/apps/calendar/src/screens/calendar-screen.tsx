@@ -16,7 +16,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, ChevronLeft, ChevronRight, Keyboard, Loader2, Menu, MoreVertical, Plus, Printer, RefreshCw, Settings, Trash2 } from "lucide-react";
+import {
+    CalendarCheck,
+    ChevronLeft,
+    ChevronRight,
+    Keyboard,
+    Loader2,
+    Menu,
+    MoreVertical,
+    Plus,
+    Printer,
+    RefreshCw,
+    Settings,
+    Trash2
+} from "lucide-react";
 import {
     Button,
     cn,
@@ -59,7 +72,13 @@ import { cacheKey, dropCached, unwrap, useCachedRead } from "./cached-read";
 import { CalendarDialog, type CalendarDialogTarget } from "./calendar-dialog";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarSummary, OccurrenceView, RangeView, TaskItemView } from "../lib/wire";
-import { DEFAULT_PREFERENCES, VIEWS, newEventMinutes, type CalendarPreferences, type CalendarViewName } from "../lib/preferences";
+import {
+    DEFAULT_PREFERENCES,
+    VIEWS,
+    newEventMinutes,
+    type CalendarPreferences,
+    type CalendarViewName
+} from "../lib/preferences";
 
 const GridView = lazy(() => import("./grid-view"));
 
@@ -69,25 +88,52 @@ const REFRESH_MS = 120_000;
 type Selected = { readonly id: string; readonly item: GridItem } | null;
 
 type Popover =
-    | { readonly kind: "event"; readonly occurrence: OccurrenceView; readonly anchor: DOMRect | null }
-    | { readonly kind: "new"; readonly start: GridMoment; readonly end: GridMoment; readonly anchor: DOMRect | null; readonly summary: string; readonly calendarId: string }
+    | {
+          readonly kind: "event";
+          readonly occurrence: OccurrenceView;
+          readonly anchor: DOMRect | null;
+      }
+    | {
+          readonly kind: "new";
+          readonly start: GridMoment;
+          readonly end: GridMoment;
+          readonly anchor: DOMRect | null;
+          readonly summary: string;
+          readonly calendarId: string;
+      }
     | null;
 
-async function readRange(span: { from: Date; to: Date }, zone: string, signal: AbortSignal, failed: string): Promise<RangeView> {
-    const query = new URLSearchParams({ from: span.from.toISOString(), to: span.to.toISOString(), zone, tasks: "1" });
+async function readRange(
+    span: { from: Date; to: Date },
+    zone: string,
+    signal: AbortSignal,
+    failed: string
+): Promise<RangeView> {
+    const query = new URLSearchParams({
+        from: span.from.toISOString(),
+        to: span.to.toISOString(),
+        zone,
+        tasks: "1"
+    });
     const response = await fetch(`/api/calendar/range?${query}`, { cache: "no-store", signal });
     if (!response.ok) throw new Error(failed);
     return (await response.json()) as RangeView;
 }
 
 /** The occurrence moved by what a drag did, for the optimistic draw. */
-function shifted(occurrence: OccurrenceView, startDeltaMs: number, endDeltaMs: number): OccurrenceView {
+function shifted(
+    occurrence: OccurrenceView,
+    startDeltaMs: number,
+    endDeltaMs: number
+): OccurrenceView {
     const days = (ms: number) => Math.round(ms / 86_400_000);
     return {
         ...occurrence,
         start: new Date(new Date(occurrence.start).getTime() + startDeltaMs).toISOString(),
         end: new Date(new Date(occurrence.end).getTime() + endDeltaMs).toISOString(),
-        startDate: occurrence.startDate ? time.addDays(occurrence.startDate, days(startDeltaMs)) : null,
+        startDate: occurrence.startDate
+            ? time.addDays(occurrence.startDate, days(startDeltaMs))
+            : null,
         endDate: occurrence.endDate ? time.addDays(occurrence.endDate, days(endDeltaMs)) : null
     };
 }
@@ -98,12 +144,24 @@ function sameOccurrence(a: OccurrenceView, b: OccurrenceView): boolean {
 
 /** Where new events go: the chosen calendar if it still takes events, else the
  *  first of one's own that does. */
-export function defaultCalendarId(calendars: readonly CalendarSummary[], preferences: CalendarPreferences): string {
-    const takes = (calendar: CalendarSummary) => calendar.writable && calendar.components.includes("VEVENT");
-    const chosen = calendars.find((calendar) => calendar.id === preferences.defaultCalendarId && takes(calendar));
+export function defaultCalendarId(
+    calendars: readonly CalendarSummary[],
+    preferences: CalendarPreferences
+): string {
+    const takes = (calendar: CalendarSummary) =>
+        calendar.writable && calendar.components.includes("VEVENT");
+    const chosen = calendars.find(
+        (calendar) => calendar.id === preferences.defaultCalendarId && takes(calendar)
+    );
     if (chosen) return chosen.id;
     const sorted = [...calendars].sort((a, b) => a.position - b.position);
-    return (sorted.find((calendar) => calendar.reach === "owner" && takes(calendar) && !calendar.hidden) ?? sorted.find(takes))?.id ?? "";
+    return (
+        (
+            sorted.find(
+                (calendar) => calendar.reach === "owner" && takes(calendar) && !calendar.hidden
+            ) ?? sorted.find(takes)
+        )?.id ?? ""
+    );
 }
 
 export function CalendarScreen({ path }: { path: string[] }) {
@@ -116,8 +174,18 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const [askScope, scopeElement] = useScopeChoice();
     const route = useMemo(() => time.parseCalendarPath(path), [path]);
 
-    const preferencesRead = useCachedRead<CalendarPreferences>(cacheKey("preferences"), async () => (await unwrap(() => preferenceActions.loadPreferencesAction(), t("screen.failed"))).preferences);
-    const calendarsRead = useCachedRead<CalendarSummary[]>(cacheKey("calendars"), async () => (await unwrap(() => calendarActions.listCalendarsAction(), t("screen.failed"))).calendars);
+    const preferencesRead = useCachedRead<CalendarPreferences>(
+        cacheKey("preferences"),
+        async () =>
+            (await unwrap(() => preferenceActions.loadPreferencesAction(), t("screen.failed")))
+                .preferences
+    );
+    const calendarsRead = useCachedRead<CalendarSummary[]>(
+        cacheKey("calendars"),
+        async () =>
+            (await unwrap(() => calendarActions.listCalendarsAction(), t("screen.failed")))
+                .calendars
+    );
     const preferences = preferencesRead.data ?? DEFAULT_PREFERENCES;
     const calendars = calendarsRead.data;
     const zone = time.displayZone(preferences.timezone, format.preferences.timeZone);
@@ -131,17 +199,25 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const viewChosen = useRef(route.view !== null);
     const [selected, setSelected] = useState<Selected>(null);
     const [popover, setPopover] = useState<Popover>(null);
-    const [editor, setEditor] = useState<EditorTarget | null>(route.objectId ? { kind: "open", objectId: route.objectId, recurrenceKey: null } : null);
+    const [editor, setEditor] = useState<EditorTarget | null>(
+        route.objectId ? { kind: "open", objectId: route.objectId, recurrenceKey: null } : null
+    );
     const [todoId, setTodoId] = useState<string | null>(null);
     const [calendarDialog, setCalendarDialog] = useState<CalendarDialogTarget | null>(null);
-    const [shareFor, setShareFor] = useState<{ calendar: CalendarSummary; kind: "share" | "publish" } | null>(null);
+    const [shareFor, setShareFor] = useState<{
+        calendar: CalendarSummary;
+        kind: "share" | "publish";
+    } | null>(null);
     const [addOpen, setAddOpen] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const [helpOpen, setHelpOpen] = useState(false);
     const [picker, setPicker] = useState<DOMRect | null>(null);
     const [searchSignal, setSearchSignal] = useState(0);
     const [creating, setCreating] = useState(false);
-    const [tasks, setTasks] = useState<{ items: TaskItemView[] | null; error: string | null }>({ items: null, error: null });
+    const [tasks, setTasks] = useState<{ items: TaskItemView[] | null; error: string | null }>({
+        items: null,
+        error: null
+    });
     const undo = useRef<{ run: () => Promise<void> } | null>(null);
 
     // The view the calendar was left on, once the settings have arrived - unless
@@ -153,17 +229,29 @@ export function CalendarScreen({ path }: { path: string[] }) {
         }
     }, [preferencesRead.data]);
 
-    const span = useMemo(() => time.viewWindow(view, anchor, firstDay, preferences.customDays), [view, anchor, firstDay, preferences.customDays]);
+    const span = useMemo(
+        () => time.viewWindow(view, anchor, firstDay, preferences.customDays),
+        [view, anchor, firstDay, preferences.customDays]
+    );
     const instants = useMemo(() => time.windowInstants(span, zone), [span, zone]);
-    const rangeKey = cacheKey("range", zone, instants.from.toISOString(), instants.to.toISOString());
-    const rangeRead = useCachedRead<RangeView>(rangeKey, (signal) => readRange(instants, zone, signal, t("grid.loadFailed")));
+    const rangeKey = cacheKey(
+        "range",
+        zone,
+        instants.from.toISOString(),
+        instants.to.toISOString()
+    );
+    const rangeRead = useCachedRead<RangeView>(rangeKey, (signal) =>
+        readRange(instants, zone, signal, t("grid.loadFailed"))
+    );
     const { refresh: refreshRange, replace: replaceRange } = rangeRead;
 
     // The address follows the view; an opened event keeps its own until closed.
     useEffect(() => {
-        if (editor?.kind === "open" && window.location.pathname === time.eventPath(editor.objectId)) return;
+        if (editor?.kind === "open" && window.location.pathname === time.eventPath(editor.objectId))
+            return;
         const next = time.calendarPath(view, anchor);
-        if (window.location.pathname !== next) window.history.replaceState(window.history.state, "", next);
+        if (window.location.pathname !== next)
+            window.history.replaceState(window.history.state, "", next);
     }, [view, anchor, editor]);
 
     // Read again when the tab comes back, and now and then while it is seen.
@@ -171,7 +259,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
         const onVisible = () => {
             if (document.visibilityState === "visible") refreshRange();
         };
-        const timer = setInterval(() => document.visibilityState === "visible" && refreshRange(), REFRESH_MS);
+        const timer = setInterval(
+            () => document.visibilityState === "visible" && refreshRange(),
+            REFRESH_MS
+        );
         document.addEventListener("visibilitychange", onVisible);
         return () => {
             clearInterval(timer);
@@ -179,7 +270,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
         };
     }, [refreshRange]);
 
-    const calendarsById = useMemo(() => new Map((calendars ?? []).map((calendar) => [calendar.id, calendar])), [calendars]);
+    const calendarsById = useMemo(
+        () => new Map((calendars ?? []).map((calendar) => [calendar.id, calendar])),
+        [calendars]
+    );
     const events = useMemo(
         () =>
             gridEvents(rangeRead.data, {
@@ -192,10 +286,25 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 calendars: calendarsById,
                 t
             }),
-        [rangeRead.data, zone, locale, now, preferences.showDeclined, preferences.showTasks, preferences.dimPast, calendarsById, t]
+        [
+            rangeRead.data,
+            zone,
+            locale,
+            now,
+            preferences.showDeclined,
+            preferences.showTasks,
+            preferences.dimPast,
+            calendarsById,
+            t
+        ]
     );
 
-    const failed = (title: string, caught: unknown) => toast.show({ key: `calendar-${title}`, title, body: caught instanceof Error ? caught.message : undefined });
+    const failed = (title: string, caught: unknown) =>
+        toast.show({
+            key: `calendar-${title}`,
+            title,
+            body: caught instanceof Error ? caught.message : undefined
+        });
 
     /** Everything that changes events makes every kept window stale. */
     const eventsChanged = useCallback(() => {
@@ -207,11 +316,16 @@ export function CalendarScreen({ path }: { path: string[] }) {
         async (patch: Partial<CalendarPreferences>) => {
             const current = preferencesRead.data;
             if (!current) return;
-            const changed = (Object.keys(patch) as (keyof CalendarPreferences)[]).some((key) => JSON.stringify(patch[key]) !== JSON.stringify(current[key]));
+            const changed = (Object.keys(patch) as (keyof CalendarPreferences)[]).some(
+                (key) => JSON.stringify(patch[key]) !== JSON.stringify(current[key])
+            );
             if (!changed) return;
             preferencesRead.replace({ ...current, ...patch });
             try {
-                const answer = await unwrap(() => preferenceActions.savePreferencesAction(patch), t("screen.failed"));
+                const answer = await unwrap(
+                    () => preferenceActions.savePreferencesAction(patch),
+                    t("screen.failed")
+                );
                 preferencesRead.replace(answer.preferences);
             } catch (caught) {
                 preferencesRead.replace(current);
@@ -227,16 +341,24 @@ export function CalendarScreen({ path }: { path: string[] }) {
         setView(next);
         void savePreferences({ view: next });
     };
-    const step = (direction: 1 | -1) => setAnchor((current) => time.stepAnchor(view, current, direction, preferences.customDays));
+    const step = (direction: 1 | -1) =>
+        setAnchor((current) => time.stepAnchor(view, current, direction, preferences.customDays));
 
     // --- Calendars -----------------------------------------------------------
 
-    const changeCalendars = async (next: CalendarSummary[], call: () => Promise<{ ok: boolean }>, failure: string) => {
+    const changeCalendars = async (
+        next: CalendarSummary[],
+        call: () => Promise<{ ok: boolean }>,
+        failure: string
+    ) => {
         const previous = calendarsRead.data;
         if (!previous) return;
         calendarsRead.replace(next);
         try {
-            await unwrap(call as () => Promise<{ ok: true } | { ok: false; error: string }>, t("screen.failed"));
+            await unwrap(
+                call as () => Promise<{ ok: true } | { ok: false; error: string }>,
+                t("screen.failed")
+            );
         } catch (caught) {
             calendarsRead.replace(previous);
             failed(failure, caught);
@@ -246,14 +368,29 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const loadTasks = useCallback(() => {
         unwrap(() => taskActions.unscheduledTasksAction(), t("screen.failed"))
             .then((answer) => setTasks({ items: answer.tasks, error: null }))
-            .catch((caught: unknown) => setTasks((previous) => ({ items: previous.items, error: caught instanceof Error ? caught.message : String(caught) })));
+            .catch((caught: unknown) =>
+                setTasks((previous) => ({
+                    items: previous.items,
+                    error: caught instanceof Error ? caught.message : String(caught)
+                }))
+            );
     }, [t]);
 
     const scheduleTask = async (taskId: string, at: GridMoment) => {
         const previous = tasks.items;
-        setTasks((current) => ({ ...current, items: current.items?.filter((task) => task.id !== taskId) ?? null }));
+        setTasks((current) => ({
+            ...current,
+            items: current.items?.filter((task) => task.id !== taskId) ?? null
+        }));
         try {
-            await unwrap(() => taskActions.scheduleTaskAction({ taskId, due: { at: at.at.toISOString(), timed: !at.allDay } }), t("screen.failed"));
+            await unwrap(
+                () =>
+                    taskActions.scheduleTaskAction({
+                        taskId,
+                        due: { at: at.at.toISOString(), timed: !at.allDay }
+                    }),
+                t("screen.failed")
+            );
             toast.show({ key: "calendar-task-scheduled", title: t("tasksPanel.scheduled") });
             eventsChanged();
         } catch (caught) {
@@ -266,7 +403,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
         const previous = calendarsRead.data ?? [];
         const own = calendar.reach === "owner";
         const ok = await confirm({
-            title: own ? t("sidebar.deleteTitle", { name: calendar.name }) : t("sidebar.leaveTitle", { name: calendar.name }),
+            title: own
+                ? t("sidebar.deleteTitle", { name: calendar.name })
+                : t("sidebar.leaveTitle", { name: calendar.name }),
             description: own ? t("sidebar.deleteBody") : t("sidebar.leaveBody"),
             confirmLabel: own ? t("sidebar.delete") : t("sidebar.leave"),
             danger: true
@@ -275,13 +414,25 @@ export function CalendarScreen({ path }: { path: string[] }) {
         calendarsRead.replace(previous.filter((entry) => entry.id !== calendar.id));
         const restore = async () => {
             calendarsRead.replace(previous);
-            if (own) await unwrap(() => trashActions.restoreTrashAction({ kind: "calendar", id: calendar.id, zone }), t("screen.failed"));
+            if (own)
+                await unwrap(
+                    () =>
+                        trashActions.restoreTrashAction({
+                            kind: "calendar",
+                            id: calendar.id,
+                            zone
+                        }),
+                    t("screen.failed")
+                );
             calendarsRead.refresh();
             eventsChanged();
         };
         if (own) {
             try {
-                await unwrap(() => calendarActions.trashCalendarAction(calendar.id), t("screen.failed"));
+                await unwrap(
+                    () => calendarActions.trashCalendarAction(calendar.id),
+                    t("screen.failed")
+                );
                 eventsChanged();
             } catch (caught) {
                 calendarsRead.replace(previous);
@@ -305,11 +456,21 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     calendarsRead.replace(previous);
                 }
             };
-            toast.show({ key: `calendar-removed-${calendar.id}`, title: t("sidebar.left", { name: calendar.name }), life: 8000, actions: [{ label: t("screen.undo"), run: async () => (await runUndo()) }] });
+            toast.show({
+                key: `calendar-removed-${calendar.id}`,
+                title: t("sidebar.left", { name: calendar.name }),
+                life: 8000,
+                actions: [{ label: t("screen.undo"), run: async () => await runUndo() }]
+            });
             return;
         }
         undo.current = { run: restore };
-        toast.show({ key: `calendar-removed-${calendar.id}`, title: t("sidebar.deleted", { name: calendar.name }), life: 8000, actions: [{ label: t("screen.undo"), run: async () => (await runUndo()) }] });
+        toast.show({
+            key: `calendar-removed-${calendar.id}`,
+            title: t("sidebar.deleted", { name: calendar.name }),
+            life: 8000,
+            actions: [{ label: t("screen.undo"), run: async () => await runUndo() }]
+        });
     };
 
     const runUndo = async (): Promise<string | null> => {
@@ -328,7 +489,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
         onToggle: (calendar) => {
             const list = calendarsRead.data ?? [];
             void changeCalendars(
-                list.map((entry) => (entry.id === calendar.id ? { ...entry, hidden: !entry.hidden } : entry)),
+                list.map((entry) =>
+                    entry.id === calendar.id ? { ...entry, hidden: !entry.hidden } : entry
+                ),
                 () => calendarActions.setDisplayAction(calendar.id, { hidden: !calendar.hidden }),
                 t("sidebar.toggleFailed")
             );
@@ -369,10 +532,13 @@ export function CalendarScreen({ path }: { path: string[] }) {
             setDrawer(false);
         },
         onToggleSection: (section) => {
-            const collapsed = preferences.collapsed.includes(section) ? preferences.collapsed.filter((entry) => entry !== section) : [...preferences.collapsed, section].slice(-20);
+            const collapsed = preferences.collapsed.includes(section)
+                ? preferences.collapsed.filter((entry) => entry !== section)
+                : [...preferences.collapsed, section].slice(-20);
             void savePreferences({ collapsed });
         },
-        onScheduleTask: (task, day) => void scheduleTask(task.id, { at: time.dayStart(day, zone), day, allDay: true })
+        onScheduleTask: (task, day) =>
+            void scheduleTask(task.id, { at: time.dayStart(day, zone), day, allDay: true })
     };
 
     // --- Events --------------------------------------------------------------
@@ -391,10 +557,19 @@ export function CalendarScreen({ path }: { path: string[] }) {
 
     const openEditor = (occurrence: OccurrenceView) => {
         setPopover(null);
-        setEditor({ kind: "open", objectId: occurrence.objectId, recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null });
+        setEditor({
+            kind: "open",
+            objectId: occurrence.objectId,
+            recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null
+        });
     };
 
-    const newFormFor = (start: GridMoment, end: GridMoment, summary: string, calendarId: string) => {
+    const newFormFor = (
+        start: GridMoment,
+        end: GridMoment,
+        summary: string,
+        calendarId: string
+    ) => {
         const calendar = calendars?.find((entry) => entry.id === calendarId) ?? null;
         return model.newForm({
             calendarId,
@@ -410,13 +585,24 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const startCreate = (start: GridMoment, end: GridMoment, anchorRect: DOMRect | null) => {
         const calendarId = defaultCalendarId(calendars ?? [], preferences);
         // A click on a slot selects one slot; a new event takes the usual length.
-        const minimal = !start.allDay && end.at.getTime() - start.at.getTime() <= preferences.slotMinutes * 60_000;
-        const finish = minimal ? { ...end, at: new Date(start.at.getTime() + newEventMinutes(preferences) * 60_000) } : end;
+        const minimal =
+            !start.allDay &&
+            end.at.getTime() - start.at.getTime() <= preferences.slotMinutes * 60_000;
+        const finish = minimal
+            ? { ...end, at: new Date(start.at.getTime() + newEventMinutes(preferences) * 60_000) }
+            : end;
         if (preferences.skipPopover) {
             setEditor({ kind: "new", form: newFormFor(start, finish, "", calendarId) });
             return;
         }
-        setPopover({ kind: "new", start, end: finish, anchor: anchorRect, summary: "", calendarId });
+        setPopover({
+            kind: "new",
+            start,
+            end: finish,
+            anchor: anchorRect,
+            summary: "",
+            calendarId
+        });
     };
 
     const createFromCard = async () => {
@@ -431,7 +617,18 @@ export function CalendarScreen({ path }: { path: string[] }) {
         setCreating(true);
         const previous = rangeRead.data;
         try {
-            await unwrap(() => eventActions.saveEventAction({ objectId: null, recurrenceKey: null, scope: "all", version: null, zone, event: model.inputOf(form) }), t("screen.failed"));
+            await unwrap(
+                () =>
+                    eventActions.saveEventAction({
+                        objectId: null,
+                        recurrenceKey: null,
+                        scope: "all",
+                        version: null,
+                        zone,
+                        event: model.inputOf(form)
+                    }),
+                t("screen.failed")
+            );
             setPopover(null);
             toast.show({ key: "calendar-created-event", title: t("editor.created") });
             eventsChanged();
@@ -450,22 +647,62 @@ export function CalendarScreen({ path }: { path: string[] }) {
             const answer = await askScope({ action: "delete" });
             if (!answer) return;
             scope = answer;
-        } else if (!(await confirm({ title: t("editor.deleteTitle"), description: t("editor.deleteBody", { title: occurrence.summary || t("screen.untitled") }), confirmLabel: t("screen.delete"), danger: true }))) {
+        } else if (
+            !(await confirm({
+                title: t("editor.deleteTitle"),
+                description: t("editor.deleteBody", {
+                    title: occurrence.summary || t("screen.untitled")
+                }),
+                confirmLabel: t("screen.delete"),
+                danger: true
+            }))
+        ) {
             return;
         }
         setPopover(null);
         const previous = rangeRead.data;
-        if (previous) replaceRange({ ...previous, occurrences: previous.occurrences.filter((entry) => (scope === "this" ? !sameOccurrence(entry, occurrence) : entry.objectId !== occurrence.objectId || (scope === "following" && entry.start < occurrence.start))) });
+        if (previous)
+            replaceRange({
+                ...previous,
+                occurrences: previous.occurrences.filter((entry) =>
+                    scope === "this"
+                        ? !sameOccurrence(entry, occurrence)
+                        : entry.objectId !== occurrence.objectId ||
+                          (scope === "following" && entry.start < occurrence.start)
+                )
+            });
         try {
-            await unwrap(() => eventActions.deleteEventAction({ objectId: occurrence.objectId, recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null, scope, zone }), t("screen.failed"));
+            await unwrap(
+                () =>
+                    eventActions.deleteEventAction({
+                        objectId: occurrence.objectId,
+                        recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null,
+                        scope,
+                        zone
+                    }),
+                t("screen.failed")
+            );
             if (scope === "all") {
                 undo.current = {
                     run: async () => {
-                        await unwrap(() => trashActions.restoreTrashAction({ kind: "event", id: occurrence.objectId, zone }), t("screen.failed"));
+                        await unwrap(
+                            () =>
+                                trashActions.restoreTrashAction({
+                                    kind: "event",
+                                    id: occurrence.objectId,
+                                    zone
+                                }),
+                            t("screen.failed")
+                        );
                         eventsChanged();
                     }
                 };
-                toast.show({ key: "calendar-deleted-event", title: t("editor.deleted"), life: 8000, actions: [{ label: t("screen.undo"), run: async () => (await runUndo()) }] });
+                toast.show({
+                    key: "calendar-deleted-event",
+                    title: t("editor.deleted"),
+                    life: 8000,
+                    actions: [{ label: t("screen.undo"), run: async () => await runUndo() }]
+                });
             } else {
                 toast.show({ key: "calendar-deleted-event", title: t("editor.deleted") });
             }
@@ -480,7 +717,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const duplicateOccurrence = async (occurrence: OccurrenceView) => {
         setPopover(null);
         try {
-            const answer = await unwrap(() => eventActions.duplicateEventAction({ objectId: occurrence.objectId, zone }), t("screen.failed"));
+            const answer = await unwrap(
+                () => eventActions.duplicateEventAction({ objectId: occurrence.objectId, zone }),
+                t("screen.failed")
+            );
             eventsChanged();
             setEditor({ kind: "open", objectId: answer.objectId, recurrenceKey: null });
         } catch (caught) {
@@ -489,7 +729,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
     };
 
     const applyChange = async (change: GridChange) => {
-        if (change.item.kind !== "event" || (change.startDeltaMs === 0 && change.endDeltaMs === 0)) {
+        if (
+            change.item.kind !== "event" ||
+            (change.startDeltaMs === 0 && change.endDeltaMs === 0)
+        ) {
             change.revert();
             return;
         }
@@ -504,19 +747,51 @@ export function CalendarScreen({ path }: { path: string[] }) {
             scope = answer;
         }
         const previous = rangeRead.data;
-        if (previous) replaceRange({ ...previous, occurrences: previous.occurrences.map((entry) => (sameOccurrence(entry, occurrence) ? shifted(entry, change.startDeltaMs, change.endDeltaMs) : entry)) });
+        if (previous)
+            replaceRange({
+                ...previous,
+                occurrences: previous.occurrences.map((entry) =>
+                    sameOccurrence(entry, occurrence)
+                        ? shifted(entry, change.startDeltaMs, change.endDeltaMs)
+                        : entry
+                )
+            });
         const shift = (startDeltaMs: number, endDeltaMs: number, recurrenceKey: string | null) =>
-            unwrap(() => eventActions.shiftEventAction({ objectId: occurrence.objectId, recurrenceKey, startDeltaMs, endDeltaMs, scope, version: null, zone }), t("screen.failed"));
+            unwrap(
+                () =>
+                    eventActions.shiftEventAction({
+                        objectId: occurrence.objectId,
+                        recurrenceKey,
+                        startDeltaMs,
+                        endDeltaMs,
+                        scope,
+                        version: null,
+                        zone
+                    }),
+                t("screen.failed")
+            );
         try {
-            await shift(change.startDeltaMs, change.endDeltaMs, occurrence.recurring ? occurrence.recurrenceKey : null);
+            await shift(
+                change.startDeltaMs,
+                change.endDeltaMs,
+                occurrence.recurring ? occurrence.recurrenceKey : null
+            );
             undo.current = {
                 // The occurrence's own key is unchanged by a move: it names the original start.
                 run: async () => {
-                    await shift(-change.startDeltaMs, -change.endDeltaMs, occurrence.recurring ? occurrence.recurrenceKey : null);
+                    await shift(
+                        -change.startDeltaMs,
+                        -change.endDeltaMs,
+                        occurrence.recurring ? occurrence.recurrenceKey : null
+                    );
                     eventsChanged();
                 }
             };
-            toast.show({ key: "calendar-moved", title: t("grid.moved"), actions: [{ label: t("screen.undo"), run: async () => (await runUndo()) }] });
+            toast.show({
+                key: "calendar-moved",
+                title: t("grid.moved"),
+                actions: [{ label: t("screen.undo"), run: async () => await runUndo() }]
+            });
             eventsChanged();
         } catch (caught) {
             if (previous) replaceRange(previous);
@@ -532,11 +807,20 @@ export function CalendarScreen({ path }: { path: string[] }) {
         const at = time.dayStart(anchor, zone);
         const start = new Date(at.getTime() + hour * 3_600_000);
         const startMoment: GridMoment = { at: start, day: anchor, allDay: false };
-        startCreate(startMoment, { at: new Date(start.getTime() + newEventMinutes(preferences) * 60_000), day: anchor, allDay: false }, null);
+        startCreate(
+            startMoment,
+            {
+                at: new Date(start.getTime() + newEventMinutes(preferences) * 60_000),
+                day: anchor,
+                allDay: false
+            },
+            null
+        );
     };
 
     const openSearchResult = (result: SearchResult) => {
-        if (result.day && (result.day < span.start || result.day >= span.end)) setAnchor(result.day);
+        if (result.day && (result.day < span.start || result.day >= span.end))
+            setAnchor(result.day);
         setEditor({ kind: "open", objectId: result.objectId, recurrenceKey: result.recurrenceKey });
     };
 
@@ -552,7 +836,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 setAnchor(today);
                 return true;
             case "goTo":
-                setPicker(document.getElementById("calendar-heading")?.getBoundingClientRect() ?? null);
+                setPicker(
+                    document.getElementById("calendar-heading")?.getBoundingClientRect() ?? null
+                );
                 return true;
             case "view":
                 chooseView(action.view);
@@ -598,10 +884,24 @@ export function CalendarScreen({ path }: { path: string[] }) {
     });
 
     const label = time.windowLabel(view, anchor, span, locale);
-    const viewOptions = VIEWS.map((entry) => ({ value: entry, label: t(`views.${entry}`, { count: preferences.customDays }) }));
-    const colorOf = useCallback((calendarId: string, own: string | null) => own ?? calendarsById.get(calendarId)?.color ?? "#7f7f7f", [calendarsById]);
+    const viewOptions = VIEWS.map((entry) => ({
+        value: entry,
+        label: t(`views.${entry}`, { count: preferences.customDays })
+    }));
+    const colorOf = useCallback(
+        (calendarId: string, own: string | null) =>
+            own ?? calendarsById.get(calendarId)?.color ?? "#7f7f7f",
+        [calendarsById]
+    );
     const businessHours = useMemo(
-        () => Object.entries(preferences.workingHours).flatMap(([day, spans]) => (spans ?? []).map((span) => ({ daysOfWeek: [Number(day)], startTime: span.from, endTime: span.to }))),
+        () =>
+            Object.entries(preferences.workingHours).flatMap(([day, spans]) =>
+                (spans ?? []).map((span) => ({
+                    daysOfWeek: [Number(day)],
+                    startTime: span.from,
+                    endTime: span.to
+                }))
+            ),
         [preferences.workingHours]
     );
     const ShareCalendar = calendarSlots.ShareCalendar;
@@ -630,17 +930,42 @@ export function CalendarScreen({ path }: { path: string[] }) {
         <div data-cal-ready className="flex h-full min-h-0 flex-col">
             <header className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-2 sm:gap-2">
                 <div className="flex min-w-0 flex-1 items-center gap-1">
-                    <Button size="icon-sm" variant="ghost" className="lg:hidden" aria-label={t("header.calendars")} title={t("header.calendars")} onClick={() => setDrawer(true)}>
+                    <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        className="lg:hidden"
+                        aria-label={t("header.calendars")}
+                        title={t("header.calendars")}
+                        onClick={() => setDrawer(true)}
+                    >
                         <Menu />
                     </Button>
-                    <Button size="sm" variant="outline" aria-label={t("header.today")} title={t("header.todayHint")} onClick={() => setAnchor(today)}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={t("header.today")}
+                        title={t("header.todayHint")}
+                        onClick={() => setAnchor(today)}
+                    >
                         <CalendarCheck className="sm:hidden" />
                         <span className="hidden sm:inline">{t("header.today")}</span>
                     </Button>
-                    <Button size="icon-sm" variant="ghost" aria-label={t("header.previous")} title={t("header.previous")} onClick={() => step(-1)}>
+                    <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={t("header.previous")}
+                        title={t("header.previous")}
+                        onClick={() => step(-1)}
+                    >
                         <ChevronLeft />
                     </Button>
-                    <Button size="icon-sm" variant="ghost" aria-label={t("header.next")} title={t("header.next")} onClick={() => step(1)}>
+                    <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={t("header.next")}
+                        title={t("header.next")}
+                        onClick={() => step(1)}
+                    >
                         <ChevronRight />
                     </Button>
                     <h1 className="min-w-0 truncate text-[17px] font-semibold tracking-tight first-letter:uppercase tabular-nums">
@@ -650,24 +975,61 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             className="max-w-full truncate rounded px-1 text-left"
                             aria-label={t("header.goTo", { label })}
                             title={t("header.goTo", { label })}
-                            onClick={(event) => setPicker(event.currentTarget.getBoundingClientRect())}
+                            onClick={(event) =>
+                                setPicker(event.currentTarget.getBoundingClientRect())
+                            }
                         >
                             {label}
                         </button>
                     </h1>
-                    {rangeRead.loading ? <Loader2 aria-label={t("grid.loading")} className="size-4 animate-spin text-foreground-subtle" /> : null}
+                    {rangeRead.loading ? (
+                        <Loader2
+                            aria-label={t("grid.loading")}
+                            className="size-4 animate-spin text-foreground-subtle"
+                        />
+                    ) : null}
                 </div>
                 <div className="flex items-center gap-1.5">
-                    <CalendarSearch occurrences={rangeRead.data?.occurrences ?? []} colorOf={colorOf} zone={zone} locale={locale} focusSignal={searchSignal} onOpen={openSearchResult} />
-                    <SegmentedControl className="hidden xl:flex" size="sm" aria-label={t("header.view")} value={view} onValueChange={chooseView} options={viewOptions} />
-                    <Select className="h-7 w-28 xl:hidden" aria-label={t("header.view")} value={view} onValueChange={(next) => chooseView(next as CalendarViewName)} options={viewOptions} />
-                    <Button size="sm" aria-label={t("header.newEvent")} title={t("header.newEvent")} onClick={createNow}>
+                    <CalendarSearch
+                        occurrences={rangeRead.data?.occurrences ?? []}
+                        colorOf={colorOf}
+                        zone={zone}
+                        locale={locale}
+                        focusSignal={searchSignal}
+                        onOpen={openSearchResult}
+                    />
+                    <SegmentedControl
+                        className="hidden xl:flex"
+                        size="sm"
+                        aria-label={t("header.view")}
+                        value={view}
+                        onValueChange={chooseView}
+                        options={viewOptions}
+                    />
+                    <Select
+                        className="h-7 w-28 xl:hidden"
+                        aria-label={t("header.view")}
+                        value={view}
+                        onValueChange={(next) => chooseView(next as CalendarViewName)}
+                        options={viewOptions}
+                    />
+                    <Button
+                        size="sm"
+                        aria-label={t("header.newEvent")}
+                        title={t("header.newEvent")}
+                        onClick={createNow}
+                    >
                         <Plus />
                         <span className="hidden sm:inline">{t("header.newEvent")}</span>
                     </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button size="icon-sm" variant="ghost" aria-label={t("header.more")} title={t("header.more")}>
+                            <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                aria-label={t("header.more")}
+                                title={t("header.more")}
+                            >
                                 <MoreVertical />
                             </Button>
                         </DropdownMenuTrigger>
@@ -700,7 +1062,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <Button asChild size="icon-sm" variant="ghost">
-                        <Link href="/calendar/settings" aria-label={t("header.settings")} title={t("header.settings")}>
+                        <Link
+                            href="/calendar/settings"
+                            aria-label={t("header.settings")}
+                            title={t("header.settings")}
+                        >
                             <Settings />
                         </Link>
                     </Button>
@@ -708,29 +1074,44 @@ export function CalendarScreen({ path }: { path: string[] }) {
             </header>
 
             <div className="flex min-h-0 flex-1">
-                <aside aria-label={t("header.calendars")} className="hidden w-64 shrink-0 overflow-y-auto overscroll-contain border-r border-border bg-surface lg:block">
+                <aside
+                    aria-label={t("header.calendars")}
+                    className="hidden w-64 shrink-0 overflow-y-auto overscroll-contain border-r border-border bg-surface lg:block"
+                >
                     {sidebar}
                 </aside>
                 <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-card">
                     {rangeRead.error ? (
-                        <div role="alert" className="flex items-center gap-2 border-b border-border bg-warning-soft px-3 py-1.5 text-xs text-warning-ink">
+                        <div
+                            role="alert"
+                            className="flex items-center gap-2 border-b border-border bg-warning-soft px-3 py-1.5 text-xs text-warning-ink"
+                        >
                             <span className="min-w-0 flex-1">{t("grid.loadFailed")}</span>
                             <Button size="xs" variant="outline" onClick={refreshRange}>
                                 {t("screen.retry")}
                             </Button>
                         </div>
                     ) : rangeRead.stale ? (
-                        <p role="status" className="border-b border-border px-3 py-1 text-xs text-muted-foreground">
+                        <p
+                            role="status"
+                            className="border-b border-border px-3 py-1 text-xs text-muted-foreground"
+                        >
                             {t("grid.stale")}
                         </p>
                     ) : null}
                     {rangeRead.data && rangeRead.data.unreadable > 0 ? (
-                        <p role="status" className="border-b border-border px-3 py-1 text-xs text-muted-foreground">
+                        <p
+                            role="status"
+                            className="border-b border-border px-3 py-1 text-xs text-muted-foreground"
+                        >
                             {t("grid.unreadable", { count: rangeRead.data.unreadable })}
                         </p>
                     ) : null}
                     {rangeRead.data?.truncated ? (
-                        <p role="status" className="border-b border-border px-3 py-1 text-xs text-muted-foreground">
+                        <p
+                            role="status"
+                            className="border-b border-border px-3 py-1 text-xs text-muted-foreground"
+                        >
                             {t("grid.truncated")}
                         </p>
                     ) : null}
@@ -740,7 +1121,12 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             title={t("grid.noCalendars")}
                             description={t("grid.noCalendarsHint")}
                             action={
-                                <Button size="sm" onClick={() => setCalendarDialog({ kind: "new", withTasks: false })}>
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        setCalendarDialog({ kind: "new", withTasks: false })
+                                    }
+                                >
                                     <Plus />
                                     {t("sidebar.newCalendar")}
                                 </Button>
@@ -771,13 +1157,24 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                         noEvents: t("grid.noEvents"),
                                         week: t("grid.week"),
                                         more: (count) => t("grid.more", { count }),
-                                        secondaryZone: t("grid.secondaryZone", { zone: preferences.secondaryTimezone ?? "" })
+                                        secondaryZone: t("grid.secondaryZone", {
+                                            zone: preferences.secondaryTimezone ?? ""
+                                        })
                                     }}
-                                    onSelectRange={(range, anchorRect) => startCreate(range.start, range.end, anchorRect)}
-                                    onItemClick={(item, id, anchorRect) => openItem(item, id, anchorRect)}
+                                    onSelectRange={(range, anchorRect) =>
+                                        startCreate(range.start, range.end, anchorRect)
+                                    }
+                                    onItemClick={(item, id, anchorRect) =>
+                                        openItem(item, id, anchorRect)
+                                    }
                                     onItemFocus={(id) => {
                                         const found = events.find((event) => event.id === id);
-                                        if (found) setSelected({ id, item: (found.extendedProps as { item: GridItem }).item });
+                                        if (found)
+                                            setSelected({
+                                                id,
+                                                item: (found.extendedProps as { item: GridItem })
+                                                    .item
+                                            });
                                     }}
                                     onChange={(change) => void applyChange(change)}
                                     onTaskDrop={(taskId, at) => void scheduleTask(taskId, at)}
@@ -793,14 +1190,25 @@ export function CalendarScreen({ path }: { path: string[] }) {
             </div>
 
             <Dialog open={drawer} onOpenChange={setDrawer}>
-                <DialogContent aria-describedby={undefined} className="left-0 top-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none p-0 sm:w-80">
-                    <DialogTitle className="border-b border-border px-4 py-3 pr-14">{t("header.calendars")}</DialogTitle>
+                <DialogContent
+                    aria-describedby={undefined}
+                    className="left-0 top-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none p-0 sm:w-80"
+                >
+                    <DialogTitle className="border-b border-border px-4 py-3 pr-14">
+                        {t("header.calendars")}
+                    </DialogTitle>
                     {sidebar}
                 </DialogContent>
             </Dialog>
 
             {picker ? (
-                <AnchoredPanel open onOpenChange={(open) => !open && setPicker(null)} anchor={picker} title={t("header.goToTitle")} width={272}>
+                <AnchoredPanel
+                    open
+                    onOpenChange={(open) => !open && setPicker(null)}
+                    anchor={picker}
+                    title={t("header.goToTitle")}
+                    width={272}
+                >
                     <MiniMonth
                         value={anchor}
                         today={today}
@@ -835,8 +1243,22 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     anchor={newCard.anchor}
                     when={
                         newCard.start.allDay
-                            ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).formatRange(time.dayDate(newCard.start.day), time.dayDate(time.addDays(newCard.end.day, -1) < newCard.start.day ? newCard.start.day : time.addDays(newCard.end.day, -1)))
-                            : new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: zone }).formatRange(newCard.start.at, newCard.end.at)
+                            ? new Intl.DateTimeFormat(locale, {
+                                  dateStyle: "medium",
+                                  timeZone: "UTC"
+                              }).formatRange(
+                                  time.dayDate(newCard.start.day),
+                                  time.dayDate(
+                                      time.addDays(newCard.end.day, -1) < newCard.start.day
+                                          ? newCard.start.day
+                                          : time.addDays(newCard.end.day, -1)
+                                  )
+                              )
+                            : new Intl.DateTimeFormat(locale, {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                  timeZone: zone
+                              }).formatRange(newCard.start.at, newCard.end.at)
                     }
                     calendars={calendars ?? []}
                     calendarId={newCard.calendarId}
@@ -846,7 +1268,15 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     busy={creating}
                     onSave={() => void createFromCard()}
                     onMore={() => {
-                        setEditor({ kind: "new", form: newFormFor(newCard.start, newCard.end, newCard.summary, newCard.calendarId) });
+                        setEditor({
+                            kind: "new",
+                            form: newFormFor(
+                                newCard.start,
+                                newCard.end,
+                                newCard.summary,
+                                newCard.calendarId
+                            )
+                        });
                         setPopover(null);
                     }}
                     onClose={() => setPopover(null)}
@@ -857,7 +1287,12 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 target={editor}
                 onClose={() => {
                     setEditor(null);
-                    if (route.objectId) window.history.replaceState(window.history.state, "", time.calendarPath(view, anchor));
+                    if (route.objectId)
+                        window.history.replaceState(
+                            window.history.state,
+                            "",
+                            time.calendarPath(view, anchor)
+                        );
                 }}
                 calendars={calendars ?? []}
                 zone={zone}
@@ -865,7 +1300,12 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 onChanged={eventsChanged}
                 onOpen={(objectId) => setEditor({ kind: "open", objectId, recurrenceKey: null })}
             />
-            <TodoEditor objectId={todoId} zone={zone} onClose={() => setTodoId(null)} onChanged={eventsChanged} />
+            <TodoEditor
+                objectId={todoId}
+                zone={zone}
+                onClose={() => setTodoId(null)}
+                onChanged={eventsChanged}
+            />
             {calendarDialog ? (
                 <CalendarDialog
                     target={calendarDialog}
@@ -873,14 +1313,32 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     onClose={() => setCalendarDialog(null)}
                     onSaved={(calendar) => {
                         const list = calendarsRead.data ?? [];
-                        calendarsRead.replace(list.some((entry) => entry.id === calendar.id) ? list.map((entry) => (entry.id === calendar.id ? calendar : entry)) : [...list, calendar]);
+                        calendarsRead.replace(
+                            list.some((entry) => entry.id === calendar.id)
+                                ? list.map((entry) => (entry.id === calendar.id ? calendar : entry))
+                                : [...list, calendar]
+                        );
                         calendarsRead.refresh();
                         eventsChanged();
                     }}
                 />
             ) : null}
-            {shareFor && ShareCalendar && shareFor.kind === "share" ? <ShareCalendar calendar={shareFor.calendar} open onOpenChange={(open) => !open && setShareFor(null)} onChanged={calendarsRead.refresh} /> : null}
-            {shareFor && PublishCalendar && shareFor.kind === "publish" ? <PublishCalendar calendar={shareFor.calendar} open onOpenChange={(open) => !open && setShareFor(null)} onChanged={calendarsRead.refresh} /> : null}
+            {shareFor && ShareCalendar && shareFor.kind === "share" ? (
+                <ShareCalendar
+                    calendar={shareFor.calendar}
+                    open
+                    onOpenChange={(open) => !open && setShareFor(null)}
+                    onChanged={calendarsRead.refresh}
+                />
+            ) : null}
+            {shareFor && PublishCalendar && shareFor.kind === "publish" ? (
+                <PublishCalendar
+                    calendar={shareFor.calendar}
+                    open
+                    onOpenChange={(open) => !open && setShareFor(null)}
+                    onChanged={calendarsRead.refresh}
+                />
+            ) : null}
             {AddCalendars ? (
                 <AddCalendars
                     open={addOpen}
@@ -891,7 +1349,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     }}
                 />
             ) : null}
-            <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} enabled={preferences.keyboardShortcuts} />
+            <ShortcutsDialog
+                open={helpOpen}
+                onOpenChange={setHelpOpen}
+                enabled={preferences.keyboardShortcuts}
+            />
             {confirmElement}
             {scopeElement}
         </div>

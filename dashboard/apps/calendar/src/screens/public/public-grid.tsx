@@ -12,7 +12,11 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import type { EventInput } from "@fullcalendar/core";
 
-export const PUBLIC_VIEWS = { month: "dayGridMonth", week: "timeGridWeek", list: "listRange" } as const;
+export const PUBLIC_VIEWS = {
+    month: "dayGridMonth",
+    week: "timeGridWeek",
+    list: "listRange"
+} as const;
 export type PublicView = keyof typeof PUBLIC_VIEWS;
 
 export interface PublicGridProps {
@@ -23,7 +27,12 @@ export interface PublicGridProps {
     readonly locale: string;
     readonly now: string;
     readonly events: EventInput[];
-    readonly words: { readonly allDay: string; readonly noEvents: string; readonly week: string; readonly more: (count: number) => string };
+    readonly words: {
+        readonly allDay: string;
+        readonly noEvents: string;
+        readonly week: string;
+        readonly more: (count: number) => string;
+    };
 }
 
 export default function PublicGrid(props: PublicGridProps) {

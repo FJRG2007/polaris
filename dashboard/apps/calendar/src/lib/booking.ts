@@ -44,7 +44,13 @@ import {
     type BookingQuestion,
     type BookingRequest
 } from "./scheduling-schemas";
-import type { BookingPageView, BookingView, ManagedBooking, PublicBookingPage, SlotView } from "./scheduling-wire";
+import type {
+    BookingPageView,
+    BookingView,
+    ManagedBooking,
+    PublicBookingPage,
+    SlotView
+} from "./scheduling-wire";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -110,7 +116,9 @@ function readQuestions(raw: string): BookingQuestion[] {
 function readIds(raw: string): string[] {
     try {
         const list = JSON.parse(raw) as unknown;
-        return Array.isArray(list) ? list.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(list)
+            ? list.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -120,7 +128,11 @@ function readAnswers(raw: string): Record<string, string> {
     try {
         const parsed = JSON.parse(raw) as unknown;
         if (!parsed || typeof parsed !== "object") return {};
-        return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+        return Object.fromEntries(
+            Object.entries(parsed).filter(
+                (entry): entry is [string, string] => typeof entry[1] === "string"
+            )
+        );
     } catch {
         return {};
     }
@@ -179,8 +191,14 @@ async function upcomingCounts(pageIds: readonly string[], now: Date): Promise<Ma
     return new Map(rows.map((row) => [row.pageId, row._count._all]));
 }
 
-export async function listBookingPages(user: SessionUser, now = new Date()): Promise<BookingPageView[]> {
-    const rows = await prisma.calendarBookingPage.findMany({ where: { ownerId: user.id }, orderBy: { createdAt: "asc" } });
+export async function listBookingPages(
+    user: SessionUser,
+    now = new Date()
+): Promise<BookingPageView[]> {
+    const rows = await prisma.calendarBookingPage.findMany({
+        where: { ownerId: user.id },
+        orderBy: { createdAt: "asc" }
+    });
     const counts = await upcomingCounts(
         rows.map((row) => row.id),
         now
@@ -194,7 +212,11 @@ async function ownPage(user: SessionUser, id: string): Promise<PageRow> {
     return row;
 }
 
-export async function bookingPage(user: SessionUser, id: string, now = new Date()): Promise<BookingPageView> {
+export async function bookingPage(
+    user: SessionUser,
+    id: string,
+    now = new Date()
+): Promise<BookingPageView> {
     const row = await ownPage(user, id);
     return pageView(row, (await upcomingCounts([row.id], now)).get(row.id) ?? 0);
 }
@@ -210,7 +232,11 @@ function newSlug(title: string): string {
         .replace(/^-+|-+$/g, "")
         .slice(0, 40)
         .replace(/-+$/, "");
-    const tail = newLinkToken().replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 6).padEnd(6, "0");
+    const tail = newLinkToken()
+        .replace(/[^a-z0-9]/gi, "")
+        .toLowerCase()
+        .slice(0, 6)
+        .padEnd(6, "0");
     const slug = base ? `${base}-${tail}` : `book-${tail}`;
     return slugSchema.safeParse(slug).success ? slug : `book-${tail}`;
 }
@@ -229,7 +255,9 @@ function columns(input: BookingPageInput) {
         location: input.location,
         visibility: input.visibility,
         calendarId: input.calendarId,
-        conflictIds: JSON.stringify([...new Set(input.conflictIds.filter((id) => id !== input.calendarId))]),
+        conflictIds: JSON.stringify([
+            ...new Set(input.conflictIds.filter((id) => id !== input.calendarId))
+        ]),
         durationMinutes: input.durationMinutes,
         slotMinutes: input.slotMinutes,
         bufferBefore: input.bufferBefore,
@@ -252,37 +280,57 @@ async function bookingAllowed(): Promise<boolean> {
 }
 
 async function requireBookingAllowed(): Promise<void> {
-    if (!(await bookingAllowed())) throw new CalendarRefusal((await calendarT())("instance.bookingOff"));
+    if (!(await bookingAllowed()))
+        throw new CalendarRefusal((await calendarT())("instance.bookingOff"));
 }
 
 async function slugFree(slug: string, exceptId: string | null): Promise<void> {
-    const taken = await prisma.calendarBookingPage.findUnique({ where: { slug }, select: { id: true } });
-    if (taken && taken.id !== exceptId) throw new CalendarRefusal((await calendarT())("bookingPage.slugTaken"));
+    const taken = await prisma.calendarBookingPage.findUnique({
+        where: { slug },
+        select: { id: true }
+    });
+    if (taken && taken.id !== exceptId)
+        throw new CalendarRefusal((await calendarT())("bookingPage.slugTaken"));
 }
 
-export async function createBookingPage(user: SessionUser, input: BookingPageInput): Promise<BookingPageView> {
+export async function createBookingPage(
+    user: SessionUser,
+    input: BookingPageInput
+): Promise<BookingPageView> {
     await requireBookingAllowed();
     const count = await prisma.calendarBookingPage.count({ where: { ownerId: user.id } });
     if (count >= MAX_PAGES) throw new CalendarRefusal((await calendarT())("bookingPage.tooMany"));
     await checkCalendars(user, input);
     const slug = input.slug ?? newSlug(input.title);
     await slugFree(slug, null);
-    const row = await prisma.calendarBookingPage.create({ data: { ownerId: user.id, slug, ...columns(input) } });
+    const row = await prisma.calendarBookingPage.create({
+        data: { ownerId: user.id, slug, ...columns(input) }
+    });
     return pageView(row, 0);
 }
 
-export async function updateBookingPage(user: SessionUser, id: string, input: BookingPageInput): Promise<BookingPageView> {
+export async function updateBookingPage(
+    user: SessionUser,
+    id: string,
+    input: BookingPageInput
+): Promise<BookingPageView> {
     const row = await ownPage(user, id);
     if (input.enabled) await requireBookingAllowed();
     await checkCalendars(user, input);
     const slug = input.slug ?? row.slug;
     if (slug !== row.slug) await slugFree(slug, row.id);
-    const updated = await prisma.calendarBookingPage.update({ where: { id: row.id }, data: { slug, ...columns(input) } });
+    const updated = await prisma.calendarBookingPage.update({
+        where: { id: row.id },
+        data: { slug, ...columns(input) }
+    });
     return pageView(updated, (await upcomingCounts([row.id], new Date())).get(row.id) ?? 0);
 }
 
 /** A copy of a page, switched off until its owner has looked at it. */
-export async function duplicateBookingPage(user: SessionUser, id: string): Promise<BookingPageView> {
+export async function duplicateBookingPage(
+    user: SessionUser,
+    id: string
+): Promise<BookingPageView> {
     await requireBookingAllowed();
     const row = await ownPage(user, id);
     const count = await prisma.calendarBookingPage.count({ where: { ownerId: user.id } });
@@ -328,13 +376,22 @@ export async function listBookings(user: SessionUser, pageId: string): Promise<B
             email: row.email,
             start: row.start.toISOString(),
             end: row.end.toISOString(),
-            status: row.status === "confirmed" ? "confirmed" : row.status === "cancelled" ? "cancelled" : "pending",
+            status:
+                row.status === "confirmed"
+                    ? "confirmed"
+                    : row.status === "cancelled"
+                      ? "cancelled"
+                      : "pending",
             timezone: row.timezone,
             answers: [
                 ...questions.flatMap((question) =>
-                    answers[question.id] ? [{ label: question.label, value: answers[question.id]! }] : []
+                    answers[question.id]
+                        ? [{ label: question.label, value: answers[question.id]! }]
+                        : []
                 ),
-                ...(answers[NOTE_KEY] ? [{ label: t("booking.note"), value: answers[NOTE_KEY] }] : [])
+                ...(answers[NOTE_KEY]
+                    ? [{ label: t("booking.note"), value: answers[NOTE_KEY] }]
+                    : [])
             ],
             objectId: row.objectId,
             createdAt: row.createdAt.toISOString()
@@ -346,7 +403,12 @@ export async function listBookings(user: SessionUser, pageId: string): Promise<B
 
 /** Bookings that hold time: confirmed ones, and holds younger than `HOLD_MS`. */
 function holdingWhere(now: Date) {
-    return { OR: [{ status: "confirmed" }, { status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } }] };
+    return {
+        OR: [
+            { status: "confirmed" },
+            { status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } }
+        ]
+    };
 }
 
 type SlotIgnore = { bookingId?: string; uid?: string; holdsBefore?: Date; noticeFrom?: Date };
@@ -366,7 +428,13 @@ async function slotsFor(
     now: Date,
     ignore: SlotIgnore = {}
 ): Promise<{ start: Date; end: Date }[]> {
-    return slotsAmong(page, window, now, await busyFor(page, window, ignore), await holdsFor(prisma, page, window, now, ignore));
+    return slotsAmong(
+        page,
+        window,
+        now,
+        await busyFor(page, window, ignore),
+        await holdsFor(prisma, page, window, now, ignore)
+    );
 }
 
 function paddedWindow(window: { from: Date; to: Date }): { from: Date; to: Date } {
@@ -383,7 +451,9 @@ async function busyFor(page: PageRow, window: { from: Date; to: Date }, ignore: 
     });
     // A calendar the owner no longer reaches says nothing about them any more.
     const reach = await reachOf(page.ownerId, candidates);
-    const calendarIds = candidates.filter((calendar) => reaches(reach.get(calendar.id) ?? null, "freebusy")).map((calendar) => calendar.id);
+    const calendarIds = candidates
+        .filter((calendar) => reaches(reach.get(calendar.id) ?? null, "freebusy"))
+        .map((calendar) => calendar.id);
     const [owner] = await host.calendarHost.peopleByIds([page.ownerId]);
     return calendarBusy(calendarIds, padded, {
         selfEmails: owner ? [owner.email] : [],
@@ -393,7 +463,13 @@ async function busyFor(page: PageRow, window: { from: Date; to: Date }, ignore: 
 }
 
 /** The other bookings on the page that hold time around the window. */
-async function holdsFor(client: Client, page: PageRow, window: { from: Date; to: Date }, now: Date, ignore: SlotIgnore) {
+async function holdsFor(
+    client: Client,
+    page: PageRow,
+    window: { from: Date; to: Date },
+    now: Date,
+    ignore: SlotIgnore
+) {
     const padded = paddedWindow(window);
     const holding = await client.calendarBooking.findMany({
         where: {
@@ -406,7 +482,10 @@ async function holdsFor(client: Client, page: PageRow, window: { from: Date; to:
         select: { start: true, end: true, status: true, createdAt: true }
     });
     return holding.filter(
-        (booking) => booking.status === "confirmed" || !ignore.holdsBefore || booking.createdAt < ignore.holdsBefore
+        (booking) =>
+            booking.status === "confirmed" ||
+            !ignore.holdsBefore ||
+            booking.createdAt < ignore.holdsBefore
     );
 }
 
@@ -439,14 +518,18 @@ function slotsAmong(
  *  calendar is there takes no bookings. */
 async function liveCalendarIds(ids: readonly string[]): Promise<Set<string>> {
     if (ids.length === 0) return new Set();
-    const rows = await prisma.calendar.findMany({ where: { id: { in: [...new Set(ids)] }, trashedAt: null }, select: { id: true } });
+    const rows = await prisma.calendar.findMany({
+        where: { id: { in: [...new Set(ids)] }, trashedAt: null },
+        select: { id: true }
+    });
     return new Set(rows.map((row) => row.id));
 }
 
 /** Whether a page takes bookings: switched on, its calendar not in the trash,
  *  and booking pages on for the whole instance. */
 async function takesBookings(page: PageRow): Promise<boolean> {
-    if (!page.enabled || !(await liveCalendarIds([page.calendarId])).has(page.calendarId)) return false;
+    if (!page.enabled || !(await liveCalendarIds([page.calendarId])).has(page.calendarId))
+        return false;
     return bookingAllowed();
 }
 
@@ -464,7 +547,11 @@ export async function publicBookingPage(slug: string): Promise<PublicBookingPage
 }
 
 /** The slots a visitor may pick inside a window. */
-export async function publicSlots(slug: string, window: { from: Date; to: Date }, now = new Date()): Promise<SlotView[] | null> {
+export async function publicSlots(
+    slug: string,
+    window: { from: Date; to: Date },
+    now = new Date()
+): Promise<SlotView[] | null> {
     const row = await openPage(slug);
     if (!row) return null;
     const slots = await slotsFor(row, window, now);
@@ -488,9 +575,18 @@ async function claimSlot<T>(
     const busy = await busyFor(page, window, ignore);
     return prisma.$transaction(async (tx) => {
         // Writing the page's row locks it until the transaction ends.
-        const locked = await tx.calendarBookingPage.updateMany({ where: { id: page.id }, data: { updatedAt: new Date() } });
+        const locked = await tx.calendarBookingPage.updateMany({
+            where: { id: page.id },
+            data: { updatedAt: new Date() }
+        });
         if (locked.count === 0) return null;
-        const slots = slotsAmong(page, window, ignore.noticeFrom ?? now, busy, await holdsFor(tx, page, window, now, ignore));
+        const slots = slotsAmong(
+            page,
+            window,
+            ignore.noticeFrom ?? now,
+            busy,
+            await holdsFor(tx, page, window, now, ignore)
+        );
         if (!slots.some((slot) => slot.start.getTime() === start.getTime())) return null;
         return write(tx);
     });
@@ -499,13 +595,19 @@ async function claimSlot<T>(
 // ---------------------------------------------------------------- mail
 
 function whenLine(start: Date, end: Date, zone: string, locale: string): string {
-    const day = new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: zone }).format(start);
+    const day = new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: zone }).format(
+        start
+    );
     const time = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone: zone });
     return `${day}, ${time.format(start)} - ${time.format(end)} (${zone})`;
 }
 
 async function mail(to: string, subject: string, lines: readonly string[]): Promise<boolean> {
-    const result = await host.calendarHost.sendCalendarEmail({ to, subject, text: `${lines.join("\n")}\n` });
+    const result = await host.calendarHost.sendCalendarEmail({
+        to,
+        subject,
+        text: `${lines.join("\n")}\n`
+    });
     if (result.error) console.error("polaris: a booking email was not sent:", result.error);
     return !result.error;
 }
@@ -523,11 +625,24 @@ function requesterOf(pageId: string, address: string): string {
 /** Refuse a new hold when this visitor already keeps `MAX_OPEN_HOLDS` open on
  *  the page, counted by their address and by their email. Expired holds do not
  *  count. Run inside the page's lock, so two requests at once cannot both pass. */
-async function refuseExcessHolds(client: Client, pageId: string, requester: string, email: string, now: Date): Promise<void> {
-    const open = { pageId, status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } };
-    const byRequester = requester ? await client.calendarBooking.count({ where: { ...open, requester } }) : 0;
+async function refuseExcessHolds(
+    client: Client,
+    pageId: string,
+    requester: string,
+    email: string,
+    now: Date
+): Promise<void> {
+    const open = {
+        pageId,
+        status: "pending",
+        createdAt: { gt: new Date(now.getTime() - HOLD_MS) }
+    };
+    const byRequester = requester
+        ? await client.calendarBooking.count({ where: { ...open, requester } })
+        : 0;
     const byEmail = await client.calendarBooking.count({ where: { ...open, email } });
-    if (byRequester >= MAX_OPEN_HOLDS || byEmail >= MAX_OPEN_HOLDS) throw new CalendarRefusal((await calendarT())("booking.tooManyHolds"));
+    if (byRequester >= MAX_OPEN_HOLDS || byEmail >= MAX_OPEN_HOLDS)
+        throw new CalendarRefusal((await calendarT())("booking.tooManyHolds"));
 }
 
 /**
@@ -535,7 +650,10 @@ async function refuseExcessHolds(client: Client, pageId: string, requester: stri
  * when the slot is no longer offered, the answers do not fit the questions, or
  * this address or this visitor has asked too often.
  */
-export async function requestBooking(input: BookingRequest, now = new Date()): Promise<{ email: string }> {
+export async function requestBooking(
+    input: BookingRequest,
+    now = new Date()
+): Promise<{ email: string }> {
     const t = await calendarT();
     const address = await callerAddress();
     await throttle(`calendar.book:${address}`, 10, HOUR);
@@ -550,7 +668,13 @@ export async function requestBooking(input: BookingRequest, now = new Date()): P
     // The same visitor asking for the same slot again: send the link again
     // rather than refusing them over their own hold.
     const own = await prisma.calendarBooking.findFirst({
-        where: { pageId: page.id, email: input.email, start, status: "pending", createdAt: { gt: new Date(now.getTime() - HOLD_MS) } },
+        where: {
+            pageId: page.id,
+            email: input.email,
+            start,
+            status: "pending",
+            createdAt: { gt: new Date(now.getTime() - HOLD_MS) }
+        },
         select: { id: true, confirmToken: true }
     });
 
@@ -603,9 +727,15 @@ export async function requestBooking(input: BookingRequest, now = new Date()): P
 async function bookingRowByToken(token: string) {
     if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
     const include = { page: true } as const;
-    const byConfirm = await prisma.calendarBooking.findUnique({ where: { confirmToken: token }, include });
+    const byConfirm = await prisma.calendarBooking.findUnique({
+        where: { confirmToken: token },
+        include
+    });
     if (byConfirm) return { row: byConfirm, via: "confirm" as const };
-    const byManage = await prisma.calendarBooking.findUnique({ where: { manageToken: token }, include });
+    const byManage = await prisma.calendarBooking.findUnique({
+        where: { manageToken: token },
+        include
+    });
     return byManage ? { row: byManage, via: "manage" as const } : null;
 }
 
@@ -613,12 +743,16 @@ type BookingRow = NonNullable<Awaited<ReturnType<typeof bookingRowByToken>>>["ro
 
 function stateOf(row: BookingRow, now: Date): ManagedBooking["state"] {
     if (row.status === "cancelled") return "cancelled";
-    if (row.status === "pending") return row.createdAt.getTime() < now.getTime() - HOLD_MS ? "expired" : "pending";
+    if (row.status === "pending")
+        return row.createdAt.getTime() < now.getTime() - HOLD_MS ? "expired" : "pending";
     return row.end.getTime() < now.getTime() ? "past" : "confirmed";
 }
 
 /** A booking as its confirmation or manage link shows it. */
-export async function bookingByToken(token: string, now = new Date()): Promise<ManagedBooking | null> {
+export async function bookingByToken(
+    token: string,
+    now = new Date()
+): Promise<ManagedBooking | null> {
     if (!(await bookingAllowed())) return null;
     const found = await bookingRowByToken(token);
     if (!found) return null;
@@ -635,7 +769,11 @@ export async function bookingByToken(token: string, now = new Date()): Promise<M
 }
 
 /** The event a confirmed booking becomes. */
-async function bookingEvent(page: PageRow, booking: BookingRow, conference: string): Promise<engine.CalendarItem> {
+async function bookingEvent(
+    page: PageRow,
+    booking: BookingRow,
+    conference: string
+): Promise<engine.CalendarItem> {
     const [owner] = await host.calendarHost.peopleByIds([page.ownerId]);
     const t = calendarTIn(await localeOf(page.ownerId));
     const answers = readAnswers(booking.answers);
@@ -653,7 +791,10 @@ async function bookingEvent(page: PageRow, booking: BookingRow, conference: stri
     });
     return engine.eventItem(
         engine.newEvent({
-            summary: t("booking.eventTitle", { title: page.title, name: booking.name }).slice(0, 500),
+            summary: t("booking.eventTitle", { title: page.title, name: booking.name }).slice(
+                0,
+                500
+            ),
             description: lines.join("\n"),
             location: page.location,
             start: at(booking.start),
@@ -680,7 +821,10 @@ async function meetingFor(page: PageRow, start: Date): Promise<string> {
     if (!page.meetingLink) return "";
     try {
         const scheduledAt = start.getTime() - Date.now() < 364 * DAY ? start : null;
-        const created = await host.calendarHost.createMeetingLink(page.ownerId, { title: page.title, scheduledAt });
+        const created = await host.calendarHost.createMeetingLink(page.ownerId, {
+            title: page.title,
+            scheduledAt
+        });
         return "link" in created ? created.link : "";
     } catch (caught) {
         console.error("polaris: a booking's meeting link was not made:", caught);
@@ -688,7 +832,12 @@ async function meetingFor(page: PageRow, start: Date): Promise<string> {
     }
 }
 
-async function notifyOwner(page: PageRow, booking: BookingRow, key: "booking.notify.booked" | "booking.notify.cancelled" | "booking.notify.moved", href: string): Promise<void> {
+async function notifyOwner(
+    page: PageRow,
+    booking: BookingRow,
+    key: "booking.notify.booked" | "booking.notify.cancelled" | "booking.notify.moved",
+    href: string
+): Promise<void> {
     const t = await calendarTFor(page.ownerId);
     const locale = await localeOf(page.ownerId);
     await host.notificationsDispatch
@@ -699,7 +848,9 @@ async function notifyOwner(page: PageRow, booking: BookingRow, key: "booking.not
             body: whenLine(booking.start, booking.end, page.timezone, locale),
             href
         })
-        .catch((caught: unknown) => console.error("polaris: a booking notice was not sent:", caught));
+        .catch((caught: unknown) =>
+            console.error("polaris: a booking notice was not sent:", caught)
+        );
 }
 
 /**
@@ -711,16 +862,23 @@ async function notifyOwner(page: PageRow, booking: BookingRow, key: "booking.not
 export async function confirmBooking(
     token: string,
     now = new Date()
-): Promise<{ status: "confirmed" | "taken" | "expired" | "cancelled"; manageToken: string | null }> {
+): Promise<{
+    status: "confirmed" | "taken" | "expired" | "cancelled";
+    manageToken: string | null;
+}> {
     const t = await calendarT();
     await throttle(`calendar.book-confirm:${await callerAddress()}`, 30, HOUR);
     const found = await bookingRowByToken(token);
     if (!found || found.via !== "confirm") throw new CalendarRefusal(t("booking.linkGone"));
     const booking = found.row;
     const page = booking.page;
-    if (booking.status === "confirmed") return { status: "confirmed", manageToken: booking.manageToken };
+    if (booking.status === "confirmed")
+        return { status: "confirmed", manageToken: booking.manageToken };
     if (booking.status === "cancelled") return { status: "cancelled", manageToken: null };
-    if (booking.createdAt.getTime() < now.getTime() - HOLD_MS || booking.start.getTime() <= now.getTime()) {
+    if (
+        booking.createdAt.getTime() < now.getTime() - HOLD_MS ||
+        booking.start.getTime() <= now.getTime()
+    ) {
         return { status: "expired", manageToken: null };
     }
     if (!(await takesBookings(page))) throw new CalendarRefusal(t("booking.pageGone"));
@@ -737,11 +895,17 @@ export async function confirmBooking(
             })
     );
     if (!claimed) {
-        await prisma.calendarBooking.updateMany({ where: { id: booking.id, status: "pending" }, data: { status: "cancelled" } });
+        await prisma.calendarBooking.updateMany({
+            where: { id: booking.id, status: "pending" },
+            data: { status: "cancelled" }
+        });
         return { status: "taken", manageToken: null };
     }
     if (claimed.count === 0) {
-        const again = await prisma.calendarBooking.findUnique({ where: { id: booking.id }, select: { status: true } });
+        const again = await prisma.calendarBooking.findUnique({
+            where: { id: booking.id },
+            select: { status: true }
+        });
         return again?.status === "confirmed"
             ? { status: "confirmed", manageToken: booking.manageToken }
             : { status: "cancelled", manageToken: null };
@@ -751,11 +915,17 @@ export async function confirmBooking(
     try {
         const calendar = await requireWritableCalendar(page.ownerId, page.calendarId);
         const item = await bookingEvent(page, booking, await meetingFor(page, booking.start));
-        objectId = await writeItem(calendar.id, null, item, { actor: null, floatingZone: page.timezone });
+        objectId = await writeItem(calendar.id, null, item, {
+            actor: null,
+            floatingZone: page.timezone
+        });
     } catch (caught) {
         // No event, no booking: give the slot back rather than confirm a time
         // nobody will find in their calendar.
-        await prisma.calendarBooking.update({ where: { id: booking.id }, data: { status: "cancelled" } });
+        await prisma.calendarBooking.update({
+            where: { id: booking.id },
+            data: { status: "cancelled" }
+        });
         if (caught instanceof CalendarRefusal) throw new CalendarRefusal(t("booking.pageGone"));
         throw caught;
     }
@@ -785,13 +955,18 @@ async function eventRow(objectId: string | null): Promise<StoredObject | null> {
 /** Cancel a confirmed booking: its event goes to the trash, which mails the
  *  visitor the cancellation, and the owner is told. */
 async function cancelConfirmed(booking: BookingRow, byOwner: boolean): Promise<void> {
-    await prisma.calendarBooking.update({ where: { id: booking.id }, data: { status: "cancelled" } });
+    await prisma.calendarBooking.update({
+        where: { id: booking.id },
+        data: { status: "cancelled" }
+    });
     const row = await eventRow(booking.objectId);
     if (row && !row.deletedAt) {
         const item = await itemOf(row).catch(() => null);
-        if (item) await trashObject(row, item, { actor: null, floatingZone: booking.page.timezone });
+        if (item)
+            await trashObject(row, item, { actor: null, floatingZone: booking.page.timezone });
     }
-    if (!byOwner) await notifyOwner(booking.page, booking, "booking.notify.cancelled", "/calendar/booking");
+    if (!byOwner)
+        await notifyOwner(booking.page, booking, "booking.notify.cancelled", "/calendar/booking");
 }
 
 async function managedRow(manageToken: string, now: Date): Promise<BookingRow> {
@@ -811,7 +986,11 @@ export async function cancelBooking(manageToken: string, now = new Date()): Prom
 }
 
 /** The visitor moves their booking to another offered slot. */
-export async function rescheduleBooking(manageToken: string, startIso: string, now = new Date()): Promise<{ start: string; end: string }> {
+export async function rescheduleBooking(
+    manageToken: string,
+    startIso: string,
+    now = new Date()
+): Promise<{ start: string; end: string }> {
     const t = await calendarT();
     const booking = await managedRow(manageToken, now);
     const page = booking.page;
@@ -819,23 +998,47 @@ export async function rescheduleBooking(manageToken: string, startIso: string, n
     const row = await eventRow(booking.objectId);
     const start = new Date(startIso);
     const end = new Date(start.getTime() + page.durationMinutes * 60_000);
-    const moved = await claimSlot(page, start, now, { bookingId: booking.id, ...(row ? { uid: row.uid } : {}) }, (client) =>
-        client.calendarBooking.updateMany({ where: { id: booking.id, status: "confirmed" }, data: { start, end } })
+    const moved = await claimSlot(
+        page,
+        start,
+        now,
+        { bookingId: booking.id, ...(row ? { uid: row.uid } : {}) },
+        (client) =>
+            client.calendarBooking.updateMany({
+                where: { id: booking.id, status: "confirmed" },
+                data: { start, end }
+            })
     );
     if (!moved) throw new CalendarRefusal(t("booking.slotTaken"));
     if (moved.count === 0) throw new CalendarRefusal(t("booking.notConfirmed"));
     if (row && !row.deletedAt) {
         const item = await itemOf(row);
         if (item.component === "VEVENT" && item.master) {
-            const at = (instant: Date) => ({ dateTime: engine.formatWall(engine.instantToWall(instant, page.timezone)), tzid: page.timezone });
+            const at = (instant: Date) => ({
+                dateTime: engine.formatWall(engine.instantToWall(instant, page.timezone)),
+                tzid: page.timezone
+            });
             const moved: engine.CalendarItem = {
                 ...item,
-                master: { ...item.master, start: at(start), end: at(end), sequence: item.master.sequence + 1 }
+                master: {
+                    ...item.master,
+                    start: at(start),
+                    end: at(end),
+                    sequence: item.master.sequence + 1
+                }
             };
-            await writeItem(row.calendarId, row, moved, { actor: null, floatingZone: page.timezone });
+            await writeItem(row.calendarId, row, moved, {
+                actor: null,
+                floatingZone: page.timezone
+            });
         }
     }
-    await notifyOwner(page, { ...booking, start, end }, "booking.notify.moved", row ? `/calendar/e/${row.id}` : "/calendar/booking");
+    await notifyOwner(
+        page,
+        { ...booking, start, end },
+        "booking.notify.moved",
+        row ? `/calendar/e/${row.id}` : "/calendar/booking"
+    );
     return { start: start.toISOString(), end: end.toISOString() };
 }
 
@@ -849,7 +1052,10 @@ export async function cancelBookingAsOwner(user: SessionUser, bookingId: string)
     if (!booking) throw new CalendarRefusal(t("booking.notFound"));
     if (booking.status === "cancelled") return;
     if (booking.status === "pending") {
-        await prisma.calendarBooking.update({ where: { id: booking.id }, data: { status: "cancelled" } });
+        await prisma.calendarBooking.update({
+            where: { id: booking.id },
+            data: { status: "cancelled" }
+        });
         return;
     }
     await cancelConfirmed(booking, true);
@@ -861,7 +1067,9 @@ async function mailCancelled(booking: BookingRow): Promise<void> {
     const page = booking.page;
     const locale = isLocale(booking.locale) ? booking.locale : DEFAULT_LOCALE;
     const t = calendarTIn(locale);
-    const again = (await takesBookings(page)) ? [`${await host.domainService.appBaseUrl()}/cal/book/${page.slug}`] : [];
+    const again = (await takesBookings(page))
+        ? [`${await host.domainService.appBaseUrl()}/cal/book/${page.slug}`]
+        : [];
     await mail(booking.email, t("booking.mail.cancelledSubject", { title: page.title }), [
         t("booking.mail.cancelledIntro", { name: booking.name }),
         "",
@@ -875,7 +1083,9 @@ async function mailCancelled(booking: BookingRow): Promise<void> {
 async function declinedByOwner(ownerId: string, event: engine.CalendarEvent): Promise<boolean> {
     const invitations = await import("./invitations");
     const owner = await invitations.ownerAddresses(ownerId);
-    return event.attendees.some((attendee) => owner.has(attendee.email.toLowerCase()) && attendee.partstat === "DECLINED");
+    return event.attendees.some(
+        (attendee) => owner.has(attendee.email.toLowerCase()) && attendee.partstat === "DECLINED"
+    );
 }
 
 /**
@@ -895,7 +1105,12 @@ export async function followEvent(change: ObjectChange, now = new Date()): Promi
         const item = change.after;
         const event = item?.component === "VEVENT" ? item.master : null;
         if (item && !event) continue;
-        if (!item || !event || event.status === "CANCELLED" || (await declinedByOwner(booking.page.ownerId, event))) {
+        if (
+            !item ||
+            !event ||
+            event.status === "CANCELLED" ||
+            (await declinedByOwner(booking.page.ownerId, event))
+        ) {
             const cancelled = await prisma.calendarBooking.updateMany({
                 where: { id: booking.id, status: "confirmed" },
                 data: { status: "cancelled" }
@@ -905,7 +1120,11 @@ export async function followEvent(change: ObjectChange, now = new Date()): Promi
         }
         const bounds = engine.itemBounds(item, booking.page.timezone);
         if (bounds.recurring || !bounds.startsAt || !bounds.endsAt) continue;
-        if (bounds.startsAt.getTime() === booking.start.getTime() && bounds.endsAt.getTime() === booking.end.getTime()) continue;
+        if (
+            bounds.startsAt.getTime() === booking.start.getTime() &&
+            bounds.endsAt.getTime() === booking.end.getTime()
+        )
+            continue;
         await prisma.calendarBooking.updateMany({
             where: { id: booking.id, status: "confirmed" },
             data: { start: bounds.startsAt, end: bounds.endsAt }
@@ -916,7 +1135,9 @@ export async function followEvent(change: ObjectChange, now = new Date()): Promi
 /** Somebody's public booking pages, for their overview page. Null - nobody
  *  there - unless they have at least one page taking bookings, so the address
  *  says nothing about an account that publishes none. */
-export async function publicPagesOf(userId: string): Promise<{ ownerName: string; pages: PublicBookingPage[] } | null> {
+export async function publicPagesOf(
+    userId: string
+): Promise<{ ownerName: string; pages: PublicBookingPage[] } | null> {
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return null;
     if (!(await bookingAllowed())) return null;
     const listed = await prisma.calendarBookingPage.findMany({

@@ -36,54 +36,116 @@ describe("calendar sharing", () => {
 
     it("lets a manager share, but not hand out manage or take a manager's share away", async () => {
         world.addShare(calendar, { userId: bob.id }, "manage");
-        await sharing.share(bob, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "write" });
-        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe("write");
-        await expect(sharing.share(bob, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "manage" })).rejects.toThrow(
-            world.en("sharing.onlyOwnerManage")
+        await sharing.share(bob, {
+            calendarId: calendar,
+            target: { kind: "user", id: carol.id },
+            access: "write"
+        });
+        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe(
+            "write"
         );
+        await expect(
+            sharing.share(bob, {
+                calendarId: calendar,
+                target: { kind: "user", id: carol.id },
+                access: "manage"
+            })
+        ).rejects.toThrow(world.en("sharing.onlyOwnerManage"));
         const dave = addUser({ name: "Dave", email: "dave@example.test" });
         const daveShare = world.addShare(calendar, { userId: dave.id }, "manage");
-        await expect(sharing.unshare(bob, daveShare)).rejects.toThrow(world.en("sharing.onlyOwnerManage"));
-        await expect(sharing.share(bob, { calendarId: calendar, target: { kind: "user", id: dave.id }, access: "freebusy" })).rejects.toThrow(
+        await expect(sharing.unshare(bob, daveShare)).rejects.toThrow(
             world.en("sharing.onlyOwnerManage")
         );
+        await expect(
+            sharing.share(bob, {
+                calendarId: calendar,
+                target: { kind: "user", id: dave.id },
+                access: "freebusy"
+            })
+        ).rejects.toThrow(world.en("sharing.onlyOwnerManage"));
         expect(db.byId("calendarShare", daveShare)?.access).toBe("manage");
-        await sharing.share(alice, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "manage" });
-        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe("manage");
+        await sharing.share(alice, {
+            calendarId: calendar,
+            target: { kind: "user", id: carol.id },
+            access: "manage"
+        });
+        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe(
+            "manage"
+        );
     });
 
     it("refuses a writer or reader who tries to share", async () => {
         world.addShare(calendar, { userId: bob.id }, "write");
-        await expect(sharing.share(bob, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "read" })).rejects.toThrow(
-            world.en("errors.calendarNotFound")
-        );
+        await expect(
+            sharing.share(bob, {
+                calendarId: calendar,
+                target: { kind: "user", id: carol.id },
+                access: "read"
+            })
+        ).rejects.toThrow(world.en("errors.calendarNotFound"));
     });
 
     it("announces a share once, not again when its level changes", async () => {
-        await sharing.share(alice, { calendarId: calendar, target: { kind: "user", id: bob.id }, access: "read" });
-        await sharing.share(alice, { calendarId: calendar, target: { kind: "user", id: bob.id }, access: "read" });
-        await sharing.share(alice, { calendarId: calendar, target: { kind: "user", id: bob.id }, access: "write" });
-        expect(fake.notices).toEqual([expect.objectContaining({ userId: bob.id, event: "calendar.shared", href: `/calendar?c=${calendar}` })]);
-        expect(fake.notices[0]?.title).toBe(world.en("sharing.sharedTitle", { who: "Alice", calendar: "Team plans" }));
+        await sharing.share(alice, {
+            calendarId: calendar,
+            target: { kind: "user", id: bob.id },
+            access: "read"
+        });
+        await sharing.share(alice, {
+            calendarId: calendar,
+            target: { kind: "user", id: bob.id },
+            access: "read"
+        });
+        await sharing.share(alice, {
+            calendarId: calendar,
+            target: { kind: "user", id: bob.id },
+            access: "write"
+        });
+        expect(fake.notices).toEqual([
+            expect.objectContaining({
+                userId: bob.id,
+                event: "calendar.shared",
+                href: `/calendar?c=${calendar}`
+            })
+        ]);
+        expect(fake.notices[0]?.title).toBe(
+            world.en("sharing.sharedTitle", { who: "Alice", calendar: "Team plans" })
+        );
         expect(db.rows("calendarShare")).toHaveLength(1);
     });
 
     it("shares with a team the sharer is on and tells its members, not the sharer", async () => {
         const team = addTeam("Design", [alice.id, bob.id, carol.id]);
         const outsiders = addTeam("Elsewhere", [bob.id]);
-        await sharing.share(alice, { calendarId: calendar, target: { kind: "team", id: team }, access: "read" });
-        expect(fake.notices.map((notice) => notice.userId).sort()).toEqual([bob.id, carol.id].sort());
-        await expect(sharing.share(alice, { calendarId: calendar, target: { kind: "team", id: outsiders }, access: "read" })).rejects.toThrow(
-            world.en("sharing.notYourTeam")
+        await sharing.share(alice, {
+            calendarId: calendar,
+            target: { kind: "team", id: team },
+            access: "read"
+        });
+        expect(fake.notices.map((notice) => notice.userId).sort()).toEqual(
+            [bob.id, carol.id].sort()
         );
-        expect((await sharing.listShares(alice, calendar)).map((row) => row.target)).toEqual([{ kind: "team", id: team, name: "Design" }]);
+        await expect(
+            sharing.share(alice, {
+                calendarId: calendar,
+                target: { kind: "team", id: outsiders },
+                access: "read"
+            })
+        ).rejects.toThrow(world.en("sharing.notYourTeam"));
+        expect((await sharing.listShares(alice, calendar)).map((row) => row.target)).toEqual([
+            { kind: "team", id: team, name: "Design" }
+        ]);
     });
 
     it("refuses sharing with the owner", async () => {
         world.addShare(calendar, { userId: bob.id }, "manage");
-        await expect(sharing.share(bob, { calendarId: calendar, target: { kind: "user", id: alice.id }, access: "read" })).rejects.toThrow(
-            world.en("sharing.alreadyOwner")
-        );
+        await expect(
+            sharing.share(bob, {
+                calendarId: calendar,
+                target: { kind: "user", id: alice.id },
+                access: "read"
+            })
+        ).rejects.toThrow(world.en("sharing.alreadyOwner"));
     });
 
     it("deletes the token when publishing stops, and mints a new one when it starts again", async () => {
@@ -100,7 +162,9 @@ describe("calendar sharing", () => {
     });
 
     it("rotates a published address and refuses to mail an unpublished one", async () => {
-        await expect(sharing.mailPublicLink(alice, calendar, "friend@outside.test")).rejects.toThrow(world.en("sharing.notPublished"));
+        await expect(
+            sharing.mailPublicLink(alice, calendar, "friend@outside.test")
+        ).rejects.toThrow(world.en("sharing.notPublished"));
         const token = (await sharing.publish(alice, calendar, "full"))!;
         const rotated = await sharing.rotatePublicLink(alice, calendar);
         expect(rotated).not.toBe(token);
@@ -109,7 +173,9 @@ describe("calendar sharing", () => {
         expect(fake.mails[0]?.text).toContain(`https://polaris.example.test/cal/p/${rotated}`);
         expect(fake.rateKeys).toEqual([`calendar.mail-link:${alice.id}`]);
         fake.rateAllowed = false;
-        await expect(sharing.mailPublicLink(alice, calendar, "friend@outside.test")).rejects.toThrow(world.en("sharing.slowDown"));
+        await expect(
+            sharing.mailPublicLink(alice, calendar, "friend@outside.test")
+        ).rejects.toThrow(world.en("sharing.slowDown"));
     });
 
     describe("what a published link shows", () => {
@@ -119,17 +185,34 @@ describe("calendar sharing", () => {
                 summary: "Launch party",
                 location: "Rooftop",
                 description: "Bring snacks",
-                alarms: [{ action: "DISPLAY", trigger: { kind: "relative", minutes: -30, related: "START" }, description: "" }],
+                alarms: [
+                    {
+                        action: "DISPLAY",
+                        trigger: { kind: "relative", minutes: -30, related: "START" },
+                        description: ""
+                    }
+                ],
                 start: world.at("2026-10-10T18:00:00"),
                 end: world.at("2026-10-10T21:00:00"),
-                attendees: [{ email: bob.email, name: "Bob", role: "REQ-PARTICIPANT", partstat: "ACCEPTED", rsvp: false, type: "INDIVIDUAL" }]
+                attendees: [
+                    {
+                        email: bob.email,
+                        name: "Bob",
+                        role: "REQ-PARTICIPANT",
+                        partstat: "ACCEPTED",
+                        rsvp: false,
+                        type: "INDIVIDUAL"
+                    }
+                ]
             });
             world.storeEvent(calendar, {
                 uid: "private-1",
                 summary: "Therapy",
                 location: "Clinic",
                 classification: "PRIVATE",
-                extraComponents: ["BEGIN:VLOCATION\r\nUID:loc-1\r\nNAME:Secret place\r\nEND:VLOCATION"],
+                extraComponents: [
+                    "BEGIN:VLOCATION\r\nUID:loc-1\r\nNAME:Secret place\r\nEND:VLOCATION"
+                ],
                 start: world.at("2026-10-11T09:00:00"),
                 end: world.at("2026-10-11T10:00:00")
             });
@@ -145,15 +228,35 @@ describe("calendar sharing", () => {
         it("hides every detail in busy mode, in the feed and on the page", async () => {
             const token = (await sharing.publish(alice, calendar, "busy"))!;
             const feed = (await published.publishedFeed(token, "Busy"))!;
-            for (const secret of ["Launch party", "Rooftop", "Bring snacks", "Therapy", "Clinic", "Secret place", "bob@example.test", "Working from home"]) {
+            for (const secret of [
+                "Launch party",
+                "Rooftop",
+                "Bring snacks",
+                "Therapy",
+                "Clinic",
+                "Secret place",
+                "bob@example.test",
+                "Working from home"
+            ]) {
                 expect(feed.ics).not.toContain(secret);
             }
             const parsed = engine.parseCalendarText(feed.ics);
-            expect(parsed.items.map((item) => (item.component === "VEVENT" ? item.master?.summary : null))).toEqual(["Busy", "Busy"]);
+            expect(
+                parsed.items.map((item) =>
+                    item.component === "VEVENT" ? item.master?.summary : null
+                )
+            ).toEqual(["Busy", "Busy"]);
 
             const range = (await published.publishedRange(token, OCTOBER, "UTC"))!;
             expect(range.occurrences).toHaveLength(2);
-            expect(range.occurrences.every((occurrence) => occurrence.summary === "" && occurrence.location === "" && occurrence.busyOnly)).toBe(true);
+            expect(
+                range.occurrences.every(
+                    (occurrence) =>
+                        occurrence.summary === "" &&
+                        occurrence.location === "" &&
+                        occurrence.busyOnly
+                )
+            ).toBe(true);
             expect(JSON.stringify(range)).not.toContain("Launch party");
         });
 
@@ -167,9 +270,13 @@ describe("calendar sharing", () => {
             expect(feed.ics).not.toContain("Clinic");
             expect(feed.ics).not.toContain("Secret place");
             const range = (await published.publishedRange(token, OCTOBER, "UTC"))!;
-            const party = range.occurrences.find((occurrence) => occurrence.summary === "Launch party");
+            const party = range.occurrences.find(
+                (occurrence) => occurrence.summary === "Launch party"
+            );
             expect(party).toMatchObject({ location: "Rooftop", busyOnly: false });
-            const therapy = range.occurrences.find((occurrence) => occurrence.start === "2026-10-11T07:00:00.000Z");
+            const therapy = range.occurrences.find(
+                (occurrence) => occurrence.start === "2026-10-11T07:00:00.000Z"
+            );
             expect(therapy).toMatchObject({ summary: "", location: "", busyOnly: true });
         });
 
@@ -180,18 +287,56 @@ describe("calendar sharing", () => {
                 start: world.at("2026-10-14T10:00:00"),
                 end: world.at("2026-10-14T11:00:00"),
                 organizer: { email: alice.email, name: "Alice" },
-                attendees: [{ email: "guest@outside.test", name: "Guest", role: "REQ-PARTICIPANT", partstat: "ACCEPTED", rsvp: false, type: "INDIVIDUAL" }],
-                attachments: [{ uri: "https://files.example.test/budget.pdf", name: "budget.pdf", mime: "application/pdf" }],
+                attendees: [
+                    {
+                        email: "guest@outside.test",
+                        name: "Guest",
+                        role: "REQ-PARTICIPANT",
+                        partstat: "ACCEPTED",
+                        rsvp: false,
+                        type: "INDIVIDUAL"
+                    }
+                ],
+                attachments: [
+                    {
+                        uri: "https://files.example.test/budget.pdf",
+                        name: "budget.pdf",
+                        mime: "application/pdf"
+                    }
+                ],
                 extra: [{ line: "X-INTERNAL-NOTE:salary review" }]
             });
-            const task = engine.newTodo({ uid: "task-1", summary: "Call the lawyer", due: world.at("2026-10-15T12:00:00") });
-            world.storeItem(calendar, engine.todoItem({ ...task, extra: [{ line: "CLASS:PRIVATE" }] }));
-            world.storeItem(calendar, engine.todoItem(engine.newTodo({ uid: "task-2", summary: "Order cake", due: world.at("2026-10-16T12:00:00") })));
+            const task = engine.newTodo({
+                uid: "task-1",
+                summary: "Call the lawyer",
+                due: world.at("2026-10-15T12:00:00")
+            });
+            world.storeItem(
+                calendar,
+                engine.todoItem({ ...task, extra: [{ line: "CLASS:PRIVATE" }] })
+            );
+            world.storeItem(
+                calendar,
+                engine.todoItem(
+                    engine.newTodo({
+                        uid: "task-2",
+                        summary: "Order cake",
+                        due: world.at("2026-10-16T12:00:00")
+                    })
+                )
+            );
             const token = (await sharing.publish(alice, calendar, "full"))!;
             const feed = (await published.publishedFeed(token, "Busy"))!;
             expect(feed.ics).toContain("Town hall");
             expect(feed.ics).toContain("Order cake");
-            for (const secret of ["guest@outside.test", "alice@example.test", "bob@example.test", "budget.pdf", "salary review", "Call the lawyer"]) {
+            for (const secret of [
+                "guest@outside.test",
+                "alice@example.test",
+                "bob@example.test",
+                "budget.pdf",
+                "salary review",
+                "Call the lawyer"
+            ]) {
                 expect(feed.ics).not.toContain(secret);
             }
         });

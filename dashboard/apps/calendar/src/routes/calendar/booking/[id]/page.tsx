@@ -9,7 +9,11 @@ import { BookingPageEditor } from "../../../../screens/booking/booking-page-edit
 
 export const dynamic = "force-dynamic";
 
-export default async function BookingPageEditPage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function BookingPageEditPage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     await requireCalendarUser();
     const { id } = await params;
     const parsed = uuidSchema.safeParse(id);

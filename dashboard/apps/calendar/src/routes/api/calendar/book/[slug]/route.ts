@@ -10,17 +10,29 @@ import { host } from "@polaris/app-host";
 import { MAX_SLOT_WINDOW_DAYS, publicSlots } from "../../../../../lib/booking";
 
 const window = z
-    .object({ from: z.string().datetime({ offset: true }), to: z.string().datetime({ offset: true }) })
+    .object({
+        from: z.string().datetime({ offset: true }),
+        to: z.string().datetime({ offset: true })
+    })
     .transform((value) => ({ from: new Date(value.from), to: new Date(value.to) }))
     .refine((value) => value.to > value.from)
-    .refine((value) => value.to.getTime() - value.from.getTime() <= MAX_SLOT_WINDOW_DAYS * 86_400_000);
+    .refine(
+        (value) => value.to.getTime() - value.from.getTime() <= MAX_SLOT_WINDOW_DAYS * 86_400_000
+    );
 
 /** Requests one address may make per minute: a visitor paging through weeks. */
 const PER_MINUTE = 60;
 
-export async function GET(request: Request, context: { params: Promise<{ slug: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    context: { params: Promise<{ slug: string }> }
+): Promise<Response> {
     const ip = (await host.requestContext.clientIp()) ?? "unknown";
-    const limited = await host.rateLimitService.rateLimit(`calendar.book-slots:${ip}`, PER_MINUTE, 60_000);
+    const limited = await host.rateLimitService.rateLimit(
+        `calendar.book-slots:${ip}`,
+        PER_MINUTE,
+        60_000
+    );
     if (!limited.ok) return new Response(null, { status: 429, headers: { "retry-after": "60" } });
     const { slug } = await context.params;
     const parsed = window.safeParse(Object.fromEntries(new URL(request.url).searchParams));

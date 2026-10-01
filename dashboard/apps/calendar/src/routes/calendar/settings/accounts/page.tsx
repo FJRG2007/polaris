@@ -22,5 +22,10 @@ export default async function CalendarAccountsPage({
     const params = await searchParams;
     const connection = one(params.connection);
     const provider = one(params.provider);
-    return <AccountsView linked={/^[a-z_]+$/.test(connection) ? connection : null} provider={provider === "microsoft" ? "microsoft" : "google"} />;
+    return (
+        <AccountsView
+            linked={/^[a-z_]+$/.test(connection) ? connection : null}
+            provider={provider === "microsoft" ? "microsoft" : "google"}
+        />
+    );
 }

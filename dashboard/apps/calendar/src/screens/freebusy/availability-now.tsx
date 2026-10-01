@@ -15,11 +15,22 @@ import { cacheKey, unwrap, useCachedRead } from "../cached-read";
 
 type Answer = { status: "free" | "busy" | "away" | "unavailable"; until: string | null };
 
-export function AvailabilityNow({ userId, zone, className }: { userId: string; zone: string; className?: string }) {
+export function AvailabilityNow({
+    userId,
+    zone,
+    className
+}: {
+    userId: string;
+    zone: string;
+    className?: string;
+}) {
     const t = useCalendarT();
     const locale = hostUi.i18nProvider.useLocale();
     const read = useCachedRead<Answer>(cacheKey("availability", userId, zone), async () => {
-        const answer = await unwrap(() => freeBusyActions.availabilityNowAction({ userId, zone }), t("freeBusy.failed"));
+        const answer = await unwrap(
+            () => freeBusyActions.availabilityNowAction({ userId, zone }),
+            t("freeBusy.failed")
+        );
         return { status: answer.status, until: answer.until };
     });
     if (read.loading) return <Skeleton className={cn("h-4 w-28", className)} />;
@@ -39,8 +50,23 @@ export function AvailabilityNow({ userId, zone, className }: { userId: string; z
                 ? t("freeBusy.freeUntil", { time: until })
                 : t("freeBusy.freeToday");
     return (
-        <span className={cn("inline-flex items-center gap-1.5 text-xs text-muted-foreground", className)}>
-            <span aria-hidden className={cn("inline-block size-2 rounded-full", answer.status === "free" ? "bg-success" : answer.status === "busy" ? "bg-danger" : "bg-warning")} />
+        <span
+            className={cn(
+                "inline-flex items-center gap-1.5 text-xs text-muted-foreground",
+                className
+            )}
+        >
+            <span
+                aria-hidden
+                className={cn(
+                    "inline-block size-2 rounded-full",
+                    answer.status === "free"
+                        ? "bg-success"
+                        : answer.status === "busy"
+                          ? "bg-danger"
+                          : "bg-warning"
+                )}
+            />
             {text}
         </span>
     );

@@ -21,7 +21,12 @@ import { cacheKey, dropCached, unwrap, useCachedRead } from "../cached-read";
 
 function useProposals() {
     const t = useCalendarT();
-    return useCachedRead<ProposalSummary[]>(cacheKey("proposals"), async () => (await unwrap(() => proposalActions.listProposalsAction(), t("proposals.failed"))).proposals);
+    return useCachedRead<ProposalSummary[]>(
+        cacheKey("proposals"),
+        async () =>
+            (await unwrap(() => proposalActions.listProposalsAction(), t("proposals.failed")))
+                .proposals
+    );
 }
 
 export function ProposalsView() {
@@ -33,12 +38,20 @@ export function ProposalsView() {
 
     const remove = async (proposal: ProposalSummary) => {
         if (!list) return;
-        const ok = await confirm({ title: t("proposals.deleteTitle", { title: proposal.title }), description: t("proposals.deleteBody"), confirmLabel: t("proposals.delete"), danger: true });
+        const ok = await confirm({
+            title: t("proposals.deleteTitle", { title: proposal.title }),
+            description: t("proposals.deleteBody"),
+            confirmLabel: t("proposals.delete"),
+            danger: true
+        });
         if (!ok) return;
         setProblem(null);
         read.replace(list.filter((entry) => entry.id !== proposal.id));
         try {
-            await unwrap(() => proposalActions.deleteProposalAction(proposal.id), t("proposals.failed"));
+            await unwrap(
+                () => proposalActions.deleteProposalAction(proposal.id),
+                t("proposals.failed")
+            );
             dropCached("proposal", proposal.id);
         } catch (caught) {
             read.replace(list);
@@ -82,21 +95,35 @@ export function ProposalsView() {
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
                     {list?.map((proposal) => (
                         <li key={proposal.id} className="group flex items-center gap-3 px-3 py-2.5">
-                            <Link href={`/calendar/proposals/${proposal.id}`} className="min-w-0 flex-1 no-underline">
-                                <div className="truncate text-[13px] font-medium text-foreground" title={proposal.title}>
+                            <Link
+                                href={`/calendar/proposals/${proposal.id}`}
+                                className="min-w-0 flex-1 no-underline"
+                            >
+                                <div
+                                    className="truncate text-[13px] font-medium text-foreground"
+                                    title={proposal.title}
+                                >
                                     {proposal.title}
                                 </div>
                                 <div className="text-xs text-foreground-subtle">
-                                    {t("proposals.summaryLine", { dates: proposal.dates, answered: proposal.answered, people: proposal.participants })}
+                                    {t("proposals.summaryLine", {
+                                        dates: proposal.dates,
+                                        answered: proposal.answered,
+                                        people: proposal.participants
+                                    })}
                                 </div>
                             </Link>
                             <span
                                 className={cn(
                                     "shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium",
-                                    proposal.status === "open" ? "border-success-edge bg-success-soft text-success-ink" : "border-border bg-muted text-muted-foreground"
+                                    proposal.status === "open"
+                                        ? "border-success-edge bg-success-soft text-success-ink"
+                                        : "border-border bg-muted text-muted-foreground"
                                 )}
                             >
-                                {proposal.status === "open" ? t("proposals.open") : t("proposals.closedBadge")}
+                                {proposal.status === "open"
+                                    ? t("proposals.open")
+                                    : t("proposals.closedBadge")}
                             </span>
                             <Button
                                 size="icon-sm"
@@ -140,21 +167,33 @@ export function ProposalsSection(_props: SidebarSectionSlotProps) {
     return (
         <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between gap-2 px-1">
-                <h3 className="text-[11px] font-medium uppercase tracking-wider text-foreground-subtle">{t("proposals.backToList")}</h3>
-                <Link href="/calendar/proposals" className="text-xs text-muted-foreground no-underline hover:text-foreground">
+                <h3 className="text-[11px] font-medium uppercase tracking-wider text-foreground-subtle">
+                    {t("proposals.backToList")}
+                </h3>
+                <Link
+                    href="/calendar/proposals"
+                    className="text-xs text-muted-foreground no-underline hover:text-foreground"
+                >
                     {t("proposals.manage")}
                 </Link>
             </div>
             {read.loading ? (
                 <Skeleton className="h-5 w-40" />
             ) : open.length === 0 ? (
-                <Link href="/calendar/proposals/new" className="inline-flex items-center gap-1.5 rounded px-1 py-1 text-xs text-muted-foreground no-underline hover:text-foreground">
+                <Link
+                    href="/calendar/proposals/new"
+                    className="inline-flex items-center gap-1.5 rounded px-1 py-1 text-xs text-muted-foreground no-underline hover:text-foreground"
+                >
                     <Plus className="size-3.5" />
                     {t("proposals.new")}
                 </Link>
             ) : (
                 open.map((proposal) => (
-                    <Link key={proposal.id} href={`/calendar/proposals/${proposal.id}`} className="flex items-center gap-2 rounded px-1 py-0.5 text-[13px] text-foreground no-underline hover:bg-card-hover">
+                    <Link
+                        key={proposal.id}
+                        href={`/calendar/proposals/${proposal.id}`}
+                        className="flex items-center gap-2 rounded px-1 py-0.5 text-[13px] text-foreground no-underline hover:bg-card-hover"
+                    >
                         <CalendarClock className="size-3.5 text-foreground-subtle" />
                         <span className="min-w-0 flex-1 truncate" title={proposal.title}>
                             {proposal.title}

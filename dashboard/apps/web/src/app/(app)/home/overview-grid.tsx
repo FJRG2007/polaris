@@ -433,9 +433,7 @@ export function OverviewGrid({
                                 : t("welcomeBack", { name: firstName(name) })
                             : t("title")}
                     </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {t("intro")}
-                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">{t("intro")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -643,7 +641,9 @@ function WidgetBody({
         case "games":
             return <GamesWidget data={data === undefined ? undefined : (data.games ?? null)} />;
         case "calendar":
-            return <CalendarWidget data={data === undefined ? undefined : (data.calendar ?? null)} />;
+            return (
+                <CalendarWidget data={data === undefined ? undefined : (data.calendar ?? null)} />
+            );
     }
 }
 

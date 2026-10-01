@@ -22,8 +22,22 @@ function StatusChip({ status }: { status: BookingView["status"] }) {
             : status === "pending"
               ? "border-warning-edge bg-warning-soft text-warning-ink"
               : "border-border bg-muted text-muted-foreground";
-    const label = status === "confirmed" ? t("booking.statusConfirmed") : status === "pending" ? t("booking.statusPending") : t("booking.statusCancelled");
-    return <span className={cn("inline-flex h-5 shrink-0 items-center rounded border px-1.5 text-[11px] font-medium", tone)}>{label}</span>;
+    const label =
+        status === "confirmed"
+            ? t("booking.statusConfirmed")
+            : status === "pending"
+              ? t("booking.statusPending")
+              : t("booking.statusCancelled");
+    return (
+        <span
+            className={cn(
+                "inline-flex h-5 shrink-0 items-center rounded border px-1.5 text-[11px] font-medium",
+                tone
+            )}
+        >
+            {label}
+        </span>
+    );
 }
 
 export function BookingsList({ pageId }: { pageId: string }) {
@@ -33,12 +47,19 @@ export function BookingsList({ pageId }: { pageId: string }) {
     const [scope, setScope] = useState<"upcoming" | "past">("upcoming");
     const [problem, setProblem] = useState<string | null>(null);
     const [confirm, confirmNode] = hostUi.confirmDialog.useConfirm();
-    const read = useCachedRead(cacheKey("bookings", pageId), async () => (await unwrap(() => listBookingsAction(pageId), t("errors.generic"))).bookings);
+    const read = useCachedRead(
+        cacheKey("bookings", pageId),
+        async () => (await unwrap(() => listBookingsAction(pageId), t("errors.generic"))).bookings
+    );
 
     const now = Date.now();
     const all = read.data ?? [];
-    const upcoming = all.filter((booking) => booking.status !== "cancelled" && Date.parse(booking.end) >= now).reverse();
-    const past = all.filter((booking) => booking.status === "cancelled" || Date.parse(booking.end) < now);
+    const upcoming = all
+        .filter((booking) => booking.status !== "cancelled" && Date.parse(booking.end) >= now)
+        .reverse();
+    const past = all.filter(
+        (booking) => booking.status === "cancelled" || Date.parse(booking.end) < now
+    );
     const shown = scope === "upcoming" ? upcoming : past;
 
     async function cancel(booking: BookingView) {
@@ -52,8 +73,15 @@ export function BookingsList({ pageId }: { pageId: string }) {
         if (!sure) return;
         setProblem(null);
         const before = all;
-        read.replace(all.map((entry) => (entry.id === booking.id ? { ...entry, status: "cancelled" } : entry)));
-        const answer = await hostUi.runAction.runAction(() => cancelBookingAsOwnerAction(booking.id), setProblem);
+        read.replace(
+            all.map((entry) =>
+                entry.id === booking.id ? { ...entry, status: "cancelled" } : entry
+            )
+        );
+        const answer = await hostUi.runAction.runAction(
+            () => cancelBookingAsOwnerAction(booking.id),
+            setProblem
+        );
         if (!answer || !answer.ok) {
             read.replace(before);
             if (answer && !answer.ok) setProblem(answer.error);
@@ -79,7 +107,10 @@ export function BookingsList({ pageId }: { pageId: string }) {
             {problem ? <StatusNote tone="danger">{problem}</StatusNote> : null}
             {read.error && !read.data ? <StatusNote tone="danger">{read.error}</StatusNote> : null}
             {read.loading ? (
-                <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card" aria-busy>
+                <ul
+                    className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card"
+                    aria-busy
+                >
                     {[0, 1].map((row) => (
                         <li key={row} className="flex flex-col gap-1.5 px-3 py-3">
                             <Skeleton className="h-4 w-40" />
@@ -109,12 +140,16 @@ export function BookingsList({ pageId }: { pageId: string }) {
                                             href={`/calendar/e/${booking.objectId}`}
                                             aria-label={t("booking.openEvent")}
                                             title={t("booking.openEvent")}
-                                            className={buttonVariants({ size: "icon-sm", variant: "ghost" })}
+                                            className={buttonVariants({
+                                                size: "icon-sm",
+                                                variant: "ghost"
+                                            })}
                                         >
                                             <ExternalLink />
                                         </Link>
                                     ) : null}
-                                    {booking.status !== "cancelled" && Date.parse(booking.end) >= now ? (
+                                    {booking.status !== "cancelled" &&
+                                    Date.parse(booking.end) >= now ? (
                                         <Button
                                             size="icon-sm"
                                             variant="ghost"
@@ -127,16 +162,25 @@ export function BookingsList({ pageId }: { pageId: string }) {
                                     ) : null}
                                 </span>
                             </div>
-                            <span className="text-muted-foreground">{formatRange(booking.start, booking.end, zone, locale)}</span>
-                            <a href={`mailto:${booking.email}`} className="w-fit max-w-full truncate text-xs text-muted-foreground underline-offset-2 hover:underline">
+                            <span className="text-muted-foreground">
+                                {formatRange(booking.start, booking.end, zone, locale)}
+                            </span>
+                            <a
+                                href={`mailto:${booking.email}`}
+                                className="w-fit max-w-full truncate text-xs text-muted-foreground underline-offset-2 hover:underline"
+                            >
                                 {booking.email}
                             </a>
                             {booking.answers.length > 0 ? (
                                 <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 text-xs sm:grid-cols-[max-content_1fr]">
                                     {booking.answers.map((answer, index) => (
                                         <div key={index} className="contents">
-                                            <dt className="text-foreground-subtle">{answer.label}</dt>
-                                            <dd className="whitespace-pre-wrap break-words text-muted-foreground">{answer.value}</dd>
+                                            <dt className="text-foreground-subtle">
+                                                {answer.label}
+                                            </dt>
+                                            <dd className="whitespace-pre-wrap break-words text-muted-foreground">
+                                                {answer.value}
+                                            </dd>
                                         </div>
                                     ))}
                                 </dl>

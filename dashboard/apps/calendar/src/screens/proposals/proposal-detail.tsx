@@ -20,7 +20,17 @@ import * as calendarActions from "../../actions/calendars";
 import type { ProposalView } from "../../lib/scheduling-wire";
 import { Check, CircleHelp, Minus, Pencil, Trash2, X } from "lucide-react";
 import { cacheKey, dropCached, unwrap, useCachedRead } from "../cached-read";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Select, Skeleton, cn } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Select,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 
 function VoteMark({ vote, label }: { vote: Vote | undefined; label: string }) {
     const icon =
@@ -50,15 +60,27 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
     const [calendarId, setCalendarId] = useState("");
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
-    const read = useCachedRead<ProposalView>(cacheKey("proposal", proposalId), async () => (await unwrap(() => proposalActions.proposalAction(proposalId), t("proposals.failed"))).proposal);
+    const read = useCachedRead<ProposalView>(
+        cacheKey("proposal", proposalId),
+        async () =>
+            (await unwrap(() => proposalActions.proposalAction(proposalId), t("proposals.failed")))
+                .proposal
+    );
     const calendars = useCachedRead<CalendarSummary[]>(
         choosing ? cacheKey("calendars", "writable") : null,
-        async () => (await unwrap(() => calendarActions.listCalendarsAction(), t("proposals.failed"))).calendars.filter((calendar) => calendar.writable && calendar.kind !== "resource")
+        async () =>
+            (
+                await unwrap(() => calendarActions.listCalendarsAction(), t("proposals.failed"))
+            ).calendars.filter((calendar) => calendar.writable && calendar.kind !== "resource")
     );
     const proposal = read.data;
 
     const tally = useMemo(() => {
-        if (!proposal) return new Map<string, { yes: number; maybe: number; no: number; requiredNo: number }>();
+        if (!proposal)
+            return new Map<
+                string,
+                { yes: number; maybe: number; no: number; requiredNo: number }
+            >();
         return new Map(
             proposal.dates.map((date) => {
                 const counts = { yes: 0, maybe: 0, no: 0, requiredNo: 0 };
@@ -87,14 +109,28 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
     }, [proposal, tally]);
 
     const voteLabel = (vote: Vote | undefined) =>
-        vote === "yes" ? t("proposals.vote.yes") : vote === "maybe" ? t("proposals.vote.maybe") : vote === "no" ? t("proposals.vote.no") : t("proposals.vote.none");
+        vote === "yes"
+            ? t("proposals.vote.yes")
+            : vote === "maybe"
+              ? t("proposals.vote.maybe")
+              : vote === "no"
+                ? t("proposals.vote.no")
+                : t("proposals.vote.none");
 
     const choose = async () => {
         if (!proposal || !choosing || !calendarId || busy) return;
         setBusy(true);
         setProblem(null);
         try {
-            const answer = await unwrap(() => proposalActions.chooseProposalDateAction({ proposalId: proposal.id, dateId: choosing, calendarId }), t("proposals.failed"));
+            const answer = await unwrap(
+                () =>
+                    proposalActions.chooseProposalDateAction({
+                        proposalId: proposal.id,
+                        dateId: choosing,
+                        calendarId
+                    }),
+                t("proposals.failed")
+            );
             read.replace({ ...proposal, status: "closed", objectId: answer.objectId, calendarId });
             dropCached("proposals");
             setChoosing(null);
@@ -107,10 +143,18 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
 
     const remove = async () => {
         if (!proposal) return;
-        const ok = await confirm({ title: t("proposals.deleteTitle", { title: proposal.title }), description: t("proposals.deleteBody"), confirmLabel: t("proposals.delete"), danger: true });
+        const ok = await confirm({
+            title: t("proposals.deleteTitle", { title: proposal.title }),
+            description: t("proposals.deleteBody"),
+            confirmLabel: t("proposals.delete"),
+            danger: true
+        });
         if (!ok) return;
         try {
-            await unwrap(() => proposalActions.deleteProposalAction(proposal.id), t("proposals.failed"));
+            await unwrap(
+                () => proposalActions.deleteProposalAction(proposal.id),
+                t("proposals.failed")
+            );
             dropCached("proposals");
             router.push("/calendar/proposals");
         } catch (caught) {
@@ -149,25 +193,51 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                 <div className="min-w-0">
                     <h2 className="text-[14px] font-semibold">{proposal.title}</h2>
                     <p className="text-xs text-foreground-subtle">
-                        {[proposal.location, t("proposals.minutes", { count: proposal.durationMinutes }), zone].filter(Boolean).join(", ")}
+                        {[
+                            proposal.location,
+                            t("proposals.minutes", { count: proposal.durationMinutes }),
+                            zone
+                        ]
+                            .filter(Boolean)
+                            .join(", ")}
                     </p>
-                    {proposal.description ? <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">{proposal.description}</p> : null}
+                    {proposal.description ? (
+                        <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">
+                            {proposal.description}
+                        </p>
+                    ) : null}
                 </div>
                 <div className="flex items-center gap-1">
                     <span
                         className={cn(
                             "rounded border px-1.5 py-0.5 text-[11px] font-medium",
-                            proposal.status === "open" ? "border-success-edge bg-success-soft text-success-ink" : "border-border bg-muted text-muted-foreground"
+                            proposal.status === "open"
+                                ? "border-success-edge bg-success-soft text-success-ink"
+                                : "border-border bg-muted text-muted-foreground"
                         )}
                     >
-                        {proposal.status === "open" ? t("proposals.open") : t("proposals.closedBadge")}
+                        {proposal.status === "open"
+                            ? t("proposals.open")
+                            : t("proposals.closedBadge")}
                     </span>
                     {proposal.status === "open" ? (
-                        <Button size="icon-sm" variant="ghost" aria-label={t("proposals.edit")} title={t("proposals.edit")} onClick={() => setEditing(true)}>
+                        <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={t("proposals.edit")}
+                            title={t("proposals.edit")}
+                            onClick={() => setEditing(true)}
+                        >
                             <Pencil />
                         </Button>
                     ) : null}
-                    <Button size="icon-sm" variant="ghost" aria-label={t("proposals.delete")} title={t("proposals.delete")} onClick={() => void remove()}>
+                    <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={t("proposals.delete")}
+                        title={t("proposals.delete")}
+                        onClick={() => void remove()}
+                    >
                         <Trash2 />
                     </Button>
                 </div>
@@ -176,7 +246,10 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
             {proposal.status === "closed" && proposal.objectId ? (
                 <StatusNote tone="success">
                     {t("proposals.settled")}{" "}
-                    <Link className="underline underline-offset-2" href={`/calendar/e/${proposal.objectId}`}>
+                    <Link
+                        className="underline underline-offset-2"
+                        href={`/calendar/e/${proposal.objectId}`}
+                    >
                         {t("proposals.openEvent")}
                     </Link>
                 </StatusNote>
@@ -189,8 +262,24 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                         <tr className="border-b border-border">
                             <th className="px-3 py-2 text-left">{t("proposals.person")}</th>
                             {proposal.dates.map((date) => (
-                                <th key={date.id} className={cn("px-2 py-2 text-center", best === date.id && "bg-success-soft")}>
-                                    <span className="block normal-case tracking-normal text-foreground">{formatRange(date.start, new Date(Date.parse(date.start) + proposal.durationMinutes * 60_000).toISOString(), zone, locale)}</span>
+                                <th
+                                    key={date.id}
+                                    className={cn(
+                                        "px-2 py-2 text-center",
+                                        best === date.id && "bg-success-soft"
+                                    )}
+                                >
+                                    <span className="block normal-case tracking-normal text-foreground">
+                                        {formatRange(
+                                            date.start,
+                                            new Date(
+                                                Date.parse(date.start) +
+                                                    proposal.durationMinutes * 60_000
+                                            ).toISOString(),
+                                            zone,
+                                            locale
+                                        )}
+                                    </span>
                                 </th>
                             ))}
                         </tr>
@@ -202,22 +291,49 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                                     <div className="truncate" title={person.email}>
                                         {person.name || person.email}
                                     </div>
-                                    <div className="truncate text-xs text-foreground-subtle">{person.required ? t("proposals.required") : t("proposals.optional")}{person.respondedAt ? "" : `, ${t("proposals.noAnswer")}`}</div>
+                                    <div className="truncate text-xs text-foreground-subtle">
+                                        {person.required
+                                            ? t("proposals.required")
+                                            : t("proposals.optional")}
+                                        {person.respondedAt ? "" : `, ${t("proposals.noAnswer")}`}
+                                    </div>
                                 </td>
                                 {proposal.dates.map((date) => (
-                                    <td key={date.id} className={cn("px-2 py-2 text-center", best === date.id && "bg-success-soft")}>
-                                        <VoteMark vote={person.votes[date.id]} label={voteLabel(person.votes[date.id])} />
+                                    <td
+                                        key={date.id}
+                                        className={cn(
+                                            "px-2 py-2 text-center",
+                                            best === date.id && "bg-success-soft"
+                                        )}
+                                    >
+                                        <VoteMark
+                                            vote={person.votes[date.id]}
+                                            label={voteLabel(person.votes[date.id])}
+                                        />
                                     </td>
                                 ))}
                             </tr>
                         ))}
                         <tr className="border-t border-border">
-                            <td className="px-3 py-2 text-xs text-foreground-subtle">{t("proposals.totals")}</td>
+                            <td className="px-3 py-2 text-xs text-foreground-subtle">
+                                {t("proposals.totals")}
+                            </td>
                             {proposal.dates.map((date) => {
                                 const counts = tally.get(date.id)!;
                                 return (
-                                    <td key={date.id} className={cn("px-2 py-2 text-center", best === date.id && "bg-success-soft")}>
-                                        <div className="text-xs tabular-nums text-muted-foreground">{t("proposals.tally", { yes: counts.yes, maybe: counts.maybe })}</div>
+                                    <td
+                                        key={date.id}
+                                        className={cn(
+                                            "px-2 py-2 text-center",
+                                            best === date.id && "bg-success-soft"
+                                        )}
+                                    >
+                                        <div className="text-xs tabular-nums text-muted-foreground">
+                                            {t("proposals.tally", {
+                                                yes: counts.yes,
+                                                maybe: counts.maybe
+                                            })}
+                                        </div>
                                         {proposal.status === "open" ? (
                                             <Button
                                                 size="xs"
@@ -253,16 +369,25 @@ export function ProposalDetail({ proposalId }: { proposalId: string }) {
                             onValueChange={setCalendarId}
                             placeholder={t("proposals.pickCalendar")}
                             aria-label={t("proposals.pickCalendar")}
-                            options={(calendars.data ?? []).map((calendar) => ({ value: calendar.id, label: calendar.name }))}
+                            options={(calendars.data ?? []).map((calendar) => ({
+                                value: calendar.id,
+                                label: calendar.name
+                            }))}
                         />
                     )}
-                    {calendars.error ? <StatusNote tone="danger">{calendars.error}</StatusNote> : null}
+                    {calendars.error ? (
+                        <StatusNote tone="danger">{calendars.error}</StatusNote>
+                    ) : null}
                     {problem ? <StatusNote tone="danger">{problem}</StatusNote> : null}
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setChoosing(null)}>
                             {t("proposals.cancel")}
                         </Button>
-                        <Button onClick={() => void choose()} disabled={busy} aria-disabled={!calendarId || busy}>
+                        <Button
+                            onClick={() => void choose()}
+                            disabled={busy}
+                            aria-disabled={!calendarId || busy}
+                        >
                             {t("proposals.confirmChoice")}
                         </Button>
                     </DialogFooter>

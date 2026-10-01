@@ -12,7 +12,10 @@ import { exportEverything } from "../../../../../lib/export-all";
 
 const id = z.string().uuid();
 
-export async function GET(_request: Request, context: { params: Promise<{ path?: string[] }> }): Promise<Response> {
+export async function GET(
+    _request: Request,
+    context: { params: Promise<{ path?: string[] }> }
+): Promise<Response> {
     const user = await apiCalendarUser();
     if (user instanceof Response) return user;
     const { path = [] } = await context.params;
@@ -33,9 +36,12 @@ export async function GET(_request: Request, context: { params: Promise<{ path?:
     }
     const event = path[0] === "event";
     const parsed = id.safeParse(event ? path[1] : path[0]);
-    if (!parsed.success || path.length !== (event ? 2 : 1)) return new Response(null, { status: 404 });
+    if (!parsed.success || path.length !== (event ? 2 : 1))
+        return new Response(null, { status: 404 });
     try {
-        const file = event ? await exportEvent(user, parsed.data) : await exportCalendar(user, parsed.data);
+        const file = event
+            ? await exportEvent(user, parsed.data)
+            : await exportCalendar(user, parsed.data);
         return new Response(file.ics, {
             headers: {
                 "content-type": "text/calendar; charset=utf-8",

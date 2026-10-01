@@ -43,28 +43,65 @@ const TABLES: Record<string, Table> = {
             meetingLink: false,
             enabled: true
         },
-        relations: { bookings: { model: "calendarBooking", kind: "many", foreignKey: "pageId", cascade: true } },
+        relations: {
+            bookings: {
+                model: "calendarBooking",
+                kind: "many",
+                foreignKey: "pageId",
+                cascade: true
+            }
+        },
         updatedAt: true
     },
     calendarBooking: {
-        defaults: { objectId: null, answers: "{}", timezone: "", status: "pending", requester: "", locale: "" },
+        defaults: {
+            objectId: null,
+            answers: "{}",
+            timezone: "",
+            status: "pending",
+            requester: "",
+            locale: ""
+        },
         relations: { page: { model: "calendarBookingPage", kind: "one", foreignKey: "pageId" } }
     },
     calendarProposal: {
-        defaults: { calendarId: null, description: "", location: "", durationMinutes: 60, timezone: "", notify: true, status: "open", objectId: null },
+        defaults: {
+            calendarId: null,
+            description: "",
+            location: "",
+            durationMinutes: 60,
+            timezone: "",
+            notify: true,
+            status: "open",
+            objectId: null
+        },
         relations: {
-            dates: { model: "calendarProposalDate", kind: "many", foreignKey: "proposalId", cascade: true },
-            participants: { model: "calendarProposalParticipant", kind: "many", foreignKey: "proposalId", cascade: true }
+            dates: {
+                model: "calendarProposalDate",
+                kind: "many",
+                foreignKey: "proposalId",
+                cascade: true
+            },
+            participants: {
+                model: "calendarProposalParticipant",
+                kind: "many",
+                foreignKey: "proposalId",
+                cascade: true
+            }
         },
         updatedAt: true
     },
     calendarProposalDate: {
         defaults: {},
-        relations: { proposal: { model: "calendarProposal", kind: "one", foreignKey: "proposalId" } }
+        relations: {
+            proposal: { model: "calendarProposal", kind: "one", foreignKey: "proposalId" }
+        }
     },
     calendarProposalParticipant: {
         defaults: { name: "", userId: null, required: true, votes: "{}", respondedAt: null },
-        relations: { proposal: { model: "calendarProposal", kind: "one", foreignKey: "proposalId" } }
+        relations: {
+            proposal: { model: "calendarProposal", kind: "one", foreignKey: "proposalId" }
+        }
     }
 };
 
@@ -79,7 +116,12 @@ function rowsOf(model: string): Row[] {
 }
 
 function plain(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !(value instanceof Date) && !Array.isArray(value);
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        !(value instanceof Date) &&
+        !Array.isArray(value)
+    );
 }
 
 function same(left: unknown, right: unknown): boolean {
@@ -95,13 +137,15 @@ function order(value: unknown): number | string {
 
 function related(model: string, row: Row, name: string): Row[] {
     const relation = TABLES[model]?.relations[name] ?? unsupported(`relation ${model}.${name}`);
-    if (relation.kind === "one") return rowsOf(relation.model).filter((other) => other.id === row[relation.foreignKey]);
+    if (relation.kind === "one")
+        return rowsOf(relation.model).filter((other) => other.id === row[relation.foreignKey]);
     return rowsOf(relation.model).filter((other) => other[relation.foreignKey] === row.id);
 }
 
 function scalar(value: unknown, filter: unknown): boolean {
     if (filter === undefined) return true;
-    if (filter === null || !plain(filter)) return filter === null ? value === null || value === undefined : same(value, filter);
+    if (filter === null || !plain(filter))
+        return filter === null ? value === null || value === undefined : same(value, filter);
     for (const [operator, operand] of Object.entries(filter)) {
         if (operator === "in") {
             if (!(operand as unknown[]).some((candidate) => same(value, candidate))) return false;
@@ -132,7 +176,8 @@ function matches(model: string, row: Row, where: unknown): boolean {
         } else if (TABLES[model]!.relations[key]) {
             const relation = TABLES[model]!.relations[key]!;
             if (relation.kind !== "one") unsupported(`list relation filter ${key}`);
-            if (!related(model, row, key).some((other) => matches(relation.model, other, filter))) return false;
+            if (!related(model, row, key).some((other) => matches(relation.model, other, filter)))
+                return false;
         } else if (!scalar(row[key], filter)) return false;
     }
     return true;
@@ -140,7 +185,10 @@ function matches(model: string, row: Row, where: unknown): boolean {
 
 function sorted(rows: Row[], orderBy: unknown): Row[] {
     if (!orderBy) return rows;
-    const specs = (Array.isArray(orderBy) ? orderBy : [orderBy]) as Record<string, "asc" | "desc">[];
+    const specs = (Array.isArray(orderBy) ? orderBy : [orderBy]) as Record<
+        string,
+        "asc" | "desc"
+    >[];
     return [...rows].sort((left, right) => {
         for (const spec of specs) {
             const [field, direction] = Object.entries(spec)[0]!;
@@ -160,7 +208,9 @@ function shaped(model: string, row: Row, spec: unknown): Row {
         const relation = TABLES[model]!.relations[name];
         if (name === "_count") {
             const counts: Row = {};
-            for (const counted of Object.keys((wanted as { select: Record<string, unknown> }).select)) {
+            for (const counted of Object.keys(
+                (wanted as { select: Record<string, unknown> }).select
+            )) {
                 counts[counted] = related(model, row, counted).length;
             }
             out._count = counts;
@@ -183,7 +233,12 @@ function shaped(model: string, row: Row, spec: unknown): Row {
 function build(model: string, data: Row): Row {
     const table = TABLES[model]!;
     const stamp = new Date();
-    const row: Row = { id: randomUUID(), ...table.defaults, createdAt: stamp, ...(table.updatedAt ? { updatedAt: stamp } : {}) };
+    const row: Row = {
+        id: randomUUID(),
+        ...table.defaults,
+        createdAt: stamp,
+        ...(table.updatedAt ? { updatedAt: stamp } : {})
+    };
     const children: [Relation, Row[]][] = [];
     for (const [key, value] of Object.entries(data)) {
         const relation = table.relations[key];
@@ -193,18 +248,24 @@ function build(model: string, data: Row): Row {
         } else row[key] = value;
     }
     for (const unique of ["slug", "token", "confirmToken", "manageToken"]) {
-        if (row[unique] !== undefined && rowsOf(model).some((other) => other[unique] === row[unique])) unsupported(`duplicate ${model}.${unique}`);
+        if (
+            row[unique] !== undefined &&
+            rowsOf(model).some((other) => other[unique] === row[unique])
+        )
+            unsupported(`duplicate ${model}.${unique}`);
     }
     rowsOf(model).push(row);
     for (const [relation, list] of children) {
-        for (const child of list) build(relation.model, { ...child, [relation.foreignKey]: row.id });
+        for (const child of list)
+            build(relation.model, { ...child, [relation.foreignKey]: row.id });
     }
     return row;
 }
 
 function remove(model: string, row: Row): void {
     for (const [name, relation] of Object.entries(TABLES[model]!.relations)) {
-        if (relation.kind === "many" && relation.cascade) for (const other of related(model, row, name)) remove(relation.model, other);
+        if (relation.kind === "many" && relation.cascade)
+            for (const other of related(model, row, name)) remove(relation.model, other);
     }
     const rows = rowsOf(model);
     rows.splice(rows.indexOf(row), 1);
@@ -212,7 +273,10 @@ function remove(model: string, row: Row): void {
 
 function apply(model: string, row: Row, data: Row): void {
     Object.assign(row, data);
-    if (TABLES[model]!.updatedAt) row.updatedAt = new Date(Math.max(Date.now(), ((row.updatedAt as Date | undefined)?.getTime() ?? 0) + 1));
+    if (TABLES[model]!.updatedAt)
+        row.updatedAt = new Date(
+            Math.max(Date.now(), ((row.updatedAt as Date | undefined)?.getTime() ?? 0) + 1)
+        );
 }
 
 function delegate(model: string) {
@@ -238,8 +302,10 @@ function delegate(model: string) {
             if (!row) throw new Error(`scheduling-db: no ${model}`);
             return shaped(model, row, args.include ?? args.select);
         },
-        count: async (args: Args = {}) => rowsOf(model).filter((row) => matches(model, row, args.where)).length,
-        create: async (args: Args) => shaped(model, build(model, args.data as Row), args.include ?? args.select),
+        count: async (args: Args = {}) =>
+            rowsOf(model).filter((row) => matches(model, row, args.where)).length,
+        create: async (args: Args) =>
+            shaped(model, build(model, args.data as Row), args.include ?? args.select),
         createMany: async (args: Args) => {
             const list = args.data as Row[];
             for (const data of list) build(model, data);
@@ -270,7 +336,9 @@ function delegate(model: string) {
         groupBy: async (args: Args) => {
             const [field] = args.by as string[];
             const groups = new Map<unknown, number>();
-            for (const row of rowsOf(model).filter((candidate) => matches(model, candidate, args.where))) {
+            for (const row of rowsOf(model).filter((candidate) =>
+                matches(model, candidate, args.where)
+            )) {
                 groups.set(row[field!], (groups.get(row[field!]) ?? 0) + 1);
             }
             return [...groups].map(([key, count]) => ({ [field!]: key, _count: { _all: count } }));
@@ -291,15 +359,21 @@ export const scheduling = {
 let running: Promise<unknown> = Promise.resolve();
 
 /** The shared fake's client with the scheduling tables beside it. */
-export const prisma: Record<string, unknown> = Object.assign(Object.create(null) as Record<string, unknown>, db.prisma, {
-    ...Object.fromEntries(Object.keys(TABLES).map((name) => [name, delegate(name)])),
-    $transaction: async (work: unknown): Promise<unknown> => {
-        if (typeof work !== "function") return db.prisma.$transaction(work);
-        const turn = running.then(() => (work as (client: unknown) => Promise<unknown>)(prisma));
-        running = turn.catch(() => undefined);
-        return turn;
+export const prisma: Record<string, unknown> = Object.assign(
+    Object.create(null) as Record<string, unknown>,
+    db.prisma,
+    {
+        ...Object.fromEntries(Object.keys(TABLES).map((name) => [name, delegate(name)])),
+        $transaction: async (work: unknown): Promise<unknown> => {
+            if (typeof work !== "function") return db.prisma.$transaction(work);
+            const turn = running.then(() =>
+                (work as (client: unknown) => Promise<unknown>)(prisma)
+            );
+            running = turn.catch(() => undefined);
+            return turn;
+        }
     }
-});
+);
 
 /** What `vi.mock("@polaris/db", ...)` answers with in a feature test. */
 export const dbModule = { prisma, VISIBLE_USER: {} };

@@ -95,7 +95,11 @@ export async function reachOf(
     }
     // A room is seen as taken or free by everybody who books rooms.
     for (const calendar of calendars) {
-        if (calendar.kind === "resource" && !found.has(calendar.id) && calendar.trashedAt === null) {
+        if (
+            calendar.kind === "resource" &&
+            !found.has(calendar.id) &&
+            calendar.trashedAt === null
+        ) {
             found.set(calendar.id, "freebusy");
         }
     }
@@ -115,7 +119,10 @@ export async function reachableCalendars(userId: string): Promise<Map<string, Re
                     trashedAt: null,
                     shares: {
                         some: {
-                            OR: [{ userId }, ...(teams.length > 0 ? [{ teamId: { in: teams } }] : [])]
+                            OR: [
+                                { userId },
+                                ...(teams.length > 0 ? [{ teamId: { in: teams } }] : [])
+                            ]
                         }
                     }
                 }
@@ -148,13 +155,27 @@ export async function requireCalendar(
 }> {
     const row = await prisma.calendar.findUnique({
         where: { id: calendarId },
-        select: { id: true, ownerId: true, kind: true, trashedAt: true, readOnly: true, sourceId: true }
+        select: {
+            id: true,
+            ownerId: true,
+            kind: true,
+            trashedAt: true,
+            readOnly: true,
+            sourceId: true
+        }
     });
     const reach = row ? ((await reachOf(userId, [row])).get(row.id) ?? null) : null;
     if (!row || row.trashedAt || !reaches(reach, wanted)) {
         throw new CalendarRefusal((await calendarT())("errors.calendarNotFound"));
     }
-    return { id: row.id, ownerId: row.ownerId, kind: row.kind, readOnly: row.readOnly, sourceId: row.sourceId, reach: reach! };
+    return {
+        id: row.id,
+        ownerId: row.ownerId,
+        kind: row.kind,
+        readOnly: row.readOnly,
+        sourceId: row.sourceId,
+        reach: reach!
+    };
 }
 
 /** A calendar this person may write events into: at least write, and not a
@@ -190,7 +211,10 @@ export function busyBlock(event: engine.CalendarEvent, summary = ""): engine.Cal
 export function todoClassification(todo: engine.CalendarTodo): engine.Classification {
     const line = todo.extra.find((extra) => /^CLASS[;:]/i.test(extra.line))?.line;
     if (!line) return "PUBLIC";
-    const value = line.slice(line.lastIndexOf(":") + 1).trim().toUpperCase();
+    const value = line
+        .slice(line.lastIndexOf(":") + 1)
+        .trim()
+        .toUpperCase();
     return value === "PUBLIC" || value === "CONFIDENTIAL" ? value : "PRIVATE";
 }
 
@@ -208,6 +232,11 @@ export function publicItem(item: engine.CalendarItem): boolean {
  */
 export function forReader(item: engine.CalendarItem): engine.CalendarItem | null {
     if (item.component === "VTODO") return todoClassification(item.todo) === "PUBLIC" ? item : null;
-    const map = (event: engine.CalendarEvent) => (event.classification === "PUBLIC" ? event : busyBlock(event));
-    return { ...item, master: item.master ? map(item.master) : null, overrides: item.overrides.map(map) };
+    const map = (event: engine.CalendarEvent) =>
+        event.classification === "PUBLIC" ? event : busyBlock(event);
+    return {
+        ...item,
+        master: item.master ? map(item.master) : null,
+        overrides: item.overrides.map(map)
+    };
 }

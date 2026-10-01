@@ -28,7 +28,10 @@ const MINUTE = 60_000;
 
 /** The stable key of one alarm: its place in the list and its trigger. */
 export function alarmKey(alarm: Alarm, index: number): string {
-    const trigger = alarm.trigger.kind === "absolute" ? `abs:${alarm.trigger.at}` : `rel:${alarm.trigger.minutes}:${alarm.trigger.related}`;
+    const trigger =
+        alarm.trigger.kind === "absolute"
+            ? `abs:${alarm.trigger.at}`
+            : `rel:${alarm.trigger.minutes}:${alarm.trigger.related}`;
     return `${index}:${alarm.action}:${trigger}`;
 }
 
@@ -49,12 +52,24 @@ function inRange(date: Date, range: { from: Date; to: Date }): boolean {
 
 /** Fire times of a list of alarms for one occurrence. A null entry keeps its
  *  place (so keys stay the alarm's index) but is not planned. */
-function plan(alarms: readonly (Alarm | null)[], occurrence: { start: Date; end: Date }, recurrenceKey: string, range: { from: Date; to: Date }): PlannedAlarm[] {
+function plan(
+    alarms: readonly (Alarm | null)[],
+    occurrence: { start: Date; end: Date },
+    recurrenceKey: string,
+    range: { from: Date; to: Date }
+): PlannedAlarm[] {
     const found: PlannedAlarm[] = [];
     alarms.forEach((alarm, index) => {
         if (!alarm) return;
         const fireAt = fireTime(alarm, occurrence);
-        if (inRange(fireAt, range)) found.push({ key: alarmKey(alarm, index), action: alarm.action, fireAt, occurrenceStart: occurrence.start, recurrenceKey });
+        if (inRange(fireAt, range))
+            found.push({
+                key: alarmKey(alarm, index),
+                action: alarm.action,
+                fireAt,
+                occurrenceStart: occurrence.start,
+                recurrenceKey
+            });
     });
     return found;
 }
@@ -63,54 +78,97 @@ function plan(alarms: readonly (Alarm | null)[], occurrence: { start: Date; end:
  * Every alarm that fires in `range` (from inclusive, to exclusive), for every
  * occurrence, sorted by fire time.
  */
-export function alarmsFor(item: CalendarItem, range: { from: Date; to: Date }, floatingZone: string): PlannedAlarm[] {
+export function alarmsFor(
+    item: CalendarItem,
+    range: { from: Date; to: Date },
+    floatingZone: string
+): PlannedAlarm[] {
     if (item.component === "VTODO") {
         const times = expandTodo(item, floatingZone);
         const start = times.start ?? times.due;
         const end = times.due ?? times.start;
-        if (!start || !end || item.todo.status === "COMPLETED" || item.todo.status === "CANCELLED") return [];
+        if (!start || !end || item.todo.status === "COMPLETED" || item.todo.status === "CANCELLED")
+            return [];
         const reference = item.todo.due ?? item.todo.start;
         const key = reference && "date" in reference ? reference.date : start.toISOString();
         return sortByFire(plan(item.todo.alarms, { start, end }, key, range));
     }
     const events = [item.master, ...item.overrides].filter((event) => event !== null);
-    const offsets = events.flatMap((event) => event.alarms).filter((alarm) => alarm.trigger.kind === "relative").map((alarm) => (alarm.trigger.kind === "relative" ? alarm.trigger.minutes : 0));
+    const offsets = events
+        .flatMap((event) => event.alarms)
+        .filter((alarm) => alarm.trigger.kind === "relative")
+        .map((alarm) => (alarm.trigger.kind === "relative" ? alarm.trigger.minutes : 0));
     if (events.every((event) => event.alarms.length === 0)) return [];
     // An occurrence whose alarm fires in the range starts within these bounds.
     const earliest = Math.min(0, ...offsets);
     const latest = Math.max(0, ...offsets);
-    const window = { from: new Date(range.from.getTime() - latest * MINUTE), to: new Date(range.to.getTime() - earliest * MINUTE + MINUTE) };
+    const window = {
+        from: new Date(range.from.getTime() - latest * MINUTE),
+        to: new Date(range.to.getTime() - earliest * MINUTE + MINUTE)
+    };
     const found: PlannedAlarm[] = [];
-    const relativeOnly = (alarms: readonly Alarm[]) => alarms.map((alarm) => (alarm.trigger.kind === "absolute" ? null : alarm));
+    const relativeOnly = (alarms: readonly Alarm[]) =>
+        alarms.map((alarm) => (alarm.trigger.kind === "absolute" ? null : alarm));
     for (const occurrence of expandItem(item, window, { floatingZone, limit: 10_000 })) {
         if (occurrence.event.status === "CANCELLED") continue;
-        found.push(...plan(relativeOnly(occurrence.event.alarms), occurrence, occurrence.recurrenceKey, range));
+        found.push(
+            ...plan(
+                relativeOnly(occurrence.event.alarms),
+                occurrence,
+                occurrence.recurrenceKey,
+                range
+            )
+        );
     }
     // An absolute trigger fires once, whatever the recurrence and wherever the
     // occurrences are: it belongs to the component that carries it.
     const context = { floatingZone, timezones: item.timezones };
     for (const event of events) {
-        if (event.status === "CANCELLED" || !event.alarms.some((alarm) => alarm.trigger.kind === "absolute")) continue;
+        if (
+            event.status === "CANCELLED" ||
+            !event.alarms.some((alarm) => alarm.trigger.kind === "absolute")
+        )
+            continue;
         const span = placeEvent(event, context);
-        const key = event.recurrenceId && item.master ? recurrenceKeyOf(wallKeyOf(event.recurrenceId, item.master, context), item.master, context) : span.startDate ?? span.start.toISOString();
-        const absolute = event.alarms.map((alarm) => (alarm.trigger.kind === "absolute" ? alarm : null));
+        const key =
+            event.recurrenceId && item.master
+                ? recurrenceKeyOf(
+                      wallKeyOf(event.recurrenceId, item.master, context),
+                      item.master,
+                      context
+                  )
+                : (span.startDate ?? span.start.toISOString());
+        const absolute = event.alarms.map((alarm) =>
+            alarm.trigger.kind === "absolute" ? alarm : null
+        );
         found.push(...plan(absolute, span, key, range));
     }
     return sortByFire(found);
 }
 
 function sortByFire(alarms: PlannedAlarm[]): PlannedAlarm[] {
-    return alarms.sort((a, b) => a.fireAt.getTime() - b.fireAt.getTime() || a.key.localeCompare(b.key));
+    return alarms.sort(
+        (a, b) => a.fireAt.getTime() - b.fireAt.getTime() || a.key.localeCompare(b.key)
+    );
 }
 
 /**
  * The next time each alarm fires after `after`, looking `horizonDays` ahead:
  * one entry per alarm key, what a reminder job schedules next.
  */
-export function nextAlarm(item: CalendarItem, after: Date, floatingZone: string, horizonDays = 400): PlannedAlarm[] {
-    const range = { from: new Date(after.getTime() + 1), to: new Date(after.getTime() + horizonDays * 86_400_000) };
+export function nextAlarm(
+    item: CalendarItem,
+    after: Date,
+    floatingZone: string,
+    horizonDays = 400
+): PlannedAlarm[] {
+    const range = {
+        from: new Date(after.getTime() + 1),
+        to: new Date(after.getTime() + horizonDays * 86_400_000)
+    };
     const first = new Map<string, PlannedAlarm>();
-    for (const alarm of alarmsFor(item, range, floatingZone)) if (!first.has(alarm.key)) first.set(alarm.key, alarm);
+    for (const alarm of alarmsFor(item, range, floatingZone))
+        if (!first.has(alarm.key)) first.set(alarm.key, alarm);
     return sortByFire([...first.values()]);
 }
 
@@ -121,8 +179,13 @@ export function nextAlarm(item: CalendarItem, after: Date, floatingZone: string,
  * before.
  */
 export function defaultAlarmPresets(allDay: boolean): AlarmTrigger[] {
-    const relative = (minutes: number): AlarmTrigger => ({ kind: "relative", minutes, related: "START" });
-    if (allDay) return [540, 540 - 1440, 540 - 2 * 1440, 540 - 3 * 1440, 540 - 7 * 1440].map(relative);
+    const relative = (minutes: number): AlarmTrigger => ({
+        kind: "relative",
+        minutes,
+        related: "START"
+    });
+    if (allDay)
+        return [540, 540 - 1440, 540 - 2 * 1440, 540 - 3 * 1440, 540 - 7 * 1440].map(relative);
     return [0, -5, -10, -15, -30, -45, -60, -120, -180, -1440, -2880].map(relative);
 }
 
@@ -138,7 +201,11 @@ function amount(minutes: number, t: RuleTranslator): string {
 function clock(minutesOfDay: number, locale: string): { text: string; one: "yes" | "no" } {
     const hours = Math.floor(minutesOfDay / 60);
     const date = new Date(Date.UTC(2024, 0, 1, hours, minutesOfDay % 60));
-    const text = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(date);
+    const text = new Intl.DateTimeFormat(locale, {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: "UTC"
+    }).format(date);
     return { text, one: hours === 1 || hours === 13 ? "yes" : "no" };
 }
 
@@ -147,10 +214,19 @@ function clock(minutesOfDay: number, locale: string): { text: string; one: "yes"
  * 9:00 AM", "El mismo día a las 9:00". All-day triggers are read as a day and a
  * time of day, the way the presets are made. `t` is scoped to `rule.json`.
  */
-export function describeTrigger(trigger: AlarmTrigger, allDay: boolean, t: RuleTranslator, options: { locale?: string; timeZone?: string } = {}): string {
+export function describeTrigger(
+    trigger: AlarmTrigger,
+    allDay: boolean,
+    t: RuleTranslator,
+    options: { locale?: string; timeZone?: string } = {}
+): string {
     const locale = options.locale ?? "en-US";
     if (trigger.kind === "absolute") {
-        const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: options.timeZone ?? "UTC" }).format(absoluteInstant(trigger.at));
+        const date = new Intl.DateTimeFormat(locale, {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: options.timeZone ?? "UTC"
+        }).format(absoluteInstant(trigger.at));
         return t("alarm.onDate", { date });
     }
     const minutes = trigger.minutes;
@@ -163,7 +239,7 @@ export function describeTrigger(trigger: AlarmTrigger, allDay: boolean, t: RuleT
     }
     if (minutes === 0) return t(trigger.related === "END" ? "alarm.atEnd" : "alarm.atStart");
     const time = amount(minutes, t);
-    if (trigger.related === "END") return t(minutes < 0 ? "alarm.beforeEnd" : "alarm.afterEnd", { time });
+    if (trigger.related === "END")
+        return t(minutes < 0 ? "alarm.beforeEnd" : "alarm.afterEnd", { time });
     return t(minutes < 0 ? "alarm.before" : "alarm.after", { time });
 }
-

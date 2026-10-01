@@ -103,7 +103,10 @@ export interface AppExtension {
 
     /** The titles of the events among these ids that this account may read,
      *  for a pasted calendar link to show as a named chip. */
-    readonly eventTitles?: (userId: string, ids: readonly string[]) => Promise<Readonly<Record<string, string>>>;
+    readonly eventTitles?: (
+        userId: string,
+        ids: readonly string[]
+    ) => Promise<Readonly<Record<string, string>>>;
 
     /** The reader's next events, for the Overview card, soonest first. */
     readonly upcomingEvents?: (userId: string, limit: number) => Promise<readonly UpcomingEvent[]>;

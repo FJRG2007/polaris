@@ -287,7 +287,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "calendar.syncFailed",
         group: "calendar",
         label: "A linked calendar stopped syncing",
-        description: "A calendar you linked from Google, Microsoft or a CalDAV server refused Polaris or could not be reached.",
+        description:
+            "A calendar you linked from Google, Microsoft or a CalDAV server refused Polaris or could not be reached.",
         level: "warning",
         defaults: { inapp: true, email: false }
     },

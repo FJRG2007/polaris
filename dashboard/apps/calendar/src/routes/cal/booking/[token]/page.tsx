@@ -10,7 +10,11 @@ import { BookingManage } from "../../../../screens/public/booking-manage";
 
 export const dynamic = "force-dynamic";
 
-export default async function PublicBookingManagePage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function PublicBookingManagePage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     const { token } = await params;
     if (typeof token !== "string") notFound();
     const booking = await bookingByToken(token);

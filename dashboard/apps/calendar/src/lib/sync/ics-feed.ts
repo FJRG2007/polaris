@@ -72,7 +72,9 @@ export async function fetchIcsFeed(input: {
     fetcher: Fetcher;
     maxBytes?: number;
 }): Promise<FeedResult> {
-    const headers: Record<string, string> = { Accept: "text/calendar, text/plain;q=0.8, */*;q=0.5" };
+    const headers: Record<string, string> = {
+        Accept: "text/calendar, text/plain;q=0.8, */*;q=0.5"
+    };
     if (input.etag) headers["If-None-Match"] = input.etag;
     if (input.lastModified) headers["If-Modified-Since"] = input.lastModified;
     const { response } = await send(input.fetcher, feedUrl(input.url), { headers });
@@ -82,7 +84,8 @@ export async function fetchIcsFeed(input: {
     }
     if (!response.ok) throw errorFor(response, await reasonOf(response));
     const text = await readCapped(response, input.maxBytes ?? DEFAULT_FEED_BYTES);
-    if (!/BEGIN:VCALENDAR/i.test(text)) throw new SyncRefusedError("The address did not return a calendar", response.status);
+    if (!/BEGIN:VCALENDAR/i.test(text))
+        throw new SyncRefusedError("The address did not return a calendar", response.status);
     const parsed = engine.parseCalendarText(text);
     const objects: RemoteObject[] = [];
     for (const item of parsed.items) {
@@ -93,7 +96,11 @@ export async function fetchIcsFeed(input: {
         notModified: false,
         etag: response.headers.get("etag"),
         lastModified: response.headers.get("last-modified"),
-        calendar: { name: parsed.name ?? null, color: parsed.color ?? null, timezone: parsed.timezone ?? null },
+        calendar: {
+            name: parsed.name ?? null,
+            color: parsed.color ?? null,
+            timezone: parsed.timezone ?? null
+        },
         objects
     };
 }
@@ -118,14 +125,23 @@ export function createIcsProvider(input: {
     const fetchOnce = (etag: string, lastModified: string): Promise<FeedResult> => {
         const key = JSON.stringify([etag, lastModified]);
         if (last?.key === key) return last.result;
-        const result = fetchIcsFeed({ url: input.url, etag: etag || null, lastModified: lastModified || null, fetcher: input.fetcher, maxBytes: input.maxBytes });
+        const result = fetchIcsFeed({
+            url: input.url,
+            etag: etag || null,
+            lastModified: lastModified || null,
+            fetcher: input.fetcher,
+            maxBytes: input.maxBytes
+        });
         last = { key, result };
         return result;
     };
 
     return {
         async listCalendars() {
-            const result = await fetchOnce(input.validators?.etag ?? "", input.validators?.lastModified ?? "");
+            const result = await fetchOnce(
+                input.validators?.etag ?? "",
+                input.validators?.lastModified ?? ""
+            );
             const calendar = result.notModified ? null : result.calendar;
             return [
                 {
@@ -142,8 +158,21 @@ export function createIcsProvider(input: {
 
         async pull(state) {
             const result = await fetchOnce(state.syncToken, state.ctag);
-            if (result.notModified) return { changed: [], removed: [], syncToken: state.syncToken, ctag: state.ctag, full: false };
-            return { changed: result.objects, removed: [], syncToken: result.etag ?? "", ctag: result.lastModified ?? "", full: true };
+            if (result.notModified)
+                return {
+                    changed: [],
+                    removed: [],
+                    syncToken: state.syncToken,
+                    ctag: state.ctag,
+                    full: false
+                };
+            return {
+                changed: result.objects,
+                removed: [],
+                syncToken: result.etag ?? "",
+                ctag: result.lastModified ?? "",
+                full: true
+            };
         },
 
         async put() {

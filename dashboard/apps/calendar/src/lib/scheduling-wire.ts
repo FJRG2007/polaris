@@ -157,7 +157,11 @@ export interface FreeBusyPerson {
      *  look up (or no Polaris account) - said the same way for both, so the
      *  answer never tells whether an account exists. */
     readonly status: "ok" | "unavailable";
-    readonly busy: readonly { readonly start: string; readonly end: string; readonly type: "BUSY" | "BUSY-TENTATIVE" | "BUSY-UNAVAILABLE" }[];
+    readonly busy: readonly {
+        readonly start: string;
+        readonly end: string;
+        readonly type: "BUSY" | "BUSY-TENTATIVE" | "BUSY-UNAVAILABLE";
+    }[];
     /** Outside their working hours inside the window. */
     readonly away: readonly { readonly start: string; readonly end: string }[];
 }
@@ -188,5 +192,9 @@ export interface RsvpView {
     readonly email: string;
     readonly partstat: PartStat;
     /** The next occurrences of a series, for answering one of them. */
-    readonly occurrences: readonly { readonly key: string; readonly start: string; readonly allDay: boolean }[];
+    readonly occurrences: readonly {
+        readonly key: string;
+        readonly start: string;
+        readonly allDay: boolean;
+    }[];
 }

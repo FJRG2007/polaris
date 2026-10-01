@@ -15,15 +15,27 @@ import { loadInstanceSettingsAction } from "../../actions/instance";
 import type { InstanceSettings } from "../../lib/instance-settings";
 import { FeedForm, HolidayPicker, SuggestedCalendars } from "./forms";
 import { cacheKey, dropCached, unwrap, useCachedRead } from "../cached-read";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, SegmentedControl } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    SegmentedControl
+} from "@polaris/ui";
 
 type Tab = "subscribe" | "holidays" | "accounts";
 
 export function AddCalendarsDialog({ open, onOpenChange, onChanged }: AddCalendarsSlotProps) {
     const t = useCalendarT();
     const [tab, setTab] = useState<Tab>("subscribe");
-    const instance = useCachedRead<{ settings: InstanceSettings; canManage: boolean }>(open ? cacheKey("instance") : null, () =>
-        unwrap(() => loadInstanceSettingsAction(), t("errors.generic")).then((answer) => ({ settings: answer.settings, canManage: answer.canManage }))
+    const instance = useCachedRead<{ settings: InstanceSettings; canManage: boolean }>(
+        open ? cacheKey("instance") : null,
+        () =>
+            unwrap(() => loadInstanceSettingsAction(), t("errors.generic")).then((answer) => ({
+                settings: answer.settings,
+                canManage: answer.canManage
+            }))
     );
     const allow = instance.data?.settings.allowSubscriptions ?? true;
 
@@ -51,10 +63,15 @@ export function AddCalendarsDialog({ open, onOpenChange, onChanged }: AddCalenda
                 <div className="pt-2">
                     {tab === "accounts" ? (
                         <div className="flex flex-col gap-3">
-                            <p className="text-muted-foreground">{t("accounts.addDialog.accountsLead")}</p>
+                            <p className="text-muted-foreground">
+                                {t("accounts.addDialog.accountsLead")}
+                            </p>
                             <div>
                                 <Button asChild variant="outline">
-                                    <Link href="/calendar/settings/accounts" onClick={() => onOpenChange(false)}>
+                                    <Link
+                                        href="/calendar/settings/accounts"
+                                        onClick={() => onOpenChange(false)}
+                                    >
                                         {t("accounts.addDialog.openAccounts")}
                                     </Link>
                                 </Button>
@@ -64,12 +81,19 @@ export function AddCalendarsDialog({ open, onOpenChange, onChanged }: AddCalenda
                         <SubscriptionsOff canManage={instance.data?.canManage ?? false} />
                     ) : tab === "subscribe" ? (
                         <div className="flex flex-col gap-2">
-                            <p className="text-xs text-foreground-subtle">{t("accounts.feed.lead")}</p>
+                            <p className="text-xs text-foreground-subtle">
+                                {t("accounts.feed.lead")}
+                            </p>
                             <FeedForm onAdded={added} />
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4">
-                            {instance.data ? <SuggestedCalendars suggested={instance.data.settings.suggested} onAdded={added} /> : null}
+                            {instance.data ? (
+                                <SuggestedCalendars
+                                    suggested={instance.data.settings.suggested}
+                                    onAdded={added}
+                                />
+                            ) : null}
                             <HolidayPicker onAdded={added} />
                         </div>
                     )}

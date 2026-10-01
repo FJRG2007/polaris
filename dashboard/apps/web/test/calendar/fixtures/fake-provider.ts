@@ -7,8 +7,17 @@
  * (those have their own tests against fake servers).
  */
 
-import { SyncConflictError, SyncGoneError, SyncNotFoundError } from "@polaris-app/calendar/src/lib/sync/errors";
-import type { ChangeSet, CalendarProvider, PullState, RemoteCalendar } from "@polaris-app/calendar/src/lib/sync/provider";
+import {
+    SyncConflictError,
+    SyncGoneError,
+    SyncNotFoundError
+} from "@polaris-app/calendar/src/lib/sync/errors";
+import type {
+    ChangeSet,
+    CalendarProvider,
+    PullState,
+    RemoteCalendar
+} from "@polaris-app/calendar/src/lib/sync/provider";
 
 interface Stored {
     etag: string;
@@ -56,17 +65,25 @@ export function createFakeProvider() {
     const provider: CalendarProvider = {
         async listCalendars() {
             fail("list");
-            return calendars.map((calendar) => ({ ...calendar, components: [...calendar.components] }));
+            return calendars.map((calendar) => ({
+                ...calendar,
+                components: [...calendar.components]
+            }));
         },
         async pull(state: PullState): Promise<ChangeSet> {
             pulls.push({ ...state, known: new Map(state.known) });
             fail("pull");
-            if (state.syncToken && expired.has(state.syncToken)) throw new SyncGoneError("The sync token expired", 410);
+            if (state.syncToken && expired.has(state.syncToken))
+                throw new SyncGoneError("The sync token expired", 410);
             const held = collection(state.remoteId);
             const token = `token-${seq}`;
             if (!state.syncToken) {
                 return {
-                    changed: [...held.entries()].map(([href, object]) => ({ href, etag: object.etag, ics: object.ics })),
+                    changed: [...held.entries()].map(([href, object]) => ({
+                        href,
+                        etag: object.etag,
+                        ics: object.ics
+                    })),
                     removed: [],
                     syncToken: token,
                     ctag: token,
@@ -75,15 +92,24 @@ export function createFakeProvider() {
             }
             const since = Number(state.syncToken.replace("token-", ""));
             return {
-                changed: [...held.entries()].filter(([, object]) => object.seq > since).map(([href, object]) => ({ href, etag: object.etag, ics: object.ics })),
-                removed: [...(removed.get(state.remoteId)?.entries() ?? [])].filter(([, at]) => at > since).map(([href]) => href),
+                changed: [...held.entries()]
+                    .filter(([, object]) => object.seq > since)
+                    .map(([href, object]) => ({ href, etag: object.etag, ics: object.ics })),
+                removed: [...(removed.get(state.remoteId)?.entries() ?? [])]
+                    .filter(([, at]) => at > since)
+                    .map(([href]) => href),
                 syncToken: token,
                 ctag: token,
                 full: false
             };
         },
         async put(target, object) {
-            writes.push({ op: "put", remoteId: target.remoteId, href: object.href, ifMatch: object.etag });
+            writes.push({
+                op: "put",
+                remoteId: target.remoteId,
+                href: object.href,
+                ifMatch: object.etag
+            });
             if (gate) await gate;
             fail("put");
             const held = collection(target.remoteId);
@@ -96,7 +122,12 @@ export function createFakeProvider() {
             return { href, etag };
         },
         async remove(target, object) {
-            writes.push({ op: "remove", remoteId: target.remoteId, href: object.href, ifMatch: object.etag });
+            writes.push({
+                op: "remove",
+                remoteId: target.remoteId,
+                href: object.href,
+                ifMatch: object.etag
+            });
             fail("remove");
             const held = collection(target.remoteId);
             const existing = held.get(object.href);
@@ -112,7 +143,14 @@ export function createFakeProvider() {
         writes,
         pulls,
         addCalendar(calendar: Partial<RemoteCalendar> & { remoteId: string; name: string }) {
-            calendars.push({ color: null, description: "", timezone: null, readOnly: false, components: ["VEVENT"], ...calendar });
+            calendars.push({
+                color: null,
+                description: "",
+                timezone: null,
+                readOnly: false,
+                components: ["VEVENT"],
+                ...calendar
+            });
             collection(calendar.remoteId);
         },
         /** A change made at the provider by somebody else. */

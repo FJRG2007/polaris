@@ -17,8 +17,24 @@
 import ICAL from "ical.js";
 import { addToWall, formatWall, parseWall, wallDifferenceSeconds } from "./tz";
 import { neverRecurs } from "./rule";
-import type { CalendarEvent, CalendarItem, DateValue, Frequency, Occurrence, RecurrenceRule, WallTime } from "./types";
-import { addDays, clockFor, daysBetween, isDateOnly, valueToInstant, valueWall, type ZoneClock } from "./zones";
+import type {
+    CalendarEvent,
+    CalendarItem,
+    DateValue,
+    Frequency,
+    Occurrence,
+    RecurrenceRule,
+    WallTime
+} from "./types";
+import {
+    addDays,
+    clockFor,
+    daysBetween,
+    isDateOnly,
+    valueToInstant,
+    valueWall,
+    type ZoneClock
+} from "./zones";
 
 /** Candidates ical.js may test for a single rule before it is treated as
  *  runaway: it steps through times no BY part allows without returning, so
@@ -27,7 +43,13 @@ const ITERATION_GUARD = 200_000;
 
 /** The wall-clock length of one period, for the frequencies whose periods all
  *  have the same length. */
-const PERIOD_SECONDS: Partial<Record<Frequency, number>> = { SECONDLY: 1, MINUTELY: 60, HOURLY: 3600, DAILY: 86_400, WEEKLY: 604_800 };
+const PERIOD_SECONDS: Partial<Record<Frequency, number>> = {
+    SECONDLY: 1,
+    MINUTELY: 60,
+    HOURLY: 3600,
+    DAILY: 86_400,
+    WEEKLY: 604_800
+};
 
 /** Where every expansion of one item reads its times. */
 export interface ExpandContext {
@@ -54,28 +76,45 @@ export function masterClock(master: CalendarEvent, context: ExpandContext): Zone
  * RDATE or RECURRENCE-ID is compared with generated occurrences.
  */
 export function wallKeyOf(value: DateValue, master: CalendarEvent, context: ExpandContext): string {
-    if (isDateOnly(master.start)) return isDateOnly(value) ? value.date : value.dateTime.slice(0, 10);
+    if (isDateOnly(master.start))
+        return isDateOnly(value) ? value.date : value.dateTime.slice(0, 10);
     const start = master.start;
     if (isDateOnly(value)) return `${value.date}${start.dateTime.slice(10)}`;
     if (value.tzid === start.tzid) return value.dateTime;
-    return formatWall(masterClock(master, context).toWall(valueToInstant(value, context.floatingZone, context.timezones)));
+    return formatWall(
+        masterClock(master, context).toWall(
+            valueToInstant(value, context.floatingZone, context.timezones)
+        )
+    );
 }
 
 /** The occurrence key a screen uses for a wall key: an ISO instant, or the date. */
-export function recurrenceKeyOf(wallKey: string, master: CalendarEvent, context: ExpandContext): string {
+export function recurrenceKeyOf(
+    wallKey: string,
+    master: CalendarEvent,
+    context: ExpandContext
+): string {
     if (isDateOnly(master.start)) return wallKey;
     return masterClock(master, context).toInstant(parseWall(wallKey)).toISOString();
 }
 
 /** The wall key a screen's recurrence key stands for. */
-export function wallKeyFromRecurrenceKey(key: string, master: CalendarEvent, context: ExpandContext): string {
+export function wallKeyFromRecurrenceKey(
+    key: string,
+    master: CalendarEvent,
+    context: ExpandContext
+): string {
     if (isDateOnly(master.start)) return key.slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(key)) return `${key}${master.start.dateTime.slice(10)}`;
     return formatWall(masterClock(master, context).toWall(new Date(key)));
 }
 
 /** The RECURRENCE-ID value an override of that occurrence carries. */
-export function recurrenceIdFor(key: string, master: CalendarEvent, context: ExpandContext): DateValue {
+export function recurrenceIdFor(
+    key: string,
+    master: CalendarEvent,
+    context: ExpandContext
+): DateValue {
     const wallKey = wallKeyFromRecurrenceKey(key, master, context);
     if (isDateOnly(master.start)) return { date: wallKey };
     return { dateTime: wallKey, tzid: master.start.tzid };
@@ -84,7 +123,9 @@ export function recurrenceIdFor(key: string, master: CalendarEvent, context: Exp
 function rawWithout(raw: string, names: readonly string[]): string {
     return raw
         .split(";")
-        .filter((part) => part.trim() && !names.includes(part.split("=")[0]?.trim().toUpperCase() ?? ""))
+        .filter(
+            (part) => part.trim() && !names.includes(part.split("=")[0]?.trim().toUpperCase() ?? "")
+        )
         .join(";");
 }
 
@@ -92,7 +133,14 @@ function rawWithout(raw: string, names: readonly string[]): string {
 function untilKey(master: CalendarEvent, context: ExpandContext): string | null {
     const until = master.rule?.until;
     if (!until) return null;
-    if (isDateOnly(master.start)) return isDateOnly(until) ? until.date : wallKeyOf(until, { ...master, start: { dateTime: `${master.start.date}T00:00:00`, tzid: null } }, context).slice(0, 10);
+    if (isDateOnly(master.start))
+        return isDateOnly(until)
+            ? until.date
+            : wallKeyOf(
+                  until,
+                  { ...master, start: { dateTime: `${master.start.date}T00:00:00`, tzid: null } },
+                  context
+              ).slice(0, 10);
     if (isDateOnly(until)) return `${until.date}T23:59:59`;
     return wallKeyOf(until, master, context);
 }
@@ -110,7 +158,12 @@ function allowedDay(rule: RecurrenceRule, wall: WallTime): boolean {
 const RUNAWAY = new Error("Runaway recurrence rule.");
 
 /** The rule's own starts after DTSTART, in order. */
-function* ruleStarts(master: CalendarEvent, context: ExpandContext, stopAfter: string | null, from: string | null): Generator<GeneratedStart> {
+function* ruleStarts(
+    master: CalendarEvent,
+    context: ExpandContext,
+    stopAfter: string | null,
+    from: string | null
+): Generator<GeneratedStart> {
     const rule = master.rule;
     const allDay = isDateOnly(master.start);
     const first = valueWall(master.start);
@@ -140,8 +193,19 @@ function* ruleStarts(master: CalendarEvent, context: ExpandContext, stopAfter: s
         }
     };
     let emitted = 1;
-    for (let next = advance(); next && emitted < (rule.count ?? Number.POSITIVE_INFINITY); next = advance()) {
-        const wall: WallTime = { year: next.year, month: next.month, day: next.day, hour: allDay ? 0 : next.hour, minute: allDay ? 0 : next.minute, second: allDay ? 0 : next.second };
+    for (
+        let next = advance();
+        next && emitted < (rule.count ?? Number.POSITIVE_INFINITY);
+        next = advance()
+    ) {
+        const wall: WallTime = {
+            year: next.year,
+            month: next.month,
+            day: next.day,
+            hour: allDay ? 0 : next.hour,
+            minute: allDay ? 0 : next.minute,
+            second: allDay ? 0 : next.second
+        };
         const key = allDay ? formatWall(wall).slice(0, 10) : formatWall(wall);
         if (key <= firstKey) continue;
         if (until !== null && key > until) return;
@@ -162,7 +226,12 @@ function* ruleStarts(master: CalendarEvent, context: ExpandContext, stopAfter: s
  * them: its iteration begins a whole number of periods after DTSTART, two
  * periods short of `from`, which generates the same starts from there on.
  */
-export function* startsInOrder(master: CalendarEvent, context: ExpandContext, stopAfter: string | null, from: string | null = null): Generator<GeneratedStart> {
+export function* startsInOrder(
+    master: CalendarEvent,
+    context: ExpandContext,
+    stopAfter: string | null,
+    from: string | null = null
+): Generator<GeneratedStart> {
     const allDay = isDateOnly(master.start);
     const first = valueWall(master.start);
     const firstKey = allDay ? formatWall(first).slice(0, 10) : formatWall(first);
@@ -186,7 +255,13 @@ export function* startsInOrder(master: CalendarEvent, context: ExpandContext, st
 }
 
 /** The starts of `startsInOrder`, at most `max` of them. */
-export function generateStarts(master: CalendarEvent, context: ExpandContext, stopAfter: string | null, max = Number.POSITIVE_INFINITY, from: string | null = null): GeneratedStart[] {
+export function generateStarts(
+    master: CalendarEvent,
+    context: ExpandContext,
+    stopAfter: string | null,
+    max = Number.POSITIVE_INFINITY,
+    from: string | null = null
+): GeneratedStart[] {
     const starts: GeneratedStart[] = [];
     if (max < 1) return starts;
     for (const start of startsInOrder(master, context, stopAfter, from)) {
@@ -197,13 +272,25 @@ export function generateStarts(master: CalendarEvent, context: ExpandContext, st
 }
 
 /** The span an event covers, placed at a given start (wall reading in its frame). */
-function placed(event: CalendarEvent, wall: WallTime, context: ExpandContext, clock: ZoneClock): { start: Date; end: Date; startDate: string | null; endDate: string | null } {
+function placed(
+    event: CalendarEvent,
+    wall: WallTime,
+    context: ExpandContext,
+    clock: ZoneClock
+): { start: Date; end: Date; startDate: string | null; endDate: string | null } {
     if (isDateOnly(event.start)) {
         const startDate = formatWall(wall).slice(0, 10);
-        const length = isDateOnly(event.end) ? Math.max(1, daysBetween(event.start.date, event.end.date)) : 1;
+        const length = isDateOnly(event.end)
+            ? Math.max(1, daysBetween(event.start.date, event.end.date))
+            : 1;
         const endDate = addDays(startDate, length);
         const floating = clockFor(null, context.floatingZone);
-        return { start: floating.toInstant(parseWall(startDate)), end: floating.toInstant(parseWall(endDate)), startDate, endDate };
+        return {
+            start: floating.toInstant(parseWall(startDate)),
+            end: floating.toInstant(parseWall(endDate)),
+            startDate,
+            endDate
+        };
     }
     const start = clock.toInstant(wall);
     const end = event.end;
@@ -211,15 +298,39 @@ function placed(event: CalendarEvent, wall: WallTime, context: ExpandContext, cl
         // Same clock: keep the wall-clock length, so a 09:00-10:00 meeting is
         // still 09:00-10:00 on the day the clocks change.
         const seconds = wallDifferenceSeconds(valueWall(event.start), valueWall(end));
-        return { start, end: clock.toInstant(addToWall(wall, { seconds: Math.max(0, seconds) })), startDate: null, endDate: null };
+        return {
+            start,
+            end: clock.toInstant(addToWall(wall, { seconds: Math.max(0, seconds) })),
+            startDate: null,
+            endDate: null
+        };
     }
-    const length = valueToInstant(end, context.floatingZone, context.timezones).getTime() - valueToInstant(event.start, context.floatingZone, context.timezones).getTime();
-    return { start, end: new Date(start.getTime() + Math.max(0, length)), startDate: null, endDate: null };
+    const length =
+        valueToInstant(end, context.floatingZone, context.timezones).getTime() -
+        valueToInstant(event.start, context.floatingZone, context.timezones).getTime();
+    return {
+        start,
+        end: new Date(start.getTime() + Math.max(0, length)),
+        startDate: null,
+        endDate: null
+    };
 }
 
 /** An event where its own DTSTART/DTEND put it (a single event or an override). */
-export function placeEvent(event: CalendarEvent, context: ExpandContext): { start: Date; end: Date; startDate: string | null; endDate: string | null } {
-    return placed(event, valueWall(event.start), context, clockFor(isDateOnly(event.start) ? null : event.start.tzid, context.floatingZone, context.timezones));
+export function placeEvent(
+    event: CalendarEvent,
+    context: ExpandContext
+): { start: Date; end: Date; startDate: string | null; endDate: string | null } {
+    return placed(
+        event,
+        valueWall(event.start),
+        context,
+        clockFor(
+            isDateOnly(event.start) ? null : event.start.tzid,
+            context.floatingZone,
+            context.timezones
+        )
+    );
 }
 
 function overlaps(start: Date, end: Date, range: { from: Date; to: Date }): boolean {
@@ -229,7 +340,13 @@ function overlaps(start: Date, end: Date, range: { from: Date; to: Date }): bool
     return start.getTime() === end.getTime() && start.getTime() >= range.from.getTime();
 }
 
-function occurrenceOf(event: CalendarEvent, recurrenceKey: string, span: ReturnType<typeof placed>, overridden: boolean, recurring: boolean): Occurrence {
+function occurrenceOf(
+    event: CalendarEvent,
+    recurrenceKey: string,
+    span: ReturnType<typeof placed>,
+    overridden: boolean,
+    recurring: boolean
+): Occurrence {
     return {
         uid: event.uid,
         recurrenceKey,
@@ -250,12 +367,16 @@ export function isRecurring(event: CalendarEvent): boolean {
 }
 
 /** Overrides by the wall key of the occurrence they replace. */
-export function overridesByKey(item: Extract<CalendarItem, { component: "VEVENT" }>, context: ExpandContext): Map<string, CalendarEvent> {
+export function overridesByKey(
+    item: Extract<CalendarItem, { component: "VEVENT" }>,
+    context: ExpandContext
+): Map<string, CalendarEvent> {
     const found = new Map<string, CalendarEvent>();
     const master = item.master;
     if (!master) return found;
     for (const override of item.overrides) {
-        if (override.recurrenceId) found.set(wallKeyOf(override.recurrenceId, master, context), override);
+        if (override.recurrenceId)
+            found.set(wallKeyOf(override.recurrenceId, master, context), override);
     }
     return found;
 }
@@ -271,17 +392,27 @@ export function overridesByKey(item: Extract<CalendarItem, { component: "VEVENT"
  * override naming an occurrence the rule never produces is not drawn - the same
  * reading ical.js and Nextcloud give it.
  */
-export function expandItem(item: CalendarItem, range: { from: Date; to: Date }, options: { floatingZone: string; limit?: number }): Occurrence[] {
+export function expandItem(
+    item: CalendarItem,
+    range: { from: Date; to: Date },
+    options: { floatingZone: string; limit?: number }
+): Occurrence[] {
     if (item.component !== "VEVENT") return [];
-    const context: ExpandContext = { floatingZone: options.floatingZone, timezones: item.timezones };
+    const context: ExpandContext = {
+        floatingZone: options.floatingZone,
+        timezones: item.timezones
+    };
     const limit = options.limit ?? 2000;
     const master = item.master;
     const result: Occurrence[] = [];
     if (!master) {
         for (const override of item.overrides) {
             const span = placeEvent(override, context);
-            const key = override.recurrenceId ? recurrenceKeyOfValue(override.recurrenceId, context) : span.start.toISOString();
-            if (overlaps(span.start, span.end, range)) result.push(occurrenceOf(override, key, span, true, true));
+            const key = override.recurrenceId
+                ? recurrenceKeyOfValue(override.recurrenceId, context)
+                : span.start.toISOString();
+            if (overlaps(span.start, span.end, range))
+                result.push(occurrenceOf(override, key, span, true, true));
         }
         return sortAndLimit(result, limit);
     }
@@ -289,16 +420,22 @@ export function expandItem(item: CalendarItem, range: { from: Date; to: Date }, 
     if (!isRecurring(master)) {
         const span = placeEvent(master, context);
         const key = isDateOnly(master.start) ? master.start.date : span.start.toISOString();
-        const override = overridesByKey(item, context).get(isDateOnly(master.start) ? master.start.date : master.start.dateTime);
+        const override = overridesByKey(item, context).get(
+            isDateOnly(master.start) ? master.start.date : master.start.dateTime
+        );
         if (override) {
             const moved = placeEvent(override, context);
-            if (overlaps(moved.start, moved.end, range)) result.push(occurrenceOf(override, key, moved, true, false));
-        } else if (overlaps(span.start, span.end, range)) result.push(occurrenceOf(master, key, span, false, false));
+            if (overlaps(moved.start, moved.end, range))
+                result.push(occurrenceOf(override, key, moved, true, false));
+        } else if (overlaps(span.start, span.end, range))
+            result.push(occurrenceOf(master, key, span, false, false));
         return result;
     }
     const overrides = overridesByKey(item, context);
     const exdates = new Set(master.exdates.map((value) => wallKeyOf(value, master, context)));
-    const futures = [...overrides.entries()].filter(([, event]) => event.thisAndFuture).sort(([a], [b]) => (a < b ? -1 : 1));
+    const futures = [...overrides.entries()]
+        .filter(([, event]) => event.thisAndFuture)
+        .sort(([a], [b]) => (a < b ? -1 : 1));
     // Iterate far enough to reach the range's end and every overridden
     // occurrence, which may have been moved into the range from later on, and
     // as far again on both sides as a THISANDFUTURE override moves the rest.
@@ -313,10 +450,16 @@ export function expandItem(item: CalendarItem, range: { from: Date; to: Date }, 
     for (const key of overrides.keys()) if (key > stopAfter) stopAfter = key;
     const lowWall = formatWall(clock.toWall(new Date(range.from.getTime() - margin)));
     const low = isDateOnly(master.start) ? lowWall.slice(0, 10) : lowWall;
-    const from = [...overrides.keys()].reduce((earliest, key) => (key < earliest ? key : earliest), low);
+    const from = [...overrides.keys()].reduce(
+        (earliest, key) => (key < earliest ? key : earliest),
+        low
+    );
     // Past the last override every occurrence is placed the same way, in
     // order, so once `limit` of them are drawn no later one can make the cut.
-    const lastOverride = [...overrides.keys()].reduce((latest, key) => (key > latest ? key : latest), "");
+    const lastOverride = [...overrides.keys()].reduce(
+        (latest, key) => (key > latest ? key : latest),
+        ""
+    );
     let settled = 0;
     for (const generated of startsInOrder(master, context, stopAfter, from)) {
         if (settled >= limit) break;
@@ -324,16 +467,46 @@ export function expandItem(item: CalendarItem, range: { from: Date; to: Date }, 
         const override = overrides.get(generated.wallKey);
         if (override) {
             const span = placeEvent(override, context);
-            if (overlaps(span.start, span.end, range)) result.push(occurrenceOf(override, recurrenceKeyOf(generated.wallKey, master, context), span, true, true));
+            if (overlaps(span.start, span.end, range))
+                result.push(
+                    occurrenceOf(
+                        override,
+                        recurrenceKeyOf(generated.wallKey, master, context),
+                        span,
+                        true,
+                        true
+                    )
+                );
             continue;
         }
         if (generated.wallKey < low) continue;
         const future = [...futures].reverse().find(([key]) => key < generated.wallKey)?.[1];
         const event = future ?? master;
-        const wall = future ? addToWall(generated.wall, { seconds: shiftSeconds(future, master, context) }) : generated.wall;
-        const span = placed(event, wall, context, future && isDateOnly(master.start) ? clockFor(isDateOnly(future.start) ? null : future.start.tzid, context.floatingZone, context.timezones) : clock);
+        const wall = future
+            ? addToWall(generated.wall, { seconds: shiftSeconds(future, master, context) })
+            : generated.wall;
+        const span = placed(
+            event,
+            wall,
+            context,
+            future && isDateOnly(master.start)
+                ? clockFor(
+                      isDateOnly(future.start) ? null : future.start.tzid,
+                      context.floatingZone,
+                      context.timezones
+                  )
+                : clock
+        );
         if (!overlaps(span.start, span.end, range)) continue;
-        result.push(occurrenceOf(event, recurrenceKeyOf(generated.wallKey, master, context), span, false, true));
+        result.push(
+            occurrenceOf(
+                event,
+                recurrenceKeyOf(generated.wallKey, master, context),
+                span,
+                false,
+                true
+            )
+        );
         if (generated.wallKey > lastOverride) settled++;
     }
     return sortAndLimit(result, limit);
@@ -341,20 +514,34 @@ export function expandItem(item: CalendarItem, range: { from: Date; to: Date }, 
 
 /** The furthest any THISANDFUTURE override of an item moves the occurrences
  *  after it, in seconds either way. */
-export function thisAndFutureReach(item: Extract<CalendarItem, { component: "VEVENT" }>, context: ExpandContext): number {
+export function thisAndFutureReach(
+    item: Extract<CalendarItem, { component: "VEVENT" }>,
+    context: ExpandContext
+): number {
     const master = item.master;
     if (!master) return 0;
-    return Math.max(0, ...item.overrides.filter((event) => event.thisAndFuture).map((event) => Math.abs(shiftSeconds(event, master, context))));
+    return Math.max(
+        0,
+        ...item.overrides
+            .filter((event) => event.thisAndFuture)
+            .map((event) => Math.abs(shiftSeconds(event, master, context)))
+    );
 }
 
 /** How far a THISANDFUTURE override moves a later occurrence: its wall delta
  *  in seconds, read in the master's frame. */
-function shiftSeconds(future: CalendarEvent, master: CalendarEvent, context: ExpandContext): number {
+function shiftSeconds(
+    future: CalendarEvent,
+    master: CalendarEvent,
+    context: ExpandContext
+): number {
     const original = future.recurrenceId;
     if (!original) return 0;
     if (isDateOnly(future.start) || isDateOnly(original)) {
         const from = isDateOnly(original) ? original.date : original.dateTime.slice(0, 10);
-        const to = isDateOnly(future.start) ? future.start.date : future.start.dateTime.slice(0, 10);
+        const to = isDateOnly(future.start)
+            ? future.start.date
+            : future.start.dateTime.slice(0, 10);
         return daysBetween(from, to) * 86_400;
     }
     const originalKey = wallKeyOf(original, master, context);
@@ -373,7 +560,13 @@ function recurrenceKeyOfValue(value: DateValue, context: ExpandContext): string 
 }
 
 function sortAndLimit(occurrences: Occurrence[], limit: number): Occurrence[] {
-    return occurrences.sort((a, b) => a.start.getTime() - b.start.getTime() || a.recurrenceKey.localeCompare(b.recurrenceKey)).slice(0, limit);
+    return occurrences
+        .sort(
+            (a, b) =>
+                a.start.getTime() - b.start.getTime() ||
+                a.recurrenceKey.localeCompare(b.recurrenceKey)
+        )
+        .slice(0, limit);
 }
 
 /**
@@ -381,27 +574,51 @@ function sortAndLimit(occurrences: Occurrence[], limit: number): Occurrence[] {
  * screen has drawn: its override when there is one, otherwise the generated
  * occurrence. Null when the key names nothing the item has.
  */
-export function occurrenceFor(item: CalendarItem, recurrenceKey: string, floatingZone: string): Occurrence | null {
+export function occurrenceFor(
+    item: CalendarItem,
+    recurrenceKey: string,
+    floatingZone: string
+): Occurrence | null {
     if (item.component !== "VEVENT") return null;
     const context: ExpandContext = { floatingZone, timezones: item.timezones };
     const master = item.master;
     if (!master) {
-        const override = item.overrides.find((event) => event.recurrenceId && recurrenceKeyOfValue(event.recurrenceId, context) === recurrenceKey);
-        return override ? occurrenceOf(override, recurrenceKey, placeEvent(override, context), true, true) : null;
+        const override = item.overrides.find(
+            (event) =>
+                event.recurrenceId &&
+                recurrenceKeyOfValue(event.recurrenceId, context) === recurrenceKey
+        );
+        return override
+            ? occurrenceOf(override, recurrenceKey, placeEvent(override, context), true, true)
+            : null;
     }
     const wallKey = wallKeyFromRecurrenceKey(recurrenceKey, master, context);
     if (!isRecurring(master) && wallKey !== wallKeyOf(master.start, master, context)) return null;
     const override = overridesByKey(item, context).get(wallKey);
-    if (override) return occurrenceOf(override, recurrenceKey, placeEvent(override, context), true, isRecurring(master));
+    if (override)
+        return occurrenceOf(
+            override,
+            recurrenceKey,
+            placeEvent(override, context),
+            true,
+            isRecurring(master)
+        );
     if (!isOccurrence(master, wallKey, context)) return null;
     const wall = parseWall(wallKey);
-    return occurrenceOf(master, recurrenceKey, placed(master, wall, context, masterClock(master, context)), false, isRecurring(master));
+    return occurrenceOf(
+        master,
+        recurrenceKey,
+        placed(master, wall, context, masterClock(master, context)),
+        false,
+        isRecurring(master)
+    );
 }
 
 /** Whether the series makes a start at a wall key and no EXDATE takes it out. */
 function isOccurrence(master: CalendarEvent, wallKey: string, context: ExpandContext): boolean {
     if (master.exdates.some((value) => wallKeyOf(value, master, context) === wallKey)) return false;
-    for (const start of startsInOrder(master, context, wallKey, wallKey)) if (start.wallKey === wallKey) return true;
+    for (const start of startsInOrder(master, context, wallKey, wallKey))
+        if (start.wallKey === wallKey) return true;
     return false;
 }
 
@@ -409,7 +626,10 @@ function isOccurrence(master: CalendarEvent, wallKey: string, context: ExpandCon
  * A task's times in instants. An all-day DUE or DTSTART is midnight in
  * `floatingZone`, like an all-day event.
  */
-export function expandTodo(item: CalendarItem, floatingZone: string): { due: Date | null; start: Date | null; allDay: boolean } {
+export function expandTodo(
+    item: CalendarItem,
+    floatingZone: string
+): { due: Date | null; start: Date | null; allDay: boolean } {
     if (item.component !== "VTODO") return { due: null, start: null, allDay: false };
     const { todo } = item;
     const due = todo.due ? valueToInstant(todo.due, floatingZone, item.timezones) : null;

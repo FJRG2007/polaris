@@ -15,14 +15,23 @@ import { cleanText, colorSchema, isKnownZone, nameSchema, uuidSchema } from "./s
 
 /** Normalize an address the way every calendar screen stores it. */
 export function normalizeAddress(value: string): string {
-    return value.trim().replace(/^mailto:/i, "").toLowerCase();
+    return value
+        .trim()
+        .replace(/^mailto:/i, "")
+        .toLowerCase();
 }
 
 /** An email address: trimmed, lowercased, then checked. */
 export const emailSchema = z
     .string()
     .transform(normalizeAddress)
-    .pipe(z.string().min(1, "booking.validation.emailNeeded").max(320).email("booking.validation.email"));
+    .pipe(
+        z
+            .string()
+            .min(1, "booking.validation.emailNeeded")
+            .max(320)
+            .email("booking.validation.email")
+    );
 
 /** A person's name as they typed it: cleaned, each word capitalized. */
 export function normalizePersonName(value: string): string {
@@ -52,18 +61,16 @@ const prose = (max: number) =>
         .transform((value) => value.trim());
 
 /** A one-line text that may be empty. */
-const line = (max: number) =>
-    z
-        .string()
-        .transform(cleanText)
-        .pipe(z.string().max(max));
+const line = (max: number) => z.string().transform(cleanText).pipe(z.string().max(max));
 
 /** What a booking page's address ends in. */
 export const slugSchema = z
     .string()
     .trim()
     .toLowerCase()
-    .pipe(z.string().regex(/^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$/, "bookingPage.validation.slugForm"));
+    .pipe(
+        z.string().regex(/^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$/, "bookingPage.validation.slugForm")
+    );
 
 // ---------------------------------------------------------------- booking pages
 
@@ -79,14 +86,25 @@ export const questionSchema = z
             .pipe(z.string().min(1, "bookingPage.validation.questionLabel").max(200)),
         kind: z.enum(QUESTION_KINDS),
         required: z.boolean(),
-        options: z.array(z.string().transform(cleanText).pipe(z.string().min(1).max(100))).max(20).default([])
+        options: z
+            .array(z.string().transform(cleanText).pipe(z.string().min(1).max(100)))
+            .max(20)
+            .default([])
     })
     .superRefine((question, context) => {
         if (question.kind === "choice" && question.options.length < 2) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "bookingPage.validation.optionsNeeded" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["options"],
+                message: "bookingPage.validation.optionsNeeded"
+            });
         }
         if (new Set(question.options).size !== question.options.length) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["options"], message: "bookingPage.validation.optionTwice" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["options"],
+                message: "bookingPage.validation.optionTwice"
+            });
         }
     });
 
@@ -107,7 +125,11 @@ export const bookingPageInputSchema = z
         slotMinutes: z.number().int().min(5).max(720),
         bufferBefore: z.number().int().min(0).max(240),
         bufferAfter: z.number().int().min(0).max(240),
-        noticeMinutes: z.number().int().min(0).max(60 * 24 * 60),
+        noticeMinutes: z
+            .number()
+            .int()
+            .min(0)
+            .max(60 * 24 * 60),
         maxPerDay: z.number().int().min(1).max(100).nullable(),
         horizonDays: z.number().int().min(1).max(365),
         timezone: requiredZoneSchema,
@@ -118,10 +140,19 @@ export const bookingPageInputSchema = z
     })
     .superRefine((page, context) => {
         if (new Set(page.questions.map((question) => question.id)).size !== page.questions.length) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["questions"], message: "bookingPage.validation.questionTwice" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["questions"],
+                message: "bookingPage.validation.questionTwice"
+            });
         }
         const open = Object.values(page.availability.weekly).some((ranges) => ranges.length > 0);
-        if (!open) context.addIssue({ code: z.ZodIssueCode.custom, path: ["availability"], message: "bookingPage.validation.noHours" });
+        if (!open)
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["availability"],
+                message: "bookingPage.validation.noHours"
+            });
     });
 
 export type BookingPageInput = z.infer<typeof bookingPageInputSchema>;
@@ -132,15 +163,26 @@ export function answersSchemaFor(questions: readonly BookingQuestion[]) {
     return z.record(z.string(), z.string().max(4000)).transform((raw, context) => {
         const answers: Record<string, string> = {};
         for (const question of questions) {
-            const value = question.kind === "long" ? (raw[question.id] ?? "").trim() : cleanText(raw[question.id] ?? "");
+            const value =
+                question.kind === "long"
+                    ? (raw[question.id] ?? "").trim()
+                    : cleanText(raw[question.id] ?? "");
             if (!value) {
                 if (question.required) {
-                    context.addIssue({ code: z.ZodIssueCode.custom, path: [question.id], message: "booking.validation.answerNeeded" });
+                    context.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        path: [question.id],
+                        message: "booking.validation.answerNeeded"
+                    });
                 }
                 continue;
             }
             if (question.kind === "choice" && !question.options.includes(value)) {
-                context.addIssue({ code: z.ZodIssueCode.custom, path: [question.id], message: "booking.validation.choice" });
+                context.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: [question.id],
+                    message: "booking.validation.choice"
+                });
                 continue;
             }
             answers[question.id] = value.slice(0, question.kind === "long" ? 4000 : 500);
@@ -179,20 +221,38 @@ export const proposalInputSchema = z
         title: nameSchema,
         description: prose(4000),
         location: line(500),
-        durationMinutes: z.number().int().min(5).max(24 * 60),
+        durationMinutes: z
+            .number()
+            .int()
+            .min(5)
+            .max(24 * 60),
         timezone: requiredZoneSchema,
         notify: z.boolean(),
-        participants: z.array(proposalParticipantSchema).min(1, "proposals.validation.noParticipants").max(50),
-        dates: z.array(z.string().datetime({ offset: true })).min(1, "proposals.validation.noDates").max(30)
+        participants: z
+            .array(proposalParticipantSchema)
+            .min(1, "proposals.validation.noParticipants")
+            .max(50),
+        dates: z
+            .array(z.string().datetime({ offset: true }))
+            .min(1, "proposals.validation.noDates")
+            .max(30)
     })
     .superRefine((proposal, context) => {
         const emails = proposal.participants.map((participant) => participant.email);
         if (new Set(emails).size !== emails.length) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["participants"], message: "proposals.validation.invitedTwice" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["participants"],
+                message: "proposals.validation.invitedTwice"
+            });
         }
         const starts = proposal.dates.map((date) => new Date(date).getTime());
         if (new Set(starts).size !== starts.length) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["dates"], message: "proposals.validation.dateTwice" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["dates"],
+                message: "proposals.validation.dateTwice"
+            });
         }
     });
 
@@ -239,9 +299,18 @@ export const freeBusyRequestSchema = z
         from: z.string().datetime({ offset: true }),
         to: z.string().datetime({ offset: true }),
         zone: requiredZoneSchema,
-        durationMinutes: z.number().int().min(5).max(24 * 60).optional()
+        durationMinutes: z
+            .number()
+            .int()
+            .min(5)
+            .max(24 * 60)
+            .optional()
     })
-    .refine((input) => input.emails.length + input.userIds.length > 0 && input.emails.length + input.userIds.length <= FREEBUSY_MAX_PEOPLE)
+    .refine(
+        (input) =>
+            input.emails.length + input.userIds.length > 0 &&
+            input.emails.length + input.userIds.length <= FREEBUSY_MAX_PEOPLE
+    )
     .refine((input) => {
         const span = new Date(input.to).getTime() - new Date(input.from).getTime();
         return span > 0 && span <= FREEBUSY_MAX_DAYS * 86_400_000;
@@ -260,5 +329,9 @@ export const rsvpInputSchema = z.object({
 /** The catalog key a refused value carries, when it carries one of ours. */
 export function issueKey(issues: readonly { message: string }[]): string | null {
     const message = issues[0]?.message ?? "";
-    return /^(booking|bookingPage|proposals|rooms|vote|rsvp|freeBusy)\.validation\.[A-Za-z]+$/.test(message) ? message : null;
+    return /^(booking|bookingPage|proposals|rooms|vote|rsvp|freeBusy)\.validation\.[A-Za-z]+$/.test(
+        message
+    )
+        ? message
+        : null;
 }

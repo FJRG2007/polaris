@@ -133,7 +133,9 @@ async function postToken(
         })
     });
     if (response.status === 400 || response.status === 401) {
-        throw new MicrosoftAuthExpiredError(await refusalMessage(response, "Microsoft refused the token request"));
+        throw new MicrosoftAuthExpiredError(
+            await refusalMessage(response, "Microsoft refused the token request")
+        );
     }
     if (!response.ok) {
         throw new Error(await refusalMessage(response, "Microsoft refused the token request"));

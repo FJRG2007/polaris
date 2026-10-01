@@ -30,7 +30,9 @@ export async function settle(): Promise<void> {
 
 /** A sentence from the Calendar's English catalog. */
 export function en(key: string, values?: Record<string, unknown>): string {
-    return (calendarTIn("en-US") as unknown as (key: string, values?: Record<string, unknown>) => string)(key, values);
+    return (
+        calendarTIn("en-US") as unknown as (key: string, values?: Record<string, unknown>) => string
+    )(key, values);
 }
 
 /** A sentence from the English recurrence and validation catalog. */
@@ -42,12 +44,23 @@ export function addCalendar(ownerId: string, data: Row = {}): string {
     return db.insert("calendar", { ownerId, name: "Work", ...data }).id as string;
 }
 
-export function addShare(calendarId: string, to: { userId?: string; teamId?: string }, access: string): string {
-    return db.insert("calendarShare", { calendarId, userId: to.userId ?? null, teamId: to.teamId ?? null, access }).id as string;
+export function addShare(
+    calendarId: string,
+    to: { userId?: string; teamId?: string },
+    access: string
+): string {
+    return db.insert("calendarShare", {
+        calendarId,
+        userId: to.userId ?? null,
+        teamId: to.teamId ?? null,
+        access
+    }).id as string;
 }
 
 /** An event built by the engine, with every field at its default but these. */
-export function event(fields: Partial<engine.CalendarEvent> & { start: engine.DateValue; end: engine.DateValue }): engine.CalendarEvent {
+export function event(
+    fields: Partial<engine.CalendarEvent> & { start: engine.DateValue; end: engine.DateValue }
+): engine.CalendarEvent {
     return engine.newEvent(fields);
 }
 
@@ -57,7 +70,12 @@ export function at(dateTime: string, tzid: string | null = "Europe/Madrid"): eng
 }
 
 /** Store an item as a row with the columns derived the way `writeItem` derives them. */
-export function storeItem(calendarId: string, item: engine.CalendarItem, extra: Row = {}, floatingZone = "UTC"): Row {
+export function storeItem(
+    calendarId: string,
+    item: engine.CalendarItem,
+    extra: Row = {},
+    floatingZone = "UTC"
+): Row {
     const bounds = engine.itemBounds(item, floatingZone);
     return db.insert("calendarObject", {
         calendarId,
@@ -75,7 +93,11 @@ export function storeItem(calendarId: string, item: engine.CalendarItem, extra: 
     });
 }
 
-export function storeEvent(calendarId: string, fields: Parameters<typeof event>[0], extra: Row = {}): Row {
+export function storeEvent(
+    calendarId: string,
+    fields: Parameters<typeof event>[0],
+    extra: Row = {}
+): Row {
     return storeItem(calendarId, engine.eventItem(event(fields)), extra);
 }
 
@@ -108,7 +130,9 @@ export function input(calendarId: string, fields: Record<string, unknown> = {}):
 }
 
 /** A weekly rule as the editor sends it. */
-export function weekly(end: engine.RuleEditorModel["end"] = { kind: "never" }): engine.RuleEditorModel {
+export function weekly(
+    end: engine.RuleEditorModel["end"] = { kind: "never" }
+): engine.RuleEditorModel {
     return {
         frequency: "WEEKLY",
         interval: 1,

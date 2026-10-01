@@ -28,7 +28,9 @@ export async function searchEvents(
     const term = query.trim();
     if (term.length < 2) return [];
     const reach = await reachableCalendars(user.id);
-    const readable = [...reach.entries()].filter(([, level]) => reaches(level, "read")).map(([id]) => id);
+    const readable = [...reach.entries()]
+        .filter(([, level]) => reaches(level, "read"))
+        .map(([id]) => id);
     if (readable.length === 0) return [];
     const rows = await prisma.calendarObject.findMany({
         where: {
@@ -60,7 +62,8 @@ export async function searchEvents(
         const item = tryItemOf(row.ics);
         const event = item?.component === "VEVENT" ? (item.master ?? item.overrides[0]) : null;
         // What a read-only sharee may not see (a private event or task) is not a hit.
-        if (!reaches(reach.get(row.calendarId) ?? null, "write") && !(item && publicItem(item))) continue;
+        if (!reaches(reach.get(row.calendarId) ?? null, "write") && !(item && publicItem(item)))
+            continue;
         let start = row.startsAt;
         if (item && row.recurring) {
             const next = engine.expandItem(

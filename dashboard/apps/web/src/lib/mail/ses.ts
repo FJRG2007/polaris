@@ -66,7 +66,9 @@ function encodeHeader(value: string): string {
         chunk += char;
     }
     if (chunk) words.push(chunk);
-    return words.map((word) => `=?UTF-8?B?${Buffer.from(word, "utf8").toString("base64")}?=`).join(`${CRLF} `);
+    return words
+        .map((word) => `=?UTF-8?B?${Buffer.from(word, "utf8").toString("base64")}?=`)
+        .join(`${CRLF} `);
 }
 
 /** The From header: the quoted display name when it is ASCII, an encoded one when it is not. */
@@ -78,7 +80,9 @@ function fromHeader(config: SesConfig): string {
 
 /** Content as base64 in lines of 76, the transfer encoding every part here uses. */
 function base64Lines(content: string): string {
-    return Buffer.from(content, "utf8").toString("base64").replace(/.{1,76}/g, (line) => `${line}${CRLF}`);
+    return Buffer.from(content, "utf8")
+        .toString("base64")
+        .replace(/.{1,76}/g, (line) => `${line}${CRLF}`);
 }
 
 /** One MIME part: its headers, a blank line, and its base64 body. */
@@ -98,7 +102,11 @@ function multipart(boundary: string, parts: string[]): string {
  * alternative beside the text and HTML (RFC 6047), and again as an invite.ics
  * attachment for the clients that only look at files.
  */
-function rawMessage(config: SesConfig, message: EmailMessage, calendar: NonNullable<EmailMessage["calendar"]>): string {
+function rawMessage(
+    config: SesConfig,
+    message: EmailMessage,
+    calendar: NonNullable<EmailMessage["calendar"]>
+): string {
     const mixed = `mixed-${randomBytes(12).toString("hex")}`;
     const alternative = `alt-${randomBytes(12).toString("hex")}`;
     const alternatives = [
@@ -134,7 +142,14 @@ function payloadFor(config: SesConfig, message: EmailMessage): string {
         return JSON.stringify({
             FromEmailAddress: formatFrom(config),
             Destination: { ToAddresses: [message.to] },
-            Content: { Raw: { Data: Buffer.from(rawMessage(config, message, message.calendar), "utf8").toString("base64") } }
+            Content: {
+                Raw: {
+                    Data: Buffer.from(
+                        rawMessage(config, message, message.calendar),
+                        "utf8"
+                    ).toString("base64")
+                }
+            }
         });
     }
     const content: Record<string, unknown> = {
@@ -152,7 +167,11 @@ function payloadFor(config: SesConfig, message: EmailMessage): string {
 }
 
 /** Send one message through SES, throwing SES's own error text on refusal. */
-export async function sendWithSes(config: SesConfig, secret: string, message: EmailMessage): Promise<void> {
+export async function sendWithSes(
+    config: SesConfig,
+    secret: string,
+    message: EmailMessage
+): Promise<void> {
     const host = `email.${config.region}.amazonaws.com`;
     const body = payloadFor(config, message);
     const bodyHash = sha256Hex(body);
@@ -179,7 +198,9 @@ export async function sendWithSes(config: SesConfig, secret: string, message: Em
     const stringToSign = [ALGORITHM, amzDate, scope, sha256Hex(canonicalRequest)].join("\n");
 
     // 3. Signature, and the Authorization header that carries it.
-    const signature = hmac(signingKey(secret, dateStamp, config.region), stringToSign).toString("hex");
+    const signature = hmac(signingKey(secret, dateStamp, config.region), stringToSign).toString(
+        "hex"
+    );
     const authorization = `${ALGORITHM} Credential=${config.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
     let res: Response;
@@ -196,9 +217,16 @@ export async function sendWithSes(config: SesConfig, secret: string, message: Em
             body
         });
     } catch (caught) {
-        throw new Error(caught instanceof Error ? `SES unreachable: ${caught.message}` : "SES unreachable");
+        throw new Error(
+            caught instanceof Error ? `SES unreachable: ${caught.message}` : "SES unreachable"
+        );
     }
     if (res.ok) return;
-    const detail = (await res.json().catch(() => null)) as { message?: string; Message?: string } | null;
-    throw new Error(detail?.message ?? detail?.Message ?? `SES refused the message (HTTP ${res.status})`);
+    const detail = (await res.json().catch(() => null)) as {
+        message?: string;
+        Message?: string;
+    } | null;
+    throw new Error(
+        detail?.message ?? detail?.Message ?? `SES refused the message (HTTP ${res.status})`
+    );
 }

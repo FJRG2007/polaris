@@ -66,22 +66,42 @@ export interface CalendarGroups {
 
 /** The sidebar's sections. Pure. */
 export function groupCalendars(calendars: readonly CalendarSummary[]): CalendarGroups {
-    const sorted = [...calendars].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+    const sorted = [...calendars].sort(
+        (a, b) => a.position - b.position || a.name.localeCompare(b.name)
+    );
     const linked = new Map<string, CalendarSummary[]>();
-    const groups = { mine: [] as CalendarSummary[], shared: [] as CalendarSummary[], subscriptions: [] as CalendarSummary[], rooms: [] as CalendarSummary[] };
+    const groups = {
+        mine: [] as CalendarSummary[],
+        shared: [] as CalendarSummary[],
+        subscriptions: [] as CalendarSummary[],
+        rooms: [] as CalendarSummary[]
+    };
     for (const calendar of sorted) {
         if (calendar.kind === "resource") groups.rooms.push(calendar);
         else if (calendar.source?.kind === "ics") groups.subscriptions.push(calendar);
-        else if (calendar.source) linked.set(calendar.source.label, [...(linked.get(calendar.source.label) ?? []), calendar]);
+        else if (calendar.source)
+            linked.set(calendar.source.label, [
+                ...(linked.get(calendar.source.label) ?? []),
+                calendar
+            ]);
         else if (calendar.reach === "owner") groups.mine.push(calendar);
         else groups.shared.push(calendar);
     }
-    return { ...groups, linked: [...linked.entries()].map(([label, list]) => ({ label, calendars: list })) };
+    return {
+        ...groups,
+        linked: [...linked.entries()].map(([label, list]) => ({ label, calendars: list }))
+    };
 }
 
 /** The whole order with one calendar moved before another (or to the end). */
-export function reordered(calendars: readonly CalendarSummary[], moving: string, before: string | null): string[] {
-    const ids = [...calendars].sort((a, b) => a.position - b.position).map((calendar) => calendar.id);
+export function reordered(
+    calendars: readonly CalendarSummary[],
+    moving: string,
+    before: string | null
+): string[] {
+    const ids = [...calendars]
+        .sort((a, b) => a.position - b.position)
+        .map((calendar) => calendar.id);
     const without = ids.filter((id) => id !== moving);
     const index = before === null ? without.length : without.indexOf(before);
     without.splice(index < 0 ? without.length : index, 0, moving);
@@ -93,7 +113,10 @@ export interface SidebarActions {
     readonly onReorder: (ids: string[]) => void;
     readonly onEdit: (calendar: CalendarSummary, focus?: "reminders") => void;
     readonly onColor: (calendar: CalendarSummary, color: string) => void;
-    readonly onPatch: (calendar: CalendarSummary, patch: { alarmsMuted?: boolean; transparent?: boolean }) => void;
+    readonly onPatch: (
+        calendar: CalendarSummary,
+        patch: { alarmsMuted?: boolean; transparent?: boolean }
+    ) => void;
     readonly onRemove: (calendar: CalendarSummary) => void;
     readonly onShare: (calendar: CalendarSummary) => void;
     readonly onPublish: (calendar: CalendarSummary) => void;
@@ -128,7 +151,11 @@ export function Sidebar({
     firstDay: number;
     locale: string;
     zone: string;
-    tasks: { readonly items: readonly TaskItemView[] | null; readonly error: string | null; readonly load: () => void };
+    tasks: {
+        readonly items: readonly TaskItemView[] | null;
+        readonly error: string | null;
+        readonly load: () => void;
+    };
     actions: SidebarActions;
 }) {
     const t = useCalendarT();
@@ -139,21 +166,36 @@ export function Sidebar({
 
     const section = (key: string, title: string, list: readonly CalendarSummary[]) =>
         list.length === 0 ? null : (
-            <Section key={key} id={key} title={title} collapsed={collapsed.has(key)} onToggle={() => actions.onToggleSection(key)}>
+            <Section
+                key={key}
+                id={key}
+                title={title}
+                collapsed={collapsed.has(key)}
+                onToggle={() => actions.onToggleSection(key)}
+            >
                 <CalendarList calendars={list} all={calendars ?? []} actions={actions} />
             </Section>
         );
 
     return (
         <div className="flex flex-col gap-4 p-3">
-            <MiniMonth value={anchor} today={today} firstDay={firstDay} locale={locale} highlight={shown} onPick={actions.onPickDay} />
+            <MiniMonth
+                value={anchor}
+                today={today}
+                firstDay={firstDay}
+                locale={locale}
+                highlight={shown}
+                onPick={actions.onPickDay}
+            />
 
             <div className="flex items-center gap-2">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button size="sm" variant="outline" className="w-full justify-start">
                             <Plus />
-                            <span className="min-w-0 flex-1 truncate text-left">{t("sidebar.add")}</span>
+                            <span className="min-w-0 flex-1 truncate text-left">
+                                {t("sidebar.add")}
+                            </span>
                             <ChevronDown className="text-foreground-subtle" />
                         </Button>
                     </DropdownMenuTrigger>
@@ -192,9 +234,17 @@ export function Sidebar({
             ) : (
                 <nav aria-label={t("sidebar.calendars")} className="flex flex-col gap-3">
                     {section("mine", t("sidebar.mine"), groups.mine)}
-                    {groups.mine.length === 0 ? <p className="text-xs text-muted-foreground">{t("sidebar.noneYet")}</p> : null}
+                    {groups.mine.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">{t("sidebar.noneYet")}</p>
+                    ) : null}
                     {section("shared", t("sidebar.shared"), groups.shared)}
-                    {groups.linked.map((group) => section(`linked:${group.label}`.slice(0, 40), t("sidebar.linked", { account: group.label }), group.calendars))}
+                    {groups.linked.map((group) =>
+                        section(
+                            `linked:${group.label}`.slice(0, 40),
+                            t("sidebar.linked", { account: group.label }),
+                            group.calendars
+                        )
+                    )}
                     {section("subscriptions", t("sidebar.subscriptions"), groups.subscriptions)}
                     {section("rooms", t("sidebar.rooms"), groups.rooms)}
                 </nav>
@@ -204,26 +254,65 @@ export function Sidebar({
             {Proposals ? <Proposals zone={zone} /> : null}
 
             {preferences.worldClock.length > 0 ? (
-                <Section id="clock" title={t("sidebar.worldClock")} collapsed={collapsed.has("clock")} onToggle={() => actions.onToggleSection("clock")}>
+                <Section
+                    id="clock"
+                    title={t("sidebar.worldClock")}
+                    collapsed={collapsed.has("clock")}
+                    onToggle={() => actions.onToggleSection("clock")}
+                >
                     <WorldClock zones={preferences.worldClock} locale={locale} hour12={undefined} />
                 </Section>
             ) : null}
 
             {preferences.showTasks ? (
-                <Section id="tasks" title={t("sidebar.unscheduled")} collapsed={collapsed.has("tasks")} onToggle={() => actions.onToggleSection("tasks")}>
-                    <UnscheduledTasks tasks={tasks} anchor={anchor} locale={locale} onSchedule={actions.onScheduleTask} />
+                <Section
+                    id="tasks"
+                    title={t("sidebar.unscheduled")}
+                    collapsed={collapsed.has("tasks")}
+                    onToggle={() => actions.onToggleSection("tasks")}
+                >
+                    <UnscheduledTasks
+                        tasks={tasks}
+                        anchor={anchor}
+                        locale={locale}
+                        onSchedule={actions.onScheduleTask}
+                    />
                 </Section>
             ) : null}
         </div>
     );
 }
 
-function Section({ id, title, collapsed, onToggle, children }: { id: string; title: string; collapsed: boolean; onToggle: () => void; children: ReactNode }) {
+function Section({
+    id,
+    title,
+    collapsed,
+    onToggle,
+    children
+}: {
+    id: string;
+    title: string;
+    collapsed: boolean;
+    onToggle: () => void;
+    children: ReactNode;
+}) {
     const bodyId = `calendar-section-${id.replace(/[^a-z0-9-]/gi, "-")}`;
     return (
         <section className="flex flex-col gap-1">
-            <button type="button" aria-expanded={!collapsed} aria-controls={bodyId} onClick={onToggle} className="flex items-center gap-1 rounded text-left">
-                <ChevronDown aria-hidden className={cn("size-3.5 text-foreground-subtle transition-transform duration-fast", collapsed && "-rotate-90")} />
+            <button
+                type="button"
+                aria-expanded={!collapsed}
+                aria-controls={bodyId}
+                onClick={onToggle}
+                className="flex items-center gap-1 rounded text-left"
+            >
+                <ChevronDown
+                    aria-hidden
+                    className={cn(
+                        "size-3.5 text-foreground-subtle transition-transform duration-fast",
+                        collapsed && "-rotate-90"
+                    )}
+                />
                 <GroupHeading className="min-w-0 flex-1 truncate">{title}</GroupHeading>
             </button>
             {collapsed ? null : <div id={bodyId}>{children}</div>}
@@ -231,10 +320,19 @@ function Section({ id, title, collapsed, onToggle, children }: { id: string; tit
     );
 }
 
-function CalendarList({ calendars, all, actions }: { calendars: readonly CalendarSummary[]; all: readonly CalendarSummary[]; actions: SidebarActions }) {
+function CalendarList({
+    calendars,
+    all,
+    actions
+}: {
+    calendars: readonly CalendarSummary[];
+    all: readonly CalendarSummary[];
+    actions: SidebarActions;
+}) {
     const [dragging, setDragging] = useState<string | null>(null);
     const [over, setOver] = useState<string | null>(null);
-    const sameList = (id: string | null) => id !== null && calendars.some((calendar) => calendar.id === id);
+    const sameList = (id: string | null) =>
+        id !== null && calendars.some((calendar) => calendar.id === id);
 
     const onDrop = (event: DragEvent, before: string | null) => {
         event.preventDefault();
@@ -246,7 +344,11 @@ function CalendarList({ calendars, all, actions }: { calendars: readonly Calenda
     };
 
     return (
-        <ul className="flex flex-col" onDragOver={(event) => sameList(dragging) && event.preventDefault()} onDrop={(event) => onDrop(event, null)}>
+        <ul
+            className="flex flex-col"
+            onDragOver={(event) => sameList(dragging) && event.preventDefault()}
+            onDrop={(event) => onDrop(event, null)}
+        >
             {calendars.map((calendar, index) => (
                 <CalendarRow
                     key={calendar.id}
@@ -256,8 +358,13 @@ function CalendarList({ calendars, all, actions }: { calendars: readonly Calenda
                     onMove={(direction) => {
                         const neighbour = calendars[index + direction];
                         if (!neighbour) return;
-                        const before = direction === -1 ? neighbour.id : (calendars[index + 2]?.id ?? null);
-                        actions.onReorder(before === null ? reordered(all, calendar.id, nextAfter(all, neighbour.id)) : reordered(all, calendar.id, before));
+                        const before =
+                            direction === -1 ? neighbour.id : (calendars[index + 2]?.id ?? null);
+                        actions.onReorder(
+                            before === null
+                                ? reordered(all, calendar.id, nextAfter(all, neighbour.id))
+                                : reordered(all, calendar.id, before)
+                        );
                     }}
                     first={index === 0}
                     last={index === calendars.length - 1}
@@ -309,7 +416,12 @@ function CalendarRow({
     onMove: (direction: 1 | -1) => void;
     first: boolean;
     last: boolean;
-    drag: { onDragStart: (event: DragEvent) => void; onDragEnd: () => void; onDragOver: (event: DragEvent) => void; onDrop: (event: DragEvent) => void };
+    drag: {
+        onDragStart: (event: DragEvent) => void;
+        onDragEnd: () => void;
+        onDragOver: (event: DragEvent) => void;
+        onDrop: (event: DragEvent) => void;
+    };
 }) {
     const t = useCalendarT();
     const owner = ownsSettings(calendar);
@@ -325,7 +437,10 @@ function CalendarRow({
             onDragEnd={drag.onDragEnd}
             onDragOver={drag.onDragOver}
             onDrop={drag.onDrop}
-            className={cn("group flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 hover:bg-card-hover", dropBefore && "shadow-[inset_0_2px_0_hsl(var(--foreground))]")}
+            className={cn(
+                "group flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 hover:bg-card-hover",
+                dropBefore && "shadow-[inset_0_2px_0_hsl(var(--foreground))]"
+            )}
         >
             <button
                 type="button"
@@ -335,19 +450,63 @@ function CalendarRow({
                 title={t(visible ? "sidebar.hide" : "sidebar.show", { name: calendar.name })}
                 onClick={() => actions.onToggle(calendar)}
                 className="flex size-4 shrink-0 items-center justify-center rounded border-2"
-                style={{ borderColor: calendar.color, backgroundColor: visible ? calendar.color : "transparent" }}
+                style={{
+                    borderColor: calendar.color,
+                    backgroundColor: visible ? calendar.color : "transparent"
+                }}
             />
-            <span className={cn("min-w-0 flex-1 truncate text-[0.8125rem]", !visible && "text-muted-foreground")} title={calendar.owner ? t("sidebar.ownedBy", { name: calendar.name, owner: calendar.owner.name }) : calendar.name}>
+            <span
+                className={cn(
+                    "min-w-0 flex-1 truncate text-[0.8125rem]",
+                    !visible && "text-muted-foreground"
+                )}
+                title={
+                    calendar.owner
+                        ? t("sidebar.ownedBy", { name: calendar.name, owner: calendar.owner.name })
+                        : calendar.name
+                }
+            >
                 {calendar.name}
             </span>
-            {calendar.components.includes("VTODO") ? <ListTodo aria-label={t("sidebar.holdsTasks")} className="size-3.5 text-foreground-subtle" /> : null}
-            {calendar.alarmsMuted ? <BellOff aria-label={t("sidebar.muted")} className="size-3.5 text-foreground-subtle" /> : null}
-            {calendar.transparent ? <EyeOff aria-label={t("sidebar.neverBusy")} className="size-3.5 text-foreground-subtle" /> : null}
-            {calendar.shareCount > 0 ? <Users aria-label={t("sidebar.sharedCount", { count: calendar.shareCount })} className="size-3.5 text-foreground-subtle" /> : null}
-            {failing ? <AlertTriangle aria-label={t("sidebar.syncProblem")} className="size-3.5 text-warning" /> : null}
+            {calendar.components.includes("VTODO") ? (
+                <ListTodo
+                    aria-label={t("sidebar.holdsTasks")}
+                    className="size-3.5 text-foreground-subtle"
+                />
+            ) : null}
+            {calendar.alarmsMuted ? (
+                <BellOff
+                    aria-label={t("sidebar.muted")}
+                    className="size-3.5 text-foreground-subtle"
+                />
+            ) : null}
+            {calendar.transparent ? (
+                <EyeOff
+                    aria-label={t("sidebar.neverBusy")}
+                    className="size-3.5 text-foreground-subtle"
+                />
+            ) : null}
+            {calendar.shareCount > 0 ? (
+                <Users
+                    aria-label={t("sidebar.sharedCount", { count: calendar.shareCount })}
+                    className="size-3.5 text-foreground-subtle"
+                />
+            ) : null}
+            {failing ? (
+                <AlertTriangle
+                    aria-label={t("sidebar.syncProblem")}
+                    className="size-3.5 text-warning"
+                />
+            ) : null}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button size="icon-xs" variant="ghost" className="md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100 md:data-[state=open]:opacity-100" aria-label={t("sidebar.menu", { name: calendar.name })} title={t("sidebar.menu", { name: calendar.name })}>
+                    <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        className="md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100 md:data-[state=open]:opacity-100"
+                        aria-label={t("sidebar.menu", { name: calendar.name })}
+                        title={t("sidebar.menu", { name: calendar.name })}
+                    >
                         <MoreHorizontal />
                     </Button>
                 </DropdownMenuTrigger>
@@ -364,8 +523,20 @@ function CalendarRow({
                         <DropdownMenuSubContent className="min-w-0">
                             <div className="grid grid-cols-4 gap-1 p-1">
                                 {CALENDAR_COLORS.map((color) => (
-                                    <DropdownMenuItem key={color} className="justify-center p-1" aria-label={color} onSelect={() => actions.onColor(calendar, color)}>
-                                        <ColorDot color={color} className={cn("size-5", color === calendar.color && "ring-2 ring-foreground ring-offset-1 ring-offset-elevated")} />
+                                    <DropdownMenuItem
+                                        key={color}
+                                        className="justify-center p-1"
+                                        aria-label={color}
+                                        onSelect={() => actions.onColor(calendar, color)}
+                                    >
+                                        <ColorDot
+                                            color={color}
+                                            className={cn(
+                                                "size-5",
+                                                color === calendar.color &&
+                                                    "ring-2 ring-foreground ring-offset-1 ring-offset-elevated"
+                                            )}
+                                        />
                                     </DropdownMenuItem>
                                 ))}
                             </div>
@@ -373,17 +544,33 @@ function CalendarRow({
                     </DropdownMenuSub>
                     {owner ? (
                         <>
-                            <DropdownMenuItem onSelect={() => actions.onEdit(calendar, "reminders")}>
+                            <DropdownMenuItem
+                                onSelect={() => actions.onEdit(calendar, "reminders")}
+                            >
                                 <BellOff className="opacity-0" aria-hidden />
                                 {t("sidebar.defaultReminders")}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => actions.onPatch(calendar, { alarmsMuted: !calendar.alarmsMuted })}>
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    actions.onPatch(calendar, {
+                                        alarmsMuted: !calendar.alarmsMuted
+                                    })
+                                }
+                            >
                                 <BellOff />
                                 {calendar.alarmsMuted ? t("sidebar.unmute") : t("sidebar.mute")}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => actions.onPatch(calendar, { transparent: !calendar.transparent })}>
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    actions.onPatch(calendar, {
+                                        transparent: !calendar.transparent
+                                    })
+                                }
+                            >
                                 <EyeOff />
-                                {calendar.transparent ? t("sidebar.countAsBusy") : t("sidebar.neverBusyAction")}
+                                {calendar.transparent
+                                    ? t("sidebar.countAsBusy")
+                                    : t("sidebar.neverBusyAction")}
                             </DropdownMenuItem>
                         </>
                     ) : null}
@@ -419,9 +606,14 @@ function CalendarRow({
                     {calendar.kind !== "resource" && calendar.kind !== "birthdays" ? (
                         <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="danger" onSelect={() => actions.onRemove(calendar)}>
+                            <DropdownMenuItem
+                                variant="danger"
+                                onSelect={() => actions.onRemove(calendar)}
+                            >
                                 {calendar.reach === "owner" ? <Trash2 /> : <LogOut />}
-                                {calendar.reach === "owner" ? t("sidebar.delete") : t("sidebar.leave")}
+                                {calendar.reach === "owner"
+                                    ? t("sidebar.delete")
+                                    : t("sidebar.leave")}
                             </DropdownMenuItem>
                         </>
                     ) : null}
@@ -431,7 +623,15 @@ function CalendarRow({
     );
 }
 
-function WorldClock({ zones, locale, hour12 }: { zones: readonly string[]; locale: string; hour12: boolean | undefined }) {
+function WorldClock({
+    zones,
+    locale,
+    hour12
+}: {
+    zones: readonly string[];
+    locale: string;
+    hour12: boolean | undefined;
+}) {
     const now = useNow(30_000);
     return (
         <ul className="flex flex-col gap-1">
@@ -439,14 +639,26 @@ function WorldClock({ zones, locale, hour12 }: { zones: readonly string[]; local
                 let text = "";
                 let day = "";
                 try {
-                    text = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", hour12, timeZone: zone }).format(now);
-                    day = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: zone }).format(now);
+                    text = new Intl.DateTimeFormat(locale, {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12,
+                        timeZone: zone
+                    }).format(now);
+                    day = new Intl.DateTimeFormat(locale, {
+                        weekday: "short",
+                        timeZone: zone
+                    }).format(now);
                 } catch {
                     text = "-";
                 }
                 const city = zone.split("/").pop()?.replace(/_/g, " ") ?? zone;
                 return (
-                    <li key={zone} className="flex items-baseline gap-2 text-[0.8125rem]" title={zone}>
+                    <li
+                        key={zone}
+                        className="flex items-baseline gap-2 text-[0.8125rem]"
+                        title={zone}
+                    >
                         <span className="min-w-0 flex-1 truncate">{city}</span>
                         <span className="text-xs text-foreground-subtle">{day}</span>
                         <span className="tabular-nums">{text}</span>
@@ -463,7 +675,11 @@ function UnscheduledTasks({
     locale,
     onSchedule
 }: {
-    tasks: { readonly items: readonly TaskItemView[] | null; readonly error: string | null; readonly load: () => void };
+    tasks: {
+        readonly items: readonly TaskItemView[] | null;
+        readonly error: string | null;
+        readonly load: () => void;
+    };
     anchor: string;
     locale: string;
     onSchedule: (task: TaskItemView, day: string) => void;
@@ -518,24 +734,41 @@ function UnscheduledTasks({
             </div>
         );
     }
-    if (tasks.items.length === 0) return <p className="text-xs text-muted-foreground">{t("sidebar.noUnscheduled")}</p>;
+    if (tasks.items.length === 0)
+        return <p className="text-xs text-muted-foreground">{t("sidebar.noUnscheduled")}</p>;
     const dayText = time.formatDay(anchor, locale, { day: "numeric", month: "short" });
     return (
         <>
             <p className="mb-1 text-xs text-foreground-subtle">{t("sidebar.dragHint")}</p>
             <ul ref={list} className="flex flex-col">
                 {tasks.items.map((task) => (
-                    <li key={task.id} data-task-id={task.id} data-task-title={task.title} className="group flex min-w-0 cursor-grab items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover">
+                    <li
+                        key={task.id}
+                        data-task-id={task.id}
+                        data-task-title={task.title}
+                        className="group flex min-w-0 cursor-grab items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover"
+                    >
                         <ListTodo aria-hidden className="size-4 text-foreground-subtle" />
-                        <Link href={`/tasks/t/${task.id}`} className="min-w-0 flex-1 truncate text-[0.8125rem] hover:underline" title={task.listName ? `${task.title} - ${task.listName}` : task.title}>
-                            {task.reference ? <span className="mr-1 text-xs text-foreground-subtle tabular-nums">{task.reference}</span> : null}
+                        <Link
+                            href={`/tasks/t/${task.id}`}
+                            className="min-w-0 flex-1 truncate text-[0.8125rem] hover:underline"
+                            title={task.listName ? `${task.title} - ${task.listName}` : task.title}
+                        >
+                            {task.reference ? (
+                                <span className="mr-1 text-xs text-foreground-subtle tabular-nums">
+                                    {task.reference}
+                                </span>
+                            ) : null}
                             {task.title}
                         </Link>
                         <Button
                             size="icon-xs"
                             variant="ghost"
                             className="md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-                            aria-label={t("sidebar.scheduleOn", { title: task.title, day: dayText })}
+                            aria-label={t("sidebar.scheduleOn", {
+                                title: task.title,
+                                day: dayText
+                            })}
                             title={t("sidebar.scheduleOn", { title: task.title, day: dayText })}
                             onClick={() => onSchedule(task, anchor)}
                         >

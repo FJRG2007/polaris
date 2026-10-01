@@ -18,7 +18,10 @@ const MAX_REASON = 200;
 
 /** Cuts a server-supplied reason down to something safe to log and show. */
 export function safeReason(text: string): string {
-    const flat = text.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+    const flat = text
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
     return flat.length > MAX_REASON ? `${flat.slice(0, MAX_REASON - 3)}...` : flat;
 }
 

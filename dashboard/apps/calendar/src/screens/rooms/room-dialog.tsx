@@ -12,7 +12,18 @@ import * as roomActions from "../../actions/resources";
 import { StatusNote, useIssueText } from "../public/kit";
 import type { RoomView } from "../../lib/scheduling-wire";
 import { roomInputSchema } from "../../lib/scheduling-schemas";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, SegmentedControl, Textarea, cn } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    SegmentedControl,
+    Textarea,
+    cn
+} from "@polaris/ui";
 
 interface Draft {
     name: string;
@@ -43,7 +54,15 @@ function inputOf(draft: Draft) {
     return { ...draft, capacity };
 }
 
-export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; onClose: () => void; onSaved: (room: RoomView) => void }) {
+export function RoomDialog({
+    room,
+    onClose,
+    onSaved
+}: {
+    room: RoomView | null;
+    onClose: () => void;
+    onSaved: (room: RoomView) => void;
+}) {
     const t = useCalendarT();
     const issueText = useIssueText();
     const [draft, setDraft] = useState<Draft>(() => draftOf(room));
@@ -58,7 +77,8 @@ export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; 
         const issues = parsed.error.issues.filter((issue) => issue.path[0] === field);
         return issues.length > 0 ? issueText(issues) : null;
     };
-    const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+    const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+        setDraft((current) => ({ ...current, [key]: value }));
 
     const addFeature = () => {
         const clean = feature.trim();
@@ -73,7 +93,10 @@ export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; 
         setProblem(null);
         try {
             const answer = await unwrap(
-                () => (room ? roomActions.updateRoomAction(room.id, parsed.data) : roomActions.createRoomAction(parsed.data)),
+                () =>
+                    room
+                        ? roomActions.updateRoomAction(room.id, parsed.data)
+                        : roomActions.createRoomAction(parsed.data),
                 t("rooms.failed")
             );
             onSaved(answer.room);
@@ -100,8 +123,17 @@ export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; 
                         void save();
                     }}
                 >
-                    <FieldRow label={`${t("rooms.name")} *`} htmlFor="room-name" error={nameMissing ? null : issueFor("name")}>
-                        <Input id="room-name" value={draft.name} onChange={(event) => set("name", event.target.value)} autoFocus />
+                    <FieldRow
+                        label={`${t("rooms.name")} *`}
+                        htmlFor="room-name"
+                        error={nameMissing ? null : issueFor("name")}
+                    >
+                        <Input
+                            id="room-name"
+                            value={draft.name}
+                            onChange={(event) => set("name", event.target.value)}
+                            autoFocus
+                        />
                     </FieldRow>
                     <SegmentedControl
                         aria-label={t("rooms.type")}
@@ -113,17 +145,48 @@ export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; 
                         ]}
                     />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <FieldRow label={t("rooms.capacity")} htmlFor="room-capacity" error={issueFor("capacity")}>
-                            <Input id="room-capacity" type="number" inputMode="numeric" min={1} value={draft.capacity} onChange={(event) => set("capacity", event.target.value)} />
+                        <FieldRow
+                            label={t("rooms.capacity")}
+                            htmlFor="room-capacity"
+                            error={issueFor("capacity")}
+                        >
+                            <Input
+                                id="room-capacity"
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                value={draft.capacity}
+                                onChange={(event) => set("capacity", event.target.value)}
+                            />
                         </FieldRow>
-                        <FieldRow label={t("rooms.building")} htmlFor="room-building" error={issueFor("building")}>
-                            <Input id="room-building" value={draft.building} onChange={(event) => set("building", event.target.value)} />
+                        <FieldRow
+                            label={t("rooms.building")}
+                            htmlFor="room-building"
+                            error={issueFor("building")}
+                        >
+                            <Input
+                                id="room-building"
+                                value={draft.building}
+                                onChange={(event) => set("building", event.target.value)}
+                            />
                         </FieldRow>
-                        <FieldRow label={t("rooms.floor")} htmlFor="room-floor" error={issueFor("floor")}>
-                            <Input id="room-floor" value={draft.floor} onChange={(event) => set("floor", event.target.value)} />
+                        <FieldRow
+                            label={t("rooms.floor")}
+                            htmlFor="room-floor"
+                            error={issueFor("floor")}
+                        >
+                            <Input
+                                id="room-floor"
+                                value={draft.floor}
+                                onChange={(event) => set("floor", event.target.value)}
+                            />
                         </FieldRow>
                     </div>
-                    <FieldRow label={t("rooms.features")} htmlFor="room-feature" hint={t("rooms.featuresHint")}>
+                    <FieldRow
+                        label={t("rooms.features")}
+                        htmlFor="room-feature"
+                        hint={t("rooms.featuresHint")}
+                    >
                         <div className="flex gap-2">
                             <Input
                                 id="room-feature"
@@ -136,21 +199,37 @@ export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; 
                                     }
                                 }}
                             />
-                            <Button type="button" size="sm" variant="outline" onClick={addFeature} disabled={feature.trim() === ""}>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={addFeature}
+                                disabled={feature.trim() === ""}
+                            >
                                 {t("rooms.addFeature")}
                             </Button>
                         </div>
                         {draft.features.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5 pt-1">
                                 {draft.features.map((entry) => (
-                                    <span key={entry} className="inline-flex items-center gap-1 rounded border border-border bg-field py-0.5 pl-2 pr-0.5 text-xs">
+                                    <span
+                                        key={entry}
+                                        className="inline-flex items-center gap-1 rounded border border-border bg-field py-0.5 pl-2 pr-0.5 text-xs"
+                                    >
                                         {entry}
                                         <button
                                             type="button"
                                             className="rounded p-0.5 text-foreground-subtle hover:text-foreground"
                                             aria-label={t("rooms.removeFeature", { name: entry })}
                                             title={t("rooms.removeFeature", { name: entry })}
-                                            onClick={() => set("features", draft.features.filter((other) => other !== entry))}
+                                            onClick={() =>
+                                                set(
+                                                    "features",
+                                                    draft.features.filter(
+                                                        (other) => other !== entry
+                                                    )
+                                                )
+                                            }
                                         >
                                             <X className="size-3" />
                                         </button>
@@ -160,7 +239,11 @@ export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; 
                         ) : null}
                     </FieldRow>
                     <FieldRow label={t("rooms.color")}>
-                        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("rooms.color")}>
+                        <div
+                            className="flex flex-wrap gap-1.5"
+                            role="radiogroup"
+                            aria-label={t("rooms.color")}
+                        >
                             {CALENDAR_COLORS.map((color) => (
                                 <button
                                     key={color}
@@ -170,14 +253,28 @@ export function RoomDialog({ room, onClose, onSaved }: { room: RoomView | null; 
                                     aria-label={color}
                                     title={color}
                                     onClick={() => set("color", color)}
-                                    className={cn("size-6 rounded-full border-2", draft.color === color ? "border-foreground" : "border-transparent")}
+                                    className={cn(
+                                        "size-6 rounded-full border-2",
+                                        draft.color === color
+                                            ? "border-foreground"
+                                            : "border-transparent"
+                                    )}
                                     style={{ backgroundColor: color }}
                                 />
                             ))}
                         </div>
                     </FieldRow>
-                    <FieldRow label={t("rooms.descriptionLabel")} htmlFor="room-description" error={issueFor("description")}>
-                        <Textarea id="room-description" rows={3} value={draft.description} onChange={(event) => set("description", event.target.value)} />
+                    <FieldRow
+                        label={t("rooms.descriptionLabel")}
+                        htmlFor="room-description"
+                        error={issueFor("description")}
+                    >
+                        <Textarea
+                            id="room-description"
+                            rows={3}
+                            value={draft.description}
+                            onChange={(event) => set("description", event.target.value)}
+                        />
                     </FieldRow>
                     {problem ? <StatusNote tone="danger">{problem}</StatusNote> : null}
                     <DialogFooter>

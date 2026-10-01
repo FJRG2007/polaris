@@ -42,7 +42,9 @@ export async function openEventAction(input: unknown): Promise<Outcome<{ detail:
 export async function openTodoAction(objectId: unknown): Promise<Outcome<{ detail: TodoDetail }>> {
     const parsed = uuidSchema.safeParse(objectId);
     if (!parsed.success) return invalid(parsed.error.issues);
-    return outcome(async () => ({ detail: await detail.todoDetail(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        detail: await detail.todoDetail(await requireCalendarUser(), parsed.data)
+    }));
 }
 
 const saveInput = z.object({
@@ -125,7 +127,11 @@ export async function duplicateEventAction(input: unknown): Promise<Outcome<{ ob
     const parsed = z.object({ objectId: uuidSchema, zone }).safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => ({
-        objectId: await objects.duplicateEvent(await requireCalendarUser(), parsed.data.objectId, parsed.data.zone)
+        objectId: await objects.duplicateEvent(
+            await requireCalendarUser(),
+            parsed.data.objectId,
+            parsed.data.zone
+        )
     }));
 }
 

@@ -84,7 +84,8 @@ function wallBefore(transition: Transition) {
     return instantToWall(new Date(transition.at.getTime() + transition.from * 60_000), "UTC");
 }
 
-const weekdayOf = (year: number, month: number, day: number) => new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+const weekdayOf = (year: number, month: number, day: number) =>
+    new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 const daysIn = (year: number, month: number) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 /**
@@ -93,26 +94,39 @@ const daysIn = (year: number, month: number) => new Date(Date.UTC(year, month, 0
  * or after a day (Israel's "Friday before the last Sunday" is Fri>=23), or a
  * fixed date. With nothing to tell them apart, the year's own day decides.
  */
-function yearlyRule(zone: string, transition: Transition, year: number): { rule: string; startDay: number } {
+function yearlyRule(
+    zone: string,
+    transition: Transition,
+    year: number
+): { rule: string; startDay: number } {
     const local = wallBefore(transition);
     const { month, day } = local;
     const weekday = weekdayOf(local.year, month, day);
     const seen = [{ year: local.year, day }];
     for (let next = year + 1; next < year + RULE_YEARS; next++) {
-        const match = transitionsBetween(zone, Date.UTC(next, month - 1, 1) - 2 * DAY, Date.UTC(next, month, 1) + 2 * DAY)
+        const match = transitionsBetween(
+            zone,
+            Date.UTC(next, month - 1, 1) - 2 * DAY,
+            Date.UTC(next, month, 1) + 2 * DAY
+        )
             .filter((change) => change.from === transition.from && change.to === transition.to)
             .map(wallBefore)
             .find((wall) => wall.month === month);
         if (match) seen.push({ year: match.year, day: match.day });
     }
     const sameWeekday = seen.every((entry) => weekdayOf(entry.year, month, entry.day) === weekday);
-    if (!sameWeekday && seen.every((entry) => entry.day === day)) return { rule: `BYMONTH=${month};BYMONTHDAY=${day}`, startDay: day };
-    const ordinal = (entry: { year: number; day: number }) => (entry.day + 7 > daysIn(entry.year, month) ? -1 : Math.ceil(entry.day / 7));
+    if (!sameWeekday && seen.every((entry) => entry.day === day))
+        return { rule: `BYMONTH=${month};BYMONTHDAY=${day}`, startDay: day };
+    const ordinal = (entry: { year: number; day: number }) =>
+        entry.day + 7 > daysIn(entry.year, month) ? -1 : Math.ceil(entry.day / 7);
     const ordinals = new Set(sameWeekday ? seen.map(ordinal) : [ordinal(seen[0]!)]);
     const last = sameWeekday && seen.every((entry) => entry.day + 7 > daysIn(entry.year, month));
     if (last || ordinals.size === 1) {
         const which = last ? -1 : [...ordinals][0]!;
-        return { rule: `BYMONTH=${month};BYDAY=${which}${WEEKDAYS[weekday]}`, startDay: nthWeekday(1970, month, weekday, which) };
+        return {
+            rule: `BYMONTH=${month};BYDAY=${which}${WEEKDAYS[weekday]}`,
+            startDay: nthWeekday(1970, month, weekday, which)
+        };
     }
     const first = Math.min(...seen.map((entry) => entry.day));
     const days = Array.from({ length: 7 }, (_, index) => first + index);
@@ -123,7 +137,12 @@ function yearlyRule(zone: string, transition: Transition, year: number): { rule:
 }
 
 /** One observance: the wall time it starts at (before the change), as a rule. */
-function observance(transition: Transition, kind: "STANDARD" | "DAYLIGHT", zoneName: string, year: number): string[] {
+function observance(
+    transition: Transition,
+    kind: "STANDARD" | "DAYLIGHT",
+    zoneName: string,
+    year: number
+): string[] {
     const local = wallBefore(transition);
     const { rule, startDay } = yearlyRule(zoneName, transition, year);
     return [
@@ -151,7 +170,10 @@ export function vtimezoneFor(tzid: string, year: number): string | null {
         const [first, second] = changes as [Transition, Transition];
         const daylight = first.to > second.to ? first : second;
         const standard = daylight === first ? second : first;
-        lines.push(...observance(standard, "STANDARD", zone, year), ...observance(daylight, "DAYLIGHT", zone, year));
+        lines.push(
+            ...observance(standard, "STANDARD", zone, year),
+            ...observance(daylight, "DAYLIGHT", zone, year)
+        );
     } else {
         // No daylight saving this year (or an irregular one): the offset the
         // year ends on, held.

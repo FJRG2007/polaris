@@ -19,21 +19,41 @@ export interface HoursRange {
 
 /** Working hours per weekday, "0" = Sunday .. "6" = Saturday. A day with no
  *  ranges is not a working day. */
-export type WorkingHours = Readonly<Record<"0" | "1" | "2" | "3" | "4" | "5" | "6", readonly HoursRange[]>>;
+export type WorkingHours = Readonly<
+    Record<"0" | "1" | "2" | "3" | "4" | "5" | "6", readonly HoursRange[]>
+>;
 
-const RANK: Readonly<Record<BusyInterval["type"], number>> = { "BUSY-TENTATIVE": 0, BUSY: 1, "BUSY-UNAVAILABLE": 2 };
+const RANK: Readonly<Record<BusyInterval["type"], number>> = {
+    "BUSY-TENTATIVE": 0,
+    BUSY: 1,
+    "BUSY-UNAVAILABLE": 2
+};
 const BY_RANK: readonly BusyInterval["type"][] = ["BUSY-TENTATIVE", "BUSY", "BUSY-UNAVAILABLE"];
 
 /** The busy intervals a list of occurrences makes, unmerged. */
-export function busyFromOccurrences(occurrences: readonly Occurrence[], options: { selfEmail?: string } = {}): BusyInterval[] {
+export function busyFromOccurrences(
+    occurrences: readonly Occurrence[],
+    options: { selfEmail?: string } = {}
+): BusyInterval[] {
     const self = options.selfEmail?.trim().toLowerCase();
     const busy: BusyInterval[] = [];
     for (const occurrence of occurrences) {
         const event = occurrence.event;
         if (event.transparency === "TRANSPARENT" || event.status === "CANCELLED") continue;
-        if (self && event.attendees.some((attendee) => attendee.email === self && attendee.partstat === "DECLINED")) continue;
+        if (
+            self &&
+            event.attendees.some(
+                (attendee) => attendee.email === self && attendee.partstat === "DECLINED"
+            )
+        )
+            continue;
         if (occurrence.end.getTime() <= occurrence.start.getTime()) continue;
-        const type: BusyInterval["type"] = event.kind === "outOfOffice" ? "BUSY-UNAVAILABLE" : event.status === "TENTATIVE" ? "BUSY-TENTATIVE" : "BUSY";
+        const type: BusyInterval["type"] =
+            event.kind === "outOfOffice"
+                ? "BUSY-UNAVAILABLE"
+                : event.status === "TENTATIVE"
+                  ? "BUSY-TENTATIVE"
+                  : "BUSY";
         busy.push({ start: occurrence.start, end: occurrence.end, type });
     }
     return busy;
@@ -52,7 +72,10 @@ export function mergeBusy(intervals: readonly BusyInterval[]): BusyInterval[] {
         const end = interval.end.getTime();
         if (!(end > start)) continue;
         const rank = RANK[interval.type];
-        for (const [at, delta] of [[start, 1], [end, -1]] as const) {
+        for (const [at, delta] of [
+            [start, 1],
+            [end, -1]
+        ] as const) {
             const counts = changes.get(at) ?? [0, 0, 0];
             counts[rank] = (counts[rank] ?? 0) + delta;
             changes.set(at, counts);
@@ -65,19 +88,24 @@ export function mergeBusy(intervals: readonly BusyInterval[]): BusyInterval[] {
         const from = points[index] ?? 0;
         const to = points[index + 1] ?? 0;
         const counts = changes.get(from) ?? [];
-        for (let rank = 0; rank < active.length; rank++) active[rank] = (active[rank] ?? 0) + (counts[rank] ?? 0);
+        for (let rank = 0; rank < active.length; rank++)
+            active[rank] = (active[rank] ?? 0) + (counts[rank] ?? 0);
         let type: BusyInterval["type"] | null = null;
-        for (let rank = active.length - 1; rank >= 0 && type === null; rank--) if ((active[rank] ?? 0) > 0) type = BY_RANK[rank] ?? null;
+        for (let rank = active.length - 1; rank >= 0 && type === null; rank--)
+            if ((active[rank] ?? 0) > 0) type = BY_RANK[rank] ?? null;
         if (!type) continue;
         const last = pieces[pieces.length - 1];
-        if (last && last.type === type && last.end.getTime() === from) pieces[pieces.length - 1] = { ...last, end: new Date(to) };
+        if (last && last.type === type && last.end.getTime() === from)
+            pieces[pieces.length - 1] = { ...last, end: new Date(to) };
         else pieces.push({ start: new Date(from), end: new Date(to), type });
     }
     return pieces;
 }
 
 function overlapsAny(start: number, end: number, busy: readonly BusyInterval[]): boolean {
-    return busy.some((interval) => interval.start.getTime() < end && interval.end.getTime() > start);
+    return busy.some(
+        (interval) => interval.start.getTime() < end && interval.end.getTime() > start
+    );
 }
 
 /** The local-day windows a day offers: its working hours, or the whole day. */

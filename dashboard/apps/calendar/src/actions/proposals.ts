@@ -13,28 +13,43 @@ import * as scheduling from "../lib/scheduling-schemas";
 import type { ProposalSummary, ProposalView } from "../lib/scheduling-wire";
 
 export async function listProposalsAction(): Promise<Outcome<{ proposals: ProposalSummary[] }>> {
-    return outcome(async () => ({ proposals: await proposals.listProposals(await requireCalendarUser()) }));
+    return outcome(async () => ({
+        proposals: await proposals.listProposals(await requireCalendarUser())
+    }));
 }
 
 export async function proposalAction(id: unknown): Promise<Outcome<{ proposal: ProposalView }>> {
     const parsed = schemas.uuidSchema.safeParse(id);
     if (!parsed.success) return refusedInput(parsed.error.issues);
-    return outcome(async () => ({ proposal: await proposals.proposal(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        proposal: await proposals.proposal(await requireCalendarUser(), parsed.data)
+    }));
 }
 
-export async function createProposalAction(input: unknown): Promise<Outcome<{ proposal: ProposalView }>> {
+export async function createProposalAction(
+    input: unknown
+): Promise<Outcome<{ proposal: ProposalView }>> {
     const parsed = scheduling.proposalInputSchema.safeParse(input);
     if (!parsed.success) return refusedInput(parsed.error.issues);
-    return outcome(async () => ({ proposal: await proposals.createProposal(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        proposal: await proposals.createProposal(await requireCalendarUser(), parsed.data)
+    }));
 }
 
-export async function updateProposalAction(id: unknown, input: unknown): Promise<Outcome<{ proposal: ProposalView }>> {
+export async function updateProposalAction(
+    id: unknown,
+    input: unknown
+): Promise<Outcome<{ proposal: ProposalView }>> {
     const parsedId = schemas.uuidSchema.safeParse(id);
     if (!parsedId.success) return refusedInput(parsedId.error.issues);
     const parsed = scheduling.proposalInputSchema.safeParse(input);
     if (!parsed.success) return refusedInput(parsed.error.issues);
     return outcome(async () => ({
-        proposal: await proposals.updateProposal(await requireCalendarUser(), parsedId.data, parsed.data)
+        proposal: await proposals.updateProposal(
+            await requireCalendarUser(),
+            parsedId.data,
+            parsed.data
+        )
     }));
 }
 
@@ -53,7 +68,9 @@ const chooseInput = z.object({
     calendarId: schemas.uuidSchema
 });
 
-export async function chooseProposalDateAction(input: unknown): Promise<Outcome<{ objectId: string }>> {
+export async function chooseProposalDateAction(
+    input: unknown
+): Promise<Outcome<{ objectId: string }>> {
     const parsed = chooseInput.safeParse(input);
     if (!parsed.success) return refusedInput(parsed.error.issues);
     return outcome(async () => proposals.chooseDate(await requireCalendarUser(), parsed.data));

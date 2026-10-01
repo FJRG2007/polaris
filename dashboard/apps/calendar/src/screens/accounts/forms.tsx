@@ -37,16 +37,28 @@ export const REFRESH_CHOICES = [
 type Translator = ReturnType<typeof useCalendarT>;
 
 export function refreshOptions(t: Translator): SelectOption[] {
-    return REFRESH_CHOICES.map((choice) => ({ value: String(choice.minutes), label: t(`accounts.intervals.${choice.key}`) }));
+    return REFRESH_CHOICES.map((choice) => ({
+        value: String(choice.minutes),
+        label: t(`accounts.intervals.${choice.key}`)
+    }));
 }
 
 /** The issues of one field in a zod result. */
-function issuesAt(result: { success: boolean; error?: { issues: { path: (string | number)[]; message: string }[] } }, field: string) {
+function issuesAt(
+    result: {
+        success: boolean;
+        error?: { issues: { path: (string | number)[]; message: string }[] };
+    },
+    field: string
+) {
     if (result.success || !result.error) return [];
     return result.error.issues.filter((issue) => issue.path[0] === field);
 }
 
-async function run<T extends { ok: boolean }>(call: () => Promise<T>, fallback: string): Promise<{ error: string | null }> {
+async function run<T extends { ok: boolean }>(
+    call: () => Promise<T>,
+    fallback: string
+): Promise<{ error: string | null }> {
     try {
         await unwrap(call, fallback);
         return { error: null };
@@ -57,7 +69,13 @@ async function run<T extends { ok: boolean }>(call: () => Promise<T>, fallback: 
 
 // ---------------------------------------------------------------- subscription
 
-export function FeedForm({ onAdded, withProton = true }: { onAdded: () => void; withProton?: boolean }) {
+export function FeedForm({
+    onAdded,
+    withProton = true
+}: {
+    onAdded: () => void;
+    withProton?: boolean;
+}) {
     const t = useCalendarT();
     const issueText = useIssueText();
     const id = useId();
@@ -98,7 +116,11 @@ export function FeedForm({ onAdded, withProton = true }: { onAdded: () => void; 
 
     return (
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3" noValidate>
-            <FieldRow label={`${t("accounts.feed.url")} *`} htmlFor={`${id}-url`} error={shown("url", url)}>
+            <FieldRow
+                label={`${t("accounts.feed.url")} *`}
+                htmlFor={`${id}-url`}
+                error={shown("url", url)}
+            >
                 <Input
                     id={`${id}-url`}
                     type="url"
@@ -111,7 +133,11 @@ export function FeedForm({ onAdded, withProton = true }: { onAdded: () => void; 
                 />
             </FieldRow>
             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                <FieldRow label={`${t("accounts.feed.name")} *`} htmlFor={`${id}-name`} error={shown("name", name)}>
+                <FieldRow
+                    label={`${t("accounts.feed.name")} *`}
+                    htmlFor={`${id}-name`}
+                    error={shown("name", name)}
+                >
                     <Input
                         id={`${id}-name`}
                         value={name}
@@ -121,13 +147,25 @@ export function FeedForm({ onAdded, withProton = true }: { onAdded: () => void; 
                     />
                 </FieldRow>
                 <FieldRow label={t("accounts.feed.interval")}>
-                    <Select value={refresh} onValueChange={setRefresh} options={refreshOptions(t)} aria-label={t("accounts.feed.interval")} className="sm:w-44" />
+                    <Select
+                        value={refresh}
+                        onValueChange={setRefresh}
+                        options={refreshOptions(t)}
+                        aria-label={t("accounts.feed.interval")}
+                        className="sm:w-44"
+                    />
                 </FieldRow>
             </div>
             <ColorChoice value={color} onChange={setColor} />
             {note ? <StatusNote tone={note.tone}>{note.text}</StatusNote> : null}
             <div className="flex flex-wrap items-center justify-between gap-2">
-                {withProton ? <p className="min-w-0 flex-1 text-xs text-foreground-subtle">{t("accounts.feed.proton")}</p> : <span />}
+                {withProton ? (
+                    <p className="min-w-0 flex-1 text-xs text-foreground-subtle">
+                        {t("accounts.feed.proton")}
+                    </p>
+                ) : (
+                    <span />
+                )}
                 <Button type="submit" disabled={busy} aria-disabled={!result.success}>
                     {busy ? <Loader2 className="animate-spin" aria-hidden /> : null}
                     {t("accounts.feed.add")}
@@ -141,8 +179,14 @@ function ColorChoice({ value, onChange }: { value: string; onChange: (color: str
     const t = useCalendarT();
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">{t("accounts.feed.color")}</span>
-            <div role="radiogroup" aria-label={t("accounts.feed.color")} className="flex flex-wrap gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+                {t("accounts.feed.color")}
+            </span>
+            <div
+                role="radiogroup"
+                aria-label={t("accounts.feed.color")}
+                className="flex flex-wrap gap-1.5"
+            >
                 {CALENDAR_COLORS.map((color) => (
                     <button
                         key={color}
@@ -158,7 +202,9 @@ function ColorChoice({ value, onChange }: { value: string; onChange: (color: str
                         )}
                         style={{ backgroundColor: color }}
                     >
-                        {value === color ? <Check className="size-3.5 text-white" aria-hidden /> : null}
+                        {value === color ? (
+                            <Check className="size-3.5 text-white" aria-hidden />
+                        ) : null}
                     </button>
                 ))}
             </div>
@@ -186,7 +232,16 @@ export function CalDavForm({ onAdded }: { onAdded: () => void }) {
     const chosen = CALDAV_PRESETS.find((entry) => entry.id === preset) ?? null;
     const ownHost = preset === "custom" || (chosen !== null && chosen.url === null);
     const urlSource = preset === "custom" ? customUrl : chosen && chosen.url === null ? host : "";
-    const url = preset === "custom" ? customUrl : chosen ? (chosen.url === null ? (host.trim() ? presetUrl(chosen, host) : "") : presetUrl(chosen)) : "";
+    const url =
+        preset === "custom"
+            ? customUrl
+            : chosen
+              ? chosen.url === null
+                  ? host.trim()
+                      ? presetUrl(chosen, host)
+                      : ""
+                  : presetUrl(chosen)
+              : "";
     const result = caldavSourceSchema.safeParse({ url, username, password });
     const shown = (field: string, value: string) => {
         if (!touched[field] || value.trim() === "") return null;
@@ -195,7 +250,10 @@ export function CalDavForm({ onAdded }: { onAdded: () => void }) {
     };
 
     const options: SelectOption[] = [
-        ...CALDAV_PRESETS.map((entry) => ({ value: entry.id, label: t(`accounts.caldav.presets.${entry.id}`) })),
+        ...CALDAV_PRESETS.map((entry) => ({
+            value: entry.id,
+            label: t(`accounts.caldav.presets.${entry.id}`)
+        })),
         { value: "custom", label: t("accounts.caldav.custom") }
     ];
 
@@ -221,7 +279,12 @@ export function CalDavForm({ onAdded }: { onAdded: () => void }) {
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3" noValidate>
             <div className="grid gap-3 sm:grid-cols-2">
                 <FieldRow label={t("accounts.caldav.service")}>
-                    <Select value={preset} onValueChange={(value) => setPreset(value as PresetChoice)} options={options} aria-label={t("accounts.caldav.service")} />
+                    <Select
+                        value={preset}
+                        onValueChange={(value) => setPreset(value as PresetChoice)}
+                        options={options}
+                        aria-label={t("accounts.caldav.service")}
+                    />
                 </FieldRow>
                 {ownHost ? (
                     <FieldRow
@@ -236,14 +299,22 @@ export function CalDavForm({ onAdded }: { onAdded: () => void }) {
                             autoComplete="off"
                             placeholder="https://"
                             value={preset === "custom" ? customUrl : host}
-                            onChange={(event) => (preset === "custom" ? setCustomUrl(event.target.value) : setHost(event.target.value))}
+                            onChange={(event) =>
+                                preset === "custom"
+                                    ? setCustomUrl(event.target.value)
+                                    : setHost(event.target.value)
+                            }
                             onBlur={() => setTouched((held) => ({ ...held, url: true }))}
                         />
                     </FieldRow>
                 ) : null}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-                <FieldRow label={`${t("accounts.caldav.username")} *`} htmlFor={`${id}-user`} error={shown("username", username)}>
+                <FieldRow
+                    label={`${t("accounts.caldav.username")} *`}
+                    htmlFor={`${id}-user`}
+                    error={shown("username", username)}
+                >
                     <Input
                         id={`${id}-user`}
                         autoComplete="username"
@@ -252,7 +323,11 @@ export function CalDavForm({ onAdded }: { onAdded: () => void }) {
                         onBlur={() => setTouched((held) => ({ ...held, username: true }))}
                     />
                 </FieldRow>
-                <FieldRow label={`${t("accounts.caldav.password")} *`} htmlFor={`${id}-password`} error={shown("password", password)}>
+                <FieldRow
+                    label={`${t("accounts.caldav.password")} *`}
+                    htmlFor={`${id}-password`}
+                    error={shown("password", password)}
+                >
                     {/* A third-party service's app password, not a Polaris one: the identity and breach checks do not apply. */}
                     <Input
                         id={`${id}-password`}
@@ -296,13 +371,21 @@ function useFeedAdder(onAdded: () => void) {
     const [adding, setAdding] = useState<string | null>(null);
     const [added, setAdded] = useState<ReadonlySet<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
-    async function add(url: string, name: string, color: string, refreshMinutes: number): Promise<void> {
+    async function add(
+        url: string,
+        name: string,
+        color: string,
+        refreshMinutes: number
+    ): Promise<void> {
         if (adding) return;
         setAdding(url);
         setError(null);
         // Drawn as added at once; taken back when refused.
         setAdded((held) => new Set([...held, url]));
-        const outcome = await run(() => sources.addFeedAction({ url, name: name.slice(0, 120), color, refreshMinutes }), t("errors.generic"));
+        const outcome = await run(
+            () => sources.addFeedAction({ url, name: name.slice(0, 120), color, refreshMinutes }),
+            t("errors.generic")
+        );
         setAdding(null);
         if (outcome.error) {
             setAdded((held) => new Set([...held].filter((entry) => entry !== url)));
@@ -314,7 +397,13 @@ function useFeedAdder(onAdded: () => void) {
     return { adding, added, error, add };
 }
 
-export function HolidayPicker({ onAdded, subscribed = [] }: { onAdded: () => void; subscribed?: readonly string[] }) {
+export function HolidayPicker({
+    onAdded,
+    subscribed = []
+}: {
+    onAdded: () => void;
+    subscribed?: readonly string[];
+}) {
     const t = useCalendarT();
     const locale = hostUi.i18nProvider.useLocale();
     const [query, setQuery] = useState("");
@@ -329,24 +418,44 @@ export function HolidayPicker({ onAdded, subscribed = [] }: { onAdded: () => voi
         } catch {
             regions = null;
         }
-        const byRegion = new Map<string, { region: string; name: string; feeds: { url: string; label: string; language: string }[] }>();
+        const byRegion = new Map<
+            string,
+            {
+                region: string;
+                name: string;
+                feeds: { url: string; label: string; language: string }[];
+            }
+        >();
         for (const feed of HOLIDAY_CALENDARS) {
             const name = regions?.of(feed.region) ?? feed.name;
             const entry = byRegion.get(feed.region) ?? { region: feed.region, name, feeds: [] };
-            entry.feeds.push({ url: feed.url, label: name, language: languages?.of(feed.language) ?? feed.language });
+            entry.feeds.push({
+                url: feed.url,
+                label: name,
+                language: languages?.of(feed.language) ?? feed.language
+            });
             byRegion.set(feed.region, entry);
         }
         return [...byRegion.values()].sort((a, b) => a.name.localeCompare(b.name, locale));
     }, [locale]);
 
     const term = query.trim().toLocaleLowerCase(locale);
-    const shown = term ? groups.filter((group) => group.name.toLocaleLowerCase(locale).includes(term) || group.region.toLowerCase() === term) : groups;
+    const shown = term
+        ? groups.filter(
+              (group) =>
+                  group.name.toLocaleLowerCase(locale).includes(term) ||
+                  group.region.toLowerCase() === term
+          )
+        : groups;
     const taken = new Set([...subscribed, ...adder.added]);
 
     return (
         <div className="flex flex-col gap-2">
             <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle" aria-hidden />
+                <Search
+                    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-foreground-subtle"
+                    aria-hidden
+                />
                 <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
@@ -357,15 +466,23 @@ export function HolidayPicker({ onAdded, subscribed = [] }: { onAdded: () => voi
             </div>
             {adder.error ? <StatusNote tone="danger">{adder.error}</StatusNote> : null}
             {shown.length === 0 ? (
-                <p className="py-2 text-[13px] text-muted-foreground">{t("accounts.holidays.noMatch")}</p>
+                <p className="py-2 text-[13px] text-muted-foreground">
+                    {t("accounts.holidays.noMatch")}
+                </p>
             ) : (
                 <ul className="max-h-80 divide-y divide-border overflow-y-auto rounded-md border border-border">
                     {shown.flatMap((group) =>
                         group.feeds.map((feed) => {
-                            const label = group.feeds.length > 1 ? `${group.name} (${feed.language})` : group.name;
+                            const label =
+                                group.feeds.length > 1
+                                    ? `${group.name} (${feed.language})`
+                                    : group.name;
                             const done = taken.has(feed.url);
                             return (
-                                <li key={feed.url} className="flex items-center gap-2 px-2.5 py-1.5 text-[13px]">
+                                <li
+                                    key={feed.url}
+                                    className="flex items-center gap-2 px-2.5 py-1.5 text-[13px]"
+                                >
                                     <span className="min-w-0 flex-1 truncate" title={label}>
                                         {label}
                                     </span>
@@ -382,9 +499,15 @@ export function HolidayPicker({ onAdded, subscribed = [] }: { onAdded: () => voi
                                             disabled={adder.adding !== null}
                                             aria-label={t("accounts.holidays.add", { name: label })}
                                             title={t("accounts.holidays.add", { name: label })}
-                                            onClick={() => void adder.add(feed.url, label, "#2ca02c", 10080)}
+                                            onClick={() =>
+                                                void adder.add(feed.url, label, "#2ca02c", 10080)
+                                            }
                                         >
-                                            {adder.adding === feed.url ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
+                                            {adder.adding === feed.url ? (
+                                                <Loader2 className="animate-spin" aria-hidden />
+                                            ) : (
+                                                <Plus aria-hidden />
+                                            )}
                                         </Button>
                                     )}
                                 </li>
@@ -417,7 +540,10 @@ export function SuggestedCalendars({
             {adder.error ? <StatusNote tone="danger">{adder.error}</StatusNote> : null}
             <ul className="divide-y divide-border rounded-md border border-border">
                 {suggested.map((entry) => (
-                    <li key={entry.url} className="flex items-center gap-2 px-2.5 py-1.5 text-[13px]">
+                    <li
+                        key={entry.url}
+                        className="flex items-center gap-2 px-2.5 py-1.5 text-[13px]"
+                    >
                         <span className="min-w-0 flex-1 truncate" title={entry.url}>
                             {entry.name}
                         </span>
@@ -434,9 +560,15 @@ export function SuggestedCalendars({
                                 disabled={adder.adding !== null}
                                 aria-label={t("accounts.suggested.add", { name: entry.name })}
                                 title={t("accounts.suggested.add", { name: entry.name })}
-                                onClick={() => void adder.add(entry.url, entry.name, CALENDAR_COLORS[1], 1440)}
+                                onClick={() =>
+                                    void adder.add(entry.url, entry.name, CALENDAR_COLORS[1], 1440)
+                                }
                             >
-                                {adder.adding === entry.url ? <Loader2 className="animate-spin" aria-hidden /> : <Plus aria-hidden />}
+                                {adder.adding === entry.url ? (
+                                    <Loader2 className="animate-spin" aria-hidden />
+                                ) : (
+                                    <Plus aria-hidden />
+                                )}
                             </Button>
                         )}
                     </li>

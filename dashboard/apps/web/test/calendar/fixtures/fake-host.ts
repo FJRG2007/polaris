@@ -41,7 +41,12 @@ export class RefusedAddressError extends Error {
 /** Whether a URL points into a private network, the way the guarded fetch decides. */
 function privateAddress(raw: string): boolean {
     const host = new URL(raw).hostname;
-    return host === "localhost" || /^(10|127)\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+    return (
+        host === "localhost" ||
+        /^(10|127)\./.test(host) ||
+        /^192\.168\./.test(host) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    );
 }
 
 type Handler = (url: string, init: RequestInit) => Promise<Response>;
@@ -66,7 +71,12 @@ function blankState() {
         rateAllowed: true,
         fetches: [] as { url: string; allowPrivate: boolean }[],
         fetchHandler: (async () => new Response("", { status: 404 })) as Handler,
-        links: [] as { id: string; provider: "google" | "microsoft"; label: string; grantsCalendar: boolean }[],
+        links: [] as {
+            id: string;
+            provider: "google" | "microsoft";
+            label: string;
+            grantsCalendar: boolean;
+        }[],
         tasks: [] as {
             id: string;
             name: string;
@@ -90,8 +100,18 @@ export function resetHost(): void {
 }
 
 /** A Polaris account, in the fake database and ready to sign in as. */
-export function addUser(input: { name: string; email: string; isAdmin?: boolean; username?: string | null }): FakeUser {
-    const row = db.insert("user", { name: input.name, email: input.email.toLowerCase(), isAdmin: input.isAdmin ?? false, username: input.username ?? null });
+export function addUser(input: {
+    name: string;
+    email: string;
+    isAdmin?: boolean;
+    username?: string | null;
+}): FakeUser {
+    const row = db.insert("user", {
+        name: input.name,
+        email: input.email.toLowerCase(),
+        isAdmin: input.isAdmin ?? false,
+        username: input.username ?? null
+    });
     return {
         id: row.id as string,
         name: input.name,
@@ -120,20 +140,28 @@ function can(userId: string, permission: string): boolean {
 }
 
 function person(row: Row) {
-    return { id: row.id as string, name: row.name as string, email: row.email as string, username: (row.username as string | null) ?? null };
+    return {
+        id: row.id as string,
+        name: row.name as string,
+        email: row.email as string,
+        username: (row.username as string | null) ?? null
+    };
 }
 
 export const host = {
     session: {
         requirePermission: async (permission: string): Promise<FakeUser> => {
             const user = fake.current;
-            if (!user || !can(user.id, permission)) throw new Error("NEXT_REDIRECT;replace;/login;307;");
+            if (!user || !can(user.id, permission))
+                throw new Error("NEXT_REDIRECT;replace;/login;307;");
             return user;
         },
-        sessionCan: async (user: { id: string }, permission: string): Promise<boolean> => can(user.id, permission)
+        sessionCan: async (user: { id: string }, permission: string): Promise<boolean> =>
+            can(user.id, permission)
     },
     apiSession: {
-        apiUser: async (): Promise<FakeUser | Response> => fake.current ?? new Response(null, { status: 401 })
+        apiUser: async (): Promise<FakeUser | Response> =>
+            fake.current ?? new Response(null, { status: 401 })
     },
     i18nRequest: { getLocale: async () => fake.requestLocale },
     i18nLocaleService: {
@@ -159,15 +187,26 @@ export const host = {
     },
     domainService: { appBaseUrl: async () => "https://polaris.example.test" },
     calendarHost: {
-        teamIdsOf: async (userId: string) => [...fake.teams.entries()].filter(([, members]) => members.includes(userId)).map(([id]) => id),
+        teamIdsOf: async (userId: string) =>
+            [...fake.teams.entries()]
+                .filter(([, members]) => members.includes(userId))
+                .map(([id]) => id),
         teamMemberIds: async (teamId: string) => [...(fake.teams.get(teamId) ?? [])],
         displayTimeZone: async (userId: string) => fake.timeZones.get(userId) ?? "auto",
         teamsOf: async (userId: string) =>
             db
                 .rows("team")
                 .filter((team) => fake.teams.get(team.id as string)?.includes(userId))
-                .map((team) => ({ id: team.id as string, name: team.name as string, orgName: team.orgName as string })),
-        peopleByIds: async (ids: readonly string[]) => db.rows("user").filter((row) => ids.includes(row.id as string)).map(person),
+                .map((team) => ({
+                    id: team.id as string,
+                    name: team.name as string,
+                    orgName: team.orgName as string
+                })),
+        peopleByIds: async (ids: readonly string[]) =>
+            db
+                .rows("user")
+                .filter((row) => ids.includes(row.id as string))
+                .map(person),
         accountsByEmail: async (emails: readonly string[]) => {
             const wanted = new Set(emails.map((email) => email.trim().toLowerCase()));
             return [
@@ -191,12 +230,16 @@ export const host = {
                 .rows("user")
                 .filter((row) => ids.includes(row.id as string))
                 .map((row) => row.id as string),
-        sendCalendarEmail:async (message: SentMail): Promise<{ error?: string }> => {
+        sendCalendarEmail: async (message: SentMail): Promise<{ error?: string }> => {
             if (fake.mailError) return { error: fake.mailError };
             fake.mails.push(message);
             return {};
         },
-        calendarFetch: async (url: string, init: RequestInit, options: { allowPrivate: boolean }): Promise<Response> => {
+        calendarFetch: async (
+            url: string,
+            init: RequestInit,
+            options: { allowPrivate: boolean }
+        ): Promise<Response> => {
             fake.fetches.push({ url, allowPrivate: options.allowPrivate });
             if (!options.allowPrivate && privateAddress(url)) throw new RefusedAddressError();
             return fake.fetchHandler(url, init);
@@ -210,7 +253,8 @@ export const host = {
             secretKeyId: "fake-key"
         }),
         listCalendarLinks: async () => [...fake.links],
-        calendarLinkUrl: async (provider: string) => `/account/connections/new?provider=${provider}&scope=calendar`,
+        calendarLinkUrl: async (provider: string) =>
+            `/account/connections/new?provider=${provider}&scope=calendar`,
         assignedTasks: async () => [...fake.tasks],
         scheduleTask: async (_actor: unknown, taskId: string, due: unknown) => {
             fake.scheduled.push({ taskId, due });

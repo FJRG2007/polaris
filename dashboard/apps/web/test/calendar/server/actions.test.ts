@@ -48,39 +48,90 @@ describe("calendar actions", () => {
 
     it("answers invalid input with a sentence instead of throwing, for every action", async () => {
         const answers = await Promise.all([
-            calendars.createCalendarAction({ name: "   ", color: "red", description: "", timezone: "", components: "VEVENT" }),
+            calendars.createCalendarAction({
+                name: "   ",
+                color: "red",
+                description: "",
+                timezone: "",
+                components: "VEVENT"
+            }),
             calendars.updateCalendarAction("not-a-uuid", {}),
             calendars.updateCalendarAction(calendar, { owner: "me" }),
             calendars.setDisplayAction(calendar, { hidden: "yes" }),
             calendars.reorderCalendarsAction(["x"]),
             calendars.trashCalendarAction(42),
             calendars.leaveCalendarAction(null),
-            events.openEventAction({ objectId: MISSING, recurrenceKey: null, zone: "Mars/Olympus" }),
+            events.openEventAction({
+                objectId: MISSING,
+                recurrenceKey: null,
+                zone: "Mars/Olympus"
+            }),
             events.openTodoAction("nope"),
             events.saveEventAction(undefined),
-            events.shiftEventAction({ objectId: MISSING, recurrenceKey: null, startDeltaMs: 1.5, endDeltaMs: 0, scope: "all", version: null, zone: ZONE }),
-            events.deleteEventAction({ objectId: MISSING, recurrenceKey: null, scope: "some", zone: ZONE }),
+            events.shiftEventAction({
+                objectId: MISSING,
+                recurrenceKey: null,
+                startDeltaMs: 1.5,
+                endDeltaMs: 0,
+                scope: "all",
+                version: null,
+                zone: ZONE
+            }),
+            events.deleteEventAction({
+                objectId: MISSING,
+                recurrenceKey: null,
+                scope: "some",
+                zone: ZONE
+            }),
             events.duplicateEventAction({ objectId: MISSING }),
-            events.respondToEventAction({ objectId: MISSING, recurrenceKey: null, partstat: "NEEDS-ACTION", zone: ZONE }),
+            events.respondToEventAction({
+                objectId: MISSING,
+                recurrenceKey: null,
+                partstat: "NEEDS-ACTION",
+                zone: ZONE
+            }),
             preferences.savePreferencesAction({ view: "decade" }),
             preferences.savePreferencesAction({ unknown: true }),
             sharing.listSharesAction(""),
-            sharing.shareCalendarAction({ calendarId: calendar, target: { kind: "org", id: MISSING }, access: "read" }),
+            sharing.shareCalendarAction({
+                calendarId: calendar,
+                target: { kind: "org", id: MISSING },
+                access: "read"
+            }),
             sharing.unshareCalendarAction(undefined),
             sharing.shareTargetsAction("x".repeat(101)),
             sharing.publishCalendarAction({ calendarId: calendar, mode: "everything" }),
             sharing.rotatePublicLinkAction(1),
             sharing.mailPublicLinkAction({ calendarId: calendar, email: "not an address" }),
-            sources.addFeedAction({ url: "https://asdf", name: "Feed", color: "#2ca02c", refreshMinutes: 60 }),
-            sources.addCalDavAction({ url: "https://cloud.example.test", username: "", password: "x" }),
+            sources.addFeedAction({
+                url: "https://asdf",
+                name: "Feed",
+                color: "#2ca02c",
+                refreshMinutes: 60
+            }),
+            sources.addCalDavAction({
+                url: "https://cloud.example.test",
+                username: "",
+                password: "x"
+            }),
             sources.addLinkedAccountAction("x"),
             sources.refreshSourceAction(""),
             sources.updateSourceAction({ id: MISSING, refreshMinutes: 1 }),
             sources.removeSourceAction(""),
             sources.resolveConflictAction({ objectId: MISSING, keep: "both", zone: ZONE }),
             tasks.scheduleTaskAction({ taskId: MISSING, due: { at: "tomorrow", timed: true } }),
-            tasks.saveTodoAction({ objectId: MISSING, version: "x", summary: "", due: null, status: "DONE", zone: ZONE }),
-            transfer.importCalendarAction({ target: { kind: "existing", calendarId: "x" }, text: "" }),
+            tasks.saveTodoAction({
+                objectId: MISSING,
+                version: "x",
+                summary: "",
+                due: null,
+                status: "DONE",
+                zone: ZONE
+            }),
+            transfer.importCalendarAction({
+                target: { kind: "existing", calendarId: "x" },
+                text: ""
+            }),
             trash.restoreTrashAction({ kind: "task", id: MISSING }),
             trash.purgeTrashAction({ kind: "event", id: "x" })
         ]);
@@ -102,7 +153,13 @@ describe("calendar actions", () => {
             scope: "all",
             version: null,
             zone: ZONE,
-            event: { calendarId: calendar, summary: "Backwards", start: world.at("2026-10-08T11:00:00"), end: world.at("2026-10-08T10:00:00"), allDay: false }
+            event: {
+                calendarId: calendar,
+                summary: "Backwards",
+                start: world.at("2026-10-08T11:00:00"),
+                end: world.at("2026-10-08T10:00:00"),
+                allDay: false
+            }
         });
         expect(answer).toEqual({ ok: false, error: world.enRule("validation.endBeforeStart") });
         fake.requestLocale = "es-ES";
@@ -112,24 +169,48 @@ describe("calendar actions", () => {
             scope: "all",
             version: null,
             zone: ZONE,
-            event: { calendarId: calendar, summary: "Backwards", start: world.at("2026-10-08T11:00:00"), end: world.at("2026-10-08T10:00:00"), allDay: false }
+            event: {
+                calendarId: calendar,
+                summary: "Backwards",
+                start: world.at("2026-10-08T11:00:00"),
+                end: world.at("2026-10-08T10:00:00"),
+                allDay: false
+            }
         });
         expect(spanish.ok).toBe(false);
-        expect((spanish as { error: string }).error).not.toBe(world.enRule("validation.endBeforeStart"));
+        expect((spanish as { error: string }).error).not.toBe(
+            world.enRule("validation.endBeforeStart")
+        );
     });
 
     it("passes a refusal through as written", async () => {
-        expect(await events.openEventAction({ objectId: MISSING, recurrenceKey: null, zone: ZONE })).toEqual({ ok: false, error: world.en("errors.eventNotFound") });
-        expect(await calendars.trashCalendarAction(MISSING)).toEqual({ ok: false, error: world.en("errors.calendarNotFound") });
+        expect(
+            await events.openEventAction({ objectId: MISSING, recurrenceKey: null, zone: ZONE })
+        ).toEqual({ ok: false, error: world.en("errors.eventNotFound") });
+        expect(await calendars.trashCalendarAction(MISSING)).toEqual({
+            ok: false,
+            error: world.en("errors.calendarNotFound")
+        });
         expect(logged).not.toHaveBeenCalled();
     });
 
     it("logs anything else and answers with the generic sentence", async () => {
-        const failing = vi.spyOn(db.prisma.calendar, "create").mockRejectedValueOnce(new Error("connection reset by 10.0.0.3:5432"));
-        const answer = await calendars.createCalendarAction({ name: "Side project", color: "#2ca02c", description: "", timezone: "", components: "VEVENT" });
+        const failing = vi
+            .spyOn(db.prisma.calendar, "create")
+            .mockRejectedValueOnce(new Error("connection reset by 10.0.0.3:5432"));
+        const answer = await calendars.createCalendarAction({
+            name: "Side project",
+            color: "#2ca02c",
+            description: "",
+            timezone: "",
+            components: "VEVENT"
+        });
         expect(answer).toEqual({ ok: false, error: world.en("errors.generic") });
         expect(JSON.stringify(answer)).not.toContain("10.0.0.3");
-        expect(logged).toHaveBeenCalledWith("polaris: a calendar action failed:", expect.any(Error));
+        expect(logged).toHaveBeenCalledWith(
+            "polaris: a calendar action failed:",
+            expect.any(Error)
+        );
         failing.mockRestore();
     });
 
@@ -139,12 +220,26 @@ describe("calendar actions", () => {
     });
 
     it("creates a calendar, answers its summary, and keeps settings", async () => {
-        const created = await calendars.createCalendarAction({ name: "  Side   project ", color: "#2CA02C", description: "", timezone: "Europe/Madrid", components: "VEVENT" });
+        const created = await calendars.createCalendarAction({
+            name: "  Side   project ",
+            color: "#2CA02C",
+            description: "",
+            timezone: "Europe/Madrid",
+            components: "VEVENT"
+        });
         expect(created.ok).toBe(true);
         if (!created.ok) return;
-        expect(created.calendar).toMatchObject({ name: "Side project", color: "#2ca02c", reach: "owner", writable: true });
+        expect(created.calendar).toMatchObject({
+            name: "Side project",
+            color: "#2ca02c",
+            reach: "owner",
+            writable: true
+        });
 
-        const saved = await preferences.savePreferencesAction({ view: "month", showWeekends: false });
+        const saved = await preferences.savePreferencesAction({
+            view: "month",
+            showWeekends: false
+        });
         expect(saved.ok && saved.preferences.view).toBe("month");
         const row = db.rows("calendarPreference")[0]!;
         const stamp = (row.updatedAt as Date).getTime();
@@ -155,7 +250,10 @@ describe("calendar actions", () => {
     });
 
     it("refuses saving a task in a zone nobody knows", async () => {
-        const todo = world.storeItem(calendar, engine.todoItem(engine.newTodo({ uid: "todo-1", summary: "Taxes" })));
+        const todo = world.storeItem(
+            calendar,
+            engine.todoItem(engine.newTodo({ uid: "todo-1", summary: "Taxes" }))
+        );
         const answer = await tasks.saveTodoAction({
             objectId: todo.id,
             version: (todo.updatedAt as Date).toISOString(),
@@ -170,7 +268,10 @@ describe("calendar actions", () => {
     });
 
     it("saves a calendar task and schedules a Tasks-app task", async () => {
-        const todo = world.storeItem(calendar, engine.todoItem(engine.newTodo({ uid: "todo-1", summary: "Taxes" })));
+        const todo = world.storeItem(
+            calendar,
+            engine.todoItem(engine.newTodo({ uid: "todo-1", summary: "Taxes" }))
+        );
         const answer = await tasks.saveTodoAction({
             objectId: todo.id,
             version: (todo.updatedAt as Date).toISOString(),
@@ -182,10 +283,22 @@ describe("calendar actions", () => {
         expect(answer).toEqual({ ok: true });
         const item = world.itemIn(db.byId("calendarObject", String(todo.id)));
         if (item.component !== "VTODO") throw new Error("a task expected");
-        expect(item.todo).toMatchObject({ summary: "File taxes", status: "COMPLETED", percent: 100, due: { date: "2026-10-20" } });
+        expect(item.todo).toMatchObject({
+            summary: "File taxes",
+            status: "COMPLETED",
+            percent: 100,
+            due: { date: "2026-10-20" }
+        });
         expect(item.todo.completed).not.toBeNull();
 
-        expect(await tasks.scheduleTaskAction({ taskId: MISSING, due: { at: "2026-10-20T09:00:00+02:00", timed: true } })).toEqual({ ok: true });
-        expect(fake.scheduled).toEqual([{ taskId: MISSING, due: { at: "2026-10-20T09:00:00+02:00", timed: true } }]);
+        expect(
+            await tasks.scheduleTaskAction({
+                taskId: MISSING,
+                due: { at: "2026-10-20T09:00:00+02:00", timed: true }
+            })
+        ).toEqual({ ok: true });
+        expect(fake.scheduled).toEqual([
+            { taskId: MISSING, due: { at: "2026-10-20T09:00:00+02:00", timed: true } }
+        ]);
     });
 });

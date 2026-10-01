@@ -41,7 +41,10 @@ export function vtimezoneId(text: string): string | null {
 }
 
 function intlClock(zone: string): ZoneClock {
-    return { toInstant: (wall) => wallToInstant(wall, zone), toWall: (instant) => instantToWall(instant, zone) };
+    return {
+        toInstant: (wall) => wallToInstant(wall, zone),
+        toWall: (instant) => instantToWall(instant, zone)
+    };
 }
 
 function icalClock(zone: ICAL.Timezone): ZoneClock {
@@ -49,7 +52,14 @@ function icalClock(zone: ICAL.Timezone): ZoneClock {
         toInstant(wall) {
             const time = ICAL.Time.fromData({ ...wall, isDate: false });
             const offset = zone.utcOffset(time);
-            const utc = Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second);
+            const utc = Date.UTC(
+                wall.year,
+                wall.month - 1,
+                wall.day,
+                wall.hour,
+                wall.minute,
+                wall.second
+            );
             return new Date(utc - offset * 1000);
         },
         toWall(instant) {
@@ -72,7 +82,11 @@ function icalClock(zone: ICAL.Timezone): ZoneClock {
  * `null` is floating time, read in `floatingZone`. `timezones` are the VTIMEZONE
  * blocks the item carried, consulted only for a TZID `Intl` cannot resolve.
  */
-export function clockFor(tzid: string | null, floatingZone: string, timezones: readonly string[] = []): ZoneClock {
+export function clockFor(
+    tzid: string | null,
+    floatingZone: string,
+    timezones: readonly string[] = []
+): ZoneClock {
     if (tzid === null) return intlClock(resolveZone(floatingZone) ?? "UTC");
     const known = resolveZone(tzid);
     if (known) return intlClock(known);
@@ -99,14 +113,24 @@ export function isDateOnly(value: DateValue): value is { readonly date: string }
  * reading: both mean "wherever the reader is". `timezones` are the item's
  * VTIMEZONE blocks, for a TZID `Intl` does not know.
  */
-export function valueToInstant(value: DateValue, floatingZone: string, timezones: readonly string[] = []): Date {
+export function valueToInstant(
+    value: DateValue,
+    floatingZone: string,
+    timezones: readonly string[] = []
+): Date {
     if ("date" in value) return clockFor(null, floatingZone).toInstant(parseWall(value.date));
     return clockFor(value.tzid, floatingZone, timezones).toInstant(parseWall(value.dateTime));
 }
 
 /** An instant written as a value in the same zone and kind as `like`. */
-export function instantToValue(instant: Date, like: DateValue, floatingZone: string, timezones: readonly string[] = []): DateValue {
-    if ("date" in like) return { date: formatWall(clockFor(null, floatingZone).toWall(instant)).slice(0, 10) };
+export function instantToValue(
+    instant: Date,
+    like: DateValue,
+    floatingZone: string,
+    timezones: readonly string[] = []
+): DateValue {
+    if ("date" in like)
+        return { date: formatWall(clockFor(null, floatingZone).toWall(instant)).slice(0, 10) };
     const wall = clockFor(like.tzid, floatingZone, timezones).toWall(instant);
     return { dateTime: formatWall(wall), tzid: like.tzid };
 }
@@ -122,5 +146,7 @@ export function addDays(date: string, days: number): string {
 export function daysBetween(from: string, to: string): number {
     const a = parseWall(from);
     const b = parseWall(to);
-    return Math.round((Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day)) / 86_400_000);
+    return Math.round(
+        (Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day)) / 86_400_000
+    );
 }

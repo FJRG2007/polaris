@@ -26,7 +26,15 @@ interface Outcome {
     readonly problems: readonly string[];
 }
 
-export function ImportExport({ calendars, zone, onImported }: { calendars: readonly CalendarSummary[] | null; zone: string; onImported: () => void }) {
+export function ImportExport({
+    calendars,
+    zone,
+    onImported
+}: {
+    calendars: readonly CalendarSummary[] | null;
+    zone: string;
+    onImported: () => void;
+}) {
     const t = useCalendarT();
     const ids = useId();
     const input = useRef<HTMLInputElement>(null);
@@ -53,7 +61,11 @@ export function ImportExport({ calendars, zone, onImported }: { calendars: reado
     };
 
     const nameOk = target !== NEW || nameSchema.safeParse(name).success;
-    const blocked = !file ? t("transferSection.chooseFile") : !nameOk ? t("transferSection.nameNeeded") : null;
+    const blocked = !file
+        ? t("transferSection.chooseFile")
+        : !nameOk
+          ? t("transferSection.nameNeeded")
+          : null;
 
     const run = async () => {
         if (!file || blocked || busy) return;
@@ -61,17 +73,27 @@ export function ImportExport({ calendars, zone, onImported }: { calendars: reado
         setProblem(null);
         try {
             const used = (calendars ?? []).map((calendar) => calendar.ownColor);
-            const color = CALENDAR_COLORS.find((candidate) => !used.includes(candidate)) ?? CALENDAR_COLORS[0];
+            const color =
+                CALENDAR_COLORS.find((candidate) => !used.includes(candidate)) ??
+                CALENDAR_COLORS[0];
             const answer = await unwrap(
                 () =>
                     transferActions.importCalendarAction({
-                        target: target === NEW ? { kind: "new", name, color } : { kind: "existing", calendarId: target },
+                        target:
+                            target === NEW
+                                ? { kind: "new", name, color }
+                                : { kind: "existing", calendarId: target },
                         text: file.text,
                         zone
                     }),
                 t("screen.failed")
             );
-            setOutcome({ calendarId: answer.calendarId, imported: answer.imported, skipped: answer.skipped, problems: answer.problems });
+            setOutcome({
+                calendarId: answer.calendarId,
+                imported: answer.imported,
+                skipped: answer.skipped,
+                problems: answer.problems
+            });
             setFile(null);
             if (input.current) input.current.value = "";
             onImported();
@@ -99,11 +121,25 @@ export function ImportExport({ calendars, zone, onImported }: { calendars: reado
                         setDragging(false);
                         void read(event.dataTransfer.files[0]);
                     }}
-                    className={cn("flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center", dragging ? "border-foreground" : "border-border")}
+                    className={cn(
+                        "flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center",
+                        dragging ? "border-foreground" : "border-border"
+                    )}
                 >
                     <FileUp aria-hidden className="size-5 text-foreground-subtle" />
-                    <p className="text-xs text-muted-foreground">{file ? t("transferSection.chosen", { name: file.name }) : t("transferSection.drop")}</p>
-                    <input ref={input} id={`${ids}-file`} type="file" accept=".ics,.ical,.ifb,.json,.jcal,text/calendar,application/calendar+json" className="sr-only" onChange={(event) => void read(event.target.files?.[0])} />
+                    <p className="text-xs text-muted-foreground">
+                        {file
+                            ? t("transferSection.chosen", { name: file.name })
+                            : t("transferSection.drop")}
+                    </p>
+                    <input
+                        ref={input}
+                        id={`${ids}-file`}
+                        type="file"
+                        accept=".ics,.ical,.ifb,.json,.jcal,text/calendar,application/calendar+json"
+                        className="sr-only"
+                        onChange={(event) => void read(event.target.files?.[0])}
+                    />
                     <Button size="sm" variant="outline" onClick={() => input.current?.click()}>
                         {t("transferSection.pick")}
                     </Button>
@@ -115,16 +151,34 @@ export function ImportExport({ calendars, zone, onImported }: { calendars: reado
                             aria-label={t("transferSection.into")}
                             value={target}
                             onValueChange={setTarget}
-                            options={[{ value: NEW, label: t("transferSection.newCalendar") }, ...writable.map((calendar) => ({ value: calendar.id, label: calendar.name, icon: <ColorDot color={calendar.color} /> }))]}
+                            options={[
+                                { value: NEW, label: t("transferSection.newCalendar") },
+                                ...writable.map((calendar) => ({
+                                    value: calendar.id,
+                                    label: calendar.name,
+                                    icon: <ColorDot color={calendar.color} />
+                                }))
+                            ]}
                         />
                     </label>
                     {target === NEW ? (
                         <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
                             {t("transferSection.newName")}
-                            <Input value={name} maxLength={120} required aria-required onChange={(event) => setName(event.target.value)} />
+                            <Input
+                                value={name}
+                                maxLength={120}
+                                required
+                                aria-required
+                                onChange={(event) => setName(event.target.value)}
+                            />
                         </label>
                     ) : null}
-                    <Button aria-disabled={blocked !== null || busy} title={blocked ?? undefined} className={cn(blocked !== null && "opacity-50")} onClick={() => void run()}>
+                    <Button
+                        aria-disabled={blocked !== null || busy}
+                        title={blocked ?? undefined}
+                        className={cn(blocked !== null && "opacity-50")}
+                        onClick={() => void run()}
+                    >
                         {busy ? t("transferSection.importing") : t("transferSection.run")}
                     </Button>
                 </div>
@@ -134,8 +188,16 @@ export function ImportExport({ calendars, zone, onImported }: { calendars: reado
                     </p>
                 ) : null}
                 {outcome ? (
-                    <div role="status" className="flex flex-col gap-1 rounded-md border border-border p-3 text-xs">
-                        <p className="text-foreground tabular-nums">{t("transferSection.done", { imported: outcome.imported, skipped: outcome.skipped })}</p>
+                    <div
+                        role="status"
+                        className="flex flex-col gap-1 rounded-md border border-border p-3 text-xs"
+                    >
+                        <p className="text-foreground tabular-nums">
+                            {t("transferSection.done", {
+                                imported: outcome.imported,
+                                skipped: outcome.skipped
+                            })}
+                        </p>
                         {outcome.problems.length > 0 ? (
                             <ul className="list-disc pl-4 text-muted-foreground">
                                 {outcome.problems.slice(0, 20).map((line, index) => (
@@ -149,11 +211,18 @@ export function ImportExport({ calendars, zone, onImported }: { calendars: reado
 
             <section className="flex flex-col gap-2" aria-labelledby={`${ids}-export`}>
                 <div className="flex flex-wrap items-center gap-2">
-                    <h3 id={`${ids}-export`} className="min-w-0 flex-1 text-[0.8125rem] font-medium">
+                    <h3
+                        id={`${ids}-export`}
+                        className="min-w-0 flex-1 text-[0.8125rem] font-medium"
+                    >
                         {t("transferSection.export")}
                     </h3>
                     <Button asChild size="sm" variant="outline">
-                        <a href="/api/calendar/export/all" download title={t("transferSection.everythingHint")}>
+                        <a
+                            href="/api/calendar/export/all"
+                            download
+                            title={t("transferSection.everythingHint")}
+                        >
                             <Download />
                             {t("transferSection.everything")}
                         </a>
@@ -169,13 +238,28 @@ export function ImportExport({ calendars, zone, onImported }: { calendars: reado
                         {calendars
                             .filter((calendar) => calendar.reach !== "freebusy")
                             .map((calendar) => (
-                                <li key={calendar.id} className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover">
+                                <li
+                                    key={calendar.id}
+                                    className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover"
+                                >
                                     <ColorDot color={calendar.color} />
-                                    <span className="min-w-0 flex-1 truncate text-[0.8125rem]" title={calendar.name}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-[0.8125rem]"
+                                        title={calendar.name}
+                                    >
                                         {calendar.name}
                                     </span>
                                     <Button asChild size="icon-sm" variant="ghost">
-                                        <a href={`/api/calendar/export/${calendar.id}`} download aria-label={t("transferSection.download", { name: calendar.name })} title={t("transferSection.download", { name: calendar.name })}>
+                                        <a
+                                            href={`/api/calendar/export/${calendar.id}`}
+                                            download
+                                            aria-label={t("transferSection.download", {
+                                                name: calendar.name
+                                            })}
+                                            title={t("transferSection.download", {
+                                                name: calendar.name
+                                            })}
+                                        >
                                             <Download />
                                         </a>
                                     </Button>

@@ -29,7 +29,10 @@ export function browserZone(): string {
  * The zone the calendar is drawn in: the calendar's own setting, then the
  * account's display zone, then the browser's.
  */
-export function displayZone(calendarSetting: string, accountSetting: string | null | undefined): string {
+export function displayZone(
+    calendarSetting: string,
+    accountSetting: string | null | undefined
+): string {
     if (calendarSetting !== "auto") {
         const chosen = engine.resolveZone(calendarSetting);
         if (chosen) return chosen;
@@ -125,7 +128,12 @@ export interface DayWindow {
 export const LIST_DAYS = 30;
 
 /** The days a view shows around `anchor`, the way the grid lays them out. */
-export function viewWindow(view: CalendarViewName, anchor: DayString, firstDay: number, customDays: number): DayWindow {
+export function viewWindow(
+    view: CalendarViewName,
+    anchor: DayString,
+    firstDay: number,
+    customDays: number
+): DayWindow {
     switch (view) {
         case "day":
             return { start: anchor, end: addDays(anchor, 1) };
@@ -141,14 +149,22 @@ export function viewWindow(view: CalendarViewName, anchor: DayString, firstDay: 
             return { start, end: addDays(start, 42) };
         }
         case "year":
-            return { start: `${anchor.slice(0, 4)}-01-01`, end: `${String(Number(anchor.slice(0, 4)) + 1).padStart(4, "0")}-01-01` };
+            return {
+                start: `${anchor.slice(0, 4)}-01-01`,
+                end: `${String(Number(anchor.slice(0, 4)) + 1).padStart(4, "0")}-01-01`
+            };
         case "list":
             return { start: anchor, end: addDays(anchor, LIST_DAYS) };
     }
 }
 
 /** The anchor one step before or after, for previous and next. */
-export function stepAnchor(view: CalendarViewName, anchor: DayString, direction: 1 | -1, customDays: number): DayString {
+export function stepAnchor(
+    view: CalendarViewName,
+    anchor: DayString,
+    direction: 1 | -1,
+    customDays: number
+): DayString {
     switch (view) {
         case "day":
             return addDays(anchor, direction);
@@ -183,8 +199,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *  calendar as it was left. */
 export function parseCalendarPath(path: readonly string[]): CalendarRoute {
     const [first, second] = path;
-    if (first === "e" && second && UUID.test(second)) return { view: null, date: null, objectId: second.toLowerCase() };
-    const view = (VIEWS as readonly string[]).includes(first ?? "") ? (first as CalendarViewName) : null;
+    if (first === "e" && second && UUID.test(second))
+        return { view: null, date: null, objectId: second.toLowerCase() };
+    const view = (VIEWS as readonly string[]).includes(first ?? "")
+        ? (first as CalendarViewName)
+        : null;
     const date = second && isDayString(second) ? second : null;
     return { view, date, objectId: null };
 }
@@ -219,35 +238,70 @@ export function dayDate(day: DayString): Date {
 }
 
 /** Intl for a day string, never shifted by a zone. */
-export function formatDay(day: DayString, locale: string, options: Intl.DateTimeFormatOptions): string {
+export function formatDay(
+    day: DayString,
+    locale: string,
+    options: Intl.DateTimeFormatOptions
+): string {
     return new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(dayDate(day));
 }
 
 /** Intl for an instant, in the display zone. */
-export function formatInstant(instant: string | Date, locale: string, zone: string, options: Intl.DateTimeFormatOptions): string {
-    return new Intl.DateTimeFormat(locale, { ...options, timeZone: zone }).format(new Date(instant));
+export function formatInstant(
+    instant: string | Date,
+    locale: string,
+    zone: string,
+    options: Intl.DateTimeFormatOptions
+): string {
+    return new Intl.DateTimeFormat(locale, { ...options, timeZone: zone }).format(
+        new Date(instant)
+    );
 }
 
 /** The heading of a view: "September 2026", "28 Sep - 4 Oct 2026", "2026". */
-export function windowLabel(view: CalendarViewName, anchor: DayString, window: DayWindow, locale: string): string {
+export function windowLabel(
+    view: CalendarViewName,
+    anchor: DayString,
+    window: DayWindow,
+    locale: string
+): string {
     if (view === "year") return formatDay(anchor, locale, { year: "numeric" });
     if (view === "month") return formatDay(anchor, locale, { month: "long", year: "numeric" });
-    if (view === "day") return formatDay(anchor, locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    if (view === "day")
+        return formatDay(anchor, locale, {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+        });
     const last = addDays(window.end, -1);
-    const format = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+    const format = new Intl.DateTimeFormat(locale, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC"
+    });
     return format.formatRange(dayDate(window.start), dayDate(last));
 }
 
 /** The weeks of a month for a small month grid: six rows of seven days. */
 export function monthGrid(anchor: DayString, firstDay: number): DayString[][] {
     const start = weekStartOf(firstOfMonth(anchor), firstDay);
-    return Array.from({ length: 6 }, (_, row) => Array.from({ length: 7 }, (__, column) => addDays(start, row * 7 + column)));
+    return Array.from({ length: 6 }, (_, row) =>
+        Array.from({ length: 7 }, (__, column) => addDays(start, row * 7 + column))
+    );
 }
 
 /** Weekday names starting on `firstDay`, from Intl. */
-export function weekdayLabels(locale: string, firstDay: number, width: "narrow" | "short" | "long"): string[] {
+export function weekdayLabels(
+    locale: string,
+    firstDay: number,
+    width: "narrow" | "short" | "long"
+): string[] {
     // 2024-01-07 was a Sunday.
-    return Array.from({ length: 7 }, (_, index) => formatDay(addDays("2024-01-07", (firstDay + index) % 7), locale, { weekday: width }));
+    return Array.from({ length: 7 }, (_, index) =>
+        formatDay(addDays("2024-01-07", (firstDay + index) % 7), locale, { weekday: width })
+    );
 }
 
 /** The time zone a "GMT+02:00 Europe/Madrid" label names, for pickers. */

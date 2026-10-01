@@ -46,7 +46,11 @@ export function normalizeEmail(value: string): string {
 function realDate(text: string): boolean {
     const [year, month, day] = text.split("-").map(Number);
     const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
-    return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day;
+    return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() + 1 === month &&
+        date.getUTCDate() === day
+    );
 }
 
 /** `YYYY-MM-DD`, a day that exists. */
@@ -70,7 +74,10 @@ const tzidSchema = z
     .trim()
     .min(1)
     .max(100)
-    .refine((zone) => !/[\u0000-\u001f\u007f]/.test(zone) && resolveZone(zone) !== null, SCHEMA_MESSAGES.unknownZone)
+    .refine(
+        (zone) => !/[\u0000-\u001f\u007f]/.test(zone) && resolveZone(zone) !== null,
+        SCHEMA_MESSAGES.unknownZone
+    )
     .nullable();
 
 export const dateValueSchema = z.union([
@@ -96,13 +103,20 @@ export const alarmSchema = z.object({
     description: z.string().trim().max(1000).default("")
 });
 
-const emailSchema = z.preprocess((value) => (typeof value === "string" ? normalizeEmail(value) : value), z.string().email().max(320));
+const emailSchema = z.preprocess(
+    (value) => (typeof value === "string" ? normalizeEmail(value) : value),
+    z.string().email().max(320)
+);
 
 export const attendeeSchema = z.object({
     email: emailSchema,
     name: z.string().trim().max(200).default(""),
-    role: z.enum(["CHAIR", "REQ-PARTICIPANT", "OPT-PARTICIPANT", "NON-PARTICIPANT"]).default("REQ-PARTICIPANT"),
-    partstat: z.enum(["NEEDS-ACTION", "ACCEPTED", "DECLINED", "TENTATIVE", "DELEGATED"]).default("NEEDS-ACTION"),
+    role: z
+        .enum(["CHAIR", "REQ-PARTICIPANT", "OPT-PARTICIPANT", "NON-PARTICIPANT"])
+        .default("REQ-PARTICIPANT"),
+    partstat: z
+        .enum(["NEEDS-ACTION", "ACCEPTED", "DECLINED", "TENTATIVE", "DELEGATED"])
+        .default("NEEDS-ACTION"),
     rsvp: z.boolean().default(true),
     type: z.enum(["INDIVIDUAL", "GROUP", "RESOURCE", "ROOM", "UNKNOWN"]).default("INDIVIDUAL")
 });
@@ -112,10 +126,21 @@ const weekdaySchema = z.enum(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]);
 export const ruleEditorSchema = z.object({
     frequency: z.enum(["NONE", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
     interval: z.number().int().min(1).max(999),
-    weekdays: z.array(weekdaySchema).max(7).refine((days) => new Set(days).size === days.length, SCHEMA_MESSAGES.weekdayTwice),
+    weekdays: z
+        .array(weekdaySchema)
+        .max(7)
+        .refine((days) => new Set(days).size === days.length, SCHEMA_MESSAGES.weekdayTwice),
     monthlyMode: z.enum(["day", "ordinal"]),
     monthDays: z.array(z.number().int().min(1).max(31)).max(31),
-    ordinal: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(-1), z.literal(-2)]),
+    ordinal: z.union([
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+        z.literal(5),
+        z.literal(-1),
+        z.literal(-2)
+    ]),
     ordinalDay: z.union([weekdaySchema, z.enum(["day", "weekday", "weekend"])]),
     months: z.array(z.number().int().min(1).max(12)).max(12),
     end: z.discriminatedUnion("kind", [
@@ -187,7 +212,10 @@ export const eventInputSchema = z
             .array(attendeeSchema)
             .max(200)
             .default([])
-            .refine((list) => new Set(list.map((attendee) => attendee.email)).size === list.length, SCHEMA_MESSAGES.invitedTwice),
+            .refine(
+                (list) => new Set(list.map((attendee) => attendee.email)).size === list.length,
+                SCHEMA_MESSAGES.invitedTwice
+            ),
         categories: z.array(z.string().trim().min(1).max(100)).max(20).default([]),
         color: z
             .string()
@@ -208,29 +236,45 @@ export const eventInputSchema = z
         const startIsDate = "date" in input.start;
         const endIsDate = "date" in input.end;
         if (startIsDate !== input.allDay || endIsDate !== input.allDay) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["allDay"], message: SCHEMA_MESSAGES.allDayMismatch });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["allDay"],
+                message: SCHEMA_MESSAGES.allDayMismatch
+            });
             return;
         }
         const start = instantOf(input.start);
         const end = instantOf(input.end);
         if (start === null || end === null) return;
         if (end < start) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["end"], message: SCHEMA_MESSAGES.endBeforeStart });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["end"],
+                message: SCHEMA_MESSAGES.endBeforeStart
+            });
         }
     });
 
 export type EventInput = z.infer<typeof eventInputSchema>;
 
 const hoursRangeSchema = z
-    .object({ from: z.string().regex(hhmm, SCHEMA_MESSAGES.timeForm), to: z.string().regex(hhmm, SCHEMA_MESSAGES.timeForm) })
-    .refine((range) => range.from < range.to, { message: SCHEMA_MESSAGES.endBeforeStart, path: ["to"] });
+    .object({
+        from: z.string().regex(hhmm, SCHEMA_MESSAGES.timeForm),
+        to: z.string().regex(hhmm, SCHEMA_MESSAGES.timeForm)
+    })
+    .refine((range) => range.from < range.to, {
+        message: SCHEMA_MESSAGES.endBeforeStart,
+        path: ["to"]
+    });
 
 const dayHoursSchema = z
     .array(hoursRangeSchema)
     .max(10)
     .refine((ranges) => {
         const sorted = [...ranges].sort((a, b) => (a.from < b.from ? -1 : 1));
-        return sorted.every((range, index) => index === 0 || (sorted[index - 1]?.to ?? "") <= range.from);
+        return sorted.every(
+            (range, index) => index === 0 || (sorted[index - 1]?.to ?? "") <= range.from
+        );
     }, SCHEMA_MESSAGES.rangesOverlap);
 
 /** Working hours per weekday, "0" = Sunday; a missing day is not worked. */
@@ -251,5 +295,11 @@ export const availabilitySchema = z.object({
         .record(z.string(), dayHoursSchema)
         .default({})
         .refine((overrides) => Object.keys(overrides).length <= 366, SCHEMA_MESSAGES.tooManyDates)
-        .refine((overrides) => Object.keys(overrides).every((date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && realDate(date)), SCHEMA_MESSAGES.noSuchDate)
+        .refine(
+            (overrides) =>
+                Object.keys(overrides).every(
+                    (date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && realDate(date)
+                ),
+            SCHEMA_MESSAGES.noSuchDate
+        )
 });

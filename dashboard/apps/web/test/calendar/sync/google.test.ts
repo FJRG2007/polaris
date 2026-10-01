@@ -31,8 +31,18 @@ function seed(fake: Fake) {
         start: { dateTime: "2026-10-05T10:00:00+02:00", timeZone: "Europe/Madrid" },
         end: { dateTime: "2026-10-05T11:00:00+02:00", timeZone: "Europe/Madrid" },
         attendees: [
-            { email: "Bob@Example.test", displayName: "Bob", responseStatus: "tentative", optional: true },
-            { email: "room-1@resource.example.test", displayName: "Room 1", responseStatus: "accepted", resource: true }
+            {
+                email: "Bob@Example.test",
+                displayName: "Bob",
+                responseStatus: "tentative",
+                optional: true
+            },
+            {
+                email: "room-1@resource.example.test",
+                displayName: "Room 1",
+                responseStatus: "accepted",
+                resource: true
+            }
         ],
         organizer: { email: "me@example.test", displayName: "Me" },
         reminders: { useDefault: true },
@@ -51,7 +61,13 @@ function seed(fake: Fake) {
         summary: "Holiday",
         start: { date: "2026-10-10" },
         end: { date: "2026-10-11" },
-        reminders: { useDefault: false, overrides: [{ method: "email", minutes: 1440 }, { method: "popup", minutes: 30 }] }
+        reminders: {
+            useDefault: false,
+            overrides: [
+                { method: "email", minutes: 1440 },
+                { method: "popup", minutes: 30 }
+            ]
+        }
     });
     fake.put({
         id: "m",
@@ -96,20 +112,35 @@ describe("createGoogleProvider", () => {
         fake = createFakeGoogle({ pageSize: 3 });
         seed(fake);
         provider = createGoogleProvider({ accessToken: fake.accessToken, fetcher: fake.fetcher });
-        first = await provider.pull({ remoteId: fake.calendarId, syncToken: "", ctag: "", known: new Map() });
+        first = await provider.pull({
+            remoteId: fake.calendarId,
+            syncToken: "",
+            ctag: "",
+            known: new Map()
+        });
     });
 
     it("lists calendars with their access, colour and zone", async () => {
         const calendars = await provider.listCalendars();
-        expect(calendars.map((c) => [c.remoteId, c.name, c.color, c.readOnly, c.timezone])).toEqual([
-            [fake.calendarId, "Me", "#9fe1e7", false, "Europe/Madrid"],
-            ["holidays@group.v.calendar.google.com", "Festivos", "#16a765", true, "Europe/Madrid"],
-            ["busy@example.test", "Busy", null, true, null]
-        ]);
+        expect(calendars.map((c) => [c.remoteId, c.name, c.color, c.readOnly, c.timezone])).toEqual(
+            [
+                [fake.calendarId, "Me", "#9fe1e7", false, "Europe/Madrid"],
+                [
+                    "holidays@group.v.calendar.google.com",
+                    "Festivos",
+                    "#16a765",
+                    true,
+                    "Europe/Madrid"
+                ],
+                ["busy@example.test", "Busy", null, true, null]
+            ]
+        );
     });
 
     it("does a full sync over two pages and groups a series into one object", () => {
-        const listings = fake.requests.filter((r) => r.url.pathname.endsWith("/events") && !r.url.searchParams.has("iCalUID"));
+        const listings = fake.requests.filter(
+            (r) => r.url.pathname.endsWith("/events") && !r.url.searchParams.has("iCalUID")
+        );
         expect(listings).toHaveLength(2);
         expect(listings[0]!.url.searchParams.get("showDeleted")).toBe("true");
         expect(listings[0]!.url.searchParams.get("singleEvents")).toBe("false");
@@ -120,18 +151,33 @@ describe("createGoogleProvider", () => {
         expect(first.changed.map((o) => o.href).sort()).toEqual(["a", "b", "m"]);
 
         const series = first.changed.find((o) => o.href === "m")!;
-        expect(series.etag).toBe([fake.get("m")!.etag, fake.get("m_20261008T070000Z")!.etag, fake.get("m_20261015T070000Z")!.etag].join(","));
+        expect(series.etag).toBe(
+            [
+                fake.get("m")!.etag,
+                fake.get("m_20261008T070000Z")!.etag,
+                fake.get("m_20261015T070000Z")!.etag
+            ].join(",")
+        );
         const item = eventsOf(series.ics);
         expect(item.uid).toBe("m@google.com");
         expect(item.master!.rule!.frequency).toBe("WEEKLY");
-        expect(item.master!.start).toEqual({ dateTime: "2026-10-01T09:00:00", tzid: "Europe/Madrid" });
+        expect(item.master!.start).toEqual({
+            dateTime: "2026-10-01T09:00:00",
+            tzid: "Europe/Madrid"
+        });
         expect(item.master!.exdates).toEqual([
             { dateTime: "2026-10-22T09:00:00", tzid: "Europe/Madrid" },
             { dateTime: "2026-10-15T09:00:00", tzid: "Europe/Madrid" }
         ]);
         expect(item.overrides).toHaveLength(1);
-        expect(item.overrides[0]!.recurrenceId).toEqual({ dateTime: "2026-10-08T09:00:00", tzid: "Europe/Madrid" });
-        expect(item.overrides[0]!.start).toEqual({ dateTime: "2026-10-08T11:00:00", tzid: "Europe/Madrid" });
+        expect(item.overrides[0]!.recurrenceId).toEqual({
+            dateTime: "2026-10-08T09:00:00",
+            tzid: "Europe/Madrid"
+        });
+        expect(item.overrides[0]!.start).toEqual({
+            dateTime: "2026-10-08T11:00:00",
+            tzid: "Europe/Madrid"
+        });
         expect(item.overrides[0]!.summary).toBe("Standup (moved)");
     });
 
@@ -173,32 +219,59 @@ describe("createGoogleProvider", () => {
             originalStartTime: { dateTime: "2026-10-29T09:00:00+01:00", timeZone: "Europe/Madrid" }
         });
         fake.cancel("b");
-        const next = await provider.pull({ remoteId: fake.calendarId, syncToken: first.syncToken, ctag: "", known });
+        const next = await provider.pull({
+            remoteId: fake.calendarId,
+            syncToken: first.syncToken,
+            ctag: "",
+            known
+        });
         expect(next.full).toBe(false);
         expect(next.syncToken).toBe("tok-8");
         expect(next.removed).toEqual(["b"]);
         expect(next.changed.map((o) => o.href).sort()).toEqual(["a", "m"]);
-        expect(eventsOf(next.changed.find((o) => o.href === "a")!.ics).master!.summary).toBe("Dentist (moved)");
+        expect(eventsOf(next.changed.find((o) => o.href === "a")!.ics).master!.summary).toBe(
+            "Dentist (moved)"
+        );
         const series = eventsOf(next.changed.find((o) => o.href === "m")!.ics);
-        expect(series.master!.exdates).toContainEqual({ dateTime: "2026-10-29T09:00:00", tzid: "Europe/Madrid" });
+        expect(series.master!.exdates).toContainEqual({
+            dateTime: "2026-10-29T09:00:00",
+            tzid: "Europe/Madrid"
+        });
         expect(series.master!.exdates).toHaveLength(3);
         expect(series.overrides).toHaveLength(1);
     });
 
     it("throws SyncGoneError on an expired token", async () => {
         fake.expire(first.syncToken);
-        await expect(provider.pull({ remoteId: fake.calendarId, syncToken: first.syncToken, ctag: "", known: new Map() })).rejects.toBeInstanceOf(SyncGoneError);
+        await expect(
+            provider.pull({
+                remoteId: fake.calendarId,
+                syncToken: first.syncToken,
+                ctag: "",
+                known: new Map()
+            })
+        ).rejects.toBeInstanceOf(SyncGoneError);
     });
 
     it("updates with If-Match, invites attendees, and answers a stale etag as a conflict", async () => {
         const a = first.changed.find((o) => o.href === "a")!;
         fake.put({ ...fake.get("a")!, summary: "Changed on the phone" });
-        await expect(provider.put({ remoteId: fake.calendarId }, { href: "a", etag: a.etag, ics: a.ics, uid: "a@google.com" })).rejects.toBeInstanceOf(SyncConflictError);
+        await expect(
+            provider.put(
+                { remoteId: fake.calendarId },
+                { href: "a", etag: a.etag, ics: a.ics, uid: "a@google.com" }
+            )
+        ).rejects.toBeInstanceOf(SyncConflictError);
 
         const current = fake.get("a")!.etag;
         const edited = a.ics.replace("SUMMARY:Dentist", "SUMMARY:Dentist, again");
-        const written = await provider.put({ remoteId: fake.calendarId }, { href: "a", etag: current, ics: edited, uid: "a@google.com" });
-        const patch = fake.requests.find((r) => r.method === "PATCH" && r.headers["if-match"] === current)!;
+        const written = await provider.put(
+            { remoteId: fake.calendarId },
+            { href: "a", etag: current, ics: edited, uid: "a@google.com" }
+        );
+        const patch = fake.requests.find(
+            (r) => r.method === "PATCH" && r.headers["if-match"] === current
+        )!;
         expect(patch.url.searchParams.get("sendUpdates")).toBe("all");
         expect(patch.body).toMatchObject({
             summary: "Dentist, again",
@@ -208,8 +281,18 @@ describe("createGoogleProvider", () => {
             reminders: { useDefault: true },
             start: { dateTime: "2026-10-05T10:00:00", timeZone: "Europe/Madrid" },
             attendees: [
-                { email: "bob@example.test", displayName: "Bob", optional: true, responseStatus: "tentative" },
-                { email: "room-1@resource.example.test", displayName: "Room 1", resource: true, responseStatus: "accepted" }
+                {
+                    email: "bob@example.test",
+                    displayName: "Bob",
+                    optional: true,
+                    responseStatus: "tentative"
+                },
+                {
+                    email: "room-1@resource.example.test",
+                    displayName: "Room 1",
+                    resource: true,
+                    responseStatus: "accepted"
+                }
             ]
         });
         expect(written).toEqual({ href: "a", etag: fake.get("a")!.etag });
@@ -240,7 +323,10 @@ describe("createGoogleProvider", () => {
             "END:VCALENDAR",
             ""
         ].join("\r\n");
-        const written = await provider.put({ remoteId: fake.calendarId }, { href: null, etag: null, ics, uid: "new-series@polaris.test" });
+        const written = await provider.put(
+            { remoteId: fake.calendarId },
+            { href: null, etag: null, ics, uid: "new-series@polaris.test" }
+        );
         const insert = fake.requests.find((r) => r.method === "POST")!;
         expect(insert.url.searchParams.get("sendUpdates")).toBe("none");
         expect(insert.body).toMatchObject({
@@ -250,12 +336,22 @@ describe("createGoogleProvider", () => {
             start: { dateTime: "2026-11-02T10:00:00", timeZone: "Europe/Madrid" }
         });
         const instance = fake.requests.find((r) => r.method === "PATCH")!;
-        expect(instance.url.pathname).toMatch(new RegExp(`/events/${written.href}_20261104T090000Z$`));
-        expect(instance.body).toMatchObject({ summary: "Daily (late)", start: { dateTime: "2026-11-04T12:00:00", timeZone: "Europe/Madrid" } });
+        expect(instance.url.pathname).toMatch(
+            new RegExp(`/events/${written.href}_20261104T090000Z$`)
+        );
+        expect(instance.body).toMatchObject({
+            summary: "Daily (late)",
+            start: { dateTime: "2026-11-04T12:00:00", timeZone: "Europe/Madrid" }
+        });
         expect(instance.body).not.toHaveProperty("recurrence");
         expect(written.etag.split(",")).toHaveLength(2);
 
-        const pulled = await provider.pull({ remoteId: fake.calendarId, syncToken: "", ctag: "", known: new Map() });
+        const pulled = await provider.pull({
+            remoteId: fake.calendarId,
+            syncToken: "",
+            ctag: "",
+            known: new Map()
+        });
         const object = pulled.changed.find((o) => o.href === written.href)!;
         expect(object.etag).toBe(written.etag);
         expect(eventsOf(object.ics).overrides[0]!.summary).toBe("Daily (late)");
@@ -292,14 +388,27 @@ describe("createGoogleProvider", () => {
             fetcher: async (url, init) => {
                 if ((init.method ?? "GET") === "PATCH") throw new Error("socket hang up");
                 const response = await fake.fetcher(url, init);
-                if (init.method === "POST") masterId = ((await response.clone().json()) as { id: string }).id;
+                if (init.method === "POST")
+                    masterId = ((await response.clone().json()) as { id: string }).id;
                 return response;
             }
         });
-        await expect(interrupted.put(target, { href: null, etag: null, ics, uid: "half-written@polaris.test" })).rejects.toBeInstanceOf(SyncUnreachableError);
+        await expect(
+            interrupted.put(target, {
+                href: null,
+                etag: null,
+                ics,
+                uid: "half-written@polaris.test"
+            })
+        ).rejects.toBeInstanceOf(SyncUnreachableError);
         expect(fake.get(masterId)).toMatchObject({ iCalUID: "half-written@polaris.test" });
 
-        const written = await provider.put(target, { href: null, etag: null, ics, uid: "half-written@polaris.test" });
+        const written = await provider.put(target, {
+            href: null,
+            etag: null,
+            ics,
+            uid: "half-written@polaris.test"
+        });
         expect(written.href).toBe(masterId);
         expect(fake.requests.filter((r) => r.method === "POST")).toHaveLength(2);
         expect(fake.get(`${masterId}_20261104T090000Z`)).toMatchObject({ summary: "Daily (late)" });
@@ -315,16 +424,35 @@ describe("createGoogleProvider", () => {
     });
 
     it("treats rate limits as retryable, not as a broken sign-in", async () => {
-        fake.failWith(new Response(JSON.stringify({ error: { code: 403, message: "Rate Limit Exceeded", errors: [{ reason: "rateLimitExceeded" }] } }), { status: 403 }));
+        fake.failWith(
+            new Response(
+                JSON.stringify({
+                    error: {
+                        code: 403,
+                        message: "Rate Limit Exceeded",
+                        errors: [{ reason: "rateLimitExceeded" }]
+                    }
+                }),
+                { status: 403 }
+            )
+        );
         await expect(provider.listCalendars()).rejects.toBeInstanceOf(SyncUnreachableError);
         fake.failWith(new Response("{}", { status: 429, headers: { "Retry-After": "30" } }));
         const error = await provider.listCalendars().catch((e: unknown) => e);
         expect(error).toBeInstanceOf(SyncUnreachableError);
         expect((error as SyncUnreachableError).retryAfterSeconds).toBe(30);
 
-        const signedOut = createGoogleProvider({ accessToken: async () => "revoked", fetcher: fake.fetcher });
+        const signedOut = createGoogleProvider({
+            accessToken: async () => "revoked",
+            fetcher: fake.fetcher
+        });
         await expect(signedOut.listCalendars()).rejects.toBeInstanceOf(SyncAuthError);
-        const failing = createGoogleProvider({ accessToken: async () => { throw new Error("invalid_grant"); }, fetcher: fake.fetcher });
+        const failing = createGoogleProvider({
+            accessToken: async () => {
+                throw new Error("invalid_grant");
+            },
+            fetcher: fake.fetcher
+        });
         await expect(failing.listCalendars()).rejects.toBeInstanceOf(SyncAuthError);
     });
 });

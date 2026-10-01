@@ -24,7 +24,11 @@ export interface Upcoming {
     readonly href: string;
 }
 
-export async function upcomingEvents(userId: string, limit: number, now = new Date()): Promise<Upcoming[]> {
+export async function upcomingEvents(
+    userId: string,
+    limit: number,
+    now = new Date()
+): Promise<Upcoming[]> {
     const person = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, email: true, name: true, isAdmin: true }
@@ -32,15 +36,25 @@ export async function upcomingEvents(userId: string, limit: number, now = new Da
     if (!person) return [];
     const user: SessionUser = { ...person, sessionId: "" };
     const preferences = await loadPreferences(userId);
-    const zone = displayZone(preferences.timezone, await host.calendarHost.displayTimeZone(userId).catch(() => null));
+    const zone = displayZone(
+        preferences.timezone,
+        await host.calendarHost.displayTimeZone(userId).catch(() => null)
+    );
     const [calendars, hidden] = await Promise.all([
         reachableCalendars(userId).then((reach) =>
             prisma.calendar.findMany({
-                where: { id: { in: [...reach.keys()] }, trashedAt: null, kind: { not: "resource" } },
+                where: {
+                    id: { in: [...reach.keys()] },
+                    trashedAt: null,
+                    kind: { not: "resource" }
+                },
                 select: { id: true, color: true }
             })
         ),
-        prisma.calendarDisplay.findMany({ where: { userId, hidden: true }, select: { calendarId: true } })
+        prisma.calendarDisplay.findMany({
+            where: { userId, hidden: true },
+            select: { calendarId: true }
+        })
     ]);
     const hide = new Set(hidden.map((row) => row.calendarId));
     const shown = calendars.filter((calendar) => !hide.has(calendar.id));
@@ -63,7 +77,10 @@ export async function upcomingEvents(userId: string, limit: number, now = new Da
         .map((occurrence) => ({
             id: occurrence.objectId,
             title: occurrence.summary,
-            start: occurrence.allDay && occurrence.startDate ? `${occurrence.startDate}T00:00:00.000Z` : occurrence.start,
+            start:
+                occurrence.allDay && occurrence.startDate
+                    ? `${occurrence.startDate}T00:00:00.000Z`
+                    : occurrence.start,
             allDay: occurrence.allDay,
             color: occurrence.color ?? colors.get(occurrence.calendarId) ?? "#3b82f6",
             href: `/calendar/e/${occurrence.objectId}?k=${encodeURIComponent(occurrence.recurrenceKey)}`

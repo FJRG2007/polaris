@@ -21,7 +21,9 @@ export function newLinkToken(): string {
 
 /** A schema's refusal as an action's answer: our own key when it carries one,
  *  the engine's otherwise. */
-export async function refusedInput(issues: readonly { message: string }[]): Promise<{ ok: false; error: string }> {
+export async function refusedInput(
+    issues: readonly { message: string }[]
+): Promise<{ ok: false; error: string }> {
     const key = issueKey(issues);
     if (key) return { ok: false, error: (await calendarT())(key as CalendarKey) };
     return invalid(issues);
@@ -48,7 +50,11 @@ const OUTSIDE_MAIL_PER_HOUR = 200;
  */
 export async function mayMailOutside(senderId: string, count = 1): Promise<boolean> {
     for (let sent = 0; sent < count; sent += 1) {
-        const result = await host.rateLimitService.rateLimit(`calendar.mail-out:${senderId}`, OUTSIDE_MAIL_PER_HOUR, 3_600_000);
+        const result = await host.rateLimitService.rateLimit(
+            `calendar.mail-out:${senderId}`,
+            OUTSIDE_MAIL_PER_HOUR,
+            3_600_000
+        );
         if (!result.ok) return false;
     }
     return true;

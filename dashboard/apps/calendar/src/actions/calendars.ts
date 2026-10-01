@@ -15,10 +15,14 @@ import type { CalendarSummary } from "../lib/wire";
 
 /** Every calendar the signed-in person reaches, in their order. */
 export async function listCalendarsAction(): Promise<Outcome<{ calendars: CalendarSummary[] }>> {
-    return outcome(async () => ({ calendars: await calendars.listCalendars(await requireCalendarUser()) }));
+    return outcome(async () => ({
+        calendars: await calendars.listCalendars(await requireCalendarUser())
+    }));
 }
 
-export async function createCalendarAction(input: unknown): Promise<Outcome<{ calendar: CalendarSummary }>> {
+export async function createCalendarAction(
+    input: unknown
+): Promise<Outcome<{ calendar: CalendarSummary }>> {
     const parsed = schemas.calendarInputSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => {
@@ -28,7 +32,10 @@ export async function createCalendarAction(input: unknown): Promise<Outcome<{ ca
     });
 }
 
-export async function updateCalendarAction(id: unknown, patch: unknown): Promise<Outcome<{ calendar: CalendarSummary }>> {
+export async function updateCalendarAction(
+    id: unknown,
+    patch: unknown
+): Promise<Outcome<{ calendar: CalendarSummary }>> {
     const calendarId = schemas.uuidSchema.safeParse(id);
     const parsed = schemas.calendarPatchSchema.safeParse(patch);
     if (!calendarId.success) return invalid(calendarId.error.issues);

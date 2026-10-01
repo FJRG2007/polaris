@@ -21,7 +21,13 @@ import multiMonthPlugin from "@fullcalendar/multimonth";
 import interactionPlugin from "@fullcalendar/interaction";
 import type { CalendarViewName } from "../lib/preferences";
 import type { EventReceiveArg, EventResizeDoneArg } from "@fullcalendar/interaction";
-import type { DateSelectArg, EventApi, EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core";
+import type {
+    DateSelectArg,
+    EventApi,
+    EventClickArg,
+    EventDropArg,
+    EventInput
+} from "@fullcalendar/core";
 
 export const FC_VIEWS: Record<CalendarViewName, string> = {
     day: "timeGridDay",
@@ -73,7 +79,10 @@ export interface GridViewProps {
         readonly more: (count: number) => string;
         readonly secondaryZone: string;
     };
-    readonly onSelectRange: (range: { start: GridMoment; end: GridMoment }, anchor: DOMRect | null) => void;
+    readonly onSelectRange: (
+        range: { start: GridMoment; end: GridMoment },
+        anchor: DOMRect | null
+    ) => void;
     readonly onItemClick: (item: GridItem, id: string, anchor: DOMRect) => void;
     readonly onItemFocus: (id: string) => void;
     readonly onChange: (change: GridChange) => void;
@@ -119,16 +128,43 @@ export default function GridView(props: GridViewProps) {
         [props.customDays]
     );
 
-    const hourFormat = useMemo(() => new Intl.DateTimeFormat(props.locale, { hour: "numeric", minute: "2-digit", hour12: props.hour12, timeZone: "UTC" }), [props.locale, props.hour12]);
-    const secondary = props.secondaryZone && props.secondaryZone !== props.zone ? props.secondaryZone : null;
-    const events = useMemo(() => props.events.map((event) => (event.id === props.selectedId ? { ...event, classNames: [...((event.classNames as string[]) ?? []), "pc-selected"] } : event)), [props.events, props.selectedId]);
+    const hourFormat = useMemo(
+        () =>
+            new Intl.DateTimeFormat(props.locale, {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: props.hour12,
+                timeZone: "UTC"
+            }),
+        [props.locale, props.hour12]
+    );
+    const secondary =
+        props.secondaryZone && props.secondaryZone !== props.zone ? props.secondaryZone : null;
+    const events = useMemo(
+        () =>
+            props.events.map((event) =>
+                event.id === props.selectedId
+                    ? {
+                          ...event,
+                          classNames: [...((event.classNames as string[]) ?? []), "pc-selected"]
+                      }
+                    : event
+            ),
+        [props.events, props.selectedId]
+    );
 
     return (
         <div className="pc-grid h-full min-h-0">
             <style>{GRID_CSS}</style>
             <FullCalendar
                 ref={calendar}
-                plugins={[dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin, interactionPlugin]}
+                plugins={[
+                    dayGridPlugin,
+                    timeGridPlugin,
+                    listPlugin,
+                    multiMonthPlugin,
+                    interactionPlugin
+                ]}
                 initialView={fcView}
                 initialDate={props.anchor}
                 views={views}
@@ -149,21 +185,40 @@ export default function GridView(props: GridViewProps) {
                 weekends={props.showWeekends}
                 weekNumbers={props.showWeekNumbers}
                 navLinks
-                navLinkDayClick={(date: Date) => propsRef.current.onOpenDay(time.gridDay(date), "day")}
-                navLinkWeekClick={(date: Date) => propsRef.current.onOpenDay(time.gridDay(date), "week")}
+                navLinkDayClick={(date: Date) =>
+                    propsRef.current.onOpenDay(time.gridDay(date), "day")
+                }
+                navLinkWeekClick={(date: Date) =>
+                    propsRef.current.onOpenDay(time.gridDay(date), "week")
+                }
                 slotDuration={{ minutes: props.slotMinutes }}
                 scrollTime={`${props.dayStart}:00`}
                 scrollTimeReset={false}
-                slotLabelFormat={{ hour: "numeric", minute: "2-digit", hour12: props.hour12, omitZeroMinute: props.hour12 }}
-                eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: props.hour12, meridiem: props.hour12 ? "short" : false }}
+                slotLabelFormat={{
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: props.hour12,
+                    omitZeroMinute: props.hour12
+                }}
+                eventTimeFormat={{
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: props.hour12,
+                    meridiem: props.hour12 ? "short" : false
+                }}
                 slotLabelContent={
                     secondary
                         ? (arg) => {
-                              const other = time.wallOf(time.gridInstant(arg.date, propsRef.current.zone), secondary);
+                              const other = time.wallOf(
+                                  time.gridInstant(arg.date, propsRef.current.zone),
+                                  secondary
+                              );
                               const date = new Date(`${other.slice(0, 16)}:00Z`);
                               return (
                                   <span className="pc-slot" title={props.words.secondaryZone}>
-                                      <span className="pc-slot-secondary">{hourFormat.format(date)}</span>
+                                      <span className="pc-slot-secondary">
+                                          {hourFormat.format(date)}
+                                      </span>
                                       <span>{arg.text}</span>
                                   </span>
                               );
@@ -186,16 +241,31 @@ export default function GridView(props: GridViewProps) {
                 eventDidMount={(arg) => {
                     const label = (arg.event.extendedProps as { label?: string }).label;
                     if (label) arg.el.setAttribute("aria-label", label);
-                    arg.el.addEventListener("focus", () => propsRef.current.onItemFocus(arg.event.id));
+                    arg.el.addEventListener("focus", () =>
+                        propsRef.current.onItemFocus(arg.event.id)
+                    );
                 }}
                 eventClick={(arg: EventClickArg) => {
                     arg.jsEvent.preventDefault();
-                    propsRef.current.onItemClick(itemOf(arg.event), arg.event.id, arg.el.getBoundingClientRect());
+                    propsRef.current.onItemClick(
+                        itemOf(arg.event),
+                        arg.event.id,
+                        arg.el.getBoundingClientRect()
+                    );
                 }}
                 select={(arg: DateSelectArg) => {
                     const zone = propsRef.current.zone;
-                    const target = arg.jsEvent?.target instanceof Element ? arg.jsEvent.target.getBoundingClientRect() : null;
-                    propsRef.current.onSelectRange({ start: moment(arg.start, arg.allDay, zone), end: moment(arg.end, arg.allDay, zone) }, target);
+                    const target =
+                        arg.jsEvent?.target instanceof Element
+                            ? arg.jsEvent.target.getBoundingClientRect()
+                            : null;
+                    propsRef.current.onSelectRange(
+                        {
+                            start: moment(arg.start, arg.allDay, zone),
+                            end: moment(arg.end, arg.allDay, zone)
+                        },
+                        target
+                    );
                     calendar.current?.getApi().unselect();
                 }}
                 eventDrop={(arg: EventDropArg) => {
@@ -204,7 +274,12 @@ export default function GridView(props: GridViewProps) {
                     propsRef.current.onChange({
                         item: itemOf(arg.event),
                         startDeltaMs: edgeDelta(arg.oldEvent.start, arg.event.start, allDay, zone),
-                        endDeltaMs: edgeDelta(arg.oldEvent.end ?? arg.oldEvent.start, arg.event.end ?? arg.event.start, allDay, zone),
+                        endDeltaMs: edgeDelta(
+                            arg.oldEvent.end ?? arg.oldEvent.start,
+                            arg.event.end ?? arg.event.start,
+                            allDay,
+                            zone
+                        ),
                         revert: arg.revert
                     });
                 }}
@@ -214,7 +289,12 @@ export default function GridView(props: GridViewProps) {
                     propsRef.current.onChange({
                         item: itemOf(arg.event),
                         startDeltaMs: edgeDelta(arg.oldEvent.start, arg.event.start, allDay, zone),
-                        endDeltaMs: edgeDelta(arg.oldEvent.end ?? arg.oldEvent.start, arg.event.end ?? arg.event.start, allDay, zone),
+                        endDeltaMs: edgeDelta(
+                            arg.oldEvent.end ?? arg.oldEvent.start,
+                            arg.event.end ?? arg.event.start,
+                            allDay,
+                            zone
+                        ),
                         revert: arg.revert
                     });
                 }}
@@ -225,7 +305,11 @@ export default function GridView(props: GridViewProps) {
                     // The dropped copy is only a preview: the task is drawn again
                     // from the server once it has a due date.
                     arg.event.remove();
-                    if (taskId && start) propsRef.current.onTaskDrop(taskId, moment(start, allDay, propsRef.current.zone));
+                    if (taskId && start)
+                        propsRef.current.onTaskDrop(
+                            taskId,
+                            moment(start, allDay, propsRef.current.zone)
+                        );
                 }}
             />
         </div>

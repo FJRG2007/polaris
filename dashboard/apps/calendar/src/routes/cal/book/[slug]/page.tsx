@@ -9,7 +9,11 @@ import { BookingFlow } from "../../../../screens/public/booking-flow";
 
 export const dynamic = "force-dynamic";
 
-export default async function PublicBookingPagePage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function PublicBookingPagePage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     const { slug } = await params;
     if (typeof slug !== "string") notFound();
     const page = await publicBookingPage(slug);

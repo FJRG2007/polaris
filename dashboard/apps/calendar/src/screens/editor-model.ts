@@ -90,7 +90,18 @@ export const DEFAULT_CATEGORIES = [
 export const DURATION_PRESETS = [15, 30, 45, 60, 90, 120, 180] as const;
 
 /** Colours offered for one event. */
-export const EVENT_COLORS = ["#d62728", "#ff7f0e", "#bcbd22", "#2ca02c", "#17becf", "#1f77b4", "#9467bd", "#e377c2", "#8c564b", "#7f7f7f"] as const;
+export const EVENT_COLORS = [
+    "#d62728",
+    "#ff7f0e",
+    "#bcbd22",
+    "#2ca02c",
+    "#17becf",
+    "#1f77b4",
+    "#9467bd",
+    "#e377c2",
+    "#8c564b",
+    "#7f7f7f"
+] as const;
 
 function splitWall(wall: string): { date: string; time: string } {
     return { date: wall.slice(0, 10), time: wall.slice(11, 16) };
@@ -102,13 +113,21 @@ function zoneOf(value: engine.DateValue): string {
 }
 
 function alarmDrafts(alarms: readonly engine.Alarm[]): AlarmDraft[] {
-    return alarms.map((alarm) => ({ action: alarm.action, trigger: alarm.trigger, description: alarm.description }));
+    return alarms.map((alarm) => ({
+        action: alarm.action,
+        trigger: alarm.trigger,
+        description: alarm.description
+    }));
 }
 
 /** Reminders as minutes relative to the start, the shape calendars and
  *  preferences store their defaults in. */
 export function alarmsFromMinutes(minutes: readonly number[]): AlarmDraft[] {
-    return minutes.map((value) => ({ action: "DISPLAY", trigger: { kind: "relative", minutes: value, related: "START" }, description: "" }));
+    return minutes.map((value) => ({
+        action: "DISPLAY",
+        trigger: { kind: "relative", minutes: value, related: "START" },
+        description: ""
+    }));
 }
 
 /** The rule the editor shows: the series', read by the start of the occurrence. */
@@ -120,8 +139,20 @@ export function ruleOf(detail: EventDetail): engine.RecurrenceRule | null {
 export function formFromDetail(detail: EventDetail): EditorForm {
     const event = detail.event;
     const allDay = "date" in event.start;
-    const start = "date" in event.start ? { date: event.start.date, time: "09:00" } : splitWall(event.start.dateTime);
-    const end = "date" in event.end ? { date: addDays(event.end.date, -1) < start.date ? start.date : addDays(event.end.date, -1), time: "10:00" } : splitWall(event.end.dateTime);
+    const start =
+        "date" in event.start
+            ? { date: event.start.date, time: "09:00" }
+            : splitWall(event.start.dateTime);
+    const end =
+        "date" in event.end
+            ? {
+                  date:
+                      addDays(event.end.date, -1) < start.date
+                          ? start.date
+                          : addDays(event.end.date, -1),
+                  time: "10:00"
+              }
+            : splitWall(event.end.dateTime);
     return {
         calendarId: detail.calendarId,
         summary: event.summary,
@@ -136,7 +167,11 @@ export function formFromDetail(detail: EventDetail): EditorForm {
         endZone: zoneOf(event.end),
         repeat: engine.editorFromRule(ruleOf(detail), event.start),
         keepRule: ruleOf(detail)?.supported === false,
-        attachments: event.attachments.map((attachment) => ({ uri: attachment.uri, name: attachment.name, mime: attachment.mime })),
+        attachments: event.attachments.map((attachment) => ({
+            uri: attachment.uri,
+            name: attachment.name,
+            mime: attachment.mime
+        })),
         alarms: alarmDrafts(event.alarms),
         attendees: event.attendees.map((attendee) => ({
             email: attendee.email,
@@ -168,11 +203,19 @@ export function newForm(input: {
     readonly summary?: string;
     readonly alarms: readonly number[];
 }): EditorForm {
-    const startWall = typeof input.start === "string" ? `${input.start}T09:00:00` : wallOf(input.start, input.zone);
-    const endWall = typeof input.end === "string" ? `${addDays(input.end, -1)}T10:00:00` : wallOf(input.end, input.zone);
+    const startWall =
+        typeof input.start === "string"
+            ? `${input.start}T09:00:00`
+            : wallOf(input.start, input.zone);
+    const endWall =
+        typeof input.end === "string"
+            ? `${addDays(input.end, -1)}T10:00:00`
+            : wallOf(input.end, input.zone);
     const start = splitWall(startWall);
     const end = splitWall(endWall);
-    const startValue: engine.DateValue = input.allDay ? { date: start.date } : { dateTime: startWall, tzid: input.zone };
+    const startValue: engine.DateValue = input.allDay
+        ? { date: start.date }
+        : { dateTime: startWall, tzid: input.zone };
     return {
         calendarId: input.calendarId,
         summary: input.summary ?? "",
@@ -203,8 +246,16 @@ export function newForm(input: {
 
 /** The reminders a new event in a calendar starts with: the calendar's own
  *  defaults, or the person's. */
-export function defaultAlarmMinutes(allDay: boolean, calendar: { defaultAlarms: { timed: readonly number[]; allDay: readonly number[] } } | null, preferences: CalendarPreferences): readonly number[] {
-    const own = calendar ? (allDay ? calendar.defaultAlarms.allDay : calendar.defaultAlarms.timed) : [];
+export function defaultAlarmMinutes(
+    allDay: boolean,
+    calendar: { defaultAlarms: { timed: readonly number[]; allDay: readonly number[] } } | null,
+    preferences: CalendarPreferences
+): readonly number[] {
+    const own = calendar
+        ? allDay
+            ? calendar.defaultAlarms.allDay
+            : calendar.defaultAlarms.timed
+        : [];
     if (own.length > 0) return own;
     return allDay ? preferences.defaultAlarms.allDay : preferences.defaultAlarms.timed;
 }
@@ -215,7 +266,8 @@ function startValue(form: EditorForm): engine.DateValue {
 }
 
 function endValue(form: EditorForm): engine.DateValue {
-    if (form.allDay) return { date: isDayString(form.endDate) ? addDays(form.endDate, 1) : form.endDate };
+    if (form.allDay)
+        return { date: isDayString(form.endDate) ? addDays(form.endDate, 1) : form.endDate };
     return { dateTime: `${form.endDate}T${form.endTime}`, tzid: form.endZone || null };
 }
 
@@ -257,7 +309,22 @@ export function sameRule(a: EditorForm, b: EditorForm): boolean {
 }
 
 /** The fields a validation message is drawn under. */
-export type FieldName = "calendarId" | "summary" | "start" | "end" | "allDay" | "location" | "description" | "url" | "conference" | "color" | "attendees" | "rule" | "alarms" | "categories" | "attachments";
+export type FieldName =
+    | "calendarId"
+    | "summary"
+    | "start"
+    | "end"
+    | "allDay"
+    | "location"
+    | "description"
+    | "url"
+    | "conference"
+    | "color"
+    | "attendees"
+    | "rule"
+    | "alarms"
+    | "categories"
+    | "attachments";
 
 export interface FormCheck {
     /** Complete and valid: what the schema read. */
@@ -301,7 +368,12 @@ export function checkForm(form: EditorForm): FormCheck {
 }
 
 /** The instant a form's start or end names; null while it does not read. */
-export function formInstant(date: string, time: string, zone: string, fallbackZone: string): Date | null {
+export function formInstant(
+    date: string,
+    time: string,
+    zone: string,
+    fallbackZone: string
+): Date | null {
     if (!isDayString(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
     const resolved = engine.resolveZone(zone || fallbackZone) ?? "UTC";
     return engine.wallToInstant(engine.parseWall(`${date}T${time}`), resolved);
@@ -326,10 +398,22 @@ export function durationOf(form: EditorForm, fallbackZone: string): number | nul
 }
 
 /** The start moved, the length kept. */
-export function withStart(form: EditorForm, date: string, time: string, fallbackZone: string): EditorForm {
+export function withStart(
+    form: EditorForm,
+    date: string,
+    time: string,
+    fallbackZone: string
+): EditorForm {
     if (form.allDay) {
-        const length = isDayString(form.startDate) && isDayString(form.endDate) ? Math.max(0, engine.daysBetween(form.startDate, form.endDate)) : 0;
-        return { ...form, startDate: date, endDate: isDayString(date) ? addDays(date, length) : form.endDate };
+        const length =
+            isDayString(form.startDate) && isDayString(form.endDate)
+                ? Math.max(0, engine.daysBetween(form.startDate, form.endDate))
+                : 0;
+        return {
+            ...form,
+            startDate: date,
+            endDate: isDayString(date) ? addDays(date, length) : form.endDate
+        };
     }
     const length = durationOf(form, fallbackZone);
     const moved = { ...form, startDate: date, startTime: time };
@@ -339,10 +423,26 @@ export function withStart(form: EditorForm, date: string, time: string, fallback
 /** All day switched on or off, times kept for switching back. */
 export function withAllDay(form: EditorForm, allDay: boolean, fallbackZone: string): EditorForm {
     if (allDay === form.allDay) return form;
-    if (allDay) return { ...form, allDay, endDate: form.endDate < form.startDate ? form.startDate : form.endDate };
+    if (allDay)
+        return {
+            ...form,
+            allDay,
+            endDate: form.endDate < form.startDate ? form.startDate : form.endDate
+        };
     const zone = form.startZone || fallbackZone;
-    const next = { ...form, allDay, startZone: zone, endZone: form.endZone || zone, endDate: form.startDate };
-    return form.startTime < form.endTime ? next : { ...next, endTime: timeOfMinutes(Math.min(1439, (engine.minutesOf(form.startTime) || 0) + 60)) };
+    const next = {
+        ...form,
+        allDay,
+        startZone: zone,
+        endZone: form.endZone || zone,
+        endDate: form.startDate
+    };
+    return form.startTime < form.endTime
+        ? next
+        : {
+              ...next,
+              endTime: timeOfMinutes(Math.min(1439, (engine.minutesOf(form.startTime) || 0) + 60))
+          };
 }
 
 /** Whether a URL-ish token is a web link a person may open. */
@@ -374,14 +474,23 @@ export function linkify(text: string): { readonly text: string; readonly href: s
 /** The addresses a person answers to among the attendees. */
 export function myAttendee(detail: EventDetail): engine.Attendee | null {
     const mine = new Set(detail.myEmails.map((email) => email.toLowerCase()));
-    return detail.event.attendees.find((attendee) => mine.has(attendee.email.toLowerCase())) ?? null;
+    return (
+        detail.event.attendees.find((attendee) => mine.has(attendee.email.toLowerCase())) ?? null
+    );
 }
 
 /** Answers by kind, for "3 yes, 1 maybe". */
-export function responseCounts(attendees: readonly AttendeeDraft[]): Record<"ACCEPTED" | "TENTATIVE" | "DECLINED" | "NEEDS-ACTION", number> {
+export function responseCounts(
+    attendees: readonly AttendeeDraft[]
+): Record<"ACCEPTED" | "TENTATIVE" | "DECLINED" | "NEEDS-ACTION", number> {
     const counts = { ACCEPTED: 0, TENTATIVE: 0, DECLINED: 0, "NEEDS-ACTION": 0 };
     for (const attendee of attendees) {
-        if (attendee.partstat === "ACCEPTED" || attendee.partstat === "TENTATIVE" || attendee.partstat === "DECLINED") counts[attendee.partstat] += 1;
+        if (
+            attendee.partstat === "ACCEPTED" ||
+            attendee.partstat === "TENTATIVE" ||
+            attendee.partstat === "DECLINED"
+        )
+            counts[attendee.partstat] += 1;
         else counts["NEEDS-ACTION"] += 1;
     }
     return counts;

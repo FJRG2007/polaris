@@ -22,7 +22,15 @@ import { busyBlock, todoClassification } from "./access";
 /** A public event as anybody with the link may read it: what and when, but
  *  not who else is invited, what is attached, or a property nobody here reads. */
 function published(event: engine.CalendarEvent): engine.CalendarEvent {
-    return { ...event, attendees: [], organizer: null, alarms: [], attachments: [], extra: [], extraComponents: [] };
+    return {
+        ...event,
+        attendees: [],
+        organizer: null,
+        alarms: [],
+        attachments: [],
+        extra: [],
+        extraComponents: []
+    };
 }
 
 function shown(mode: string, event: engine.CalendarEvent): boolean {
@@ -31,18 +39,30 @@ function shown(mode: string, event: engine.CalendarEvent): boolean {
 
 /** An item as a link in this mode may show it, or null when nothing of it is
  *  shown (a transparent event says nothing about being busy). */
-function forLink(item: engine.CalendarItem, mode: string, busyLabel: string): engine.CalendarItem | null {
+function forLink(
+    item: engine.CalendarItem,
+    mode: string,
+    busyLabel: string
+): engine.CalendarItem | null {
     // A task's reminders are its owner's, like an event's below.
     if (item.component !== "VEVENT") {
         if (mode !== "full" || todoClassification(item.todo) !== "PUBLIC") return null;
         return { ...item, todo: { ...item.todo, alarms: [], extra: [], extraComponents: [] } };
     }
     // What the page leaves out - free time, cancelled events - the feed does too.
-    const events = [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent => Boolean(event));
-    if (events.every((event) => event.transparency === "TRANSPARENT" || event.status === "CANCELLED")) return null;
+    const events = [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent =>
+        Boolean(event)
+    );
+    if (
+        events.every(
+            (event) => event.transparency === "TRANSPARENT" || event.status === "CANCELLED"
+        )
+    )
+        return null;
     // Reminders are the owner's, not the subscribers': a feed that carried them
     // would ring on every phone that subscribes to it.
-    const map = (event: engine.CalendarEvent) => (shown(mode, event) ? published(event) : busyBlock(event, busyLabel));
+    const map = (event: engine.CalendarEvent) =>
+        shown(mode, event) ? published(event) : busyBlock(event, busyLabel);
     return {
         ...item,
         master: item.master ? map(item.master) : null,
@@ -51,7 +71,10 @@ function forLink(item: engine.CalendarItem, mode: string, busyLabel: string): en
 }
 
 /** The feed a subscription reads. */
-export async function publishedFeed(token: string, busyLabel: string): Promise<{ name: string; ics: string } | null> {
+export async function publishedFeed(
+    token: string,
+    busyLabel: string
+): Promise<{ name: string; ics: string } | null> {
     const calendar = await publishedCalendar(token);
     if (!calendar) return null;
     return exportCalendarRow(calendar.id, (ics) => {
@@ -66,7 +89,12 @@ export async function publishedRange(
     token: string,
     window: { from: Date; to: Date },
     floatingZone: string
-): Promise<{ name: string; color: string; description: string; occurrences: OccurrenceView[] } | null> {
+): Promise<{
+    name: string;
+    color: string;
+    description: string;
+    occurrences: OccurrenceView[];
+} | null> {
     const calendar = await publishedCalendar(token);
     if (!calendar) return null;
     const rows = await prisma.calendarObject.findMany({
@@ -122,5 +150,10 @@ export async function publishedRange(
         }
     }
     occurrences.sort((left, right) => left.start.localeCompare(right.start));
-    return { name: calendar.name, color: calendar.color, description: calendar.description, occurrences };
+    return {
+        name: calendar.name,
+        color: calendar.color,
+        description: calendar.description,
+        occurrences
+    };
 }

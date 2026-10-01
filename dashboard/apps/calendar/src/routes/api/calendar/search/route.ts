@@ -16,7 +16,10 @@ export async function GET(request: Request): Promise<Response> {
     const parsed = query.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!parsed.success) return Response.json({ hits: [] });
     try {
-        const hits = await searchEvents(user, parsed.data.q, { floatingZone: parsed.data.zone, now: new Date() });
+        const hits = await searchEvents(user, parsed.data.q, {
+            floatingZone: parsed.data.zone,
+            now: new Date()
+        });
         return Response.json({ hits }, { headers: { "cache-control": "no-store" } });
     } catch (caught) {
         console.error("polaris: a calendar search failed:", caught);

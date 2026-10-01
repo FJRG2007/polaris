@@ -79,20 +79,32 @@ describe("calendar access", () => {
         addShare(calendar, { userId: bob.id }, "manage");
         expect((await reachableCalendars(alice.id)).get(calendar)).toBe("owner");
         expect((await reachableCalendars(bob.id)).has(calendar)).toBe(false);
-        await expect(requireCalendar(bob.id, calendar, "freebusy")).rejects.toThrow(en("errors.calendarNotFound"));
-        await expect(requireCalendar(alice.id, calendar, "read")).rejects.toBeInstanceOf(CalendarRefusal);
+        await expect(requireCalendar(bob.id, calendar, "freebusy")).rejects.toThrow(
+            en("errors.calendarNotFound")
+        );
+        await expect(requireCalendar(alice.id, calendar, "read")).rejects.toBeInstanceOf(
+            CalendarRefusal
+        );
     });
 
     it("lets everybody see a room as free or busy, and no further", async () => {
         const room = addCalendar(carol.id, { kind: "resource", name: "Room 1" });
         expect((await requireCalendar(bob.id, room, "freebusy")).reach).toBe("freebusy");
-        await expect(requireCalendar(bob.id, room, "read")).rejects.toThrow(en("errors.calendarNotFound"));
+        await expect(requireCalendar(bob.id, room, "read")).rejects.toThrow(
+            en("errors.calendarNotFound")
+        );
     });
 
     it("refuses an unknown id and an unreachable one with the same sentence", async () => {
         const calendar = addCalendar(alice.id);
-        const unknown = await requireCalendar(bob.id, "018f2b7a-0000-7000-8000-00000000dead", "freebusy").catch((caught: Error) => caught);
-        const unreachable = await requireCalendar(bob.id, calendar, "freebusy").catch((caught: Error) => caught);
+        const unknown = await requireCalendar(
+            bob.id,
+            "018f2b7a-0000-7000-8000-00000000dead",
+            "freebusy"
+        ).catch((caught: Error) => caught);
+        const unreachable = await requireCalendar(bob.id, calendar, "freebusy").catch(
+            (caught: Error) => caught
+        );
         expect(unknown).toBeInstanceOf(CalendarRefusal);
         expect(unreachable).toBeInstanceOf(CalendarRefusal);
         expect((unknown as Error).message).toBe((unreachable as Error).message);
@@ -100,10 +112,14 @@ describe("calendar access", () => {
 
     it("refuses a read-only calendar for writing even to its owner", async () => {
         const feed = addCalendar(alice.id, { readOnly: true });
-        await expect(requireWritableCalendar(alice.id, feed)).rejects.toThrow(en("errors.readOnly"));
+        await expect(requireWritableCalendar(alice.id, feed)).rejects.toThrow(
+            en("errors.readOnly")
+        );
         const shared = addCalendar(alice.id);
         addShare(shared, { userId: bob.id }, "read");
-        await expect(requireWritableCalendar(bob.id, shared)).rejects.toThrow(en("errors.calendarNotFound"));
+        await expect(requireWritableCalendar(bob.id, shared)).rejects.toThrow(
+            en("errors.calendarNotFound")
+        );
     });
 
     it("asks the session for calendar.use, and answers 403 on the API without it", async () => {

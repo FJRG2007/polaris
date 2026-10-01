@@ -39,14 +39,19 @@ async function recipientsOf(calendarId: string): Promise<string[]> {
         select: {
             ownerId: true,
             kind: true,
-            shares: { where: { access: { in: ["read", "write", "manage"] } }, select: { userId: true, teamId: true } }
+            shares: {
+                where: { access: { in: ["read", "write", "manage"] } },
+                select: { userId: true, teamId: true }
+            }
         }
     });
     if (!calendar || calendar.kind === "resource") return [];
     const people = new Set<string>([calendar.ownerId]);
     for (const share of calendar.shares) {
         if (share.userId) people.add(share.userId);
-        if (share.teamId) for (const member of await host.calendarHost.teamMemberIds(share.teamId)) people.add(member);
+        if (share.teamId)
+            for (const member of await host.calendarHost.teamMemberIds(share.teamId))
+                people.add(member);
         if (people.size >= MAX_RECIPIENTS) break;
     }
     const muted = await prisma.calendarDisplay.findMany({
@@ -58,14 +63,22 @@ async function recipientsOf(calendarId: string): Promise<string[]> {
 }
 
 /** Stop reminding these people of a calendar's events. */
-export async function forgetReminders(calendarId: string, userIds: readonly string[]): Promise<void> {
+export async function forgetReminders(
+    calendarId: string,
+    userIds: readonly string[]
+): Promise<void> {
     if (userIds.length === 0) return;
-    await prisma.calendarReminder.deleteMany({ where: { userId: { in: [...userIds] }, object: { calendarId } } });
+    await prisma.calendarReminder.deleteMany({
+        where: { userId: { in: [...userIds] }, object: { calendarId } }
+    });
 }
 
 /** The zone a floating time is read in when nobody is asking: the calendar's. */
 async function floatingZoneOf(calendarId: string): Promise<string> {
-    const calendar = await prisma.calendar.findUnique({ where: { id: calendarId }, select: { timezone: true } });
+    const calendar = await prisma.calendar.findUnique({
+        where: { id: calendarId },
+        select: { timezone: true }
+    });
     return calendar?.timezone || "UTC";
 }
 
@@ -73,10 +86,17 @@ async function floatingZoneOf(calendarId: string): Promise<string> {
  * Plan an object's reminders again from its current text. `item` null clears
  * them (deleted, trashed, or its calendar's alarms muted).
  */
-export async function planObject(objectId: string, item: engine.CalendarItem | null, now = new Date()): Promise<void> {
+export async function planObject(
+    objectId: string,
+    item: engine.CalendarItem | null,
+    now = new Date()
+): Promise<void> {
     await prisma.calendarReminder.deleteMany({ where: { objectId } });
     if (!item) return;
-    const row = await prisma.calendarObject.findUnique({ where: { id: objectId }, select: { calendarId: true } });
+    const row = await prisma.calendarObject.findUnique({
+        where: { id: objectId },
+        select: { calendarId: true }
+    });
     if (!row) return;
     const planned = engine.nextAlarm(item, now, await floatingZoneOf(row.calendarId));
     if (planned.length === 0) return;
@@ -91,11 +111,14 @@ export async function planObject(objectId: string, item: engine.CalendarItem | n
             action: alarm.action === "EMAIL" ? "EMAIL" : "DISPLAY"
         }))
     );
-    if (rows.length > 0) await prisma.calendarReminder.createMany({ data: rows, skipDuplicates: true });
+    if (rows.length > 0)
+        await prisma.calendarReminder.createMany({ data: rows, skipDuplicates: true });
 }
 
 /** Send what is due, and plan each alarm's next firing. */
-export async function fireDueReminders(now = new Date()): Promise<{ sent: number; dropped: number }> {
+export async function fireDueReminders(
+    now = new Date()
+): Promise<{ sent: number; dropped: number }> {
     const due = await prisma.calendarReminder.findMany({
         where: { fireAt: { lte: now } },
         orderBy: { fireAt: "asc" },
@@ -113,7 +136,16 @@ export async function fireDueReminders(now = new Date()): Promise<{ sent: number
                     calendarId: true,
                     ics: true,
                     deletedAt: true,
-                    calendar: { select: { ownerId: true, kind: true, name: true, alarmsMuted: true, trashedAt: true, timezone: true } }
+                    calendar: {
+                        select: {
+                            ownerId: true,
+                            kind: true,
+                            name: true,
+                            alarmsMuted: true,
+                            trashedAt: true,
+                            timezone: true
+                        }
+                    }
                 }
             }
         }
@@ -138,12 +170,23 @@ export async function fireDueReminders(now = new Date()): Promise<{ sent: number
         if (!item) continue;
         const calendar = { id: object.calendarId, ...object.calendar };
         const key = `${reminder.userId}:${calendar.id}`;
-        if (!levels.has(key)) levels.set(key, (await reachOf(reminder.userId, [calendar])).get(calendar.id) ?? null);
-        await deliver(reminder.userId, reminder.action, item, reminder.occurrence, reminder.objectId, calendar, levels.get(key)!)
+        if (!levels.has(key))
+            levels.set(key, (await reachOf(reminder.userId, [calendar])).get(calendar.id) ?? null);
+        await deliver(
+            reminder.userId,
+            reminder.action,
+            item,
+            reminder.occurrence,
+            reminder.objectId,
+            calendar,
+            levels.get(key)!
+        )
             .then((delivered) => {
                 if (delivered) sent += 1;
             })
-            .catch((caught: unknown) => console.error("polaris: a calendar reminder could not be sent:", caught));
+            .catch((caught: unknown) =>
+                console.error("polaris: a calendar reminder could not be sent:", caught)
+            );
     }
     // The next firing of every alarm that just fired, from after this one -
     // once nothing is left due for the object, since planning it again drops
@@ -181,16 +224,29 @@ async function describe(
     const summary = busyOnly
         ? t("published.busy")
         : item.component === "VEVENT"
-            ? (item.master ?? item.overrides[0])?.summary || t("reminders.untitledEvent")
-            : item.todo.summary || t("reminders.untitledTask");
-    const start = item.component === "VEVENT" ? (item.master ?? item.overrides[0])?.start : (item.todo.due ?? item.todo.start);
+          ? (item.master ?? item.overrides[0])?.summary || t("reminders.untitledEvent")
+          : item.todo.summary || t("reminders.untitledTask");
+    const start =
+        item.component === "VEVENT"
+            ? (item.master ?? item.overrides[0])?.start
+            : (item.todo.due ?? item.todo.start);
     const allDay = Boolean(start && "date" in start);
-    const zone = (start && "tzid" in start && start.tzid && engine.resolveZone(start.tzid)) || calendarZone;
+    const zone =
+        (start && "tzid" in start && start.tzid && engine.resolveZone(start.tzid)) || calendarZone;
     const when = new Intl.DateTimeFormat(
         locale,
         allDay
             ? { dateStyle: "full", timeZone: zone }
-            : { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: zone, timeZoneName: "short" }
+            : {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  timeZone: zone,
+                  timeZoneName: "short"
+              }
     ).format(occurrence);
     return { title: summary, body: t("reminders.body", { when }), locale };
 }

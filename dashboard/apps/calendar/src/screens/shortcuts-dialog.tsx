@@ -4,7 +4,14 @@
 
 import { useCalendarT } from "./i18n";
 import { EDITOR_SHORTCUT_ROWS, SHORTCUT_ROWS } from "./shortcuts";
-import { applePlatform, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    applePlatform,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 function Keys({ keys, modifier }: { keys: readonly string[]; modifier?: string }) {
     const t = useCalendarT();
@@ -12,7 +19,9 @@ function Keys({ keys, modifier }: { keys: readonly string[]; modifier?: string }
         <span className="flex flex-wrap items-center justify-end gap-1">
             {keys.map((key, index) => (
                 <span key={key} className="flex items-center gap-1">
-                    {index > 0 ? <span className="text-xs text-foreground-subtle">{t("shortcuts.or")}</span> : null}
+                    {index > 0 ? (
+                        <span className="text-xs text-foreground-subtle">{t("shortcuts.or")}</span>
+                    ) : null}
                     <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
                         {modifier ? `${modifier}+` : ""}
                         {key}
@@ -29,7 +38,9 @@ export function ShortcutsTable({ enabled }: { enabled: boolean }) {
     const modifier = typeof navigator !== "undefined" && applePlatform() ? "Cmd" : "Ctrl";
     return (
         <div className="flex flex-col gap-4">
-            {!enabled ? <p className="text-xs text-muted-foreground">{t("shortcuts.off")}</p> : null}
+            {!enabled ? (
+                <p className="text-xs text-muted-foreground">{t("shortcuts.off")}</p>
+            ) : null}
             <table className="w-full text-[0.8125rem]">
                 <thead>
                     <tr>
@@ -60,7 +71,15 @@ export function ShortcutsTable({ enabled }: { enabled: boolean }) {
     );
 }
 
-export function ShortcutsDialog({ open, onOpenChange, enabled }: { open: boolean; onOpenChange: (open: boolean) => void; enabled: boolean }) {
+export function ShortcutsDialog({
+    open,
+    onOpenChange,
+    enabled
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    enabled: boolean;
+}) {
     const t = useCalendarT();
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

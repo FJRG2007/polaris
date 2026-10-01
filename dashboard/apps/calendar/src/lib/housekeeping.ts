@@ -7,7 +7,9 @@
 
 import { purgeExpiredTrash } from "./trash";
 
-export async function sweepCalendarHousekeeping(now = new Date()): Promise<{ purged: number; stale: number }> {
+export async function sweepCalendarHousekeeping(
+    now = new Date()
+): Promise<{ purged: number; stale: number }> {
     const purged = await purgeExpiredTrash(now);
     const booking = await import("./booking");
     const stale = await booking.sweepStaleBookings(now);

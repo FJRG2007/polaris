@@ -41,14 +41,14 @@ describe("rooms", () => {
         client.$executeRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
             const sql = parts.join("?");
             locks.push(`${sql} ${values.join(" ")}`);
-            if (sql.startsWith("INSERT INTO \"CalendarLease\"")) {
+            if (sql.startsWith('INSERT INTO "CalendarLease"')) {
                 const [key, until, now] = values as [string, bigint, bigint];
                 const held = leases.get(key);
                 if (held !== undefined && held >= now) return 0;
                 leases.set(key, until);
                 return 1;
             }
-            if (sql.startsWith("DELETE FROM \"CalendarLease\"")) {
+            if (sql.startsWith('DELETE FROM "CalendarLease"')) {
                 const [key, until] = values as [string, bigint];
                 if (leases.get(key) !== until) return 0;
                 leases.delete(key);
@@ -77,7 +77,12 @@ describe("rooms", () => {
         });
     });
 
-    async function book(start: string, end: string, summary = "Review", fields: Record<string, unknown> = {}): Promise<string> {
+    async function book(
+        start: string,
+        end: string,
+        summary = "Review",
+        fields: Record<string, unknown> = {}
+    ): Promise<string> {
         const { objectId } = await objects.saveEvent(alice as never, {
             objectId: null,
             recurrenceKey: null,
@@ -96,7 +101,9 @@ describe("rooms", () => {
     }
 
     function roomAnswer(objectId: string) {
-        return world.eventIn(db.byId("calendarObject", objectId)).attendees.find((attendee) => attendee.email === room.email)?.partstat;
+        return world
+            .eventIn(db.byId("calendarObject", objectId))
+            .attendees.find((attendee) => attendee.email === room.email)?.partstat;
     }
 
     it("has one address format, never deliverable, read back to its calendar", () => {
@@ -109,9 +116,20 @@ describe("rooms", () => {
 
     it("is kept by administrators only", async () => {
         await expect(
-            resources.createRoom(alice as never, { name: "Mine", type: "room", capacity: null, building: "", floor: "", features: [], color: "#3b82f6", description: "" })
+            resources.createRoom(alice as never, {
+                name: "Mine",
+                type: "room",
+                capacity: null,
+                building: "",
+                floor: "",
+                features: [],
+                color: "#3b82f6",
+                description: ""
+            })
         ).rejects.toThrow(world.en("rooms.notAllowed"));
-        await expect(resources.removeRoom(alice as never, room.id)).rejects.toThrow(world.en("rooms.notAllowed"));
+        await expect(resources.removeRoom(alice as never, room.id)).rejects.toThrow(
+            world.en("rooms.notAllowed")
+        );
     });
 
     it("accepts a free time, holds it in its calendar, and is never mailed", async () => {
@@ -121,7 +139,10 @@ describe("rooms", () => {
         expect(held).toHaveLength(1);
         expect(world.eventIn(held[0]).summary).toBe("Review");
         expect(fake.mails).toEqual([]);
-        const rooms = await resources.roomsFor({ from: new Date("2026-10-06T08:30:00Z"), to: new Date("2026-10-06T09:30:00Z") });
+        const rooms = await resources.roomsFor({
+            from: new Date("2026-10-06T08:30:00Z"),
+            to: new Date("2026-10-06T09:30:00Z")
+        });
         expect(rooms.find((entry) => entry.id === room.id)?.free).toBe(false);
     });
 
@@ -129,12 +150,19 @@ describe("rooms", () => {
         await book("2026-10-06T10:00:00", "2026-10-06T11:00:00");
         const clash = await book("2026-10-06T10:30:00", "2026-10-06T11:30:00", "Clash");
         expect(roomAnswer(clash)).toBe("DECLINED");
-        expect(world.objectsIn(room.id).map((row) => world.eventIn(row).summary)).toEqual(["Review"]);
+        expect(world.objectsIn(room.id).map((row) => world.eventIn(row).summary)).toEqual([
+            "Review"
+        ]);
     });
 
     it("lets go of the time when the event is deleted", async () => {
         const id = await book("2026-10-06T10:00:00", "2026-10-06T11:00:00");
-        await objects.deleteEvent(alice as never, { objectId: id, recurrenceKey: null, scope: "all", floatingZone: ZONE });
+        await objects.deleteEvent(alice as never, {
+            objectId: id,
+            recurrenceKey: null,
+            scope: "all",
+            floatingZone: ZONE
+        });
         expect(world.objectsIn(room.id)[0]?.deletedAt).toBeInstanceOf(Date);
         const again = await book("2026-10-06T10:00:00", "2026-10-06T11:00:00", "Again");
         expect(roomAnswer(again)).toBe("ACCEPTED");
@@ -148,7 +176,9 @@ describe("rooms", () => {
         expect([roomAnswer(first), roomAnswer(second)].sort()).toEqual(["ACCEPTED", "DECLINED"]);
         expect(world.objectsIn(room.id).filter((row) => !row.deletedAt)).toHaveLength(1);
         expect(locks.length).toBeGreaterThan(0);
-        expect(locks.every((lock) => lock.includes("CalendarLease") && lock.includes(room.id))).toBe(true);
+        expect(
+            locks.every((lock) => lock.includes("CalendarLease") && lock.includes(room.id))
+        ).toBe(true);
         expect(leases.size).toBe(0);
     });
 
@@ -174,13 +204,21 @@ describe("rooms", () => {
             description: "Who earns what",
             location: "Board room",
             classification: "PRIVATE",
-            attendees: [{ email: room.email, name: room.name, type: "ROOM" }, { email: "guest@outside.test" }]
+            attendees: [
+                { email: room.email, name: room.name, type: "ROOM" },
+                { email: "guest@outside.test" }
+            ]
         });
         const held = world.eventIn(world.objectsIn(room.id)[0]);
         expect(held).toMatchObject({ summary: "", description: "", location: "", alarms: [] });
         expect(held.organizer?.email).toBe(alice.email);
-        expect(held.attendees.map((attendee) => [attendee.email, attendee.partstat])).toEqual([[room.email, "ACCEPTED"]]);
-        const rooms = await resources.roomsFor({ from: new Date("2026-10-06T08:30:00Z"), to: new Date("2026-10-06T09:30:00Z") });
+        expect(held.attendees.map((attendee) => [attendee.email, attendee.partstat])).toEqual([
+            [room.email, "ACCEPTED"]
+        ]);
+        const rooms = await resources.roomsFor({
+            from: new Date("2026-10-06T08:30:00Z"),
+            to: new Date("2026-10-06T09:30:00Z")
+        });
         expect(rooms.find((entry) => entry.id === room.id)?.free).toBe(false);
     });
 
@@ -195,15 +233,29 @@ describe("rooms", () => {
                 start: world.at("2026-10-07T10:00:00"),
                 end: world.at("2026-10-07T11:00:00"),
                 organizer: { email: mallory.email, name: "Mallory" },
-                attendees: [{ email: room.email, name: room.name, role: "NON-PARTICIPANT", partstat: "NEEDS-ACTION", rsvp: true, type: "ROOM" }]
+                attendees: [
+                    {
+                        email: room.email,
+                        name: room.name,
+                        role: "NON-PARTICIPANT",
+                        partstat: "NEEDS-ACTION",
+                        rsvp: true,
+                        type: "ROOM"
+                    }
+                ]
             })
         );
-        expect(await resources.answerForRoom(mallory.id, room.id, forged, "REQUEST")).toBe("DECLINED");
+        expect(await resources.answerForRoom(mallory.id, room.id, forged, "REQUEST")).toBe(
+            "DECLINED"
+        );
         await resources.answerForRoom(mallory.id, room.id, forged, "CANCEL");
         const held = world.objectsIn(room.id);
         expect(held).toHaveLength(1);
         expect(held[0]?.deletedAt ?? null).toBeNull();
-        expect(world.eventIn(held[0])).toMatchObject({ summary: "Review", organizer: { email: alice.email } });
+        expect(world.eventIn(held[0])).toMatchObject({
+            summary: "Review",
+            organizer: { email: alice.email }
+        });
         expect(roomAnswer(id)).toBe("ACCEPTED");
     });
 });

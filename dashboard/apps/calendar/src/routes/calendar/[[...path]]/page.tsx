@@ -15,7 +15,11 @@ import { CalendarScreen } from "../../../screens/calendar-screen";
 
 export const dynamic = "force-dynamic";
 
-export default async function CalendarPage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function CalendarPage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     await requireCalendarUser();
     const t = await calendarT();
     const raw = (await params).path;
@@ -24,7 +28,13 @@ export default async function CalendarPage({ params }: { params: Promise<Record<
     return (
         <div className={`${PAGE_BLEED} [&:has([data-cal-ready])>[data-cal-fallback]]:hidden`}>
             <div data-cal-fallback className="h-full">
-                <CalendarShell words={{ today: t("header.today"), newEvent: t("header.newEvent"), loading: t("grid.loading") }} />
+                <CalendarShell
+                    words={{
+                        today: t("header.today"),
+                        newEvent: t("header.newEvent"),
+                        loading: t("grid.loading")
+                    }}
+                />
             </div>
             <CalendarScreen path={path} />
         </div>

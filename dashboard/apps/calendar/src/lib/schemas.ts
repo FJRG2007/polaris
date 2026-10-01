@@ -19,10 +19,7 @@ export function cleanText(value: string): string {
 }
 
 /** A one-line name: cleaned, then required and bounded. */
-export const nameSchema = z
-    .string()
-    .transform(cleanText)
-    .pipe(z.string().min(1).max(120));
+export const nameSchema = z.string().transform(cleanText).pipe(z.string().min(1).max(120));
 
 /** A CSS hex colour. */
 export const colorSchema = z
@@ -70,7 +67,10 @@ const alarmMinutes = z.array(z.number().int().min(-40320).max(40320)).max(5);
 export const calendarInputSchema = z.object({
     name: nameSchema,
     color: colorSchema,
-    description: z.string().max(2000).transform((value) => value.trim()),
+    description: z
+        .string()
+        .max(2000)
+        .transform((value) => value.trim()),
     timezone: zoneSchema,
     components: z.enum(["VEVENT", "VTODO", "VEVENT,VTODO"])
 });
@@ -81,7 +81,10 @@ export const calendarPatchSchema = z
     .object({
         name: nameSchema,
         color: colorSchema,
-        description: z.string().max(2000).transform((value) => value.trim()),
+        description: z
+            .string()
+            .max(2000)
+            .transform((value) => value.trim()),
         timezone: zoneSchema,
         transparent: z.boolean(),
         alarmsMuted: z.boolean(),
@@ -153,7 +156,11 @@ export const icsSourceSchema = z.object({
     url: addressSchema,
     name: nameSchema,
     color: colorSchema,
-    refreshMinutes: z.number().int().min(15).max(7 * 24 * 60)
+    refreshMinutes: z
+        .number()
+        .int()
+        .min(15)
+        .max(7 * 24 * 60)
 });
 
 export const caldavSourceSchema = z.object({
@@ -169,5 +176,8 @@ export const importInputSchema = z.object({
         z.object({ kind: z.literal("new"), name: nameSchema, color: colorSchema })
     ]),
     /** The file's text. 10 MiB is far more than any real calendar export. */
-    text: z.string().min(1).max(10 * 1024 * 1024)
+    text: z
+        .string()
+        .min(1)
+        .max(10 * 1024 * 1024)
 });

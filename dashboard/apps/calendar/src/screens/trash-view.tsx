@@ -30,7 +30,12 @@ export function TrashView() {
     const [busy, setBusy] = useState<string | null>(null);
     const [turn, setTurn] = useState(0);
     const format = hostUi.displayFormat.useDisplayFormat();
-    const preferencesRead = useCachedRead<CalendarPreferences>(cacheKey("preferences"), async () => (await unwrap(() => preferenceActions.loadPreferencesAction(), t("screen.failed"))).preferences);
+    const preferencesRead = useCachedRead<CalendarPreferences>(
+        cacheKey("preferences"),
+        async () =>
+            (await unwrap(() => preferenceActions.loadPreferencesAction(), t("screen.failed")))
+                .preferences
+    );
     const zone = displayZone(preferencesRead.data?.timezone ?? "auto", format.preferences.timeZone);
 
     useEffect(() => {
@@ -42,32 +47,65 @@ export function TrashView() {
                 setItems(answer.items);
                 setRetention(answer.retentionDays);
             })
-            .catch((caught: unknown) => live && setError(caught instanceof Error ? caught.message : String(caught)));
+            .catch(
+                (caught: unknown) =>
+                    live && setError(caught instanceof Error ? caught.message : String(caught))
+            );
         return () => {
             live = false;
         };
     }, [turn, t]);
 
-    const titleOf = (item: TrashItemView) => item.title || (item.kind === "calendar" ? t("trashPage.untitledCalendar") : t("screen.untitled"));
+    const titleOf = (item: TrashItemView) =>
+        item.title ||
+        (item.kind === "calendar" ? t("trashPage.untitledCalendar") : t("screen.untitled"));
 
     const act = async (item: TrashItemView, kind: "restore" | "purge") => {
         if (busy) return;
         if (kind === "purge") {
-            const ok = await confirm({ title: t("trashPage.purgeTitle", { title: titleOf(item) }), description: t("trashPage.purgeBody"), confirmLabel: t("trashPage.purge"), danger: true });
+            const ok = await confirm({
+                title: t("trashPage.purgeTitle", { title: titleOf(item) }),
+                description: t("trashPage.purgeBody"),
+                confirmLabel: t("trashPage.purge"),
+                danger: true
+            });
             if (!ok) return;
         }
         const previous = items;
         setBusy(`${item.kind}:${item.id}`);
-        setItems((current) => current?.filter((entry) => !(entry.kind === item.kind && entry.id === item.id)) ?? null);
+        setItems(
+            (current) =>
+                current?.filter((entry) => !(entry.kind === item.kind && entry.id === item.id)) ??
+                null
+        );
         try {
-            if (kind === "restore") await unwrap(() => trashActions.restoreTrashAction({ kind: item.kind, id: item.id, zone }), t("screen.failed"));
-            else await unwrap(() => trashActions.purgeTrashAction({ kind: item.kind, id: item.id }), t("screen.failed"));
+            if (kind === "restore")
+                await unwrap(
+                    () => trashActions.restoreTrashAction({ kind: item.kind, id: item.id, zone }),
+                    t("screen.failed")
+                );
+            else
+                await unwrap(
+                    () => trashActions.purgeTrashAction({ kind: item.kind, id: item.id }),
+                    t("screen.failed")
+                );
             dropCached("range");
             dropCached("calendars");
-            toast.show({ key: "calendar-trash", title: kind === "restore" ? t("trashPage.restored", { title: titleOf(item) }) : t("trashPage.purged", { title: titleOf(item) }) });
+            toast.show({
+                key: "calendar-trash",
+                title:
+                    kind === "restore"
+                        ? t("trashPage.restored", { title: titleOf(item) })
+                        : t("trashPage.purged", { title: titleOf(item) })
+            });
         } catch (caught) {
             setItems(previous);
-            toast.show({ key: "calendar-trash-failed", title: kind === "restore" ? t("trashPage.restoreFailed") : t("trashPage.purgeFailed"), body: caught instanceof Error ? caught.message : undefined });
+            toast.show({
+                key: "calendar-trash-failed",
+                title:
+                    kind === "restore" ? t("trashPage.restoreFailed") : t("trashPage.purgeFailed"),
+                body: caught instanceof Error ? caught.message : undefined
+            });
         } finally {
             setBusy(null);
         }
@@ -75,7 +113,12 @@ export function TrashView() {
 
     const empty = async () => {
         if (!items?.length || busy) return;
-        const ok = await confirm({ title: t("trashPage.emptyTitle"), description: t("trashPage.emptyBody", { count: items.length }), confirmLabel: t("trashPage.empty"), danger: true });
+        const ok = await confirm({
+            title: t("trashPage.emptyTitle"),
+            description: t("trashPage.emptyBody", { count: items.length }),
+            confirmLabel: t("trashPage.empty"),
+            danger: true
+        });
         if (!ok) return;
         const previous = items;
         setBusy("all");
@@ -85,7 +128,11 @@ export function TrashView() {
             toast.show({ key: "calendar-trash", title: t("trashPage.emptied") });
         } catch (caught) {
             setItems(previous);
-            toast.show({ key: "calendar-trash-failed", title: t("trashPage.emptyFailed"), body: caught instanceof Error ? caught.message : undefined });
+            toast.show({
+                key: "calendar-trash-failed",
+                title: t("trashPage.emptyFailed"),
+                body: caught instanceof Error ? caught.message : undefined
+            });
         } finally {
             setBusy(null);
         }
@@ -94,8 +141,16 @@ export function TrashView() {
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="min-w-0 flex-1 text-xs text-muted-foreground">{retention !== null ? t("trashPage.retention", { count: retention }) : " "}</p>
-                <Button size="sm" variant="outline" aria-disabled={!items?.length || busy !== null} title={!items?.length ? t("trashPage.nothing") : undefined} onClick={() => void empty()}>
+                <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                    {retention !== null ? t("trashPage.retention", { count: retention }) : " "}
+                </p>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    aria-disabled={!items?.length || busy !== null}
+                    title={!items?.length ? t("trashPage.nothing") : undefined}
+                    onClick={() => void empty()}
+                >
                     <Trash2 />
                     {t("trashPage.empty")}
                 </Button>
@@ -104,7 +159,11 @@ export function TrashView() {
                 <div role="alert" className="flex flex-col items-start gap-2">
                     <p className="text-[0.8125rem]">{t("trashPage.loadFailed")}</p>
                     <p className="text-xs text-muted-foreground">{error}</p>
-                    <Button size="sm" variant="outline" onClick={() => setTurn((value) => value + 1)}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setTurn((value) => value + 1)}
+                    >
                         {t("screen.retry")}
                     </Button>
                 </div>
@@ -115,7 +174,11 @@ export function TrashView() {
                     ))}
                 </div>
             ) : items.length === 0 ? (
-                <EmptyState icon={<CalendarDays />} title={t("trashPage.emptyState")} description={t("trashPage.emptyStateHint")} />
+                <EmptyState
+                    icon={<CalendarDays />}
+                    title={t("trashPage.emptyState")}
+                    description={t("trashPage.emptyStateHint")}
+                />
             ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full min-w-[32rem] text-[0.8125rem]">
@@ -133,7 +196,10 @@ export function TrashView() {
                             {items.map((item) => {
                                 const title = titleOf(item);
                                 return (
-                                    <tr key={`${item.kind}:${item.id}`} className="border-b border-border last:border-b-0">
+                                    <tr
+                                        key={`${item.kind}:${item.id}`}
+                                        className="border-b border-border last:border-b-0"
+                                    >
                                         <td className="w-full max-w-0 px-3 py-2">
                                             <span className="flex min-w-0 items-center gap-2">
                                                 <ColorDot color={item.color} />
@@ -141,15 +207,44 @@ export function TrashView() {
                                                     {title}
                                                 </span>
                                             </span>
-                                            <span className="block truncate text-xs text-foreground-subtle">{item.kind === "calendar" ? t("trashPage.kindCalendar") : t("trashPage.inCalendar", { name: item.calendarName })}</span>
+                                            <span className="block truncate text-xs text-foreground-subtle">
+                                                {item.kind === "calendar"
+                                                    ? t("trashPage.kindCalendar")
+                                                    : t("trashPage.inCalendar", {
+                                                          name: item.calendarName
+                                                      })}
+                                            </span>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-muted-foreground tabular-nums">{formatInstant(item.deletedAt, locale, zone, { dateStyle: "medium", timeStyle: "short" })}</td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-muted-foreground tabular-nums">{formatInstant(item.purgeAt, locale, zone, { dateStyle: "medium" })}</td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-muted-foreground tabular-nums">
+                                            {formatInstant(item.deletedAt, locale, zone, {
+                                                dateStyle: "medium",
+                                                timeStyle: "short"
+                                            })}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-muted-foreground tabular-nums">
+                                            {formatInstant(item.purgeAt, locale, zone, {
+                                                dateStyle: "medium"
+                                            })}
+                                        </td>
                                         <td className="whitespace-nowrap px-3 py-2 text-right">
-                                            <Button size="icon-sm" variant="ghost" aria-label={t("trashPage.restore", { title })} title={t("trashPage.restore", { title })} disabled={busy !== null} onClick={() => void act(item, "restore")}>
+                                            <Button
+                                                size="icon-sm"
+                                                variant="ghost"
+                                                aria-label={t("trashPage.restore", { title })}
+                                                title={t("trashPage.restore", { title })}
+                                                disabled={busy !== null}
+                                                onClick={() => void act(item, "restore")}
+                                            >
                                                 <RotateCcw />
                                             </Button>
-                                            <Button size="icon-sm" variant="ghost" aria-label={t("trashPage.purgeOne", { title })} title={t("trashPage.purgeOne", { title })} disabled={busy !== null} onClick={() => void act(item, "purge")}>
+                                            <Button
+                                                size="icon-sm"
+                                                variant="ghost"
+                                                aria-label={t("trashPage.purgeOne", { title })}
+                                                title={t("trashPage.purgeOne", { title })}
+                                                disabled={busy !== null}
+                                                onClick={() => void act(item, "purge")}
+                                            >
                                                 <Trash2 />
                                             </Button>
                                         </td>

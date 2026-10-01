@@ -7,11 +7,17 @@ import { preferencesPatchSchema, type CalendarPreferences } from "../lib/prefere
 import { requireCalendarUser } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 
-export async function loadPreferencesAction(): Promise<Outcome<{ preferences: CalendarPreferences }>> {
-    return outcome(async () => ({ preferences: await loadPreferences((await requireCalendarUser()).id) }));
+export async function loadPreferencesAction(): Promise<
+    Outcome<{ preferences: CalendarPreferences }>
+> {
+    return outcome(async () => ({
+        preferences: await loadPreferences((await requireCalendarUser()).id)
+    }));
 }
 
-export async function savePreferencesAction(patch: unknown): Promise<Outcome<{ preferences: CalendarPreferences }>> {
+export async function savePreferencesAction(
+    patch: unknown
+): Promise<Outcome<{ preferences: CalendarPreferences }>> {
     const parsed = preferencesPatchSchema.safeParse(patch);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => ({

@@ -21,20 +21,68 @@ import { hostUi } from "@polaris/app-host/client";
 import { loadInstanceSettingsAction } from "../../actions/instance";
 import type { InstanceSettings } from "../../lib/instance-settings";
 import { cacheKey, dropCached, unwrap, useCachedRead } from "../cached-read";
-import { CalDavForm, FeedForm, HolidayPicker, refreshOptions, REFRESH_CHOICES, SuggestedCalendars } from "./forms";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, KeyRound, Link2, Loader2, RefreshCw, Trash2, X } from "lucide-react";
-import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Select, Skeleton } from "@polaris/ui";
+import {
+    CalDavForm,
+    FeedForm,
+    HolidayPicker,
+    refreshOptions,
+    REFRESH_CHOICES,
+    SuggestedCalendars
+} from "./forms";
+import {
+    AlertTriangle,
+    ArrowLeft,
+    CheckCircle2,
+    Clock,
+    KeyRound,
+    Link2,
+    Loader2,
+    RefreshCw,
+    Trash2,
+    X
+} from "lucide-react";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 
-type Accounts = Extract<Awaited<ReturnType<typeof sources.loadAccountsAction>>, { ok: true }>["accounts"];
+type Accounts = Extract<
+    Awaited<ReturnType<typeof sources.loadAccountsAction>>,
+    { ok: true }
+>["accounts"];
 type Instance = { settings: InstanceSettings; canManage: boolean };
 
 const PROVIDER_NAMES = { google: "Google", microsoft: "Microsoft" } as const;
 
 /** The outcome a return from the connection flow carries, as a sentence. */
-function OutcomeBanner({ outcome, provider, onDismiss }: { outcome: string; provider: string; onDismiss: () => void }) {
+function OutcomeBanner({
+    outcome,
+    provider,
+    onDismiss
+}: {
+    outcome: string;
+    provider: string;
+    onDismiss: () => void;
+}) {
     const t = useCalendarT();
     const name = provider === "microsoft" ? PROVIDER_NAMES.microsoft : PROVIDER_NAMES.google;
-    const tone = outcome === "linked" ? "success" : outcome === "cancelled" ? "neutral" : outcome === "wrong_account" ? "warning" : "danger";
+    const tone =
+        outcome === "linked"
+            ? "success"
+            : outcome === "cancelled"
+              ? "neutral"
+              : outcome === "wrong_account"
+                ? "warning"
+                : "danger";
     const text =
         outcome === "linked"
             ? t("accounts.outcome.linked", { provider: name })
@@ -63,7 +111,13 @@ function OutcomeBanner({ outcome, provider, onDismiss }: { outcome: string; prov
     );
 }
 
-export function AccountsView({ linked, provider = "" }: { linked: string | null; provider?: string }) {
+export function AccountsView({
+    linked,
+    provider = ""
+}: {
+    linked: string | null;
+    provider?: string;
+}) {
     const t = useCalendarT();
     const generic = t("errors.generic");
     const [outcome, setOutcome] = useState<string | null>(linked);
@@ -71,7 +125,10 @@ export function AccountsView({ linked, provider = "" }: { linked: string | null;
         unwrap(() => sources.loadAccountsAction(), generic).then((answer) => answer.accounts)
     );
     const instance = useCachedRead<Instance>(cacheKey("instance"), () =>
-        unwrap(() => loadInstanceSettingsAction(), generic).then((answer) => ({ settings: answer.settings, canManage: answer.canManage }))
+        unwrap(() => loadInstanceSettingsAction(), generic).then((answer) => ({
+            settings: answer.settings,
+            canManage: answer.canManage
+        }))
     );
 
     function dismiss(): void {
@@ -96,7 +153,10 @@ export function AccountsView({ linked, provider = "" }: { linked: string | null;
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
             <div className="flex flex-col gap-1">
-                <Link href="/calendar" className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                <Link
+                    href="/calendar"
+                    className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
                     <ArrowLeft className="size-3.5" aria-hidden />
                     {t("accounts.back")}
                 </Link>
@@ -104,7 +164,9 @@ export function AccountsView({ linked, provider = "" }: { linked: string | null;
                 <p className="text-muted-foreground">{t("accounts.lead")}</p>
             </div>
 
-            {outcome ? <OutcomeBanner outcome={outcome} provider={provider} onDismiss={dismiss} /> : null}
+            {outcome ? (
+                <OutcomeBanner outcome={outcome} provider={provider} onDismiss={dismiss} />
+            ) : null}
 
             <section className="flex flex-col gap-2">
                 <GroupHeading>{t("accounts.sourcesTitle")}</GroupHeading>
@@ -120,17 +182,36 @@ export function AccountsView({ linked, provider = "" }: { linked: string | null;
                         </Button>
                     </div>
                 ) : data.sources.length === 0 ? (
-                    <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">{t("accounts.sourcesEmpty")}</p>
+                    <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+                        {t("accounts.sourcesEmpty")}
+                    </p>
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {data.sources.map((source) => (
                             <SourceRow
                                 key={source.id}
                                 source={source}
-                                reconnectUrl={source.kind === "google" || source.kind === "microsoft" ? data.linkUrls[source.kind] : null}
-                                onReplace={(next) => accounts.replace({ ...data, sources: data.sources.map((entry) => (entry.id === next.id ? next : entry)) })}
+                                reconnectUrl={
+                                    source.kind === "google" || source.kind === "microsoft"
+                                        ? data.linkUrls[source.kind]
+                                        : null
+                                }
+                                onReplace={(next) =>
+                                    accounts.replace({
+                                        ...data,
+                                        sources: data.sources.map((entry) =>
+                                            entry.id === next.id ? next : entry
+                                        )
+                                    })
+                                }
                                 onRemoved={(gone) => {
-                                    if (gone) accounts.replace({ ...data, sources: data.sources.filter((entry) => entry.id !== source.id) });
+                                    if (gone)
+                                        accounts.replace({
+                                            ...data,
+                                            sources: data.sources.filter(
+                                                (entry) => entry.id !== source.id
+                                            )
+                                        });
                                     else changed();
                                 }}
                             />
@@ -141,7 +222,11 @@ export function AccountsView({ linked, provider = "" }: { linked: string | null;
 
             <section className="flex flex-col gap-2">
                 <GroupHeading>{t("accounts.linkedTitle")}</GroupHeading>
-                {data ? <LinkedAccounts accounts={data} onChanged={changed} /> : <SourceSkeleton rows={1} />}
+                {data ? (
+                    <LinkedAccounts accounts={data} onChanged={changed} />
+                ) : (
+                    <SourceSkeleton rows={1} />
+                )}
             </section>
 
             <section className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
@@ -164,10 +249,18 @@ export function AccountsView({ linked, provider = "" }: { linked: string | null;
 
             {allow ? (
                 <>
-                    {instance.data ? <SuggestedCalendars suggested={instance.data.settings.suggested} onAdded={changed} subscribed={subscribed} /> : null}
+                    {instance.data ? (
+                        <SuggestedCalendars
+                            suggested={instance.data.settings.suggested}
+                            onAdded={changed}
+                            subscribed={subscribed}
+                        />
+                    ) : null}
                     <section className="flex flex-col gap-2">
                         <GroupHeading>{t("accounts.holidays.title")}</GroupHeading>
-                        <p className="text-xs text-foreground-subtle">{t("accounts.holidays.lead")}</p>
+                        <p className="text-xs text-foreground-subtle">
+                            {t("accounts.holidays.lead")}
+                        </p>
                         <HolidayPicker onAdded={changed} subscribed={subscribed} />
                     </section>
                 </>
@@ -183,7 +276,10 @@ export function SubscriptionsOff({ canManage }: { canManage: boolean }) {
         <p className="text-[13px] text-muted-foreground">
             {t("accounts.subscriptionsOff")}{" "}
             {canManage ? (
-                <Link href="/calendar/admin" className="text-foreground underline underline-offset-2">
+                <Link
+                    href="/calendar/admin"
+                    className="text-foreground underline underline-offset-2"
+                >
                     {t("accounts.subscriptionsOn")}
                 </Link>
             ) : null}
@@ -195,7 +291,10 @@ function SourceSkeleton({ rows = 2 }: { rows?: number }) {
     return (
         <div className="flex flex-col gap-2" aria-hidden>
             {Array.from({ length: rows }, (_, index) => (
-                <div key={index} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5">
+                <div
+                    key={index}
+                    className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5"
+                >
                     <div className="flex flex-1 flex-col gap-1.5">
                         <Skeleton className="h-4 w-48 max-w-full" />
                         <Skeleton className="h-3 w-32" />
@@ -232,26 +331,44 @@ function LinkedAccounts({ accounts, onChanged }: { accounts: Accounts; onChanged
     return (
         <div className="flex flex-col gap-2">
             {error ? <StatusNote tone="danger">{error}</StatusNote> : null}
-            {unused.length === 0 && accounts.links.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("accounts.linkedEmpty")}</p> : null}
+            {unused.length === 0 && accounts.links.length === 0 ? (
+                <p className="text-[13px] text-muted-foreground">{t("accounts.linkedEmpty")}</p>
+            ) : null}
             {unused.length > 0 ? (
                 <ul className="flex flex-col gap-2">
                     {unused.map((link) => (
-                        <li key={link.id} className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5">
+                        <li
+                            key={link.id}
+                            className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5"
+                        >
                             <Logo slug={link.provider} className="size-5" />
                             <div className="min-w-0 flex-1">
                                 <p className="truncate font-medium" title={link.label}>
                                     {link.label}
                                 </p>
-                                {!link.grantsCalendar ? <p className="text-xs text-foreground-subtle">{t("accounts.reconnectHint")}</p> : null}
+                                {!link.grantsCalendar ? (
+                                    <p className="text-xs text-foreground-subtle">
+                                        {t("accounts.reconnectHint")}
+                                    </p>
+                                ) : null}
                             </div>
                             {link.grantsCalendar ? (
-                                <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void use(link.id)}>
-                                    {busy === link.id ? <Loader2 className="animate-spin" aria-hidden /> : null}
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy !== null}
+                                    onClick={() => void use(link.id)}
+                                >
+                                    {busy === link.id ? (
+                                        <Loader2 className="animate-spin" aria-hidden />
+                                    ) : null}
                                     {t("accounts.useForCalendars")}
                                 </Button>
                             ) : (
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href={accounts.linkUrls[link.provider]}>{t("accounts.reconnect")}</a>
+                                    <a href={accounts.linkUrls[link.provider]}>
+                                        {t("accounts.reconnect")}
+                                    </a>
                                 </Button>
                             )}
                         </li>
@@ -268,7 +385,9 @@ function LinkedAccounts({ accounts, onChanged }: { accounts: Accounts; onChanged
                 <Button size="sm" variant="secondary" asChild>
                     <a href={accounts.linkUrls.microsoft}>
                         <Logo slug="microsoft" className="size-4" />
-                        {hasMicrosoft ? t("accounts.linkAnotherMicrosoft") : t("accounts.linkMicrosoft")}
+                        {hasMicrosoft
+                            ? t("accounts.linkAnotherMicrosoft")
+                            : t("accounts.linkMicrosoft")}
                     </a>
                 </Button>
             </div>
@@ -328,7 +447,10 @@ function SourceRow({
         onReplace({ ...source, refreshMinutes: minutes });
         setError(null);
         try {
-            await unwrap(() => sources.updateSourceAction({ id: source.id, refreshMinutes: minutes }), generic);
+            await unwrap(
+                () => sources.updateSourceAction({ id: source.id, refreshMinutes: minutes }),
+                generic
+            );
         } catch (caught) {
             onReplace(before);
             setError(caught instanceof Error ? caught.message : generic);
@@ -353,7 +475,9 @@ function SourceRow({
         }
     }
 
-    const intervalValue = REFRESH_CHOICES.some((choice) => choice.minutes === source.refreshMinutes) ? String(source.refreshMinutes) : "";
+    const intervalValue = REFRESH_CHOICES.some((choice) => choice.minutes === source.refreshMinutes)
+        ? String(source.refreshMinutes)
+        : "";
 
     return (
         <li className="flex flex-col gap-2 rounded-md border border-border bg-card px-3 py-2.5">
@@ -364,25 +488,45 @@ function SourceRow({
                         <span className="min-w-0 truncate font-medium" title={name}>
                             {name}
                         </span>
-                        <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground">{t(`accounts.kinds.${source.kind}`)}</span>
+                        <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            {t(`accounts.kinds.${source.kind}`)}
+                        </span>
                     </p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-foreground-subtle">
-                        <span className={cn("inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]", chip)}>
-                            {tone === "success" ? <CheckCircle2 className="size-3" aria-hidden /> : <AlertTriangle className="size-3" aria-hidden />}
+                        <span
+                            className={cn(
+                                "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]",
+                                chip
+                            )}
+                        >
+                            {tone === "success" ? (
+                                <CheckCircle2 className="size-3" aria-hidden />
+                            ) : (
+                                <AlertTriangle className="size-3" aria-hidden />
+                            )}
                             {t(`accounts.status.${source.status}`)}
                         </span>
                         <span className="inline-flex items-center gap-1">
                             <Clock className="size-3" aria-hidden />
-                            {source.lastSyncAt ? <RelativeTime iso={source.lastSyncAt} /> : t("accounts.neverSynced")}
+                            {source.lastSyncAt ? (
+                                <RelativeTime iso={source.lastSyncAt} />
+                            ) : (
+                                t("accounts.neverSynced")
+                            )}
                         </span>
                         <span>{t("accounts.calendarCount", { count: source.calendarCount })}</span>
                     </p>
                     {source.kind === "ics" && source.url ? (
-                        <p className="mt-0.5 truncate text-xs text-foreground-subtle" title={source.url}>
+                        <p
+                            className="mt-0.5 truncate text-xs text-foreground-subtle"
+                            title={source.url}
+                        >
                             {source.url}
                         </p>
                     ) : null}
-                    {source.status === "error" && source.lastError ? <p className="mt-0.5 text-xs text-foreground-subtle">{source.lastError}</p> : null}
+                    {source.status === "error" && source.lastError ? (
+                        <p className="mt-0.5 text-xs text-foreground-subtle">{source.lastError}</p>
+                    ) : null}
                 </div>
                 <div className="flex items-center gap-1">
                     {source.status === "auth" && reconnectUrl ? (
@@ -457,7 +601,13 @@ function SourceRow({
                 />
             ) : null}
             {source.kind === "ics" ? (
-                <AddressDialog open={addressOpen} onOpenChange={setAddressOpen} name={name} sourceId={source.id} onSaved={onReplace} />
+                <AddressDialog
+                    open={addressOpen}
+                    onOpenChange={setAddressOpen}
+                    name={name}
+                    sourceId={source.id}
+                    onSaved={onReplace}
+                />
             ) : null}
         </li>
     );
@@ -493,7 +643,10 @@ function PasswordDialog({
         setBusy(true);
         setError(null);
         try {
-            await unwrap(() => sources.updateSourceAction({ id: sourceId, password }), t("errors.generic"));
+            await unwrap(
+                () => sources.updateSourceAction({ id: sourceId, password }),
+                t("errors.generic")
+            );
             onSaved();
             onOpenChange(false);
         } catch (caught) {
@@ -574,7 +727,8 @@ function AddressDialog({
     }, [open]);
 
     const result = addressSchema.safeParse(url);
-    const issue = touched && url.trim() !== "" && !result.success ? issueText(result.error.issues) : null;
+    const issue =
+        touched && url.trim() !== "" && !result.success ? issueText(result.error.issues) : null;
 
     async function save(): Promise<void> {
         setTouched(true);
@@ -583,7 +737,10 @@ function AddressDialog({
         setBusy(true);
         setError(null);
         try {
-            const answer = await unwrap(() => sources.updateSourceAction({ id: sourceId, url: address }), t("errors.generic"));
+            const answer = await unwrap(
+                () => sources.updateSourceAction({ id: sourceId, url: address }),
+                t("errors.generic")
+            );
             onSaved(answer.source);
             onOpenChange(false);
         } catch (caught) {
@@ -608,7 +765,12 @@ function AddressDialog({
                     className="flex flex-col gap-3"
                     noValidate
                 >
-                    <FieldRow label={`${t("accounts.feed.url")} *`} htmlFor={`${sourceId}-address`} error={issue} hint={t("accounts.addressHint")}>
+                    <FieldRow
+                        label={`${t("accounts.feed.url")} *`}
+                        htmlFor={`${sourceId}-address`}
+                        error={issue}
+                        hint={t("accounts.addressHint")}
+                    >
                         <Input
                             id={`${sourceId}-address`}
                             type="url"

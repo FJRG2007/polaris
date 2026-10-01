@@ -8,7 +8,9 @@ import { requireCalendarUser } from "../lib/access";
 import { importInputSchema, isKnownZone } from "../lib/schemas";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 
-const input = importInputSchema.extend({ zone: z.string().max(64).refine(isKnownZone).default("UTC") });
+const input = importInputSchema.extend({
+    zone: z.string().max(64).refine(isKnownZone).default("UTC")
+});
 
 export async function importCalendarAction(
     raw: unknown

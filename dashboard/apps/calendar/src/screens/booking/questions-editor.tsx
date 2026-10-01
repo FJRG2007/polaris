@@ -29,13 +29,20 @@ export function QuestionsEditor({
         { value: "choice", label: t("bookingPage.kindChoice") }
     ];
     const update = (index: number, patch: Partial<BookingQuestion>) =>
-        onChange(value.map((question, at) => (at === index ? { ...question, ...patch } : question)));
+        onChange(
+            value.map((question, at) => (at === index ? { ...question, ...patch } : question))
+        );
 
     return (
         <div className="flex flex-col gap-2">
-            {value.length === 0 ? <p className="text-foreground-subtle">{t("bookingPage.noQuestions")}</p> : null}
+            {value.length === 0 ? (
+                <p className="text-foreground-subtle">{t("bookingPage.noQuestions")}</p>
+            ) : null}
             {value.map((question, index) => (
-                <div key={question.id} className="flex flex-col gap-2 rounded-md border border-border p-3">
+                <div
+                    key={question.id}
+                    className="flex flex-col gap-2 rounded-md border border-border p-3"
+                >
                     <div className="flex flex-wrap items-center gap-2">
                         <Input
                             value={question.label}
@@ -46,13 +53,26 @@ export function QuestionsEditor({
                         />
                         <Select
                             value={question.kind}
-                            onValueChange={(kind) => update(index, { kind: kind as QuestionKind, options: kind === "choice" && question.options.length === 0 ? ["", ""] : question.options })}
+                            onValueChange={(kind) =>
+                                update(index, {
+                                    kind: kind as QuestionKind,
+                                    options:
+                                        kind === "choice" && question.options.length === 0
+                                            ? ["", ""]
+                                            : question.options
+                                })
+                            }
                             options={kinds}
                             aria-label={t("bookingPage.questionKind")}
                             className="w-40"
                         />
                         <label className="flex items-center gap-2 text-muted-foreground">
-                            <Checkbox checked={question.required} onChange={(event) => update(index, { required: event.target.checked })} />
+                            <Checkbox
+                                checked={question.required}
+                                onChange={(event) =>
+                                    update(index, { required: event.target.checked })
+                                }
+                            />
                             {t("bookingPage.required")}
                         </label>
                         <Button
@@ -71,15 +91,31 @@ export function QuestionsEditor({
                                 <div key={at} className="flex items-center gap-1.5">
                                     <Input
                                         value={option}
-                                        onChange={(event) => update(index, { options: question.options.map((entry, place) => (place === at ? event.target.value : entry)) })}
-                                        placeholder={t("bookingPage.optionPlaceholder", { n: at + 1 })}
-                                        aria-label={t("bookingPage.optionPlaceholder", { n: at + 1 })}
+                                        onChange={(event) =>
+                                            update(index, {
+                                                options: question.options.map((entry, place) =>
+                                                    place === at ? event.target.value : entry
+                                                )
+                                            })
+                                        }
+                                        placeholder={t("bookingPage.optionPlaceholder", {
+                                            n: at + 1
+                                        })}
+                                        aria-label={t("bookingPage.optionPlaceholder", {
+                                            n: at + 1
+                                        })}
                                         className="min-w-0 flex-1"
                                     />
                                     <Button
                                         size="icon-sm"
                                         variant="ghost"
-                                        onClick={() => update(index, { options: question.options.filter((_, place) => place !== at) })}
+                                        onClick={() =>
+                                            update(index, {
+                                                options: question.options.filter(
+                                                    (_, place) => place !== at
+                                                )
+                                            })
+                                        }
                                         aria-label={t("bookingPage.removeOption")}
                                         title={t("bookingPage.removeOption")}
                                     >
@@ -88,7 +124,14 @@ export function QuestionsEditor({
                                 </div>
                             ))}
                             <div>
-                                <Button size="xs" variant="ghost" disabled={question.options.length >= 20} onClick={() => update(index, { options: [...question.options, ""] })}>
+                                <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    disabled={question.options.length >= 20}
+                                    onClick={() =>
+                                        update(index, { options: [...question.options, ""] })
+                                    }
+                                >
                                     <Plus />
                                     {t("bookingPage.addOption")}
                                 </Button>
@@ -98,7 +141,12 @@ export function QuestionsEditor({
                 </div>
             ))}
             <div>
-                <Button size="sm" variant="outline" disabled={value.length >= MAX_QUESTIONS} onClick={() => onChange([...value, newQuestion()])}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={value.length >= MAX_QUESTIONS}
+                    onClick={() => onChange([...value, newQuestion()])}
+                >
                     <Plus />
                     {t("bookingPage.addQuestion")}
                 </Button>

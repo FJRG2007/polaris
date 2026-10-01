@@ -21,7 +21,17 @@ import type { OccurrenceView } from "../../lib/wire";
 import { cacheKey, useCachedRead } from "../cached-read";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { Button, cn, SegmentedControl } from "@polaris/ui";
-import { CalendarPlus, Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Globe, Loader2 } from "lucide-react";
+import {
+    CalendarPlus,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Copy,
+    Download,
+    ExternalLink,
+    Globe,
+    Loader2
+} from "lucide-react";
 
 const PublicGrid = lazy(() => import("./public-grid"));
 
@@ -46,7 +56,15 @@ function firstDayFor(locale: string): number {
     return /^en-US$|^es-US$|^pt-BR$/.test(locale) ? 0 : 1;
 }
 
-export function PublicCalendar({ token, name, color, description, mode, base, embed = false }: PublicCalendarProps) {
+export function PublicCalendar({
+    token,
+    name,
+    color,
+    description,
+    mode,
+    base,
+    embed = false
+}: PublicCalendarProps) {
     const t = useCalendarT();
     const locale = hostUi.i18nProvider.useLocale();
     const [zone, setZone] = useState(() => time.browserZone());
@@ -59,12 +77,18 @@ export function PublicCalendar({ token, name, color, description, mode, base, em
     const instants = time.windowInstants(days, zone);
     const from = instants.from.toISOString();
     const to = instants.to.toISOString();
-    const range = useCachedRead<RangeAnswer>(cacheKey("public", token, from, to, zone), async (signal) => {
-        const query = new URLSearchParams({ from, to, zone });
-        const response = await fetch(`/api/calendar/public/${encodeURIComponent(token)}/range?${query.toString()}`, { signal, cache: "no-store" });
-        if (!response.ok) throw new Error(t("publicPage.loadFailed"));
-        return (await response.json()) as RangeAnswer;
-    });
+    const range = useCachedRead<RangeAnswer>(
+        cacheKey("public", token, from, to, zone),
+        async (signal) => {
+            const query = new URLSearchParams({ from, to, zone });
+            const response = await fetch(
+                `/api/calendar/public/${encodeURIComponent(token)}/range?${query.toString()}`,
+                { signal, cache: "no-store" }
+            );
+            if (!response.ok) throw new Error(t("publicPage.loadFailed"));
+            return (await response.json()) as RangeAnswer;
+        }
+    );
 
     const busyLabel = t("published.busy");
     const events = useMemo<EventInput[]>(
@@ -75,8 +99,14 @@ export function PublicCalendar({ token, name, color, description, mode, base, em
                     id: `${occurrence.objectId}:${occurrence.recurrenceKey}`,
                     title,
                     allDay: occurrence.allDay,
-                    start: occurrence.allDay && occurrence.startDate ? occurrence.startDate : time.wallOf(occurrence.start, zone),
-                    end: occurrence.allDay && occurrence.endDate ? occurrence.endDate : time.wallOf(occurrence.end, zone),
+                    start:
+                        occurrence.allDay && occurrence.startDate
+                            ? occurrence.startDate
+                            : time.wallOf(occurrence.start, zone),
+                    end:
+                        occurrence.allDay && occurrence.endDate
+                            ? occurrence.endDate
+                            : time.wallOf(occurrence.end, zone),
                     backgroundColor: color,
                     borderColor: color,
                     classNames: occurrence.status === "TENTATIVE" ? ["pc-tentative"] : [],
@@ -105,7 +135,11 @@ export function PublicCalendar({ token, name, color, description, mode, base, em
                 >
                     <ChevronLeft aria-hidden />
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setAnchor(time.todayIn(zone, new Date()))}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAnchor(time.todayIn(zone, new Date()))}
+                >
                     {t("publicPage.today")}
                 </Button>
                 <Button
@@ -148,7 +182,13 @@ export function PublicCalendar({ token, name, color, description, mode, base, em
                 </Button>
                 {embed ? (
                     <Button size="icon-sm" variant="ghost" asChild>
-                        <a href={pageUrl} target="_blank" rel="noopener noreferrer" aria-label={t("embed.openFull")} title={t("embed.openFull")}>
+                        <a
+                            href={pageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={t("embed.openFull")}
+                            title={t("embed.openFull")}
+                        >
                             <ExternalLink aria-hidden />
                         </a>
                     </Button>
@@ -158,7 +198,12 @@ export function PublicCalendar({ token, name, color, description, mode, base, em
     );
 
     const grid = (
-        <div className={cn("relative min-h-0 overflow-hidden rounded-lg border border-border bg-card", embed ? "flex-1" : "h-[70vh] min-h-[28rem]")}>
+        <div
+            className={cn(
+                "relative min-h-0 overflow-hidden rounded-lg border border-border bg-card",
+                embed ? "flex-1" : "h-[70vh] min-h-[28rem]"
+            )}
+        >
             <Suspense fallback={<div className="h-full animate-pulse bg-muted/40" aria-hidden />}>
                 <PublicGrid
                     view={view}
@@ -220,13 +265,25 @@ export function PublicCalendar({ token, name, color, description, mode, base, em
                 <header className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-col gap-1">
                         <h1 className="flex min-w-0 items-center gap-2 text-[17px] font-semibold tracking-tight">
-                            <span aria-hidden className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                            <span
+                                aria-hidden
+                                className="inline-block size-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: color }}
+                            />
                             <span className="min-w-0 truncate" title={name}>
                                 {name}
                             </span>
                         </h1>
-                        {description ? <p className="whitespace-pre-wrap text-muted-foreground">{description}</p> : null}
-                        {mode === "busy" ? <p className="text-xs text-foreground-subtle">{t("publicPage.busyNote")}</p> : null}
+                        {description ? (
+                            <p className="whitespace-pre-wrap text-muted-foreground">
+                                {description}
+                            </p>
+                        ) : null}
+                        {mode === "busy" ? (
+                            <p className="text-xs text-foreground-subtle">
+                                {t("publicPage.busyNote")}
+                            </p>
+                        ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <Button size="sm" asChild>
@@ -269,7 +326,9 @@ function CopyLinkButton({ value }: { value: string }) {
     return (
         <Button size="sm" variant="outline" onClick={() => void copy()}>
             {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-            <span aria-live="polite">{copied ? t("publicPage.copied") : t("publicPage.copyLink")}</span>
+            <span aria-live="polite">
+                {copied ? t("publicPage.copied") : t("publicPage.copyLink")}
+            </span>
         </Button>
     );
 }

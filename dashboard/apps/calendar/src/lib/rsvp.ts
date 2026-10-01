@@ -21,12 +21,16 @@ const OCCURRENCES_OFFERED = 12;
 
 function eventsOf(item: engine.CalendarItem): engine.CalendarEvent[] {
     if (item.component !== "VEVENT") return [];
-    return [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent => Boolean(event));
+    return [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent =>
+        Boolean(event)
+    );
 }
 
 /** The zone an event's times are written in. */
 function zoneOf(event: engine.CalendarEvent): string {
-    return "tzid" in event.start && event.start.tzid ? (engine.resolveZone(event.start.tzid) ?? "UTC") : "UTC";
+    return "tzid" in event.start && event.start.tzid
+        ? (engine.resolveZone(event.start.tzid) ?? "UTC")
+        : "UTC";
 }
 
 /** Whether a key names an occurrence the series really has - not merely a
@@ -34,8 +38,13 @@ function zoneOf(event: engine.CalendarEvent): string {
 function isOccurrence(item: engine.CalendarItem, key: string, zone: string): boolean {
     const placed = engine.occurrenceFor(item, key, zone);
     if (!placed) return false;
-    const around = { from: new Date(placed.start.getTime() - 86_400_000), to: new Date(placed.end.getTime() + 86_400_000) };
-    return engine.expandItem(item, around, { floatingZone: zone, limit: 100 }).some((occurrence) => occurrence.recurrenceKey === key);
+    const around = {
+        from: new Date(placed.start.getTime() - 86_400_000),
+        to: new Date(placed.end.getTime() + 86_400_000)
+    };
+    return engine
+        .expandItem(item, around, { floatingZone: zone, limit: 100 })
+        .some((occurrence) => occurrence.recurrenceKey === key);
 }
 
 /** The invitation a link opens, as its page draws it; null when the link is
@@ -48,9 +57,17 @@ export async function rsvpView(token: string, now = new Date()): Promise<RsvpVie
     const event = item.master ?? item.overrides[0];
     if (!event) return null;
     const zone = zoneOf(event);
-    const first = engine.occurrenceFor(item, engine.valueToInstant(event.start, zone, item.timezones).toISOString(), zone);
+    const first = engine.occurrenceFor(
+        item,
+        engine.valueToInstant(event.start, zone, item.timezones).toISOString(),
+        zone
+    );
     const upcoming = engine.isRecurring(event)
-        ? engine.expandItem(item, { from: now, to: new Date(now.getTime() + 2 * 366 * 86_400_000) }, { floatingZone: zone, limit: OCCURRENCES_OFFERED })
+        ? engine.expandItem(
+              item,
+              { from: now, to: new Date(now.getTime() + 2 * 366 * 86_400_000) },
+              { floatingZone: zone, limit: OCCURRENCES_OFFERED }
+          )
         : [];
     const shown = upcoming[0] ?? first;
     const own = eventsOf(item)
@@ -62,7 +79,9 @@ export async function rsvpView(token: string, now = new Date()): Promise<RsvpVie
         location: event.location,
         conference: event.conference,
         organizer: event.organizer?.name || event.organizer?.email || "",
-        start: (shown?.start ?? engine.valueToInstant(event.start, zone, item.timezones)).toISOString(),
+        start: (
+            shown?.start ?? engine.valueToInstant(event.start, zone, item.timezones)
+        ).toISOString(),
         end: (shown?.end ?? engine.valueToInstant(event.end, zone, item.timezones)).toISOString(),
         allDay: shown?.allDay ?? "date" in event.start,
         startDate: shown?.startDate ?? null,
@@ -81,9 +100,11 @@ export async function rsvpView(token: string, now = new Date()): Promise<RsvpVie
 }
 
 /** Record an answer given through the link, on the organizer's copy. */
-export async function answerByToken(
-    input: { token: string; partstat: "ACCEPTED" | "TENTATIVE" | "DECLINED"; recurrenceKey: string | null }
-): Promise<void> {
+export async function answerByToken(input: {
+    token: string;
+    partstat: "ACCEPTED" | "TENTATIVE" | "DECLINED";
+    recurrenceKey: string | null;
+}): Promise<void> {
     const t = await calendarT();
     await throttle(`calendar.rsvp:${await callerAddress()}`, 30, 600_000);
     await throttle(`calendar.rsvp-token:${input.token}`, 10, 3_600_000);
@@ -97,7 +118,13 @@ export async function answerByToken(
     if (input.recurrenceKey && !isOccurrence(item, input.recurrenceKey, zoneOf(series))) {
         throw new CalendarRefusal(t("rsvp.noSuchOccurrence"));
     }
-    await applyAnswer(invitation.object.calendar.ownerId, invitation.object.uid, invitation.email, input.partstat, input.recurrenceKey);
+    await applyAnswer(
+        invitation.object.calendar.ownerId,
+        invitation.object.uid,
+        invitation.email,
+        input.partstat,
+        input.recurrenceKey
+    );
     // Kept in step even when the organizer's copy could not be read, so the
     // page shows the answer that was given.
     await prisma.calendarInvitation.update({

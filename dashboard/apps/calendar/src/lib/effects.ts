@@ -36,12 +36,16 @@ export async function afterObjectChange(change: ObjectChange): Promise<void> {
     const reminders = await import("./reminders");
     await reminders
         .planObject(change.objectId, change.after && !calendar.alarmsMuted ? change.after : null)
-        .catch((caught: unknown) => console.error("polaris: calendar reminders were not planned:", caught));
+        .catch((caught: unknown) =>
+            console.error("polaris: calendar reminders were not planned:", caught)
+        );
 
     const booking = await import("./booking");
     await booking
         .followEvent(change)
-        .catch((caught: unknown) => console.error("polaris: a booking did not follow its event:", caught));
+        .catch((caught: unknown) =>
+            console.error("polaris: a booking did not follow its event:", caught)
+        );
 
     if (calendar.sourceId && !change.context.fromProvider) {
         const sync = await import("./sync-engine");
@@ -60,6 +64,8 @@ export async function afterObjectChange(change: ObjectChange): Promise<void> {
         const invitations = await import("./invitations");
         await invitations
             .afterChange(change, calendar.ownerId)
-            .catch((caught: unknown) => console.error("polaris: calendar invitations were not sent:", caught));
+            .catch((caught: unknown) =>
+                console.error("polaris: calendar invitations were not sent:", caught)
+            );
     }
 }

@@ -119,7 +119,10 @@ export async function writeItem(
     // A change made here is stamped now (DTSTAMP is when the object last
     // changed, and clients compare it); what came from a provider or a file
     // keeps the stamp it arrived with.
-    const ics = engine.serializeItem(item, context.fromProvider || context.fromImport ? {} : { now: new Date() });
+    const ics = engine.serializeItem(
+        item,
+        context.fromProvider || context.fromImport ? {} : { now: new Date() }
+    );
     const columns = derived(item, context.floatingZone);
     const before = previous ? tryItemOf(previous.ics) : null;
     const row = previous
@@ -148,14 +151,16 @@ export async function writableObject(user: SessionUser, objectId: string, versio
     const t = await calendarT();
     if (!row || row.deletedAt) throw new CalendarRefusal(t("errors.eventNotFound"));
     const calendar = await requireWritableCalendar(user.id, row.calendarId);
-    if (version && version !== versionOf(row)) throw new CalendarRefusal(t("errors.changedMeanwhile"));
+    if (version && version !== versionOf(row))
+        throw new CalendarRefusal(t("errors.changedMeanwhile"));
     return { row, calendar };
 }
 
 /** One stored object this person may read. */
 export async function readableObject(user: SessionUser, objectId: string) {
     const row = await prisma.calendarObject.findUnique({ where: { id: objectId }, select: STORED });
-    if (!row || row.deletedAt) throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
+    if (!row || row.deletedAt)
+        throw new CalendarRefusal((await calendarT())("errors.eventNotFound"));
     const calendar = await requireCalendar(user.id, row.calendarId, "freebusy");
     return { row, calendar };
 }
@@ -176,9 +181,16 @@ export function eventFromInput(
     organizer: engine.Person | null
 ): engine.CalendarEvent {
     const rule =
-        input.keepRule && base?.rule ? base.rule : input.rule ? engine.ruleFromEditor(input.rule, input.start) : null;
+        input.keepRule && base?.rule
+            ? base.rule
+            : input.rule
+              ? engine.ruleFromEditor(input.rule, input.start)
+              : null;
     const hasAttendees = input.attendees.length > 0;
-    const fields: Partial<engine.CalendarEvent> & { start: engine.CalendarEvent["start"]; end: engine.CalendarEvent["end"] } = {
+    const fields: Partial<engine.CalendarEvent> & {
+        start: engine.CalendarEvent["start"];
+        end: engine.CalendarEvent["end"];
+    } = {
         summary: input.summary,
         description: input.description,
         location: input.location,
@@ -197,7 +209,9 @@ export function eventFromInput(
             // What the provider knew about a file (its size, its id at Google)
             // stays with it when the editor sends the same link back.
             const known = base?.attachments.find((existing) => existing.uri === attachment.uri);
-            return known ? { ...known, name: attachment.name, mime: attachment.mime || known.mime } : attachment;
+            return known
+                ? { ...known, name: attachment.name, mime: attachment.mime || known.mime }
+                : attachment;
         }),
         attendees: input.attendees.map((attendee) => {
             // An answer is the attendee's, never the editor's: keep what they said.
@@ -223,7 +237,10 @@ export interface SaveEventInput {
  * Create or change an event. Moving it to another calendar is part of the same
  * save: the row moves, and a provider calendar on either side is told.
  */
-export async function saveEvent(user: SessionUser, input: SaveEventInput): Promise<{ objectId: string }> {
+export async function saveEvent(
+    user: SessionUser,
+    input: SaveEventInput
+): Promise<{ objectId: string }> {
     const context: WriteContext = { actor: user, floatingZone: input.floatingZone };
     const target = await requireWritableCalendar(user.id, input.event.calendarId);
     if (!input.objectId) {
@@ -233,7 +250,8 @@ export async function saveEvent(user: SessionUser, input: SaveEventInput): Promi
 
     const { row } = await writableObject(user, input.objectId, input.version ?? undefined);
     const item = await itemOf(row);
-    if (item.component !== "VEVENT") throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
+    if (item.component !== "VEVENT")
+        throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
     const base =
         (input.recurrenceKey
             ? item.overrides.find((override) => overrideKeyMatches(override, input.recurrenceKey!))
@@ -286,18 +304,34 @@ async function moveObject(
     await removeObject(row, context);
     // The old provider's copy is deleted from the row as it still stands there;
     // after the move the row no longer says where that copy was.
-    const from = await prisma.calendar.findUnique({ where: { id: row.calendarId }, select: { sourceId: true } });
+    const from = await prisma.calendar.findUnique({
+        where: { id: row.calendarId },
+        select: { sourceId: true }
+    });
     if (from?.sourceId) {
         const sync = await import("./sync-engine");
         await sync
             .pushNow(row.id, from.sourceId)
-            .catch((caught: unknown) => console.error("polaris: a moved event was not removed from its provider:", caught));
+            .catch((caught: unknown) =>
+                console.error("polaris: a moved event was not removed from its provider:", caught)
+            );
     }
     await prisma.calendarObject.update({
         where: { id: row.id },
-        data: { calendarId: targetCalendarId, href: "", etag: "", pendingPush: "", conflictIcs: null }
+        data: {
+            calendarId: targetCalendarId,
+            href: "",
+            etag: "",
+            pendingPush: "",
+            conflictIcs: null
+        }
     });
-    return writeItem(targetCalendarId, { ...row, calendarId: targetCalendarId, href: "", etag: "" }, item, { ...context, actor: user });
+    return writeItem(
+        targetCalendarId,
+        { ...row, calendarId: targetCalendarId, href: "", etag: "" },
+        item,
+        { ...context, actor: user }
+    );
 }
 
 /** Drag or resize: move an occurrence (or its series) by whole milliseconds. */
@@ -335,7 +369,12 @@ export async function shiftEvent(
  */
 export async function deleteEvent(
     user: SessionUser,
-    input: { objectId: string; recurrenceKey: string | null; scope: engine.EditScope; floatingZone: string }
+    input: {
+        objectId: string;
+        recurrenceKey: string | null;
+        scope: engine.EditScope;
+        floatingZone: string;
+    }
 ): Promise<void> {
     const { row } = await writableObject(user, input.objectId);
     const item = await itemOf(row);
@@ -352,9 +391,19 @@ export async function deleteEvent(
 }
 
 /** Put a whole object in the trash and tell everything that depends on it. */
-export async function trashObject(row: StoredObject, item: engine.CalendarItem, context: WriteContext): Promise<void> {
+export async function trashObject(
+    row: StoredObject,
+    item: engine.CalendarItem,
+    context: WriteContext
+): Promise<void> {
     await prisma.calendarObject.update({ where: { id: row.id }, data: { deletedAt: new Date() } });
-    await afterObjectChange({ objectId: row.id, calendarId: row.calendarId, before: item, after: null, context });
+    await afterObjectChange({
+        objectId: row.id,
+        calendarId: row.calendarId,
+        before: item,
+        after: null,
+        context
+    });
 }
 
 /** Remove an object from its provider (and its reminders), for a move. */
@@ -370,7 +419,11 @@ async function removeObject(row: StoredObject, context: WriteContext): Promise<v
 
 /** A copy of an event, in the same calendar, with a new UID and nobody invited
  *  yet - a copy that re-sent the original's invitations would be a surprise. */
-export async function duplicateEvent(user: SessionUser, objectId: string, floatingZone: string): Promise<string> {
+export async function duplicateEvent(
+    user: SessionUser,
+    objectId: string,
+    floatingZone: string
+): Promise<string> {
     const { row } = await writableObject(user, objectId);
     const copy = engine.duplicateItem(await itemOf(row));
     // Stored the way a file is: nobody listed in it is sent an invitation.
@@ -395,13 +448,22 @@ export async function respondToEvent(
     const { row, calendar } = await readableObject(user, input.objectId);
     if (calendar.readOnly) throw new CalendarRefusal((await calendarT())("errors.readOnly"));
     const item = await itemOf(row);
-    if (item.component !== "VEVENT") throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
-    const events = [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent => Boolean(event));
+    if (item.component !== "VEVENT")
+        throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
+    const events = [item.master, ...item.overrides].filter((event): event is engine.CalendarEvent =>
+        Boolean(event)
+    );
     const email = input.emails.find((address) =>
         events.some((event) => event.attendees.some((attendee) => attendee.email === address))
     );
     if (!email) throw new CalendarRefusal((await calendarT())("errors.notInvited"));
-    const answered = engine.setAttendeeStatus(item, email, input.partstat, input.recurrenceKey, input.floatingZone);
+    const answered = engine.setAttendeeStatus(
+        item,
+        email,
+        input.partstat,
+        input.recurrenceKey,
+        input.floatingZone
+    );
     await writeItem(row.calendarId, row, answered, {
         actor: user,
         floatingZone: input.floatingZone,

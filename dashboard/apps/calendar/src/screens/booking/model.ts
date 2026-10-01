@@ -33,7 +33,15 @@ export function newDraft(zone: string, calendarId: string): BookingDraft {
         horizonDays: 60,
         timezone: zone,
         availability: {
-            weekly: { "0": [], "1": [...WORKDAY], "2": [...WORKDAY], "3": [...WORKDAY], "4": [...WORKDAY], "5": [...WORKDAY], "6": [] },
+            weekly: {
+                "0": [],
+                "1": [...WORKDAY],
+                "2": [...WORKDAY],
+                "3": [...WORKDAY],
+                "4": [...WORKDAY],
+                "5": [...WORKDAY],
+                "6": []
+            },
             overrides: {}
         },
         questions: [],
@@ -61,7 +69,10 @@ export function draftOf(page: BookingPageView): BookingDraft {
         horizonDays: page.horizonDays,
         timezone: page.timezone,
         availability: JSON.parse(JSON.stringify(page.availability)) as BookingDraft["availability"],
-        questions: page.questions.map((question) => ({ ...question, options: [...question.options] })),
+        questions: page.questions.map((question) => ({
+            ...question,
+            options: [...question.options]
+        })),
         meetingLink: page.meetingLink,
         enabled: page.enabled
     };
@@ -80,7 +91,10 @@ export function writableCalendars(calendars: readonly CalendarSummary[]): Calend
 
 /** A fresh question id: eight lowercase letters and digits. */
 export function newQuestion(): BookingQuestion {
-    const id = Array.from({ length: 8 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]).join("");
+    const id = Array.from(
+        { length: 8 },
+        () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]
+    ).join("");
     return { id, label: "", kind: "short", required: false, options: [] };
 }
 

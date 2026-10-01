@@ -10,7 +10,11 @@ import { RsvpForm } from "../../../../screens/public/rsvp-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function RsvpPage({ params }: { params: Promise<Record<string, string | string[]>> }) {
+export default async function RsvpPage({
+    params
+}: {
+    params: Promise<Record<string, string | string[]>>;
+}) {
     const { token } = await params;
     if (typeof token !== "string") notFound();
     const view = await rsvpView(token);

@@ -46,7 +46,9 @@ export async function readInstanceSettings(): Promise<InstanceSettings> {
     const shape = instanceSettingsSchema.shape;
     const pick = <K extends keyof InstanceSettings>(key: K): InstanceSettings[K] => {
         const result = shape[key].safeParse(stored[key]);
-        return result.success ? (result.data as InstanceSettings[K]) : DEFAULT_INSTANCE_SETTINGS[key];
+        return result.success
+            ? (result.data as InstanceSettings[K])
+            : DEFAULT_INSTANCE_SETTINGS[key];
     };
     return {
         allowSubscriptions: pick("allowSubscriptions"),

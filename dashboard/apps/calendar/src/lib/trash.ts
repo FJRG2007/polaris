@@ -26,7 +26,9 @@ function purgeAt(deletedAt: Date): string {
 /** What this person may see in the trash, newest first. */
 export async function listTrash(user: SessionUser): Promise<TrashItemView[]> {
     const reach = await reachableCalendars(user.id);
-    const writable = [...reach.entries()].filter(([, level]) => reaches(level, "write")).map(([id]) => id);
+    const writable = [...reach.entries()]
+        .filter(([, level]) => reaches(level, "write"))
+        .map(([id]) => id);
     const [calendars, objects] = await Promise.all([
         prisma.calendar.findMany({
             where: { ownerId: user.id, trashedAt: { not: null } },
@@ -35,7 +37,11 @@ export async function listTrash(user: SessionUser): Promise<TrashItemView[]> {
             take: 500
         }),
         prisma.calendarObject.findMany({
-            where: { calendarId: { in: writable }, deletedAt: { not: null }, calendar: { trashedAt: null } },
+            where: {
+                calendarId: { in: writable },
+                deletedAt: { not: null },
+                calendar: { trashedAt: null }
+            },
             select: {
                 id: true,
                 summary: true,
@@ -114,9 +120,15 @@ export async function restoreTrash(
         const calendar = await trashedCalendar(user, id);
         await prisma.calendar.update({ where: { id: calendar.id }, data: { trashedAt: null } });
         // Putting it in the trash cleared its reminders; its events remind again.
-        const row = await prisma.calendar.findUniqueOrThrow({ where: { id: calendar.id }, select: { alarmsMuted: true } });
+        const row = await prisma.calendar.findUniqueOrThrow({
+            where: { id: calendar.id },
+            select: { alarmsMuted: true }
+        });
         if (row.alarmsMuted) return;
-        const live = await prisma.calendarObject.findMany({ where: { calendarId: calendar.id, deletedAt: null }, select: { id: true, ics: true } });
+        const live = await prisma.calendarObject.findMany({
+            where: { calendarId: calendar.id, deletedAt: null },
+            select: { id: true, ics: true }
+        });
         const reminders = await import("./reminders");
         for (const object of live) await reminders.planObject(object.id, tryItemOf(object.ics));
         return;
@@ -126,11 +138,18 @@ export async function restoreTrash(
     const item = tryItemOf(row.ics);
     if (!item) throw new CalendarRefusal((await calendarT())("errors.unreadableEvent"));
     await prisma.calendarObject.update({ where: { id: row.id }, data: { href: "", etag: "" } });
-    await writeItem(row.calendarId, { ...row, href: "", etag: "" }, item, { actor: user, floatingZone });
+    await writeItem(row.calendarId, { ...row, href: "", etag: "" }, item, {
+        actor: user,
+        floatingZone
+    });
 }
 
 /** Remove something for good. */
-export async function purgeTrash(user: SessionUser, kind: "calendar" | "event", id: string): Promise<void> {
+export async function purgeTrash(
+    user: SessionUser,
+    kind: "calendar" | "event",
+    id: string
+): Promise<void> {
     if (kind === "calendar") {
         const calendar = await trashedCalendar(user, id);
         await prisma.calendar.delete({ where: { id: calendar.id } });
@@ -149,7 +168,9 @@ export async function emptyTrash(user: SessionUser): Promise<number> {
         prisma.calendar.deleteMany({
             where: { id: { in: calendars }, ownerId: user.id, trashedAt: { not: null } }
         }),
-        prisma.calendarObject.deleteMany({ where: { id: { in: objects }, deletedAt: { not: null } } })
+        prisma.calendarObject.deleteMany({
+            where: { id: { in: objects }, deletedAt: { not: null } }
+        })
     ]);
     return removedCalendars.count + removedObjects.count;
 }

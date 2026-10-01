@@ -10,10 +10,21 @@ import Link from "next/link";
 import type { Loaded } from "./infrastructure";
 import type { OverviewCalendar } from "@/lib/overview/overview-service";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { WidgetEmpty, WidgetList, WidgetRow, WidgetRowsSkeleton, WidgetUnavailable } from "../widget-card";
+import {
+    WidgetEmpty,
+    WidgetList,
+    WidgetRow,
+    WidgetRowsSkeleton,
+    WidgetUnavailable
+} from "../widget-card";
 
 /** When an event starts, as the row's second line: "Today 14:30", "Fri 3 Oct". */
-function when(start: string, allDay: boolean, locale: string, words: { today: string; tomorrow: string }): string {
+function when(
+    start: string,
+    allDay: boolean,
+    locale: string,
+    words: { today: string; tomorrow: string }
+): string {
     const date = new Date(start);
     const now = new Date();
     const day = (value: Date) =>
@@ -21,7 +32,9 @@ function when(start: string, allDay: boolean, locale: string, words: { today: st
             ? value.toISOString().slice(0, 10)
             : `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`;
     const tomorrow = new Date(now.getTime() + 86_400_000);
-    const time = allDay ? "" : new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(date);
+    const time = allDay
+        ? ""
+        : new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(date);
     const today = allDay ? now.toISOString().slice(0, 10) : day(now);
     const next = allDay ? tomorrow.toISOString().slice(0, 10) : day(tomorrow);
     const label =
@@ -47,7 +60,10 @@ export function CalendarWidget({ data }: { data: Loaded<OverviewCalendar> }) {
         return (
             <WidgetEmpty
                 action={
-                    <Link href="/calendar" className="text-xs font-medium text-primary hover:underline">
+                    <Link
+                        href="/calendar"
+                        className="text-xs font-medium text-primary hover:underline"
+                    >
                         {t("calendar.open")}
                     </Link>
                 }

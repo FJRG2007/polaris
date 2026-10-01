@@ -60,7 +60,11 @@ export function compactUtc(value: types.DateValue, floatingZone = "UTC"): string
 }
 
 /** An engine item holding a master and its overrides. */
-export function eventItem(uid: string, master: types.CalendarEvent | null, overrides: readonly types.CalendarEvent[]): types.CalendarItem {
+export function eventItem(
+    uid: string,
+    master: types.CalendarEvent | null,
+    overrides: readonly types.CalendarEvent[]
+): types.CalendarItem {
     return { component: "VEVENT", uid, master, overrides, timezones: [], method: null };
 }
 
@@ -70,17 +74,25 @@ export function writeItem(item: types.CalendarItem): string {
 }
 
 /** The event item in an object's text; a provider that only knows events refuses a task. */
-export function readEventItem(ics: string, uid: string): Extract<types.CalendarItem, { component: "VEVENT" }> {
+export function readEventItem(
+    ics: string,
+    uid: string
+): Extract<types.CalendarItem, { component: "VEVENT" }> {
     const { items } = engine.parseCalendarText(ics);
     const item = items.find((candidate) => candidate.uid === uid) ?? items[0];
     if (!item) throw new SyncRefusedError("The object has no event in it", null);
-    if (item.component !== "VEVENT") throw new SyncRefusedError("This calendar only holds events", null);
+    if (item.component !== "VEVENT")
+        throw new SyncRefusedError("This calendar only holds events", null);
     return item;
 }
 
 /** Unfolds iCalendar text into content lines. */
 function contentLines(text: string): string[] {
-    return text.replace(/\r\n/g, "\n").replace(/\n[ \t]/g, "").split("\n").filter(Boolean);
+    return text
+        .replace(/\r\n/g, "\n")
+        .replace(/\n[ \t]/g, "")
+        .split("\n")
+        .filter(Boolean);
 }
 
 /**
@@ -88,20 +100,38 @@ function contentLines(text: string): string[] {
  * the engine's own parser against the series start, so every date form
  * (`VALUE=DATE`, `TZID=`, UTC) is read one way everywhere.
  */
-export function readRecurrence(lines: readonly string[], start: types.DateValue): Pick<types.CalendarEvent, "rule" | "exdates" | "rdates"> {
-    const probe = eventItem("recurrence-probe", { ...blankEvent("recurrence-probe", start, start) }, []);
+export function readRecurrence(
+    lines: readonly string[],
+    start: types.DateValue
+): Pick<types.CalendarEvent, "rule" | "exdates" | "rdates"> {
+    const probe = eventItem(
+        "recurrence-probe",
+        { ...blankEvent("recurrence-probe", start, start) },
+        []
+    );
     const text = writeItem(probe);
-    const kept = lines.map((line) => line.trim()).filter((line) => /^(RRULE|EXDATE|RDATE)[;:]/i.test(line));
+    const kept = lines
+        .map((line) => line.trim())
+        .filter((line) => /^(RRULE|EXDATE|RDATE)[;:]/i.test(line));
     const withRecurrence = text.replace(/END:VEVENT/, `${kept.join("\r\n")}\r\nEND:VEVENT`);
     const parsed = engine.parseCalendarText(withRecurrence).items[0];
     const master = parsed && parsed.component === "VEVENT" ? parsed.master : null;
-    return { rule: master?.rule ?? null, exdates: master?.exdates ?? [], rdates: master?.rdates ?? [] };
+    return {
+        rule: master?.rule ?? null,
+        exdates: master?.exdates ?? [],
+        rdates: master?.rdates ?? []
+    };
 }
 
 /** The `RRULE` / `EXDATE` / `RDATE` lines the engine writes for an event, unfolded. */
 export function recurrenceLines(event: types.CalendarEvent): string[] {
     if (!event.rule && event.exdates.length === 0 && event.rdates.length === 0) return [];
-    const bare: EventDraft = { ...blankEvent(event.uid, event.start, event.end), rule: event.rule, exdates: event.exdates, rdates: event.rdates };
+    const bare: EventDraft = {
+        ...blankEvent(event.uid, event.start, event.end),
+        rule: event.rule,
+        exdates: event.exdates,
+        rdates: event.rdates
+    };
     // Only the event's own lines: the VTIMEZONE blocks in the same file carry
     // RRULE and RDATE lines of their own, which describe the zone, not the event.
     const lines = contentLines(writeItem(eventItem(event.uid, bare, [])));
@@ -132,7 +162,7 @@ export function htmlToText(html: string): string {
         .replace(/&nbsp;/gi, " ")
         .replace(/&lt;/gi, "<")
         .replace(/&gt;/gi, ">")
-        .replace(/&quot;/gi, "\"")
+        .replace(/&quot;/gi, '"')
         .replace(/&#39;|&apos;/gi, "'")
         .replace(/&amp;/gi, "&")
         .replace(/[ \t]+\n/g, "\n")

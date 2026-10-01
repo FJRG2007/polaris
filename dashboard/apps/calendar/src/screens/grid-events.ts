@@ -12,7 +12,9 @@ import type { CalendarTranslator } from "../lib/i18n";
 import { formatInstant, formatDay, wallOf, addDays } from "./time";
 import type { CalendarSummary, OccurrenceView, RangeView, TaskItemView } from "../lib/wire";
 
-export type GridItem = { readonly kind: "event"; readonly occurrence: OccurrenceView } | { readonly kind: "task"; readonly task: TaskItemView };
+export type GridItem =
+    | { readonly kind: "event"; readonly occurrence: OccurrenceView }
+    | { readonly kind: "task"; readonly task: TaskItemView };
 
 export interface GridOptions {
     readonly zone: string;
@@ -27,7 +29,9 @@ export interface GridOptions {
 }
 
 /** The id the grid knows an occurrence by. */
-export function occurrenceId(occurrence: Pick<OccurrenceView, "objectId" | "recurrenceKey">): string {
+export function occurrenceId(
+    occurrence: Pick<OccurrenceView, "objectId" | "recurrenceKey">
+): string {
     return `event|${occurrence.objectId}|${occurrence.recurrenceKey}`;
 }
 
@@ -40,16 +44,34 @@ const FALLBACK_COLOR = "#7f7f7f";
 function whenText(occurrence: OccurrenceView, options: GridOptions): string {
     if (occurrence.allDay && occurrence.startDate) {
         const last = occurrence.endDate ? addDays(occurrence.endDate, -1) : occurrence.startDate;
-        const format = new Intl.DateTimeFormat(options.locale, { dateStyle: "medium", timeZone: "UTC" });
-        return last > occurrence.startDate ? format.formatRange(new Date(`${occurrence.startDate}T12:00:00Z`), new Date(`${last}T12:00:00Z`)) : formatDay(occurrence.startDate, options.locale, { dateStyle: "medium" });
+        const format = new Intl.DateTimeFormat(options.locale, {
+            dateStyle: "medium",
+            timeZone: "UTC"
+        });
+        return last > occurrence.startDate
+            ? format.formatRange(
+                  new Date(`${occurrence.startDate}T12:00:00Z`),
+                  new Date(`${last}T12:00:00Z`)
+              )
+            : formatDay(occurrence.startDate, options.locale, { dateStyle: "medium" });
     }
-    return new Intl.DateTimeFormat(options.locale, { dateStyle: "medium", timeStyle: "short", timeZone: options.zone }).formatRange(new Date(occurrence.start), new Date(occurrence.end));
+    return new Intl.DateTimeFormat(options.locale, {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: options.zone
+    }).formatRange(new Date(occurrence.start), new Date(occurrence.end));
 }
 
 /** What a screen reader says for one occurrence. */
-export function occurrenceLabel(occurrence: OccurrenceView, calendar: CalendarSummary | undefined, options: GridOptions): string {
+export function occurrenceLabel(
+    occurrence: OccurrenceView,
+    calendar: CalendarSummary | undefined,
+    options: GridOptions
+): string {
     const t = options.t;
-    const title = occurrence.busyOnly ? t("screen.busy") : occurrence.summary || t("screen.untitled");
+    const title = occurrence.busyOnly
+        ? t("screen.busy")
+        : occurrence.summary || t("screen.untitled");
     const parts = [title, whenText(occurrence, options)];
     if (calendar) parts.push(t("grid.inCalendar", { name: calendar.name }));
     if (occurrence.status === "CANCELLED") parts.push(t("grid.cancelled"));
@@ -81,9 +103,15 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
         const allDay = occurrence.allDay && occurrence.startDate !== null;
         events.push({
             id: occurrenceId(occurrence),
-            title: occurrence.busyOnly ? options.t("screen.busy") : occurrence.summary || options.t("screen.untitled"),
-            start: allDay ? (occurrence.startDate as string) : wallOf(occurrence.start, options.zone),
-            end: allDay ? (occurrence.endDate ?? addDays(occurrence.startDate as string, 1)) : wallOf(occurrence.end, options.zone),
+            title: occurrence.busyOnly
+                ? options.t("screen.busy")
+                : occurrence.summary || options.t("screen.untitled"),
+            start: allDay
+                ? (occurrence.startDate as string)
+                : wallOf(occurrence.start, options.zone),
+            end: allDay
+                ? (occurrence.endDate ?? addDays(occurrence.startDate as string, 1))
+                : wallOf(occurrence.end, options.zone),
             allDay,
             backgroundColor: color,
             borderColor: color,
@@ -92,7 +120,10 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
             editable: occurrence.editable,
             startEditable: occurrence.editable,
             durationEditable: occurrence.editable,
-            extendedProps: { item: { kind: "event", occurrence } satisfies GridItem, label: occurrenceLabel(occurrence, calendar, options) }
+            extendedProps: {
+                item: { kind: "event", occurrence } satisfies GridItem,
+                label: occurrenceLabel(occurrence, calendar, options)
+            }
         });
     }
     if (!options.showTasks) return events;
@@ -103,7 +134,14 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
         const color = calendar?.color ?? FALLBACK_COLOR;
         const label = options.t(task.done ? "grid.taskDone" : "grid.task", {
             title: task.title,
-            when: task.allDay ? formatDay(wallOf(task.due, options.zone).slice(0, 10), options.locale, { dateStyle: "medium" }) : formatInstant(task.due, options.locale, options.zone, { dateStyle: "medium", timeStyle: "short" })
+            when: task.allDay
+                ? formatDay(wallOf(task.due, options.zone).slice(0, 10), options.locale, {
+                      dateStyle: "medium"
+                  })
+                : formatInstant(task.due, options.locale, options.zone, {
+                      dateStyle: "medium",
+                      timeStyle: "short"
+                  })
         });
         const day = wallOf(task.due, options.zone).slice(0, 10);
         events.push({

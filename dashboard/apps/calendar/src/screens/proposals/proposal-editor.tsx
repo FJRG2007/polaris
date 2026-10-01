@@ -44,7 +44,12 @@ function draftOf(proposal: ProposalView | null): Draft {
         durationMinutes: proposal?.durationMinutes ?? 60,
         timezone: zone,
         notify: proposal?.notify ?? true,
-        participants: proposal?.participants.map((entry) => ({ email: entry.email, name: entry.name, required: entry.required })) ?? [],
+        participants:
+            proposal?.participants.map((entry) => ({
+                email: entry.email,
+                name: entry.name,
+                required: entry.required
+            })) ?? [],
         dates: proposal?.dates.map((date) => wallOf(date.start, zone).slice(0, 16)) ?? [""]
     };
 }
@@ -55,7 +60,15 @@ function instantOf(wall: string, zone: string): string {
     return engine.wallToInstant(engine.parseWall(`${wall}:00`), zone).toISOString();
 }
 
-export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: ProposalView | null; onSaved: (proposal: ProposalView) => void; onCancel?: () => void }) {
+export function ProposalEditor({
+    proposal,
+    onSaved,
+    onCancel
+}: {
+    proposal: ProposalView | null;
+    onSaved: (proposal: ProposalView) => void;
+    onCancel?: () => void;
+}) {
     const t = useCalendarT();
     const issueText = useIssueText();
     const AccountInput = hostUi.accountInput.AccountInput;
@@ -65,7 +78,8 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
     const [addProblem, setAddProblem] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const initial = useMemo(() => JSON.stringify(draftOf(proposal)), [proposal]);
-    const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+    const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+        setDraft((current) => ({ ...current, [key]: value }));
 
     const filledDates = draft.dates.filter((date) => date.trim() !== "");
     const input = { ...draft, dates: filledDates.map((date) => instantOf(date, draft.timezone)) };
@@ -82,11 +96,16 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
         setAddProblem(null);
         const checked = emailSchema.safeParse(email);
         if (!checked.success) {
-            setAddProblem(email.trim() ? issueText(checked.error.issues) : t("proposals.addressHidden"));
+            setAddProblem(
+                email.trim() ? issueText(checked.error.issues) : t("proposals.addressHidden")
+            );
             return false;
         }
         if (draft.participants.some((entry) => entry.email === checked.data)) return true;
-        set("participants", [...draft.participants, { email: checked.data, name: name.trim(), required: true }]);
+        set("participants", [
+            ...draft.participants,
+            { email: checked.data, name: name.trim(), required: true }
+        ]);
         return true;
     };
 
@@ -96,7 +115,10 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
         setProblem(null);
         try {
             const answer = await unwrap(
-                () => (proposal ? proposalActions.updateProposalAction(proposal.id, parsed.data) : proposalActions.createProposalAction(parsed.data)),
+                () =>
+                    proposal
+                        ? proposalActions.updateProposalAction(proposal.id, parsed.data)
+                        : proposalActions.createProposalAction(parsed.data),
                 t("proposals.failed")
             );
             onSaved(answer.proposal);
@@ -116,22 +138,53 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
             }}
         >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <FieldRow className="sm:col-span-2" label={`${t("proposals.fieldTitle")} *`} htmlFor="proposal-title" error={titleMissing ? null : issueFor("title")}>
-                    <Input id="proposal-title" value={draft.title} onChange={(event) => set("title", event.target.value)} autoFocus={!proposal} />
+                <FieldRow
+                    className="sm:col-span-2"
+                    label={`${t("proposals.fieldTitle")} *`}
+                    htmlFor="proposal-title"
+                    error={titleMissing ? null : issueFor("title")}
+                >
+                    <Input
+                        id="proposal-title"
+                        value={draft.title}
+                        onChange={(event) => set("title", event.target.value)}
+                        autoFocus={!proposal}
+                    />
                 </FieldRow>
-                <FieldRow label={t("proposals.fieldLocation")} htmlFor="proposal-location" error={issueFor("location")}>
-                    <Input id="proposal-location" value={draft.location} onChange={(event) => set("location", event.target.value)} />
+                <FieldRow
+                    label={t("proposals.fieldLocation")}
+                    htmlFor="proposal-location"
+                    error={issueFor("location")}
+                >
+                    <Input
+                        id="proposal-location"
+                        value={draft.location}
+                        onChange={(event) => set("location", event.target.value)}
+                    />
                 </FieldRow>
                 <FieldRow label={t("proposals.fieldDuration")} htmlFor="proposal-duration">
                     <Select
                         id="proposal-duration"
                         value={String(draft.durationMinutes)}
                         onValueChange={(value) => set("durationMinutes", Number(value))}
-                        options={DURATIONS.map((minutes) => ({ value: String(minutes), label: t("proposals.minutes", { count: minutes }) }))}
+                        options={DURATIONS.map((minutes) => ({
+                            value: String(minutes),
+                            label: t("proposals.minutes", { count: minutes })
+                        }))}
                     />
                 </FieldRow>
-                <FieldRow className="sm:col-span-2" label={t("proposals.fieldDescription")} htmlFor="proposal-description" error={issueFor("description")}>
-                    <Textarea id="proposal-description" rows={3} value={draft.description} onChange={(event) => set("description", event.target.value)} />
+                <FieldRow
+                    className="sm:col-span-2"
+                    label={t("proposals.fieldDescription")}
+                    htmlFor="proposal-description"
+                    error={issueFor("description")}
+                >
+                    <Textarea
+                        id="proposal-description"
+                        rows={3}
+                        value={draft.description}
+                        onChange={(event) => set("description", event.target.value)}
+                    />
                 </FieldRow>
             </div>
 
@@ -179,23 +232,49 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
                                     <div className="truncate text-[13px]" title={person.email}>
                                         {person.name || person.email}
                                     </div>
-                                    {person.name ? <div className="truncate text-xs text-foreground-subtle">{person.email}</div> : null}
+                                    {person.name ? (
+                                        <div className="truncate text-xs text-foreground-subtle">
+                                            {person.email}
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                                     <Switch
                                         checked={person.required}
-                                        onChange={(required) => set("participants", draft.participants.map((entry, at) => (at === index ? { ...entry, required } : entry)))}
-                                        aria-label={t("proposals.requiredFor", { name: person.name || person.email })}
+                                        onChange={(required) =>
+                                            set(
+                                                "participants",
+                                                draft.participants.map((entry, at) =>
+                                                    at === index ? { ...entry, required } : entry
+                                                )
+                                            )
+                                        }
+                                        aria-label={t("proposals.requiredFor", {
+                                            name: person.name || person.email
+                                        })}
                                     />
-                                    <span className="hidden sm:inline">{person.required ? t("proposals.required") : t("proposals.optional")}</span>
+                                    <span className="hidden sm:inline">
+                                        {person.required
+                                            ? t("proposals.required")
+                                            : t("proposals.optional")}
+                                    </span>
                                 </label>
                                 <Button
                                     type="button"
                                     size="icon-sm"
                                     variant="ghost"
-                                    aria-label={t("proposals.removePerson", { name: person.name || person.email })}
-                                    title={t("proposals.removePerson", { name: person.name || person.email })}
-                                    onClick={() => set("participants", draft.participants.filter((_, at) => at !== index))}
+                                    aria-label={t("proposals.removePerson", {
+                                        name: person.name || person.email
+                                    })}
+                                    title={t("proposals.removePerson", {
+                                        name: person.name || person.email
+                                    })}
+                                    onClick={() =>
+                                        set(
+                                            "participants",
+                                            draft.participants.filter((_, at) => at !== index)
+                                        )
+                                    }
                                 >
                                     <Trash2 />
                                 </Button>
@@ -213,7 +292,11 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
             <section className="flex flex-col gap-2">
                 <GroupHeading>{t("proposals.dates")}</GroupHeading>
                 <FieldRow label={t("proposals.fieldZone")}>
-                    <ZonePicker value={draft.timezone} onChange={(zone) => set("timezone", zone)} label={t("proposals.fieldZone")} />
+                    <ZonePicker
+                        value={draft.timezone}
+                        onChange={(zone) => set("timezone", zone)}
+                        label={t("proposals.fieldZone")}
+                    />
                 </FieldRow>
                 <ul className="flex flex-col gap-1.5">
                     {draft.dates.map((date, index) => (
@@ -221,7 +304,14 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
                             <Input
                                 type="datetime-local"
                                 value={date}
-                                onChange={(event) => set("dates", draft.dates.map((entry, at) => (at === index ? event.target.value : entry)))}
+                                onChange={(event) =>
+                                    set(
+                                        "dates",
+                                        draft.dates.map((entry, at) =>
+                                            at === index ? event.target.value : entry
+                                        )
+                                    )
+                                }
                                 aria-label={t("proposals.dateNumber", { number: index + 1 })}
                                 className="max-w-xs"
                             />
@@ -232,7 +322,12 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
                                 disabled={draft.dates.length <= 1}
                                 aria-label={t("proposals.removeDate", { number: index + 1 })}
                                 title={t("proposals.removeDate", { number: index + 1 })}
-                                onClick={() => set("dates", draft.dates.filter((_, at) => at !== index))}
+                                onClick={() =>
+                                    set(
+                                        "dates",
+                                        draft.dates.filter((_, at) => at !== index)
+                                    )
+                                }
                             >
                                 <Trash2 />
                             </Button>
@@ -240,7 +335,13 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
                     ))}
                 </ul>
                 <div>
-                    <Button type="button" size="sm" variant="ghost" disabled={draft.dates.length >= 30} onClick={() => set("dates", [...draft.dates, draft.dates.at(-1) ?? ""])}>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={draft.dates.length >= 30}
+                        onClick={() => set("dates", [...draft.dates, draft.dates.at(-1) ?? ""])}
+                    >
                         <Plus />
                         {t("proposals.addDate")}
                     </Button>
@@ -253,7 +354,11 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
             </section>
 
             <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                <Switch checked={draft.notify} onChange={(notify) => set("notify", notify)} aria-label={t("proposals.notify")} />
+                <Switch
+                    checked={draft.notify}
+                    onChange={(notify) => set("notify", notify)}
+                    aria-label={t("proposals.notify")}
+                />
                 {t("proposals.notify")}
             </label>
 
@@ -264,7 +369,11 @@ export function ProposalEditor({ proposal, onSaved, onCancel }: { proposal: Prop
                         {t("proposals.cancel")}
                     </Button>
                 ) : null}
-                <Button type="submit" disabled={busy} aria-disabled={!parsed.success || !dirty || busy}>
+                <Button
+                    type="submit"
+                    disabled={busy}
+                    aria-disabled={!parsed.success || !dirty || busy}
+                >
                     {proposal ? t("proposals.save") : t("proposals.create")}
                 </Button>
             </div>

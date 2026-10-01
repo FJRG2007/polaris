@@ -7,7 +7,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { XmlError, child, childrenOf, parseXml, textContent } from "@polaris-app/calendar/src/lib/sync/xml";
+import {
+    XmlError,
+    child,
+    childrenOf,
+    parseXml,
+    textContent
+} from "@polaris-app/calendar/src/lib/sync/xml";
 
 describe("parseXml", () => {
     it("names elements by namespace URI, whatever the prefix", () => {
@@ -33,18 +39,24 @@ describe("parseXml", () => {
     });
 
     it("decodes the predefined entities and character references", () => {
-        const root = parseXml(`<t a="&quot;q&quot; &amp; &#x41;">&lt;b&gt; &amp; &apos;s&apos; &#65;&#x1F600;</t>`);
+        const root = parseXml(
+            `<t a="&quot;q&quot; &amp; &#x41;">&lt;b&gt; &amp; &apos;s&apos; &#65;&#x1F600;</t>`
+        );
         expect(root.text).toBe("<b> & 's' A\u{1F600}");
-        expect(root.attrs.get("a")).toBe("\"q\" & A");
+        expect(root.attrs.get("a")).toBe('"q" & A');
     });
 
     it("keeps CDATA verbatim, markup and entities included", () => {
-        const root = parseXml(`<t><![CDATA[BEGIN:VCALENDAR\r\nSUMMARY:a <b> &amp; c\r\nEND:VCALENDAR]]></t>`);
+        const root = parseXml(
+            `<t><![CDATA[BEGIN:VCALENDAR\r\nSUMMARY:a <b> &amp; c\r\nEND:VCALENDAR]]></t>`
+        );
         expect(root.text).toBe("BEGIN:VCALENDAR\nSUMMARY:a <b> &amp; c\nEND:VCALENDAR");
     });
 
     it("reads self-closing tags, comments and processing instructions", () => {
-        const root = parseXml(`<?xml version="1.0"?><!-- a comment --><r><e/><e x='1' /><?pi data?></r>`);
+        const root = parseXml(
+            `<?xml version="1.0"?><!-- a comment --><r><e/><e x='1' /><?pi data?></r>`
+        );
         expect(root.children).toHaveLength(2);
         expect(root.children[1]!.attrs.get("x")).toBe("1");
     });

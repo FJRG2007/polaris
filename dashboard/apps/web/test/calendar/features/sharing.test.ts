@@ -33,20 +33,38 @@ describe("sharing and publishing rules", () => {
     });
 
     it("lets a manager share below manage, and never grant manage", async () => {
-        await sharing.share(manager as never, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "write" });
-        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe("write");
+        await sharing.share(manager as never, {
+            calendarId: calendar,
+            target: { kind: "user", id: carol.id },
+            access: "write"
+        });
+        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe(
+            "write"
+        );
         await expect(
-            sharing.share(manager as never, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "manage" })
+            sharing.share(manager as never, {
+                calendarId: calendar,
+                target: { kind: "user", id: carol.id },
+                access: "manage"
+            })
         ).rejects.toThrow(world.en("sharing.onlyOwnerManage"));
-        await sharing.share(owner as never, { calendarId: calendar, target: { kind: "user", id: carol.id }, access: "manage" });
-        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe("manage");
+        await sharing.share(owner as never, {
+            calendarId: calendar,
+            target: { kind: "user", id: carol.id },
+            access: "manage"
+        });
+        expect(db.rows("calendarShare").find((row) => row.userId === carol.id)?.access).toBe(
+            "manage"
+        );
     });
 
     it("keeps a manager from removing another manager", async () => {
         const other = db.rows("calendarShare").find((row) => row.userId === manager.id)!;
         const second = addUser({ name: "Second", email: "second@example.test" });
         world.addShare(calendar, { userId: second.id }, "manage");
-        await expect(sharing.unshare(second as never, String(other.id))).rejects.toThrow(world.en("sharing.onlyOwnerManage"));
+        await expect(sharing.unshare(second as never, String(other.id))).rejects.toThrow(
+            world.en("sharing.onlyOwnerManage")
+        );
         await sharing.unshare(owner as never, String(other.id));
         expect(db.rows("calendarShare").some((row) => row.userId === manager.id)).toBe(false);
     });
@@ -54,16 +72,32 @@ describe("sharing and publishing rules", () => {
     it("deletes the address when publishing is turned off, so a new one is issued", async () => {
         const first = await sharing.publish(owner as never, calendar, "busy");
         expect(first).toMatch(/^[A-Za-z0-9_-]{20,64}$/);
-        expect(await publishedRange(first!, { from: world.NOW, to: new Date(world.NOW.getTime() + 86_400_000) }, "UTC")).not.toBeNull();
+        expect(
+            await publishedRange(
+                first!,
+                { from: world.NOW, to: new Date(world.NOW.getTime() + 86_400_000) },
+                "UTC"
+            )
+        ).not.toBeNull();
         expect(await sharing.publish(owner as never, calendar, "")).toBeNull();
-        expect(db.byId("calendar", calendar)).toEqual(expect.objectContaining({ publicToken: null, publicMode: "" }));
-        expect(await publishedRange(first!, { from: world.NOW, to: new Date(world.NOW.getTime() + 86_400_000) }, "UTC")).toBeNull();
+        expect(db.byId("calendar", calendar)).toEqual(
+            expect.objectContaining({ publicToken: null, publicMode: "" })
+        );
+        expect(
+            await publishedRange(
+                first!,
+                { from: world.NOW, to: new Date(world.NOW.getTime() + 86_400_000) },
+                "UTC"
+            )
+        ).toBeNull();
         const second = await sharing.publish(owner as never, calendar, "full");
         expect(second).not.toBe(first);
     });
 
     it("keeps a reader below manage from publishing", async () => {
         world.addShare(calendar, { userId: carol.id }, "write");
-        await expect(sharing.publish(carol as never, calendar, "full")).rejects.toThrow(world.en("errors.calendarNotFound"));
+        await expect(sharing.publish(carol as never, calendar, "full")).rejects.toThrow(
+            world.en("errors.calendarNotFound")
+        );
     });
 });

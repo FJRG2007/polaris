@@ -14,7 +14,13 @@ import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { OccurrenceView, RangeView, TaskItemView } from "./wire";
-import { reachableCalendars, reaches, todoClassification, type Reach, type SessionUser } from "./access";
+import {
+    reachableCalendars,
+    reaches,
+    todoClassification,
+    type Reach,
+    type SessionUser
+} from "./access";
 
 /** The widest window answered: a year view with the weeks around it. */
 export const MAX_WINDOW_DAYS = 400;
@@ -67,7 +73,10 @@ function shownInFull(reach: Reach, event: engine.CalendarEvent): boolean {
     return event.classification === "PUBLIC";
 }
 
-function partstatOf(event: engine.CalendarEvent, emails: ReadonlySet<string>): engine.PartStat | null {
+function partstatOf(
+    event: engine.CalendarEvent,
+    emails: ReadonlySet<string>
+): engine.PartStat | null {
     return event.attendees.find((attendee) => emails.has(attendee.email))?.partstat ?? null;
 }
 
@@ -106,7 +115,14 @@ export async function occurrencesIn(
                       deletedAt: null,
                       ...reachingWindow(window)
                   },
-                  select: { id: true, calendarId: true, uid: true, ics: true, updatedAt: true, component: true },
+                  select: {
+                      id: true,
+                      calendarId: true,
+                      uid: true,
+                      ics: true,
+                      updatedAt: true,
+                      component: true
+                  },
                   orderBy: [{ startsAt: "asc" }, { id: "asc" }],
                   take: MAX_OBJECTS + 1
               });
@@ -219,7 +235,13 @@ export async function verifiedAddresses(userId: string, primary: string): Promis
         where: { userId, verifiedAt: { not: null } },
         select: { email: true }
     });
-    return [...new Set([primary, ...extra.map((row) => row.email)].map((email) => email.trim().toLowerCase()).filter(Boolean))];
+    return [
+        ...new Set(
+            [primary, ...extra.map((row) => row.email)]
+                .map((email) => email.trim().toLowerCase())
+                .filter(Boolean)
+        )
+    ];
 }
 
 /** Every address this person answers invitations at. */

@@ -12,8 +12,20 @@
  */
 
 import { MAX_RESPONSE_BYTES, errorFor, readCapped, reasonOf, type Fetcher } from "./http";
-import { SyncAuthError, SyncError, SyncNotFoundError, SyncRefusedError, SyncUnreachableError } from "./errors";
-import type { CalendarProvider, ChangeSet, PullState, RemoteCalendar, RemoteObject } from "./provider";
+import {
+    SyncAuthError,
+    SyncError,
+    SyncNotFoundError,
+    SyncRefusedError,
+    SyncUnreachableError
+} from "./errors";
+import type {
+    CalendarProvider,
+    ChangeSet,
+    PullState,
+    RemoteCalendar,
+    RemoteObject
+} from "./provider";
 import * as dav from "./dav";
 import { childrenOf, escapeXml } from "./xml";
 
@@ -68,8 +80,13 @@ export function normalizeServerUrl(raw: string): URL {
     } catch {
         throw new SyncRefusedError("Not a valid address", null);
     }
-    if (url.protocol !== "https:" && url.protocol !== "http:") throw new SyncRefusedError("Only http and https addresses are supported", null);
-    if (url.username || url.password) throw new SyncRefusedError("Put the username and password in their own fields, not in the address", null);
+    if (url.protocol !== "https:" && url.protocol !== "http:")
+        throw new SyncRefusedError("Only http and https addresses are supported", null);
+    if (url.username || url.password)
+        throw new SyncRefusedError(
+            "Put the username and password in their own fields, not in the address",
+            null
+        );
     url.hash = "";
     return url;
 }
@@ -102,7 +119,8 @@ function isReadOnly(response: dav.DavResponse): boolean {
     // refuses surfaces as a refusal on that object, not as a broken calendar.
     if (!set) return false;
     for (const privilege of childrenOf(set, dav.DAV, "privilege")) {
-        if (privilege.children.some((p) => p.ns === dav.DAV && WRITE_PRIVILEGES.has(p.local))) return false;
+        if (privilege.children.some((p) => p.ns === dav.DAV && WRITE_PRIVILEGES.has(p.local)))
+            return false;
     }
     return true;
 }
@@ -110,7 +128,9 @@ function isReadOnly(response: dav.DavResponse): boolean {
 function componentsOf(response: dav.DavResponse): ("VEVENT" | "VTODO")[] {
     const set = dav.prop(response, dav.CALDAV, "supported-calendar-component-set");
     if (!set) return ["VEVENT", "VTODO"];
-    const names = new Set(childrenOf(set, dav.CALDAV, "comp").map((c) => (c.attrs.get("name") ?? "").toUpperCase()));
+    const names = new Set(
+        childrenOf(set, dav.CALDAV, "comp").map((c) => (c.attrs.get("name") ?? "").toUpperCase())
+    );
     const out: ("VEVENT" | "VTODO")[] = [];
     if (names.has("VEVENT")) out.push("VEVENT");
     if (names.has("VTODO")) out.push("VTODO");
@@ -118,8 +138,17 @@ function componentsOf(response: dav.DavResponse): ("VEVENT" | "VTODO")[] {
 }
 
 /** Reads the calendars under a home (Depth 1), skipping the home itself and anything that is not a calendar. */
-async function listUnder(credentials: dav.DavCredentials, homeUrl: string): Promise<RemoteCalendar[]> {
-    const { multistatus } = await dav.davMultistatus(credentials, "PROPFIND", asCollection(homeUrl), "1", CALENDARS_BODY);
+async function listUnder(
+    credentials: dav.DavCredentials,
+    homeUrl: string
+): Promise<RemoteCalendar[]> {
+    const { multistatus } = await dav.davMultistatus(
+        credentials,
+        "PROPFIND",
+        asCollection(homeUrl),
+        "1",
+        CALENDARS_BODY
+    );
     const home = dav.hrefKey(asCollection(homeUrl));
     const calendars: RemoteCalendar[] = [];
     for (const response of multistatus.responses) {
@@ -128,7 +157,9 @@ async function listUnder(credentials: dav.DavCredentials, homeUrl: string): Prom
         const components = componentsOf(response);
         if (components.length === 0) continue;
         const remoteId = asCollection(response.href);
-        const name = dav.propText(response, dav.DAV, "displayname") || decodeURIComponent(new URL(remoteId).pathname.split("/").filter(Boolean).pop() ?? "");
+        const name =
+            dav.propText(response, dav.DAV, "displayname") ||
+            decodeURIComponent(new URL(remoteId).pathname.split("/").filter(Boolean).pop() ?? "");
         calendars.push({
             remoteId,
             name,
@@ -143,8 +174,17 @@ async function listUnder(credentials: dav.DavCredentials, homeUrl: string): Prom
 }
 
 /** The calendar home a principal points at, or null when it names none. */
-async function homeOf(credentials: dav.DavCredentials, principalUrl: string): Promise<string | null> {
-    const { multistatus, url } = await dav.davMultistatus(credentials, "PROPFIND", principalUrl, "0", HOME_BODY);
+async function homeOf(
+    credentials: dav.DavCredentials,
+    principalUrl: string
+): Promise<string | null> {
+    const { multistatus, url } = await dav.davMultistatus(
+        credentials,
+        "PROPFIND",
+        principalUrl,
+        "0",
+        HOME_BODY
+    );
     return dav.propHref(multistatus.responses[0], dav.CALDAV, "calendar-home-set", url);
 }
 
@@ -163,24 +203,48 @@ interface Located {
  */
 async function locate(credentials: dav.DavCredentials, raw: string): Promise<Located> {
     const given = normalizeServerUrl(raw);
-    const candidates = given.pathname === "/" || given.pathname === "" ? [new URL("/.well-known/caldav", given).href, given.href] : [given.href];
+    const candidates =
+        given.pathname === "/" || given.pathname === ""
+            ? [new URL("/.well-known/caldav", given).href, given.href]
+            : [given.href];
     let lastError: unknown = null;
     let answered: string | null = null;
     for (const candidate of candidates) {
         try {
-            const { multistatus, url } = await dav.davMultistatus(credentials, "PROPFIND", candidate, "0", PRINCIPAL_BODY);
+            const { multistatus, url } = await dav.davMultistatus(
+                credentials,
+                "PROPFIND",
+                candidate,
+                "0",
+                PRINCIPAL_BODY
+            );
             const first = multistatus.responses[0];
-            const principal = dav.propHref(first, dav.DAV, "current-user-principal", url) ?? (dav.hasType(first, dav.DAV, "principal") ? url.href : null);
+            const principal =
+                dav.propHref(first, dav.DAV, "current-user-principal", url) ??
+                (dav.hasType(first, dav.DAV, "principal") ? url.href : null);
             const directHome = dav.propHref(first, dav.CALDAV, "calendar-home-set", url);
             if (principal) {
-                const home = (principal === url.href ? directHome : null) ?? (await homeOf(credentials, principal)) ?? directHome;
-                if (home) return { serverUrl: url.href, principalUrl: principal, homeUrl: asCollection(home) };
+                const home =
+                    (principal === url.href ? directHome : null) ??
+                    (await homeOf(credentials, principal)) ??
+                    directHome;
+                if (home)
+                    return {
+                        serverUrl: url.href,
+                        principalUrl: principal,
+                        homeUrl: asCollection(home)
+                    };
             } else if (directHome) {
-                return { serverUrl: url.href, principalUrl: url.href, homeUrl: asCollection(directHome) };
+                return {
+                    serverUrl: url.href,
+                    principalUrl: url.href,
+                    homeUrl: asCollection(directHome)
+                };
             }
             answered ??= url.href;
         } catch (error) {
-            if (error instanceof SyncAuthError || error instanceof SyncUnreachableError) throw error;
+            if (error instanceof SyncAuthError || error instanceof SyncUnreachableError)
+                throw error;
             lastError = error;
         }
     }
@@ -199,13 +263,23 @@ async function locate(credentials: dav.DavCredentials, raw: string): Promise<Loc
  * Throws `SyncAuthError` when the password is refused, so the form can say that
  * rather than "not found".
  */
-export async function discoverCalDav(input: { url: string; username: string; password: string; fetcher: Fetcher }): Promise<{
+export async function discoverCalDav(input: {
+    url: string;
+    username: string;
+    password: string;
+    fetcher: Fetcher;
+}): Promise<{
     serverUrl: string;
     principalUrl: string;
     homeUrl: string;
     calendars: RemoteCalendar[];
 }> {
-    const credentials: dav.DavCredentials = { username: input.username, password: input.password, fetcher: input.fetcher, origin: normalizeServerUrl(input.url).href };
+    const credentials: dav.DavCredentials = {
+        username: input.username,
+        password: input.password,
+        fetcher: input.fetcher,
+        origin: normalizeServerUrl(input.url).href
+    };
     const located = await locate(credentials, input.url);
     const calendars = await listUnder(credentials, located.homeUrl);
     return { ...located, calendars };
@@ -221,12 +295,25 @@ function hrefFor(url: string, collection: string): string {
 }
 
 /** A CalDAV account as a `CalendarProvider`. */
-export function createCalDavProvider(input: { serverUrl: string; username: string; password: string; fetcher: Fetcher }): CalendarProvider {
-    const credentials: dav.DavCredentials = { username: input.username, password: input.password, fetcher: input.fetcher, origin: normalizeServerUrl(input.serverUrl).href };
+export function createCalDavProvider(input: {
+    serverUrl: string;
+    username: string;
+    password: string;
+    fetcher: Fetcher;
+}): CalendarProvider {
+    const credentials: dav.DavCredentials = {
+        username: input.username,
+        password: input.password,
+        fetcher: input.fetcher,
+        origin: normalizeServerUrl(input.serverUrl).href
+    };
     let home: string | null = null;
 
     /** Fetches bodies with calendar-multiget, falling back to one GET each. */
-    const fetchBodies = async (collection: string, wanted: ReadonlyMap<string, string>): Promise<{ objects: RemoteObject[]; gone: string[] }> => {
+    const fetchBodies = async (
+        collection: string,
+        wanted: ReadonlyMap<string, string>
+    ): Promise<{ objects: RemoteObject[]; gone: string[] }> => {
         const objects: RemoteObject[] = [];
         const gone: string[] = [];
         const byKey = new Map<string, string>();
@@ -238,7 +325,13 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
             const missing = new Set(batch);
             if (multiget) {
                 try {
-                    const { multistatus } = await dav.davMultistatus(credentials, "REPORT", collection, "1", multigetBody(batch.map((h) => hrefFor(h, collection))));
+                    const { multistatus } = await dav.davMultistatus(
+                        credentials,
+                        "REPORT",
+                        collection,
+                        "1",
+                        multigetBody(batch.map((h) => hrefFor(h, collection)))
+                    );
                     for (const response of multistatus.responses) {
                         const href = byKey.get(dav.hrefKey(response.href));
                         if (!href) continue;
@@ -249,16 +342,29 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
                         }
                         const ics = dav.prop(response, dav.CALDAV, "calendar-data");
                         if (!ics) continue;
-                        objects.push({ href, etag: dav.propText(response, dav.DAV, "getetag") ?? wanted.get(href) ?? "", ics: ics.text });
+                        objects.push({
+                            href,
+                            etag:
+                                dav.propText(response, dav.DAV, "getetag") ??
+                                wanted.get(href) ??
+                                "",
+                            ics: ics.text
+                        });
                         missing.delete(href);
                     }
                 } catch (error) {
-                    if (!(error instanceof SyncRefusedError) && !(error instanceof SyncNotFoundError)) throw error;
+                    if (
+                        !(error instanceof SyncRefusedError) &&
+                        !(error instanceof SyncNotFoundError)
+                    )
+                        throw error;
                     multiget = false;
                 }
             }
             for (const href of missing) {
-                const { response } = await dav.davRequest(credentials, "GET", href, { headers: { Accept: "text/calendar" } });
+                const { response } = await dav.davRequest(credentials, "GET", href, {
+                    headers: { Accept: "text/calendar" }
+                });
                 if (response.status === 404 || response.status === 410) {
                     await response.body?.cancel().catch(() => undefined);
                     gone.push(href);
@@ -266,7 +372,11 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
                 }
                 if (!response.ok) throw errorFor(response, await reasonOf(response));
                 const ics = await readCapped(response, MAX_RESPONSE_BYTES);
-                objects.push({ href, etag: response.headers.get("etag") ?? wanted.get(href) ?? "", ics });
+                objects.push({
+                    href,
+                    etag: response.headers.get("etag") ?? wanted.get(href) ?? "",
+                    ics
+                });
             }
         }
         return { objects, gone };
@@ -278,11 +388,18 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
      * which is never one held, so its body is read.
      */
     const listEtags = async (collection: string): Promise<Map<string, string>> => {
-        const { multistatus } = await dav.davMultistatus(credentials, "PROPFIND", collection, "1", ETAGS_BODY);
+        const { multistatus } = await dav.davMultistatus(
+            credentials,
+            "PROPFIND",
+            collection,
+            "1",
+            ETAGS_BODY
+        );
         const self = dav.hrefKey(collection);
         const etags = new Map<string, string>();
         for (const response of multistatus.responses) {
-            if (dav.hrefKey(response.href) === self || dav.hasType(response, dav.DAV, "collection")) continue;
+            if (dav.hrefKey(response.href) === self || dav.hasType(response, dav.DAV, "collection"))
+                continue;
             if (response.status === 404 || response.status === 410) continue;
             etags.set(response.href, dav.propText(response, dav.DAV, "getetag") ?? "");
         }
@@ -290,7 +407,12 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
     };
 
     /** Diffs the server's etags against what is held: exact, one listing plus the changed bodies. */
-    const diffPull = async (collection: string, state: PullState, syncToken: string, ctag: string): Promise<ChangeSet> => {
+    const diffPull = async (
+        collection: string,
+        state: PullState,
+        syncToken: string,
+        ctag: string
+    ): Promise<ChangeSet> => {
         const remote = await listEtags(collection);
         const knownByKey = new Map<string, [string, string]>();
         for (const [href, etag] of state.known) knownByKey.set(dav.hrefKey(href), [href, etag]);
@@ -302,13 +424,20 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
             const held = knownByKey.get(key);
             if (!held || !etag || held[1] !== etag) wanted.set(held ? held[0] : href, etag);
         }
-        const removed = [...knownByKey.entries()].filter(([key]) => !seen.has(key)).map(([, [href]]) => href);
+        const removed = [...knownByKey.entries()]
+            .filter(([key]) => !seen.has(key))
+            .map(([, [href]]) => href);
         const { objects, gone } = await fetchBodies(collection, wanted);
         return { changed: objects, removed: [...removed, ...gone], syncToken, ctag, full: false };
     };
 
     /** RFC 6578 sync-collection from a token; null when the server will not do it. */
-    const syncPull = async (collection: string, token: string, state: PullState, ctag: string): Promise<ChangeSet | null> => {
+    const syncPull = async (
+        collection: string,
+        token: string,
+        state: PullState,
+        ctag: string
+    ): Promise<ChangeSet | null> => {
         const changedEtags = new Map<string, string>();
         const removed = new Set<string>();
         const self = dav.hrefKey(collection);
@@ -316,11 +445,18 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
         for (let round = 0; round < MAX_SYNC_ROUNDS; round++) {
             let result;
             try {
-                result = await dav.davMultistatus(credentials, "REPORT", collection, "0", syncBody(current));
+                result = await dav.davMultistatus(
+                    credentials,
+                    "REPORT",
+                    collection,
+                    "0",
+                    syncBody(current)
+                );
             } catch (error) {
                 // A refused token (403/409 valid-sync-token, 412) or a server that
                 // does not know the report: the etag diff is exact either way.
-                if (error instanceof SyncError && SYNC_FALLBACK_STATUSES.has(error.status ?? 0)) return null;
+                if (error instanceof SyncError && SYNC_FALLBACK_STATUSES.has(error.status ?? 0))
+                    return null;
                 throw error;
             }
             let truncated = false;
@@ -342,7 +478,8 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
             if (!next) return null;
             current = next;
             if (!truncated) break;
-            if (round === MAX_SYNC_ROUNDS - 1) throw new SyncUnreachableError("The server kept truncating its change list", 507);
+            if (round === MAX_SYNC_ROUNDS - 1)
+                throw new SyncUnreachableError("The server kept truncating its change list", 507);
         }
         // Report only what differs from what is held, keyed as the caller holds it.
         const knownByKey = new Map<string, [string, string]>();
@@ -352,9 +489,17 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
             const held = knownByKey.get(dav.hrefKey(href));
             if (!held || !etag || held[1] !== etag) wanted.set(held ? held[0] : href, etag);
         }
-        const removedHrefs = [...removed].map((href) => knownByKey.get(dav.hrefKey(href))?.[0] ?? href);
+        const removedHrefs = [...removed].map(
+            (href) => knownByKey.get(dav.hrefKey(href))?.[0] ?? href
+        );
         const { objects, gone } = await fetchBodies(collection, wanted);
-        return { changed: objects, removed: [...removedHrefs, ...gone], syncToken: current, ctag, full: false };
+        return {
+            changed: objects,
+            removed: [...removedHrefs, ...gone],
+            syncToken: current,
+            ctag,
+            full: false
+        };
     };
 
     return {
@@ -365,13 +510,20 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
 
         async pull(state) {
             const collection = asCollection(state.remoteId);
-            const { multistatus } = await dav.davMultistatus(credentials, "PROPFIND", collection, "0", STATE_BODY);
+            const { multistatus } = await dav.davMultistatus(
+                credentials,
+                "PROPFIND",
+                collection,
+                "0",
+                STATE_BODY
+            );
             const self = multistatus.responses[0];
             const ctag = dav.propText(self, dav.CS, "getctag") ?? "";
             const serverToken = dav.propText(self, dav.DAV, "sync-token") ?? "";
 
             if (state.syncToken && serverToken) {
-                if (serverToken === state.syncToken) return { changed: [], removed: [], syncToken: serverToken, ctag, full: false };
+                if (serverToken === state.syncToken)
+                    return { changed: [], removed: [], syncToken: serverToken, ctag, full: false };
                 const synced = await syncPull(collection, state.syncToken, state, ctag);
                 if (synced) return synced;
             } else if (!serverToken && ctag && ctag === state.ctag) {
@@ -386,25 +538,42 @@ export function createCalDavProvider(input: { serverUrl: string; username: strin
 
         async put(target, object) {
             const collection = asCollection(target.remoteId);
-            const url = object.href ?? new URL(`${encodeURIComponent(object.uid)}.ics`, collection).href;
-            const headers: Record<string, string> = { "Content-Type": "text/calendar; charset=utf-8" };
+            const url =
+                object.href ?? new URL(`${encodeURIComponent(object.uid)}.ics`, collection).href;
+            const headers: Record<string, string> = {
+                "Content-Type": "text/calendar; charset=utf-8"
+            };
             if (object.href === null) headers["If-None-Match"] = "*";
             else if (object.etag) headers["If-Match"] = object.etag;
-            const { response } = await dav.davRequest(credentials, "PUT", url, { body: object.ics, headers });
+            const { response } = await dav.davRequest(credentials, "PUT", url, {
+                body: object.ics,
+                headers
+            });
             if (!response.ok) throw errorFor(response, await reasonOf(response));
             await response.body?.cancel().catch(() => undefined);
             const etag = response.headers.get("etag");
             if (etag) return { href: url, etag };
             // The server changed the object as it stored it (or does not say):
             // ask for the etag it now has.
-            const { multistatus } = await dav.davMultistatus(credentials, "PROPFIND", url, "0", ETAG_BODY);
-            return { href: url, etag: dav.propText(multistatus.responses[0], dav.DAV, "getetag") ?? "" };
+            const { multistatus } = await dav.davMultistatus(
+                credentials,
+                "PROPFIND",
+                url,
+                "0",
+                ETAG_BODY
+            );
+            return {
+                href: url,
+                etag: dav.propText(multistatus.responses[0], dav.DAV, "getetag") ?? ""
+            };
         },
 
         async remove(_target, object) {
             const headers: Record<string, string> = {};
             if (object.etag) headers["If-Match"] = object.etag;
-            const { response } = await dav.davRequest(credentials, "DELETE", object.href, { headers });
+            const { response } = await dav.davRequest(credentials, "DELETE", object.href, {
+                headers
+            });
             await response.body?.cancel().catch(() => undefined);
             if (response.ok || response.status === 404 || response.status === 410) return;
             throw errorFor(response);

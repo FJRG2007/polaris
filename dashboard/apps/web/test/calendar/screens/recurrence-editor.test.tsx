@@ -50,7 +50,9 @@ describe("the repeat editor", () => {
         const monday = screen.getByRole("button", { name: "Monday" });
         const friday = screen.getByRole("button", { name: "Friday" });
         expect(monday.getAttribute("aria-pressed")).toBe("true");
-        expect(screen.getByRole("button", { name: "Wednesday" }).getAttribute("aria-pressed")).toBe("true");
+        expect(screen.getByRole("button", { name: "Wednesday" }).getAttribute("aria-pressed")).toBe(
+            "true"
+        );
         expect(friday.getAttribute("aria-pressed")).toBe("false");
         expect(savedRule()).toBe("FREQ=WEEKLY;BYDAY=MO,WE");
 
@@ -71,7 +73,9 @@ describe("the repeat editor", () => {
         expect(latest?.ordinal).toBe(-1);
         expect(latest?.ordinalDay).toBe("FR");
         expect(savedRule()).toBe("FREQ=MONTHLY;BYDAY=-1FR;COUNT=6");
-        fireEvent.change(screen.getByRole("spinbutton", { name: "Times" }), { target: { value: "8" } });
+        fireEvent.change(screen.getByRole("spinbutton", { name: "Times" }), {
+            target: { value: "8" }
+        });
         expect(savedRule()).toBe("FREQ=MONTHLY;BYDAY=-1FR;COUNT=8");
     });
 

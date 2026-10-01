@@ -11,7 +11,9 @@ import { invalid, outcome, type Outcome } from "../lib/outcome";
 
 const target = z.object({ kind: z.enum(["calendar", "event"]), id: uuidSchema });
 
-export async function listTrashAction(): Promise<Outcome<{ items: TrashItemView[]; retentionDays: number }>> {
+export async function listTrashAction(): Promise<
+    Outcome<{ items: TrashItemView[]; retentionDays: number }>
+> {
     return outcome(async () => ({
         items: await trash.listTrash(await requireCalendarUser()),
         retentionDays: trash.RETENTION_DAYS
@@ -24,7 +26,12 @@ export async function restoreTrashAction(input: unknown): Promise<Outcome<object
         .safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => {
-        await trash.restoreTrash(await requireCalendarUser(), parsed.data.kind, parsed.data.id, parsed.data.zone);
+        await trash.restoreTrash(
+            await requireCalendarUser(),
+            parsed.data.kind,
+            parsed.data.id,
+            parsed.data.zone
+        );
         return {};
     });
 }

@@ -32,7 +32,10 @@ export function VoteForm({ token, view }: { token: string; view: VotePageView })
         setBusy(true);
         setProblem(null);
         setDone(false);
-        const answer = await hostUi.runAction.runAction(() => proposalActions.castVotesAction({ token, votes }), setProblem);
+        const answer = await hostUi.runAction.runAction(
+            () => proposalActions.castVotesAction({ token, votes }),
+            setProblem
+        );
         setBusy(false);
         if (!answer) return;
         if (!answer.ok) {
@@ -43,7 +46,8 @@ export function VoteForm({ token, view }: { token: string; view: VotePageView })
         setDone(true);
     };
 
-    const end = (start: string) => new Date(Date.parse(start) + view.durationMinutes * 60_000).toISOString();
+    const end = (start: string) =>
+        new Date(Date.parse(start) + view.durationMinutes * 60_000).toISOString();
 
     return (
         <PublicFrame
@@ -55,21 +59,40 @@ export function VoteForm({ token, view }: { token: string; view: VotePageView })
                 </span>
             }
         >
-            {view.description ? <p className="whitespace-pre-wrap text-[13px] text-muted-foreground">{view.description}</p> : null}
+            {view.description ? (
+                <p className="whitespace-pre-wrap text-[13px] text-muted-foreground">
+                    {view.description}
+                </p>
+            ) : null}
             {closed ? (
-                <StatusNote tone="neutral">{view.chosen ? t("vote.closedChosen", { when: formatRange(view.chosen, end(view.chosen), zone, locale) }) : t("vote.closed")}</StatusNote>
+                <StatusNote tone="neutral">
+                    {view.chosen
+                        ? t("vote.closedChosen", {
+                              when: formatRange(view.chosen, end(view.chosen), zone, locale)
+                          })
+                        : t("vote.closed")}
+                </StatusNote>
             ) : (
                 <p className="text-[13px] text-muted-foreground">{t("vote.intro", { zone })}</p>
             )}
             <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
                 {view.dates.map((date) => (
-                    <li key={date.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                        <span className="text-[13px]">{formatRange(date.start, end(date.start), zone, locale)}</span>
+                    <li
+                        key={date.id}
+                        className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                        <span className="text-[13px]">
+                            {formatRange(date.start, end(date.start), zone, locale)}
+                        </span>
                         <SegmentedControl
                             size="sm"
-                            aria-label={t("vote.choiceFor", { when: formatRange(date.start, end(date.start), zone, locale) })}
+                            aria-label={t("vote.choiceFor", {
+                                when: formatRange(date.start, end(date.start), zone, locale)
+                            })}
                             value={votes[date.id] ?? ("" as Vote)}
-                            onValueChange={(value) => !closed && setVotes((current) => ({ ...current, [date.id]: value }))}
+                            onValueChange={(value) =>
+                                !closed && setVotes((current) => ({ ...current, [date.id]: value }))
+                            }
                             options={[
                                 { value: "yes", label: t("vote.yes"), disabled: closed },
                                 { value: "maybe", label: t("vote.maybe"), disabled: closed },
@@ -83,7 +106,11 @@ export function VoteForm({ token, view }: { token: string; view: VotePageView })
             {done && !dirty ? <StatusNote tone="success">{t("vote.saved")}</StatusNote> : null}
             {closed ? null : (
                 <div className="flex justify-end">
-                    <Button onClick={() => void submit()} disabled={busy} aria-disabled={!dirty || busy}>
+                    <Button
+                        onClick={() => void submit()}
+                        disabled={busy}
+                        aria-disabled={!dirty || busy}
+                    >
                         {t("vote.submit")}
                     </Button>
                 </div>

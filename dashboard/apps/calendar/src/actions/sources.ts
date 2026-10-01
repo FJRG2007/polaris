@@ -46,7 +46,10 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
             host.calendarHost.calendarLinkUrl("microsoft"),
             readInstanceSettings()
         ]);
-        const catalog = [...sync.HOLIDAY_CALENDARS.map((feed) => feed.url), ...settings.suggested.map((entry) => entry.url)];
+        const catalog = [
+            ...sync.HOLIDAY_CALENDARS.map((feed) => feed.url),
+            ...settings.suggested.map((entry) => entry.url)
+        ];
         const used = new Set(list.map((source) => source.connectionId).filter(Boolean));
         return {
             accounts: {
@@ -64,16 +67,22 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
 export async function addFeedAction(input: unknown): Promise<Outcome<{ sourceId: string }>> {
     const parsed = schemas.icsSourceSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
-    return outcome(async () => ({ sourceId: await sources.addFeed(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        sourceId: await sources.addFeed(await requireCalendarUser(), parsed.data)
+    }));
 }
 
 export async function addCalDavAction(input: unknown): Promise<Outcome<{ sourceId: string }>> {
     const parsed = schemas.caldavSourceSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
-    return outcome(async () => ({ sourceId: await sources.addCalDav(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        sourceId: await sources.addCalDav(await requireCalendarUser(), parsed.data)
+    }));
 }
 
-export async function addLinkedAccountAction(connectionId: unknown): Promise<Outcome<{ sourceId: string }>> {
+export async function addLinkedAccountAction(
+    connectionId: unknown
+): Promise<Outcome<{ sourceId: string }>> {
     const parsed = schemas.uuidSchema.safeParse(connectionId);
     if (!parsed.success) return invalid(parsed.error.issues);
     return outcome(async () => ({
@@ -84,12 +93,19 @@ export async function addLinkedAccountAction(connectionId: unknown): Promise<Out
 export async function refreshSourceAction(id: unknown): Promise<Outcome<{ source: SourceView }>> {
     const parsed = schemas.uuidSchema.safeParse(id);
     if (!parsed.success) return invalid(parsed.error.issues);
-    return outcome(async () => ({ source: await sources.refreshSource(await requireCalendarUser(), parsed.data) }));
+    return outcome(async () => ({
+        source: await sources.refreshSource(await requireCalendarUser(), parsed.data)
+    }));
 }
 
 const updateInput = z.object({
     id: schemas.uuidSchema,
-    refreshMinutes: z.number().int().min(15).max(7 * 24 * 60).optional(),
+    refreshMinutes: z
+        .number()
+        .int()
+        .min(15)
+        .max(7 * 24 * 60)
+        .optional(),
     password: z.string().min(1).max(512).optional(),
     url: schemas.addressSchema.optional()
 });

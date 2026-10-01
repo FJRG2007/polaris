@@ -15,9 +15,20 @@ import { Button, Skeleton, cn } from "@polaris/ui";
 import type { SlotView } from "../../lib/scheduling-wire";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Globe } from "lucide-react";
-import { addMonths, dayStart, firstOfMonth, formatDay, monthGrid, todayIn, weekdayLabels } from "../time";
+import {
+    addMonths,
+    dayStart,
+    firstOfMonth,
+    formatDay,
+    monthGrid,
+    todayIn,
+    weekdayLabels
+} from "../time";
 
-type Load = { status: "loading" } | { status: "ready"; slots: SlotView[] } | { status: "error"; message: string };
+type Load =
+    | { status: "loading" }
+    | { status: "ready"; slots: SlotView[] }
+    | { status: "error"; message: string };
 
 /** Monday first: what most of the places a booking page is sent to expect. */
 const FIRST_DAY = 1;
@@ -64,7 +75,10 @@ export function SlotPicker({
         setLoad({ status: "loading" });
         const from = dayStart(month, zone).toISOString();
         const to = dayStart(addMonths(month, 1), zone).toISOString();
-        fetch(`/api/calendar/book/${encodeURIComponent(slug)}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { signal: controller.signal })
+        fetch(
+            `/api/calendar/book/${encodeURIComponent(slug)}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+            { signal: controller.signal }
+        )
             .then(async (response) => {
                 if (response.status === 429) throw new Error(t("booking.slowDown"));
                 if (response.status === 404) throw new Error(t("booking.pageGone"));
@@ -75,7 +89,10 @@ export function SlotPicker({
             })
             .catch((caught: unknown) => {
                 if (controller.signal.aborted) return;
-                setLoad({ status: "error", message: caught instanceof Error ? caught.message : t("booking.slotsFailed") });
+                setLoad({
+                    status: "error",
+                    message: caught instanceof Error ? caught.message : t("booking.slotsFailed")
+                });
             });
         return () => controller.abort();
         // `t` is stable for a page; the month, the zone and a retry decide a read.
@@ -110,7 +127,9 @@ export function SlotPicker({
                     className="flex w-fit max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                 >
                     <Globe className="size-3.5" />
-                    <span className="truncate">{t("booking.timesIn", { zone: engine.zoneLabel(zone, new Date(), locale) })}</span>
+                    <span className="truncate">
+                        {t("booking.timesIn", { zone: engine.zoneLabel(zone, new Date(), locale) })}
+                    </span>
                 </button>
                 {zoneOpen ? (
                     <ZonePicker
@@ -128,7 +147,9 @@ export function SlotPicker({
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                        <span className="inline-block font-medium first-letter:uppercase">{monthLabel}</span>
+                        <span className="inline-block font-medium first-letter:uppercase">
+                            {monthLabel}
+                        </span>
                         <span className="flex gap-1">
                             <Button
                                 size="icon-sm"
@@ -158,9 +179,18 @@ export function SlotPicker({
                             </Button>
                         </span>
                     </div>
-                    <div role="grid" aria-label={monthLabel} className="grid grid-cols-7 gap-1 text-center" aria-busy={load.status === "loading"}>
+                    <div
+                        role="grid"
+                        aria-label={monthLabel}
+                        className="grid grid-cols-7 gap-1 text-center"
+                        aria-busy={load.status === "loading"}
+                    >
                         {labels.map((label) => (
-                            <span key={label} role="columnheader" className="pb-1 text-[11px] uppercase tracking-wider text-foreground-subtle">
+                            <span
+                                key={label}
+                                role="columnheader"
+                                className="pb-1 text-[11px] uppercase tracking-wider text-foreground-subtle"
+                            >
                                 {label}
                             </span>
                         ))}
@@ -175,7 +205,11 @@ export function SlotPicker({
                                     role="gridcell"
                                     disabled={!open}
                                     aria-selected={chosen}
-                                    aria-label={formatDay(date, locale, { weekday: "long", day: "numeric", month: "long" })}
+                                    aria-label={formatDay(date, locale, {
+                                        weekday: "long",
+                                        day: "numeric",
+                                        month: "long"
+                                    })}
                                     onClick={() => setDay(date)}
                                     className={cn(
                                         "flex aspect-square max-h-11 items-center justify-center rounded-md text-[13px] tabular-nums transition-colors duration-fast",
@@ -204,21 +238,35 @@ export function SlotPicker({
                     ) : load.status === "error" ? (
                         <StatusNote tone="danger">
                             <span>{load.message}</span>{" "}
-                            <button type="button" className="underline underline-offset-2" onClick={() => setTurn((value) => value + 1)}>
+                            <button
+                                type="button"
+                                className="underline underline-offset-2"
+                                onClick={() => setTurn((value) => value + 1)}
+                            >
                                 {t("booking.retry")}
                             </button>
                         </StatusNote>
                     ) : times.length === 0 ? (
-                        <p className="text-muted-foreground">{byDay.size === 0 ? t("booking.noSlotsMonth") : t("booking.pickDay")}</p>
+                        <p className="text-muted-foreground">
+                            {byDay.size === 0 ? t("booking.noSlotsMonth") : t("booking.pickDay")}
+                        </p>
                     ) : (
                         <>
-                            <span className="text-xs text-muted-foreground">{formatDay(openDay!, locale, { weekday: "long", day: "numeric", month: "long" })}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {formatDay(openDay!, locale, {
+                                    weekday: "long",
+                                    day: "numeric",
+                                    month: "long"
+                                })}
+                            </span>
                             <ul className="flex max-h-80 flex-col gap-1.5 overflow-y-auto">
                                 {times.map((slot) => (
                                     <li key={slot.start}>
                                         <Button
                                             type="button"
-                                            variant={selected === slot.start ? "primary" : "outline"}
+                                            variant={
+                                                selected === slot.start ? "primary" : "outline"
+                                            }
                                             className="w-full"
                                             aria-pressed={selected === slot.start}
                                             onClick={() => onPick(slot)}

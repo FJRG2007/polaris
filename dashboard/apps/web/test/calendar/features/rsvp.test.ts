@@ -29,13 +29,19 @@ describe("answering an invitation from its link", () => {
         calendar = world.addCalendar(alice.id, { timezone: ZONE });
     });
 
-    async function invite(fields: Record<string, unknown> = {}): Promise<{ objectId: string; token: string }> {
+    async function invite(
+        fields: Record<string, unknown> = {}
+    ): Promise<{ objectId: string; token: string }> {
         const { objectId } = await objects.saveEvent(alice as never, {
             objectId: null,
             recurrenceKey: null,
             scope: "all",
             version: null,
-            event: world.input(calendar, { summary: "Kickoff", attendees: [{ email: GUEST }], ...fields }),
+            event: world.input(calendar, {
+                summary: "Kickoff",
+                attendees: [{ email: GUEST }],
+                ...fields
+            }),
             floatingZone: ZONE
         });
         const invitation = db.rows("calendarInvitation").find((row) => row.objectId === objectId)!;
@@ -45,7 +51,15 @@ describe("answering an invitation from its link", () => {
     it("shows the event the link is for", async () => {
         const { token } = await invite();
         const view = await rsvp.rsvpView(token);
-        expect(view).toEqual(expect.objectContaining({ title: "Kickoff", organizer: "Alice", email: GUEST, partstat: "NEEDS-ACTION", recurring: false }));
+        expect(view).toEqual(
+            expect.objectContaining({
+                title: "Kickoff",
+                organizer: "Alice",
+                email: GUEST,
+                partstat: "NEEDS-ACTION",
+                recurring: false
+            })
+        );
         expect(await rsvp.rsvpView("x".repeat(32))).toBeNull();
     });
 
@@ -53,26 +67,44 @@ describe("answering an invitation from its link", () => {
         const { objectId, token } = await invite();
         fake.notices.length = 0;
         await rsvp.answerByToken({ token, partstat: "ACCEPTED", recurrenceKey: null });
-        const guest = world.eventIn(db.byId("calendarObject", objectId)).attendees.find((attendee) => attendee.email === GUEST);
+        const guest = world
+            .eventIn(db.byId("calendarObject", objectId))
+            .attendees.find((attendee) => attendee.email === GUEST);
         expect(guest?.partstat).toBe("ACCEPTED");
-        expect(db.rows("calendarInvitation")[0]).toEqual(expect.objectContaining({ partstat: "ACCEPTED", respondedAt: expect.any(Date) }));
-        expect(fake.notices).toEqual([expect.objectContaining({ userId: alice.id, event: "calendar.reply" })]);
+        expect(db.rows("calendarInvitation")[0]).toEqual(
+            expect.objectContaining({ partstat: "ACCEPTED", respondedAt: expect.any(Date) })
+        );
+        expect(fake.notices).toEqual([
+            expect.objectContaining({ userId: alice.id, event: "calendar.reply" })
+        ]);
         expect((await rsvp.rsvpView(token))?.partstat).toBe("ACCEPTED");
     });
 
     it("answers one occurrence of a series alone", async () => {
-        const { objectId, token } = await invite({ rule: world.weekly({ kind: "count", count: 4 }) });
+        const { objectId, token } = await invite({
+            rule: world.weekly({ kind: "count", count: 4 })
+        });
         const view = await rsvp.rsvpView(token);
         expect(view?.occurrences.length).toBe(4);
         const second = view!.occurrences[1]!.key;
         await rsvp.answerByToken({ token, partstat: "DECLINED", recurrenceKey: second });
         const item = world.itemIn(db.byId("calendarObject", objectId));
         if (item.component !== "VEVENT") throw new Error("not an event");
-        expect(item.master?.attendees.find((attendee) => attendee.email === GUEST)?.partstat).toBe("NEEDS-ACTION");
-        expect(item.overrides.flatMap((override) => override.attendees).find((attendee) => attendee.email === GUEST)?.partstat).toBe("DECLINED");
-        await expect(rsvp.answerByToken({ token, partstat: "ACCEPTED", recurrenceKey: "2020-01-01T00:00:00.000Z" })).rejects.toThrow(
-            world.en("rsvp.noSuchOccurrence")
+        expect(item.master?.attendees.find((attendee) => attendee.email === GUEST)?.partstat).toBe(
+            "NEEDS-ACTION"
         );
+        expect(
+            item.overrides
+                .flatMap((override) => override.attendees)
+                .find((attendee) => attendee.email === GUEST)?.partstat
+        ).toBe("DECLINED");
+        await expect(
+            rsvp.answerByToken({
+                token,
+                partstat: "ACCEPTED",
+                recurrenceKey: "2020-01-01T00:00:00.000Z"
+            })
+        ).rejects.toThrow(world.en("rsvp.noSuchOccurrence"));
     });
 
     it("is rate limited per address and per link", async () => {
@@ -80,15 +112,27 @@ describe("answering an invitation from its link", () => {
         expect(fake.rateKeys).toEqual([`calendar.mail-out:${alice.id}`]);
         fake.rateKeys.length = 0;
         await rsvp.answerByToken({ token, partstat: "TENTATIVE", recurrenceKey: null });
-        expect(fake.rateKeys).toEqual(["calendar.rsvp:203.0.113.7", `calendar.rsvp-token:${token}`]);
+        expect(fake.rateKeys).toEqual([
+            "calendar.rsvp:203.0.113.7",
+            `calendar.rsvp-token:${token}`
+        ]);
         fake.rateAllowed = false;
-        await expect(rsvp.answerByToken({ token, partstat: "ACCEPTED", recurrenceKey: null })).rejects.toThrow(world.en("booking.slowDown"));
+        await expect(
+            rsvp.answerByToken({ token, partstat: "ACCEPTED", recurrenceKey: null })
+        ).rejects.toThrow(world.en("booking.slowDown"));
         expect(db.rows("calendarInvitation")[0]?.partstat).toBe("TENTATIVE");
     });
 
     it("refuses a link whose event was deleted", async () => {
         const { objectId, token } = await invite();
-        await objects.deleteEvent(alice as never, { objectId, recurrenceKey: null, scope: "all", floatingZone: ZONE });
-        await expect(rsvp.answerByToken({ token, partstat: "ACCEPTED", recurrenceKey: null })).rejects.toThrow(world.en("rsvp.linkGone"));
+        await objects.deleteEvent(alice as never, {
+            objectId,
+            recurrenceKey: null,
+            scope: "all",
+            floatingZone: ZONE
+        });
+        await expect(
+            rsvp.answerByToken({ token, partstat: "ACCEPTED", recurrenceKey: null })
+        ).rejects.toThrow(world.en("rsvp.linkGone"));
     });
 });

@@ -30,7 +30,16 @@ import { SyncAuthError, SyncUnreachableError } from "@polaris-app/calendar/src/l
 const ZONE = "Europe/Madrid";
 
 function icsFor(uid: string, summary: string, day = "2026-10-12"): string {
-    return engine.serializeItem(engine.eventItem(world.event({ uid, summary, start: world.at(`${day}T10:00:00`), end: world.at(`${day}T11:00:00`) })));
+    return engine.serializeItem(
+        engine.eventItem(
+            world.event({
+                uid,
+                summary,
+                start: world.at(`${day}T10:00:00`),
+                end: world.at(`${day}T11:00:00`)
+            })
+        )
+    );
 }
 
 describe("calendar sync engine", () => {
@@ -69,7 +78,11 @@ describe("calendar sync engine", () => {
             recurrenceKey: null,
             scope: "all",
             version: null,
-            event: world.input(String(row.calendarId), { summary, start: world.at("2026-10-12T10:00:00"), end: world.at("2026-10-12T11:00:00") }),
+            event: world.input(String(row.calendarId), {
+                summary,
+                start: world.at("2026-10-12T10:00:00"),
+                end: world.at("2026-10-12T11:00:00")
+            }),
             floatingZone: ZONE
         });
         return String(row.id);
@@ -77,23 +90,46 @@ describe("calendar sync engine", () => {
 
     it("creates the provider's calendars and objects on the first pull", async () => {
         const calendar = await firstPull();
-        expect(calendar).toMatchObject({ kind: "remote", remoteId: "primary", name: "Work", color: "#aa0000", timezone: ZONE, ownerId: alice.id });
+        expect(calendar).toMatchObject({
+            kind: "remote",
+            remoteId: "primary",
+            name: "Work",
+            color: "#aa0000",
+            timezone: ZONE,
+            ownerId: alice.id
+        });
         expect(calendar.syncToken).not.toBe("");
         const dentist = objectAt("dentist")!;
-        expect(dentist).toMatchObject({ calendarId: calendar.id, uid: "dentist@google", summary: "Dentist", etag: remote.object("primary", "dentist")!.etag });
+        expect(dentist).toMatchObject({
+            calendarId: calendar.id,
+            uid: "dentist@google",
+            summary: "Dentist",
+            etag: remote.object("primary", "dentist")!.etag
+        });
         expect(objectAt("lunch")?.summary).toBe("Lunch");
-        expect(db.byId("calendarSource", sourceId)).toMatchObject({ status: "ok", lastError: null });
+        expect(db.byId("calendarSource", sourceId)).toMatchObject({
+            status: "ok",
+            lastError: null
+        });
         expect(db.byId("calendarSource", sourceId)?.lastSyncAt).toEqual(world.NOW);
         expect(fake.mails).toEqual([]);
     });
 
     it("pulls only what changed since the token: an edit updates, a deletion trashes", async () => {
         await firstPull();
-        const etag = remote.remoteWrite("primary", "dentist", icsFor("dentist@google", "Dentist (moved)", "2026-10-14"));
+        const etag = remote.remoteWrite(
+            "primary",
+            "dentist",
+            icsFor("dentist@google", "Dentist (moved)", "2026-10-14")
+        );
         remote.remoteDelete("primary", "lunch");
         await syncEngine.syncSource(sourceId);
         expect(remote.pulls.at(-1)?.syncToken).not.toBe("");
-        expect(objectAt("dentist")).toMatchObject({ summary: "Dentist (moved)", etag, deletedAt: null });
+        expect(objectAt("dentist")).toMatchObject({
+            summary: "Dentist (moved)",
+            etag,
+            deletedAt: null
+        });
         expect(objectAt("dentist")?.startsAt).toEqual(new Date("2026-10-14T08:00:00Z"));
         expect(objectAt("lunch")?.deletedAt).toBeInstanceOf(Date);
     });
@@ -129,10 +165,16 @@ describe("calendar sync engine", () => {
         expect(db.byId("calendarObject", id)?.pendingPush).toBe("put");
         release();
         await world.settle();
-        expect(remote.writes).toEqual([{ op: "put", remoteId: "primary", href: "dentist", ifMatch: before }]);
+        expect(remote.writes).toEqual([
+            { op: "put", remoteId: "primary", href: "dentist", ifMatch: before }
+        ]);
         const stored = remote.object("primary", "dentist")!;
         expect(stored.ics).toContain("Dentist\\, bring forms");
-        expect(db.byId("calendarObject", id)).toMatchObject({ pendingPush: "", etag: stored.etag, conflictIcs: null });
+        expect(db.byId("calendarObject", id)).toMatchObject({
+            pendingPush: "",
+            etag: stored.etag,
+            conflictIcs: null
+        });
     });
 
     it("sends again a row that changed while its push was on the way, with If-Match on the etag that push got", async () => {
@@ -147,7 +189,11 @@ describe("calendar sync engine", () => {
         expect(stored.ics).toContain("Changed meanwhile");
         expect(remote.writes.map((write) => write.ifMatch)).toEqual([before, expect.any(String)]);
         expect(remote.writes[1]?.ifMatch).not.toBe(before);
-        expect(db.byId("calendarObject", id)).toMatchObject({ pendingPush: "", etag: stored.etag, conflictIcs: null });
+        expect(db.byId("calendarObject", id)).toMatchObject({
+            pendingPush: "",
+            etag: stored.etag,
+            conflictIcs: null
+        });
     });
 
     it("sends two quick edits one after the other, the provider ending with the last and nothing set aside", async () => {
@@ -159,7 +205,11 @@ describe("calendar sync engine", () => {
         await world.settle();
         const stored = remote.object("primary", "dentist")!;
         expect(stored.ics).toContain("Edit two");
-        expect(db.byId("calendarObject", id)).toMatchObject({ pendingPush: "", etag: stored.etag, conflictIcs: null });
+        expect(db.byId("calendarObject", id)).toMatchObject({
+            pendingPush: "",
+            etag: stored.etag,
+            conflictIcs: null
+        });
         expect(world.eventIn(db.byId("calendarObject", id)).summary).toBe("Edit two");
     });
 
@@ -183,7 +233,11 @@ describe("calendar sync engine", () => {
 
     it("keeps the provider's version on a 412 and sets the local one aside", async () => {
         await firstPull();
-        remote.remoteWrite("primary", "dentist", icsFor("dentist@google", "Dentist (their change)"));
+        remote.remoteWrite(
+            "primary",
+            "dentist",
+            icsFor("dentist@google", "Dentist (their change)")
+        );
         const id = await edit("dentist", "Dentist (my change)");
         await world.settle();
         const row = db.byId("calendarObject", id)!;
@@ -201,7 +255,11 @@ describe("calendar sync engine", () => {
         const theirEtag = remote.object("primary", "dentist")!.etag;
         await syncEngine.resolveConflict(id, "mine", ZONE);
         await world.settle();
-        expect(remote.writes.at(-1)).toMatchObject({ op: "put", href: "dentist", ifMatch: theirEtag });
+        expect(remote.writes.at(-1)).toMatchObject({
+            op: "put",
+            href: "dentist",
+            ifMatch: theirEtag
+        });
         expect(remote.object("primary", "dentist")?.ics).toContain("SUMMARY:Mine");
         expect(db.byId("calendarObject", id)).toMatchObject({ conflictIcs: null, pendingPush: "" });
 
@@ -222,9 +280,17 @@ describe("calendar sync engine", () => {
         await syncEngine.syncSource(sourceId);
         await syncEngine.syncSource(sourceId);
         expect(db.byId("calendarSource", sourceId)?.status).toBe("auth");
-        expect(fake.notices).toEqual([expect.objectContaining({ userId: alice.id, event: "calendar.syncFailed", href: "/calendar/settings/accounts" })]);
+        expect(fake.notices).toEqual([
+            expect.objectContaining({
+                userId: alice.id,
+                event: "calendar.syncFailed",
+                href: "/calendar/settings/accounts"
+            })
+        ]);
         expect(fake.notices[0]?.body).toBe(world.en("sync.failedAuth"));
-        expect((db.byId("calendarSource", sourceId)?.nextSyncAt as Date).getTime()).toBe(world.NOW.getTime() + 60 * 60_000);
+        expect((db.byId("calendarSource", sourceId)?.nextSyncAt as Date).getTime()).toBe(
+            world.NOW.getTime() + 60 * 60_000
+        );
     });
 
     it("retries on the scheduled pass what the provider did not take", async () => {
@@ -247,14 +313,22 @@ describe("calendar sync engine", () => {
         await world.settle();
         remote.remoteDelete("primary", "dentist");
         await syncEngine.syncSource(sourceId);
-        expect(db.byId("calendarObject", id)).toMatchObject({ deletedAt: null, pendingPush: "put" });
+        expect(db.byId("calendarObject", id)).toMatchObject({
+            deletedAt: null,
+            pendingPush: "put"
+        });
     });
 
     it("does not bring back a local deletion still on its way when a pull lists the unchanged event", async () => {
         const calendar = await firstPull();
         remote.failOn("remove", new SyncUnreachableError("The server is unavailable (503)", 503));
         const id = String(objectAt("dentist")!.id);
-        await objects.deleteEvent(alice, { objectId: id, recurrenceKey: null, scope: "all", floatingZone: ZONE });
+        await objects.deleteEvent(alice, {
+            objectId: id,
+            recurrenceKey: null,
+            scope: "all",
+            floatingZone: ZONE
+        });
         await world.settle();
         expect(db.byId("calendarObject", id)?.pendingPush).toBe("delete");
         db.byId("calendar", String(calendar.id))!.syncToken = "";
@@ -270,7 +344,8 @@ describe("calendar sync engine", () => {
 
     it("keeps every calendar when the provider's listing comes back empty", async () => {
         const calendar = await firstPull();
-        (remote.provider as unknown as { listCalendars: () => Promise<unknown[]> }).listCalendars = async () => [];
+        (remote.provider as unknown as { listCalendars: () => Promise<unknown[]> }).listCalendars =
+            async () => [];
         await syncEngine.syncSource(sourceId);
         expect(db.byId("calendar", String(calendar.id))).toBeDefined();
         expect(objectAt("dentist")?.deletedAt).toBeNull();
@@ -283,7 +358,10 @@ describe("calendar sync engine", () => {
             if (!raced) {
                 raced = true;
                 await create(args);
-                throw new FakePrismaError("P2002", "fake-db: unique calendar.sourceId_remoteId violated");
+                throw new FakePrismaError(
+                    "P2002",
+                    "fake-db: unique calendar.sourceId_remoteId violated"
+                );
             }
             return create(args);
         };
@@ -304,7 +382,10 @@ describe("calendar sync engine", () => {
             ...(await pull({ ...state, syncToken: "" })),
             changed: [],
             full: true,
-            window: { start: new Date("2026-10-13T00:00:00Z"), end: new Date("2027-10-13T00:00:00Z") }
+            window: {
+                start: new Date("2026-10-13T00:00:00Z"),
+                end: new Date("2027-10-13T00:00:00Z")
+            }
         });
         await syncEngine.syncSource(sourceId);
         expect(objectAt("lunch")?.deletedAt).toBeInstanceOf(Date);
@@ -332,26 +413,59 @@ describe("calendar sync engine", () => {
         fake.fetchHandler = async (_url, init) => {
             const headers = (init.headers ?? {}) as Record<string, string>;
             seen.push(headers);
-            if (headers["If-None-Match"] === "\"v1\"") return new Response(null, { status: 304 });
-            return new Response(feed, { status: 200, headers: { ETag: "\"v1\"" } });
+            if (headers["If-None-Match"] === '"v1"') return new Response(null, { status: 304 });
+            return new Response(feed, { status: 200, headers: { ETag: '"v1"' } });
         };
         const url = "https://feeds.example.test/team.ics";
-        const feedSource = db.insert("calendarSource", { userId: alice.id, kind: "ics", label: "My name", url }).id as string;
-        const calendarId = db.insert("calendar", { ownerId: alice.id, sourceId: feedSource, kind: "remote", remoteId: url, name: "My name", readOnly: true }).id as string;
+        const feedSource = db.insert("calendarSource", {
+            userId: alice.id,
+            kind: "ics",
+            label: "My name",
+            url
+        }).id as string;
+        const calendarId = db.insert("calendar", {
+            ownerId: alice.id,
+            sourceId: feedSource,
+            kind: "remote",
+            remoteId: url,
+            name: "My name",
+            readOnly: true
+        }).id as string;
 
         await syncEngine.syncSource(feedSource);
         expect(seen).toHaveLength(1);
         expect(seen[0]?.["If-None-Match"]).toBeUndefined();
-        expect(db.byId("calendar", calendarId)).toMatchObject({ name: "My name", timezone: "Europe/Madrid", syncToken: "\"v1\"", remoteId: "feed" });
-        expect(Buffer.from(db.byId("calendarSource", feedSource)?.encryptedSecret as Uint8Array).toString("utf8")).toBe(url);
-        expect(db.byId("calendarSource", feedSource)?.url).toBe("https://feeds.example.test/....ics");
-        expect(db.rows("calendarObject").filter((row) => row.calendarId === calendarId)).toHaveLength(1);
+        expect(db.byId("calendar", calendarId)).toMatchObject({
+            name: "My name",
+            timezone: "Europe/Madrid",
+            syncToken: '"v1"',
+            remoteId: "feed"
+        });
+        expect(
+            Buffer.from(
+                db.byId("calendarSource", feedSource)?.encryptedSecret as Uint8Array
+            ).toString("utf8")
+        ).toBe(url);
+        expect(db.byId("calendarSource", feedSource)?.url).toBe(
+            "https://feeds.example.test/....ics"
+        );
+        expect(
+            db.rows("calendarObject").filter((row) => row.calendarId === calendarId)
+        ).toHaveLength(1);
 
         await syncEngine.syncSource(feedSource);
         expect(seen).toHaveLength(2);
-        expect(seen[1]?.["If-None-Match"]).toBe("\"v1\"");
-        expect(db.rows("calendar").filter((row) => row.sourceId === feedSource).map((row) => row.id)).toEqual([calendarId]);
-        expect(db.byId("calendar", calendarId)).toMatchObject({ name: "My name", timezone: "Europe/Madrid" });
+        expect(seen[1]?.["If-None-Match"]).toBe('"v1"');
+        expect(
+            db
+                .rows("calendar")
+                .filter((row) => row.sourceId === feedSource)
+                .map((row) => row.id)
+        ).toEqual([calendarId]);
+        expect(db.byId("calendar", calendarId)).toMatchObject({
+            name: "My name",
+            timezone: "Europe/Madrid"
+        });
         expect(db.byId("calendarSource", feedSource)?.status).toBe("ok");
     });
 
@@ -362,9 +476,18 @@ describe("calendar sync engine", () => {
         expect(db.rows("calendar").filter((row) => row.sourceId === sourceId)).toHaveLength(2);
         const family = db.rows("calendar").find((row) => row.remoteId === "family")!;
         remote.failOn("list", null);
-        (remote.provider as unknown as { listCalendars: () => Promise<unknown[]> }).listCalendars = async () => [
-            { remoteId: "primary", name: "Work", color: null, description: "", timezone: null, readOnly: false, components: ["VEVENT"] }
-        ];
+        (remote.provider as unknown as { listCalendars: () => Promise<unknown[]> }).listCalendars =
+            async () => [
+                {
+                    remoteId: "primary",
+                    name: "Work",
+                    color: null,
+                    description: "",
+                    timezone: null,
+                    readOnly: false,
+                    components: ["VEVENT"]
+                }
+            ];
         await syncEngine.syncSource(sourceId);
         expect(db.byId("calendar", String(family.id))).toBeUndefined();
         expect(db.byId("calendar", String(calendar.id))).toBeDefined();

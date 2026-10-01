@@ -57,7 +57,14 @@ const MODELS: Record<string, Model> = {
         unique: [["id"], ["email"]]
     },
     userEmail: {
-        fields: { id: uuid, userId: undefined, email: undefined, recovery: false, verifiedAt: null, createdAt: now },
+        fields: {
+            id: uuid,
+            userId: undefined,
+            email: undefined,
+            recovery: false,
+            verifiedAt: null,
+            createdAt: now
+        },
         relations: { user: { model: "user", kind: "one", foreignKey: "userId", references: "id" } },
         unique: [["id"], ["email"]]
     },
@@ -88,7 +95,13 @@ const MODELS: Record<string, Model> = {
         },
         relations: {
             user: { model: "user", kind: "one", foreignKey: "userId", references: "id" },
-            calendars: { model: "calendar", kind: "many", foreignKey: "sourceId", references: "id", cascade: true }
+            calendars: {
+                model: "calendar",
+                kind: "many",
+                foreignKey: "sourceId",
+                references: "id",
+                cascade: true
+            }
         },
         unique: [["id"]],
         updatedAt: true
@@ -120,26 +133,74 @@ const MODELS: Record<string, Model> = {
         },
         relations: {
             owner: { model: "user", kind: "one", foreignKey: "ownerId", references: "id" },
-            source: { model: "calendarSource", kind: "one", foreignKey: "sourceId", references: "id" },
-            objects: { model: "calendarObject", kind: "many", foreignKey: "calendarId", references: "id", cascade: true },
-            shares: { model: "calendarShare", kind: "many", foreignKey: "calendarId", references: "id", cascade: true },
-            displays: { model: "calendarDisplay", kind: "many", foreignKey: "calendarId", references: "id", cascade: true }
+            source: {
+                model: "calendarSource",
+                kind: "one",
+                foreignKey: "sourceId",
+                references: "id"
+            },
+            objects: {
+                model: "calendarObject",
+                kind: "many",
+                foreignKey: "calendarId",
+                references: "id",
+                cascade: true
+            },
+            shares: {
+                model: "calendarShare",
+                kind: "many",
+                foreignKey: "calendarId",
+                references: "id",
+                cascade: true
+            },
+            displays: {
+                model: "calendarDisplay",
+                kind: "many",
+                foreignKey: "calendarId",
+                references: "id",
+                cascade: true
+            }
         },
         unique: [["id"], ["publicToken"]],
         updatedAt: true
     },
     calendarDisplay: {
-        fields: { id: uuid, calendarId: undefined, userId: undefined, position: 0, hidden: false, color: null },
+        fields: {
+            id: uuid,
+            calendarId: undefined,
+            userId: undefined,
+            position: 0,
+            hidden: false,
+            color: null
+        },
         relations: {
-            calendar: { model: "calendar", kind: "one", foreignKey: "calendarId", references: "id" },
+            calendar: {
+                model: "calendar",
+                kind: "one",
+                foreignKey: "calendarId",
+                references: "id"
+            },
             user: { model: "user", kind: "one", foreignKey: "userId", references: "id" }
         },
         unique: [["id"], ["calendarId", "userId"]]
     },
     calendarShare: {
-        fields: { id: uuid, calendarId: undefined, userId: null, teamId: null, access: "read", createdById: null, createdAt: now },
+        fields: {
+            id: uuid,
+            calendarId: undefined,
+            userId: null,
+            teamId: null,
+            access: "read",
+            createdById: null,
+            createdAt: now
+        },
         relations: {
-            calendar: { model: "calendar", kind: "one", foreignKey: "calendarId", references: "id" },
+            calendar: {
+                model: "calendar",
+                kind: "one",
+                foreignKey: "calendarId",
+                references: "id"
+            },
             user: { model: "user", kind: "one", foreignKey: "userId", references: "id" },
             team: { model: "team", kind: "one", foreignKey: "teamId", references: "id" }
         },
@@ -168,9 +229,26 @@ const MODELS: Record<string, Model> = {
             updatedAt: now
         },
         relations: {
-            calendar: { model: "calendar", kind: "one", foreignKey: "calendarId", references: "id" },
-            reminders: { model: "calendarReminder", kind: "many", foreignKey: "objectId", references: "id", cascade: true },
-            invitations: { model: "calendarInvitation", kind: "many", foreignKey: "objectId", references: "id", cascade: true }
+            calendar: {
+                model: "calendar",
+                kind: "one",
+                foreignKey: "calendarId",
+                references: "id"
+            },
+            reminders: {
+                model: "calendarReminder",
+                kind: "many",
+                foreignKey: "objectId",
+                references: "id",
+                cascade: true
+            },
+            invitations: {
+                model: "calendarInvitation",
+                kind: "many",
+                foreignKey: "objectId",
+                references: "id",
+                cascade: true
+            }
         },
         unique: [["id"], ["calendarId", "uid"]],
         updatedAt: true
@@ -186,7 +264,12 @@ const MODELS: Record<string, Model> = {
             action: "DISPLAY"
         },
         relations: {
-            object: { model: "calendarObject", kind: "one", foreignKey: "objectId", references: "id" },
+            object: {
+                model: "calendarObject",
+                kind: "one",
+                foreignKey: "objectId",
+                references: "id"
+            },
             user: { model: "user", kind: "one", foreignKey: "userId", references: "id" }
         },
         unique: [["id"], ["objectId", "userId", "alarmKey", "occurrence"]]
@@ -203,7 +286,14 @@ const MODELS: Record<string, Model> = {
             respondedAt: null,
             createdAt: now
         },
-        relations: { object: { model: "calendarObject", kind: "one", foreignKey: "objectId", references: "id" } },
+        relations: {
+            object: {
+                model: "calendarObject",
+                kind: "one",
+                foreignKey: "objectId",
+                references: "id"
+            }
+        },
         unique: [["id"], ["token"], ["objectId", "email"]]
     },
     calendarPreference: {
@@ -235,7 +325,13 @@ function unsupported(what: string): never {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !(value instanceof Date) && !(value instanceof Uint8Array) && !Array.isArray(value);
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        !(value instanceof Date) &&
+        !(value instanceof Uint8Array) &&
+        !Array.isArray(value)
+    );
 }
 
 function copyValue(value: unknown): unknown {
@@ -256,7 +352,20 @@ function comparable(value: unknown): number | string {
     return unsupported(`comparison of ${typeof value}`);
 }
 
-const SCALAR_OPERATORS = new Set(["equals", "in", "notIn", "not", "lt", "lte", "gt", "gte", "contains", "startsWith", "endsWith", "mode"]);
+const SCALAR_OPERATORS = new Set([
+    "equals",
+    "in",
+    "notIn",
+    "not",
+    "lt",
+    "lte",
+    "gt",
+    "gte",
+    "contains",
+    "startsWith",
+    "endsWith",
+    "mode"
+]);
 
 export function createFakeDb() {
     const tables = new Map<string, Row[]>(Object.keys(MODELS).map((name) => [name, []]));
@@ -270,7 +379,9 @@ export function createFakeDb() {
     }
 
     function related(model: string, row: Row, relationName: string): Row[] {
-        const relation = modelOf(model).relations[relationName] ?? unsupported(`relation ${model}.${relationName}`);
+        const relation =
+            modelOf(model).relations[relationName] ??
+            unsupported(`relation ${model}.${relationName}`);
         if (relation.kind === "one") {
             const key = row[relation.foreignKey];
             if (key === null || key === undefined) return [];
@@ -288,8 +399,10 @@ export function createFakeDb() {
             if (!SCALAR_OPERATORS.has(operator)) unsupported(`operator ${operator}`);
         }
         const insensitive = filter.mode === "insensitive";
-        if (filter.mode !== undefined && filter.mode !== "insensitive" && filter.mode !== "default") unsupported(`mode ${String(filter.mode)}`);
-        const text = (input: unknown) => (insensitive && typeof input === "string" ? input.toLowerCase() : input);
+        if (filter.mode !== undefined && filter.mode !== "insensitive" && filter.mode !== "default")
+            unsupported(`mode ${String(filter.mode)}`);
+        const text = (input: unknown) =>
+            insensitive && typeof input === "string" ? input.toLowerCase() : input;
         if ("equals" in filter && !matchesScalar(value, filter.equals)) return false;
         if ("in" in filter) {
             if (!Array.isArray(filter.in)) unsupported("non-array in");
@@ -298,14 +411,16 @@ export function createFakeDb() {
         if ("notIn" in filter) {
             if (!Array.isArray(filter.notIn)) unsupported("non-array notIn");
             if (value === null || value === undefined) return false;
-            if ((filter.notIn as unknown[]).some((candidate) => same(value, candidate))) return false;
+            if ((filter.notIn as unknown[]).some((candidate) => same(value, candidate)))
+                return false;
         }
         if ("not" in filter) {
             const negated = filter.not;
             if (negated === null) {
                 if (value === null || value === undefined) return false;
             } else if (isPlainObject(negated)) {
-                if (value === null || value === undefined || matchesScalar(value, negated)) return false;
+                if (value === null || value === undefined || matchesScalar(value, negated))
+                    return false;
             } else if (value === null || value === undefined || same(value, negated)) {
                 return false;
             }
@@ -334,7 +449,8 @@ export function createFakeDb() {
 
     function matches(model: string, row: Row, where: unknown): boolean {
         if (where === undefined) return true;
-        if (!isPlainObject(where)) return unsupported(`where on ${model}: ${JSON.stringify(where)}`);
+        if (!isPlainObject(where))
+            return unsupported(`where on ${model}: ${JSON.stringify(where)}`);
         const definition = modelOf(model);
         for (const [key, filter] of Object.entries(where)) {
             if (filter === undefined) continue;
@@ -353,7 +469,9 @@ export function createFakeDb() {
                 if (all.some((part) => matches(model, row, part))) return false;
                 continue;
             }
-            const compound = definition.unique.find((fields) => fields.length > 1 && keyName(fields) === key);
+            const compound = definition.unique.find(
+                (fields) => fields.length > 1 && keyName(fields) === key
+            );
             if (compound) {
                 if (!isPlainObject(filter)) unsupported(`compound key ${key}`);
                 for (const field of compound) {
@@ -372,17 +490,33 @@ export function createFakeDb() {
         return true;
     }
 
-    function matchesRelation(model: string, row: Row, name: string, relation: Relation, filter: unknown): boolean {
+    function matchesRelation(
+        model: string,
+        row: Row,
+        name: string,
+        relation: Relation,
+        filter: unknown
+    ): boolean {
         const others = related(model, row, name);
         if (relation.kind === "one") {
             if (filter === null) return others.length === 0;
             if (!isPlainObject(filter)) return unsupported(`relation filter ${model}.${name}`);
             if ("is" in filter || "isNot" in filter) {
                 if ("is" in filter) {
-                    if (filter.is === null ? others.length > 0 : !others.some((other) => matches(relation.model, other, filter.is))) return false;
+                    if (
+                        filter.is === null
+                            ? others.length > 0
+                            : !others.some((other) => matches(relation.model, other, filter.is))
+                    )
+                        return false;
                 }
                 if ("isNot" in filter) {
-                    if (filter.isNot === null ? others.length === 0 : others.some((other) => matches(relation.model, other, filter.isNot))) return false;
+                    if (
+                        filter.isNot === null
+                            ? others.length === 0
+                            : others.some((other) => matches(relation.model, other, filter.isNot))
+                    )
+                        return false;
                 }
                 return true;
             }
@@ -390,11 +524,21 @@ export function createFakeDb() {
         }
         if (!isPlainObject(filter)) return unsupported(`relation filter ${model}.${name}`);
         for (const operator of Object.keys(filter)) {
-            if (!["some", "every", "none"].includes(operator)) unsupported(`list relation operator ${operator}`);
+            if (!["some", "every", "none"].includes(operator))
+                unsupported(`list relation operator ${operator}`);
         }
-        if ("some" in filter && !others.some((other) => matches(relation.model, other, filter.some))) return false;
-        if ("every" in filter && !others.every((other) => matches(relation.model, other, filter.every))) return false;
-        if ("none" in filter && others.some((other) => matches(relation.model, other, filter.none))) return false;
+        if (
+            "some" in filter &&
+            !others.some((other) => matches(relation.model, other, filter.some))
+        )
+            return false;
+        if (
+            "every" in filter &&
+            !others.every((other) => matches(relation.model, other, filter.every))
+        )
+            return false;
+        if ("none" in filter && others.some((other) => matches(relation.model, other, filter.none)))
+            return false;
         return true;
     }
 
@@ -406,7 +550,8 @@ export function createFakeDb() {
             if (!isPlainObject(order)) return unsupported("orderBy form");
             return Object.entries(order).map(([field, direction]) => {
                 if (!(field in definition.fields)) unsupported(`orderBy ${model}.${field}`);
-                if (direction !== "asc" && direction !== "desc") unsupported(`orderBy direction ${String(direction)}`);
+                if (direction !== "asc" && direction !== "desc")
+                    unsupported(`orderBy direction ${String(direction)}`);
                 return { field, direction };
             });
         });
@@ -418,7 +563,15 @@ export function createFakeDb() {
                 const bNull = b === null || b === undefined;
                 // PostgreSQL: nulls sort as larger than every value.
                 if (aNull && bNull) continue;
-                const order = aNull ? 1 : bNull ? -1 : comparable(a) < comparable(b) ? -1 : comparable(a) > comparable(b) ? 1 : 0;
+                const order = aNull
+                    ? 1
+                    : bNull
+                      ? -1
+                      : comparable(a) < comparable(b)
+                        ? -1
+                        : comparable(a) > comparable(b)
+                          ? 1
+                          : 0;
                 if (order !== 0) return direction === "asc" ? order : -order;
             }
             return 0;
@@ -444,11 +597,17 @@ export function createFakeDb() {
             if (name === "_count") {
                 if (!isPlainObject(spec) || !isPlainObject(spec.select)) unsupported("_count form");
                 const counts: Row = {};
-                for (const [relationName, relationSpec] of Object.entries((spec as { select: Row }).select)) {
+                for (const [relationName, relationSpec] of Object.entries(
+                    (spec as { select: Row }).select
+                )) {
                     if (!relationSpec) continue;
-                    const relation = definition.relations[relationName] ?? unsupported(`_count of ${model}.${relationName}`);
+                    const relation =
+                        definition.relations[relationName] ??
+                        unsupported(`_count of ${model}.${relationName}`);
                     const where = isPlainObject(relationSpec) ? relationSpec.where : undefined;
-                    counts[relationName] = related(model, row, relationName).filter((other) => matches(relation.model, other, where)).length;
+                    counts[relationName] = related(model, row, relationName).filter((other) =>
+                        matches(relation.model, other, where)
+                    ).length;
                 }
                 out._count = counts;
                 continue;
@@ -468,9 +627,12 @@ export function createFakeDb() {
         const relation = modelOf(model).relations[name]!;
         const options = isPlainObject(spec) ? spec : {};
         for (const key of Object.keys(options)) {
-            if (!["select", "include", "where", "orderBy", "take"].includes(key)) unsupported(`nested ${key}`);
+            if (!["select", "include", "where", "orderBy", "take"].includes(key))
+                unsupported(`nested ${key}`);
         }
-        let others = related(model, row, name).filter((other) => matches(relation.model, other, options.where));
+        let others = related(model, row, name).filter((other) =>
+            matches(relation.model, other, options.where)
+        );
         if (relation.kind === "one") {
             const [first] = others;
             return first ? shape(relation.model, first, options.select, options.include) : null;
@@ -485,7 +647,8 @@ export function createFakeDb() {
         const definition = modelOf(model);
         for (const [field, value] of Object.entries(data)) {
             if (!(field in definition.fields)) unsupported(`field ${model}.${field} in data`);
-            if (isPlainObject(value) && !("increment" in value) && !("set" in value)) unsupported(`nested write ${model}.${field}`);
+            if (isPlainObject(value) && !("increment" in value) && !("set" in value))
+                unsupported(`nested write ${model}.${field}`);
         }
         return data;
     }
@@ -493,8 +656,12 @@ export function createFakeDb() {
     function violatesUnique(model: string, candidate: Row, except: Row | null): string | null {
         for (const fields of modelOf(model).unique) {
             // PostgreSQL treats nulls as distinct in a unique index.
-            if (fields.some((field) => candidate[field] === null || candidate[field] === undefined)) continue;
-            const clash = rowsOf(model).find((row) => row !== except && fields.every((field) => same(row[field], candidate[field])));
+            if (fields.some((field) => candidate[field] === null || candidate[field] === undefined))
+                continue;
+            const clash = rowsOf(model).find(
+                (row) =>
+                    row !== except && fields.every((field) => same(row[field], candidate[field]))
+            );
             if (clash) return keyName(fields);
         }
         return null;
@@ -508,7 +675,8 @@ export function createFakeDb() {
             const value = given[field];
             if (value !== undefined) row[field] = copyValue(value);
             else if (typeof fallback === "function") row[field] = (fallback as () => unknown)();
-            else if (fallback === undefined) throw new FakePrismaError("P2012", `fake-db: ${model}.${field} is required`);
+            else if (fallback === undefined)
+                throw new FakePrismaError("P2012", `fake-db: ${model}.${field} is required`);
             else row[field] = fallback;
         }
         const clash = violatesUnique(model, row, null);
@@ -552,7 +720,8 @@ export function createFakeDb() {
         const isUnique = definition.unique.some((fields) =>
             fields.length === 1 ? named.includes(fields[0]!) : named.includes(keyName(fields))
         );
-        if (!isUnique) unsupported(`findUnique on ${model} without a unique key: ${named.join(",")}`);
+        if (!isUnique)
+            unsupported(`findUnique on ${model} without a unique key: ${named.join(",")}`);
         return rowsOf(model).find((row) => matches(model, row, where)) ?? null;
     }
 
@@ -561,7 +730,8 @@ export function createFakeDb() {
     function delegate(model: string) {
         const findMany = (args: Args = {}): Row[] => {
             for (const key of Object.keys(args)) {
-                if (!["where", "select", "include", "orderBy", "take", "skip"].includes(key)) unsupported(`findMany ${key}`);
+                if (!["where", "select", "include", "orderBy", "take", "skip"].includes(key))
+                    unsupported(`findMany ${key}`);
             }
             let rows = rowsOf(model).filter((row) => matches(model, row, args.where));
             rows = sortRows(model, rows, args.orderBy);
@@ -587,7 +757,8 @@ export function createFakeDb() {
                 if (!row) throw notFound();
                 return shape(model, row, args.select, args.include);
             },
-            count: async (args: Args = {}) => rowsOf(model).filter((row) => matches(model, row, args.where)).length,
+            count: async (args: Args = {}) =>
+                rowsOf(model).filter((row) => matches(model, row, args.where)).length,
             create: async (args: Args) => {
                 const row = build(model, args.data);
                 rowsOf(model).push(row);
@@ -601,7 +772,12 @@ export function createFakeDb() {
                         rowsOf(model).push(build(model, data));
                         count += 1;
                     } catch (caught) {
-                        if (args.skipDuplicates && caught instanceof FakePrismaError && caught.code === "P2002") continue;
+                        if (
+                            args.skipDuplicates &&
+                            caught instanceof FakePrismaError &&
+                            caught.code === "P2002"
+                        )
+                            continue;
                         throw caught;
                     }
                 }
@@ -661,7 +837,8 @@ export function createFakeDb() {
                 for (const step of work) results.push(await step);
                 return results;
             }
-            if (typeof work === "function") return (work as (client: unknown) => Promise<unknown>)(prisma);
+            if (typeof work === "function")
+                return (work as (client: unknown) => Promise<unknown>)(prisma);
             return unsupported("$transaction form");
         }
     };
@@ -677,7 +854,8 @@ export function createFakeDb() {
             return row;
         },
         /** One row by id, live. */
-        byId: (model: string, id: string): Row | undefined => rowsOf(model).find((row) => row.id === id),
+        byId: (model: string, id: string): Row | undefined =>
+            rowsOf(model).find((row) => row.id === id),
         reset: () => {
             for (const rows of tables.values()) rows.length = 0;
         }

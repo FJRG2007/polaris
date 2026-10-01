@@ -16,7 +16,12 @@ import { Button, Select, Switch } from "@polaris/ui";
 import { responseCounts, type AttendeeDraft } from "./editor-model";
 import { Check, CircleHelp, Clock, DoorOpen, Mail, UsersRound, X } from "lucide-react";
 
-const ROLES: readonly engine.AttendeeRole[] = ["REQ-PARTICIPANT", "OPT-PARTICIPANT", "CHAIR", "NON-PARTICIPANT"];
+const ROLES: readonly engine.AttendeeRole[] = [
+    "REQ-PARTICIPANT",
+    "OPT-PARTICIPANT",
+    "CHAIR",
+    "NON-PARTICIPANT"
+];
 
 function PartstatIcon({ partstat, label }: { partstat: engine.PartStat; label: string }) {
     const icon =
@@ -48,7 +53,12 @@ export function AttendeesEditor({
     readOnly: boolean;
     organizer: engine.Person | null;
     /** The event's time, for "find a time" and the room picker. */
-    when: { start: string; end: string; zone: string; onPick: (start: string, end: string) => void } | null;
+    when: {
+        start: string;
+        end: string;
+        zone: string;
+        onPick: (start: string, end: string) => void;
+    } | null;
 }) {
     const t = useCalendarT();
     const [typed, setTyped] = useState("");
@@ -59,10 +69,16 @@ export function AttendeesEditor({
     const FindATime = calendarSlots.FindATime;
     const RoomPicker = calendarSlots.RoomPicker;
 
-    const add = (entries: readonly { email: string; name: string; type?: engine.CalendarUserType }[]) => {
+    const add = (
+        entries: readonly { email: string; name: string; type?: engine.CalendarUserType }[]
+    ) => {
         const next = [...value];
         for (const entry of entries) {
-            const parsed = engine.attendeeSchema.safeParse({ email: entry.email, name: entry.name, type: entry.type ?? "INDIVIDUAL" });
+            const parsed = engine.attendeeSchema.safeParse({
+                email: entry.email,
+                name: entry.name,
+                type: entry.type ?? "INDIVIDUAL"
+            });
             if (!parsed.success) {
                 setProblem(t("attendeeEditor.badAddress", { address: entry.email }));
                 return;
@@ -85,19 +101,42 @@ export function AttendeesEditor({
 
     const counts = responseCounts(value);
     const emails = value.map((attendee) => attendee.email);
-    const update = (email: string, change: Partial<AttendeeDraft>) => onChange(value.map((attendee) => (attendee.email === email ? { ...attendee, ...change } : attendee)));
+    const update = (email: string, change: Partial<AttendeeDraft>) =>
+        onChange(
+            value.map((attendee) =>
+                attendee.email === email ? { ...attendee, ...change } : attendee
+            )
+        );
 
     return (
         <div className="flex flex-col gap-2">
-            {organizer ? <p className="text-xs text-muted-foreground">{t("attendeeEditor.organizer", { name: organizer.name || organizer.email })}</p> : null}
+            {organizer ? (
+                <p className="text-xs text-muted-foreground">
+                    {t("attendeeEditor.organizer", { name: organizer.name || organizer.email })}
+                </p>
+            ) : null}
 
             {value.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
-                    <span>{t("attendeeEditor.counts", { accepted: counts.ACCEPTED, tentative: counts.TENTATIVE, declined: counts.DECLINED, waiting: counts["NEEDS-ACTION"] })}</span>
+                    <span>
+                        {t("attendeeEditor.counts", {
+                            accepted: counts.ACCEPTED,
+                            tentative: counts.TENTATIVE,
+                            declined: counts.DECLINED,
+                            waiting: counts["NEEDS-ACTION"]
+                        })}
+                    </span>
                     <span className="flex items-center gap-1">
-                        <hostUi.copyButton.CopyButton value={emails.join(", ")} label={t("attendeeEditor.copyAll")} />
+                        <hostUi.copyButton.CopyButton
+                            value={emails.join(", ")}
+                            label={t("attendeeEditor.copyAll")}
+                        />
                         <Button asChild size="icon-sm" variant="ghost">
-                            <a href={`mailto:${emails.map(encodeURIComponent).join(",")}`} aria-label={t("attendeeEditor.emailAll")} title={t("attendeeEditor.emailAll")}>
+                            <a
+                                href={`mailto:${emails.map(encodeURIComponent).join(",")}`}
+                                aria-label={t("attendeeEditor.emailAll")}
+                                title={t("attendeeEditor.emailAll")}
+                            >
                                 <Mail />
                             </a>
                         </Button>
@@ -110,33 +149,67 @@ export function AttendeesEditor({
                     const answer = t(`attendeeEditor.partstat.${attendee.partstat}`);
                     const name = attendee.name || attendee.email;
                     return (
-                        <li key={attendee.email} className="flex min-w-0 flex-wrap items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover sm:flex-nowrap">
+                        <li
+                            key={attendee.email}
+                            className="flex min-w-0 flex-wrap items-center gap-2 rounded-md px-1 py-1 hover:bg-card-hover sm:flex-nowrap"
+                        >
                             <PartstatIcon partstat={attendee.partstat} label={answer} />
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[0.8125rem]" title={name}>
                                     {name}
                                 </span>
                                 {attendee.name ? (
-                                    <span className="block truncate text-xs text-foreground-subtle" title={attendee.email}>
+                                    <span
+                                        className="block truncate text-xs text-foreground-subtle"
+                                        title={attendee.email}
+                                    >
                                         {attendee.email}
                                     </span>
                                 ) : null}
                             </span>
                             {readOnly ? (
-                                <span className="text-xs text-muted-foreground">{t(`attendeeEditor.role.${attendee.role}`)}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t(`attendeeEditor.role.${attendee.role}`)}
+                                </span>
                             ) : (
                                 <>
                                     <Select
                                         className="w-36"
                                         aria-label={t("attendeeEditor.roleFor", { name })}
                                         value={attendee.role}
-                                        onValueChange={(role) => update(attendee.email, { role: role as engine.AttendeeRole })}
-                                        options={ROLES.map((role) => ({ value: role, label: t(`attendeeEditor.role.${role}`) }))}
+                                        onValueChange={(role) =>
+                                            update(attendee.email, {
+                                                role: role as engine.AttendeeRole
+                                            })
+                                        }
+                                        options={ROLES.map((role) => ({
+                                            value: role,
+                                            label: t(`attendeeEditor.role.${role}`)
+                                        }))}
                                     />
-                                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground" title={t("attendeeEditor.rsvp")}>
-                                        <Switch checked={attendee.rsvp} onChange={(rsvp) => update(attendee.email, { rsvp })} aria-label={t("attendeeEditor.rsvpFor", { name })} />
+                                    <span
+                                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                        title={t("attendeeEditor.rsvp")}
+                                    >
+                                        <Switch
+                                            checked={attendee.rsvp}
+                                            onChange={(rsvp) => update(attendee.email, { rsvp })}
+                                            aria-label={t("attendeeEditor.rsvpFor", { name })}
+                                        />
                                     </span>
-                                    <Button size="icon-sm" variant="ghost" aria-label={t("attendeeEditor.remove", { name })} title={t("attendeeEditor.remove", { name })} onClick={() => onChange(value.filter((entry) => entry.email !== attendee.email))}>
+                                    <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        aria-label={t("attendeeEditor.remove", { name })}
+                                        title={t("attendeeEditor.remove", { name })}
+                                        onClick={() =>
+                                            onChange(
+                                                value.filter(
+                                                    (entry) => entry.email !== attendee.email
+                                                )
+                                            )
+                                        }
+                                    >
                                         <X />
                                     </Button>
                                 </>
@@ -153,13 +226,20 @@ export function AttendeesEditor({
                             <AccountInput
                                 value={typed}
                                 onValueChange={setTyped}
-                                onPick={(account) => add([{ email: account.email, name: account.name }])}
+                                onPick={(account) =>
+                                    add([{ email: account.email, name: account.name }])
+                                }
                                 onEnter={addTyped}
                                 placeholder={t("attendeeEditor.placeholder")}
                                 aria-label={t("attendeeEditor.add")}
                             />
                         </div>
-                        <Button size="sm" variant="outline" onClick={addTyped} disabled={typed.trim() === ""}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={addTyped}
+                            disabled={typed.trim() === ""}
+                        >
                             {t("attendeeEditor.addButton")}
                         </Button>
                         {FindATime && when ? (

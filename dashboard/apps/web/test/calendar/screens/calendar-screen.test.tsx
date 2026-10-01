@@ -16,13 +16,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CalendarSummary } from "@polaris-app/calendar/src/lib/wire";
 import { shortcutFor } from "@polaris-app/calendar/src/screens/shortcuts";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { DEFAULT_PREFERENCES, type CalendarPreferences } from "@polaris-app/calendar/src/lib/preferences";
+import {
+    DEFAULT_PREFERENCES,
+    type CalendarPreferences
+} from "@polaris-app/calendar/src/lib/preferences";
 
 const CALENDAR_ID = "11111111-1111-4111-8111-111111111111";
 let preferences: CalendarPreferences = DEFAULT_PREFERENCES;
 const savedPreferences = vi.fn();
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() })
+}));
 vi.mock("next/link", () => ({
     default: ({ href, children, ...rest }: { href: string; children: unknown }) => (
         <a href={href} {...rest}>
@@ -32,7 +37,9 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@polaris-app/calendar/src/screens/grid-view", () => ({
-    default: (props: { view: string; anchor: string }) => <div data-testid="grid" data-view={props.view} data-anchor={props.anchor} />
+    default: (props: { view: string; anchor: string }) => (
+        <div data-testid="grid" data-view={props.view} data-anchor={props.anchor} />
+    )
 }));
 
 vi.mock("@polaris-app/calendar/src/actions/preferences", () => ({
@@ -124,7 +131,13 @@ beforeEach(() => {
     window.history.replaceState(null, "", "/calendar");
     vi.stubGlobal(
         "fetch",
-        vi.fn(async () => new Response(JSON.stringify({ from: "", to: "", occurrences: [], tasks: [], unreadable: 0 }), { status: 200, headers: { "content-type": "application/json" } }))
+        vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({ from: "", to: "", occurrences: [], tasks: [], unreadable: 0 }),
+                    { status: 200, headers: { "content-type": "application/json" } }
+                )
+        )
     );
 });
 
@@ -135,7 +148,14 @@ afterEach(() => {
 
 describe("the keyboard map", () => {
     it("maps the union of Nextcloud's and Google's keys", () => {
-        const at = (key: string) => shortcutFor({ key, ctrlKey: false, metaKey: false, altKey: false, target: document.body });
+        const at = (key: string) =>
+            shortcutFor({
+                key,
+                ctrlKey: false,
+                metaKey: false,
+                altKey: false,
+                target: document.body
+            });
         expect(at("j")).toEqual({ kind: "next" });
         expect(at("n")).toEqual({ kind: "next" });
         expect(at("k")).toEqual({ kind: "previous" });
@@ -149,9 +169,27 @@ describe("the keyboard map", () => {
     it("never fires while typing, nor with Ctrl, Cmd or Alt held", () => {
         const input = document.createElement("input");
         document.body.appendChild(input);
-        expect(shortcutFor({ key: "m", ctrlKey: false, metaKey: false, altKey: false, target: input })).toBeNull();
-        expect(shortcutFor({ key: "m", ctrlKey: true, metaKey: false, altKey: false, target: document.body })).toBeNull();
-        expect(shortcutFor({ key: "m", ctrlKey: false, metaKey: true, altKey: false, target: document.body })).toBeNull();
+        expect(
+            shortcutFor({ key: "m", ctrlKey: false, metaKey: false, altKey: false, target: input })
+        ).toBeNull();
+        expect(
+            shortcutFor({
+                key: "m",
+                ctrlKey: true,
+                metaKey: false,
+                altKey: false,
+                target: document.body
+            })
+        ).toBeNull();
+        expect(
+            shortcutFor({
+                key: "m",
+                ctrlKey: false,
+                metaKey: true,
+                altKey: false,
+                target: document.body
+            })
+        ).toBeNull();
         input.remove();
     });
 });
@@ -166,18 +204,35 @@ describe("the calendar screen", () => {
         fireEvent.click(screen.getByRole("radio", { name: "Month" }));
         await settle();
         expect(grid().getAttribute("data-view")).toBe("month");
-        expect(window.location.pathname).toBe(`/calendar/month/${grid().getAttribute("data-anchor")}`);
+        expect(window.location.pathname).toBe(
+            `/calendar/month/${grid().getAttribute("data-anchor")}`
+        );
         expect(savedPreferences).toHaveBeenCalledWith({ view: "month" });
     });
 
     it("says so when a view holds more events than were drawn", async () => {
         vi.stubGlobal(
             "fetch",
-            vi.fn(async () => new Response(JSON.stringify({ from: "", to: "", occurrences: [], tasks: [], unreadable: 0, truncated: true }), { status: 200, headers: { "content-type": "application/json" } }))
+            vi.fn(
+                async () =>
+                    new Response(
+                        JSON.stringify({
+                            from: "",
+                            to: "",
+                            occurrences: [],
+                            tasks: [],
+                            unreadable: 0,
+                            truncated: true
+                        }),
+                        { status: 200, headers: { "content-type": "application/json" } }
+                    )
+            )
         );
         render(<CalendarScreen path={["year", "2026-03-14"]} />, { wrapper: MessagesWrapper });
         await settle();
-        expect(await screen.findByText("Not every event fits in this view. Try a shorter one.")).toBeDefined();
+        expect(
+            await screen.findByText("Not every event fits in this view. Try a shorter one.")
+        ).toBeDefined();
     });
 
     it("follows the address over the remembered view", async () => {

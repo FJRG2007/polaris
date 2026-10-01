@@ -56,7 +56,11 @@ export interface RoomPickerSlotProps {
     readonly end: string;
     readonly zone: string;
     /** A room was chosen: invited as an attendee of type ROOM or RESOURCE. */
-    readonly onPick: (room: { readonly email: string; readonly name: string; readonly type: "ROOM" | "RESOURCE" }) => void;
+    readonly onPick: (room: {
+        readonly email: string;
+        readonly name: string;
+        readonly type: "ROOM" | "RESOURCE";
+    }) => void;
 }
 
 /** A section of the sidebar: booking pages, meeting proposals. */

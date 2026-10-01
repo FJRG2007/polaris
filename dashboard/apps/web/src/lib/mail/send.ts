@@ -37,13 +37,18 @@ async function post(
         });
     } catch (caught) {
         throw new Error(
-            caught instanceof Error ? `${provider} unreachable: ${caught.message}` : `${provider} unreachable`
+            caught instanceof Error
+                ? `${provider} unreachable: ${caught.message}`
+                : `${provider} unreachable`
         );
     }
     if (res.ok) return res;
-    const payload = (await res.json().catch(() => null)) as
-        | { message?: string; error?: string; ErrorMessage?: string; Messages?: Array<{ Errors?: Array<{ ErrorMessage?: string }> }> }
-        | null;
+    const payload = (await res.json().catch(() => null)) as {
+        message?: string;
+        error?: string;
+        ErrorMessage?: string;
+        Messages?: Array<{ Errors?: Array<{ ErrorMessage?: string }> }>;
+    } | null;
     const detail =
         payload?.message ??
         payload?.error ??
@@ -52,65 +57,97 @@ async function post(
     throw new Error(detail ?? `${provider} refused the message (HTTP ${res.status})`);
 }
 
-async function sendWithResend(config: ResendConfig, secret: string, message: EmailMessage): Promise<void> {
-    await post("Resend", "https://api.resend.com/emails", { Authorization: `Bearer ${secret}` }, {
-        from: formatFrom(config),
-        to: [message.to],
-        subject: message.subject,
-        text: message.text,
-        ...(message.html ? { html: message.html } : {}),
-        ...(message.calendar
-            ? {
-                  attachments: [
-                      {
-                          filename: INVITE_FILENAME,
-                          content: inviteBase64(message),
-                          content_type: calendarContentType(message.calendar)
-                      }
-                  ]
-              }
-            : {})
-    });
+async function sendWithResend(
+    config: ResendConfig,
+    secret: string,
+    message: EmailMessage
+): Promise<void> {
+    await post(
+        "Resend",
+        "https://api.resend.com/emails",
+        { Authorization: `Bearer ${secret}` },
+        {
+            from: formatFrom(config),
+            to: [message.to],
+            subject: message.subject,
+            text: message.text,
+            ...(message.html ? { html: message.html } : {}),
+            ...(message.calendar
+                ? {
+                      attachments: [
+                          {
+                              filename: INVITE_FILENAME,
+                              content: inviteBase64(message),
+                              content_type: calendarContentType(message.calendar)
+                          }
+                      ]
+                  }
+                : {})
+        }
+    );
 }
 
-async function sendWithBrevo(config: BrevoConfig, secret: string, message: EmailMessage): Promise<void> {
-    await post("Brevo", "https://api.brevo.com/v3/smtp/email", { "api-key": secret }, {
-        sender: { email: config.from, ...(config.fromName ? { name: config.fromName } : {}) },
-        to: [{ email: message.to }],
-        subject: message.subject,
-        textContent: message.text,
-        ...(message.html ? { htmlContent: message.html } : {}),
-        // Brevo takes no content type for an attachment and derives it from the
-        // name, so the METHOD cannot be stated here; the .ics carries its own.
-        ...(message.calendar ? { attachment: [{ name: INVITE_FILENAME, content: inviteBase64(message) }] } : {})
-    });
+async function sendWithBrevo(
+    config: BrevoConfig,
+    secret: string,
+    message: EmailMessage
+): Promise<void> {
+    await post(
+        "Brevo",
+        "https://api.brevo.com/v3/smtp/email",
+        { "api-key": secret },
+        {
+            sender: { email: config.from, ...(config.fromName ? { name: config.fromName } : {}) },
+            to: [{ email: message.to }],
+            subject: message.subject,
+            textContent: message.text,
+            ...(message.html ? { htmlContent: message.html } : {}),
+            // Brevo takes no content type for an attachment and derives it from the
+            // name, so the METHOD cannot be stated here; the .ics carries its own.
+            ...(message.calendar
+                ? { attachment: [{ name: INVITE_FILENAME, content: inviteBase64(message) }] }
+                : {})
+        }
+    );
 }
 
-async function sendWithMailjet(config: MailjetConfig, secret: string, message: EmailMessage): Promise<void> {
+async function sendWithMailjet(
+    config: MailjetConfig,
+    secret: string,
+    message: EmailMessage
+): Promise<void> {
     // Mailjet pairs a public key with the secret over HTTP basic auth.
     const credentials = Buffer.from(`${config.apiKey}:${secret}`).toString("base64");
-    const res = await post("Mailjet", "https://api.mailjet.com/v3.1/send", { Authorization: `Basic ${credentials}` }, {
-        Messages: [
-            {
-                From: { Email: config.from, ...(config.fromName ? { Name: config.fromName } : {}) },
-                To: [{ Email: message.to }],
-                Subject: message.subject,
-                TextPart: message.text,
-                ...(message.html ? { HTMLPart: message.html } : {}),
-                ...(message.calendar
-                    ? {
-                          Attachments: [
-                              {
-                                  ContentType: calendarContentType(message.calendar),
-                                  Filename: INVITE_FILENAME,
-                                  Base64Content: inviteBase64(message)
-                              }
-                          ]
-                      }
-                    : {})
-            }
-        ]
-    });
+    const res = await post(
+        "Mailjet",
+        "https://api.mailjet.com/v3.1/send",
+        { Authorization: `Basic ${credentials}` },
+        {
+            Messages: [
+                {
+                    From: {
+                        Email: config.from,
+                        ...(config.fromName ? { Name: config.fromName } : {})
+                    },
+                    To: [{ Email: message.to }],
+                    Subject: message.subject,
+                    TextPart: message.text,
+                    ...(message.html ? { HTMLPart: message.html } : {}),
+                    ...(message.calendar
+                        ? {
+                              Attachments: [
+                                  {
+                                      ContentType: calendarContentType(message.calendar),
+                                      Filename: INVITE_FILENAME,
+                                      Base64Content: inviteBase64(message)
+                                  }
+                              ]
+                          }
+                        : {})
+                }
+            ]
+        }
+    );
     // Mailjet answers 200 with a per-message status, so a refusal can arrive
     // inside a successful response.
     const payload = (await res.json().catch(() => null)) as {
