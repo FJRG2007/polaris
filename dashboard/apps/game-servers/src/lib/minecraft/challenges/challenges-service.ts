@@ -54,6 +54,7 @@ import * as eventMessages from "../events/messages";
 import { editionOf, type ServerContainer } from "../service";
 import { chosenLanguage as chosenEventsLanguage, readEventsConfig } from "../events/catalog";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
+import { keyedTurns } from "../../turns";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -119,19 +120,8 @@ const LOG_FILE = "/data/logs/latest.log";
 
 // ------------------------------------------------------------------ one at a time, per server
 
-const turns = new Map<string, Promise<unknown>>();
-
 /** Work on one server's challenges after whatever is already working on them. */
-export function inTurn<T>(installedAppId: string, work: () => Promise<T>): Promise<T> {
-    const before = turns.get(installedAppId) ?? Promise.resolve();
-    const turn = before.catch(() => undefined).then(work);
-    const settled = turn.catch(() => undefined);
-    turns.set(installedAppId, settled);
-    void settled.then(() => {
-        if (turns.get(installedAppId) === settled) turns.delete(installedAppId);
-    });
-    return turn;
-}
+export const inTurn = keyedTurns();
 
 // ------------------------------------------------------------------ storage
 

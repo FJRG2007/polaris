@@ -215,6 +215,20 @@ describe("the script, run", () => {
         expect(sessions(turned.next).at(-1)).toMatchObject({ kind: "leave", at: "2026-10-01T00:30:00.000Z" });
     });
 
+    it.runIf(sh)("leaves a line still being written for the next read, so it is never kept twice", () => {
+        const dir = mkdtempSync(join(tmpdir(), "polaris-player-log-"));
+        const file = join(dir, "latest.log");
+        const [login, joined] = JOIN.split("\n");
+        const cut = login!.indexOf(" at (");
+        writeFileSync(file, `${chatter(10, "30Sep2026 20:00:00.000")}${login!.slice(0, cut)}`);
+        const first = read(file, NO_PLAYER_LOG);
+        expect(first.next.lines).toEqual([]);
+        appendFileSync(file, `${login!.slice(cut)}\n${joined}\n`);
+        const second = read(file, first.next);
+        expect(second.next.lines).toHaveLength(2);
+        expect(sessions(second.next).map((event) => event.kind)).toEqual(["join"]);
+    });
+
     it.runIf(sh)("never takes more than a step's worth of a file that grew past it", () => {
         const dir = mkdtempSync(join(tmpdir(), "polaris-player-log-"));
         const file = join(dir, "latest.log");

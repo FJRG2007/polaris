@@ -271,6 +271,19 @@ describe("the record, kept true to the log", () => {
         });
     });
 
+    it("does not split a visit on a log clock running ahead, with no departure inside it", () => {
+        // The server's machine is 30s ahead: the arrival was opened at the look,
+        // and once the look's clock passes the logged join it sits past the start.
+        const open = [{ id: "v1", name: "FJRG2007", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }];
+        const roster = [{ name: "FJRG2007", id: null }];
+        const log = [
+            ...leave("2026-09-29T07:00:00.000000000Z", "FJRG2007", "Disconnected"),
+            ...login("2026-09-29T08:00:30.000000000Z", "FJRG2007", 51001)
+        ].join("\n");
+        const writes = sessionWrites(open, rosterChange(open, roster), roster, logged(log), at("2026-09-29T08:01:00.000Z"));
+        expect(writes).toEqual({ close: [], open: [] });
+    });
+
     it("never dates an arrival after the look that saw it", () => {
         const now = at("2026-09-29T08:00:00.000Z");
         const roster = [{ name: "FJRG2007", id: null }];

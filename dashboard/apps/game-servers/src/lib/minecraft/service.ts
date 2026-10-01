@@ -18,6 +18,7 @@ import * as parse from "./parse";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { inRconTurn } from "./rcon-turn";
+import { keyedTurns } from "../turns";
 import { liveContext } from "./live-values";
 import { gameMessage } from "../game-message";
 import { gameServerAddress } from "./address";
@@ -1198,18 +1199,7 @@ export async function readPlayerLog(ownerId: string, installedAppId: string): Pr
 /** Where each server's log was last read to, and what it held (see `player-log`). */
 const playerLogs = new Map<string, PlayerLogState>();
 /** One read of a server's log at a time, so two readers never start from the same cursor. */
-const playerLogTurns = new Map<string, Promise<unknown>>();
-
-function inPlayerLogTurn<T>(installedAppId: string, work: () => Promise<T>): Promise<T> {
-    const before = playerLogTurns.get(installedAppId) ?? Promise.resolve();
-    const turn = before.catch(() => undefined).then(work);
-    const settled = turn.catch(() => undefined);
-    playerLogTurns.set(installedAppId, settled);
-    void settled.then(() => {
-        if (playerLogTurns.get(installedAppId) === settled) playerLogTurns.delete(installedAppId);
-    });
-    return turn;
-}
+const inPlayerLogTurn = keyedTurns();
 
 /** Every join and leave the server's log still holds, oldest first. */
 export async function getPlayerSessions(

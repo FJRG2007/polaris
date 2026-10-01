@@ -76,14 +76,21 @@ const ENTRIES_PER_TRIP = 10;
  *  them still come back whole. */
 const BAGS_PER_TRIP = 3;
 
-/** One command's answer from a batch, asking it again alone when it did not arrive. */
-async function eachAnswered(asker: Asker, commands: readonly (readonly string[])[]): Promise<string[]> {
-    const batch = asker.askEach
-        ? await asker.askEach(commands).catch(() => commands.map(() => null))
-        : commands.map(() => null);
-    const answers: string[] = [];
+/**
+ * One command's answer from a batch, asking it again alone when it did not arrive.
+ * A batch that failed outright - it ran out of time, the container could not be
+ * reached - fails here too: its commands may still be running in the container,
+ * and asking them again at once would talk over them.
+ */
+async function eachAnswered<T = string>(
+    asker: Asker,
+    commands: readonly (readonly string[])[],
+    alone: (argv: readonly string[]) => Promise<string | T> = (argv) => asker.ask(argv)
+): Promise<(string | T)[]> {
+    const batch = asker.askEach ? await asker.askEach(commands) : commands.map(() => null);
+    const answers: (string | T)[] = [];
     for (const [index, argv] of commands.entries()) {
-        answers.push(batch[index] ?? (await asker.ask(argv)));
+        answers.push(batch[index] ?? (await alone(argv)));
     }
     return answers;
 }
@@ -122,28 +129,41 @@ export interface LiveReading {
  * forty-one; only the bags that need it pay even that.
  */
 export async function readLiveInventory(asker: Ask | Asker, player: string): Promise<LiveReading> {
-    const [reading] = await readLiveInventories(asker, [player]);
-    return reading!;
+    const how = typeof asker === "function" ? { ask: asker } : asker;
+    const whole = await how.ask(["data", "get", "entity", player, "Inventory"]);
+    return fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole);
 }
 
 /**
  * Several players' bags, in as few trips as they fit: every whole bag in one, then
  * the ones that came back cut off a batch of stacks at a time. An export of the
  * whole server used to cost a trip per player, and one per stack for every big bag.
+ *
+ * A bag that could not be read is null and costs only its own player: the rest
+ * are still read, and nobody's copy is replaced by a failure that was not theirs.
  */
 export async function readLiveInventories(
     asker: Ask | Asker,
     players: readonly string[]
-): Promise<LiveReading[]> {
+): Promise<(LiveReading | null)[]> {
     const how = typeof asker === "function" ? { ask: asker } : asker;
-    const wholes: string[] = [];
+    const wholes: (string | null)[] = [];
     for (let start = 0; start < players.length; start += BAGS_PER_TRIP) {
         const some = players.slice(start, start + BAGS_PER_TRIP);
-        wholes.push(...(await eachAnswered(how, some.map((player) => ["data", "get", "entity", player, "Inventory"]))));
+        const commands = some.map((player) => ["data", "get", "entity", player, "Inventory"]);
+        const answers = await eachAnswered(how, commands, (argv) => how.ask(argv).catch(() => null)).catch(
+            () => commands.map(() => null)
+        );
+        wholes.push(...answers);
     }
-    const readings: LiveReading[] = [];
+    const readings: (LiveReading | null)[] = [];
     for (const [index, player] of players.entries()) {
-        readings.push(await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, wholes[index]!));
+        const whole = wholes[index];
+        readings.push(
+            whole == null
+                ? null
+                : await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole).catch(() => null)
+        );
     }
     return readings;
 }
@@ -279,11 +299,11 @@ export async function snapshotOnlinePlayers(
     const readings = await readLiveInventories(askerOf(server), players).catch(() => null);
     for (const [index, player] of players.entries()) {
         try {
-            const reading = readings?.[index] ?? (await readLiveInventory(askerOf(server), player));
+            const reading = readings?.[index];
             // A refusal is not a bag. Storing what it parsed to would replace a
             // real copy from ten minutes ago with an empty one, which is the copy
             // somebody reads after the player has already logged off.
-            if (!reading.answered) continue;
+            if (!reading?.answered) continue;
             await writeSnapshot(server.installedAppId, player, reading.items, takenAt);
             kept += 1;
         } catch {

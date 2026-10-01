@@ -101,7 +101,10 @@ export function playerLogScript(cursor: LogCursor | null): string {
         `[ "$from" -lt 0 ] && from=0`,
         `[ $((s - from)) -gt ${STEP_BYTES} ] && from=$((s - ${STEP_BYTES}))`,
         `echo "@from $from"`,
-        `tail -c +$((from + 1)) "$f" | head -c $((s - from)) | grep -aE '${WANTED}' | tail -c ${MATCH_BYTES}`
+        // A last line still being written is left for the next read, which
+        // starts before it and takes it whole.
+        `[ "$s" -gt 0 ] && [ -n "$(tail -c +$s "$f" | head -c 1)" ] && cut='$d' || cut=''`,
+        `tail -c +$((from + 1)) "$f" | head -c $((s - from)) | sed "$cut" | grep -aE '${WANTED}' | tail -c ${MATCH_BYTES}`
     ].join("\n");
 }
 

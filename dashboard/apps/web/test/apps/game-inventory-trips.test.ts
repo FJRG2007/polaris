@@ -83,7 +83,7 @@ describe("reading bags", () => {
         const after = server(bags);
         const now = await readLiveInventories({ ask: after.say, askEach: after.sayEach }, Object.keys(bags));
 
-        expect(now.map((reading) => reading.items)).toEqual(old.map((reading) => reading.items));
+        expect(now.map((reading) => reading?.items)).toEqual(old.map((reading) => reading.items));
         expect(before.trips()).toBe(42 + 42 + 1);
         // 1 trip for all three whole bags, then 5 for each of the two full ones.
         expect(after.trips()).toBe(11);
@@ -98,6 +98,41 @@ describe("reading bags", () => {
         const now = await readLiveInventory({ ask: after.say, askEach: after.sayEach }, "Alice");
         expect(now.items).toEqual(truth.items);
         expect(now.unreadable).toBe(0);
+    });
+
+    it("loses only the bag that could not be read, not everybody's", async () => {
+        const bags = { Alice: [stack(0)], Bob: [stack(1)], Cleo: [stack(2)] };
+        const live = server(bags);
+        const flaky = {
+            ask: async (argv: readonly string[]) => {
+                if (argv[3] === "Bob") throw new Error("rcon-cli exited 1");
+                return live.say(argv);
+            },
+            askEach: async (commands: readonly (readonly string[])[]) =>
+                (await live.sayEach(commands)).map((answer, index) => (commands[index]![3] === "Bob" ? null : answer))
+        };
+        const readings = await readLiveInventories(flaky, Object.keys(bags));
+        expect(readings[0]?.items).toHaveLength(1);
+        expect(readings[1]).toBeNull();
+        expect(readings[2]?.items).toHaveLength(1);
+    });
+
+    it("does not ask a batch again command by command when the batch itself failed", async () => {
+        const live = server({ Alice: fullBag() });
+        let alone = 0;
+        const stuck = {
+            ask: async (argv: readonly string[]) => {
+                alone += 1;
+                return live.say(argv);
+            },
+            askEach: async () => {
+                throw new Error("No answer in time");
+            }
+        };
+        await expect(readLiveInventory(stuck, "Alice")).rejects.toThrow("No answer in time");
+        expect(alone).toBe(1);
+        expect(await readLiveInventories(stuck, ["Alice"])).toEqual([null]);
+        expect(alone).toBe(1);
     });
 
     it("keeps reading one question at a time where the server cannot take several", async () => {

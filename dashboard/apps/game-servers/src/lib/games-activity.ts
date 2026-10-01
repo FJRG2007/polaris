@@ -133,9 +133,10 @@ export interface SessionWrites {
 
 /**
  * How far past the start of a visit a join in the log has to be before it is a
- * second connection rather than the one that opened it. The two clocks are the
- * same machine's, and the log's stamp is the earlier of the two by however long
- * the look that noticed took; this is slack for that and nothing else.
+ * second connection rather than the one that opened it. The log's stamp is the
+ * earlier of the two by however long the look that noticed took; this is slack
+ * for that. A server on another machine keeps its own clock, so a split also
+ * takes a departure logged inside the visit.
  */
 const SAME_JOIN_MS = 10_000;
 
@@ -191,9 +192,10 @@ export function sessionWrites(
         const start = session.joinedAt.getTime();
         if (since.getTime() <= start + SAME_JOIN_MS) continue;
         // They left and came back after this visit began. The departure before
-        // this connection is when the last one ended, where the log kept it.
+        // this connection is when the last one ended.
         const left = log?.lastLeft?.getTime() ?? Number.NaN;
-        const end = Number.isNaN(left) || left < start || left > since.getTime() ? since : new Date(left);
+        if (Number.isNaN(left) || left < start || left > since.getTime()) continue;
+        const end = new Date(left);
         const player =
             roster.find((entry) => entry.name.trim().toLowerCase() === session.name.trim().toLowerCase()) ??
             { name: session.name, id: session.playerId };
