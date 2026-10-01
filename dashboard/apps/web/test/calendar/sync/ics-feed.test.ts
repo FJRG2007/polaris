@@ -131,11 +131,19 @@ describe("createIcsProvider", () => {
 });
 
 describe("HOLIDAY_CALENDARS", () => {
-    it("lists Thunderbird's holiday feeds from the Nextcloud catalogue", () => {
+    it("lists Thunderbird's holiday feeds, as its holiday calendars page names them", () => {
         expect(HOLIDAY_CALENDARS.length).toBeGreaterThan(50);
         for (const entry of HOLIDAY_CALENDARS) {
             expect(entry.url).toMatch(/^https:\/\/www\.thunderbird\.net\/media\/caldata\/autogen\/[A-Za-z]+\.ics$/);
             expect(entry.region).toMatch(/^[A-Z]{2}$/);
         }
+        // Every region and language is one a screen can name in the reader's words.
+        const regions = new Intl.DisplayNames(["en"], { type: "region", fallback: "none" });
+        const languages = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });
+        for (const entry of HOLIDAY_CALENDARS) {
+            expect(regions.of(entry.region), entry.name).toBeTruthy();
+            expect(languages.of(entry.language), entry.name).toBeTruthy();
+        }
+        expect(new Set(HOLIDAY_CALENDARS.map((entry) => entry.url)).size).toBe(HOLIDAY_CALENDARS.length);
     });
 });
