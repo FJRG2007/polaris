@@ -31,6 +31,8 @@ interface World {
     allWater: boolean;
     /** Open sea everywhere: the marker comes down on the water, which is nobody's build. */
     sea: boolean;
+    /** With `sea`: an island of dry ground this far round 0 0, sea beyond it. */
+    dryWithin: number;
     /** Where whoever has a kill of the boss's kind is standing. */
     killerAt: [number, number, number];
     /** Item ids the server does not know. */
@@ -76,6 +78,12 @@ interface World {
      *  they are - for the events that put down more than one. */
     markFollows: boolean;
     markAt: [number, number];
+    /** Small wild plants put back where they grew, as `x y z`; with `grass`,
+     *  short grass grows everywhere nothing else stands. */
+    plants: Map<string, string>;
+    grass: boolean;
+    /** The markers a place's columns are judged by, all at once, as `x,z`. */
+    samples: [number, number][];
     /** Chests standing in the world, as `x y z`, and the ones opened. */
     chests: string[];
     /** The loot table the chests were put down with. */
@@ -91,7 +99,7 @@ interface World {
     keepInventory: "true" | "false" | "unknown";
     /** The answer to `forceload query`. */
     forced: string;
-    /** Horde defence: who is at the point, and how many monsters are left. */
+    /** Horde defense: who is at the point, and how many monsters are left. */
     defenders: string[];
     waveAlive: number;
     hits: Record<string, number>;
@@ -186,6 +194,7 @@ const world: World = {
     arrived: false,
     allWater: false,
     sea: false,
+    dryWithin: 0,
     killerAt: [305, 70, 2],
     unknownItems: [],
     dims: {},
@@ -209,6 +218,9 @@ const world: World = {
     homeWorlds: {},
     markFollows: false,
     markAt: [300, 0],
+    plants: new Map(),
+    grass: false,
+    samples: [],
     chests: [],
     chestTable: "",
     opened: [],
@@ -756,10 +768,41 @@ function answer(sent: string): string {
         line
     );
     if (air) {
-        // Not air: a block of the world's or a meteor's, or a chest standing there.
+        // Not air: a block of the world's or a meteor's, a chest, or a plant standing there.
         const at = air[1] as string;
-        const taken = world.blocks.has(at) || world.solid || world.chests.includes(at);
+        const taken =
+            world.blocks.has(at) ||
+            world.solid ||
+            world.chests.includes(at) ||
+            plantAt(at) !== undefined;
         return taken ? "Test failed" : "Test passed";
+    }
+    const plant =
+        /^execute in minecraft:overworld if block (-?\d+ -?\d+ -?\d+) minecraft:(short_grass|grass|fern|snow)$/.exec(
+            line
+        );
+    if (plant) return plantAt(plant[1]!) === plant[2] ? "Test passed" : "Test failed";
+    const overPlant =
+        /^execute in minecraft:overworld if block (\S+ \S+ \S+) minecraft:(short_grass|grass|fern|snow) run setblock \1 minecraft:chest\{LootTable:"([^"]+)"\} replace$/.exec(
+            line
+        );
+    if (overPlant) {
+        if (plantAt(overPlant[1]!) !== overPlant[2]) return "Test failed";
+        world.plants.delete(overPlant[1]!);
+        world.chestTable = overPlant[3]!;
+        world.chests.push(overPlant[1]!);
+        return "Changed the block";
+    }
+    const plantBack =
+        /^execute in minecraft:overworld if block (\S+ \S+ \S+) minecraft:chest if data block \1 LootTable run setblock \1 minecraft:(short_grass|grass|fern|snow) replace$/.exec(
+            line
+        );
+    if (plantBack) {
+        const at = plantBack[1]!;
+        if (!world.chests.includes(at) || world.opened.includes(at)) return "Test failed";
+        world.chests = world.chests.filter((one) => one !== at);
+        world.plants.set(at, plantBack[2]!);
+        return "Changed the block";
     }
     const put = /^execute in minecraft:overworld run setblock (-?\d+ -?\d+ -?\d+) (\S+) keep$/.exec(
         line
@@ -869,7 +912,7 @@ function answer(sent: string): string {
             : `Gamerule keepInventory is currently set to: ${world.keepInventory}`;
     }
     if (line === "execute in minecraft:overworld run forceload query") return world.forced;
-    if (line === "execute if entity @e[tag=pe_mob]")
+    if (line === "execute if entity @e[tag=pe_mob]" || line === "execute if entity @e[tag=pe_mob,tag=!pe_wmount]")
         return world.waveAlive > 0 ? `Test passed, count: ${world.waveAlive}` : "Test failed";
     if (
         line.includes(
@@ -885,10 +928,13 @@ function answer(sent: string): string {
             .map(([name, value]) => `${name} has ${value} [pe_whit]`)
             .join("\n");
     }
-    if (/^execute in minecraft:overworld if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line))
-        return world.sea ? "Test passed" : "Test failed";
+    const wet = /^execute in minecraft:overworld if block (-?\d+) -?\d+ (-?\d+) minecraft:water$/.exec(
+        line
+    );
+    if (wet) return world.sea && !onIsland(wet[1]!, wet[2]!) ? "Test passed" : "Test failed";
     if (line.startsWith("execute in minecraft:overworld unless block")) {
-        if (world.sea) return "Test passed";
+        const column = /unless block (-?\d+) -?\d+ (-?\d+) /.exec(line);
+        if (world.sea && !(column && onIsland(column[1]!, column[2]!))) return "Test passed";
         const refused = world.refusedGround.find(
             (id) => line.includes(`minecraft:${id} `) || line.endsWith(`minecraft:${id}`)
         );
@@ -1039,6 +1085,38 @@ function answer(sent: string): string {
             : `Can't get value of pe_score for ${name}; none is set`;
     }
     // The heightmap under the trees: water stops it too, and the ground check refuses that.
+    // The columns of a place, judged all at once.
+    if (line === "kill @e[tag=pe_samp]") {
+        world.samples = [];
+        return "";
+    }
+    const sample = /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over .* run summon .*"pe_samp"/.exec(line);
+    if (sample) {
+        if (world.allWater) return "";
+        world.samples.push([Number(sample[1]), Number(sample[2])]);
+        return "Summoned new Armor Stand";
+    }
+    if (line.startsWith("execute as @e[tag=pe_samp]")) {
+        const listed = (picked: [number, number][]) =>
+            picked
+                .map(([x, z]) => `Armor Stand has the following entity data: [${x}d, 70.0d, ${z}d]`)
+                .join("\n");
+        const wet = world.samples.filter(
+            ([x, z]) => world.sea && !onIsland(String(Math.floor(x)), String(Math.floor(z)))
+        );
+        if (line === "execute as @e[tag=pe_samp] run data get entity @s Pos") return listed(world.samples);
+        if (line.includes("if block ~ ~-1 ~ minecraft:water")) return listed(wet);
+        if (line.includes("if block ~ ~-1 ~ #minecraft:")) return "";
+        const refused = world.refusedGround.find(
+            (id) => line.includes(`minecraft:${id} `) || line.includes(`minecraft:${id} run`)
+        );
+        if (refused) return `Unknown block type 'minecraft:${refused}'`;
+        if (world.unsureGround > 0) {
+            world.unsureGround -= 1;
+            return "That position is not loaded";
+        }
+        return listed(world.built ? world.samples : wet);
+    }
     if (line.includes("positioned over motion_blocking_no_leaves") && line.includes("pe_mark")) {
         if (world.allWater) return "No entity was found";
         const over = /positioned (-?[\d.]+) 0 (-?[\d.]+) positioned over/.exec(line);
@@ -1089,6 +1167,8 @@ function answer(sent: string): string {
     }
     if (line.includes("spreadplayers") && line.includes("pe_mark"))
         return `Spread 1 entity around ${world.markAt[0]}.5, ${world.markAt[1]}.5 with an average distance of 0 blocks apart`;
+    // Over open water everywhere the heightmap finds no ground: nothing was summoned.
+    if (line.startsWith("data get entity @e[tag=pe_mark") && world.allWater) return "No entity was found";
     if (line.startsWith("data get entity @e[tag=pe_mark"))
         return `Armor Stand has the following entity data: [${world.markAt[0]}.5d, 70.0d, ${world.markAt[1]}.5d]`;
     if (line.includes("if data block") && line.includes("LootTable")) {
@@ -1187,6 +1267,19 @@ function answer(sent: string): string {
     if (line.startsWith("execute in minecraft:overworld if block "))
         return world.refuseBlocks ? "Test failed" : "Test passed";
     return "";
+}
+
+/** What small wild plant grows at a spot, if any. */
+function plantAt(at: string): string | undefined {
+    if (world.plants.has(at)) return world.plants.get(at);
+    return world.grass && !world.chests.includes(at) && !world.blocks.has(at)
+        ? "short_grass"
+        : undefined;
+}
+
+/** Whether a column is on the island of `dryWithin`, when there is one. */
+function onIsland(x: string, z: string): boolean {
+    return world.dryWithin > 0 && Math.hypot(Number(x), Number(z)) <= world.dryWithin;
 }
 
 /** Who carries a tag. */
@@ -1399,12 +1492,27 @@ vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
 
 const SERVER = "00000000-0000-4000-8000-000000000001";
 const catalog = await import("@polaris-app/game-servers/src/lib/minecraft/events/catalog");
+
+/**
+ * A new event as these runs were written against it: the prizes and the length
+ * every kind started with before they were set by kind. Stored with this
+ * version's defaults marker, so nothing is migrated under them.
+ */
+function newPreset(kind: catalog.EventKind, id: string): catalog.EventPreset {
+    const made = catalog.newPreset(kind, id);
+    return {
+        ...made,
+        minutes: catalog.oldDefaultMinutes(kind),
+        rewards: catalog.KIND_INFO[kind].competitive ? catalog.OLD_DEFAULT_REWARDS : made.rewards
+    };
+}
 const events = await import("@polaris-app/game-servers/src/lib/minecraft/events/events-service");
 const speechService = await import("@polaris-app/game-servers/src/lib/minecraft/speech-service");
 const triviaBank = await import("@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-message");
 const commands = await import("@polaris-app/game-servers/src/lib/minecraft/events/commands");
+const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/events/messages");
 
 /** What a player reads of a command's text: the words of its JSON, without the
  *  formatting that splits them into parts (a highlighted name, a number). */
@@ -1474,6 +1582,7 @@ beforeEach(() => {
     world.arrived = false;
     world.allWater = false;
     world.sea = false;
+    world.dryWithin = 0;
     world.killerAt = [305, 70, 2];
     world.unknownItems = [];
     world.dims = {};
@@ -1499,6 +1608,9 @@ beforeEach(() => {
     world.homeWorlds = {};
     world.markFollows = false;
     world.markAt = [300, 0];
+    world.plants = new Map();
+    world.grass = false;
+    world.samples = [];
     world.chests = [];
     world.chestTable = "";
     world.opened = [];
@@ -1566,7 +1678,7 @@ afterEach(async () => {
 
 describe("operators' chat", () => {
     it("is kept clear of the event's commands while it runs, and given back after", async () => {
-        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3 }], {
+        setUp([{ ...newPreset("mining-rush", "rush"), minutes: 3 }], {
             countdownSeconds: 10
         });
         await events.startEvent({
@@ -1594,7 +1706,7 @@ describe("the boss bar's clock", () => {
     it("moves every second through the start, with no second standing still in between", async () => {
         // Eleven seconds: the countdown ends between two ticks, as it does on a
         // real server, where starting takes a moment of its own.
-        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3 }], {
+        setUp([{ ...newPreset("mining-rush", "rush"), minutes: 3 }], {
             countdownSeconds: 11
         });
         await events.startEvent({
@@ -1620,7 +1732,7 @@ describe("the boss bar's clock", () => {
 
 describe("a mining rush, from start to podium", () => {
     it("counts, ranks, hands prizes to who is on and keeps the rest", async () => {
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
         await events.startEvent({
             ownerId: "owner",
@@ -1669,7 +1781,7 @@ describe("a mining rush, from start to podium", () => {
     });
 
     it("leaves somebody the anti-cheat caught off the podium and the prizes", async () => {
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
         await events.startEvent({
             ownerId: "owner",
@@ -1711,7 +1823,7 @@ describe("chunks somebody else keeps loaded", () => {
         // lets it go again, and the end lets the drop's own chunk go.
         world.forced =
             "2 force loaded chunks were found in minecraft:overworld at: [18, 0], [18, -1]";
-        setUp([{ ...catalog.newPreset("supply-drop", "drop"), minutes: 10 }]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 10 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -1736,7 +1848,7 @@ describe("the chunks an event loads", () => {
         // somebody's build at first - given up - and later, elsewhere, on
         // open ground.
         world.built = true;
-        setUp([{ ...catalog.newPreset("supply-drop", "drop"), minutes: 10 }]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 10 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -1769,7 +1881,7 @@ describe("the chunks an event loads", () => {
 
 describe("a supply drop", () => {
     it("lands on dry ground, is told in steps, and goes to whoever opens it", async () => {
-        const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
+        const drop = { ...newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
         await events.startEvent({
             ownerId: "owner",
@@ -1812,8 +1924,10 @@ describe("a supply drop", () => {
         ).toBe(true);
     });
 
-    it("lets go of the chunk it was trying when it is called off before landing", async () => {
-        const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
+    it("lets go of every chunk it tried when it is called off before landing", async () => {
+        // Somebody's build everywhere: no column ever takes the chest.
+        world.built = true;
+        const drop = { ...newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
         await events.startEvent({
             ownerId: "owner",
@@ -1822,12 +1936,11 @@ describe("a supply drop", () => {
             trigger: "manual",
             startedBy: null
         });
-        // Begun at once: the column is chosen on the first tick after, and
-        // the chest not yet down.
-        await play(2_100);
+        // Begun at once: a column chosen and judged on each tick, the chest
+        // never down.
+        await play(4_100);
         const added = world.sent.filter((line) => line.includes("run forceload add"));
         expect(added.length).toBeGreaterThan(0);
-        expect(state().run?.target).not.toBeNull();
         expect(state().run?.place).toBeNull();
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
@@ -1839,7 +1952,7 @@ describe("a supply drop", () => {
 
 describe("starting one now", () => {
     it("skips what is left of the countdown and still runs its full time", async () => {
-        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 };
+        const hunt = { ...newPreset("mob-hunt", "hunt"), minutes: 10 };
         setUp([hunt], { countdownSeconds: 60 });
         await events.startEvent({
             ownerId: "owner",
@@ -1861,7 +1974,7 @@ describe("starting one now", () => {
     });
 
     it("says so once it has already begun", async () => {
-        setUp([{ ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 }]);
+        setUp([{ ...newPreset("mob-hunt", "hunt"), minutes: 10 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -1876,7 +1989,7 @@ describe("starting one now", () => {
 
 describe("calling one off", () => {
     it("ends it with nobody winning and cleans up", async () => {
-        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 10 };
+        const hunt = { ...newPreset("mob-hunt", "hunt"), minutes: 10 };
         setUp([hunt]);
         await events.startEvent({
             ownerId: "owner",
@@ -1897,7 +2010,7 @@ describe("calling one off", () => {
     });
 
     it("refuses a second event while one is on", async () => {
-        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 10 }]);
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 10 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -1919,7 +2032,7 @@ describe("calling one off", () => {
 
     it("refuses one with nobody on the server", async () => {
         world.online = [];
-        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 10 }]);
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 10 }]);
         const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
@@ -1935,7 +2048,7 @@ describe("calling one off", () => {
 
 describe("the minute sweep", () => {
     it("draws an event once enough people are playing, not before", async () => {
-        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 5 };
+        const fish = { ...newPreset("fishing", "fish"), minutes: 5 };
         setUp([fish], {
             minActive: 2,
             random: {
@@ -1960,7 +2073,7 @@ describe("the minute sweep", () => {
 
     it("does not start with fewer players on than its minimum, and says why", async () => {
         world.online = ["Ana"];
-        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3 }]);
+        setUp([{ ...newPreset("mining-rush", "rush"), minutes: 3 }]);
         const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
@@ -1974,7 +2087,7 @@ describe("the minute sweep", () => {
         expect(state().run).toBeNull();
         expect(world.sent.some((line) => line.includes("bossbar add"))).toBe(false);
         // An operator who lets one play alone sets the minimum to one.
-        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 3, minPlayers: 1 }]);
+        setUp([{ ...newPreset("mining-rush", "rush"), minutes: 3, minPlayers: 1 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -1987,7 +2100,7 @@ describe("the minute sweep", () => {
 
     it("skips, not fails, a scheduled event below its own minimum", async () => {
         world.online = ["Ana", "Ben"];
-        const boost = { ...catalog.newPreset("xp-boost", "boost"), minutes: 5, minPlayers: 3 };
+        const boost = { ...newPreset("xp-boost", "boost"), minutes: 5, minPlayers: 3 };
         setUp([boost], { minActive: 1 }, [
             { id: "at8", presetId: "boost", enabled: true, days: [], at: "20:00" }
         ]);
@@ -1999,7 +2112,7 @@ describe("the minute sweep", () => {
     });
 
     it("skips a scheduled event when too few are playing, and says so", async () => {
-        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 5 };
+        const fish = { ...newPreset("fishing", "fish"), minutes: 5 };
         world.online = ["Ana"];
         setUp([fish], { minActive: 2 }, [
             { id: "at8", presetId: "fish", enabled: true, days: [], at: "20:00" }
@@ -2014,7 +2127,7 @@ describe("the minute sweep", () => {
     });
 
     it("hands a waiting prize to somebody who is back", async () => {
-        setUp([catalog.newPreset("fishing", "fish")], {
+        setUp([newPreset("fishing", "fish")], {
             random: { ...catalog.settingsSchema.parse({}).random }
         });
         config[catalog.EVENT_STATE_KEY] = {
@@ -2035,7 +2148,7 @@ describe("the minute sweep", () => {
 
     it("gives a prize once to a player whose name reads like an error", async () => {
         world.online = ["ErrorBoy", "Unknown_1"];
-        setUp([catalog.newPreset("fishing", "fish")], {
+        setUp([newPreset("fishing", "fish")], {
             random: { ...catalog.settingsSchema.parse({}).random }
         });
         const reward = { items: [{ id: "minecraft:emerald", count: 2 }], levels: 3 };
@@ -2060,7 +2173,7 @@ describe("the minute sweep", () => {
     });
 
     it("keeps a prize the game refused as too many, rather than calling it given", async () => {
-        setUp([catalog.newPreset("fishing", "fish")], {
+        setUp([newPreset("fishing", "fish")], {
             random: { ...catalog.settingsSchema.parse({}).random }
         });
         const reward = { items: [{ id: "minecraft:diamond_sword", count: 150 }], levels: 0 };
@@ -2074,7 +2187,7 @@ describe("the minute sweep", () => {
     });
 
     it("keeps only what did not arrive, so nothing is given twice", async () => {
-        setUp([catalog.newPreset("fishing", "fish")], {
+        setUp([newPreset("fishing", "fish")], {
             random: { ...catalog.settingsSchema.parse({}).random }
         });
         world.unknownItems = ["minecraft:diamnd"];
@@ -2105,7 +2218,7 @@ describe("the minute sweep", () => {
 describe("trivia", () => {
     it("reads the chat for the first right answer and scores the rounds", async () => {
         const quiz = {
-            ...catalog.newPreset("trivia", "quiz"),
+            ...newPreset("trivia", "quiz"),
             options: {
                 rounds: 3,
                 seconds: 15,
@@ -2175,7 +2288,7 @@ function groundBoss(
     minutes: number,
     options: Partial<catalog.EventOptions<"world-boss">> = {}
 ): catalog.EventPreset {
-    const preset = catalog.newPreset("world-boss", id);
+    const preset = newPreset("world-boss", id);
     return {
         ...preset,
         minutes,
@@ -2279,11 +2392,11 @@ describe("a world boss", () => {
 describe("a world boss fought at range", () => {
     const boss = () => groundBoss("boss", 10);
 
-    it("shares the health nobody's melee accounts for among those fighting it, and always places the killer", async () => {
+    it("shares the health nobody's melee accounts for among those fighting it, and places the killer first when the final blow decides it", async () => {
         // Both at it from the start: its health is set for them, and it never
         // heals for want of a fighter.
         world.fighters = ["Ana", "Ben"];
-        setUp([boss()]);
+        setUp([groundBoss("boss", 10, { winner: "final-blow" })]);
         await startArena("boss");
         await play(8_100);
         // Arrows: the boss loses 100 health and nobody's melee counts any of it -
@@ -2329,8 +2442,9 @@ describe("a world boss fought at range", () => {
         const after = state();
         expect(after.history[0]?.note).toBe("Defeated; the final blow by Ana");
         const podium = after.history[0]?.podium ?? [];
-        expect(podium.map((one) => one.name).sort()).toEqual(["Ana", "Ben"]);
-        expect(podium.find((one) => one.name === "Ana")?.score).toBeGreaterThanOrEqual(20);
+        // The final blow first, whatever it scored; the rest by their damage.
+        expect(podium.map((one) => one.name)).toEqual(["Ana", "Ben"]);
+        expect(podium[0]?.place).toBe(1);
         // The killer is paid, and nobody is paid twice.
         const gives = world.sent.filter((line) => line.startsWith("give "));
         expect(gives.some((line) => line.startsWith("give Ana "))).toBe(true);
@@ -2662,7 +2776,7 @@ describe("a prize a full inventory has no room for", () => {
         world.bag = { Ana: { "minecraft:diamond": 2 }, Ben: {} };
         world.room = { Ana: 1, Ben: 64 };
         world.levels = { Ana: 10 };
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
         await startArena("rush");
         world.scores = { Ana: 40, Ben: 12 };
@@ -2698,7 +2812,7 @@ describe("a prize a full inventory has no room for", () => {
 
 describe("a blood moon", () => {
     it("brings night and waves, and only the survivors stand on the podium", async () => {
-        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        const moon = { ...newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
         await events.startEvent({
             ownerId: "owner",
@@ -2750,7 +2864,7 @@ describe("a blood moon", () => {
 describe("the others", () => {
     it("a race is won by whoever reaches the finish first", async () => {
         const race = {
-            ...catalog.newPreset("explorer", "race"),
+            ...newPreset("explorer", "race"),
             minutes: 10,
             options: { mode: "race" as const, distance: 500, place: { mode: "players" as const } }
         };
@@ -2774,7 +2888,7 @@ describe("the others", () => {
     });
 
     it("the hill counts the time spent inside the circle", async () => {
-        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        const hill = { ...newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
         await events.startEvent({
             ownerId: "owner",
@@ -2799,7 +2913,7 @@ describe("the others", () => {
     it("draws the circle's edge and a column of light, and tells each player the way", async () => {
         world.online = ["Ana"];
         const hill = {
-            ...catalog.newPreset("king-of-the-hill", "hill"),
+            ...newPreset("king-of-the-hill", "hill"),
             minutes: 3,
             minPlayers: 1
         };
@@ -2829,7 +2943,7 @@ describe("the others", () => {
 
     it("gives up a place on somebody's build and says it could not find one", async () => {
         world.built = true;
-        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        const hill = { ...newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
         await events.startEvent({
             ownerId: "owner",
@@ -2848,7 +2962,7 @@ describe("the others", () => {
     it("judges the ground by older names on a server that refuses the newest", async () => {
         world.built = true;
         world.refusedGround = ["leaf_litter"];
-        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        const hill = { ...newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
         await events.startEvent({
             ownerId: "owner",
@@ -2867,7 +2981,7 @@ describe("the others", () => {
     it("keeps judging the ground after a column that could not be read", async () => {
         world.built = true;
         world.unsureGround = 2;
-        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        const hill = { ...newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
         await events.startEvent({
             ownerId: "owner",
@@ -2886,7 +3000,7 @@ describe("the others", () => {
     it("takes the fixed point an operator chose as it is", async () => {
         world.built = true;
         const hill = {
-            ...catalog.newPreset("king-of-the-hill", "hill"),
+            ...newPreset("king-of-the-hill", "hill"),
             minutes: 3,
             options: { place: { mode: "fixed" as const, x: 300, z: 0 }, radius: 6 }
         };
@@ -2911,7 +3025,7 @@ describe("the others", () => {
         world.at = { Ana: [0, 64, 0], Ben: [0, 64, 0] };
         world.homes = { Ana: [0, 0], Ben: [0, 0] };
         world.homeWorlds = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
-        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        const hill = { ...newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
         await events.startEvent({
             ownerId: "owner",
@@ -2933,7 +3047,7 @@ describe("the others", () => {
 
     it("looks past a player's bed for somewhere to put it", async () => {
         world.homes = { Ana: [0, 0], Ben: [0, 0] };
-        const hill = { ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 };
+        const hill = { ...newPreset("king-of-the-hill", "hill"), minutes: 3 };
         setUp([hill]);
         await events.startEvent({
             ownerId: "owner",
@@ -2951,7 +3065,7 @@ describe("the others", () => {
     });
 
     it("a happy hour gives its effects for exactly as long as it lasts, and no prizes", async () => {
-        const happy = { ...catalog.newPreset("happy-hour", "happy"), minutes: 20 };
+        const happy = { ...newPreset("happy-hour", "happy"), minutes: 20 };
         setUp([happy]);
         await events.startEvent({
             ownerId: "owner",
@@ -2977,7 +3091,7 @@ describe("the others", () => {
     });
 
     it("a happy hour called off takes its effects back", async () => {
-        const happy = { ...catalog.newPreset("happy-hour", "happy"), minutes: 60 };
+        const happy = { ...newPreset("happy-hour", "happy"), minutes: 60 };
         setUp([happy]);
         await events.startEvent({
             ownerId: "owner",
@@ -2998,7 +3112,7 @@ describe("the others", () => {
 describe("when things go wrong", () => {
     it("gives up on a place after a few tries, and tells the players", async () => {
         world.allWater = true;
-        const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
+        const drop = { ...newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
         await events.startEvent({
             ownerId: "owner",
@@ -3021,7 +3135,7 @@ describe("when things go wrong", () => {
     });
 
     it("picks an event back up after a restart, the side panel still its own", async () => {
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 10 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 10 };
         setUp([rush]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -3047,7 +3161,7 @@ describe("when things go wrong", () => {
     });
 
     it("never plays a run again whose end had already begun", async () => {
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 10 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 10 };
         setUp([rush]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -3075,7 +3189,7 @@ describe("when things go wrong", () => {
     });
 
     it("is not picked up again by the sweep while its end is being written", async () => {
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
         await events.startEvent({
             ownerId: "owner",
@@ -3113,7 +3227,7 @@ describe("when things go wrong", () => {
     });
 
     it("stays called off, and says so, when Polaris stopped while calling it off", async () => {
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -3148,7 +3262,7 @@ describe("when things go wrong", () => {
 
 describe("the least to be ranked", () => {
     it("keeps a token score off the podium and out of the prizes", async () => {
-        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        const hunt = { ...newPreset("mob-hunt", "hunt"), minutes: 3 };
         expect(catalog.minScoreOf(hunt)).toBe(5);
         setUp([hunt]);
         await events.startEvent({
@@ -3166,7 +3280,7 @@ describe("the least to be ranked", () => {
     });
 
     it("means nobody wins when nobody reaches it", async () => {
-        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        const hunt = { ...newPreset("mob-hunt", "hunt"), minutes: 3 };
         setUp([hunt]);
         await events.startEvent({
             ownerId: "owner",
@@ -3198,7 +3312,7 @@ describe("where the players are, and what they are doing", () => {
     });
 
     it("waits to draw an event while somebody is in a fight", async () => {
-        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
         await events.sweepEvents();
         await play(15 * 60_000);
         world.hurt = { Ana: 40 };
@@ -3220,7 +3334,7 @@ describe("where the players are, and what they are doing", () => {
 
     it("counts only the Overworld for an event that happens there", async () => {
         world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
-        setUp([{ ...catalog.newPreset("supply-drop", "drop"), minutes: 5 }], draw("drop"));
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 5 }], draw("drop"));
         await events.sweepEvents();
         await play(15 * 60_000);
         await events.sweepEvents();
@@ -3232,7 +3346,7 @@ describe("where the players are, and what they are doing", () => {
 
     it("does not hold a mining rush back for players in the Nether", async () => {
         world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_nether" };
-        setUp([{ ...catalog.newPreset("mining-rush", "rush"), minutes: 5 }], draw("rush"));
+        setUp([{ ...newPreset("mining-rush", "rush"), minutes: 5 }], draw("rush"));
         await events.sweepEvents();
         await play(15 * 60_000);
         const started = await events.sweepEvents();
@@ -3240,7 +3354,7 @@ describe("where the players are, and what they are doing", () => {
     });
 
     it("does not count a night sat out in the Nether as surviving it", async () => {
-        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3, minScore: 1 };
+        const moon = { ...newPreset("blood-moon", "moon"), minutes: 3, minScore: 1 };
         setUp([moon]);
         await events.startEvent({
             ownerId: "owner",
@@ -3260,7 +3374,7 @@ describe("where the players are, and what they are doing", () => {
 describe("what the audit found", () => {
     it("refuses an event of hostile mobs on Peaceful, and says how to fix it", async () => {
         world.difficulty = "Peaceful";
-        setUp([{ ...catalog.newPreset("blood-moon", "moon"), minutes: 5 }]);
+        setUp([{ ...newPreset("blood-moon", "moon"), minutes: 5 }]);
         const refused = await refusal(
             events.startEvent({
                 ownerId: "owner",
@@ -3275,7 +3389,7 @@ describe("what the audit found", () => {
 
     it("runs one that needs no hostile mobs on Peaceful", async () => {
         world.difficulty = "Peaceful";
-        setUp([{ ...catalog.newPreset("fishing", "fish"), minutes: 5 }]);
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }]);
         await expect(
             events.startEvent({
                 ownerId: "owner",
@@ -3288,7 +3402,7 @@ describe("what the audit found", () => {
     });
 
     it("leaves somebody who played it in creative off the podium", async () => {
-        const rush = { ...catalog.newPreset("mining-rush", "rush"), minutes: 3 };
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
         setUp([rush]);
         await events.startEvent({
             ownerId: "owner",
@@ -3315,7 +3429,7 @@ describe("what the audit found", () => {
         );
         world.glued = true;
         world.scoreTitle = "Gran concurso de pesca en el r\u00edo del norte";
-        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
+        const fish = { ...newPreset("fishing", "fish"), minutes: 3 };
         setUp([fish]);
         await events.startEvent({
             ownerId: "owner",
@@ -3339,7 +3453,7 @@ describe("what the audit found", () => {
         world.online = ["Ana", "Ben", ".Cy", "Cy"];
         world.glued = true;
         world.display = { Ana: ["[VIP] ", ""], Ben: ["", " [AFK]"] };
-        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
+        const fish = { ...newPreset("fishing", "fish"), minutes: 3 };
         setUp([fish]);
         await events.startEvent({
             ownerId: "owner",
@@ -3360,7 +3474,7 @@ describe("what the audit found", () => {
 
     it("leaves somebody AFK the whole time off a fishing podium", async () => {
         world.still = ["Ana"];
-        const fish = { ...catalog.newPreset("fishing", "fish"), minutes: 3 };
+        const fish = { ...newPreset("fishing", "fish"), minutes: 3 };
         setUp([fish]);
         await events.startEvent({
             ownerId: "owner",
@@ -3379,7 +3493,7 @@ describe("what the audit found", () => {
 
     it("leaves somebody AFK at a mob farm off a blood moon podium, however much they are hit", async () => {
         world.still = ["Ana"];
-        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        const moon = { ...newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
         await events.startEvent({
             ownerId: "owner",
@@ -3403,7 +3517,7 @@ describe("what the audit found", () => {
     it("holds the night on a version that renamed the game rules", async () => {
         world.renamedRules = true;
         world.daylightCycle = "false";
-        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        const moon = { ...newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
         await events.startEvent({
             ownerId: "owner",
@@ -3427,7 +3541,7 @@ describe("what the audit found", () => {
         "keeps the blood moon's storm for the whole event on %s",
         async (version) => {
             world.version = version;
-            const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+            const moon = { ...newPreset("blood-moon", "moon"), minutes: 3 };
             setUp([moon]);
             await events.startEvent({
                 ownerId: "owner",
@@ -3450,7 +3564,7 @@ describe("what the audit found", () => {
             world.version = version;
             world.renamedRules = events.atLeast(version, [1, 21, 11]);
             world.daylightCycle = "false";
-            const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+            const moon = { ...newPreset("blood-moon", "moon"), minutes: 3 };
             setUp([moon]);
             await events.startEvent({
                 ownerId: "owner",
@@ -3467,7 +3581,7 @@ describe("what the audit found", () => {
 
     it("gives a server whose clock stands still its own time back after a blood moon", async () => {
         world.daylightCycle = "false";
-        const moon = { ...catalog.newPreset("blood-moon", "moon"), minutes: 3 };
+        const moon = { ...newPreset("blood-moon", "moon"), minutes: 3 };
         setUp([moon]);
         await events.startEvent({
             ownerId: "owner",
@@ -3501,6 +3615,13 @@ function touchesBlocks(lines: readonly string[]): string[] {
             ) &&
             !/if block (\S+ \S+ \S+) minecraft:chest\{LootTable:"[^"]+"\} run setblock \1 minecraft:air replace$/.test(
                 line
+            ) &&
+            // A small wild plant a chest took the place of, and the plant put back.
+            !/if block (\S+ \S+ \S+) minecraft:(short_grass|fern) run setblock \1 minecraft:chest\{LootTable:"[^"]+"\} replace$/.test(
+                line
+            ) &&
+            !/if block (\S+ \S+ \S+) minecraft:chest if data block \1 LootTable run setblock \1 minecraft:(short_grass|fern) replace$/.test(
+                line
             )
     );
 }
@@ -3510,7 +3631,7 @@ describe("a treasure hunt", () => {
         options: Partial<catalog.EventOptions<"treasure-hunt">> = {},
         minutes = 9
     ) => {
-        const made = catalog.newPreset("treasure-hunt", "hunt");
+        const made = newPreset("treasure-hunt", "hunt");
         setUp([{ ...made, minutes, options: { ...made.options, chests: 3, ...options } }]);
         await events.startEvent({
             ownerId: "owner",
@@ -3536,16 +3657,24 @@ describe("a treasure hunt", () => {
                 `execute in minecraft:overworld run forceload add ${chest.x} ${chest.z}`
             );
         expect(touchesBlocks(world.sent)).toEqual([]);
-        // The first clue for each, and the way or the count in every action bar.
-        for (const number of [1, 2, 3])
-            expect(
-                world.sent.some(
-                    (line) =>
-                        line.startsWith("tellraw @a") &&
-                        visible(line).includes(`Treasure ${number}: `)
-                )
-            ).toBe(true);
-        expect(world.sent.some((line) => line.startsWith("title Ana actionbar"))).toBe(true);
+        // Spread round the players, each its own way and apart.
+        for (const [index, one] of run.chests.entries())
+            for (const other of run.chests.slice(index + 1))
+                expect(Math.hypot(one.x - other.x, one.z - other.z)).toBeGreaterThanOrEqual(16);
+        // One line saying how many there are - no clues - a column of light over
+        // every one from the start, and the way in every action bar.
+        const told = world.sent.filter(
+            (line) => line.startsWith("tellraw @a") && visible(line).includes("treasures are hidden")
+        );
+        expect(told).toHaveLength(1);
+        expect(visible(told[0]!)).toContain("3 treasures are hidden");
+        expect(world.sent.some((line) => /Treasure \d: /.test(visible(line)))).toBe(false);
+        for (const chest of run.chests)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run particle minecraft:end_rod ${chest.x + 0.5} ${chest.y + 8} ${chest.z + 0.5} 0 8 0 0.01 60 force`
+            );
+        const bar = world.sent.find((line) => line.startsWith("title Ana actionbar"));
+        expect(visible(bar ?? "")).toMatch(/Treasure: \d+ m \S+ \(3\/3\)/);
 
         world.opened.push(at(run.chests[0]!));
         await play(2_100);
@@ -3553,17 +3682,20 @@ describe("a treasure hunt", () => {
         expect(state().run?.chests[0]).toMatchObject({ opened: true, by: "Ana" });
         expect(world.sent).toContain("scoreboard players set Ana pe_score 1");
 
-        // Three minutes in, the area; six, the exact spot; the last two, the beams.
+        // Nothing more is said in the chat until the next is opened.
+        const said = world.sent.filter((line) => line.startsWith("tellraw @a")).length;
         await play(3 * 60_000);
-        expect(world.sent.some((line) => line.includes("within 50 blocks"))).toBe(true);
-        await play(4 * 60_000);
-        const chest = state().run!.chests[1]!;
+        expect(world.sent.filter((line) => line.startsWith("tellraw @a")).length).toBe(said);
+        // The one opened has no column any more.
+        const first = run.chests[0]!;
+        const since = world.sent.lastIndexOf("scoreboard players set Ana pe_score 1");
         expect(
-            world.sent.some((line) => line.includes(`X ${chest.x} Y ${chest.y} Z ${chest.z}`))
-        ).toBe(true);
-        expect(world.sent.some((line) => line.includes("particle minecraft:end_rod"))).toBe(true);
+            world.sent
+                .slice(since)
+                .some((line) => line.includes(`particle minecraft:end_rod ${first.x + 0.5} `))
+        ).toBe(false);
 
-        await play(3 * 60_000);
+        await play(7 * 60_000);
         const after = readEventState(config);
         expect(after.run).toBeNull();
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
@@ -3605,10 +3737,29 @@ describe("a treasure hunt", () => {
         expect(world.sent.some((line) => line.includes("setblock 1 64 1"))).toBe(false);
     });
 
+    it("puts a chest in place of short grass, and puts the grass back when nobody opened it", async () => {
+        world.markFollows = true;
+        world.grass = true;
+        await start({ chests: 2 });
+        await play(30_000);
+        const run = state().run!;
+        expect(run.hidden).toBe(true);
+        expect(run.chests.map((one) => one.was)).toEqual(["short_grass", "short_grass"]);
+        expect(world.chests).toEqual(run.chests.map(at));
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(world.chests).toEqual([]);
+        for (const chest of run.chests)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld if block ${at(chest)} minecraft:chest if data block ${at(chest)} LootTable run setblock ${at(chest)} minecraft:short_grass replace`
+            );
+        expect(touchesBlocks(world.sent)).toEqual([]);
+    });
+
     it("never takes a chest already standing where it lands for one of its own", async () => {
         world.markFollows = true;
         world.markAt = [0, 0];
-        const made = catalog.newPreset("treasure-hunt", "hunt");
+        const made = newPreset("treasure-hunt", "hunt");
         setUp([{ ...made, minutes: 9, options: { ...made.options, chests: 1 } }]);
         // Every place it finds already has somebody's unopened loot chest on it.
         const answer = server.say;
@@ -3657,7 +3808,7 @@ describe("a treasure hunt", () => {
         world.markFollows = true;
         world.chests = ["500 70 500", "-400 70 20"];
         world.opened = ["-400 70 20"];
-        const made = catalog.newPreset("treasure-hunt", "hunt");
+        const made = newPreset("treasure-hunt", "hunt");
         setUp([made]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -3691,7 +3842,7 @@ describe("a treasure hunt", () => {
     it("picked up after a restart mid-hunt, it goes on and still cleans up at the end", async () => {
         world.markFollows = true;
         world.chests = ["500 70 500"];
-        const made = { ...catalog.newPreset("treasure-hunt", "hunt"), minutes: 10 };
+        const made = { ...newPreset("treasure-hunt", "hunt"), minutes: 10 };
         setUp([made]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -3722,7 +3873,7 @@ describe("a treasure hunt", () => {
 
     it("after a restart between writing a chest down and placing it, never counts it as found", async () => {
         world.markFollows = true;
-        const made = { ...catalog.newPreset("treasure-hunt", "hunt"), minutes: 10 };
+        const made = { ...newPreset("treasure-hunt", "hunt"), minutes: 10 };
         setUp([{ ...made, options: { ...made.options, chests: 2 } }]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -3756,8 +3907,14 @@ describe("a treasure hunt", () => {
 
 describe("a gathering", () => {
     it("announces the material, counts only what is gathered, and never takes an item", async () => {
-        const made = catalog.newPreset("gathering", "gather");
-        setUp([{ ...made, minutes: 3, options: { material: "wheat" as const } }]);
+        const made = newPreset("gathering", "gather");
+        setUp([
+            {
+                ...made,
+                minutes: 3,
+                options: { material: "wheat" as const, rounds: 1, roundMinutes: 3 }
+            }
+        ]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -3770,8 +3927,7 @@ describe("a gathering", () => {
             world.sent.some(
                 (line) =>
                     line.startsWith("tellraw @a") &&
-                    line.includes("Gather: ") &&
-                    line.includes("Wheat")
+                    visible(line).includes("Round 1/1: gather Wheat. Each is worth 2 points.")
             )
         ).toBe(true);
         expect(world.sent).toContain(
@@ -3794,8 +3950,8 @@ describe("a gathering", () => {
         expect(world.sent).toContain("scoreboard objectives remove pe_gp0");
     });
 
-    it("draws its material when the event is set off, and says it in the countdown", async () => {
-        const made = catalog.newPreset("gathering", "gather");
+    it("says nothing of the material in the countdown, and draws a new one for every round", async () => {
+        const made = newPreset("gathering", "gather");
         setUp([made], { countdownSeconds: 30 });
         await events.startEvent({
             ownerId: "owner",
@@ -3804,19 +3960,51 @@ describe("a gathering", () => {
             trigger: "manual",
             startedBy: null
         });
-        const material = state().run?.material;
-        expect(catalog.GATHER_MATERIALS).toContain(material);
         await play(2_100);
         expect(state().run?.phase).toBe("countdown");
+        expect(state().run?.material).toBeNull();
+        // No material is named before the start: nothing to wait beside.
+        const names = catalog.GATHER_MATERIALS.map((one) => eventMessages.materialName(one, "en"));
+        const told = (line: string) =>
+            (line.startsWith("tellraw @a") || line.startsWith("title @a")) &&
+            names.some((name) => visible(line).includes(name));
+        expect(world.sent.some(told)).toBe(false);
+        await play(30_000);
+        const first = state().run!;
+        expect(first.phase).toBe("running");
+        expect(catalog.GATHER_MATERIALS).toContain(first.material);
+        expect(first.round).toBe(0);
+        expect(world.sent.some((line) => line.startsWith("title @a title") && visible(line).includes("Round 1/3"))).toBe(true);
+        // Two minutes on: the round banked, and the next begun with another material.
+        const banked = world.sent.length;
+        await play(2 * 60_000 + 2_100);
+        const second = state().run!;
+        expect(second.round).toBe(1);
+        expect(second.material).not.toBe(first.material);
+        expect(second.materials).toEqual([first.material, second.material]);
+        const since = world.sent.slice(banked);
+        const bank = since.indexOf(
+            "execute as @a run scoreboard players operation @s pe_gtot += @s pe_gpts"
+        );
+        expect(bank).toBeGreaterThan(-1);
+        // Banked before the next round's counts are made afresh.
+        expect(bank).toBeLessThan(since.indexOf("scoreboard objectives remove pe_prog"));
+        expect(since.some((line) => line.startsWith("title @a title") && visible(line).includes("Round 2/3"))).toBe(true);
+        // The bar is the round's own clock.
         expect(
-            world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("Gather: "))
+            since.some(
+                (line) => line.startsWith("bossbar set polaris:event name") && visible(line).includes("Round 2/3")
+            )
         ).toBe(true);
+        await play(4 * 60_000 + 5_000);
+        expect(state().run).toBeNull();
+        expect(state().history[0]?.note).toBe("Ran its full time");
     });
 });
 
 describe("a rare catch", () => {
     it("is won by the first to reel the treasure in, who keeps it", async () => {
-        const made = catalog.newPreset("rare-catch", "catch");
+        const made = newPreset("rare-catch", "catch");
         setUp([{ ...made, minutes: 20, options: { treasure: "name_tag" as const } }]);
         await events.startEvent({
             ownerId: "owner",
@@ -3847,7 +4035,7 @@ describe("a rare catch", () => {
     });
 
     it("has no winner when nobody catches it", async () => {
-        const made = catalog.newPreset("rare-catch", "catch");
+        const made = newPreset("rare-catch", "catch");
         setUp([{ ...made, minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
@@ -3865,7 +4053,7 @@ describe("a rare catch", () => {
 
 describe("an experience boost", () => {
     it("pays extra experience while it lasts, takes nothing, and gives no prizes", async () => {
-        const made = { ...catalog.newPreset("xp-boost", "boost"), minutes: 5 };
+        const made = { ...newPreset("xp-boost", "boost"), minutes: 5 };
         setUp([made]);
         await events.startEvent({
             ownerId: "owner",
@@ -3890,7 +4078,7 @@ describe("an experience boost", () => {
     });
 
     it("called off, pays what is owed before its counts are taken away", async () => {
-        const made = { ...catalog.newPreset("xp-boost", "boost"), minutes: 20 };
+        const made = { ...newPreset("xp-boost", "boost"), minutes: 20 };
         setUp([made]);
         await events.startEvent({
             ownerId: "owner",
@@ -3912,7 +4100,7 @@ describe("an experience boost", () => {
     });
 });
 
-describe("a horde defence", () => {
+describe("a horde defense", () => {
     const start = () =>
         events.startEvent({
             ownerId: "owner",
@@ -3933,7 +4121,7 @@ describe("a horde defence", () => {
         );
 
     it("waits for defenders, sends every wave, and rewards everybody who held the point", async () => {
-        setUp([catalog.newPreset("waves", "waves")]);
+        setUp([newPreset("waves", "waves")]);
         await start();
         await play(10_100);
         // Nothing is lost to a death: keepInventory on, the server's own
@@ -3993,7 +4181,7 @@ describe("a horde defence", () => {
     it("never takes on a chunk somebody already keeps loaded", async () => {
         world.forced =
             "2 force loaded chunks were found in minecraft:overworld at: [18, 0], [19, 1]";
-        setUp([catalog.newPreset("waves", "waves")]);
+        setUp([newPreset("waves", "waves")]);
         await start();
         await play(10_100);
         expect(state().run?.chunks).toHaveLength(23);
@@ -4008,7 +4196,7 @@ describe("a horde defence", () => {
     it("takes away a wave that ran out of time, and a cancel takes everything back", async () => {
         world.defenders = ["Ana"];
         world.waveAlive = 3;
-        setUp([catalog.newPreset("waves", "waves")]);
+        setUp([newPreset("waves", "waves")]);
         await start();
         await play(10_100 + 46_000);
         expect(summoned()).toHaveLength(4);
@@ -4039,7 +4227,7 @@ describe("a horde defence", () => {
 
     it("gives the server back its own keepInventory when it already had it on", async () => {
         world.keepInventory = "true";
-        setUp([catalog.newPreset("waves", "waves")]);
+        setUp([newPreset("waves", "waves")]);
         await start();
         await play(4_100);
         await events.cancelEvent("owner", SERVER);
@@ -4052,7 +4240,7 @@ describe("a horde defence", () => {
     it("does not go ahead where it cannot keep inventories on", async () => {
         world.keepInventory = "unknown";
         world.defenders = ["Ana"];
-        setUp([catalog.newPreset("waves", "waves")]);
+        setUp([newPreset("waves", "waves")]);
         await start();
         await play(60_000);
         expect(state().history[0]).toMatchObject({
@@ -4064,13 +4252,13 @@ describe("a horde defence", () => {
 
     it("is refused on Peaceful", async () => {
         world.difficulty = "Peaceful";
-        setUp([catalog.newPreset("waves", "waves")]);
+        setUp([newPreset("waves", "waves")]);
         expect(await refusal(start())).toMatch(/Peaceful/);
     });
 
     it("puts the point well away from every bed", async () => {
         world.homes = { Ana: [0, 0], Ben: [0, 0] };
-        setUp([catalog.newPreset("waves", "waves")]);
+        setUp([newPreset("waves", "waves")]);
         await start();
         await play(4_100);
         const loaded = world.sent
@@ -4081,7 +4269,7 @@ describe("a horde defence", () => {
     });
 
     it("cleans up after a restart that caught it handing out its results", async () => {
-        const preset = catalog.newPreset("waves", "waves");
+        const preset = newPreset("waves", "waves");
         setUp([preset]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -4112,7 +4300,7 @@ describe("a horde defence", () => {
     });
 
     it("picks a wave back up after a restart and still ends it cleanly", async () => {
-        const preset = catalog.newPreset("waves", "waves");
+        const preset = newPreset("waves", "waves");
         setUp([preset]);
         const now = Date.now();
         world.defenders = ["Ana"];
@@ -4167,10 +4355,19 @@ describe("a meteor shower", () => {
             trigger: "manual",
             startedBy: null
         });
-    const shower = (minutes = 10) => ({
-        ...catalog.newPreset("meteor-shower", "meteors"),
-        minutes
-    });
+    /** Four meteors of six blocks, as these runs were written against. */
+    const shower = (minutes = 10) => {
+        const made = newPreset("meteor-shower", "meteors");
+        return {
+            ...made,
+            minutes,
+            options: {
+                ...(made.options as catalog.EventOptions<"meteor-shower">),
+                meteors: 4,
+                size: 6
+            }
+        };
+    };
     const ore = (key: string) => (world.blocks.get(key) ?? "").endsWith("_ore");
 
     it("lands ore only in air, forgets what is mined, and takes back only what is left of it", async () => {
@@ -4200,7 +4397,7 @@ describe("a meteor shower", () => {
         ).toBe(true);
 
         // Ana mines two blocks, then puts one of them back: hers now.
-        world.nearMeteor = true;
+        world.at.Ana = [301, 70, 1];
         const [mined, back] = first!.blocks;
         world.blocks.delete(`${mined!.x} ${mined!.y} ${mined!.z}`);
         world.blocks.delete(`${back!.x} ${back!.y} ${back!.z}`);
@@ -4210,7 +4407,7 @@ describe("a meteor shower", () => {
         world.blocks.set(hers, back!.block);
         await play(2_100);
         expect(state().run?.meteors[0]?.blocks).toHaveLength(3);
-        world.nearMeteor = false;
+        delete world.at.Ana;
 
         world.scores = { Ana: 4, Ben: 1 };
         await play(10 * 60_000);
@@ -4352,15 +4549,36 @@ describe("a meteor shower", () => {
         await start();
         // Begun at once, the column is chosen on the first tick after.
         await play(2_100);
-        const target = state().run?.target;
-        expect(target).not.toBeNull();
-        expect(Math.hypot(target!.x, target!.z)).toBeGreaterThanOrEqual(48);
+        const first = world.sent
+            .map((line) => /^execute in minecraft:overworld run forceload add (-?\d+) (-?\d+)$/.exec(line))
+            .find((match) => match !== null);
+        expect(first).toBeTruthy();
+        expect(Math.hypot(Number(first![1]), Number(first![2]))).toBeGreaterThanOrEqual(48);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
     });
 
-    it("comes in to an island for a chest when all round it is sea, and gives up for meteors", async () => {
+    it("comes down on an island when all round it is sea", async () => {
         world.sea = true;
-        world.at = { Ana: [0, 64, 0], Ben: [10, 64, 0] };
-        const drop = { ...catalog.newPreset("supply-drop", "drop"), minutes: 10 };
+        world.markFollows = true;
+        world.at = { Ana: [0, 64, 0], Ben: [3, 64, 2] };
+        // The island: dry ground within 20 blocks of the middle, sea beyond.
+        world.dryWithin = 20;
+        setUp([shower(6)]);
+        await start();
+        await play(60_000);
+        const landed = state().run?.meteors ?? [];
+        expect(landed.length).toBeGreaterThan(0);
+        for (const meteor of landed) expect(Math.hypot(meteor.x, meteor.z)).toBeLessThanOrEqual(20);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+    });
+
+    it("comes in to an island for a chest when all round it is sea", async () => {
+        world.sea = true;
+        // The players stand by 0 0, wherever the clock has walked the others to.
+        world.at = { Ana: [0, 64, 0], Ben: [5, 64, 5] };
+        const drop = { ...newPreset("supply-drop", "drop"), minutes: 10 };
         setUp([drop]);
         await events.startEvent({
             ownerId: "owner",
@@ -4464,14 +4682,15 @@ function keptTheRules(): void {
         world.sent.some(
             (line) =>
                 /minecraft:(lava|fire|tnt|water)\b/.test(line) &&
-                !/ if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line)
+                !/ if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line) &&
+                !/ if block ~ ~-1 ~ minecraft:water run data get entity @s Pos$/.test(line)
         )
     ).toBe(false);
 }
 
 describe("a parkour race", () => {
     const race = () => ({
-        ...catalog.newPreset("parkour", "race"),
+        ...newPreset("parkour", "race"),
         minutes: 5,
         options: {
             place: { mode: "players" as const },
@@ -4764,7 +4983,7 @@ describe("a parkour race on a server before 1.16", () => {
         world.online = ["Ana", "Ben"];
         setUp([
             {
-                ...catalog.newPreset("parkour", "race"),
+                ...newPreset("parkour", "race"),
                 minutes: 5,
                 options: {
                     place: { mode: "players" as const },
@@ -4787,7 +5006,7 @@ describe("a parkour race on a server before 1.16", () => {
 
 describe("spleef", () => {
     const floor = () => ({
-        ...catalog.newPreset("spleef", "floor"),
+        ...newPreset("spleef", "floor"),
         minutes: 5,
         options: { place: { mode: "players" as const }, size: 6, height: 30 }
     });
@@ -4813,7 +5032,7 @@ describe("spleef", () => {
         expect(world.sent.some((line) => line.includes("snowball"))).toBe(false);
 
         const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
-        world.at.Ben = [arenaAt.centre.x, arenaAt.floor - 3, arenaAt.centre.z];
+        world.at.Ben = [arenaAt.center.x, arenaAt.floor - 3, arenaAt.center.z];
         await play(2_100);
         expect(world.inside.has("Ben")).toBe(false);
         expect(
@@ -4821,7 +5040,7 @@ describe("spleef", () => {
                 (line) => line.startsWith("tellraw @a") && visible(line).includes("Ben is out")
             )
         ).toBe(true);
-        world.at.Cy = [arenaAt.centre.x, arenaAt.floor - 3, arenaAt.centre.z];
+        world.at.Cy = [arenaAt.center.x, arenaAt.floor - 3, arenaAt.center.z];
         await play(4_100);
 
         const after = state();
@@ -5131,7 +5350,7 @@ const copyOf = (bag: Map<number, Stack>) =>
     new Map([...bag].map(([slot, stack]) => [slot, { ...stack }]));
 
 describe("players' own things through an arena", () => {
-    const duelOf = () => ({ ...catalog.newPreset("team-duel", "duel"), minutes: 3 });
+    const duelOf = () => ({ ...newPreset("team-duel", "duel"), minutes: 3 });
 
     it("keeps everything in barrels under the floor, and gives it back before the prizes", async () => {
         world.online = ["Ana", "Ben", "Cy"];
@@ -5387,7 +5606,7 @@ describe("players' own things through an arena", () => {
 });
 
 describe("a team duel", () => {
-    const duelOf = (minutes = 3) => ({ ...catalog.newPreset("team-duel", "duel"), minutes });
+    const duelOf = (minutes = 3) => ({ ...newPreset("team-duel", "duel"), minutes });
 
     it("finds its place over the open sea round an island, where it is built in the air", async () => {
         world.online = ["Ana", "Ben"];
@@ -5708,7 +5927,7 @@ describe("a team duel", () => {
 });
 
 describe("a server whose version is not in today's log", () => {
-    const duel = () => ({ ...catalog.newPreset("team-duel", "duel"), minutes: 3 });
+    const duel = () => ({ ...newPreset("team-duel", "duel"), minutes: 3 });
     const kitGiven = () =>
         world.sent.filter((line) => line.startsWith("give ") && line.includes("polaris_event"));
 
@@ -5762,7 +5981,7 @@ describe("a server with EssentialsX on it", () => {
 
     it("runs a duel with the game's own commands: kit given and taken back, everybody home", async () => {
         world.online = ["Ana", "Ben"];
-        setUp([{ ...catalog.newPreset("team-duel", "duel"), minutes: 3 }]);
+        setUp([{ ...newPreset("team-duel", "duel"), minutes: 3 }]);
         await joinAndStart("duel");
         await play(4 * 60_000);
         expect(world.pluginGot).toEqual([]);
@@ -5774,7 +5993,7 @@ describe("a server with EssentialsX on it", () => {
     });
 
     it("hands a prize over with the game's own give and xp", async () => {
-        setUp([catalog.newPreset("fishing", "fish")], {
+        setUp([newPreset("fishing", "fish")], {
             random: { ...catalog.settingsSchema.parse({}).random }
         });
         config[catalog.EVENT_STATE_KEY] = {
@@ -5798,7 +6017,7 @@ describe("a server with EssentialsX on it", () => {
     it("sends vanilla and Fabric servers their lines as they are", async () => {
         world.bukkit = false;
         world.essentials = false;
-        setUp([{ ...catalog.newPreset("blood-moon", "moon"), minutes: 3 }]);
+        setUp([{ ...newPreset("blood-moon", "moon"), minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
@@ -5821,9 +6040,9 @@ describe("a treasure hunt on 1.13, which has no `execute if data`", () => {
         world.online = ["Ana", "Ben"];
         setUp([
             {
-                ...catalog.newPreset("treasure-hunt", "hunt"),
+                ...newPreset("treasure-hunt", "hunt"),
                 minutes: 9,
-                options: { ...catalog.newPreset("treasure-hunt", "hunt").options, chests: 2 }
+                options: { ...newPreset("treasure-hunt", "hunt").options, chests: 2 }
             }
         ]);
         await events.startEvent({
@@ -5903,7 +6122,7 @@ describe("an arena after a restart", () => {
     const blocks = ["minecraft:barrier", "minecraft:red_stained_glass"];
 
     function stored(extra: Record<string, unknown>) {
-        const duel = { ...catalog.newPreset("team-duel", "duel"), minutes: 10 };
+        const duel = { ...newPreset("team-duel", "duel"), minutes: 10 };
         setUp([duel]);
         const now = Date.now();
         config[catalog.EVENT_STATE_KEY] = {
@@ -6017,7 +6236,7 @@ describe("a build battle", () => {
     it("gives each builder a plot and a glass kit, tours the plots, and counts one vote each", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         const battle = {
-            ...catalog.newPreset("build-battle", "build"),
+            ...newPreset("build-battle", "build"),
             minutes: 3,
             options: {
                 ...catalog.optionsSchemas["build-battle"].parse({}),
@@ -6150,7 +6369,7 @@ describe("a build battle", () => {
 
 describe("a build battle's [Done] button", () => {
     const battle = (minutes = 3) => ({
-        ...catalog.newPreset("build-battle", "build"),
+        ...newPreset("build-battle", "build"),
         minutes,
         options: { ...catalog.optionsSchemas["build-battle"].parse({}), voteSeconds: 30 }
     });
@@ -6258,7 +6477,7 @@ describe("a build battle's [Done] button", () => {
 
 describe("each player reads their own language", () => {
     const quiz = () => ({
-        ...catalog.newPreset("trivia", "quiz"),
+        ...newPreset("trivia", "quiz"),
         options: { rounds: 3, seconds: 15, mode: "questions" as const, questions: [] }
     });
     const sentTo = (selector: string, words: string) =>
@@ -6329,7 +6548,7 @@ describe("each player reads their own language", () => {
         world.links = { Ana: "user-es" };
         world.locales = { "user-es": "es-ES" };
         const floor = {
-            ...catalog.newPreset("spleef", "floor"),
+            ...newPreset("spleef", "floor"),
             minutes: 5,
             options: { place: { mode: "players" as const }, size: 6, height: 30 }
         };
@@ -6403,7 +6622,7 @@ describe("the clock", () => {
     });
 
     it("announces a run at once, without waiting for a tick", async () => {
-        const hunt = { ...catalog.newPreset("mob-hunt", "hunt"), minutes: 3 };
+        const hunt = { ...newPreset("mob-hunt", "hunt"), minutes: 3 };
         setUp([hunt], { countdownSeconds: 30 });
         await startArena("hunt");
         await play(50);
@@ -6416,7 +6635,7 @@ describe("the clock", () => {
 describe("the list of who joined", () => {
     it("writes its count again as players join, not only the names under it", async () => {
         const race = {
-            ...catalog.newPreset("parkour", "race"),
+            ...newPreset("parkour", "race"),
             minutes: 5,
             options: {
                 place: { mode: "players" as const },

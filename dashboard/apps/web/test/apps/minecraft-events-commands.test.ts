@@ -142,7 +142,7 @@ describe("the scoreboard", () => {
         }
     });
 
-    it("shows distance in metres", () => {
+    it("shows distance in meters", () => {
         const lines = commands.scoreTick(preset("explorer", { mode: "distance" }));
         expect(lines).toContain(
             "execute as @a run scoreboard players operation @s pe_sum /= #w100 pe_const"
@@ -796,13 +796,13 @@ describe("where an event may go", () => {
     });
 
     it("counts somebody in the circle only where the circle scores them", () => {
-        const centre = { x: 0, y: 64, z: 0 };
-        expect(commands.inHill({ x: 3.5, y: 64, z: 0.5 }, centre, 4)).toBe(true);
-        expect(commands.inHill({ x: 3.5, y: 68, z: 0.5 }, centre, 4)).toBe(false);
-        expect(commands.inHill({ x: 5.5, y: 64, z: 0.5 }, centre, 4)).toBe(false);
+        const center = { x: 0, y: 64, z: 0 };
+        expect(commands.inHill({ x: 3.5, y: 64, z: 0.5 }, center, 4)).toBe(true);
+        expect(commands.inHill({ x: 3.5, y: 68, z: 0.5 }, center, 4)).toBe(false);
+        expect(commands.inHill({ x: 5.5, y: 64, z: 0.5 }, center, 4)).toBe(false);
     });
 
-    it("judges a place by its centre and two rings", () => {
+    it("judges a place by its center and two rings", () => {
         expect(commands.siteSamples({ x: 0, z: 0 }, 6)).toHaveLength(17);
         expect(commands.siteSamples({ x: 0, z: 0 }, 3)).toHaveLength(9);
     });
@@ -827,7 +827,7 @@ function takes(lines: readonly string[]): string[] {
 }
 
 describe("a treasure hunt", () => {
-    const chest = (x: number, z: number, opened = false) => ({ x, y: 70, z, opened, by: null });
+    const chest = (x: number, z: number, opened = false) => ({ x, y: 70, z, opened, by: null, was: null });
 
     it("asks whether a spot is air before anything goes there", () => {
         expect(hunt.airAt({ x: 10, y: 70, z: -4 })).toBe(
@@ -872,33 +872,16 @@ describe("a treasure hunt", () => {
         ).toEqual([commands.forceload(6, 7), commands.forceload(40, 5)]);
     });
 
-    it("tells the clues in three steps, and none for a chest already opened", () => {
-        const chests = [chest(0, -300), chest(200, 0, true)];
-        const origin = { x: 0, z: 0 };
-        // What a player reads of it, its colours aside.
-        const bare = (line: string | undefined) => (line ?? "").replace(/&[0-9a-fk-or]/g, "");
-        const far = hunt.clues(chests, 1, origin, "en");
-        expect(far).toHaveLength(1);
-        expect(bare(far[0])).toContain("Treasure 1");
-        expect(bare(far[0])).toContain("about 300 m north");
-        const area = hunt.clues([chest(123, -277)], 2, origin, "es");
-        expect(bare(area[0])).toContain("X 100, Z -300");
-        const exact = hunt.clues([chest(123, -277)], 3, origin, "en");
-        expect(bare(exact[0])).toContain("X 123 Y 70 Z -277");
-        for (const line of [...far, ...area, ...exact]) expect(line).not.toMatch(/[{}]/);
+    it("marks every chest nobody opened with a column of light from the start", () => {
+        const lines = hunt.marks([chest(0, -300), chest(200, 0, true)]);
+        expect(lines).toContain(commands.beam(chest(0, -300)));
+        expect(lines.some((line) => line.includes(" 200.5 "))).toBe(false);
+        expect(lines.some((line) => line.includes("particle minecraft:glow 0.5 70.8 -299.5"))).toBe(
+            true
+        );
     });
 
-    it("says the clue that is due, and brings the beams on only at the end", () => {
-        expect(hunt.clueDue(0)).toBe(1);
-        expect(hunt.clueDue(0.4)).toBe(2);
-        expect(hunt.clueDue(0.7)).toBe(3);
-        expect(hunt.beamsOn(600, 600)).toBe(false);
-        expect(hunt.beamsOn(119, 600)).toBe(true);
-        expect(hunt.beamsOn(60, 180)).toBe(false);
-        expect(hunt.beamsOn(40, 180)).toBe(true);
-    });
-
-    it("points a player who is close at the nearest chest, and tells the rest how many are left", () => {
+    it("points every player at the nearest chest nobody opened, however far, with how many are left", () => {
         const lines = hunt.guides(
             [
                 { name: "Ana", x: 0.5, z: 30.5 },
@@ -909,23 +892,72 @@ describe("a treasure hunt", () => {
         );
         expect(lines[0]).toMatch(/^title Ana actionbar /);
         expect(lines[0]).toContain("30 m ");
-        expect(lines[0]).toContain('"north"');
-        expect(lines[1]).toContain("2 of 3");
+        expect(lines[0]).toContain("north");
+        expect(lines[0]).toContain("(2/3)");
+        // Far off, the way is shown all the same.
+        expect(lines[1]).toContain("m ");
+        expect(lines[1]).toContain("(2/3)");
+        const done = hunt.guides([{ name: "Ana", x: 0, z: 0 }], [chest(0, 0, true)], "en");
+        expect(done[0]).toContain("0 of 1");
+    });
+
+    it("seeks each chest its own way round the players, the same after a restart", () => {
+        const ways = [0, 1, 2, 3, 4].map((index) => hunt.chestBearing("run-1", index, 5));
+        expect(hunt.chestBearing("run-1", 2, 5)).toBe(ways[2]);
+        for (let index = 1; index < ways.length; index += 1)
+            expect(ways[index]! - ways[index - 1]!).toBeCloseTo((2 * Math.PI) / 5);
+        // Kept within a sixth of a turn of the way asked for, at the distance asked for.
+        for (let draw = 0; draw < 50; draw += 1) {
+            const point = commands.pointAway({ x: 0, z: 0 }, 100, Math.random, 0);
+            expect(point.z).toBeLessThan(0);
+            expect(Math.abs(Math.atan2(point.x, -point.z))).toBeLessThanOrEqual(
+                commands.BEARING_SPREAD + 0.02
+            );
+            expect(Math.hypot(point.x, point.z)).toBeGreaterThanOrEqual(69);
+        }
+    });
+
+    it("takes the place of a small wild plant, and puts it back when nobody opened the chest", () => {
+        expect(hunt.hideChest({ x: 1, y: 70, z: 2 }, "dungeon", "short_grass")).toBe(
+            'execute in minecraft:overworld if block 1 70 2 minecraft:short_grass run setblock 1 70 2 minecraft:chest{LootTable:"minecraft:chests/simple_dungeon"} replace'
+        );
+        const back = hunt.removeLines({ x: 1, y: 70, z: 2, opened: false, by: null, was: "fern" });
+        expect(back[0]).toBe(
+            "execute in minecraft:overworld if block 1 70 2 minecraft:chest if data block 1 70 2 LootTable run setblock 1 70 2 minecraft:fern replace"
+        );
+        // A plant name out of anybody's hands is never written into a command.
+        const odd = hunt.removeLines({
+            x: 1,
+            y: 70,
+            z: 2,
+            opened: false,
+            by: null,
+            was: "air run kill @a"
+        });
+        expect(odd.join("\n")).not.toContain("kill");
+        expect(hunt.huntCleanup([{ x: 1, y: 70, z: 2, opened: false, by: null, was: "fern" }], [])[0]).toBe(
+            back[0]
+        );
     });
 
     it("keeps its chests apart and spreads them out", () => {
         expect(hunt.tooClose({ x: 5, y: 70, z: 5 }, [chest(0, 0)])).toBe(true);
         expect(hunt.tooClose({ x: 30, y: 70, z: 0 }, [chest(0, 0)])).toBe(false);
+        // On a small island they may come nearer, never onto one another.
+        expect(hunt.tooClose({ x: 10, y: 70, z: 0 }, [chest(0, 0)], hunt.CHEST_GAP_NEAR)).toBe(
+            false
+        );
+        expect(hunt.tooClose({ x: 5, y: 70, z: 0 }, [chest(0, 0)], hunt.CHEST_GAP_NEAR)).toBe(true);
         const options = { chests: 5, distance: 300, loot: "dungeon" as const };
         expect(hunt.huntDistance(options, () => 0)).toBe(105);
         expect(hunt.huntDistance(options, () => 0.999)).toBeLessThanOrEqual(300);
         expect(
-            hunt.centreOf([
+            hunt.centerOf([
                 { x: 0, z: 0 },
                 { x: 10, z: -20 }
             ])
         ).toEqual({ x: 5, z: -10 });
-        expect(hunt.centreOf([])).toBeNull();
+        expect(hunt.centerOf([])).toBeNull();
     });
 });
 
@@ -1090,7 +1122,11 @@ describe("the new kinds in the catalog", () => {
             distance: 300,
             loot: "dungeon"
         });
-        expect(catalog.newPreset("gathering", "g").options).toEqual({ material: "random" });
+        expect(catalog.newPreset("gathering", "g").options).toEqual({
+            material: "random",
+            rounds: 3,
+            roundMinutes: 2
+        });
         expect(catalog.newPreset("rare-catch", "r").options).toEqual({ treasure: "any" });
         expect(catalog.newPreset("xp-boost", "x").options).toEqual({ perKill: 5, perOre: 3 });
         const none = { ...catalog.newPreset("xp-boost", "x"), options: { perKill: 0, perOre: 0 } };
@@ -1119,12 +1155,17 @@ describe("the new kinds in the catalog", () => {
 
     it("has every new line in both languages, and no braces", () => {
         const lines = (["en", "es"] as const).flatMap((language) => [
-            messages.huntNear(12, "south-west", language),
+            messages.huntGuide(12, "south-west", 2, 5, language),
+            messages.huntStart(1, language),
+            messages.huntStart(5, language),
             messages.huntLeftBar(2, 5, language),
             messages.huntUnfound(1, language),
             messages.huntUnfound(3, language),
             messages.huntOpened("Ana", 0, language),
-            messages.huntBeams(language),
+            messages.gatherRoundTitle(2, 3, language),
+            messages.gatherRoundLine(2, 3, "iron_ingot", 12, language),
+            messages.gatherRoundLine(1, 3, "sand", 1, language),
+            messages.gatherRoundBar(2, 3, "logs", 61, language),
             ...catalog.GATHER_MATERIALS.map((material) =>
                 messages.gatherTarget(material, language)
             ),
@@ -1144,7 +1185,7 @@ describe("the new kinds in the catalog", () => {
     });
 });
 
-describe("a horde defence", () => {
+describe("a horde defense", () => {
     const point = { x: 300, y: 70, z: 0 };
 
     it("summons only monsters that cannot break a block, all of them tagged and kept", () => {
@@ -1168,7 +1209,7 @@ describe("a horde defence", () => {
     it("spreads a wave inside the ring, arms the archers and stops zombies calling for help", () => {
         const lines = waves.summonWave(point, "undead", 8, 0, 600);
         expect(lines).toContain(
-            "execute in minecraft:overworld run spreadplayers 300 0 2 12 false @e[tag=pe_wnew]"
+            "execute in minecraft:overworld run spreadplayers 300 0 2 12 false @e[tag=pe_wnew,tag=!pe_wride]"
         );
         expect(lines).toContain(
             "item replace entity @e[tag=pe_wnew,type=minecraft:stray] weapon.mainhand with minecraft:bow"
@@ -1183,6 +1224,122 @@ describe("a horde defence", () => {
             "execute as @e[tag=pe_wnew,type=minecraft:zombie] run attribute @s minecraft:zombie.spawn_reinforcements base set 0"
         );
         expect(lines).toContain("effect give @e[tag=pe_wnew] minecraft:fire_resistance 600 0 true");
+    });
+
+    it("dresses every wave better than the last: none, leather, chainmail, iron, diamond", () => {
+        expect([0, 1, 2, 3, 4].map((wave) => waves.armorTier(wave, 5))).toEqual([
+            "none",
+            "leather",
+            "chainmail",
+            "iron",
+            "diamond"
+        ]);
+        expect(waves.armorTier(0, 3)).toBe("none");
+        expect(waves.armorTier(2, 3)).toBe("diamond");
+        expect(waves.armorTier(9, 10)).toBe("diamond");
+        const first = waves.summonWave(point, "classic", 8, 0, 600, { waves: 5, defenders: 1 });
+        expect(first.some((line) => line.includes("_helmet"))).toBe(false);
+        const third = waves.summonWave(point, "classic", 8, 2, 600, { waves: 5, defenders: 1 });
+        expect(third).toContain(
+            "item replace entity @e[tag=pe_wnew,type=minecraft:zombie] armor.chest with minecraft:chainmail_chestplate"
+        );
+        // Spiders wear nothing; nothing is enchanted below iron.
+        expect(third.some((line) => line.includes("type=minecraft:spider] armor"))).toBe(false);
+        expect(third.some((line) => line.includes("enchant"))).toBe(false);
+        const last = waves.summonWave(point, "classic", 8, 4, 600, { waves: 5, defenders: 1 });
+        expect(last).toContain(
+            "item replace entity @e[tag=pe_wnew,type=minecraft:skeleton] armor.feet with minecraft:diamond_boots"
+        );
+        // The plain bow before the enchanted one, each era's spelling of it after.
+        const bows = last.filter((line) =>
+            line.startsWith("item replace entity @e[tag=pe_wnew,type=minecraft:skeleton] weapon.mainhand")
+        );
+        expect(bows[0]).toContain("with minecraft:bow");
+        expect(bows).toContain(
+            'item replace entity @e[tag=pe_wnew,type=minecraft:skeleton] weapon.mainhand with minecraft:bow[minecraft:enchantments={levels:{"minecraft:power":2}}]'
+        );
+        expect(bows).toContain(
+            'item replace entity @e[tag=pe_wnew,type=minecraft:skeleton] weapon.mainhand with minecraft:bow[minecraft:enchantments={"minecraft:power":2}]'
+        );
+        expect(last).toContain(
+            'replaceitem entity @e[tag=pe_wnew,type=minecraft:zombie] weapon.mainhand minecraft:iron_sword{Enchantments:[{id:"minecraft:sharpness",lvl:1s}]}'
+        );
+    });
+
+    it("brings jockeys as the waves rise, only of what the mix sends, and never counts a mount", () => {
+        expect(waves.jockeysFor(0, 5, "classic")).toEqual([]);
+        expect(waves.jockeysFor(2, 5, "classic")).toEqual(["spider"]);
+        expect(waves.jockeysFor(3, 5, "classic")).toEqual(["spider", "chicken"]);
+        expect(waves.jockeysFor(4, 5, "classic")).toEqual([
+            "spider",
+            "chicken",
+            "skeleton-horse",
+            "zombie-horse"
+        ]);
+        // No spider in an undead mix, so no spider jockey.
+        expect(waves.jockeysFor(4, 5, "undead")).not.toContain("spider");
+        const lines = waves.summonWave(point, "classic", 12, 4, 600, { waves: 5, defenders: 1 });
+        const jockeys = lines.filter((line) => line.includes("Passengers:["));
+        expect(jockeys).toHaveLength(3);
+        const summons = lines.filter((line) => line.includes(" run summon "));
+        expect(summons).toHaveLength(12);
+        for (const line of jockeys) {
+            expect(line).toContain('"pe_mob"');
+            expect(line).toContain("PersistenceRequired:1b");
+        }
+        const chicken = jockeys.find((line) => line.includes("summon minecraft:chicken"));
+        expect(chicken).toContain('"pe_wmount"');
+        expect(chicken).toContain("EggLayTime:1000000");
+        expect(chicken).toContain('DeathLootTable:"minecraft:empty"');
+        expect(chicken).toContain('{id:"minecraft:zombie",Tags:["pe_mob","pe_wnew","pe_wride"]');
+        expect(chicken).toContain("IsBaby:1b");
+        // A spider is one of the wave, and counts; a chicken or a horse is only a mount.
+        const spider = jockeys.find((line) => line.includes("summon minecraft:spider"));
+        expect(spider).not.toContain("pe_wmount");
+        expect(waves.WAVE_ALIVE).toBe("execute if entity @e[tag=pe_mob,tag=!pe_wmount]");
+        expect(waves.MOUNTS_GONE).toBe("kill @e[tag=pe_wmount]");
+        // Glowing and the wave's strength go to the fighters, never a mount.
+        expect(lines).toContain("effect give @e[tag=pe_wnew,tag=!pe_wmount] minecraft:glowing 600 0 true");
+        expect(lines.at(-1)).toBe("tag @e[tag=pe_wnew] remove pe_wnew");
+        // Every mount is the event's, and goes with the rest at the end.
+        expect(waves.wavesCleanup("classic")[0]).toBe("kill @e[tag=pe_mob]");
+    });
+
+    it("grows with the defenders at the point: more monsters, more health, harder hits, capped", () => {
+        expect(waves.waveEffects(0, 1)).toEqual([]);
+        expect(waves.waveEffects(0, 2)).toEqual([{ effect: "absorption", level: 0 }]);
+        expect(waves.waveEffects(0, 3)).toEqual([
+            { effect: "strength", level: 0 },
+            { effect: "absorption", level: 1 }
+        ]);
+        expect(waves.waveEffects(4, 3)).toEqual([
+            { effect: "strength", level: 2 },
+            { effect: "resistance", level: 0 },
+            { effect: "absorption", level: 1 }
+        ]);
+        // Never past five defenders' worth.
+        expect(waves.waveEffects(0, 40)).toEqual(waves.waveEffects(0, waves.CROWD_CAP));
+        expect(waves.waveSize(4, 0, 40)).toBe(waves.waveSize(4, 0, waves.CROWD_CAP));
+        const lines = waves.summonWave(point, "classic", 8, 0, 600, { waves: 5, defenders: 3 });
+        expect(lines).toContain(
+            "effect give @e[tag=pe_wnew,tag=!pe_wmount] minecraft:absorption 600 1 true"
+        );
+    });
+
+    it("can be decided by the damage dealt at the point instead of the kills", () => {
+        const lines = waves.wavesTick(point, "classic", true, true);
+        expect(lines.slice(-3)).toEqual([
+            "execute as @a run scoreboard players operation @s pe_wdmg = @s pe_whit",
+            "execute as @a run scoreboard players operation @s pe_wdmg /= #ten pe_wten",
+            "execute as @a[scores={pe_wdmg=1..}] run scoreboard players operation @s pe_score = @s pe_wdmg"
+        ]);
+        expect(waves.wavesSetup("classic")).toContain("scoreboard players set #ten pe_wten 10");
+        const byDamage = {
+            ...catalog.newPreset("waves", "w"),
+            options: { ...catalog.newPreset("waves", "w").options, winner: "damage" }
+        } as catalog.EventPreset;
+        expect(catalog.unitOf(byDamage)).toBe("damage");
+        expect(catalog.unitOf(catalog.newPreset("waves", "w"))).toBe("kills");
     });
 
     it("keeps a wave's archers from dropping the bow they were handed, before and after 1.21.5", () => {
@@ -1348,11 +1505,38 @@ describe("a meteor shower", () => {
         );
     });
 
-    it("brings the meteors down over the first three quarters of the event", () => {
-        expect(meteors.dueMeteors(0, 4)).toBe(1);
-        expect(meteors.dueMeteors(0.2, 4)).toBe(2);
-        expect(meteors.dueMeteors(0.74, 4)).toBe(4);
-        expect(meteors.dueMeteors(1, 4)).toBe(4);
+    it("brings the meteors down one after another, never minutes apart", () => {
+        const minutes = (count: number) => count * 60_000;
+        // Ten over six minutes: one every 27 seconds, the first at once.
+        expect(catalog.meteorGap(minutes(6), 10)).toBe(27_000);
+        expect(meteors.dueMeteors(0, minutes(6), 10)).toBe(1);
+        expect(meteors.dueMeteors(26_999, minutes(6), 10)).toBe(1);
+        expect(meteors.dueMeteors(27_000, minutes(6), 10)).toBe(2);
+        expect(meteors.dueMeteors(minutes(6), minutes(6), 10)).toBe(10);
+        // Four over ten minutes were one every 112 seconds; now never more than 40.
+        expect(catalog.meteorGap(minutes(10), 4)).toBe(catalog.METEOR_GAP_MS.most);
+        expect(meteors.dueMeteors(120_000, minutes(10), 4)).toBe(4);
+        // Thirty over three minutes do not pile up faster than one every 12 seconds.
+        expect(catalog.meteorGap(minutes(3), 30)).toBe(catalog.METEOR_GAP_MS.least);
+    });
+
+    it("asks once whether a meteor is whole before asking block by block", () => {
+        const meteor = {
+            x: 1,
+            y: 64,
+            z: 1,
+            blocks: [
+                { x: 1, y: 64, z: 1, block: "minecraft:gold_ore" },
+                { x: 2, y: 64, z: 1, block: "minecraft:diamond_ore" }
+            ]
+        };
+        expect(meteors.allOurs(meteor)).toBe(
+            "execute in minecraft:overworld if block 1 64 1 minecraft:gold_ore if block 2 64 1 minecraft:diamond_ore"
+        );
+        expect(meteors.allOurs({ ...meteor, blocks: [] })).toBeNull();
+        expect(
+            meteors.allOurs({ ...meteor, blocks: [{ x: 1, y: 64, z: 1, block: "stone run kill @a" }] })
+        ).toBeNull();
     });
 
     it("counts ore mined near a meteor and takes off ore placed near one", () => {
@@ -1534,7 +1718,7 @@ describe("a parkour course", () => {
         }
     });
 
-    it("is the same course every time for the same run, centred over its site", () => {
+    it("is the same course every time for the same run, centerd over its site", () => {
         const options = {
             place: { mode: "players" as const },
             jumps: 20,
@@ -2107,5 +2291,163 @@ describe("a chain of conditions over RCON", () => {
         expect(commands.silent("\u001b[0m \n")).toBe(true);
         expect(commands.silent("Test passed \u001b[0m")).toBe(false);
         expect(commands.silent("That position is not loaded")).toBe(false);
+    });
+});
+describe("arming what an event summons", () => {
+    it("hands a blood moon's skeletons their bows, which they never drop", () => {
+        const lines = commands.wave({ intensity: "high", creepers: false }, 0);
+        const summons = lines.filter((line) => line.includes(" summon minecraft:skeleton "));
+        expect(summons.length).toBeGreaterThan(0);
+        for (const line of summons) {
+            expect(line).toContain("HandDropChances:[0.0f,0.0f]");
+            expect(line).toContain("drop_chances:{mainhand:0.0f");
+        }
+        const armed = lines.indexOf(
+            "item replace entity @e[tag=pe_new,type=minecraft:skeleton] weapon.mainhand with minecraft:bow"
+        );
+        expect(armed).toBeGreaterThan(-1);
+        expect(lines).toContain(
+            "replaceitem entity @e[tag=pe_new,type=minecraft:skeleton] weapon.mainhand minecraft:bow"
+        );
+        // After the spread, before the tag that finds them comes off.
+        expect(armed).toBeGreaterThan(lines.findIndex((line) => line.includes("spreadplayers")));
+        expect(armed).toBeLessThan(lines.indexOf("tag @e[tag=pe_new] remove pe_new"));
+    });
+
+    it("names the weapon of every mob that needs one, and nothing for the rest", () => {
+        expect(commands.armLines("tag=x", ["zombie", "spider", "creeper"])).toEqual([]);
+        const archers = commands.armLines("tag=x", ["stray", "bogged", "pillager", "wither_skeleton"]);
+        expect(archers).toContain(
+            "item replace entity @e[tag=x,type=minecraft:stray] weapon.mainhand with minecraft:bow"
+        );
+        expect(archers).toContain(
+            "item replace entity @e[tag=x,type=minecraft:bogged] weapon.mainhand with minecraft:bow"
+        );
+        expect(archers).toContain(
+            "item replace entity @e[tag=x,type=minecraft:pillager] weapon.mainhand with minecraft:crossbow"
+        );
+        expect(archers).toContain(
+            "replaceitem entity @e[tag=x,type=minecraft:wither_skeleton] weapon.mainhand minecraft:stone_sword"
+        );
+    });
+});
+
+describe("pointing the way", () => {
+    it("draws the arrow from where a player looks", () => {
+        // Looking south (yaw 0): south is ahead, west to the right, east to the left.
+        const at = { x: 0, z: 0 };
+        expect(commands.arrowTo(at, 0, { x: 0, z: 10 })).toBe("↑");
+        expect(commands.arrowTo(at, 0, { x: -10, z: 0 })).toBe("→");
+        expect(commands.arrowTo(at, 0, { x: 10, z: 0 })).toBe("←");
+        expect(commands.arrowTo(at, 0, { x: 0, z: -10 })).toBe("↓");
+        // Looking north (yaw 180): north ahead, the point to the north-east ahead and right.
+        expect(commands.arrowTo(at, 180, { x: 0, z: -10 })).toBe("↑");
+        expect(commands.arrowTo(at, -180, { x: 10, z: -10 })).toBe("↗");
+    });
+});
+
+describe("each kind's defaults", () => {
+    it("pays by how hard, long and much work each kind is", () => {
+        const first = (kind: catalog.EventKind) => catalog.newPreset(kind, kind).rewards.first;
+        const diamonds = (kind: catalog.EventKind) =>
+            first(kind).items.find((item) => item.id === "minecraft:diamond")?.count ?? 0;
+        expect(diamonds("parkour")).toBeLessThan(diamonds("mining-rush"));
+        expect(diamonds("trivia")).toBeLessThan(diamonds("blood-moon"));
+        expect(diamonds("mining-rush")).toBeLessThan(diamonds("waves"));
+        expect(diamonds("blood-moon")).toBeLessThan(diamonds("build-battle"));
+        expect(first("supply-drop").items).toEqual([
+            { id: "minecraft:experience_bottle", count: 12 }
+        ]);
+        expect(catalog.newPreset("happy-hour", "h").rewards.first).toEqual(catalog.NO_REWARD);
+        for (const kind of catalog.EVENT_KINDS)
+            expect(catalog.presetSchema.safeParse(catalog.newPreset(kind, kind)).success).toBe(true);
+    });
+
+    it("lasts what fits each kind", () => {
+        expect(catalog.newPreset("parkour", "p").minutes).toBe(4);
+        expect(catalog.newPreset("mining-rush", "m").minutes).toBe(5);
+        expect(catalog.newPreset("supply-drop", "s").minutes).toBe(5);
+        expect(catalog.runMinutes(catalog.newPreset("gathering", "g"))).toBe(6);
+    });
+
+    it("brings an event saved on the old defaults up to the new ones, once", () => {
+        const old = {
+            ...catalog.newPreset("mining-rush", "rush"),
+            minutes: 10,
+            rewards: catalog.OLD_DEFAULT_REWARDS
+        };
+        const mine = {
+            ...catalog.newPreset("fishing", "fish"),
+            minutes: 7,
+            rewards: { ...catalog.OLD_DEFAULT_REWARDS, everyone: catalog.NO_REWARD }
+        };
+        const horde = { ...catalog.newPreset("waves", "w"), name: ["Horde", "defence"].join(" ") };
+        const meteor = {
+            ...catalog.newPreset("meteor-shower", "m"),
+            options: { ...catalog.newPreset("meteor-shower", "m").options, meteors: 4, size: 6 }
+        } as catalog.EventPreset;
+        const stored = { presets: [old, mine, horde, meteor], settings: {} };
+        const read = catalog.readEventsConfig({ [catalog.EVENTS_KEY]: stored });
+        expect(read.presets[0]!.rewards).toEqual(catalog.DEFAULT_PRIZES["mining-rush"]);
+        expect(read.presets[0]!.minutes).toBe(catalog.DEFAULT_MINUTES["mining-rush"]);
+        // Changed by the operator: kept.
+        expect(read.presets[1]!.rewards).toEqual(mine.rewards);
+        expect(read.presets[1]!.minutes).toBe(7);
+        expect(read.presets[2]!.name).toBe("Horde defense");
+        expect(read.presets[3]!.options).toMatchObject({ meteors: 10, size: 4 });
+        expect(read.settings.defaults).toBe(catalog.DEFAULTS_VERSION);
+        // Saved from the screen, then set back to ten minutes on purpose: stays ten.
+        const saved = {
+            ...read,
+            presets: [{ ...read.presets[0]!, minutes: 10, rewards: catalog.OLD_DEFAULT_REWARDS }]
+        };
+        const again = catalog.readEventsConfig({ [catalog.EVENTS_KEY]: saved });
+        expect(again.presets[0]!.minutes).toBe(10);
+        expect(again.presets[0]!.rewards).toEqual(catalog.OLD_DEFAULT_REWARDS);
+    });
+});
+
+describe("a gathering in rounds", () => {
+    it("draws a different material for every round while any is left", () => {
+        const used: string[] = [];
+        for (let round = 0; round < catalog.GATHER_MATERIALS.length; round += 1)
+            used.push(gather.drawMaterial({ material: "random" }, () => 0, used));
+        expect(new Set(used).size).toBe(catalog.GATHER_MATERIALS.length);
+        // Every one used: any again.
+        expect(catalog.GATHER_MATERIALS).toContain(gather.drawMaterial({ material: "random" }, () => 0, used));
+        expect(gather.drawMaterial({ material: "kelp" }, () => 0, ["kelp"])).toBe("kelp");
+    });
+
+    it("scores each round by what one of its material is worth, on top of the rounds before", () => {
+        const setup = gather.gatheringSetup("iron_ingot", true);
+        expect(setup).toContain("scoreboard objectives add pe_gtot dummy");
+        expect(setup).toContain("scoreboard players set #worth pe_gk 12");
+        // A later round keeps the points so far.
+        const later = gather.gatheringSetup("sand", false);
+        expect(later.some((line) => line.includes("pe_gtot"))).toBe(false);
+        expect(later).toContain("scoreboard players set #worth pe_gk 1");
+        const tick = gather.gatheringTick("logs");
+        expect(tick).toContain(
+            "execute as @a run scoreboard players operation @s pe_gpts *= #worth pe_gk"
+        );
+        expect(tick).toContain(
+            "execute as @a[scores={pe_gsum=1..}] run scoreboard players operation @s pe_score = @s pe_gsum"
+        );
+        expect(gather.BANK_ROUND).toContain(
+            "execute as @a run scoreboard players operation @s pe_gtot += @s pe_gpts"
+        );
+        // A minute of any material is worth about the same.
+        for (const material of catalog.GATHER_MATERIALS) expect(gather.WORTH[material]).toBeGreaterThan(0);
+        expect(gather.WORTH.iron_ingot).toBeGreaterThan(gather.WORTH.logs);
+        expect(gather.WORTH.logs).toBeGreaterThan(gather.WORTH.cobblestone);
+    });
+
+    it("lasts its rounds, whatever its minutes say", () => {
+        const game = {
+            ...catalog.newPreset("gathering", "g"),
+            minutes: 30,
+            options: { material: "random", rounds: 4, roundMinutes: 3 }
+        } as catalog.EventPreset;
+        expect(catalog.runMinutes(game)).toBe(12);
     });
 });

@@ -46,10 +46,10 @@ const COLOURS = [
     "black"
 ];
 
-/** What there is to build with: clear glass and fifteen colours. */
+/** What there is to build with: clear glass and fifteen colors. */
 export const KIT_BLOCKS = [
     "minecraft:glass",
-    ...COLOURS.map((colour) => `minecraft:${colour}_stained_glass`)
+    ...COLOURS.map((color) => `minecraft:${color}_stained_glass`)
 ];
 
 /** The brush: breaks the kit's glass, and only it. */
@@ -77,7 +77,7 @@ export function grid(count: number): { cols: number; rows: number } {
 const pitch = (size: number) => size + 1;
 
 export function platformBox(
-    centre: { x: number; z: number },
+    center: { x: number; z: number },
     floorY: number,
     count: number,
     size: number
@@ -85,8 +85,8 @@ export function platformBox(
     const { cols, rows } = grid(count);
     const width = cols * pitch(size) + 1;
     const depth = rows * pitch(size) + 1;
-    const x1 = centre.x - Math.floor(width / 2);
-    const z1 = centre.z - Math.floor(depth / 2);
+    const x1 = center.x - Math.floor(width / 2);
+    const z1 = center.z - Math.floor(depth / 2);
     return {
         x1,
         y1: floorY,
@@ -98,7 +98,7 @@ export function platformBox(
     };
 }
 
-/** How far from its centre the ground under a platform is judged. */
+/** How far from its center the ground under a platform is judged. */
 export function platformReach(count: number, size: number): number {
     const { cols, rows } = grid(count);
     return Math.ceil((Math.max(cols, rows) * pitch(size) + 1) / 2);

@@ -5,7 +5,7 @@
  * or asks everybody to come in empty-handed, and a player's own things must never
  * be lost to it: not to a kit cleared at the end, not to a restart, not to a
  * player who logs off halfway. So on the way in, every one of the 41 slots a
- * player has (the hotbar, the bag, the armour and the offhand) is copied - whole,
+ * player has (the hotbar, the bag, the armor and the offhand) is copied - whole,
  * with every enchantment, name and shulker's contents - into two barrels that are
  * the event's own, the copy is read back and checked, and only then is the slot
  * emptied. On the way out, after the kit is taken back, each slot is copied back
@@ -16,7 +16,7 @@
  *
  * The barrels sit under the event's own floor, cased in barrier so nobody can
  * reach them, in air only, in the columns the event keeps loaded. `item` is
- * 1.17's: an older server keeps today's behaviour, the kit beside what they carry.
+ * 1.17's: an older server keeps today's behavior, the kit beside what they carry.
  *
  * Pure: the lines, the layout and the checks. The talking is `stash-service`.
  */

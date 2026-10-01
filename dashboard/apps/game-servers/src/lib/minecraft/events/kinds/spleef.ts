@@ -20,7 +20,7 @@ const HEADROOM = 5;
 export interface Arena {
     /** The floor's height: a player standing on it has their feet one above. */
     readonly floor: number;
-    readonly centre: { readonly x: number; readonly z: number };
+    readonly center: { readonly x: number; readonly z: number };
     readonly size: number;
     /** What is built, in order: the net, the floor, the walls. */
     readonly boxes: readonly Box[];
@@ -63,7 +63,7 @@ export function arena(
     ];
     return {
         floor: y,
-        centre: { x, z },
+        center: { x, z },
         size: r,
         boxes,
         volume: {
@@ -90,9 +90,9 @@ export function spots(arena: Arena, count: number): Spot[] {
         const dz = Math.round(Math.sin(angle) * ring);
         const yaw = Math.round((Math.atan2(dx, -dz) * 180) / Math.PI);
         return {
-            x: arena.centre.x + dx + 0.5,
+            x: arena.center.x + dx + 0.5,
             y: arena.floor + 1,
-            z: arena.centre.z + dz + 0.5,
+            z: arena.center.z + dz + 0.5,
             yaw
         };
     });

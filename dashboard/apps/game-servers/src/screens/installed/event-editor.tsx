@@ -77,6 +77,13 @@ const WAVE_MIX_LABELS: Readonly<Record<(typeof catalog.WAVE_MIXES)[number], Game
         mixed: "editor.labels.waveMix.mixed"
     };
 
+const WAVE_WINNER_LABELS: Readonly<
+    Record<(typeof catalog.WAVE_WINNERS)[number], GameKey<"minecraft">>
+> = {
+    kills: "editor.labels.wavesWinner.kills",
+    damage: "editor.labels.wavesWinner.damage"
+};
+
 const METEOR_ORE_LABELS: Readonly<
     Record<(typeof catalog.METEOR_ORES)[number], GameKey<"minecraft">>
 > = {
@@ -621,6 +628,7 @@ function OptionsFields({
             return (
                 <GatheringOptions
                     value={preset.options as catalog.EventOptions<"gathering">}
+                    issues={issues}
                     onChange={onChange}
                 />
             );
@@ -695,6 +703,16 @@ function OptionsFields({
                             aria-label={t("editor.monsters")}
                         />
                     </Field>
+                    <Field label={t("editor.wavesWinner")}>
+                        <SegmentedControl
+                            value={value.winner}
+                            onValueChange={(winner) =>
+                                onChange({ ...value, winner: winner as typeof value.winner })
+                            }
+                            options={options(t, WAVE_WINNER_LABELS)}
+                            aria-label={t("editor.wavesWinner")}
+                        />
+                    </Field>
                 </>
             );
         }
@@ -727,13 +745,13 @@ function OptionsFields({
                     <div className="grid grid-cols-2 gap-3">
                         <Field
                             label={t("editor.meteors")}
-                            hint={t("editor.2To8")}
+                            hint={t("editor.range", { min: 2, max: 30 })}
                             problem={problemAt(issues, "options", "meteors")}
                         >
                             <Input
                                 type="number"
                                 min={2}
-                                max={8}
+                                max={30}
                                 value={Number.isFinite(value.meteors) ? value.meteors : ""}
                                 onChange={(event) =>
                                     onChange({ ...value, meteors: numberOf(event.target.value) })
@@ -943,7 +961,9 @@ export function EventEditor({
                                 onChange={(event) => change({ name: event.target.value })}
                             />
                         </Field>
-                        {draft.kind !== "trivia" && draft.kind !== "waves" && (
+                        {draft.kind !== "trivia" &&
+                            draft.kind !== "waves" &&
+                            draft.kind !== "gathering" && (
                             <Field
                                 label={
                                     draft.kind === "build-battle"

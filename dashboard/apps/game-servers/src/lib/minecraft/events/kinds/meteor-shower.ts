@@ -21,7 +21,7 @@
  */
 
 import { SCORE } from "../commands";
-import type { EventOptions } from "../catalog";
+import { meteorGap, type EventOptions } from "../catalog";
 
 export type MeteorOres = EventOptions<"meteor-shower">["ores"];
 
@@ -45,8 +45,7 @@ export const REACH = 10;
 export const PLACE_REACH = 20;
 /** Within this of a meteor a player is close enough to have mined some of it. */
 export const NEAR = 12;
-/** The meteors come down over this share of the event, the rest left to mine. */
-const LANDING_SHARE = 0.75;
+
 
 /** Each mix, and how often each of its ores comes up. */
 export const ORE_MIX: Readonly<Record<MeteorOres, readonly (readonly [string, number])[]>> = {
@@ -88,9 +87,19 @@ const SHAPE: readonly (readonly [number, number, number])[] = [
 /** An ore the event may name in a command - what a stored run holds is read back. */
 const BLOCK_ID = /^minecraft:[a-z_]+$/;
 
-/** How many meteors should be down by now, `share` of the event gone. */
-export function dueMeteors(share: number, count: number): number {
-    return Math.min(count, Math.floor((Math.max(0, share) / LANDING_SHARE) * count) + 1);
+/** How many meteors should be down `elapsedMs` into an event of `totalMs`:
+ *  the first at once, then one every `meteorGap`. */
+export function dueMeteors(elapsedMs: number, totalMs: number, count: number): number {
+    const gap = meteorGap(totalMs, count);
+    return Math.min(count, Math.floor(Math.max(0, elapsedMs) / gap) + 1);
+}
+
+/** `Test passed` while every block of a meteor is still its ore: one question
+ *  for all of them, asked before any is asked about alone. */
+export function allOurs(meteor: Meteor): string | null {
+    const blocks = meteor.blocks.filter((block) => BLOCK_ID.test(block.block));
+    if (blocks.length === 0) return null;
+    return `execute in minecraft:overworld ${blocks.map((block) => `if block ${at(block)} ${block.block}`).join(" ")}`;
 }
 
 /** The cells of a meteor of `size` blocks landing on `point`, each with its ore. */

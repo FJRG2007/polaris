@@ -1,5 +1,5 @@
 /**
- * The colours of what events and challenges say in the chat: one palette, the
+ * The colors of what events and challenges say in the chat: one palette, the
  * values a player looks for picked out, and every line still one command the
  * console tool will send.
  */
@@ -48,7 +48,7 @@ function chatLines(language: "en" | "es"): string[] {
         messages.circleAt(-29999984, 319, 29999984, language),
         messages.wavesPointAt(-29999984, 319, 29999984, language),
         messages.meteorAt(-29999984, 319, 29999984, 99, language),
-        messages.huntClueFar(10, 1000, "north-west", { x: -29999984, z: 29999984 }, language),
+        messages.huntGuide(9999, "north-west", 10, 10, language),
         messages.huntOpened(PLAYER, 9, language),
         messages.joinHint(language),
         messages.notEnoughJoined(1, 50, language),

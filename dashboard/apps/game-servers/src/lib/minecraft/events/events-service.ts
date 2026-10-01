@@ -17,18 +17,17 @@
 import * as plan from "./plan";
 import * as stored from "./state";
 import { readXray } from "../xray";
+import * as speech from "../speech";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
 import * as replies from "./replies";
 import * as service from "../service";
+import * as written from "./messages";
 import * as waves from "./kinds/waves";
 import * as commands from "./commands";
-import * as speech from "../speech";
-import * as speechService from "../speech-service";
-import * as delivery from "../delivery";
-import * as written from "./messages";
 import * as stage from "./kinds/stage";
 import * as playing from "../activity";
+import * as delivery from "../delivery";
 import * as trivia from "./trivia-bank";
 import * as chunks from "./kinds/chunks";
 import { host } from "@polaris/app-host";
@@ -36,21 +35,22 @@ import * as duel from "./kinds/team-duel";
 import * as boost from "./kinds/xp-boost";
 import { parseProperties } from "../parse";
 import { readSchedule } from "../schedule";
+import * as parkour from "./kinds/parkour";
 import { withTimeout } from "@polaris/core";
 import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
 import * as rareCatch from "./kinds/rare-catch";
 import * as meteors from "./kinds/meteor-shower";
+import * as speechService from "../speech-service";
+import * as bossService from "./kinds/boss-service";
+import type { GameKey } from "../../../../messages";
 import * as stageService from "./kinds/stage-service";
-import * as parkour from "./kinds/parkour";
 import * as arenaService from "./kinds/arena-service";
 import * as stashService from "./kinds/stash-service";
-import * as bossService from "./kinds/boss-service";
 import { editionOf, type ServerContainer } from "../service";
+import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
-import { gameMessage, gameMessageIn } from "../../game-message";
-import type { GameKey } from "../../../../messages";
 
 type RefusalKey =
     GameKey<"minecraft"> extends infer K
@@ -203,6 +203,9 @@ const GIVE_UP_AFTER_MS = 2 * 60_000;
 /** How many places are tried before an event that needs one gives up. */
 const PLACE_TRIES = 10;
 
+/** How long where everybody sleeps is taken as known while a place is looked for. */
+const HOMES_KEPT_MS = 30_000;
+
 /** After how many tries an event that may come near a home starts coming in closer. */
 const NEAR_AFTER = 4;
 
@@ -211,6 +214,13 @@ const NEAR_AFTER = 4;
 interface PlaceHow {
     readonly surface?: "ground" | "open";
     readonly nearHome?: boolean;
+    /** The way to look, in radians from north (`commands.pointAway`). */
+    readonly bearing?: number;
+}
+
+/** How many tries a search has, counted from where it starts (`Loop.placeFloor`). */
+function placeLimit(loop: Loop, nearHome: boolean): number {
+    return PLACE_TRIES + (nearHome ? loop.placeFloor : 0);
 }
 /** How much ground a chest or a boss is judged by around where it goes. */
 const SPOT_RADIUS = 3;
@@ -258,6 +268,12 @@ interface Loop {
     flavour: stage.Flavour | null;
     /** Whether operators' chat has been quietened for this run yet. */
     quiet: boolean;
+    /** Where players online sleep, as last asked (`homesOf`). */
+    homes: { at: number; list: { x: number; z: number }[] } | null;
+    /** Where a search that may come in near a home (`PlaceHow.nearHome`) starts,
+     *  in tries: where the last one had to come to before it found anything - an
+     *  island, where nothing further out ever does. Forgotten on a restart. */
+    placeFloor: number;
 }
 
 const loops = new Map<string, Loop>();
@@ -614,13 +630,10 @@ export async function startEvent(input: {
         held: [],
         hidden: false,
         origin: null,
-        material:
-            preset.kind === "gathering"
-                ? gather.drawMaterial(
-                      preset.options as catalog.EventOptions<"gathering">,
-                      Math.random
-                  )
-                : null,
+        // A gathering's material is drawn as each round starts, never before:
+        // told during the countdown, it had players waiting beside it.
+        material: null,
+        materials: [],
         survived: {},
         keepForced: keepForced ? [...keepForced] : null,
         chunks: [],
@@ -784,7 +797,9 @@ function startLoop(
         sawUnready: false,
         countdown: catalog.countdownSecondsFor(run.preset, settings),
         flavour: null,
-        quiet: false
+        quiet: false,
+        placeFloor: 0,
+        homes: null
     };
     loop.timer.unref?.();
     loop.clock = setInterval(() => void showClock(loop), CLOCK_MS);
@@ -940,7 +955,7 @@ async function countdown(
         await server.sayAll([
             ...commands.barCreate(
                 messages.startsInBar(title, left, language),
-                commands.barColour(preset.kind)
+                commands.barColor(preset.kind)
             ),
             ...commands.titleCommands(messages.startsSoonTitle(language), `&e${title}`),
             // One line: when, and what to do.
@@ -949,11 +964,13 @@ async function countdown(
                     messages.startsInWithRules(
                         title,
                         left,
-                        messages.rules(preset.kind, language, isRace(preset)),
+                        messages.rules(preset.kind, language, rulesVariant(preset)),
                         language
                     )
             ),
-            ...targetLines(loop.run, language),
+            // A rare catch is told now, to give time to find a rod: the treasure is
+            // caught anywhere there is water, so nobody gains a head start.
+            ...(preset.kind === "rare-catch" ? targetLines(loop.run, language) : []),
             ...(catalog.takesJoiners(preset)
                 ? (() => {
                       const buttons = messages.joinButtonsText(language);
@@ -1060,6 +1077,24 @@ async function showClock(loop: Loop): Promise<void> {
         lines.push(
             ...commands.barUpdate(messages.arenaGettingReady(preset.name, loop.language), 1, 1)
         );
+    } else if (preset.kind === "gathering" && loop.run.roundEndsAt !== null) {
+        // The round's own clock, and which round it is.
+        const options = preset.options as catalog.EventOptions<"gathering">;
+        const left = Math.min(loop.run.roundEndsAt, loop.run.endsAt) - now;
+        if (left <= 0) return;
+        lines.push(
+            ...commands.barUpdate(
+                messages.gatherRoundBar(
+                    loop.run.round + 1,
+                    options.rounds,
+                    gather.materialOf(loop.run.material, options),
+                    left / 1000,
+                    loop.language
+                ),
+                left / 1000,
+                options.roundMinutes * 60
+            )
+        );
     } else if (preset.kind !== "world-boss" && preset.kind !== "waves") {
         const left = (loop.run.endsAt - now) / 1000;
         if (left <= 0) return;
@@ -1108,6 +1143,17 @@ function targetLines(run: stored.EventRun, language: speech.Speech): string[] {
     return [];
 }
 
+/** Which way of an event's rules its options call for (`messages.rules`). */
+function rulesVariant(preset: catalog.EventPreset): written.RulesVariant {
+    if (preset.kind === "world-boss") {
+        const options = preset.options as catalog.EventOptions<"world-boss">;
+        return { arena: options.arena, finalBlow: options.winner === "final-blow" };
+    }
+    if (preset.kind === "waves")
+        return { byDamage: (preset.options as catalog.EventOptions<"waves">).winner === "damage" };
+    return { race: isRace(preset) };
+}
+
 function isRace(preset: catalog.EventPreset): boolean {
     return (
         preset.kind === "explorer" &&
@@ -1135,7 +1181,7 @@ async function begin(
     const lines: string[] = [
         ...commands.barCreate(
             messages.barName(preset.name, seconds),
-            commands.barColour(preset.kind)
+            commands.barColor(preset.kind)
         ),
         ...commands.setupScoreboard(preset, `&6&l${preset.name}`),
         ...commands.titleCommands(messages.startedTitle(language), `&e${preset.name}`),
@@ -1144,7 +1190,7 @@ async function begin(
             messages.tag(language) +
                 messages.startLine(
                     preset.name,
-                    messages.rules(preset.kind, language, isRace(preset)),
+                    messages.rules(preset.kind, language, rulesVariant(preset)),
                     catalog.runMinutes(preset),
                     language
                 )
@@ -1153,12 +1199,9 @@ async function begin(
         commands.sound(preset.kind === "blood-moon" ? commands.SOUNDS.horn : commands.SOUNDS.start)
     ];
     if (preset.kind === "gathering") {
-        // Counted from now: what everybody holds at this moment is where they start.
-        const material = gather.materialOf(
-            loop.run.material,
-            preset.options as catalog.EventOptions<"gathering">
-        );
-        lines.push(...gather.gatheringSetup(material), ...gather.gatheringTick(material));
+        // The first round, counted from now: what everybody holds at this
+        // moment is where they start.
+        lines.push(...(await gatheringRound(installedAppId, loop, now, 0)));
     }
     if (preset.kind === "rare-catch") {
         lines.push(...rareCatch.catchSetup(preset.options as catalog.EventOptions<"rare-catch">));
@@ -1311,7 +1354,7 @@ async function play(
     const lines: string[] = [];
 
     // The boss bar's clock is `showClock`'s, a second at a time; the boss's
-    // shows its health and a horde defence's the wave.
+    // shows its health and a horde defense's the wave.
     // Every other tick: the game adds the statistics up faster than anybody
     // reads a leaderboard, and it keeps the batch sent to the server small.
     if (loop.ticks % 2 === 0) lines.push(...commands.scoreTick(preset));
@@ -1356,10 +1399,10 @@ async function play(
             decided = await triviaTick(installedAppId, loop, server, now, lines);
             break;
         case "treasure-hunt":
-            decided = await treasureHunt(installedAppId, loop, server, now, lines);
+            decided = await treasureHunt(installedAppId, loop, server, lines);
             break;
         case "gathering":
-            await gathering(loop, server, lines);
+            await gathering(installedAppId, loop, server, now, lines);
             break;
         case "rare-catch":
             decided = await rareCatchTick(loop, server, lines);
@@ -1375,7 +1418,7 @@ async function play(
             break;
         }
         case "waves":
-            decided = await hordeDefence(installedAppId, loop, server, now, lines);
+            decided = await hordeDefense(installedAppId, loop, server, now, lines);
             break;
         case "meteor-shower":
             decided = await meteorShower(installedAppId, loop, server, now, lines);
@@ -1432,161 +1475,268 @@ async function findPlace(
     how: PlaceHow = {}
 ): Promise<stored.Point | "failed" | null> {
     const chosen = asGiven && place.mode === "fixed" && loop.run.placeTries === 0;
+    // A search come in near a home before starts where that one found its place.
+    if (how.nearHome && !chosen && !loop.run.target && loop.run.placeTries < loop.placeFloor)
+        loop.run = { ...loop.run, placeTries: loop.placeFloor };
+    const limit = placeLimit(loop, how.nearHome === true);
     if (!loop.run.target) {
-        const centre = await centreFor(server, place);
-        if (!centre) return "failed";
-        let point: { x: number; z: number } | null = centre;
+        const center = await centerFor(server, place);
+        if (!center) return "failed";
+        let point: { x: number; z: number } | null = center;
         if (!chosen) {
-            const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld] = await Promise.all(
-                commands.HOMES.map((line) => server.say([line]).catch(() => ""))
-            );
-            const homes = commands.readHomes(
-                spawnX ?? "",
-                spawnZ ?? "",
-                respawn ?? "",
-                spawnWorld ?? "",
-                respawnWorld ?? ""
-            );
+            const homes = await homesOf(loop, server);
             // Nothing further out would do - the players live on an island, say:
             // an event that changes nothing and brings nothing hostile comes in
             // closer, halving the distance each try, and nearer a home.
-            const look = commands.searchReach(
-                distance,
-                radius,
-                loop.run.placeTries,
-                how.nearHome === true,
-                clearance,
-                NEAR_AFTER
+            const look = commands.searchReach(distance, radius, loop.run.placeTries, how.nearHome === true, clearance, NEAR_AFTER);
+            point = commands.clearPoint(
+                center,
+                look.reach,
+                homes,
+                Math.random,
+                look.clearance,
+                how.bearing ?? null
             );
-            point = commands.clearPoint(centre, look.reach, homes, Math.random, look.clearance);
         }
         if (!point) {
             loop.run = { ...loop.run, placeTries: loop.run.placeTries + 1 };
             await persist(installedAppId, loop);
-            return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
+            return loop.run.placeTries >= limit ? "failed" : null;
         }
         // Written down before the chunk is loaded, so whatever ends the event
         // knows which one to let go of.
         loop.run = { ...loop.run, target: { x: point.x, z: point.z } };
         await persist(installedAppId, loop);
         await server.sayAll([commands.forceload(point.x, point.z)]);
-        return null;
+        // Judged at once: the ground there is loaded by asking about it.
     }
-    const { x, z } = loop.run.target;
-    let landed: stored.Point | null = null;
-    if (await dropMark(server, x, z)) {
-        const point = commands.readPoint(await server.say([commands.READ_MARK]));
-        landed = point;
-        if (
-            point &&
-            (chosen || (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground")))
-        ) {
-            // The marker can come down a block or two from the column tried - an
-            // older server spreads it - and so in the next chunk: that chunk is
-            // the one held from now on, and the one tried let go of.
-            const moved = !commands.sameChunk(point, { x, z });
-            if (moved) await server.sayAll([commands.forceload(point.x, point.z)]);
-            loop.run = { ...loop.run, place: point, target: { x: point.x, z: point.z } };
-            await persist(installedAppId, loop);
-            if (moved) await server.sayAll([commands.forceloadRemove(x, z)]);
-            return point;
-        }
+    const { x, z } = loop.run.target!;
+    const point = await dropMark(server, x, z);
+    if (point && (chosen || (await siteIsOpen(loop, server, point, radius, how.surface ?? "ground")))) {
+        // The marker can come down a block or two from the column tried - an
+        // older server spreads it - and so in the next chunk: that chunk is
+        // the one held from now on, and the one tried let go of.
+        const moved = !commands.sameChunk(point, { x, z });
+        if (moved) await server.sayAll([commands.forceload(point.x, point.z)]);
+        loop.run = { ...loop.run, place: point, target: { x: point.x, z: point.z } };
+        await persist(installedAppId, loop);
+        if (moved) await server.sayAll([commands.forceloadRemove(x, z)]);
+        if (how.nearHome && !chosen) loop.placeFloor = Math.min(loop.run.placeTries, NEAR_AFTER + 2);
+        return point;
     }
     await server.sayAll([
         commands.CLEAR_MARK,
         commands.forceloadRemove(x, z),
         // Judging the ground holds the chunk the marker came down in, which
         // need not be the column's.
-        ...(landed && !commands.sameChunk(landed, { x, z })
-            ? [commands.forceloadRemove(landed.x, landed.z)]
+        ...(point && !commands.sameChunk(point, { x, z })
+            ? [commands.forceloadRemove(point.x, point.z)]
             : [])
     ]);
     loop.run = { ...loop.run, target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
-    return loop.run.placeTries >= PLACE_TRIES ? "failed" : null;
+    return loop.run.placeTries >= limit ? "failed" : null;
+}
+
+/** Where players online sleep, as `commands.readHomes` reads them: asked once a
+ *  search, and kept that long - nobody moves their bed between two tries. */
+async function homesOf(loop: Loop, server: ServerContainer): Promise<{ x: number; z: number }[]> {
+    if (loop.homes && Date.now() - loop.homes.at < HOMES_KEPT_MS) return loop.homes.list;
+    const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld] = await Promise.all(
+        commands.HOMES.map((line) => server.say([line]).catch(() => ""))
+    );
+    const list = commands.readHomes(
+        spawnX ?? "",
+        spawnZ ?? "",
+        respawn ?? "",
+        spawnWorld ?? "",
+        respawnWorld ?? ""
+    );
+    loop.homes = { at: Date.now(), list };
+    return list;
 }
 
 /**
  * Whether the ground over the whole of a place is the world's own and walkable:
- * every sampled column dry, within a few blocks of the centre's height, and on
- * nothing anybody built. Leaves the marker back on the centre, where whatever
+ * every sampled column dry, within a few blocks of the center's height, and on
+ * nothing anybody built. Leaves the marker back on the center, where whatever
  * the event puts down is put.
+ *
+ * Every column is judged at once - a marker summoned onto each, and each
+ * question asked of all of them in one command - which is a handful of trips to
+ * the server where one column at a time took five or six each. A server too old
+ * for the heightmap that needs (before 1.19.4) is judged a column at a time.
  */
 async function siteIsOpen(
     loop: Loop,
     server: ServerContainer,
-    centre: stored.Point,
+    center: stored.Point,
     radius: number,
     /** `open` for what is built in the air: open water under it is as good as land. */
     surface: "ground" | "open" = "ground"
 ): Promise<boolean> {
     const reach = radius + 1;
-    const area = `${centre.x - reach} ${centre.z - reach} ${centre.x + reach} ${centre.z + reach}`;
+    const area = `${center.x - reach} ${center.z - reach} ${center.x + reach} ${center.z + reach}`;
     await server.sayAll([`execute in minecraft:overworld run forceload add ${area}`]);
-    let open = true;
     try {
-        const samples = commands.siteSamples(centre, radius);
-        let rough = 0;
-        for (const [index, sample] of samples.entries()) {
-            const ground = (await dropMark(server, sample.x, sample.z))
-                ? commands.readPoint(await server.say([commands.READ_MARK]))
-                : null;
-            // Water or lava where the game would not put the marker down: never
-            // somewhere to stand, and never allowed at the centre.
-            let fine = ground !== null && Math.abs(ground.y - centre.y) <= commands.SITE_STEP;
-            if (
-                fine &&
-                ground &&
-                surface === "open" &&
-                commands.readTest(await server.say([commands.waterUnder(ground)])) === "passed"
-            )
-                continue;
-            if (ground && (await builtOn(loop, server, ground)) === true) {
-                // A tree is rough ground; anything else - a build, water - is not
-                // somewhere to put anything.
-                let tree = false;
-                for (const line of commands.treeUnder(ground)) {
-                    if (commands.readTest(await server.say([line])) === "passed") tree = true;
-                }
-                if (!tree) {
-                    open = false;
-                    break;
-                }
-                fine = false;
-            }
-            if (fine) continue;
-            rough += 1;
-            if (index === 0 || rough > commands.roughAllowed(samples.length)) {
-                open = false;
-                break;
-            }
-        }
+        const samples = commands.siteSamples(center, radius);
+        const judged = await judgeAtOnce(loop, server, center, samples, surface);
+        return judged ?? (await judgeOneByOne(loop, server, center, samples, surface));
     } finally {
-        // The area let go, and the centre's own chunk held again as before.
+        // The area let go, and the center's own chunk held again as before.
         await server.sayAll([
+            commands.CLEAR_SAMPLES,
             `execute in minecraft:overworld run forceload remove ${area}`,
-            commands.forceload(centre.x, centre.z)
+            commands.forceload(center.x, center.z)
         ]);
-        await dropMark(server, centre.x, centre.z);
+        await dropMark(server, center.x, center.z);
     }
-    return open;
+}
+
+/** What one column of a place was found to be. */
+type Column = "fine" | "rough" | "water" | "built";
+
+/** The verdict on a place from its columns, the center's first: open while no
+ *  column is built on, the center is fine, and no more than a quarter are rough. */
+function verdict(columns: readonly Column[]): boolean {
+    if (columns.some((one) => one === "built")) return false;
+    if (columns[0] === "rough") return false;
+    const rough = columns.filter((one) => one === "rough").length;
+    return rough <= commands.roughAllowed(columns.length);
 }
 
 /**
- * The marker on the ground at a column, under any trees - or, on a server too old
- * for the heightmap, wherever `spreadplayers` puts it. Answers whether it is down.
+ * Every column judged in a few commands (`commands.sampleLines`). Null when the
+ * server would not put the markers down - older than the heightmap - or would
+ * not say what is under them, for the column-at-a-time judging instead.
  */
-async function dropMark(server: ServerContainer, x: number, z: number): Promise<boolean> {
-    let output = "";
-    for (const line of commands.markGround(x, z)) output = await server.say([line]);
-    if (commands.groundWorked(output)) return true;
-    for (const line of commands.markSurface(x, z)) output = await server.say([line]);
-    if (!commands.spreadWorked(output)) return false;
-    // Down through the crown and the trunk to the ground under them.
-    await server.sayAll(commands.SETTLE_MARK);
+async function judgeAtOnce(
+    loop: Loop,
+    server: ServerContainer,
+    center: stored.Point,
+    samples: readonly { x: number; z: number }[],
+    surface: "ground" | "open"
+): Promise<boolean | null> {
+    await server.sayAll(commands.sampleLines(samples));
+    const down = commands.samplesIn(await server.say([commands.READ_SAMPLES]));
+    if (down.length === 0) return null;
+    const key = (one: { x: number; z: number }) => `${one.x},${one.z}`;
+    const at = new Map(down.map((one) => [key(one), one]));
+    const read = async (line: string) => new Set(commands.samplesIn(await server.say([line])).map(key));
+    const water = surface === "open" ? await read(commands.SAMPLES_ON_WATER) : new Set<string>();
+    const built = await builtAtOnce(loop, server);
+    if (built === null) return null;
+    const trees = new Set<string>();
+    if (built.size > 0) for (const line of commands.SAMPLES_ON_TREES) for (const one of await read(line)) trees.add(one);
+    const columns = samples.map((sample): Column => {
+        const ground = at.get(key(sample));
+        // No marker: water or lava, where the heightmap is no ground at all.
+        if (!ground) return "rough";
+        const level = Math.abs(ground.y - center.y) <= commands.SITE_STEP;
+        if (level && water.has(key(sample))) return "water";
+        // A tree is rough ground; anything else - a build, water - is not
+        // somewhere to put anything.
+        if (built.has(key(sample))) return trees.has(key(sample)) ? "rough" : "built";
+        return level ? "fine" : "rough";
+    });
+    return verdict(columns);
+}
+
+/** The ground names this server was last found to know, kept across events:
+ *  asking the newest list first cost a refused command on every place tried. */
+const groundNamesOf = new Map<string, commands.GroundNames | "none">();
+
+/**
+ * The markers standing on something somebody built, by column; null when the
+ * server would not say - every list of names refused, or a column not loaded.
+ */
+async function builtAtOnce(loop: Loop, server: ServerContainer): Promise<Set<string> | null> {
+    loop.ground ??= groundNamesOf.get(server.installedAppId) ?? null;
+    while (loop.ground !== "none") {
+        const names = loop.ground ?? commands.GROUND_NAMES[0];
+        let built: Set<string> | null = null;
+        let refused = false;
+        for (const line of commands.builtUnderSamples(names)) {
+            const output = await server.say([line]);
+            if (commands.nameRefused(output)) {
+                refused = true;
+                break;
+            }
+            if (/not loaded/i.test(output)) return null;
+            const found = new Set(commands.samplesIn(output).map((one) => `${one.x},${one.z}`));
+            built = built === null ? found : new Set([...built].filter((one) => found.has(one)));
+            if (built.size === 0) break;
+        }
+        if (refused) {
+            loop.ground = commands.GROUND_NAMES[commands.GROUND_NAMES.indexOf(names) + 1] ?? "none";
+            groundNamesOf.set(server.installedAppId, loop.ground);
+            continue;
+        }
+        loop.ground = names;
+        groundNamesOf.set(server.installedAppId, names);
+        return built ?? new Set();
+    }
+    return null;
+}
+
+/** Every column judged one at a time, as a server without the heightmap needs. */
+async function judgeOneByOne(
+    loop: Loop,
+    server: ServerContainer,
+    center: stored.Point,
+    samples: readonly { x: number; z: number }[],
+    surface: "ground" | "open"
+): Promise<boolean> {
+    let rough = 0;
+    for (const [index, sample] of samples.entries()) {
+        const ground = await dropMark(server, sample.x, sample.z);
+        // Water or lava where the game would not put the marker down: never
+        // somewhere to stand, and never allowed at the center.
+        let fine = ground !== null && Math.abs(ground.y - center.y) <= commands.SITE_STEP;
+        if (
+            fine &&
+            ground &&
+            surface === "open" &&
+            commands.readTest(await server.say([commands.waterUnder(ground)])) === "passed"
+        )
+            continue;
+        if (ground && (await builtOn(loop, server, ground)) === true) {
+            // A tree is rough ground; anything else - a build, water - is not
+            // somewhere to put anything.
+            let tree = false;
+            for (const line of commands.treeUnder(ground)) {
+                if (commands.readTest(await server.say([line])) === "passed") tree = true;
+            }
+            if (!tree) return false;
+            fine = false;
+        }
+        if (fine) continue;
+        rough += 1;
+        if (index === 0 || rough > commands.roughAllowed(samples.length)) return false;
+    }
     return true;
 }
 
+/**
+ * The marker on the ground at a column, under any trees - summoned there in one
+ * line from 1.19.4; on an older server, wherever `spreadplayers` puts it and
+ * then down through any crown. Answers where it came down, or null.
+ */
+async function dropMark(
+    server: ServerContainer,
+    x: number,
+    z: number
+): Promise<stored.Point | null> {
+    await server.sayAll([commands.CLEAR_MARK, commands.summonOnGround(x, z)]);
+    const down = commands.readPoint(await server.say([commands.READ_MARK]));
+    if (down) return down;
+    let output = "";
+    for (const line of commands.markSurface(x, z)) output = await server.say([line]);
+    if (!commands.spreadWorked(output)) return null;
+    // Down through the crown and the trunk to the ground under them.
+    await server.sayAll(commands.SETTLE_MARK);
+    return commands.readPoint(await server.say([commands.READ_MARK]));
+}
 /**
  * Whether a column stands on something somebody built. Null when the server
  * refuses a name in every list of ground names, and so cannot be asked. An
@@ -1650,7 +1800,7 @@ async function retryPlace(
 }
 
 /** Where to look from: the fixed point, or one of the players in the Overworld. */
-async function centreFor(
+async function centerFor(
     server: ServerContainer,
     place: catalog.EventPlace
 ): Promise<{ x: number; z: number } | null> {
@@ -1861,9 +2011,9 @@ async function race(
     const options = loop.run.preset.options as catalog.EventOptions<"explorer">;
     if (!loop.run.place) {
         // A finish line needs no ground to stand on: only the column is checked.
-        const centre = await centreFor(server, options.place);
-        if (!centre) throw new PlaceNotFound();
-        const point = commands.pointAway(centre, options.distance, Math.random);
+        const center = await centerFor(server, options.place);
+        if (!center) throw new PlaceNotFound();
+        const point = commands.pointAway(center, options.distance, Math.random);
         loop.run = { ...loop.run, place: { x: point.x, y: 0, z: point.z } };
         await persist(installedAppId, loop);
         lines.push(
@@ -1884,16 +2034,15 @@ async function race(
 }
 
 /**
- * A treasure hunt's tick: the chests hidden first, a couple of tries a tick;
- * then the clues as they fall due, every chest checked for being opened, each
- * player pointed at the nearest one once they are close, and the beams in the
- * last minutes.
+ * A treasure hunt's tick: the chests hidden first, as many tries a tick as its
+ * time allows; then one line saying how many there are, a column of light over
+ * every one nobody has opened, every chest checked for being opened, and each
+ * player's action bar pointing at the nearest.
  */
 async function treasureHunt(
     installedAppId: string,
     loop: Loop,
     server: ServerContainer,
-    now: number,
     lines: string[]
 ): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"treasure-hunt">;
@@ -1903,21 +2052,20 @@ async function treasureHunt(
         if (!loop.run.hidden) {
             lines.push(
                 ...hunt.holdChests(loop.run.held),
+                ...hunt.marks(loop.run.chests),
                 `title @a actionbar ${commands.text(messages.huntHiding(language))}`
             );
             return null;
         }
     }
     lines.push(...hunt.holdChests(loop.run.held));
-    const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
-    const left = (loop.run.endsAt - now) / 1000;
-    const due = hunt.clueDue((total - left) / Math.max(1, total));
-    if (loop.run.reveals < due && loop.run.origin) {
-        for (const line of hunt.clues(loop.run.chests, due, loop.run.origin, language)) {
-            lines.push(commands.say(messages.tag(language) + line));
-        }
-        lines.push(commands.sound(commands.SOUNDS.tick));
-        loop.run = { ...loop.run, reveals: due };
+    // Said once, when every chest is down: nothing more until one is opened.
+    if (loop.run.reveals < 1) {
+        lines.push(
+            commands.say(messages.tag(language) + messages.huntStart(loop.run.chests.length, language)),
+            commands.sound(commands.SOUNDS.tick)
+        );
+        loop.run = { ...loop.run, reveals: 1 };
         await persist(installedAppId, loop);
     }
 
@@ -1954,24 +2102,23 @@ async function treasureHunt(
     if (unopened.length === 0) {
         return `All ${chests.length} ${chests.length === 1 ? "treasure" : "treasures"} found`;
     }
-
-    if (hunt.beamsOn(left, total)) {
-        if (loop.run.reveals < 4) {
-            lines.push(commands.say(messages.tag(language) + messages.huntBeams(language)));
-            loop.run = { ...loop.run, reveals: 4 };
-        }
-        for (const chest of unopened) lines.push(commands.beam(chest));
-    }
+    lines.push(...hunt.marks(chests));
     const players = commands.readWhere(await server.say([commands.IN_OVERWORLD]));
     lines.push(...hunt.guides(players, chests, language));
     return null;
 }
 
+/** How long one tick may spend hiding chests before it lets the rest of the
+ *  event have its turn. */
+const HIDE_BUDGET_MS = 6_000;
+
 /**
  * Hide the chests, one place at a time, each through `findPlace` - so on dry,
- * open, natural ground away from every bed - and only into air. A place that
- * will not take one is given up for another; when no more can be found, the hunt
- * goes on with the ones that are down, and fails only if none are.
+ * open, natural ground away from every bed - each sought its own way round the
+ * players (`hunt.chestBearing`), apart from the others, and only into air or a
+ * small wild plant. A place that will not take one is given up for another;
+ * when no more can be found, the hunt goes on with the ones that are down, and
+ * fails only if none are.
  */
 async function hideTreasure(
     installedAppId: string,
@@ -1980,7 +2127,7 @@ async function hideTreasure(
     options: catalog.EventOptions<"treasure-hunt">
 ): Promise<void> {
     if (!loop.run.origin) {
-        const origin = hunt.centreOf(commands.readWhere(await server.say([commands.IN_OVERWORLD])));
+        const origin = hunt.centerOf(commands.readWhere(await server.say([commands.IN_OVERWORLD])));
         if (!origin) throw new PlaceNotFound();
         loop.run = { ...loop.run, origin };
     }
@@ -1996,39 +2143,57 @@ async function hideTreasure(
         loop.run = { ...loop.run, place: null, target: null, placeTries: 0, hidden: true };
         await persist(installedAppId, loop);
     };
-    // Two steps a tick: a column chosen, then the ground there judged.
-    for (let step = 0; step < 2 && !loop.run.hidden; step += 1) {
+    const until = Date.now() + HIDE_BUDGET_MS;
+    for (let step = 0; step < 12 && !loop.run.hidden && Date.now() < until; step += 1) {
+        const index = loop.run.chests.length;
         const found = await findPlace(
             installedAppId,
             loop,
             server,
-            { mode: "players" },
+            // Round where everybody was, not round one of them.
+            loop.run.origin ? { mode: "fixed", ...loop.run.origin } : { mode: "players" },
             hunt.huntDistance(options, Math.random),
             SPOT_RADIUS,
             commands.HOME_CLEARANCE,
-            true,
-            { nearHome: true }
+            false,
+            {
+                nearHome: true,
+                bearing: hunt.chestBearing(loop.run.id, index, options.chests)
+            }
         );
         if (found === "failed") return enough();
         if (!found) continue;
         const target = loop.run.target;
         let placed = false;
-        // Air first, so a chest that was already there is never counted as
-        // one of the hunt's - and never taken away at the end.
-        const air =
-            !hunt.tooClose(found, loop.run.chests) &&
-            commands.readTest(await server.say([hunt.airAt(found)])) === "passed";
+        // Air or a small wild plant first, so a chest that was already there is
+        // never counted as one of the hunt's - and never taken away at the end.
+        const gap =
+            loop.run.placeTries >= NEAR_AFTER ? hunt.CHEST_GAP_NEAR : hunt.CHEST_GAP;
+        const apart = !hunt.tooClose(found, loop.run.chests, gap);
+        let open = false;
+        let was: hunt.Plant | null = null;
+        if (apart) {
+            open = commands.readTest(await server.say([hunt.airAt(found)])) === "passed";
+            for (const plant of open ? [] : hunt.PLANTS) {
+                if (commands.readTest(await server.say([hunt.plantAt(found, plant)])) === "passed") {
+                    was = plant;
+                    open = true;
+                    break;
+                }
+            }
+        }
         const before = { chests: loop.run.chests, held: loop.run.held };
-        if (air) {
+        const chest = { ...found, opened: false, by: null, was };
+        if (open) {
             // Written down before it is placed, so whatever ends the event
             // takes it away again.
             loop.run = {
                 ...loop.run,
-                chests: [...before.chests, { ...found, opened: false, by: null }],
+                chests: [...before.chests, chest],
                 held: [...before.held, ...(target ? [target] : []), { x: found.x, z: found.z }]
             };
             await persist(installedAppId, loop);
-            await server.sayAll([hunt.hideChest(found, options.loot), commands.CLEAR_MARK]);
+            await server.sayAll([hunt.hideChest(found, options.loot, was), commands.CLEAR_MARK]);
             // Down, and unopened: a protected area that refused the block reads
             // as nothing there.
             placed = (await chestTest(server, found)) === "passed";
@@ -2036,7 +2201,7 @@ async function hideTreasure(
         if (!placed) {
             // Given up without taking the chunks of the chests already down.
             await server.sayAll([
-                ...(air ? commands.removeChestLines(found) : []),
+                ...(open ? hunt.removeLines(chest) : []),
                 commands.CLEAR_MARK,
                 ...commands.release(found, target),
                 ...hunt.holdChests(before.held)
@@ -2049,14 +2214,14 @@ async function hideTreasure(
                 placeTries: loop.run.placeTries + 1
             };
             await persist(installedAppId, loop);
-            if (loop.run.placeTries >= PLACE_TRIES) return enough();
+            if (loop.run.placeTries >= placeLimit(loop, true)) return enough();
             continue;
         }
         loop.run = {
             ...loop.run,
             place: null,
             target: null,
-            placeTries: 0,
+            placeTries: loop.placeFloor,
             hidden: loop.run.chests.length >= options.chests
         };
         await persist(installedAppId, loop);
@@ -2080,7 +2245,7 @@ async function settlePendingChest(
     if (last.x !== place.x || last.y !== place.y || last.z !== place.z) return;
     const there = (await chestTest(server, last)) === "passed";
     if (!there) {
-        await server.sayAll(commands.removeChestLines(last));
+        await server.sayAll(hunt.removeLines(last));
         loop.run = { ...loop.run, chests: loop.run.chests.slice(0, -1) };
     }
     loop.run = {
@@ -2092,10 +2257,67 @@ async function settlePendingChest(
     await persist(installedAppId, loop);
 }
 
-/** A gathering's tick: everybody's count brought up to date, and shown to them. */
-async function gathering(loop: Loop, server: ServerContainer, lines: string[]): Promise<void> {
+/**
+ * A gathering's round `round` (from 0) begun: its material drawn - one no round
+ * before had, while any is left - written down with when it ends, its counts
+ * made afresh, and said: a title, and one line with what one is worth.
+ */
+async function gatheringRound(
+    installedAppId: string,
+    loop: Loop,
+    now: number,
+    round: number
+): Promise<string[]> {
     const options = loop.run.preset.options as catalog.EventOptions<"gathering">;
-    const material = gather.materialOf(loop.run.material, options);
+    const language = loop.language;
+    const material = gather.drawMaterial(options, Math.random, loop.run.materials);
+    loop.run = {
+        ...loop.run,
+        material,
+        materials: [...loop.run.materials, material],
+        round,
+        roundEndsAt: now + options.roundMinutes * 60_000
+    };
+    await persist(installedAppId, loop);
+    return [
+        ...gather.gatheringSetup(material, round === 0),
+        ...gather.gatheringTick(material),
+        ...commands.titleCommands(
+            messages.gatherRoundTitle(round + 1, options.rounds, language),
+            messages.gatherTarget(material, language)
+        ),
+        commands.say(
+            messages.tag(language) +
+                messages.gatherRoundLine(
+                    round + 1,
+                    options.rounds,
+                    material,
+                    gather.WORTH[material],
+                    language
+                )
+        ),
+        commands.sound(commands.SOUNDS.start)
+    ];
+}
+
+/** A gathering's tick: everybody's count brought up to date, and shown to them;
+ *  a round that is over added to the points, and the next one begun. */
+async function gathering(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number,
+    lines: string[]
+): Promise<void> {
+    const options = loop.run.preset.options as catalog.EventOptions<"gathering">;
+    let material = gather.materialOf(loop.run.material, options);
+    const next = loop.run.round + 1;
+    if (loop.run.roundEndsAt !== null && now >= loop.run.roundEndsAt && next < options.rounds) {
+        // Its last count, kept, before the next round empties the counts.
+        await server.sayAll([...gather.gatheringTick(material), ...gather.BANK_ROUND]);
+        await server.sayAll(await gatheringRound(installedAppId, loop, now, next));
+        material = gather.materialOf(loop.run.material, options);
+    }
     await server.sayAll(gather.gatheringTick(material));
     const counts = commands.readScores(await server.say([gather.READ_PROGRESS]));
     for (const [name, count] of counts) {
@@ -2306,15 +2528,15 @@ export function firstRight(log: string, accepted: readonly string[]): string | n
     return null;
 }
 
-// ------------------------------------------------------------------ horde defence
+// ------------------------------------------------------------------ horde defense
 
 /**
- * A horde defence: the point found and marked, then wave after wave summoned
+ * A horde defense: the point found and marked, then wave after wave summoned
  * round it once somebody is there to meet it. A wave ends when none of its
  * monsters is left, or when its time is up (what is left of it is taken away);
  * whoever is at the point then has held it. Decided when the last wave ends.
  */
-async function hordeDefence(
+async function hordeDefense(
     installedAppId: string,
     loop: Loop,
     server: ServerContainer,
@@ -2336,7 +2558,7 @@ async function hordeDefence(
             server,
             options.place,
             48,
-            waves.DEFENCE_RADIUS,
+            waves.DEFENSE_RADIUS,
             waves.CLEARANCE
         );
         if (found === "failed") throw new PlaceNotFound();
@@ -2367,7 +2589,7 @@ async function hordeDefence(
     lines.push(
         ...waves.wavesMarks(place),
         waves.leash(place),
-        ...waves.wavesTick(place, options.mix, open)
+        ...waves.wavesTick(place, options.mix, open, options.winner === "damage")
     );
     /** Monsters of the wave on now still about, as far as is known. */
     let left: number | null = null;
@@ -2388,7 +2610,7 @@ async function hordeDefence(
             lines.push(
                 // What is left of a wave out of time goes, so the next one
                 // starts clean.
-                ...(cleared ? [] : [`kill @e[tag=${commands.MOB_TAG}]`]),
+                ...(cleared ? [waves.MOUNTS_GONE] : [`kill @e[tag=${commands.MOB_TAG}]`]),
                 ...commands.titleCommands(
                     cleared
                         ? messages.waveCleared(wave + 1, language)
@@ -2419,7 +2641,8 @@ async function hordeDefence(
                     options.mix,
                     count,
                     wave,
-                    (loop.run.endsAt - now) / 1000 + 60
+                    (loop.run.endsAt - now) / 1000 + 60,
+                    { waves: options.waves, defenders: at.length }
                 ),
                 ...commands.titleCommands(
                     messages.waveTitle(wave + 1, options.waves, language),
@@ -2430,7 +2653,7 @@ async function hordeDefence(
         }
     }
 
-    // Where the defence stands, on the bar and at the point; the way to it
+    // Where the defense stands, on the bar and at the point; the way to it
     // for everybody further off.
     const run = loop.run;
     const fighting = run.roundEndsAt !== null;
@@ -2452,8 +2675,8 @@ async function hordeDefence(
     }
     lines.push(...commands.barUpdate(status, bar.value, bar.max));
     for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
-        const centre = { x: place.x + 0.5, z: place.z + 0.5 };
-        const away = Math.hypot(one.x - centre.x, one.z - centre.z);
+        const center = { x: place.x + 0.5, z: place.z + 0.5 };
+        const away = Math.hypot(one.x - center.x, one.z - center.z);
         lines.push(
             commands.actionbarFor(
                 one.name,
@@ -2461,7 +2684,7 @@ async function hordeDefence(
                     ? status
                     : messages.wavesGuide(
                           Math.round(away),
-                          commands.headingTo(one, centre),
+                          commands.headingTo(one, center),
                           language
                       )
             )
@@ -2473,11 +2696,11 @@ async function hordeDefence(
 // ------------------------------------------------------------------ meteor shower
 
 /**
- * A meteor shower: the meteors brought down one after another over the first
- * part of the event, each where `findPlace` finds open ground, then raced to.
- * A meteor with a player near it is looked at block by block, and any block no
- * longer its ore is forgotten for good. Decided once every meteor is down and
- * mined out.
+ * A meteor shower: the meteors brought down one after another, a few seconds
+ * apart (`meteors.meteorGap`), each where `findPlace` finds open ground - on
+ * an island, the island - then raced to. A meteor with a player near it that
+ * is no longer whole is looked at block by block, and any block no longer its
+ * ore is forgotten for good. Decided once every meteor is down and mined out.
  */
 async function meteorShower(
     installedAppId: string,
@@ -2488,8 +2711,14 @@ async function meteorShower(
 ): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"meteor-shower">;
     const language = loop.language;
-    const share = (now - loop.run.startsAt) / Math.max(1, loop.run.endsAt - loop.run.startsAt);
-    if (loop.run.landings < meteors.dueMeteors(share, options.meteors)) {
+    const due = meteors.dueMeteors(
+        now - loop.run.startsAt,
+        loop.run.endsAt - loop.run.startsAt,
+        options.meteors
+    );
+    // Both steps of finding a place in the one tick: the column chosen, then the
+    // ground there judged.
+    for (let step = 0; step < 2 && loop.run.landings < due; step += 1) {
         const found = await findPlace(
             installedAppId,
             loop,
@@ -2498,26 +2727,38 @@ async function meteorShower(
             options.distance,
             meteors.RADIUS,
             commands.HOME_CLEARANCE,
-            false
+            false,
+            // Ore put only into air, and taken out again: on an island it comes
+            // down on the island.
+            { nearHome: true }
         );
         if (found === "failed") {
             // Nowhere for this one: it is let go, and the next looked for afresh.
             loop.run = { ...loop.run, landings: loop.run.landings + 1, placeTries: 0 };
             await persist(installedAppId, loop);
-        } else if (found) {
+            break;
+        }
+        if (found) {
             await landMeteor(installedAppId, loop, server, found, options);
+            break;
         }
     }
 
     // Whatever of a meteor somebody near it has mined is forgotten: it is no
     // longer the event's to take away, whatever is put there after.
+    const players = commands.readWhere(await server.say([commands.IN_OVERWORLD]));
     let emptied = 0;
     const checked: stored.EventRun["meteors"] = [];
     for (const meteor of loop.run.meteors) {
         const near =
             meteor.blocks.length > 0 &&
-            commands.readTest(await server.say([meteors.playerNear(meteor)])) === "passed";
-        if (!near) {
+            players.some(
+                (one) =>
+                    Math.hypot(one.x - (meteor.x + 0.5), one.y - meteor.y, one.z - (meteor.z + 0.5)) <=
+                    meteors.NEAR
+            );
+        const whole = meteors.allOurs(meteor);
+        if (!near || (whole && commands.readTest(await server.say([whole])) === "passed")) {
             checked.push(meteor);
             continue;
         }
@@ -2540,21 +2781,23 @@ async function meteorShower(
 
     const live = loop.run.meteors.filter((meteor) => meteor.blocks.length > 0);
     lines.push(...meteors.meteorTick(loop.run.meteors, options.ores), ...live.map(commands.beam));
-    // Each player pointed at the latest meteor still to mine.
-    const latest = live.at(-1);
-    for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
-        if (!latest) {
+    // Each player pointed at the nearest meteor still to mine.
+    for (const one of players) {
+        const away = (meteor: (typeof live)[number]) =>
+            Math.hypot(one.x - (meteor.x + 0.5), one.z - (meteor.z + 0.5));
+        const nearest = [...live].sort((a, b) => away(a) - away(b))[0];
+        if (!nearest) {
             lines.push(commands.actionbarFor(one.name, messages.meteorWaiting(language)));
             continue;
         }
-        const centre = { x: latest.x + 0.5, z: latest.z + 0.5 };
+        const center = { x: nearest.x + 0.5, z: nearest.z + 0.5 };
         lines.push(
             commands.actionbarFor(
                 one.name,
                 messages.meteorGuide(
-                    Math.round(Math.hypot(one.x - centre.x, one.z - centre.z)),
-                    commands.headingTo(one, centre),
-                    latest.blocks.length,
+                    Math.round(away(nearest)),
+                    commands.headingTo(one, center),
+                    nearest.blocks.length,
                     language
                 )
             )
@@ -2855,19 +3098,20 @@ async function finish(
             const { scores, took } = await results(server, run);
             const minimum = catalog.minScoreOf(preset);
             if (preset.kind === "world-boss" && run.decidedBy) {
-                // The final blow always places, whatever it was dealt with.
-                const killer =
-                    [...scores.keys()].find(
-                        (name) => name.toLowerCase() === run.decidedBy!.toLowerCase()
-                    ) ?? run.decidedBy;
-                scores.set(killer, Math.max(scores.get(killer) ?? 0, minimum));
+                // The final blow took part, whatever it was dealt with.
+                const killer = run.decidedBy;
                 if (!took.some((name) => name.toLowerCase() === killer.toLowerCase()))
                     took.push(killer);
             }
-            placed = plan.podium(scores, disqualified, minimum);
+            // A world boss is won by the most damage, or by the final blow when
+            // the event says so (`bossService.podiumOf`).
+            placed =
+                preset.kind === "world-boss"
+                    ? bossService.podiumOf(run, scores, disqualified, minimum)
+                    : plan.podium(scores, disqualified, minimum);
             // Taking part is reaching the minimum too - one zombie is not taking part
             // in a hunt. A blood moon's is surviving it with a kill, and a horde
-            // defence's holding the point, which are their own bars.
+            // defense's holding the point, which are their own bars.
             const counted =
                 preset.kind === "blood-moon" ||
                 preset.kind === "waves" ||
@@ -2914,12 +3158,11 @@ async function finish(
                         createdAt: Date.now()
                     });
             }
-            // The final blow's trophy, besides whatever the podium paid.
-            if (
-                preset.kind === "world-boss" &&
-                run.decidedBy &&
-                online.has(run.decidedBy.toLowerCase())
-            ) {
+            // The boss's trophy, besides whatever the podium paid: to the most
+            // damage, or to the final blow (`bossService.trophyWinner`).
+            const trophyTo =
+                preset.kind === "world-boss" ? bossService.trophyWinner(run, placed) : null;
+            if (trophyTo && online.has(trophyTo.toLowerCase())) {
                 const trophy = await bossService.awardTrophy(
                     server,
                     run,
@@ -2928,18 +3171,19 @@ async function finish(
                         ? "text"
                         : (await serverAtLeast(server, [1, 20, 5]))
                           ? "json"
-                          : "tag"
+                          : "tag",
+                    trophyTo
                 );
                 if (trophy) {
-                    const killer = run.decidedBy.toLowerCase();
-                    const at = delivered.findIndex((one) => one.name.toLowerCase() === killer);
+                    const winner = trophyTo.toLowerCase();
+                    const at = delivered.findIndex((one) => one.name.toLowerCase() === winner);
                     const item = { id: trophy.id, count: trophy.count, dropped: trophy.dropped };
                     if (at >= 0)
                         delivered[at] = {
                             ...delivered[at]!,
                             items: [...delivered[at]!.items, item]
                         };
-                    else delivered.push({ name: run.decidedBy, items: [item], levels: 0 });
+                    else delivered.push({ name: trophyTo, items: [item], levels: 0 });
                 }
             }
             lines.push(commands.say(messages.resultsHeader(preset.name, language)));
@@ -2981,6 +3225,12 @@ async function finish(
                     )
                 );
             }
+            // Everybody's damage, not only the podium's: what each dealt is theirs to see.
+            const ranking =
+                preset.kind === "world-boss"
+                    ? bossService.rankingLine(scores, disqualified, language)
+                    : null;
+            if (ranking) lines.push(commands.say(ranking));
             if (disqualified.size > 0) {
                 const names = run.participants.filter((name) =>
                     disqualified.has(name.toLowerCase())
@@ -3268,7 +3518,7 @@ function scoreText(preset: catalog.EventPreset, score: number, language: speech.
     const stageText = stageService.scoreText(preset.kind, score, language);
     if (stageText !== null) return stageText;
     if (preset.kind === "king-of-the-hill") return messages.clock(score);
-    const unit = catalog.KIND_INFO[preset.kind].unit;
+    const unit = catalog.unitOf(preset);
     return unit ? `${score} ${unit}` : String(score);
 }
 
@@ -3306,8 +3556,15 @@ async function results(
         );
     }
     if (preset.kind === "waves" && run.place) {
-        const mix = (preset.options as catalog.EventOptions<"waves">).mix;
-        await server.sayAll(waves.wavesTick(run.place, mix, run.roundEndsAt !== null));
+        const options = preset.options as catalog.EventOptions<"waves">;
+        await server.sayAll(
+            waves.wavesTick(
+                run.place,
+                options.mix,
+                run.roundEndsAt !== null,
+                options.winner === "damage"
+            )
+        );
     }
     if (preset.kind === "meteor-shower") {
         const ores = (preset.options as catalog.EventOptions<"meteor-shower">).ores;

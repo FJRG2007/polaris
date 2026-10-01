@@ -12,8 +12,8 @@
  * made.
  */
 
-import { stripFormatting } from "../parse";
 import * as speech from "../speech";
+import { stripFormatting } from "../parse";
 import { duelTeardown } from "./kinds/team-duel";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import type { EventKind, EventOptions, EventPreset } from "./catalog";
@@ -186,7 +186,7 @@ export function components(preset: EventPreset): Component[] {
     }
 }
 
-/** Distance is counted in centimetres and shown in metres. */
+/** Distance is counted in centimeters and shown in meters. */
 export function divisorFor(preset: EventPreset): number {
     return preset.kind === "explorer" ? 100 : 1;
 }
@@ -247,20 +247,20 @@ export const SOUNDS = {
 
 // ------------------------------------------------------------------ boss bar
 
-export type BarColour = "yellow" | "red" | "purple" | "green" | "blue";
+export type BarColor = "yellow" | "red" | "purple" | "green" | "blue";
 
-export function barColour(kind: EventKind): BarColour {
+export function barColor(kind: EventKind): BarColor {
     if (kind === "blood-moon" || kind === "world-boss") return "red";
     if (kind === "happy-hour" || kind === "xp-boost") return "green";
     if (kind === "trivia") return "blue";
     return "yellow";
 }
 
-export function barCreate(name: string, colour: BarColour): string[] {
+export function barCreate(name: string, color: BarColor): string[] {
     return [
         `bossbar remove ${BAR}`,
         `bossbar add ${BAR} ${text(name)}`,
-        `bossbar set ${BAR} color ${colour}`,
+        `bossbar set ${BAR} color ${color}`,
         `bossbar set ${BAR} style notched_10`,
         `bossbar set ${BAR} players @a`
     ];
@@ -771,16 +771,19 @@ export function waterUnder(point: { x: number; y: number; z: number }): string {
 export const MARK_DRIFT = 2;
 
 /**
- * A point about `distance` from the centre that is clear of every home. The
+ * A point about `distance` from the center that is clear of every home. The
  * bearing is tried all the way round first, then further out, so somebody
  * standing at their own door still gets an event - just past their land.
  */
 export function clearPoint(
-    centre: { x: number; z: number },
+    center: { x: number; z: number },
     distance: number,
     homes: readonly { x: number; z: number }[],
     random: () => number,
-    clearance = HOME_CLEARANCE
+    clearance = HOME_CLEARANCE,
+    /** A way to keep to, in radians from north towards east, give or take a
+     *  sixth of a turn: so the places of an event of many are not all one spot. */
+    bearing: number | null = null
 ): { x: number; z: number } | null {
     // Kept further off by what the marker can drift, so where it lands is clear too.
     const clear = (point: { x: number; z: number }) =>
@@ -790,7 +793,7 @@ export function clearPoint(
     for (let ring = 0; ring < 4; ring += 1) {
         const reach = distance + ring * (clearance / 2);
         for (let turn = 0; turn < 12; turn += 1) {
-            const point = pointAway(centre, reach, random);
+            const point = pointAway(center, reach, random, bearing);
             if (clear(point)) return point;
         }
     }
@@ -925,7 +928,79 @@ export function builtUnder(
     return lines;
 }
 
-/** Whether the game said nothing: RCON's reply with its colour reset and blank
+// ------------------------------------------------------------------ judging a place at once
+
+/** The markers a place's columns are judged by, all at once (`siteSamples`). */
+export const SAMPLE_TAG = "pe_samp";
+
+const MARKER_DATA = "Invisible:1b,Marker:1b,NoGravity:1b,Invulnerable:1b";
+
+/**
+ * A marker summoned straight onto the ground at a column, under any trees -
+ * the heightmap `markGround` uses, from 1.19.4 - in one line. An older server
+ * refuses it, and nothing is summoned.
+ */
+export function summonOnGround(x: number, z: number, tag: string | null = null): string {
+    const tags = [MARK_TAG, ...(tag ? [tag] : [])].map((one) => `"${one}"`).join(",");
+    return `execute in minecraft:overworld positioned ${x + 0.5} 0 ${z + 0.5} positioned over motion_blocking_no_leaves run summon minecraft:armor_stand ~ ~ ~ {Tags:[${tags}],${MARKER_DATA}}`;
+}
+
+/** Every column of a place with a marker on its ground, the old ones taken away first. */
+export function sampleLines(samples: readonly { x: number; z: number }[]): string[] {
+    return [
+        `kill @e[tag=${SAMPLE_TAG}]`,
+        ...samples.map((one) => summonOnGround(one.x, one.z, SAMPLE_TAG))
+    ];
+}
+
+/** Where every one of them came down: `Armor Stand has the following entity data: [..]`. */
+export const READ_SAMPLES = `execute as @e[tag=${SAMPLE_TAG}] run data get entity @s Pos`;
+
+export const CLEAR_SAMPLES = `kill @e[tag=${SAMPLE_TAG}]`;
+
+/**
+ * The markers standing on something somebody built, as `builtUnder` asks of one
+ * column, asked of all of them at once: each line answers the positions of the
+ * markers none of its names matched, and a marker on a build is in every
+ * line's answer.
+ */
+export function builtUnderSamples(names: GroundNames): string[] {
+    const prefix = `execute as @e[tag=${SAMPLE_TAG}] at @s`;
+    const suffix = " run data get entity @s Pos";
+    const lines: string[] = [];
+    let line = prefix;
+    for (const id of GROUND[names]) {
+        const check = ` unless block ~ ~-1 ~ ${id.startsWith("#") ? id : `minecraft:${id}`}`;
+        if (
+            line !== prefix &&
+            commandBytes(line + check + suffix) > COMMAND_BYTES_MAX - NAMESPACE.length * 2
+        ) {
+            lines.push(line + suffix);
+            line = prefix;
+        }
+        line += check;
+    }
+    lines.push(line + suffix);
+    return lines;
+}
+
+/** The markers standing on a tree, and the ones on open water. */
+export const SAMPLES_ON_TREES = ["#minecraft:leaves", "#minecraft:logs"].map(
+    (tag) =>
+        `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ ${tag} run data get entity @s Pos`
+);
+export const SAMPLES_ON_WATER = `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ minecraft:water run data get entity @s Pos`;
+
+/** The columns out of a read of the markers, by where each was summoned. */
+export function samplesIn(output: string): { x: number; y: number; z: number }[] {
+    return readWhere(output).map((one) => ({
+        x: Math.floor(one.x),
+        y: Math.floor(one.y),
+        z: Math.floor(one.z)
+    }));
+}
+
+/** Whether the game said nothing: RCON's reply with its color reset and blank
  *  space taken away. */
 export function silent(output: string): boolean {
     // eslint-disable-next-line no-control-regex
@@ -941,31 +1016,31 @@ export function nameRefused(output: string): boolean {
     return /unknown block|<--\[HERE\]/i.test(output);
 }
 
-/** The columns a place is judged by: its centre, and rings at its edge and halfway in. */
+/** The columns a place is judged by: its center, and rings at its edge and halfway in. */
 export function siteSamples(
-    centre: { x: number; z: number },
+    center: { x: number; z: number },
     radius: number
 ): { x: number; z: number }[] {
-    const samples = [{ x: centre.x, z: centre.z }];
+    const samples = [{ x: center.x, z: center.z }];
     const rings = radius >= 4 ? [radius, Math.round(radius / 2)] : [radius];
     for (const reach of rings) {
         for (let index = 0; index < 8; index += 1) {
             const angle = (index / 8) * Math.PI * 2;
             samples.push({
-                x: Math.round(centre.x + Math.cos(angle) * reach),
-                z: Math.round(centre.z + Math.sin(angle) * reach)
+                x: Math.round(center.x + Math.cos(angle) * reach),
+                z: Math.round(center.z + Math.sin(angle) * reach)
             });
         }
     }
     return samples;
 }
 
-/** How far above or below the centre any of those may be and still be walked to. */
+/** How far above or below the center any of those may be and still be walked to. */
 export const SITE_STEP = 4;
 
 /**
  * How many of a place's columns may be rough - a tree's crown, a dip, a rise past
- * `SITE_STEP` - before the place is given up: a quarter, never the centre. A
+ * `SITE_STEP` - before the place is given up: a quarter, never the center. A
  * clearing in a forest or a gentle hill is still somewhere to walk to; a column
  * on somebody's build is never allowed, however few.
  */
@@ -983,17 +1058,33 @@ export function treeUnder(point: { x: number; y: number; z: number }): string[] 
     ];
 }
 
-/** A point `distance` away from a centre, at a random bearing, whole blocks. */
+/** How far either side of a bearing `pointAway` may stray: a sixth of a turn. */
+export const BEARING_SPREAD = Math.PI / 6;
+
+/**
+ * A point `distance` away from a center, whole blocks: at a random bearing, or
+ * within `BEARING_SPREAD` of `bearing` (radians from north, towards east -
+ * the way `headingTo` reads).
+ */
 export function pointAway(
-    centre: { x: number; z: number },
+    center: { x: number; z: number },
     distance: number,
-    random: () => number
+    random: () => number,
+    bearing: number | null = null
 ): { x: number; z: number } {
+    if (bearing !== null) {
+        const reach = distance * (0.7 + random() * 0.3);
+        const angle = bearing + (random() * 2 - 1) * BEARING_SPREAD;
+        return {
+            x: Math.round(center.x + Math.sin(angle) * reach),
+            z: Math.round(center.z - Math.cos(angle) * reach)
+        };
+    }
     const angle = random() * Math.PI * 2;
     const reach = distance * (0.7 + random() * 0.3);
     return {
-        x: Math.round(centre.x + Math.cos(angle) * reach),
-        z: Math.round(centre.z + Math.sin(angle) * reach)
+        x: Math.round(center.x + Math.cos(angle) * reach),
+        z: Math.round(center.z + Math.sin(angle) * reach)
     };
 }
 
@@ -1265,11 +1356,12 @@ export function wave(options: EventOptions<"blood-moon">, number: number): strin
     for (let index = 0; index < WAVE_SIZE[options.intensity]; index += 1) {
         const kind = kinds[(number + index) % kinds.length] as string;
         lines.push(
-            `execute in minecraft:overworld as ${players} at @s run summon minecraft:${kind} ~ ~ ~ {Tags:["${MOB_TAG}","${NEW_TAG}"],CanPickUpLoot:0b,CanBreakDoors:0b}`
+            `execute in minecraft:overworld as ${players} at @s run summon minecraft:${kind} ~ ~ ~ {Tags:["${MOB_TAG}","${NEW_TAG}"],CanPickUpLoot:0b,CanBreakDoors:0b,${DROPS_NOTHING}}`
         );
     }
     lines.push(
-        `execute in minecraft:overworld as ${players} at @s run spreadplayers ~ ~ 4 16 false @e[tag=${NEW_TAG},distance=..1]`
+        `execute in minecraft:overworld as ${players} at @s run spreadplayers ~ ~ 4 16 false @e[tag=${NEW_TAG},distance=..1]`,
+        ...armLines(`tag=${NEW_TAG}`, kinds)
     );
     // The attribute lost its `zombie.` in 1.21.2; both are tried.
     for (const id of ["minecraft:spawn_reinforcements", "minecraft:zombie.spawn_reinforcements"]) {
@@ -1279,6 +1371,57 @@ export function wave(options: EventOptions<"blood-moon">, number: number): strin
     }
     lines.push(`tag @e[tag=${NEW_TAG}] remove ${NEW_TAG}`);
     return lines;
+}
+
+// ------------------------------------------------------------------ arming what is summoned
+
+/**
+ * What each mob fights with when the game spawns it. `summon` with data - which
+ * every event sends, for its tags - skips the game's own equipping, so a
+ * skeleton came out of a blood moon without its bow and could not shoot at all.
+ * Every summoned mob that needs a weapon is handed it here. A mob a version
+ * does not have (the bogged before 1.21) makes its line fail and nothing else.
+ */
+export const MOB_WEAPONS: Readonly<Record<string, string>> = {
+    skeleton: "minecraft:bow",
+    stray: "minecraft:bow",
+    bogged: "minecraft:bow",
+    wither_skeleton: "minecraft:stone_sword",
+    pillager: "minecraft:crossbow",
+    vindicator: "minecraft:iron_axe",
+    vex: "minecraft:iron_sword",
+    zombified_piglin: "minecraft:golden_sword",
+    piglin: "minecraft:golden_sword"
+};
+
+/**
+ * Mob data that makes a summoned creature drop none of what it holds or wears,
+ * in both spellings the game has used: two lists up to 1.21.4, one
+ * `drop_chances` from 1.21.5, which reads nothing else. A key a version does
+ * not know is ignored.
+ */
+export const DROPS_NOTHING =
+    "HandDropChances:[0.0f,0.0f],ArmorDropChances:[0.0f,0.0f,0.0f,0.0f],drop_chances:{mainhand:0.0f,offhand:0.0f,head:0.0f,chest:0.0f,legs:0.0f,feet:0.0f}";
+
+/** An item into a slot of every entity a selector finds: `item replace` from
+ *  1.17, `replaceitem` before it. Whichever the server does not know fails and
+ *  changes nothing. */
+export function equipLines(selector: string, slot: string, item: string): string[] {
+    return [
+        `item replace entity ${selector} ${slot} with ${item}`,
+        `replaceitem entity ${selector} ${slot} ${item}`
+    ];
+}
+
+/** Every mob of `mobs` that a selector's arguments (`tag=pe_new`) find, armed
+ *  with its weapon (`MOB_WEAPONS`). */
+export function armLines(filter: string, mobs: readonly string[]): string[] {
+    return [...new Set(mobs)].flatMap((mob) => {
+        const weapon = MOB_WEAPONS[mob];
+        return weapon
+            ? equipLines(`@e[${filter},type=minecraft:${mob}]`, "weapon.mainhand", weapon)
+            : [];
+    });
 }
 
 /** Who died during the night - their deaths counted from when it fell. */
@@ -1569,6 +1712,26 @@ export type Heading = (typeof HEADINGS)[number];
 export function headingTo(from: { x: number; z: number }, to: { x: number; z: number }): Heading {
     const degrees = (Math.atan2(to.x - from.x, -(to.z - from.z)) * 180) / Math.PI;
     return HEADINGS[Math.round((((degrees % 360) + 360) % 360) / 45) % 8] as Heading;
+}
+
+/** An arrow for each eighth of a turn from the way somebody looks: ahead, then
+ *  round to the right. */
+const ARROWS = [0x2191, 0x2197, 0x2192, 0x2198, 0x2193, 0x2199, 0x2190, 0x2196].map((code) =>
+    String.fromCharCode(code)
+);
+
+/**
+ * The arrow pointing at a point from somebody at `from` looking along `yaw`
+ * (the game's own: 0 south, 90 west, turning right as it grows).
+ */
+export function arrowTo(
+    from: { x: number; z: number },
+    yaw: number,
+    to: { x: number; z: number }
+): string {
+    const toward = (Math.atan2(-(to.x - from.x), to.z - from.z) * 180) / Math.PI;
+    const turn = (((toward - yaw) % 360) + 360) % 360;
+    return ARROWS[Math.round(turn / 45) % 8] as string;
 }
 
 /** One line in one player's action bar. */

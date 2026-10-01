@@ -1,6 +1,8 @@
 /**
- * A gathering: one material announced at the start, and whoever gathers the
- * most of it wins.
+ * A gathering: a few short rounds, each for one material announced as it
+ * starts, and whoever has the most points over all of them wins. What one item
+ * is worth depends on the material (`WORTH`), so a round of logs and a round of
+ * iron count alike.
  *
  * Nothing is ever taken from anybody. What a player holds is counted with
  * `clear <player> <item> 0`, which removes nothing and answers how many there
@@ -78,20 +80,55 @@ const SEEN = "pe_seen";
 const CAP = "pe_cap";
 /** What each player has gathered so far, zero included, for their action bar. */
 export const PROGRESS = "pe_prog";
+/** The points of the rounds already over. */
+const BANKED = "pe_gtot";
+/** This round's points: what was gathered, times what one is worth. */
+const POINTS = "pe_gpts";
+/** Both together, what the side panel shows. */
+const TOTAL = "pe_gsum";
+/** Where what one item of this round is worth is kept, under `#worth`. */
+const WORTH_HOLDER = "pe_gk";
 
-/** The material for one run: the one chosen, or one drawn from the list. */
+/**
+ * Points for one item of each material: about what a player gathers of it in a
+ * minute, turned round, so a minute of any of them is worth about the same -
+ * a stack of cobblestone is a minute's work, an iron ingot mined and smelted a
+ * good part of one.
+ */
+export const WORTH: Readonly<Record<GatherMaterial, number>> = {
+    wheat: 2,
+    logs: 4,
+    cobblestone: 1,
+    iron_ingot: 12,
+    coal: 5,
+    kelp: 1,
+    bamboo: 1,
+    sugar_cane: 2,
+    potato: 3,
+    carrot: 3,
+    sand: 1,
+    pumpkin: 8
+};
+
+/**
+ * The material for a round: the one chosen, or one drawn from the list - none
+ * of the rounds before it (`used`) while any is left.
+ */
 export function drawMaterial(
-    options: EventOptions<"gathering">,
-    random: () => number
+    options: Pick<EventOptions<"gathering">, "material">,
+    random: () => number,
+    used: readonly string[] = []
 ): GatherMaterial {
     if (options.material !== "random") return options.material;
-    return GATHER_MATERIALS[Math.floor(random() * GATHER_MATERIALS.length)] ?? "wheat";
+    const fresh = GATHER_MATERIALS.filter((one) => !used.includes(one));
+    const from = fresh.length > 0 ? fresh : GATHER_MATERIALS;
+    return from[Math.floor(random() * from.length)] ?? "wheat";
 }
 
 /** The material a stored run is for, whatever was written. */
 export function materialOf(
     stored: string | null,
-    options: EventOptions<"gathering">
+    options: Pick<EventOptions<"gathering">, "material">
 ): GatherMaterial {
     const known = GATHER_MATERIALS.find((one) => one === stored);
     if (known) return known;
@@ -140,9 +177,21 @@ function making(material: GatherMaterial): {
     };
 }
 
-/** The objectives it counts with. The statistics count from this moment on. */
-export function gatheringSetup(material: GatherMaterial): string[] {
+/**
+ * The objectives a round counts with, made afresh - the statistics count from
+ * this moment on - and what one of its material is worth. The first round also
+ * makes the points kept across rounds.
+ */
+export function gatheringSetup(material: GatherMaterial, first = true): string[] {
     const lines: string[] = [];
+    if (first) {
+        for (const objective of [BANKED, WORTH_HOLDER]) {
+            lines.push(
+                `scoreboard objectives remove ${objective}`,
+                `scoreboard objectives add ${objective} dummy`
+            );
+        }
+    }
     const made = making(material);
     for (const one of [...statistics(material), ...(made ? [made.made, ...made.from] : [])]) {
         lines.push(
@@ -150,14 +199,31 @@ export function gatheringSetup(material: GatherMaterial): string[] {
             `scoreboard objectives add ${one.objective} ${one.criterion}`
         );
     }
-    for (const objective of [HAVE, BASE, SEEN, CAP, PROGRESS, ...(made ? [MADE, RAW] : [])]) {
+    for (const objective of [
+        HAVE,
+        BASE,
+        SEEN,
+        CAP,
+        PROGRESS,
+        POINTS,
+        TOTAL,
+        ...(made ? [MADE, RAW] : [])
+    ]) {
         lines.push(
             `scoreboard objectives remove ${objective}`,
             `scoreboard objectives add ${objective} dummy`
         );
     }
+    lines.push(`scoreboard players set #worth ${WORTH_HOLDER} ${WORTH[material]}`);
     return lines;
 }
+
+/** The round that is over added to everybody's points - after its last tick,
+ *  before the next round's setup empties its counts. */
+export const BANK_ROUND = [
+    `scoreboard players add @a ${BANKED} 0`,
+    `execute as @a run scoreboard players operation @s ${BANKED} += @s ${POINTS}`
+];
 
 /**
  * Everybody's count brought up to date: what they hold now, against what they
@@ -196,9 +262,15 @@ export function gatheringTick(material: GatherMaterial): string[] {
         `execute as @a run scoreboard players operation @s ${PROGRESS} -= @s ${BASE}`,
         `execute as @a run scoreboard players operation @s ${PROGRESS} < @s ${CAP}`,
         `scoreboard players set @a[scores={${PROGRESS}=..-1}] ${PROGRESS} 0`,
-        `execute as @a[scores={${PROGRESS}=1..}] run scoreboard players operation @s pe_score = @s ${PROGRESS}`,
+        // Points: this round's count times its worth, on top of the rounds before.
+        `scoreboard players add @a ${BANKED} 0`,
+        `execute as @a run scoreboard players operation @s ${POINTS} = @s ${PROGRESS}`,
+        `execute as @a run scoreboard players operation @s ${POINTS} *= #worth ${WORTH_HOLDER}`,
+        `execute as @a run scoreboard players operation @s ${TOTAL} = @s ${BANKED}`,
+        `execute as @a run scoreboard players operation @s ${TOTAL} += @s ${POINTS}`,
+        `execute as @a[scores={${TOTAL}=1..}] run scoreboard players operation @s pe_score = @s ${TOTAL}`,
         // Somebody on the panel whose count fell back to nothing shows nothing.
-        `execute as @a[scores={pe_score=1..,${PROGRESS}=0}] run ${setScore("@s", 0)}`
+        `execute as @a[scores={pe_score=1..,${TOTAL}=0}] run ${setScore("@s", 0)}`
     );
     return lines;
 }
@@ -209,7 +281,19 @@ export const READ_PROGRESS = `execute as @a run scoreboard players get @s ${PROG
 /** Every objective any gathering makes, taken back out. Fails harmlessly for
  *  the ones this one did not make. */
 export function gatheringCleanup(): string[] {
-    const every = new Set<string>([HAVE, BASE, SEEN, CAP, PROGRESS, MADE, RAW]);
+    const every = new Set<string>([
+        HAVE,
+        BASE,
+        SEEN,
+        CAP,
+        PROGRESS,
+        MADE,
+        RAW,
+        BANKED,
+        POINTS,
+        TOTAL,
+        WORTH_HOLDER
+    ]);
     for (const material of GATHER_MATERIALS) {
         for (const one of statistics(material)) every.add(one.objective);
         const made = making(material);

@@ -34,8 +34,22 @@
 
 import { z } from "zod";
 import * as stage from "./stage";
+import * as plan from "../plan";
 import * as catalog from "../catalog";
-import { BAR, BOSS_FIGHT_REACH, BOSS_TAG, GRIEF_RULES, SUM, asciiJson, text } from "../commands";
+import * as speech from "../../speech";
+import {
+    BAR,
+    BOSS_FIGHT_REACH,
+    BOSS_TAG,
+    DROPS_NOTHING,
+    GRIEF_RULES,
+    MOB_WEAPONS,
+    SUM,
+    armLines,
+    asciiJson,
+    equipLines as equipped,
+    text
+} from "../commands";
 
 type Options = catalog.EventOptions<"world-boss">;
 type BossKind = catalog.BossKind;
@@ -60,9 +74,8 @@ const WORLD = "execute in minecraft:overworld run";
 export interface BossProfile {
     /** The mob, without its namespace. */
     readonly entity: string;
-    /** What it holds, when a summoned one is not handed it otherwise: only what
-     *  it needs to fight at all - a weapon would add its own damage on top of
-     *  the difficulty's. */
+    /** What it holds besides its kind's own weapon (`MOB_WEAPONS`), which it
+     *  is always handed: a summoned mob with data is handed nothing. */
     readonly hand: string | null;
     /** What it wears on its head. */
     readonly head: string | null;
@@ -126,12 +139,29 @@ export const BOSSES: Readonly<Record<BossKind, BossProfile>> = {
     }
 };
 
-/** Minions that fight with something they must be handed. */
-const MINION_HANDS: Readonly<Record<string, string>> = {
-    skeleton: "minecraft:bow",
-    pillager: "minecraft:crossbow",
-    vindicator: "minecraft:iron_axe"
+/**
+ * What a weapon adds to its holder's attack, which is taken off the boss's own
+ * attack so the difficulty's damage is what it deals: a mob's attack counts the
+ * modifiers of what it holds, as a player's does.
+ */
+export const WEAPON_DAMAGE: Readonly<Record<string, number>> = {
+    "minecraft:stone_sword": 4,
+    "minecraft:iron_axe": 8,
+    "minecraft:iron_sword": 5,
+    "minecraft:golden_sword": 3
 };
+
+/** What the boss holds: its own weapon, or its kind's. */
+export function bossWeapon(kind: BossKind): string | null {
+    const profile = BOSSES[kind];
+    return profile.hand ?? MOB_WEAPONS[profile.entity] ?? null;
+}
+
+/** Its attack for a difficulty, less what its weapon adds. */
+export function bossAttack(kind: BossKind, difficulty: BossDifficulty): number {
+    const weapon = bossWeapon(kind);
+    return Math.max(1, DIFFICULTY[difficulty].attack - (weapon ? (WEAPON_DAMAGE[weapon] ?? 0) : 0));
+}
 
 /** Kinds that call for reinforcements when hurt, which would come untagged. */
 const CALLS_FOR_HELP = ["husk", "zombie"];
@@ -405,7 +435,7 @@ export function arenaSpot(origin: Point, index: number): stage.Spot {
 }
 
 /** Where the boss stands in the arena: the middle of the floor. */
-export function arenaCentre(origin: Point): Point {
+export function arenaCenter(origin: Point): Point {
     return { x: origin.x + 0.5, y: origin.y + 1, z: origin.z + 0.5 };
 }
 
@@ -442,11 +472,19 @@ export function insideArena(origin: Point, at: Point): boolean {
     );
 }
 
-/** The beam up to the arena, and who is standing in it and not up yet. */
-export function liftBeam(lift: Point): string {
-    return `${WORLD} particle minecraft:end_rod ${lift.x + 0.5} ${lift.y + 15} ${lift.z + 0.5} 0.2 15 0.2 0.01 80 force`;
+/** The beam up to the arena: a tall, dense column of light from the ground to
+ *  the arena, seen from far off, and a glow round its foot where to step in. */
+export function liftBeam(lift: Point): string[] {
+    const x = lift.x + 0.5;
+    const z = lift.z + 0.5;
+    const half = (ARENA_HEIGHT + ARENA_ROOM) / 2;
+    return [
+        `${WORLD} particle minecraft:end_rod ${x} ${lift.y + half} ${z} 0.15 ${half} 0.15 0.005 240 force`,
+        `${WORLD} particle minecraft:glow ${x} ${lift.y + 1} ${z} 0.8 0.6 0.8 0 30 force`
+    ];
 }
 
+/** Who is standing in the beam and not up yet. */
 export function inLift(lift: Point): string {
     return `execute in minecraft:overworld positioned ${lift.x + 0.5} ${lift.y + 0.5} ${lift.z + 0.5} as @a[distance=..2.5,tag=!${stage.IN_ARENA},gamemode=!creative,gamemode=!spectator] run data get entity @s Pos`;
 }
@@ -483,18 +521,17 @@ export function letGoLines(saved: stage.Saved, note: string): string[] {
 const KEEPS_NOTHING = [
     'PersistenceRequired:1b,CanPickUpLoot:0b,CanBreakDoors:0b,DeathLootTable:"minecraft:empty"',
     "CanJoinRaid:0b,PatrolLeader:0b,Patrolling:0b",
-    "HandDropChances:[0.0f,0.0f],ArmorDropChances:[0.0f,0.0f,0.0f,0.0f]",
-    "drop_chances:{mainhand:0.0f,offhand:0.0f,head:0.0f,chest:0.0f,legs:0.0f,feet:0.0f}"
+    DROPS_NOTHING
 ].join(",");
 
 /** Its attributes by the names 1.13 to 1.15 use, in its own data. */
-function legacyAttributes(health: number, level: Difficulty): string {
+function legacyAttributes(health: number, level: Difficulty, attack: number): string {
     return [
         ["generic.maxHealth", Math.min(health, HEALTH_CAP)],
         ["generic.knockbackResistance", level.knockback],
         ["generic.armor", level.armor],
         ["generic.armorToughness", level.toughness],
-        ["generic.attackDamage", level.attack],
+        ["generic.attackDamage", attack],
         ["generic.followRange", 48]
     ]
         .map(([name, base]) => `{Name:"${name}",Base:${base}d}`)
@@ -510,7 +547,7 @@ export function summonLines(
 ): string[] {
     const profile = BOSSES[kind];
     const level = DIFFICULTY[difficulty];
-    const attributes = legacyAttributes(health, level);
+    const attributes = legacyAttributes(health, level, bossAttack(kind, difficulty));
     const data = `{Tags:["${BOSS_TAG}"],Glowing:1b,CustomNameVisible:1b,${KEEPS_NOTHING},Attributes:[${attributes}],Health:${Math.min(health, HEALTH_CAP)}f}`;
     return [
         `kill ${`@e[tag=${BOSS_TAG}]`}`,
@@ -532,7 +569,7 @@ export function attributeLines(
         `attribute ${BOSS} ${id("knockback_resistance")} base set ${level.knockback}`,
         `attribute ${BOSS} ${id("armor")} base set ${level.armor}`,
         `attribute ${BOSS} ${id("armor_toughness")} base set ${level.toughness}`,
-        `attribute ${BOSS} ${id("attack_damage")} base set ${level.attack}`,
+        `attribute ${BOSS} ${id("attack_damage")} base set ${bossAttack(kind, difficulty)}`,
         `attribute ${BOSS} ${id("follow_range")} base set 48`,
         // No fall damage (1.20.5 on).
         `attribute ${BOSS} ${id("safe_fall_distance")} base set 1024`
@@ -557,16 +594,14 @@ export function equipLines(
     slot: "weapon.mainhand" | "armor.head",
     item: string
 ): string[] {
-    return [
-        `item replace entity ${selector} ${slot} with ${item}`,
-        `replaceitem entity ${selector} ${slot} ${item}`
-    ];
+    return equipped(selector, slot, item);
 }
 
 export function bossEquipLines(kind: BossKind): string[] {
     const profile = BOSSES[kind];
+    const weapon = bossWeapon(kind);
     return [
-        ...(profile.hand ? equipLines(BOSS, "weapon.mainhand", profile.hand) : []),
+        ...(weapon ? equipLines(BOSS, "weapon.mainhand", weapon) : []),
         ...(profile.head ? equipLines(BOSS, "armor.head", profile.head) : [])
     ];
 }
@@ -722,14 +757,14 @@ export function fightersWhere(arena: boolean): string {
 
 // ------------------------------------------------------------------ phases
 
-export type BarColour = "yellow" | "purple" | "red";
+export type BarColor = "yellow" | "purple" | "red";
 
-export function phaseColour(phase: Phase): BarColour {
+export function phaseColor(phase: Phase): BarColor {
     return phase === 1 ? "yellow" : phase === 2 ? "purple" : "red";
 }
 
-export function barColourLine(phase: Phase): string {
-    return `bossbar set ${BAR} color ${phaseColour(phase)}`;
+export function barColorLine(phase: Phase): string {
+    return `bossbar set ${BAR} color ${phaseColor(phase)}`;
 }
 
 /** A title to the fighters only. */
@@ -745,6 +780,23 @@ export function titleToFighters(arena: boolean, title: string, subtitle: string)
 /** A line in the fighters' action bar. */
 export function actionbarToFighters(arena: boolean, line: string): string {
     return `${AT_BOSS} run title ${fighters(arena)} actionbar ${text(line)}`;
+}
+
+/**
+ * Each fighter's own damage so far above their hotbar, read by the game itself
+ * from the count the side panel shows (`SUM`, in health points): no answer to
+ * wait for. `label` is what goes before it, in each language.
+ */
+export function damageBarLine(arena: boolean, label: Readonly<Record<catalog.Language, string>>): string {
+    const json = (words: string) =>
+        asciiJson(
+            JSON.stringify([
+                "",
+                { text: words, color: "yellow" },
+                { score: { name: "@s", objective: SUM }, color: "aqua", bold: true }
+            ])
+        );
+    return `${AT_BOSS} as ${fighters(arena)} run title @s actionbar ${speech.perLanguage({ en: json(label.en), es: json(label.es) })}`;
 }
 
 /** A line in the fighters' chat. */
@@ -798,8 +850,7 @@ export function minionLines(
             `${AT_BOSS} unless entity @e[tag=${NEW_TAG}] run summon minecraft:${minion} ~ ~ ~ ${data}`
         );
     const fresh = `@e[tag=${NEW_TAG}]`;
-    const hand = MINION_HANDS[minion];
-    if (hand) lines.push(...equipLines(fresh, "weapon.mainhand", hand));
+    lines.push(...armLines(`tag=${NEW_TAG}`, [minion]));
     if (CALLS_FOR_HELP.includes(minion)) {
         for (const id of [
             "minecraft:spawn_reinforcements",
@@ -923,7 +974,7 @@ export interface AbilityContext {
     readonly target: string | null;
     /** The warning in the fighters' action bar. */
     readonly warning: string;
-    /** Whether markers for the fangs are `marker` entities (1.17 on) or armour stands. */
+    /** Whether markers for the fangs are `marker` entities (1.17 on) or armor stands. */
     readonly markers: boolean;
 }
 
@@ -1017,7 +1068,7 @@ export function abilityLines(ability: Ability, ctx: AbilityContext): AbilityLine
                 };
             }
             const count = ctx.difficulty === "epic" ? 3 : 2;
-            const vex = `{Tags:["${FIGHT_TAG}"],LifeTicks:400,${KEEPS_NOTHING}}`;
+            const vex = `{Tags:["${FIGHT_TAG}","${NEW_TAG}"],LifeTicks:400,${KEEPS_NOTHING}}`;
             return {
                 warn: [
                     `${AT_BOSS} run particle minecraft:witch ~ ~1.5 ~ 1 1 1 0 40 force`,
@@ -1029,6 +1080,9 @@ export function abilityLines(ability: Ability, ctx: AbilityContext): AbilityLine
                         { length: count },
                         () => `${AT_BOSS} run summon minecraft:vex ~ ~1.5 ~ ${vex}`
                     ),
+                    // A vex the game summons carries an iron sword; one summoned with data, nothing.
+                    ...armLines(`tag=${NEW_TAG}`, ["vex"]),
+                    `tag @e[tag=${NEW_TAG}] remove ${NEW_TAG}`,
                     soundAt("minecraft:entity.evoker.cast_spell", 1)
                 ]
             };
@@ -1084,10 +1138,10 @@ export const TROPHY_ITEM = "minecraft:nether_star";
 export type NameSpelling = "text" | "json" | "tag";
 
 export function trophyArguments(name: string, lore: string, spelling: NameSpelling): string[] {
-    const json = (value: string, colour: string) =>
-        asciiJson(JSON.stringify({ text: value, color: colour, italic: false }));
-    const snbt = (value: string, colour: string) =>
-        `{text:${asciiJson(JSON.stringify(value))},color:"${colour}",italic:0b}`;
+    const json = (value: string, color: string) =>
+        asciiJson(JSON.stringify({ text: value, color: color, italic: false }));
+    const snbt = (value: string, color: string) =>
+        `{text:${asciiJson(JSON.stringify(value))},color:"${color}",italic:0b}`;
     const quoted = (value: string) => `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
     if (spelling !== "tag") {
         const asText = `${TROPHY_ITEM}[minecraft:custom_name=${snbt(name, "gold")},minecraft:lore=[${snbt(lore, "gray")}],minecraft:enchantment_glint_override=true]`;
@@ -1097,6 +1151,70 @@ export function trophyArguments(name: string, lore: string, spelling: NameSpelli
     return [
         `${TROPHY_ITEM}{display:{Name:${quoted(json(name, "gold"))},Lore:[${quoted(json(lore, "gray"))}]}}`
     ];
+}
+
+// ------------------------------------------------------------------ who wins
+
+/** What deciding a fight needs of its run. */
+export interface Decided {
+    readonly preset: catalog.EventPreset;
+    /** Whoever landed the final blow, once it has fallen. */
+    readonly decidedBy: string | null;
+}
+
+const lower = (name: string) => name.toLowerCase();
+
+function winnerOf(run: Decided): catalog.BossWinner {
+    return (run.preset.options as Options).winner ?? "damage";
+}
+
+/**
+ * The podium: by the damage dealt to it, as the side panel shows all through
+ * the fight - or, when the event is decided by the final blow, whoever landed
+ * it first, then the rest by their damage.
+ */
+export function podiumOf(
+    run: Decided,
+    scores: ReadonlyMap<string, number>,
+    disqualified: ReadonlySet<string>,
+    minimum: number
+): plan.Placed[] {
+    const killer = run.decidedBy;
+    if (winnerOf(run) !== "final-blow" || !killer || disqualified.has(lower(killer)))
+        return plan.podium(scores, disqualified, minimum);
+    const own = [...scores].find(([name]) => lower(name) === lower(killer));
+    const rest = new Map([...scores].filter(([name]) => lower(name) !== lower(killer)));
+    const first: plan.Placed = { place: 1, name: own?.[0] ?? killer, score: own?.[1] ?? 0 };
+    const others = plan
+        .podium(rest, disqualified, minimum)
+        .map((one) => ({ ...one, place: one.place + 1 }))
+        .filter((one) => one.place <= 3);
+    return [first, ...others];
+}
+
+/**
+ * Who the trophy goes to: nobody when it is switched off or the boss got away;
+ * whoever landed the final blow when that decides the event; otherwise whoever
+ * dealt the most damage - the podium's first.
+ */
+export function trophyWinner(run: Decided, placed: readonly plan.Placed[]): string | null {
+    const options = run.preset.options as Options;
+    if (options.trophy === false || !run.decidedBy) return null;
+    const name = winnerOf(run) === "final-blow" ? run.decidedBy : (placed[0]?.name ?? null);
+    return name && isPlayer(name) ? name : null;
+}
+
+/** Everybody who dealt any damage, most first, at most `limit` of them. */
+export function ranking(
+    scores: ReadonlyMap<string, number>,
+    disqualified: ReadonlySet<string>,
+    limit: number
+): { name: string; damage: number }[] {
+    return [...scores]
+        .filter(([name, damage]) => damage > 0 && !disqualified.has(lower(name)))
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, limit)
+        .map(([name, damage]) => ({ name, damage }));
 }
 
 // ------------------------------------------------------------------ the end

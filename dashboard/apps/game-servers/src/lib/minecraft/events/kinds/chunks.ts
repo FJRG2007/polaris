@@ -1,6 +1,6 @@
 /**
  * Chunks an event holds loaded beyond its own place - the ground round a
- * defence point, the chunks a meteor lies across - and only the ones nobody
+ * defense point, the chunks a meteor lies across - and only the ones nobody
  * held before it: a chunk the operator keeps loaded for a farm stays loaded
  * after the event, because the event never took it on.
  */
