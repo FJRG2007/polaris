@@ -534,7 +534,15 @@
         "greeNoneFound": "Ningún aire Gree respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
         "greeNoPair": "El aire respondió pero no quiso emparejarse. Quítale la corriente un minuto y vuelve a intentarlo.",
         "airNoHumidity": "Ese dispositivo no humidifica",
-        "airHumidity": "Este dispositivo no admite esa humedad"
+        "airHumidity": "Este dispositivo no admite esa humedad",
+        "philipsQuiet": "El purificador no respondió.",
+        "philipsLocalOff": "El firmware de este modelo no permite el control local. Responde en tu red, pero no al protocolo local que usa Polaris, así que solo se puede manejar desde la app Philips Air+.",
+        "philipsGarbled": "El purificador respondió de una forma que Polaris no pudo leer.",
+        "philipsRefused": "El purificador lo rechazó.",
+        "philipsLost": "Polaris ha perdido la pista de estos purificadores. Vuelve a conectarlos.",
+        "philipsNoneThere": "Ningún purificador Philips respondió en esa dirección. Comprueba que está encendido y en la misma red que Polaris.",
+        "philipsNoneFound": "Ningún purificador Philips respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
+        "philipsNoRead": "Los purificadores de esta red dijeron quiénes son pero no respondieron a una lectura. Apágalos y enciéndelos, y vuelve a intentarlo."
     },
     "connections": {
         "nuki-web": {
@@ -833,6 +841,22 @@
             "steps": {
                 "s0": "Configura el aire en la app Gree+, en la misma red wifi que Polaris.",
                 "s1": "Pulsa Conectar. Deja la dirección vacía para buscar todos los aparatos, o escribe una para emparejar solo ese."
+            },
+            "fields": {
+                "host": {
+                    "label": "Dirección",
+                    "hint": "Opcional. Vacía busca todos los aparatos de esta red; tu router muestra la dirección de cada uno entre sus dispositivos conectados.",
+                    "placeholder": "192.168.1.40"
+                }
+            }
+        },
+        "philips-coap": {
+            "label": "Philips Air+ (red local)",
+            "summary": "Los purificadores y humidificadores que usas con la app Philips Air+, directamente por tu red. Sin cuenta y sin pasar por la nube.",
+            "note": "Polaris busca los aparatos en tu red y los lee como hace Home Assistant. Antes tienen que estar configurados en la app Philips Air+ y en la misma red que Polaris. Algunos firmwares nuevos desactivan el control local; ese aparato solo se puede usar desde la app, y Polaris lo indica.",
+            "steps": {
+                "s0": "Configura el purificador en la app Philips Air+, en la misma red wifi que Polaris.",
+                "s1": "Pulsa Conectar. Deja la dirección vacía para buscar todos los aparatos, o escribe una para añadir solo ese."
             },
             "fields": {
                 "host": {

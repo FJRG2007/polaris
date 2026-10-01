@@ -604,6 +604,42 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "local"
         ]
     },
+    // Philips air purifiers and humidifiers: local, like Home Assistant's
+    // Philips integration - Philips' cloud API is not public. Units are found on
+    // the network, or at an address; nothing is paired and no key is kept.
+    {
+        id: "philips-coap",
+        brand: "Philips",
+        recommended: true,
+        logo: "philips",
+        label: en("connections.philips-coap.label"),
+        reach: "same-network",
+        summary: en("connections.philips-coap.summary"),
+        note: en("connections.philips-coap.note"),
+        steps: [en("connections.philips-coap.steps.s0"), en("connections.philips-coap.steps.s1")],
+        fields: [
+            {
+                key: "host",
+                label: en("connections.philips-coap.fields.host.label"),
+                hint: en("connections.philips-coap.fields.host.hint"),
+                placeholder: en("connections.philips-coap.fields.host.placeholder"),
+                optional: true,
+                maxLength: 200
+            }
+        ],
+        kinds: ["air"],
+        search: [
+            "philips",
+            "air+",
+            "air plus",
+            "clean home+",
+            "air purifier",
+            "purifier",
+            "humidifier",
+            "air quality",
+            "local"
+        ]
+    },
     {
         id: "hue-bridge",
         brand: "Philips Hue",

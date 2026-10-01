@@ -18,6 +18,12 @@
 import type { PlacesTranslator } from "./i18n";
 import type { PlacesKey } from "../../messages";
 import { DEVICE_ACTION_VERBS, DEVICE_KIND_LABELS } from "./device-kinds";
+import {
+    PHILIPS_GARBLED,
+    PHILIPS_LOCAL_OFF,
+    PHILIPS_QUIET,
+    PHILIPS_REFUSED
+} from "./integrations/philips-sentences";
 
 /** Sentences with nothing to fill in, by their English. */
 const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
@@ -256,6 +262,23 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     [
         "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
         "refusals.greeNoPair"
+    ],
+    [PHILIPS_QUIET, "refusals.philipsQuiet"],
+    [PHILIPS_LOCAL_OFF, "refusals.philipsLocalOff"],
+    [PHILIPS_GARBLED, "refusals.philipsGarbled"],
+    [PHILIPS_REFUSED, "refusals.philipsRefused"],
+    ["Polaris has lost track of these air purifiers. Connect them again.", "refusals.philipsLost"],
+    [
+        "No Philips air purifier answered at that address. Check it is switched on and on the same network as Polaris.",
+        "refusals.philipsNoneThere"
+    ],
+    [
+        "No Philips air purifier answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "refusals.philipsNoneFound"
+    ],
+    [
+        "The air purifiers on this network said who they are but would not answer a read. Switch them off and on again and try once more.",
+        "refusals.philipsNoRead"
     ]
 ]);
 

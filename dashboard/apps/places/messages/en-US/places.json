@@ -534,7 +534,15 @@
         "greeNoneFound": "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
         "greeNoPair": "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
         "airNoHumidity": "That device does not humidify",
-        "airHumidity": "That humidity is not one this device accepts"
+        "airHumidity": "That humidity is not one this device accepts",
+        "philipsQuiet": "The air purifier did not answer.",
+        "philipsLocalOff": "This model's firmware does not allow local control. It answers on your network but not to the local protocol Polaris uses, so it can only be operated from the Philips Air+ app.",
+        "philipsGarbled": "The air purifier answered in a way Polaris could not read.",
+        "philipsRefused": "The air purifier refused that.",
+        "philipsLost": "Polaris has lost track of these air purifiers. Connect them again.",
+        "philipsNoneThere": "No Philips air purifier answered at that address. Check it is switched on and on the same network as Polaris.",
+        "philipsNoneFound": "No Philips air purifier answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "philipsNoRead": "The air purifiers on this network said who they are but would not answer a read. Switch them off and on again and try once more."
     },
     "connections": {
         "nuki-web": {
@@ -833,6 +841,22 @@
             "steps": {
                 "s0": "Set the air conditioner up in the Gree+ app, on the same Wi-Fi network as Polaris.",
                 "s1": "Select Connect. Leave the address empty to look for every unit, or type one to pair just that unit."
+            },
+            "fields": {
+                "host": {
+                    "label": "Unit address",
+                    "hint": "Optional. Empty looks for every unit on this network; your router lists each unit's address among its connected devices.",
+                    "placeholder": "192.168.1.40"
+                }
+            }
+        },
+        "philips-coap": {
+            "label": "Philips Air+ (local network)",
+            "summary": "The air purifiers and humidifiers you use with the Philips Air+ app, straight over your network. No account, nothing through the cloud.",
+            "note": "Polaris finds the units on your network and reads them the way Home Assistant does. They have to be set up in the Philips Air+ app first, and on the same network as Polaris. Some newer firmware switches local control off; such a unit can only be used from the app, and Polaris says so.",
+            "steps": {
+                "s0": "Set the purifier up in the Philips Air+ app, on the same Wi-Fi network as Polaris.",
+                "s1": "Select Connect. Leave the address empty to look for every unit, or type one to add just that unit."
             },
             "fields": {
                 "host": {
