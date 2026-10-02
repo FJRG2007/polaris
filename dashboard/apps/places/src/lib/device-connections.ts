@@ -1027,6 +1027,14 @@ export function fieldsComplete(
     });
 }
 
+/** One field's value in its stored form: trimmed, and an address lowercased so
+ *  it has one form whatever case it was typed in. The dialog and the server
+ *  both run a value through this. */
+export function normalizeField(field: ConnectionField, raw: unknown): string {
+    const typed = (typeof raw === "string" ? raw : "").trim();
+    return field.format === "email" ? typed.toLowerCase() : typed;
+}
+
 /**
  * The fields as they should be stored: trimmed, defaults filled in, and nothing
  * the connection did not ask for.
@@ -1041,10 +1049,7 @@ export function normalizeFields(
 ): Record<string, string> {
     const clean: Record<string, string> = {};
     for (const field of connection.fields) {
-        const raw = fields[field.key];
-        const typed = (typeof raw === "string" ? raw : "").trim();
-        // One stored form for an address, whatever case it was typed in.
-        const value = (field.format === "email" ? typed.toLowerCase() : typed) || field.defaultValue || "";
+        const value = normalizeField(field, fields[field.key]) || field.defaultValue || "";
         if (value) clean[field.key] = value;
     }
     return clean;

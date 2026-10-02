@@ -125,6 +125,7 @@ describe("a connection made by pairing", () => {
             expect(registry.fieldsComplete(philips!, { email: slip })).toBe(false);
         }
         expect(registry.normalizeFields(philips!, { email: " Owner@Example.COM " }).email).toBe("owner@example.com");
+        expect(registry.normalizeField(email, " Owner@Example.COM ")).toBe("owner@example.com");
     });
 
     it("keeps the typed Tuya project as a second way in", () => {

@@ -84,6 +84,23 @@ describe("a refusal from Places", () => {
         );
     });
 
+    it("keeps what Philips said when it refused, in Spanish around it", () => {
+        expect(
+            placesRefusalText(
+                es,
+                "Philips did not accept the code. Check it, or ask for a new one. Philips said: Invalid code (403042)."
+            )
+        ).toBe("Philips no ha aceptado el código. Compruébalo o pide otro. Philips dijo: Invalid code (403042).");
+        expect(
+            placesRefusalText(
+                es,
+                "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with. Philips said: Invalid parameter value (400006)."
+            )
+        ).toBe(
+            "Philips no ha enviado un código a esa dirección. Comprueba que es la que usas en la app Air+. Philips dijo: Invalid parameter value (400006)."
+        );
+    });
+
     it("passes a camera's own words through", () => {
         const said = "401 Unauthorized: bad digest";
         expect(placesRefusalText(es, said)).toBe(said);

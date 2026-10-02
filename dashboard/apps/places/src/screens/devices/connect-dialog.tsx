@@ -236,6 +236,10 @@ function Field({
                     autoComplete="off"
                     placeholder={words.placeholder}
                     onChange={(event) => onChange(event.target.value)}
+                    onBlur={() => {
+                        const normalized = registry.normalizeField(field, value);
+                        if (normalized !== value) onChange(normalized);
+                    }}
                     aria-label={words.label}
                 />
             )}

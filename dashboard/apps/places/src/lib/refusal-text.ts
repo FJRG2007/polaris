@@ -295,6 +295,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.philipsCloudUnfinished"
     ],
     ["That code is not right or has expired. Ask for a new one.", "refusals.philipsCloudBadCode"],
+    ["Philips did not accept the code. Check it, or ask for a new one.", "refusals.philipsCloudBadCode"],
     ["The device did not answer through Philips' cloud.", "refusals.philipsCloudQuiet"],
     ["The device is busy. Try again in a moment.", "refusals.philipsCloudBusy"],
     [
@@ -343,6 +344,17 @@ const SHAPED: readonly {
             /^Polaris found no device on this Philips account\. What it saw: (.+)\. Check that the device is in a Philips app under this same email\.$/s,
         key: "refusals.philipsCloudNothing",
         params: ["summary"]
+    },
+    {
+        pattern:
+            /^Philips did not send a code to that address\. Check it is the one you sign in to the Air\+ app with\. Philips said: (.+)\.$/s,
+        key: "refusals.philipsCloudNoCodeSaid",
+        params: ["said"]
+    },
+    {
+        pattern: /^Philips did not accept the code\. Check it, or ask for a new one\. Philips said: (.+)\.$/s,
+        key: "refusals.philipsCloudBadCodeSaid",
+        params: ["said"]
     },
     {
         pattern: /^(.+) is set to be watched, not operated$/s,
