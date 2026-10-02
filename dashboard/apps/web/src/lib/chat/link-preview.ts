@@ -185,6 +185,14 @@ export async function unfurl(address: string): Promise<void> {
         fetchedAt: new Date()
     };
 
+    if (existing?.ok && !data.ok) {
+        await prisma.linkPreview.updateMany({
+            where: { url: url.href },
+            data: { fetchedAt: data.fetchedAt }
+        });
+        return;
+    }
+
     await prisma.linkPreview.upsert({
         where: { url: url.href },
         create: { url: url.href, ...data },

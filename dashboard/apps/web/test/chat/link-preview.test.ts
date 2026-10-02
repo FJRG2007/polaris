@@ -449,6 +449,46 @@ describe("a share-button short link", () => {
         expect(fetched).toEqual([]);
     });
 
+    it("keeps a card that was drawn when a later look fails", async () => {
+        rows.existing = {
+            ok: true,
+            url: share,
+            target: video,
+            fetchedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+        };
+        responses.set(share, { status: 500, headers: {}, body: "" });
+        await unfurl(share);
+        expect(stored).toEqual([]);
+        expect(rows.updates).toHaveLength(1);
+        const update = rows.updates[0]!;
+        expect(update.where).toEqual({ url: share });
+        expect(Date.now() - update.data.fetchedAt.getTime()).toBeLessThan(60 * 1000);
+    });
+
+    it("replaces a card that was drawn when a later look succeeds", async () => {
+        rows.existing = {
+            ok: true,
+            url: share,
+            target: video,
+            fetchedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+        };
+        await unfurl(share);
+        expect(stored[0]?.title).toBe("A caption");
+        expect(rows.updates).toEqual([]);
+    });
+
+    it("records a failure over a card that was never drawn", async () => {
+        rows.existing = {
+            ok: false,
+            url: share,
+            target: null,
+            fetchedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+        };
+        responses.set(share, { status: 500, headers: {}, body: "" });
+        await unfurl(share);
+        expect(stored[0]?.ok).toBe(false);
+    });
+
     it("is not how an ordinary link is treated", async () => {
         responses.set("http://example.com/", page("A page"));
         await unfurl("http://example.com/");
