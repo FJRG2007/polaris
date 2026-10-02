@@ -14,6 +14,7 @@ import { withMessages } from "../setup/i18n";
 
 vi.mock("../../src/app/(app)/account/domains/actions", () => ({}));
 vi.mock("../../src/app/(app)/account/domains/dns-actions", () => ({}));
+vi.mock("../../src/app/(app)/account/domains/security-actions", () => ({}));
 
 const { OwnerDomainsView } = await import("@/components/owner-domains-view");
 

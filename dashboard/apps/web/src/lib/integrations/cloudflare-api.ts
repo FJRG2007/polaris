@@ -593,3 +593,29 @@ export async function deleteDnsRecord(token: string, zoneId: string, recordId: s
 export async function deleteTunnel(token: string, accountId: string, tunnelId: string): Promise<void> {
     await cf(token, "DELETE", `/accounts/${accountId}/cfd_tunnel/${tunnelId}`);
 }
+
+/** A zone's DNSSEC state, and the DS record its registrar needs once it signs. */
+export interface CfDnssec {
+    /** active | pending | disabled | pending-disabled | error */
+    readonly status: string;
+    /** The whole DS record as a registrar's form takes it, once there is a key. */
+    readonly ds: string | null;
+}
+
+function dnssecOf(result: unknown): CfDnssec {
+    const body = result as { status?: unknown; ds?: unknown };
+    if (typeof body?.status !== "string") throw new CloudflareApiError("Unexpected DNSSEC response from Cloudflare");
+    return { status: body.status, ds: typeof body.ds === "string" && body.ds.trim() ? body.ds.trim() : null };
+}
+
+/** Where a zone's signing stands. Needs Zone - DNS: Read. */
+export async function getZoneDnssec(token: string, zoneId: string): Promise<CfDnssec> {
+    return dnssecOf(await cf<unknown>(token, "GET", `/zones/${encodeURIComponent(zoneId)}/dnssec`));
+}
+
+/** Sign a zone. Cloudflare answers `pending` until the DS record is at the
+ *  registrar - which a domain registered with Cloudflare gets on its own. Needs
+ *  Zone - DNS: Edit, the scope the token already has for records. */
+export async function enableZoneDnssec(token: string, zoneId: string): Promise<CfDnssec> {
+    return dnssecOf(await cf<unknown>(token, "PATCH", `/zones/${encodeURIComponent(zoneId)}/dnssec`, { status: "active" }));
+}

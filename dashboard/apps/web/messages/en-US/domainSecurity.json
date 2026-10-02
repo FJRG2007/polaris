@@ -1,0 +1,532 @@
+{
+    "title": "Domain security",
+    "grade": {
+        "protected": "Protected",
+        "fair": "Minor issues",
+        "weak": "Needs work",
+        "exposed": "At risk",
+        "unknown": "Not checked"
+    },
+    "checked": "Checked",
+    "notChecked": "Not checked yet. The first check reads public DNS, registration and the website, and takes a few seconds.",
+    "checkNow": "Check now",
+    "recheckNamed": "Check {domain} again",
+    "recheck": "Check again",
+    "checking": "Checking",
+    "summary": "{count, plural, =0 {Nothing to fix} one {# problem to fix} other {# problems to fix}}",
+    "sections": {
+        "email": "Email",
+        "dns": "DNS",
+        "registration": "Registration",
+        "web": "Web"
+    },
+    "sectionsLabel": "Area",
+    "severity": {
+        "pass": "Passed",
+        "info": "Info",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+    },
+    "where": {
+        "dnsManaged": "Polaris can publish this",
+        "dns": "Add it at your DNS host",
+        "dnssecManaged": "Polaris can switch it on",
+        "dnssec": "Switch it on at your DNS host",
+        "registrar": "Only your registrar can do this",
+        "edge": "Polaris can set this",
+        "site": "Change it on that server"
+    },
+    "nothingHere": "Nothing to fix here.",
+    "passed": "{count, plural, one {# check passed} other {# checks passed}}",
+    "fix": {
+        "review": "{count, plural, one {Review # fix} other {Review # fixes}}",
+        "title": "Fixes for {domain}",
+        "intro": "Nothing changes until you apply. A record already published is shown next to what replaces it.",
+        "none": "Polaris has nothing to change here. What is left is fixed at your registrar or on your server.",
+        "loading": "Reading the zone",
+        "action": {
+            "create": "Add",
+            "update": "Change",
+            "delete": "Remove"
+        },
+        "dnssec": "Sign the zone with DNSSEC",
+        "dnssecHint": "Your registrar then needs the DS record the zone shows. A domain registered with Cloudflare gets it on its own.",
+        "edge": "Recommended security headers",
+        "edgeHint": "HSTS for 6 months, no MIME sniffing, a strict referrer policy and framing by the same site only, on {hostname}.",
+        "now": "Now",
+        "after": "After",
+        "nothing": "Nothing",
+        "include": "Include {name}",
+        "policy": {
+            "label": "DMARC policy",
+            "keep": "Keep current",
+            "quarantine": "Quarantine",
+            "reject": "Reject",
+            "hint": "Tighten only once every service that sends as {domain} passes - the senders list shows which do. Failing mail then goes to spam (quarantine) or is refused (reject)."
+        },
+        "apply": "{count, plural, one {Apply # change} other {Apply # changes}}",
+        "applying": "Applying",
+        "applied": "{ok, plural, one {# change made} other {# changes made}}",
+        "someFailed": "{failed, plural, one {# change was not made} other {# changes were not made}}: {detail}",
+        "cannotOwner": "Polaris publishes these for you once this domain has a Cloudflare token (under its certificate).",
+        "cannotAdmin": "Polaris publishes these for you when the Cloudflare account connected under Integrations holds this zone."
+    },
+    "dedicated": {
+        "label": "Keep it fixed automatically",
+        "hint": "For a domain only Polaris uses. The daily check publishes the safe fixes itself - never a stricter DMARC policy - and tells you what it changed.",
+        "last": "{applied, plural, one {Last automatic fix: # change,} other {Last automatic fix: # changes,}}"
+    },
+    "reports": {
+        "title": "Who sends as {domain}",
+        "intro": "From the DMARC reports receivers sent in the last 30 days, worst first.",
+        "source": "Source",
+        "messages": "Messages",
+        "passed": "Passed",
+        "signedBy": "Signed by",
+        "verdict": "Verdict",
+        "nobody": "Nobody",
+        "verdicts": {
+            "authorized": "Authorized",
+            "misconfigured": "Not set up",
+            "spoofing": "Spoofing"
+        },
+        "hints": {
+            "authorized": "All its mail passed. If you do not recognize this sender, an account or key that sends as the domain is compromised.",
+            "misconfigured": "Some mail failed but it signs or passes SPF for some domain: a real sender that needs adding to SPF or signing with DKIM.",
+            "spoofing": "Every message failed and nothing signed it: somebody forging the domain. DMARC at reject refuses this mail."
+        },
+        "noneYet": "No reports yet. Receivers send them once a day to {address}.",
+        "elsewhere": "Reports for {domain} go to {hosts}, so they are read there, not in Polaris. Polaris reads them for domains on its own mail server.",
+        "nowhere": "No report address is published, so nobody learns who sends as {domain}. Polaris reads reports for domains on its own mail server."
+    },
+    "admin": {
+        "intro": "Every domain Polaris knows, checked each day for spoofing, DNS, registration and HTTPS problems. You are told when one gets worse.",
+        "empty": "Polaris does not know any domain yet. Set one up above, connect a Cloudflare account, or deploy on a domain of your own.",
+        "loading": "Loading domains",
+        "domain": "Domain",
+        "known": "Known from",
+        "state": "State",
+        "show": "Show {domain}",
+        "hide": "Hide {domain}",
+        "problems": "{count, plural, =0 {No problems} one {# problem} other {# problems}}",
+        "sources": {
+            "instance": "This Polaris",
+            "cloudflare": "Cloudflare",
+            "owner": "Brought by a user",
+            "mail-server": "Mail server",
+            "deploy": "Deployments"
+        }
+    },
+    "errors": {
+        "notFound": "That domain is not one you can see here.",
+        "cannotFix": "Polaris cannot write this domain's DNS.",
+        "planChanged": "The records changed since the preview. Review the fixes again.",
+        "tooSoon": "It was checked a moment ago.",
+        "failed": "That did not work. Try again in a moment."
+    },
+    "notice": {
+        "worse": "{domain}: {count, plural, one {# new security problem} other {# new security problems}}",
+        "worseBody": "{fixed, plural, =0 {Open the domain to see what to fix.} one {Polaris fixed # record itself. Open the domain to see what is left.} other {Polaris fixed # records itself. Open the domain to see what is left.}}",
+        "fixed": "{domain}: Polaris fixed {count, plural, one {# record} other {# records}}",
+        "fixedBody": "The daily check found problems it could fix itself and published the fixes."
+    },
+    "findings": {
+        "mxOk": {
+            "title": "Mail servers published",
+            "risk": "Mail for the domain goes to {hosts}."
+        },
+        "mxNull": {
+            "title": "Declares it takes no mail",
+            "risk": "A null MX tells senders not to try, so nothing waits in a queue for it."
+        },
+        "mxMissing": {
+            "title": "No mail servers",
+            "risk": "The domain sends mail but has no MX, so replies and bounces cannot come back and some receivers refuse its mail.",
+            "fix": "Publish the MX of the service that takes its mail, or the null MX below if nobody should write to it."
+        },
+        "spfOk": {
+            "title": "SPF is valid",
+            "risk": "It ends in {all} and costs {lookups} of the 10 DNS lookups allowed."
+        },
+        "spfMissing": {
+            "title": "No SPF record",
+            "risk": "Anybody can send mail claiming to be from this domain, and nothing tells receivers it is forged.",
+            "fix": "{parked, select, yes {This domain sends no mail: publish an SPF that allows nobody.} other {Publish one SPF listing every service that sends as the domain. The record below is a start; add each provider's include.}}"
+        },
+        "spfMultiple": {
+            "title": "More than one SPF record",
+            "risk": "With {count} SPF records receivers stop at an error and treat every message as unauthenticated.",
+            "fix": "Merge them into one record. Polaris merges them for you when it manages the zone."
+        },
+        "spfSyntax": {
+            "title": "SPF does not parse",
+            "risk": "Receivers stop at \"{term}\" and treat every message as unauthenticated.",
+            "fix": "Correct or remove that term."
+        },
+        "spfAllPass": {
+            "title": "SPF allows everybody",
+            "risk": "+all authorizes every server on the internet to send as the domain, which is worse than no SPF.",
+            "fix": "End the record with ~all or -all."
+        },
+        "spfAllNeutral": {
+            "title": "SPF ends in ?all",
+            "risk": "?all treats unlisted servers as neutral, so forged mail is not marked.",
+            "fix": "End the record with ~all, or -all once every sender is listed."
+        },
+        "spfAllSoft": {
+            "title": "SPF ends in ~all",
+            "risk": "Unlisted servers soft-fail: forged mail is marked but not refused. With DMARC at reject this is enough.",
+            "fix": "Move to -all once every sender is listed, or rely on DMARC enforcement."
+        },
+        "spfAllMissing": {
+            "title": "SPF has no all term",
+            "risk": "Without an all term unlisted servers are neutral, and forged mail passes unmarked.",
+            "fix": "End the record with ~all or -all."
+        },
+        "spfLookups": {
+            "title": "SPF needs too many lookups",
+            "risk": "It needs {count} DNS lookups. Past 10, receivers stop with an error and SPF fails for all mail.",
+            "fix": "Remove includes you no longer use, or replace them with the ip4 and ip6 ranges they list."
+        },
+        "spfVoid": {
+            "title": "SPF points at missing names",
+            "risk": "{count} lookups found nothing. Past 2, receivers stop with an error.",
+            "fix": "Remove the includes and mechanisms that point at names that are gone."
+        },
+        "spfIncludeMissing": {
+            "title": "SPF include has no SPF",
+            "risk": "{target} publishes no valid SPF, so checking ends with a permanent error.",
+            "fix": "Remove the include, or correct it to the provider's current name."
+        },
+        "spfPtr": {
+            "title": "SPF uses ptr",
+            "risk": "The ptr mechanism is slow, unreliable and deprecated; some receivers skip it.",
+            "fix": "Replace it with ip4, ip6 or include terms."
+        },
+        "spfUnchecked": {
+            "title": "SPF could not be checked",
+            "risk": "The public resolvers did not answer. It is tried again on the next check."
+        },
+        "dkimOk": {
+            "title": "DKIM keys found",
+            "risk": "Selectors with a key: {selectors}."
+        },
+        "dkimNone": {
+            "title": "No DKIM key found",
+            "risk": "None of the common selectors ({selectors}) has a key. Without DKIM, forwarded mail loses its SPF pass and fails DMARC.",
+            "fix": "Turn on DKIM signing at each service that sends as the domain and publish the key it gives you. If yours uses another selector, ignore this."
+        },
+        "dkimWeak": {
+            "title": "Weak DKIM key",
+            "risk": "Selector {selector} uses a {bits}-bit key, which can be broken and is refused by large receivers.",
+            "fix": "Generate a 2048-bit key at the sending service and publish it."
+        },
+        "dkimShort": {
+            "title": "DKIM key is 1024-bit",
+            "risk": "Selector {selector} uses {bits} bits. It works, but 2048 is the current recommendation.",
+            "fix": "Rotate to a 2048-bit key at the sending service."
+        },
+        "dkimTesting": {
+            "title": "DKIM key in test mode",
+            "risk": "Selector {selector} has t=y, so receivers may ignore failed signatures.",
+            "fix": "Remove t=y once signing works."
+        },
+        "dmarcOk": {
+            "title": "DMARC is enforced",
+            "risk": "Policy {policy}, subdomains {sp}. Forged mail is refused or sent to spam."
+        },
+        "dmarcMissing": {
+            "title": "No DMARC policy",
+            "risk": "Receivers have no instruction for mail that fails SPF and DKIM, so forged mail claiming this domain is delivered.",
+            "fix": "{parked, select, yes {This domain sends no mail: publish a policy that rejects everything.} other {Start at p=none to collect reports, then move to quarantine and reject once every sender passes.}}"
+        },
+        "dmarcMultiple": {
+            "title": "More than one DMARC record",
+            "risk": "With {count} records receivers ignore DMARC entirely.",
+            "fix": "Keep a single record at _dmarc."
+        },
+        "dmarcSyntax": {
+            "title": "DMARC does not parse",
+            "risk": "Receivers cannot read \"{term}\" and ignore the policy.",
+            "fix": "Correct the record: it starts with v=DMARC1 followed by p=."
+        },
+        "dmarcNone": {
+            "title": "DMARC only monitors",
+            "risk": "With p=none forged mail is still delivered; it only asks for reports.",
+            "fix": "Once every sender passes, move to quarantine, then reject."
+        },
+        "dmarcQuarantine": {
+            "title": "DMARC quarantines",
+            "risk": "Forged mail goes to spam rather than being refused.",
+            "fix": "Move to reject once nothing legitimate is quarantined."
+        },
+        "dmarcPct": {
+            "title": "DMARC covers part of the mail",
+            "risk": "pct={pct} applies the policy to {pct}% of failing mail; the rest is delivered.",
+            "fix": "Raise pct to 100, or remove it."
+        },
+        "dmarcSubdomainWeaker": {
+            "title": "Subdomains less protected",
+            "risk": "sp={sp} is weaker than p={p}, so mail forged from a subdomain gets through more easily.",
+            "fix": "Set sp to {p}, or remove it so subdomains inherit the policy."
+        },
+        "dmarcRuaMissing": {
+            "title": "No DMARC reports requested",
+            "risk": "Without rua nobody learns who sends as the domain, so spoofing and broken senders go unseen.",
+            "fix": "Add rua=mailto: with an address that receives reports."
+        },
+        "dmarcRuaUnauthorized": {
+            "title": "Report address not authorized",
+            "risk": "{host} has not published that it accepts reports for this domain, so receivers drop them.",
+            "fix": "Publish the authorization record at {host}, or use an address on this domain."
+        },
+        "parkedOk": {
+            "title": "Locked down, sends no mail",
+            "risk": "SPF allows nobody, DMARC rejects and the null MX refuses mail: the domain cannot be used for spoofing."
+        },
+        "parkedNullMx": {
+            "title": "No null MX",
+            "risk": "The domain sends and takes no mail. A null MX says so, and senders stop retrying.",
+            "fix": "Publish the MX record below."
+        },
+        "parkedDkim": {
+            "title": "No empty DKIM key",
+            "risk": "An empty wildcard key makes any DKIM signature claiming this domain fail at once.",
+            "fix": "Publish the wildcard record below."
+        },
+        "mtaStsOk": {
+            "title": "MTA-STS enforced",
+            "risk": "Senders must deliver over verified TLS to the listed servers."
+        },
+        "mtaStsMissing": {
+            "title": "No MTA-STS",
+            "risk": "Senders may fall back to unencrypted delivery if an attacker strips TLS on the way.",
+            "fix": "Serve a policy file on the mta-sts subdomain and publish its _mta-sts TXT record."
+        },
+        "mtaStsPolicy": {
+            "title": "MTA-STS policy not served",
+            "risk": "The TXT record exists but {host} serves no valid policy, so senders cannot use it.",
+            "fix": "Serve a valid policy at https://{host}/.well-known/mta-sts.txt."
+        },
+        "mtaStsTesting": {
+            "title": "MTA-STS not enforced",
+            "risk": "The policy is in {mode} mode: failures are reported, not prevented.",
+            "fix": "Switch the mode to enforce once reports show no failures."
+        },
+        "mtaStsMxMismatch": {
+            "title": "MTA-STS misses an MX",
+            "risk": "The policy enforces TLS but does not list {hosts}, so senders refuse to deliver there.",
+            "fix": "Add those hosts to the policy's mx lines."
+        },
+        "tlsRptOk": {
+            "title": "TLS reporting on",
+            "risk": "Senders report deliveries that failed over TLS."
+        },
+        "tlsRptMissing": {
+            "title": "No TLS reporting",
+            "risk": "Nobody hears when senders fail to deliver over TLS.",
+            "fix": "Publish a TLS-RPT record with an address that receives reports."
+        },
+        "bimiOk": {
+            "title": "BIMI published",
+            "risk": "Inboxes that support it can show the brand logo."
+        },
+        "bimiIneligible": {
+            "title": "BIMI not in effect",
+            "risk": "BIMI needs DMARC at quarantine or reject with pct=100, so the logo is not shown.",
+            "fix": "Enforce DMARC first."
+        },
+        "dnssecOk": {
+            "title": "DNSSEC signed and valid",
+            "risk": "Resolvers can verify that answers really come from the zone."
+        },
+        "dnssecOff": {
+            "title": "DNSSEC off",
+            "risk": "Answers for the domain can be forged on the way to a resolver (cache poisoning).",
+            "fix": "Sign the zone at the DNS host, then add the DS record it gives you at the registrar."
+        },
+        "dnssecNoDs": {
+            "title": "Signed, no DS at registrar",
+            "risk": "The zone is signed but its parent does not vouch for it, so nobody validates it.",
+            "fix": "Add the zone's DS record at your registrar."
+        },
+        "dnssecBroken": {
+            "title": "DNSSEC fails validation",
+            "risk": "The DS at the registrar does not match the zone's keys, so validating resolvers do not answer at all.",
+            "fix": "Replace the DS at the registrar with the one your DNS host shows, or remove it."
+        },
+        "caaOk": {
+            "title": "CAA restricts certificates",
+            "risk": "Only {issuers} may issue certificates for the domain."
+        },
+        "caaMissing": {
+            "title": "No CAA record",
+            "risk": "Any certificate authority may issue certificates for the domain.",
+            "fix": "Publish CAA records naming the authorities you use. Polaris uses Let's Encrypt."
+        },
+        "caaBlocksPolaris": {
+            "title": "CAA blocks Polaris",
+            "risk": "CAA allows {issuers} but not Let's Encrypt, so certificates Polaris orders here fail.",
+            "fix": "Add the record below alongside the existing ones."
+        },
+        "nsOk": {
+            "title": "Name servers redundant",
+            "risk": "{count} name servers on more than one network."
+        },
+        "nsSingle": {
+            "title": "Only one name server",
+            "risk": "{count} found. If it goes down the domain stops resolving.",
+            "fix": "Use at least two name servers; your DNS host lists them."
+        },
+        "nsSameNetwork": {
+            "title": "Name servers on one network",
+            "risk": "Every name server is in {block}, so one outage takes them all down.",
+            "fix": "Add a name server on another network."
+        },
+        "axfrRefused": {
+            "title": "Zone transfers refused",
+            "risk": "{count, plural, one {The name server refuses} other {All # name servers refuse}} to hand out the whole zone."
+        },
+        "axfrOpen": {
+            "title": "Zone transfer allowed",
+            "risk": "{server} hands the whole zone to anybody, listing every hostname you have.",
+            "fix": "Restrict zone transfers on that server to your secondaries."
+        },
+        "danglingOk": {
+            "title": "No dangling aliases",
+            "risk": "{count, plural, one {# alias checked} other {# aliases checked}}; all point at names that exist."
+        },
+        "danglingCname": {
+            "title": "Alias to a name that is gone",
+            "risk": "{name} points at {target}, which no longer exists. Whoever registers it can serve content on your name.",
+            "fix": "Remove the record, or point it at a name you control."
+        },
+        "wildcard": {
+            "title": "Wildcard record",
+            "risk": "{name} answers for every name, which makes a forgotten subdomain look live.",
+            "fix": "Keep it only if a service needs every name. Polaris's own zones use one on purpose."
+        },
+        "rdapUnavailable": {
+            "title": "Registration not checked",
+            "risk": "The registry publishes no RDAP for this name, so expiry and locks could not be read."
+        },
+        "expiryOk": {
+            "title": "Registered until {date}",
+            "risk": "{days} days left."
+        },
+        "expirySoon": {
+            "title": "Expires on {date}",
+            "risk": "In {days} days. A lapsed domain stops resolving and anybody can register it.",
+            "fix": "Renew it at your registrar and turn on auto-renew."
+        },
+        "transferLocked": {
+            "title": "Transfer lock on",
+            "risk": "The registrar refuses transfers until the lock is lifted."
+        },
+        "transferUnlocked": {
+            "title": "No transfer lock",
+            "risk": "Anybody who gets into the registrar account, or the mailbox behind it, can move the domain away.",
+            "fix": "Turn on the transfer lock (clientTransferProhibited) at your registrar."
+        },
+        "registrantPrivate": {
+            "title": "Registrant details private",
+            "risk": "RDAP does not publish who holds the domain."
+        },
+        "registrantPublic": {
+            "title": "Registrant details public",
+            "risk": "RDAP shows who holds the domain, which phishers and spammers use.",
+            "fix": "Turn on privacy (redaction) at your registrar."
+        },
+        "webNone": {
+            "title": "No website",
+            "risk": "The domain has no address, so there is no site to check."
+        },
+        "httpsUnreachable": {
+            "title": "No HTTPS",
+            "risk": "Nothing answers securely on port 443 ({error}).",
+            "fix": "Serve the site over HTTPS. Polaris issues certificates for the services it deploys."
+        },
+        "certOk": {
+            "title": "Certificate valid",
+            "risk": "Issued by {issuer}, valid until {date}."
+        },
+        "certInvalid": {
+            "title": "Certificate not trusted",
+            "risk": "Browsers warn every visitor: {reason}.",
+            "fix": "Install a certificate for this name from a trusted authority."
+        },
+        "certExpiring": {
+            "title": "Certificate expires {date}",
+            "risk": "In {days} days. After that browsers block the site.",
+            "fix": "Renew it, or find out why automatic renewal stopped."
+        },
+        "tlsOk": {
+            "title": "Modern TLS",
+            "risk": "Negotiated {version}; TLS 1.0 and 1.1 are refused."
+        },
+        "tlsLegacy": {
+            "title": "Old TLS accepted",
+            "risk": "The server still accepts {version}, which is deprecated and weak.",
+            "fix": "Allow only TLS 1.2 and 1.3."
+        },
+        "httpRedirectMissing": {
+            "title": "HTTP not redirected",
+            "risk": "Visitors who type the name land on unencrypted HTTP.",
+            "fix": "Redirect HTTP to HTTPS."
+        },
+        "hstsOk": {
+            "title": "HSTS on",
+            "risk": "Browsers use HTTPS only, for {maxAge} seconds."
+        },
+        "hstsMissing": {
+            "title": "No HSTS",
+            "risk": "A visitor's first request can be downgraded to HTTP and intercepted.",
+            "fix": "Send Strict-Transport-Security with a max-age of at least 6 months."
+        },
+        "hstsShort": {
+            "title": "HSTS too short",
+            "risk": "max-age={maxAge} lapses quickly, so the protection does not hold between visits.",
+            "fix": "Raise max-age to at least 15552000 (6 months)."
+        },
+        "headersOk": {
+            "title": "Security headers present",
+            "risk": "Framing, MIME sniffing and referrer leaks are restricted."
+        },
+        "headerFramingMissing": {
+            "title": "Can be framed by other sites",
+            "risk": "Without frame-ancestors or X-Frame-Options another site can embed the page and trick clicks (clickjacking).",
+            "fix": "Send Content-Security-Policy: frame-ancestors 'self'."
+        },
+        "headerNosniffMissing": {
+            "title": "MIME sniffing allowed",
+            "risk": "Without X-Content-Type-Options: nosniff a browser may run an upload as a script.",
+            "fix": "Send X-Content-Type-Options: nosniff."
+        },
+        "headerReferrerMissing": {
+            "title": "No referrer policy",
+            "risk": "Full addresses, query strings included, leak to every site you link to.",
+            "fix": "Send Referrer-Policy: strict-origin-when-cross-origin."
+        },
+        "headerCspMissing": {
+            "title": "No Content Security Policy",
+            "risk": "Nothing limits where scripts load from, so an injected script runs freely.",
+            "fix": "Add a policy that fits the site. A generic one breaks most apps, so Polaris does not set it on its own."
+        },
+        "securityTxtOk": {
+            "title": "security.txt published",
+            "risk": "Researchers know where to report a vulnerability."
+        },
+        "securityTxtMissing": {
+            "title": "No security.txt",
+            "risk": "Whoever finds a vulnerability has no published contact.",
+            "fix": "Publish {url} with a Contact and an Expires line."
+        },
+        "securityTxtExpired": {
+            "title": "security.txt expired",
+            "risk": "Its Expires date ({date}) has passed, so reporters may treat the contact as stale.",
+            "fix": "Update the Expires line."
+        }
+    }
+}

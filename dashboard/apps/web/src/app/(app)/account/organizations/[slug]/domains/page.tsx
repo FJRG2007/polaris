@@ -11,6 +11,7 @@ import { getPublicIp } from "@/lib/domain-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { requireOrgPage } from "@/lib/orgs/page-access";
+import { gradesFor } from "@/lib/domain-security/service";
 import { OwnerDomainsView } from "@/components/owner-domains-view";
 import { canAddOwnerDomain, instanceDomains, listOwnerDomains } from "@/lib/owner-domains";
 
@@ -27,6 +28,8 @@ export default async function OrganizationDomainsPage({ params }: { params: Prom
         getPublicIp(),
         instanceDomains()
     ]);
+    // One query for every badge; the cards read their own details after paint.
+    const grades = await gradesFor(domains.map((entry) => entry.domain));
     const t = await getTranslations("accountOrgs");
 
     return (
@@ -35,7 +38,7 @@ export default async function OrganizationDomainsPage({ params }: { params: Prom
                 <h2 className="text-base font-semibold">{t("domains.title")}</h2>
                 <p className="text-muted-foreground text-sm">{t("domains.intro", { org: org.name })}</p>
             </div>
-            <Messages namespaces={["dns"]}>
+            <Messages namespaces={["dns", "domainSecurity"]}>
                 <OwnerDomainsView
                     owner={{ kind: "org", orgId: org.id }}
                     domains={domains}
@@ -43,6 +46,7 @@ export default async function OrganizationDomainsPage({ params }: { params: Prom
                     blockedReason={allowed.ok ? "" : allowed.reason}
                     publicIp={publicIp}
                     instanceDomains={reserved}
+                    grades={grades}
                 />
             </Messages>
         </div>

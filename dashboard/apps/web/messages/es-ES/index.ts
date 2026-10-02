@@ -57,6 +57,7 @@ import deployProject from "./deployProject.json";
 import deployService from "./deployService.json";
 import accountPrivacy from "./accountPrivacy.json";
 import deploySettings from "./deploySettings.json";
+import domainSecurity from "./domainSecurity.json";
 import accountSecurity from "./accountSecurity.json";
 import accountNotifications from "./accountNotifications.json";
 
@@ -89,6 +90,7 @@ export default {
     deployService,
     deploySettings,
     dns,
+    domainSecurity,
     drive,
     drivePoints,
     driveViewer,

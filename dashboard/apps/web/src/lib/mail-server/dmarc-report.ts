@@ -219,7 +219,7 @@ async function serverDomains(server: MailServer): Promise<{ id: string; name: st
 }
 
 /** A filed report, back in the shape the summary reads. */
-function storedReport(row: {
+export function storedReport(row: {
     orgName: string;
     reportId: string;
     domain: string;

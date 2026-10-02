@@ -11,6 +11,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { Messages } from "@/components/i18n/messages";
 import { getPublicIp } from "@/lib/domain-service";
+import { gradesFor } from "@/lib/domain-security/service";
 import { OwnerDomainsView } from "@/components/owner-domains-view";
 import { canAddOwnerDomain, instanceDomains, listOwnerDomains } from "@/lib/owner-domains";
 
@@ -27,6 +28,8 @@ export default async function AccountDomainsPage() {
         getPublicIp(),
         instanceDomains()
     ]);
+    // One query for every badge; the cards read their own details after paint.
+    const grades = await gradesFor(domains.map((entry) => entry.domain));
 
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -34,7 +37,7 @@ export default async function AccountDomainsPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("domains.page.title")}</h1>
                 <p className="text-muted-foreground text-sm">{t("domains.page.intro")}</p>
             </div>
-            <Messages namespaces={["dns"]}>
+            <Messages namespaces={["dns", "domainSecurity"]}>
                 <OwnerDomainsView
                     owner={{ kind: "user" }}
                     domains={domains}
@@ -42,6 +45,7 @@ export default async function AccountDomainsPage() {
                     blockedReason={allowed.ok ? "" : allowed.reason}
                     publicIp={publicIp}
                     instanceDomains={reserved}
+                    grades={grades}
                 />
             </Messages>
         </div>

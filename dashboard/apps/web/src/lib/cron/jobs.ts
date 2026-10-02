@@ -510,6 +510,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: probeAllDomains
     },
     {
+        key: "domain-security",
+        // Hourly, a few domains a run: each domain is re-audited once a day,
+        // and no single run spends long on lookups however many domains there are.
+        everyMs: Number(process.env.POLARIS_DOMAIN_SECURITY_MS) || HOUR,
+        // Leased: the pass tells people about regressions and applies fixes to
+        // dedicated domains, and two runners would do both twice.
+        leaseMs: 2 * HOUR,
+        run: async () => (await import("@/lib/domain-security/service")).runDomainSecuritySweep()
+    },
+    {
         key: "alarms",
         everyMs: Number(process.env.POLARIS_ALARM_POLL_MS) || MINUTE,
         // The one that was actually broken. An alarm crossing its threshold is

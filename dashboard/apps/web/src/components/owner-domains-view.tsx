@@ -20,6 +20,9 @@ import { PageSection } from "@/components/page-section";
 import type { OwnerDomainView } from "@/lib/owner-domains";
 import { useDisplayFormat } from "@/components/display-format";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
+import type { GradeSummary } from "@/lib/domain-security/service";
+import { SecurityBadge } from "@/components/domain-security/security-badge";
+import { DomainSecurityPanel } from "@/components/domain-security/domain-security-panel";
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -65,10 +68,13 @@ export function OwnerDomainsView({
     canAdd,
     blockedReason,
     publicIp,
-    instanceDomains
+    instanceDomains,
+    grades = {}
 }: {
     owner: DomainOwnerRef;
     domains: OwnerDomainView[];
+    /** Each domain's last security grade, by domain, for the badge by its name. */
+    grades?: Record<string, GradeSummary>;
     canAdd: boolean;
     /** Why the form is not offered, when it is not. */
     blockedReason: string;
@@ -131,6 +137,7 @@ export function OwnerDomainsView({
                         owner={owner}
                         domain={entry}
                         publicIp={publicIp}
+                        grade={grades[entry.domain] ?? null}
                         onChecked={replace}
                         onRemoved={(id) => setDomains((current) => current.filter((row) => row.id !== id))}
                         onError={setError}
@@ -201,6 +208,7 @@ function DomainSection({
     owner,
     domain,
     publicIp,
+    grade,
     onChecked,
     onRemoved,
     onError
@@ -208,6 +216,7 @@ function DomainSection({
     owner: DomainOwnerRef;
     domain: OwnerDomainView;
     publicIp: string | null;
+    grade: GradeSummary | null;
     onChecked: (domain: OwnerDomainView) => void;
     onRemoved: (id: string) => void;
     onError: (message: string) => void;
@@ -257,6 +266,7 @@ function DomainSection({
                             <Clock className="size-3 shrink-0" /> {t("ownerDomains.waitingDns")}
                         </Badge>
                     )}
+                    {domain.verified && grade && <SecurityBadge grade={grade.grade} problems={grade.problems} />}
                 </>
             }
             description={
@@ -320,6 +330,10 @@ function DomainSection({
             {domain.verified && (
                 <CertificatePanel owner={owner} domain={domain} onChanged={onChecked} onError={onError} />
             )}
+
+            {/* Spoofing, DNS, registration and HTTPS: checked once the domain is
+                proven to be theirs, since until then it is only a name typed in. */}
+            {domain.verified && <DomainSecurityPanel scope={owner} domain={domain.domain} />}
 
             {/* Editing records takes the domain's own token: this Polaris's
                 token may reach the zone, but it was never handed over for this. */}

@@ -309,6 +309,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "domain.security",
+        group: "security",
+        label: "A domain's security got worse",
+        description: "A daily check found a domain you manage open to spoofing, about to expire, or newly misconfigured.",
+        level: "warning",
+        // Mail on: the whole point is that nobody is looking at the domain when it
+        // changes, and the bell is only seen by whoever opens Polaris.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "account.signin",
         group: "security",
         label: "Sign-in waiting for approval",
