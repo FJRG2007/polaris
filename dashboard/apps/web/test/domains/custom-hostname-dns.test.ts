@@ -21,14 +21,14 @@ const {
     pruneDnsRecords,
     findDomain
 } = vi.hoisted(() => ({
-        findDomain: vi.fn(),
-        resolve4: vi.fn(),
-        loadCloudflareToken: vi.fn(),
-        resolveZoneForHostname: vi.fn(),
-        findDnsRecords: vi.fn(),
-        upsertARecord: vi.fn(),
-        pruneDnsRecords: vi.fn()
-    }));
+    findDomain: vi.fn(),
+    resolve4: vi.fn(),
+    loadCloudflareToken: vi.fn(),
+    resolveZoneForHostname: vi.fn(),
+    findDnsRecords: vi.fn(),
+    upsertARecord: vi.fn(),
+    pruneDnsRecords: vi.fn()
+}));
 
 vi.mock("@polaris/db", () => ({
     prisma: { setting: { findUnique: async () => null }, domain: { findUnique: findDomain } }
@@ -63,18 +63,33 @@ describe("provisionHostnameDns", () => {
             status: "created",
             ip: "51.15.20.30"
         });
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.example.com", "51.15.20.30");
+        expect(upsertARecord).toHaveBeenCalledWith(
+            "cf-token",
+            "zone-1",
+            "orphion.example.com",
+            "51.15.20.30"
+        );
     });
 
     it("creates it just the same on a different domain the token reaches", async () => {
         resolveZoneForHostname.mockResolvedValue({ id: "zone-2", name: "orphion.com" });
         expect((await provisionHostnameDns("orphion.com")).status).toBe("created");
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-2", "orphion.com", "51.15.20.30");
+        expect(upsertARecord).toHaveBeenCalledWith(
+            "cf-token",
+            "zone-2",
+            "orphion.com",
+            "51.15.20.30"
+        );
     });
 
     it("takes the hostname as typed, however it was capitalized or spaced", async () => {
         await provisionHostnameDns("  Orphion.EXAMPLE.com  ");
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.example.com", "51.15.20.30");
+        expect(upsertARecord).toHaveBeenCalledWith(
+            "cf-token",
+            "zone-1",
+            "orphion.example.com",
+            "51.15.20.30"
+        );
     });
 
     it("asks Cloudflare nothing about a name that already answers here", async () => {
@@ -114,7 +129,9 @@ describe("provisionHostnameDns", () => {
     });
 
     it("reports why rather than throwing when the domain is not in the account", async () => {
-        resolveZoneForHostname.mockRejectedValue(new Error("orphion.com is not on a domain in this Cloudflare account."));
+        resolveZoneForHostname.mockRejectedValue(
+            new Error("orphion.com is not on a domain in this Cloudflare account.")
+        );
         const result = await provisionHostnameDns("orphion.com");
         expect(result.status).toBe("manual");
         expect(result.detail).toContain("not on a domain");
@@ -131,8 +148,16 @@ describe("provisionHostnameDns", () => {
             // cloud server must resolve to the cloud server.
             findDomain.mockResolvedValue(onServer("54.0.0.10"));
 
-            expect(await provisionHostnameDns("api.example.com")).toEqual({ status: "created", ip: "54.0.0.10" });
-            expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "api.example.com", "54.0.0.10");
+            expect(await provisionHostnameDns("api.example.com")).toEqual({
+                status: "created",
+                ip: "54.0.0.10"
+            });
+            expect(upsertARecord).toHaveBeenCalledWith(
+                "cf-token",
+                "zone-1",
+                "api.example.com",
+                "54.0.0.10"
+            );
         });
 
         it("hands the record back when that server has no public address", async () => {

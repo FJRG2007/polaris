@@ -233,7 +233,10 @@ export async function guardSupportsChallenge(now: number = Date.now()): Promise<
 
 /** Whether the guard on this machine names `feature` on its health endpoint - the
  *  general form of the challenge probe above, with the same startup-race rule. */
-export async function guardSupportsFeature(feature: string, now: number = Date.now()): Promise<boolean> {
+export async function guardSupportsFeature(
+    feature: string,
+    now: number = Date.now()
+): Promise<boolean> {
     const cached = featureProbes.get(feature);
     if (cached && now - cached.at < PROXY_PROBE_TTL_MS) return cached.supported;
     let supported = false;
@@ -352,7 +355,8 @@ function routeMiddlewares(
             challenge: route.challenge === true,
             // Only when this route really is the guard's to frame-protect: a route
             // the guard cannot merge for gets the fallback header instead.
-            frameAncestors: isProxied && framedByGuard(route, options) ? route.frameAncestors : undefined,
+            frameAncestors:
+                isProxied && framedByGuard(route, options) ? route.frameAncestors : undefined,
             presets: route.presets ?? [],
             rules: route.rules ?? []
         });
@@ -405,12 +409,7 @@ const APP_PRIORITY = 40;
  *  router over the route it narrows. */
 function rankOf(route: AppRoute, options: RenderOptions, bump = 0): number {
     const base = options.routePriority ?? APP_PRIORITY;
-    return (
-        base +
-        (route.pathPrefix ? 5 : 0) -
-        (isWildcardHostname(route.hostname) ? 20 : 0) +
-        bump
-    );
+    return base + (route.pathPrefix ? 5 : 0) - (isWildcardHostname(route.hostname) ? 20 : 0) + bump;
 }
 
 /** A path prefix safe to write into a rule. Anything else drops the route rather
@@ -470,7 +469,11 @@ function frameFallback(
 }
 
 /** A response-headers middleware named after the route, defined in `defs`. */
-function headersMiddleware(name: string, headers: Readonly<Record<string, string>>, defs: Map<string, string>): string {
+function headersMiddleware(
+    name: string,
+    headers: Readonly<Record<string, string>>,
+    defs: Map<string, string>
+): string {
     const mw = `${name}-headers`;
     const lines = Object.entries(headers)
         .map(([key, value]) => `          ${yamlQuote(key)}: ${yamlQuote(value)}`)
@@ -502,7 +505,8 @@ function edgeChain(
     const edge = route.edge;
     if (!edge) {
         const fallback = frameFallback(route, {}, options);
-        if (Object.keys(fallback).length > 0) chain.late.push(headersMiddleware(name, fallback, defs));
+        if (Object.keys(fallback).length > 0)
+            chain.late.push(headersMiddleware(name, fallback, defs));
         return chain;
     }
 
@@ -526,7 +530,10 @@ function edgeChain(
             edge.concurrencyScope === "service"
                 ? "        sourceCriterion:\n          requestHost: true"
                 : sourceByIp(route, "        ");
-        defs.set(mw, `    ${mw}:\n      inFlightReq:\n        amount: ${edge.concurrency}\n${source}`);
+        defs.set(
+            mw,
+            `    ${mw}:\n      inFlightReq:\n        amount: ${edge.concurrency}\n${source}`
+        );
         chain.early.push(mw);
     }
 
@@ -551,7 +558,11 @@ function edgeChain(
                 replacement = "${1}://${2}${3}";
             }
         } else if (redirect.kind === "apex-to-www") {
-            if (!hostname.startsWith("www.") && !isWildcardHostname(hostname) && siblings.has(`www.${hostname}`)) {
+            if (
+                !hostname.startsWith("www.") &&
+                !isWildcardHostname(hostname) &&
+                siblings.has(`www.${hostname}`)
+            ) {
                 regex = "^(https?)://([^/:]+)(.*)$";
                 replacement = "${1}://www.${2}${3}";
             }
@@ -570,9 +581,15 @@ function edgeChain(
     edge.rewrites.forEach((rewrite, index) => {
         const mw = `${name}-rewrite-${index}`;
         if (rewrite.kind === "strip-prefix" && rewrite.prefix) {
-            defs.set(mw, `    ${mw}:\n      stripPrefix:\n        prefixes: [${yamlQuote(rewrite.prefix)}]`);
+            defs.set(
+                mw,
+                `    ${mw}:\n      stripPrefix:\n        prefixes: [${yamlQuote(rewrite.prefix)}]`
+            );
         } else if (rewrite.kind === "add-prefix" && rewrite.prefix) {
-            defs.set(mw, `    ${mw}:\n      addPrefix:\n        prefix: ${yamlQuote(rewrite.prefix)}`);
+            defs.set(
+                mw,
+                `    ${mw}:\n      addPrefix:\n        prefix: ${yamlQuote(rewrite.prefix)}`
+            );
         } else if (rewrite.kind === "replace-path" && rewrite.regex && rewrite.replacement) {
             defs.set(
                 mw,
@@ -727,7 +744,8 @@ export function renderDynamicConfig(
         // out rather than written: the edge refusing this whole file over one row would
         // take every service on the machine down with it.
         const hostname = normalizeDeployHostname(route.hostname);
-        if (!hostname || (route.pathPrefix !== undefined && !PATH_PREFIX.test(route.pathPrefix))) continue;
+        if (!hostname || (route.pathPrefix !== undefined && !PATH_PREFIX.test(route.pathPrefix)))
+            continue;
         const name = `polaris-app-${route.id}`;
         const dial = `${route.dialHost}:${route.dialPort}`;
         const edge = edgeChain({ ...route, hostname }, name, defs, options);

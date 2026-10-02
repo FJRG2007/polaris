@@ -196,9 +196,12 @@ export async function checkReputation(ips: readonly string[]): Promise<void> {
     const candidates = [...new Set(ips.filter(routable))];
     if (candidates.length === 0) return;
     const banned = new Set(
-        (await prisma.wafBan.findMany({ where: { ip: { in: candidates } }, select: { ip: true } })).map(
-            (row) => row.ip
-        )
+        (
+            await prisma.wafBan.findMany({
+                where: { ip: { in: candidates } },
+                select: { ip: true }
+            })
+        ).map((row) => row.ip)
     );
 
     let asked = 0;
@@ -268,12 +271,16 @@ export async function recordWafBan(input: WafBanInput): Promise<void> {
     // ends up not doing it, and the address that gets through is by definition the one
     // somebody trusted enough to say so.
     if ((await wafTrustedAddresses()).includes(input.ip)) return;
-    const existing = await prisma.wafBan.findUnique({ where: { ip: input.ip }, select: { until: true, offences: true } });
+    const existing = await prisma.wafBan.findUnique({
+        where: { ip: input.ip },
+        select: { until: true, offences: true }
+    });
     // A ban that is still running is extended, not re-counted: one jail firing twice
     // inside its own window is one offence, not two. A permanent ban is always still
     // running - without that, re-detecting it on every pass would count an offence
     // every thirty seconds for as long as the evidence stayed in the log window.
-    const stillRunning = existing !== null && (existing.until === null || existing.until > new Date());
+    const stillRunning =
+        existing !== null && (existing.until === null || existing.until > new Date());
     const offences = existing ? existing.offences + (stillRunning ? 0 : 1) : 1;
     await prisma.wafBan.upsert({
         where: { ip: input.ip },
@@ -284,7 +291,13 @@ export async function recordWafBan(input: WafBanInput): Promise<void> {
             note: input.note ?? null,
             until: input.until
         },
-        update: { reason: input.reason, source: input.source, note: input.note ?? null, until: input.until, offences }
+        update: {
+            reason: input.reason,
+            source: input.source,
+            note: input.note ?? null,
+            until: input.until,
+            offences
+        }
     });
 }
 
@@ -295,7 +308,14 @@ export async function recordWafBan(input: WafBanInput): Promise<void> {
 export async function wafBanFor(ip: string) {
     return prisma.wafBan.findUnique({
         where: { ip },
-        select: { reason: true, source: true, note: true, until: true, offences: true, createdAt: true }
+        select: {
+            reason: true,
+            source: true,
+            note: true,
+            until: true,
+            offences: true,
+            createdAt: true
+        }
     });
 }
 
@@ -324,7 +344,9 @@ export async function getWafIgnoreList(): Promise<string[]> {
     const raw = await getSetting(IGNORE_KEY);
     try {
         const parsed: unknown = raw ? JSON.parse(raw) : [];
-        return Array.isArray(parsed) ? parsed.filter((ip): ip is string => typeof ip === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((ip): ip is string => typeof ip === "string")
+            : [];
     } catch {
         return [];
     }
@@ -466,7 +488,9 @@ let pushing = false;
  */
 export function intelFingerprint(snapshot: object): string {
     // `undefined` is left out by JSON, which is the whole of dropping it.
-    return createHash("sha256").update(JSON.stringify({ ...snapshot, at: undefined })).digest("hex");
+    return createHash("sha256")
+        .update(JSON.stringify({ ...snapshot, at: undefined }))
+        .digest("hex");
 }
 
 /**
@@ -486,7 +510,11 @@ async function pushIntelToServers(json: string, snapshot: object): Promise<void>
                 deployTargets: {
                     some: {
                         kind: { not: "local" },
-                        applications: { some: { domains: { some: { enabled: true, servedBy: { not: "polaris" } } } } }
+                        applications: {
+                            some: {
+                                domains: { some: { enabled: true, servedBy: { not: "polaris" } } }
+                            }
+                        }
                     }
                 }
             },
@@ -532,7 +560,9 @@ async function pushIntelToServers(json: string, snapshot: object): Promise<void>
 function parseEntries(json: string): string[] {
     try {
         const parsed: unknown = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }

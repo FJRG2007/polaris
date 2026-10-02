@@ -472,8 +472,7 @@ export async function getWafAddressActivityAction(
         return { activity, accounts, ban: ban ?? undefined };
     } catch (caught) {
         return {
-            error:
-                await failure(caught, "errors.activity")
+            error: await failure(caught, "errors.activity")
         };
     }
 }

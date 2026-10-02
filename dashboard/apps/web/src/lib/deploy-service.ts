@@ -1591,9 +1591,10 @@ type RoutableDomain = {
  */
 /** The framing rule a route carries: the allowed origins while protection is on,
  *  nothing at all once a scope has switched it off. */
-function frameRuleOf(rule: { readonly frameProtection: boolean; readonly frameAncestors: readonly string[] }):
-    | readonly string[]
-    | undefined {
+function frameRuleOf(rule: {
+    readonly frameProtection: boolean;
+    readonly frameAncestors: readonly string[];
+}): readonly string[] | undefined {
     return rule.frameProtection ? rule.frameAncestors : undefined;
 }
 

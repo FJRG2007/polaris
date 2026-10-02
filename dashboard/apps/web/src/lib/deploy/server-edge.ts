@@ -222,7 +222,10 @@ export async function readServerEdge(hostId: string, ownerId: string): Promise<S
         return {
             ...UNREACHABLE,
             settingUp: isSettingUp(hostId),
-            error: error instanceof Error ? error.message : (await readerWords("api"))("refusals.deploy.unreachable")
+            error:
+                error instanceof Error
+                    ? error.message
+                    : (await readerWords("api"))("refusals.deploy.unreachable")
         };
     }
 }

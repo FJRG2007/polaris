@@ -14,7 +14,12 @@ import { buildWafIntel, indexWafIntel } from "@polaris/core";
 import { evaluate, type GuardConfig } from "../src/authz.js";
 import { createControlPlaneWatch, probeHealth } from "../src/control-plane.js";
 import { generateKeyPairSync, createPublicKey } from "node:crypto";
-import { encodeGuardRule, signEdgeToken, signEdgeTokenEd25519, type WafPrincipalGrant } from "@polaris/core/waf";
+import {
+    encodeGuardRule,
+    signEdgeToken,
+    signEdgeTokenEd25519,
+    type WafPrincipalGrant
+} from "@polaris/core/waf";
 
 const NOW = 1_800_000_000;
 const HOST = "app.example.com";
@@ -49,7 +54,13 @@ function rule(options: { allow?: WafPrincipalGrant[] } = {}): string {
 
 function cookie(options: { exp?: number; iat?: number; prn?: string[] } = {}): string {
     const token = signEdgeTokenEd25519(
-        { sub: "user-1", aud: HOST, exp: options.exp ?? NOW + 3600, iat: options.iat ?? NOW - 60, prn: options.prn ?? [] },
+        {
+            sub: "user-1",
+            aud: HOST,
+            exp: options.exp ?? NOW + 3600,
+            iat: options.iat ?? NOW - 60,
+            prn: options.prn ?? []
+        },
         privateKey
     );
     return `polaris.edge=${token}`;
@@ -77,14 +88,22 @@ describe("with Polaris unreachable", () => {
 
     it("refuses a token whose session Polaris revoked before it went away", () => {
         const revokedAt = (NOW - 10) * 1000;
-        expect(evaluate(request(rule(), cookie({ iat: NOW - 60 })), config(false, { "user-1": revokedAt }))).toEqual({
+        expect(
+            evaluate(
+                request(rule(), cookie({ iat: NOW - 60 })),
+                config(false, { "user-1": revokedAt })
+            )
+        ).toEqual({
             status: 503,
             signInUnavailable: true
         });
     });
 
     it("shows a new visitor the sign-in-unavailable page", () => {
-        expect(evaluate(request(rule()), config(false))).toEqual({ status: 503, signInUnavailable: true });
+        expect(evaluate(request(rule()), config(false))).toEqual({
+            status: 503,
+            signInUnavailable: true
+        });
     });
 
     it("keeps a member in past the membership backstop, up to the hard expiry", () => {
@@ -108,7 +127,10 @@ describe("with Polaris unreachable", () => {
 
     it("refuses a token signed by any other key", () => {
         const other = generateKeyPairSync("ed25519").privateKey;
-        const token = signEdgeTokenEd25519({ sub: "user-1", aud: HOST, exp: NOW + 3600, iat: NOW }, other);
+        const token = signEdgeTokenEd25519(
+            { sub: "user-1", aud: HOST, exp: NOW + 3600, iat: NOW },
+            other
+        );
 
         expect(evaluate(request(rule(), `polaris.edge=${token}`), config(false)).status).toBe(503);
     });
@@ -120,11 +142,16 @@ describe("with Polaris answering", () => {
     });
 
     it("treats a Polaris not yet probed as answering", () => {
-        expect(evaluate(request(rule()), { ...config(true), controlPlane: () => null }).status).toBe(302);
+        expect(
+            evaluate(request(rule()), { ...config(true), controlPlane: () => null }).status
+        ).toBe(302);
     });
 
     it("turns the Ed25519 token from the callback into the cookie", () => {
-        const token = signEdgeTokenEd25519({ sub: "user-1", aud: HOST, exp: NOW + 3600, iat: NOW }, privateKey);
+        const token = signEdgeTokenEd25519(
+            { sub: "user-1", aud: HOST, exp: NOW + 3600, iat: NOW },
+            privateKey
+        );
         const decision = evaluate(
             {
                 wafHeader: rule(),
@@ -181,7 +208,10 @@ describe("the control plane watch", () => {
     it("does not report down on a single failure after being up", async () => {
         let up = true;
         let clock = 0;
-        const watch = createControlPlaneWatch(async () => up, () => clock);
+        const watch = createControlPlaneWatch(
+            async () => up,
+            () => clock
+        );
 
         watch.reachable(POLARIS, 0);
         await settle();
@@ -202,9 +232,12 @@ describe("the control plane watch", () => {
 
     it("counts a probe that throws as unreachable once it repeats", async () => {
         let clock = 0;
-        const watch = createControlPlaneWatch(async () => {
-            throw new Error("connection refused");
-        }, () => clock);
+        const watch = createControlPlaneWatch(
+            async () => {
+                throw new Error("connection refused");
+            },
+            () => clock
+        );
 
         watch.reachable(POLARIS, 0);
         await settle();

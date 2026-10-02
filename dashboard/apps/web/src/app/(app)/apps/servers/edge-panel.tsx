@@ -84,9 +84,7 @@ export function EdgePanel({ hostId }: { hostId: string }) {
             )}
 
             {state === null ? (
-                <p className="text-sm text-muted-foreground">
-                    {t("edge.asking")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("edge.asking")}</p>
             ) : state.error ? (
                 <p className="text-sm text-muted-foreground">
                     {t("edge.askFailed", { reason: state.error })}
@@ -98,16 +96,8 @@ export function EdgePanel({ hostId }: { hostId: string }) {
                         yes={t("edge.traefikYes")}
                         no={t("edge.traefikNo")}
                     />
-                    <Line
-                        good={state.guard}
-                        yes={t("edge.guardYes")}
-                        no={t("edge.guardNo")}
-                    />
-                    <Line
-                        good={state.pushable}
-                        yes={t("edge.pushYes")}
-                        no={t("edge.pushNo")}
-                    />
+                    <Line good={state.guard} yes={t("edge.guardYes")} no={t("edge.guardNo")} />
+                    <Line good={state.pushable} yes={t("edge.pushYes")} no={t("edge.pushNo")} />
                     {state.guard && (
                         <Line
                             good={state.offline}
@@ -145,11 +135,13 @@ export function EdgePanel({ hostId }: { hostId: string }) {
                     ) : (
                         <RefreshCw className="size-4 shrink-0" />
                     )}
-                    {busy || elsewhere ? t("edge.settingUp") : ready ? t("edge.again") : t("edge.setUp")}
+                    {busy || elsewhere
+                        ? t("edge.settingUp")
+                        : ready
+                          ? t("edge.again")
+                          : t("edge.setUp")}
                 </Button>
-                <span className="text-xs text-muted-foreground">
-                    {t("edge.hint")}
-                </span>
+                <span className="text-xs text-muted-foreground">{t("edge.hint")}</span>
             </div>
         </section>
     );

@@ -142,7 +142,9 @@ describe("what the guard keeps on the server's own disk", () => {
         // while the control plane is unreachable.
         expect(guarded).toContain("-v /var/lib/polaris/edge-intel:/edge-intel:ro");
         expect(guarded).toContain("-e POLARIS_EDGE_INTEL_FILE=/edge-intel/waf-intel.json");
-        expect(guarded).toContain("mkdir -p /var/lib/polaris/deploy /var/lib/polaris/volumes /var/lib/polaris/traefik");
+        expect(guarded).toContain(
+            "mkdir -p /var/lib/polaris/deploy /var/lib/polaris/volumes /var/lib/polaris/traefik"
+        );
         expect(guarded).toMatch(/mkdir -p [^\n]*\/var\/lib\/polaris\/edge-intel/);
     });
 

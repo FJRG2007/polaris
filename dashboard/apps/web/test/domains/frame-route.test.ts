@@ -61,7 +61,10 @@ describe("with a guard that merges framing", () => {
 describe("without one", () => {
     it("sets X-Frame-Options alone, never a CSP that would replace the app's", () => {
         const config = withSecret(() =>
-            renderDynamicConfig([route({ frameAncestors: [] })], { proxyAvailable: true, frameAvailable: false })
+            renderDynamicConfig([route({ frameAncestors: [] })], {
+                proxyAvailable: true,
+                frameAvailable: false
+            })
         );
 
         expect(config).toContain('"X-Frame-Options": "SAMEORIGIN"');
@@ -70,7 +73,9 @@ describe("without one", () => {
     });
 
     it("sends nothing blind when other sites are allowed, since that header cannot name them", () => {
-        const config = renderDynamicConfig([route({ frameAncestors: ["https://partner.example"] })]);
+        const config = renderDynamicConfig([
+            route({ frameAncestors: ["https://partner.example"] })
+        ]);
 
         expect(config).not.toContain("X-Frame-Options");
     });
@@ -88,7 +93,10 @@ describe("without one", () => {
     });
 
     it("leaves the header to the service's own setting when it has one", () => {
-        const edge = { ...EMPTY_EDGE_CONFIG, headers: { preset: "off" as const, frameOptions: "DENY" as const, custom: [] } };
+        const edge = {
+            ...EMPTY_EDGE_CONFIG,
+            headers: { preset: "off" as const, frameOptions: "DENY" as const, custom: [] }
+        };
         const config = renderDynamicConfig([route({ frameAncestors: [], edge })]);
 
         expect(config).toContain('"X-Frame-Options": "DENY"');

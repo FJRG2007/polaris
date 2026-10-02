@@ -10,7 +10,10 @@ import { randomUUID } from "node:crypto";
 import type { ServerResponse } from "node:http";
 import { SIGNIN_UNAVAILABLE_REFRESH_SECONDS, signInUnavailablePage } from "@polaris/core";
 
-export function sendSignInUnavailable(res: ServerResponse, ctx: { host?: string; accept?: string }): void {
+export function sendSignInUnavailable(
+    res: ServerResponse,
+    ctx: { host?: string; accept?: string }
+): void {
     const reference = randomUUID();
     const document = (ctx.accept ?? "").toLowerCase().includes("text/html");
     res.writeHead(503, {

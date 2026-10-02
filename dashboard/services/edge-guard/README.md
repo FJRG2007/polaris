@@ -14,7 +14,7 @@ gap while preserving the deploy resilience contract: it runs on the same server 
 the app and Traefik, holds **no rule state** (every rule arrives per request in the
 `X-Polaris-Waf` header that Traefik stamps on), and verifies login tokens **offline**
 with the shared secret. So the WAF keeps enforcing when the Polaris control plane is
-down; only minting a *new* login token needs Polaris up.
+down; only minting a _new_ login token needs Polaris up.
 
 ## Request contract
 
@@ -31,14 +31,14 @@ pointing here. The guard reads:
 
 ## Environment
 
-| Var | Purpose | Default |
-|---|---|---|
-| `POLARIS_AUTH_SECRET` | HMAC secret to verify edge tokens (deny-only routes need none) | - |
-| `POLARIS_PUBLIC_URL` | Fallback Polaris base URL for a login redirect, used only when the route's rule carries none (see below) | - |
-| `POLARIS_EDGE_COOKIE` | Edge-token cookie name | `polaris.edge` |
-| `POLARIS_EDGE_GUARD_PORT` | Listen port | `8080` |
-| `POLARIS_EDGE_INTEL_FILE` | Path to the bans/Tor-exits/revocations snapshot Polaris pushes over SSH (see below) | `/edge-intel/waf-intel.json` |
-| `POLARIS_CONTROL_PLANE_URL` | Address this container reaches Polaris on directly, to probe whether it is up - set only where the two share a network. Falls back to the route's own login address, which from beside Polaris is often unreachable (no hairpin NAT, split DNS) | - |
+| Var                         | Purpose                                                                                                                                                                                                                                         | Default                      |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `POLARIS_AUTH_SECRET`       | HMAC secret to verify edge tokens (deny-only routes need none)                                                                                                                                                                                  | -                            |
+| `POLARIS_PUBLIC_URL`        | Fallback Polaris base URL for a login redirect, used only when the route's rule carries none (see below)                                                                                                                                        | -                            |
+| `POLARIS_EDGE_COOKIE`       | Edge-token cookie name                                                                                                                                                                                                                          | `polaris.edge`               |
+| `POLARIS_EDGE_GUARD_PORT`   | Listen port                                                                                                                                                                                                                                     | `8080`                       |
+| `POLARIS_EDGE_INTEL_FILE`   | Path to the bans/Tor-exits/revocations snapshot Polaris pushes over SSH (see below)                                                                                                                                                             | `/edge-intel/waf-intel.json` |
+| `POLARIS_CONTROL_PLANE_URL` | Address this container reaches Polaris on directly, to probe whether it is up - set only where the two share a network. Falls back to the route's own login address, which from beside Polaris is often unreachable (no hairpin NAT, split DNS) | -                            |
 
 ## Where the login lives
 
@@ -91,10 +91,10 @@ Deploy hostnames sit under a wildcard, so every name in the zone reaches the edg
 whether or not anything was deployed on it. The guard's proxy listener serves the page
 for those, on two paths Traefik rewrites to:
 
-| Path | Reached from | Answers |
-|---|---|---|
-| `/__polaris/vacant` | the catch-all router, for a name no app claims | **404**, "there is nothing running here" |
-| `/__polaris/vacant/down` | an app router's `errors` middleware on 502/503/504 | **502**, "this app is not running" |
+| Path                     | Reached from                                       | Answers                                  |
+| ------------------------ | -------------------------------------------------- | ---------------------------------------- |
+| `/__polaris/vacant`      | the catch-all router, for a name no app claims     | **404**, "there is nothing running here" |
+| `/__polaris/vacant/down` | an app router's `errors` middleware on 502/503/504 | **502**, "this app is not running"       |
 
 Both are served before the signed-origin check, since the point is that there is no
 origin. The state is the path and not a parameter: Traefik's rewrite keeps the visitor's

@@ -25,7 +25,12 @@ import { clientIp } from "@/lib/request-context";
 import { principalsOfUser } from "@polaris/auth";
 import { deployAppIdForHost } from "@/lib/deploy-service";
 import { edgeSigningKey } from "@/lib/edge-signing-key";
-import { EDGE_TOKEN_TTL_SECONDS, principalVerdict, signEdgeToken, signEdgeTokenEd25519 } from "@polaris/core/waf";
+import {
+    EDGE_TOKEN_TTL_SECONDS,
+    principalVerdict,
+    signEdgeToken,
+    signEdgeTokenEd25519
+} from "@polaris/core/waf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -132,10 +137,14 @@ export async function GET(request: Request): Promise<Response> {
     // that reads `token`, signed with the secret it was deployed with.
     callback.searchParams.set("token", signEdgeToken(claims, secret));
     const signing = await edgeSigningKey().catch((error: unknown) => {
-        console.error("polaris: the edge signing key could not be read:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: the edge signing key could not be read:",
+            error instanceof Error ? error.message : error
+        );
         return null;
     });
-    if (signing) callback.searchParams.set("etoken", signEdgeTokenEd25519(claims, signing.privateKey));
+    if (signing)
+        callback.searchParams.set("etoken", signEdgeTokenEd25519(claims, signing.privateKey));
     callback.searchParams.set("redirect", target as string);
     return redirect(callback.toString());
 }

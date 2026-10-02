@@ -106,7 +106,9 @@ export function frameAncestorsDirective(allowed: readonly string[]): string {
  *  - `X-Frame-Options` cannot name another site, so with origins allowed it would shut
  *    them out in an older browser. Nothing is sent then rather than the wrong thing.
  */
-export function fallbackFrameHeaders(allowed: readonly string[] | undefined): Record<string, string> {
+export function fallbackFrameHeaders(
+    allowed: readonly string[] | undefined
+): Record<string, string> {
     if (allowed === undefined || allowed.length > 0) return {};
     return { "X-Frame-Options": "SAMEORIGIN" };
 }
@@ -124,7 +126,9 @@ export function declaresFraming(headers: Readonly<Record<string, string>>): bool
 
 /** Whether one CSP header value carries a `frame-ancestors` directive. */
 function hasFrameAncestors(policy: string): boolean {
-    return policy.split(/[;,]/).some((directive) => directive.trim().toLowerCase().startsWith("frame-ancestors"));
+    return policy
+        .split(/[;,]/)
+        .some((directive) => directive.trim().toLowerCase().startsWith("frame-ancestors"));
 }
 
 type NodeHeaders = Record<string, string | string[] | undefined>;

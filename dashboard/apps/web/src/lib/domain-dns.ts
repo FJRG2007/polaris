@@ -29,7 +29,12 @@ import { setDomainConfig } from "./domain-service";
 import { detectPublicIp, getLocalEnvironment } from "./network-service";
 import { reportRouterAdvice, type RouterAdvice } from "./network-advice";
 import { loadCloudflareToken } from "./integrations/cloudflare-account-service";
-import { findDnsRecords, pruneDnsRecords, resolveZoneForHostname, upsertARecord } from "./integrations/cloudflare-api";
+import {
+    findDnsRecords,
+    pruneDnsRecords,
+    resolveZoneForHostname,
+    upsertARecord
+} from "./integrations/cloudflare-api";
 import {
     gameZoneRecords,
     getDashboardZoneIntent,
@@ -102,7 +107,10 @@ export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<Z
     // after the ISP moved them was told, for the rest of those six hours, that the
     // records they had just fixed were wrong. So an explicit check re-detects; the
     // ones that run as a side effect of something else keep the cheap answer.
-    const [config, expectedIp] = await Promise.all([getDomainZones(), detectPublicIp(options.fresh === true)]);
+    const [config, expectedIp] = await Promise.all([
+        getDomainZones(),
+        detectPublicIp(options.fresh === true)
+    ]);
     const records = zoneRecords(config);
     const gameZones = await checkGameZoneDns(config, expectedIp);
     const zones = await Promise.all(
@@ -129,7 +137,9 @@ export async function checkZoneDns(options: { fresh?: boolean } = {}): Promise<Z
             // Without a known public IP the records cannot be compared, only confirmed
             // to exist - which is still the useful half of the answer.
             const elsewhere = expectedIp
-                ? [...wildcardAddresses, ...hostAddresses].filter((address) => address !== expectedIp)
+                ? [...wildcardAddresses, ...hostAddresses].filter(
+                      (address) => address !== expectedIp
+                  )
                 : [];
             if (elsewhere.length > 0) {
                 return {
@@ -198,7 +208,9 @@ async function checkGameZoneDns(
         records.map(async (record) => {
             // A random label is the whole test: nothing but the wildcard could answer
             // for a name that was never created.
-            const addresses = await resolveOrEmpty(`${randomLabel(3)}.${record.label}.${config.baseDomain}`);
+            const addresses = await resolveOrEmpty(
+                `${randomLabel(3)}.${record.label}.${config.baseDomain}`
+            );
             if (addresses.length === 0) {
                 return {
                     game: record.game,
@@ -208,7 +220,9 @@ async function checkGameZoneDns(
                     detail: `No DNS answer yet. Without it every ${record.game} server needs a DNS record of its own.`
                 };
             }
-            const elsewhere = expectedIp ? addresses.filter((address) => address !== expectedIp) : [];
+            const elsewhere = expectedIp
+                ? addresses.filter((address) => address !== expectedIp)
+                : [];
             if (elsewhere.length > 0) {
                 return {
                     game: record.game,
@@ -325,14 +339,29 @@ export interface ZoneDnsProvisionResult {
  * record and the same button should produce it: without it every game server writes a
  * record of its own, which is what fills a zone up.
  */
-export async function provisionZoneDns(options: { overwrite?: boolean } = {}): Promise<ZoneDnsProvisionResult> {
-    const [config, token, ip] = await Promise.all([getDomainZones(), loadCloudflareToken(), detectPublicIp()]);
+export async function provisionZoneDns(
+    options: { overwrite?: boolean } = {}
+): Promise<ZoneDnsProvisionResult> {
+    const [config, token, ip] = await Promise.all([
+        getDomainZones(),
+        loadCloudflareToken(),
+        detectPublicIp()
+    ]);
     if (!config.baseDomain) throw new Error("Set a base domain first");
     if (!token) throw new Error("Connect a Cloudflare API token under Integrations first");
-    if (!ip) throw new Error("Polaris could not detect this server's public IP, so it does not know what to point DNS at");
+    if (!ip)
+        throw new Error(
+            "Polaris could not detect this server's public IP, so it does not know what to point DNS at"
+        );
 
     const zone = await resolveZoneForHostname(token, config.baseDomain);
-    const result: ZoneDnsProvisionResult = { created: [], replaced: [], unchanged: [], conflicts: [], failed: [] };
+    const result: ZoneDnsProvisionResult = {
+        created: [],
+        replaced: [],
+        unchanged: [],
+        conflicts: [],
+        failed: []
+    };
     const games = await installedGames().catch(() => []);
     const names = [
         ...zoneRecords(config).flatMap((record) => [record.host, record.wildcard]),
@@ -352,7 +381,10 @@ export async function provisionZoneDns(options: { overwrite?: boolean } = {}): P
                 continue;
             }
             if (elsewhere.length > 0 && !options.overwrite) {
-                result.conflicts.push({ name, content: elsewhere.map((entry) => entry.content).join(", ") });
+                result.conflicts.push({
+                    name,
+                    content: elsewhere.map((entry) => entry.content).join(", ")
+                });
                 continue;
             }
             const recordId = await upsertARecord(token, zone.id, name, ip);
@@ -421,18 +453,26 @@ async function dnsTargetFor(hostname: string): Promise<{ ip: string | null; serv
             select: {
                 servedBy: true,
                 application: {
-                    select: { target: { select: { kind: true, host: { select: { name: true, address: true } } } } }
+                    select: {
+                        target: {
+                            select: { kind: true, host: { select: { name: true, address: true } } }
+                        }
+                    }
                 }
             }
         })
         .catch(() => null);
-    const host = domain?.application.target.kind !== "local" ? domain?.application.target.host : null;
+    const host =
+        domain?.application.target.kind !== "local" ? domain?.application.target.host : null;
     if (!domain || !host || domain.servedBy === "polaris") return { ip: await detectPublicIp() };
     const address = host.address.trim();
     // An address is used as it is; a name is looked up, the way a visitor would.
     const addresses = isIP(address) !== 0 ? [address] : await resolveOrEmpty(address);
     return {
-        ip: dnsAddressFor({ remote: true, servedBy: domain.servedBy, serverAddresses: addresses }, null),
+        ip: dnsAddressFor(
+            { remote: true, servedBy: domain.servedBy, serverAddresses: addresses },
+            null
+        ),
         server: host.name
     };
 }
@@ -477,7 +517,11 @@ export async function provisionHostnameDns(hostname: string): Promise<HostnameDn
         const elsewhere = existing.filter((entry) => entry.content !== ip);
         if (existing.length > 0 && elsewhere.length === 0) return { status: "unchanged", ip };
         if (elsewhere.length > 0) {
-            return { status: "conflict", ip, content: elsewhere.map((entry) => entry.content).join(", ") };
+            return {
+                status: "conflict",
+                ip,
+                content: elsewhere.map((entry) => entry.content).join(", ")
+            };
         }
         const recordId = await upsertARecord(token, zone.id, name, ip);
         await pruneDnsRecords(token, zone.id, recordId, existing);

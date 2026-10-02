@@ -14,11 +14,18 @@ const domains = [{ hostname: "shop.example.com", targetPort: 3000, certResolver:
 
 describe("framing protection on labels", () => {
     it("sends SAMEORIGIN on a service with no edge settings at all", () => {
-        const labels = traefikLabels({ serviceName: "web", network: "p", domains, waf: { frameAncestors: [] } });
+        const labels = traefikLabels({
+            serviceName: "web",
+            network: "p",
+            domains,
+            waf: { frameAncestors: [] }
+        });
 
         expect(labels[HEADER]).toBe("SAMEORIGIN");
         expect(labels["traefik.http.routers.web.middlewares"]).toContain("web-headers@docker");
-        expect(Object.keys(labels).some((key) => key.includes("Content-Security-Policy"))).toBe(false);
+        expect(Object.keys(labels).some((key) => key.includes("Content-Security-Policy"))).toBe(
+            false
+        );
     });
 
     it("sends nothing blind once other sites are allowed", () => {
@@ -34,7 +41,13 @@ describe("framing protection on labels", () => {
 
     it("yields to the service's own header setting", () => {
         const edge = parseAppEdgeConfig(JSON.stringify({ headers: { preset: "strict" } }));
-        const labels = traefikLabels({ serviceName: "web", network: "p", domains, edge, waf: { frameAncestors: [] } });
+        const labels = traefikLabels({
+            serviceName: "web",
+            network: "p",
+            domains,
+            edge,
+            waf: { frameAncestors: [] }
+        });
 
         expect(labels[HEADER]).toBe("DENY");
     });

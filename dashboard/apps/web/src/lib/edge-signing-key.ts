@@ -19,7 +19,12 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { createPrivateKey, createPublicKey, generateKeyPairSync, type KeyObject } from "node:crypto";
+import {
+    createPrivateKey,
+    createPublicKey,
+    generateKeyPairSync,
+    type KeyObject
+} from "node:crypto";
 
 const KEY_SETTING = "edge.signing.ed25519";
 
@@ -83,9 +88,15 @@ async function loadOrCreate(): Promise<EdgeSigningKey> {
     const { privateKey } = generateKeyPairSync("ed25519");
     const value = seal(privateKey.export({ format: "pem", type: "pkcs8" }).toString());
     if (raw === null) {
-        await prisma.setting.createMany({ data: [{ key: KEY_SETTING, value, scope: "global" }], skipDuplicates: true });
+        await prisma.setting.createMany({
+            data: [{ key: KEY_SETTING, value, scope: "global" }],
+            skipDuplicates: true
+        });
     } else {
-        await prisma.setting.updateMany({ where: { key: KEY_SETTING, value: raw }, data: { value } });
+        await prisma.setting.updateMany({
+            where: { key: KEY_SETTING, value: raw },
+            data: { value }
+        });
     }
     const settled = readKey(await getSetting(KEY_SETTING));
     if (!settled) throw new Error("The edge signing key could not be stored");
@@ -107,7 +118,10 @@ export async function edgeLoginKeys(): Promise<string[]> {
     try {
         return [(await edgeSigningKey()).publicKey];
     } catch (error) {
-        console.error("polaris: the edge signing key could not be read:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: the edge signing key could not be read:",
+            error instanceof Error ? error.message : error
+        );
         return [];
     }
 }

@@ -68,7 +68,10 @@ export function createControlPlaneWatch(
                 bases.set(base, entry);
             }
             const unconfirmed = entry.failures > 0 && entry.failures < DOWN_AFTER;
-            if (!entry.pending && now - entry.checkedAt >= (unconfirmed ? RECHECK_MS : CHECK_EVERY_MS)) {
+            if (
+                !entry.pending &&
+                now - entry.checkedAt >= (unconfirmed ? RECHECK_MS : CHECK_EVERY_MS)
+            ) {
                 const held = entry;
                 held.pending = true;
                 void probe(base)

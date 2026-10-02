@@ -13,7 +13,12 @@ async function headersFor(path: string): Promise<Record<string, string>> {
     const rules = (await nextConfig.headers?.()) ?? [];
     const out: Record<string, string> = {};
     for (const rule of rules) {
-        if (!pathToRegexp(rule.source, [], { strict: true, sensitive: false, delimiter: "/" }).test(path)) continue;
+        if (
+            !pathToRegexp(rule.source, [], { strict: true, sensitive: false, delimiter: "/" }).test(
+                path
+            )
+        )
+            continue;
         for (const header of rule.headers) out[header.key] = header.value;
     }
     return out;

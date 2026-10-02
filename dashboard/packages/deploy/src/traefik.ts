@@ -157,22 +157,24 @@ function wafMiddlewares(
     });
     if (wafNeedsGuard(waf)) {
         const ctx = `${serviceName}-waf-ctx`;
-        labels[`traefik.http.middlewares.${ctx}.headers.customrequestheaders.X-Polaris-Waf`] = encodeGuardRule({
-            deny: waf.deny ?? [],
-            presets: waf.presets ?? [],
-            rules: waf.rules ?? [],
-            requireLogin: waf.requireLogin === true,
-            loginUrl: waf.loginUrl,
-            loginAllowLists: waf.loginAllowLists ?? [],
-            loginDeny: waf.loginDeny ?? [],
-            keys: waf.loginKeys,
-            browserIntegrity: waf.browserIntegrity === true,
-            sqlInjectionProtection: waf.sqlInjectionProtection === true,
-            xssProtection: waf.xssProtection === true,
-            emailObfuscation: waf.emailObfuscation === true,
-            challenge: waf.challenge === true
-        });
-        labels["traefik.http.middlewares.polaris-waf-guard.forwardauth.address"] = `${guardUrl()}/authz`;
+        labels[`traefik.http.middlewares.${ctx}.headers.customrequestheaders.X-Polaris-Waf`] =
+            encodeGuardRule({
+                deny: waf.deny ?? [],
+                presets: waf.presets ?? [],
+                rules: waf.rules ?? [],
+                requireLogin: waf.requireLogin === true,
+                loginUrl: waf.loginUrl,
+                loginAllowLists: waf.loginAllowLists ?? [],
+                loginDeny: waf.loginDeny ?? [],
+                keys: waf.loginKeys,
+                browserIntegrity: waf.browserIntegrity === true,
+                sqlInjectionProtection: waf.sqlInjectionProtection === true,
+                xssProtection: waf.xssProtection === true,
+                emailObfuscation: waf.emailObfuscation === true,
+                challenge: waf.challenge === true
+            });
+        labels["traefik.http.middlewares.polaris-waf-guard.forwardauth.address"] =
+            `${guardUrl()}/authz`;
         app.push(`${ctx}@docker`, "polaris-waf-guard@docker");
     }
     return { app, http };
@@ -200,7 +202,8 @@ const PATH_PREFIX = /^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/;
 
 /** Where a limit counts a visitor; see the local edge's `sourceByIp`. */
 function ipSource(labels: Record<string, string>, prefix: string, domain: TraefikDomain): void {
-    labels[`${prefix}.sourcecriterion.ipstrategy.depth`] = domain.certResolver === "none" ? "1" : "0";
+    labels[`${prefix}.sourcecriterion.ipstrategy.depth`] =
+        domain.certResolver === "none" ? "1" : "0";
 }
 
 /**
@@ -253,7 +256,8 @@ function edgeMiddlewares(
     });
     if (headers.length > 0) {
         const name = `${serviceName}-headers`;
-        for (const [key, value] of headers) labels[`${mwKey(name)}.headers.customresponseheaders.${key}`] = value;
+        for (const [key, value] of headers)
+            labels[`${mwKey(name)}.headers.customresponseheaders.${key}`] = value;
         late.push(`${name}@docker`);
     }
     const hostname = domain.hostname;
@@ -266,7 +270,11 @@ function edgeMiddlewares(
                 replacement = "${1}://${2}${3}";
             }
         } else if (redirect.kind === "apex-to-www") {
-            if (!hostname.startsWith("www.") && !isWildcardHostname(hostname) && siblings.has(`www.${hostname}`)) {
+            if (
+                !hostname.startsWith("www.") &&
+                !isWildcardHostname(hostname) &&
+                siblings.has(`www.${hostname}`)
+            ) {
                 regex = "^(https?)://([^/:]+)(.*)$";
                 replacement = "${1}://www.${2}${3}";
             }
@@ -304,14 +312,17 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
     // written into the container's labels, where the edge would refuse it.
     const domains = input.domains.flatMap((domain) => {
         const hostname = normalizeDeployHostname(domain.hostname);
-        if (!hostname || (domain.pathPrefix !== undefined && !PATH_PREFIX.test(domain.pathPrefix))) return [];
+        if (!hostname || (domain.pathPrefix !== undefined && !PATH_PREFIX.test(domain.pathPrefix)))
+            return [];
         return [{ ...domain, hostname }];
     });
     if (domains.length === 0) return {};
     const labels: Record<string, string> = {
         "traefik.enable": "true",
         "traefik.docker.network": input.network,
-        [`traefik.http.services.${input.serviceName}.loadbalancer.server.port`]: String(domains[0]!.targetPort)
+        [`traefik.http.services.${input.serviceName}.loadbalancer.server.port`]: String(
+            domains[0]!.targetPort
+        )
     };
     const balancer = `traefik.http.services.${input.serviceName}.loadbalancer`;
     if (input.edge?.balancing?.sticky) {
@@ -328,7 +339,9 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
         labels[`${balancer}.healthcheck.timeout`] = "3s";
     }
     // WAF middlewares are per-service (one app -> one rule), shared by every domain.
-    const waf = input.waf ? wafMiddlewares(input.serviceName, input.waf, labels) : { app: [], http: [] };
+    const waf = input.waf
+        ? wafMiddlewares(input.serviceName, input.waf, labels)
+        : { app: [], http: [] };
     const siblings = new Set(domains.map((domain) => domain.hostname));
     domains.forEach((domain, index) => {
         const router = domains.length === 1 ? input.serviceName : `${input.serviceName}-${index}`;
@@ -350,12 +363,18 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
         const guard = waf.app.filter((name) => !allow.includes(name));
         const chain = [...allow, ...edge.early, ...guard, ...edge.late];
         const secure = domain.certResolver !== "none";
-        const setRouter = (name: string, routerRule: string, rank: number, middlewares: string[]) => {
+        const setRouter = (
+            name: string,
+            routerRule: string,
+            rank: number,
+            middlewares: string[]
+        ) => {
             labels[`traefik.http.routers.${name}.rule`] = routerRule;
             labels[`traefik.http.routers.${name}.entrypoints`] = secure ? WEBSECURE : WEB;
             labels[`traefik.http.routers.${name}.priority`] = String(rank);
             labels[`traefik.http.routers.${name}.service`] = input.serviceName;
-            if (middlewares.length > 0) labels[`traefik.http.routers.${name}.middlewares`] = middlewares.join(",");
+            if (middlewares.length > 0)
+                labels[`traefik.http.routers.${name}.middlewares`] = middlewares.join(",");
             if (!secure) return;
             labels[`traefik.http.routers.${name}.tls`] = "true";
             // A wildcard has no single name to order a certificate for over HTTP.
@@ -365,10 +384,12 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
         };
         setRouter(router, rule, labelRank(domain), chain);
         edge.byPath.forEach((scoped, pathIndex) => {
-            setRouter(`${router}-path-${pathIndex}`, `${rule} && PathPrefix(\`${scoped.path}\`)`, labelRank(domain, 1), [
-                ...chain,
-                scoped.middleware
-            ]);
+            setRouter(
+                `${router}-path-${pathIndex}`,
+                `${rule} && PathPrefix(\`${scoped.path}\`)`,
+                labelRank(domain, 1),
+                [...chain, scoped.middleware]
+            );
         });
         if (!secure) return;
         // An http router that redirects to https, behind the allowlist and the limits.

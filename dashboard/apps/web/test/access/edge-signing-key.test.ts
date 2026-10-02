@@ -9,7 +9,9 @@ const rows = new Map<string, string>();
 /** Runs once, between this process reading "nothing stored" and writing its pair. */
 let beforeWrite: (() => Promise<void>) | null = null;
 
-vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: Buffer.alloc(32, 7).toString("base64") }) }));
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_MASTER_KEY: Buffer.alloc(32, 7).toString("base64") })
+}));
 vi.mock("@polaris/db", () => ({
     prisma: {
         setting: {
@@ -27,7 +29,13 @@ vi.mock("@polaris/db", () => ({
                 }
                 return { count };
             },
-            updateMany: async ({ where, data }: { where: { key: string; value: string }; data: { value: string } }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { key: string; value: string };
+                data: { value: string };
+            }) => {
                 const hook = beforeWrite;
                 beforeWrite = null;
                 await hook?.();
