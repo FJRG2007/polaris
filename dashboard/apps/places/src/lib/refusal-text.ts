@@ -295,7 +295,10 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.philipsCloudUnfinished"
     ],
     ["That code is not right or has expired. Ask for a new one.", "refusals.philipsCloudBadCode"],
-    ["Philips did not accept the code. Check it, or ask for a new one.", "refusals.philipsCloudBadCode"],
+    [
+        "Philips did not accept the code. Check it, or ask for a new one.",
+        "refusals.philipsCloudBadCode"
+    ],
     ["The device did not answer through Philips' cloud.", "refusals.philipsCloudQuiet"],
     ["The device is busy. Try again in a moment.", "refusals.philipsCloudBusy"],
     [
@@ -352,7 +355,8 @@ const SHAPED: readonly {
         params: ["said"]
     },
     {
-        pattern: /^Philips did not accept the code\. Check it, or ask for a new one\. Philips said: (.+)\.$/s,
+        pattern:
+            /^Philips did not accept the code\. Check it, or ask for a new one\. Philips said: (.+)\.$/s,
         key: "refusals.philipsCloudBadCodeSaid",
         params: ["said"]
     },

@@ -90,7 +90,9 @@ describe("a refusal from Places", () => {
                 es,
                 "Philips did not accept the code. Check it, or ask for a new one. Philips said: Invalid code (403042)."
             )
-        ).toBe("Philips no ha aceptado el código. Compruébalo o pide otro. Philips dijo: Invalid code (403042).");
+        ).toBe(
+            "Philips no ha aceptado el código. Compruébalo o pide otro. Philips dijo: Invalid code (403042)."
+        );
         expect(
             placesRefusalText(
                 es,

@@ -979,7 +979,6 @@ export function shownFields(connection: DeviceConnection): readonly ConnectionFi
     return connection.fields.filter((field) => field.secret !== true);
 }
 
-
 /**
  * What is wrong with one field, or nothing.
  *

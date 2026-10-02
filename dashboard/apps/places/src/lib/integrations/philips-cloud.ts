@@ -176,7 +176,11 @@ const gigyaSchema = z
  * kept: its details can echo back what was sent.
  */
 function philipsSaid(sentence: string, answer: { errorCode?: number; errorMessage?: string }) {
-    const words = (answer.errorMessage ?? "").replace(/[^\x20-\x7e]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+    const words = (answer.errorMessage ?? "")
+        .replace(/[^\x20-\x7e]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
     const code = answer.errorCode === undefined ? "" : String(answer.errorCode);
     const said = words && code ? `${words} (${code})` : words || code;
     return said ? `${sentence} Philips said: ${said}.` : sentence;
