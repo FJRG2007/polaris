@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { EdgePanel } from "../edge-panel";
+import { SharedHostPanel } from "../shared-host-panel";
 import { ServerUsage } from "../server-usage";
 import { ServerStorage } from "../server-storage";
 import { ServerWorkload } from "./server-workload";
@@ -222,6 +223,13 @@ export function ServerDetail({
                         through. */}
                     {server.kind !== "local" && server.hostId ? (
                         <EdgePanel hostId={server.hostId} />
+                    ) : null}
+
+                    {/* What a clean-up may remove there. Only for a server reached
+                        over SSH: this machine's own clean-up never goes beyond
+                        images and build cache. */}
+                    {server.kind !== "local" && server.hostId ? (
+                        <SharedHostPanel hostId={server.hostId} />
                     ) : null}
 
                     {/* The whole machine, including everything that is not a

@@ -384,5 +384,11 @@
             "notHostname": "Not a hostname",
             "writeSomething": "Write something first"
         }
+    },
+    "shared": {
+        "title": "Shared with other containers",
+        "hint": "Something besides Polaris runs containers here, so clean-up only removes unused images and build cache, never a stopped container or a network. Switched on by itself when Polaris finds containers it did not start.",
+        "loadFailed": "Could not read this setting",
+        "saveFailed": "Could not save this setting"
     }
 }

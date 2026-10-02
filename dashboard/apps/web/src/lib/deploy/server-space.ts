@@ -195,6 +195,74 @@ export const PRUNE_EVERY_ENGINE = [
 ].join("; ");
 
 /**
+ * The same sweep for a server shared with containers Polaris did not start: images
+ * and build cache only. `system prune` also removes every stopped container and
+ * every network nothing is attached to at that moment - on a machine that ran
+ * somebody's services before Polaris came, that is their stopped container and
+ * the network their services find each other on, gone while it happened to be
+ * empty. Volumes are never in either sweep.
+ */
+export const PRUNE_SHARED_HOST = [
+    `if command -v docker >/dev/null 2>&1; then docker image prune -af --filter 'label!=${RELEASE_LABEL}' || true; docker builder prune -af || true; fi`,
+    "if command -v nerdctl >/dev/null 2>&1; then nerdctl image prune -af || true; fi",
+    "if command -v crictl >/dev/null 2>&1; then crictl rmi --prune || true; elif command -v k3s >/dev/null 2>&1; then k3s crictl rmi --prune || true; fi"
+].join("; ");
+
+/** The sweep for a server: the careful one where it is shared. */
+export function pruneCommandFor(shared: boolean): string {
+    return shared ? PRUNE_SHARED_HOST : PRUNE_EVERY_ENGINE;
+}
+
+/** Every container on a server, stopped ones too, with the compose project it
+ *  belongs to - what is read to tell whether anybody else runs things there. */
+export const LIST_CONTAINERS = `docker ps -a --format '{{.Names}}|{{.Label "com.docker.compose.project"}}' 2>/dev/null`;
+
+/**
+ * The containers in a `LIST_CONTAINERS` listing that Polaris did not start. Polaris
+ * starts everything in a compose project of its own (`polaris-...`), and the edge
+ * it installs under names of its own; anything else is somebody's.
+ */
+export function foreignContainers(said: string): string[] {
+    return said
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .filter((line) => {
+            const [name = "", project = ""] = line.split("|");
+            return !project.startsWith("polaris") && !name.startsWith("polaris");
+        })
+        .map((line) => line.split("|")[0] ?? line);
+}
+
+/**
+ * Whether a server is shared with containers Polaris did not start, so its
+ * clean-up must stay to images and build cache. The stored answer when there is
+ * one - the operator's, or the one found before. Otherwise it is found out once,
+ * from what runs there, and kept: a machine somebody already ran services on is
+ * shared, which is every server adopted rather than set up fresh. A machine that
+ * cannot be asked is treated as shared for this sweep and asked again next time.
+ */
+export async function isSharedHost(hostId: string): Promise<boolean> {
+    const host = await prisma.host.findUnique({ where: { id: hostId }, select: { sharedHost: true } });
+    if (!host) return true;
+    if (host.sharedHost !== null) return host.sharedHost;
+    const said = await onServer(hostId, LIST_CONTAINERS);
+    if (said === null) return true;
+    const shared = foreignContainers(said).length > 0;
+    await prisma.host.update({ where: { id: hostId }, data: { sharedHost: shared } }).catch(() => undefined);
+    return shared;
+}
+
+/** Set, by the operator, whether a server is shared. False when it was already so. */
+export async function setSharedHost(hostId: string, ownerId: string, shared: boolean): Promise<boolean> {
+    const host = await prisma.host.findFirst({ where: { id: hostId, ownerId }, select: { sharedHost: true } });
+    if (!host) throw new Error("Server not found");
+    if (host.sharedHost === shared) return false;
+    await prisma.host.update({ where: { id: hostId }, data: { sharedHost: shared } });
+    return true;
+}
+
+/**
  * Hand back the room nothing is using on a server.
  *
  * Measured with `df` on either side rather than read off what the prune printed.
@@ -221,7 +289,7 @@ export async function reclaimServerSpace(
         sshMachine(connection.address, connection.port),
         async () => {
             const before = await serverFreeBytes(hostId);
-            const said = await onServer(hostId, PRUNE_EVERY_ENGINE);
+            const said = await onServer(hostId, pruneCommandFor(await isSharedHost(hostId)));
             if (said === null) return null;
             const after = await serverFreeBytes(hostId);
             if (before !== null && after !== null && after > before) return after - before;

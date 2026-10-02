@@ -36,7 +36,8 @@ export async function getPorts(target: TargetRow, ownerId: string, signal?: Abor
             port: connection.port,
             username: connection.username,
             auth: connection.auth,
-            hostKey: connection.hostKey
+            hostKey: connection.hostKey,
+            hostId: target.hostId
         },
         signal
     );

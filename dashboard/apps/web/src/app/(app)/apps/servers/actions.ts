@@ -44,6 +44,7 @@ import {
 } from "@/lib/host-service";
 import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import * as serverEdge from "@/lib/deploy/server-edge";
+import { isSharedHost, setSharedHost } from "@/lib/deploy/server-space";
 import { findLocalPath, useLocalPath, type LocalPath } from "@/lib/server-local-path";
 import {
     createEnrollmentSchema,
@@ -672,6 +673,34 @@ export async function setLeftoverAutoRemoveAction(on: boolean): Promise<{ error?
         targetType: "host",
         targetId: "local",
         metadata: { on }
+    });
+    return {};
+}
+
+/**
+ * Whether this server is shared with containers Polaris did not start, which keeps
+ * its clean-up to images and build cache. Found out the first time it is asked.
+ */
+export async function sharedHostAction(hostId: string): Promise<{ shared?: boolean; error?: string }> {
+    const user = await requirePermission("system.manage");
+    const host = (await listHosts(user.id)).find((entry) => entry.id === hostId);
+    if (!host) return { error: await say("errors.notYours") };
+    return { shared: await isSharedHost(host.id) };
+}
+
+/** Switch it. Audited: it decides what a clean-up may remove on that machine. */
+export async function setSharedHostAction(hostId: string, shared: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    if (typeof shared !== "boolean") return { error: await say("errors.notASetting") };
+    const host = (await listHosts(user.id)).find((entry) => entry.id === hostId);
+    if (!host) return { error: await say("errors.notYours") };
+    if (!(await setSharedHost(host.id, user.id, shared))) return {};
+    await recordAudit({
+        actorId: user.id,
+        action: "server.shared",
+        targetType: "host",
+        targetId: host.id,
+        metadata: { shared }
     });
     return {};
 }

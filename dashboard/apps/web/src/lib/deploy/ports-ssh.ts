@@ -10,7 +10,7 @@ import type { Client } from "ssh2";
 import { PassThrough } from "node:stream";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
-import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
+import { DF_ROOT, freeBytesFromDf, isSharedHost, pruneCommandFor } from "@/lib/deploy/server-space";
 import { ImageStoreBusy, sshMachine, withImagePrune, withImageUse } from "@/lib/deploy/image-store-lock";
 import { ensurePrivateNetworksScript, forCompose, isReleaseImage, parseReclaimedBytes, quoteArg, renderComposeYaml, type BuildRequest, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts, type WorldTrimOptions } from "@polaris/deploy";
 
@@ -27,6 +27,9 @@ export interface SshTarget {
     readonly username: string;
     readonly auth: SshAuth;
     readonly hostKey?: string;
+    /** The server's record, which says whether it is shared (see `isSharedHost`).
+     *  Absent means it cannot be known, and the careful clean-up is used. */
+    readonly hostId?: string;
 }
 
 export class SshPorts implements RuntimePorts {
@@ -342,7 +345,10 @@ export class SshPorts implements RuntimePorts {
         const keep = (chunk: Buffer): void => {
             said += chunk.toString("utf8");
         };
-        await this.run(PRUNE_EVERY_ENGINE, keep).catch(() => undefined);
+        // Images and build cache only on a server shared with containers Polaris did
+        // not start - their stopped containers and networks are not Polaris's to take.
+        const shared = this.target.hostId ? await isSharedHost(this.target.hostId).catch(() => true) : true;
+        await this.run(pruneCommandFor(shared), keep).catch(() => undefined);
         const after = await this.freeBytes();
         if (before !== null && after !== null && after > before) return after - before;
         return parseReclaimedBytes(said);
