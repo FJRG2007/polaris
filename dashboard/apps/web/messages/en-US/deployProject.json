@@ -28,7 +28,16 @@
         "lastDeploy": "Last deploy",
         "notDeployed": "Not deployed yet",
         "needsLook": "{name} needs a look",
-        "needLook": "{count} services need a look"
+        "needLook": "{count} services need a look",
+        "outcome": {
+            "succeeded": "Succeeded",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "queued": "Queued",
+            "deploying": "Deploying",
+            "stopped": "Stopped",
+            "removed": "Removed"
+        }
     },
     "sections": {
         "architecture": {

@@ -4631,6 +4631,17 @@ model ExternalService {
     error             String?
     checkedAt         DateTime?
 
+    /// The Polaris service this is the same thing as, when somebody said so (or a
+    /// move did). Soft pointer, no FK: deleting either half leaves the other alone.
+    applicationId     String?   @db.Uuid
+    /// `owner/name` of the repository the provider builds, as it reports it - what
+    /// matches a row to a Polaris service built from the same repository.
+    repo              String?
+    /// JSON array of the hostnames the provider serves production on.
+    productionDomains String?
+    /// When the two above were last read: on their own, slower clock.
+    domainsCheckedAt  DateTime?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
@@ -4638,6 +4649,7 @@ model ExternalService {
 
     @@unique([environmentId, slug])
     @@index([environmentId])
+    @@index([applicationId])
     @@index([connectionId])
 }
 

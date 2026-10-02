@@ -142,6 +142,11 @@ export const railwayDriver: ProviderDriver = {
         } satisfies ExternalState;
     },
 
+    async productionDomains(token, externalId, ref) {
+        const { service, environment } = addressOf(ref);
+        return speaking(() => railway.railwayDomains(token, { project: externalId, service, environment }));
+    },
+
     /**
      * Nothing, always.
      *

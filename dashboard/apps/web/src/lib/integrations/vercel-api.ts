@@ -237,6 +237,35 @@ export async function vercelProject(
     return parsed.data;
 }
 
+const projectDomainSchema = z.object({
+    name: z.string(),
+    /** Set on a domain that only redirects to another one. */
+    redirect: z.string().nullable().optional(),
+    verified: z.boolean().optional()
+});
+
+/**
+ * The hostnames a project serves production on: its own domains, not the
+ * per-deployment `*.vercel.app` names. Asked for production only and without the
+ * ones that only redirect (a `www` pointing at the apex), so what comes back is
+ * where the site actually answers. One page of up to 20 is plenty for a card.
+ */
+export async function vercelProductionDomains(
+    token: string,
+    project: string,
+    team?: string | null
+): Promise<string[]> {
+    const params = new URLSearchParams({ production: "true", redirects: "false", limit: "20" });
+    if (team) params.set("teamId", team);
+    const parsed = z
+        .object({ domains: z.array(projectDomainSchema).default([]) })
+        .safeParse(await call(token, `/v9/projects/${encodeURIComponent(project)}/domains?${params.toString()}`));
+    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    return parsed.data.domains
+        .filter((domain) => !domain.redirect && domain.verified !== false)
+        .map((domain) => domain.name.toLowerCase());
+}
+
 const envSchema = z.object({
     key: z.string().default(""),
     value: z.string().nullable().default(null),

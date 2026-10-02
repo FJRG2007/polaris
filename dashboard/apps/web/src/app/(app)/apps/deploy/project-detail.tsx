@@ -227,7 +227,8 @@ function ViewToggle({
 function EnvSummary({ environment }: { environment: ProjectSummary["environments"][number] }) {
     const t = useTranslations("deployProject");
     const online =
-        environment.applications.filter((app) => app.currentDeploymentId).length +
+        // Up now, not merely deployed once: a stopped service is not online.
+        environment.applications.filter((app) => app.runState === "running").length +
         environment.databases.filter((db) =>
             ["running", "active", "healthy", "ready"].includes(db.status.toLowerCase())
         ).length;

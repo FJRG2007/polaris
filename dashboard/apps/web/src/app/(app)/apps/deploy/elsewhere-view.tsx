@@ -53,6 +53,9 @@ import {
  *  current - which is why nothing polls once everything has settled. */
 const WATCH_MS = 15_000;
 
+/** "Not one of this project's services" in the same-as picker. */
+const NO_SERVICE = "none";
+
 interface ProviderAccount {
     id: string;
     provider: string;
@@ -90,7 +93,9 @@ export function ElsewhereView({
     accounts,
     canAdd,
     canDeploy,
-    canRemove
+    canRemove,
+    canLink,
+    applications
 }: {
     projectId: string;
     services: ExternalServiceView[];
@@ -99,6 +104,11 @@ export function ElsewhereView({
     canAdd: boolean;
     canDeploy: boolean;
     canRemove: boolean;
+    /** May say which service of this project a row is the same thing as. */
+    canLink: boolean;
+    /** This project's own services, for that choice, with the repository each
+     *  builds - a row with no link counts for the one building the same one. */
+    applications: { id: string; name: string; repo: string | null }[];
 }) {
     const router = useRouter();
     const t = useTranslations("deploy");
@@ -151,6 +161,16 @@ export function ElsewhereView({
         if (result.service) settle(result.service);
     };
 
+    const link = async (service: ExternalServiceView, applicationId: string | null) => {
+        setError("");
+        const result = await runAction(
+            () => actions.linkExternalServiceAction(projectId, service.id, applicationId),
+            setError
+        );
+        if (result?.error) setError(result.error);
+        else if (result?.service) settle(result.service);
+    };
+
     const remove = async () => {
         if (!removing) return;
         const result = await runAction(
@@ -187,7 +207,7 @@ export function ElsewhereView({
                 </p>
             )}
 
-            {accounts.length === 0 ? (
+            {accounts.length === 0 && services.length === 0 ? (
                 <EmptyState
                     title={t("elsewhere.noAccount")}
                     description={t("elsewhere.noAccountHint")}
@@ -253,6 +273,45 @@ export function ElsewhereView({
                                 </span>
                                 {service.error && (
                                     <span className="text-[0.6875rem] text-danger">{service.error}</span>
+                                )}
+                                {service.productionDomains.length > 0 && (
+                                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-[0.6875rem]">
+                                        <span className="text-muted-foreground">{t("elsewhere.production")}</span>
+                                        {service.productionDomains.slice(0, 4).map((domain) => (
+                                            <a
+                                                key={domain}
+                                                href={`https://${domain}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="truncate text-primary hover:underline"
+                                            >
+                                                {domain}
+                                            </a>
+                                        ))}
+                                    </span>
+                                )}
+                                {canLink && applications.length > 0 && (
+                                    <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-muted-foreground">
+                                        {t("elsewhere.sameAs")}
+                                        <Select
+                                            value={
+                                                service.applicationId ??
+                                                applications.find((app) => app.repo && app.repo === service.repo)?.id ??
+                                                NO_SERVICE
+                                            }
+                                            onValueChange={(value) => void link(service, value === NO_SERVICE ? null : value)}
+                                            options={[
+                                                { value: NO_SERVICE, label: t("elsewhere.sameAsNone") },
+                                                ...applications.map((app) => ({ value: app.id, label: app.name }))
+                                            ]}
+                                            className="h-7 w-48 text-xs"
+                                            aria-label={t("elsewhere.sameAsLabel", { name: service.name })}
+                                        />
+                                        {!service.applicationId &&
+                                            applications.some((app) => app.repo && app.repo === service.repo) && (
+                                                <span>{t("elsewhere.sameRepository")}</span>
+                                            )}
+                                    </span>
                                 )}
                             </span>
 

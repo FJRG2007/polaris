@@ -6,6 +6,8 @@ import type { ProjectSummary } from "../deploy-view";
 import { servingReleases } from "@/lib/deploy/releases";
 import { capabilitiesFor } from "@/lib/host-capabilities";
 import { projectAccess } from "@/lib/deploy-project-access";
+import { serviceRunStates } from "@/lib/deploy/run-states";
+import { elsewhereByService, refreshStale } from "@/lib/deploy/external-services";
 import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
@@ -86,7 +88,10 @@ export default async function DeployProjectPage({
     // currently points at, which has a container name and a published port of its
     // own - so the terminal, the file browser and the direct IP:port link all have
     // to follow it.
-    const [caps, statuses, serverIp, tunnelDomains, attention, serving] = await Promise.all([
+    // Kept current on its own clock and never waited for: a provider having a bad
+    // morning must not hold the board, which draws what was last read.
+    void refreshStale(projectId).catch(() => undefined);
+    const [caps, statuses, serverIp, tunnelDomains, attention, serving, elsewhere] = await Promise.all([
         canManage ? capabilitiesFor("deploy") : null,
         getApplicationDeployStatuses(
             allApps.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
@@ -94,9 +99,12 @@ export default async function DeployProjectPage({
         getPublicIp(),
         listActiveTunnelDomains(appIds),
         serviceAttention(appIds),
-        servingReleases(allApps.map((app) => ({ ...app, environment: { project } })))
+        servingReleases(allApps.map((app) => ({ ...app, environment: { project } }))),
+        elsewhereByService(projectId, allApps)
     ]);
     const localReady = Boolean(caps?.deploy);
+    // Whether each service is up, apart from how its last deploy went.
+    const runStates = await serviceRunStates(allApps, statuses);
 
     const summary: ProjectSummary = {
         id: project.id,
@@ -115,6 +123,10 @@ export default async function DeployProjectPage({
                 // What the service is doing now: the build in flight, or the release
                 // it serves. Null only when it has never been deployed.
                 deployStatus: statuses[app.id] ?? null,
+                runState: runStates[app.id] ?? "never",
+                // The same service running on Vercel or Railway, with the domains it
+                // serves production on.
+                elsewhere: elsewhere.get(app.id) ?? [],
                 targetId: app.targetId,
                 serverId:
                     app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,

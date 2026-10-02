@@ -42,6 +42,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         domain: {
             findMany: async () => domains,
+            updateMany: async () => ({ count: 0 }),
             update: async () => ({})
         }
     }

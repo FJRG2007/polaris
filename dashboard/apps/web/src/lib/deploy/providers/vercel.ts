@@ -127,6 +127,10 @@ export const vercelDriver: ProviderDriver = {
         } satisfies ExternalState;
     },
 
+    async productionDomains(token, externalId, ref) {
+        return speaking(() => vercel.vercelProductionDomains(token, externalId, ref.team ?? null));
+    },
+
     /**
      * The repository behind the project.
      *

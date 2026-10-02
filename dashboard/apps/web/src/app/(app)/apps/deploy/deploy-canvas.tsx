@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { primaryDomain } from "./domain-rank";
+import { IntegrationLogo } from "@/components/logos";
 import { dbEngineLabel } from "@polaris/core";
 import { NewVolumeDialog } from "./volume-form";
 import { useStagedChanges } from "./staged-changes";
@@ -27,6 +28,7 @@ import {
     SERVICE_TYPES,
     ServiceIcon,
     dbTone,
+    runStateLabel,
     serviceKindOf,
     type ProjectApp,
     type ProjectSummary,
@@ -71,6 +73,9 @@ interface CanvasNode {
     volume?: string;
     /** Real attached volumes (applications), each an interactive strip below the card. */
     volumes?: VolumeChip[];
+    /** The same service on another provider, whose production domain is the
+     *  subtitle: which provider, and whether its release is live. */
+    elsewhere?: { provider: string; status: string };
 }
 
 /** Where a volume opens in Drive: a nas volume points at its NAS connection + folder;
@@ -106,11 +111,17 @@ function nodesFromEnvironment(
             id: app.id,
             name: app.name,
             kind: serviceKindOf(app.sourceType),
+            // The production copy's domain first when the service also runs on another
+            // provider - that is where it answers people - then its own best address.
             subtitle:
+                app.elsewhere.find((entry) => entry.domains.length > 0)?.domains[0] ??
                 primaryDomain(app.domains)?.hostname ??
                 (app.sourceType === "image" ? t("canvas.dockerImage") : t("canvas.gitRepository")),
-            tone: dbTone(app.deployStatus ?? ""),
-            statusLabel: app.deployStatus ?? t("view.notDeployed"),
+            elsewhere: app.elsewhere[0]
+                ? { provider: app.elsewhere[0].provider, status: app.elsewhere[0].status }
+                : undefined,
+            tone: runStateLabel(app, t).tone,
+            statusLabel: runStateLabel(app, t).label,
             volumes: app.volumes
         })
     );
@@ -774,8 +785,25 @@ export function DeployCanvas({
                                                     {node.name}
                                                 </span>
                                             </div>
-                                            <p className="mt-1 truncate text-sm text-muted-foreground">
-                                                {node.subtitle}
+                                            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                                                {node.elsewhere && (
+                                                    <>
+                                                        <IntegrationLogo
+                                                            slug={node.elsewhere.provider}
+                                                            className="size-3.5 w-4 shrink-0 object-contain"
+                                                        />
+                                                        <span
+                                                            className={`size-1.5 shrink-0 rounded-full ${
+                                                                node.elsewhere.status === "live"
+                                                                    ? "bg-success-solid"
+                                                                    : node.elsewhere.status === "failed"
+                                                                      ? "bg-danger-solid"
+                                                                      : "bg-foreground-subtle"
+                                                            }`}
+                                                        />
+                                                    </>
+                                                )}
+                                                <span className="truncate">{node.subtitle}</span>
                                             </p>
                                             <div className="mt-auto flex items-center gap-2 text-sm">
                                                 {removing ? (

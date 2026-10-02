@@ -220,6 +220,39 @@ export async function railwayDeployments(
     return parsed.data.deployments.edges.map((edge) => edge.node);
 }
 
+const railwayDomainsSchema = z.object({
+    domains: z.object({
+        serviceDomains: z.array(z.object({ domain: z.string() })).default([]),
+        customDomains: z.array(z.object({ domain: z.string() })).default([])
+    })
+});
+
+/**
+ * Where one service answers in one environment: its custom domains first, then
+ * the `*.up.railway.app` names Railway generated for it.
+ */
+export async function railwayDomains(
+    token: string,
+    input: { project: string; service: string; environment: string }
+): Promise<string[]> {
+    const parsed = railwayDomainsSchema.safeParse(
+        await query(
+            token,
+            `query domains($projectId: String!, $environmentId: String!, $serviceId: String!) {
+                domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) {
+                    serviceDomains { domain }
+                    customDomains { domain }
+                }
+            }`,
+            { projectId: input.project, environmentId: input.environment, serviceId: input.service }
+        )
+    );
+    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    return [...parsed.data.domains.customDomains, ...parsed.data.domains.serviceDomains].map((entry) =>
+        entry.domain.toLowerCase()
+    );
+}
+
 /**
  * The variables one service runs with.
  *

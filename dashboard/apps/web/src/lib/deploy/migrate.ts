@@ -48,6 +48,7 @@ import {
 } from "@/lib/deploy-service";
 import {
     addExternalService,
+    linkExternalService,
     isProvider,
     listExternalServices,
     providerDriver,
@@ -223,13 +224,15 @@ export async function moveOut(
         }
     }
 
-    const service = await addExternalService(userId, projectId, {
+    const added = await addExternalService(userId, projectId, {
         environmentId: input.environmentId,
         connectionId: input.connectionId,
         name: input.name,
         externalId: input.externalId,
         ref: input.ref
     });
+    // The same service, said once here so its card shows where it moved to.
+    const service = await linkExternalService(projectId, added.id, app.id).catch(() => added);
 
     if (input.releaseThere) {
         const driver = driverOf(link.provider);

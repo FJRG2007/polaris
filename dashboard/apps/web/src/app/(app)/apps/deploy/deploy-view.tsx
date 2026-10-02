@@ -10,6 +10,7 @@
 
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
+import { IntegrationLogo } from "@/components/logos";
 import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
@@ -24,6 +25,8 @@ import { dbEngineOptions } from "@/components/db-engine-select";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
+import { runStateTone, type ServiceRunState } from "@/lib/deploy/run-state";
+import type { ElsewhereSummary } from "@/lib/deploy/external-services";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
@@ -35,6 +38,7 @@ import {
     type TopologyValue
 } from "./database-topology-field";
 import {
+    cn,
     Badge,
     Button,
     ConfirmDeleteDialog,
@@ -115,6 +119,10 @@ export interface ProjectSummary {
             sourceType: string;
             currentDeploymentId: string | null;
             deployStatus: string | null;
+            /** Whether it is up now, apart from how its last deploy went. */
+            runState: ServiceRunState;
+            /** The same service running on another provider, production first. */
+            elsewhere: ElsewhereSummary[];
             targetId: string;
             /** Server the app runs on: "local" or a Host id (for the Settings picker). */
             serverId: string;
@@ -346,10 +354,7 @@ function AppCard({
                         {app.name}
                     </span>
                 </button>
-                <StatusPill
-                    tone={dbTone(app.deployStatus ?? "")}
-                    label={app.deployStatus ?? t("view.notDeployed")}
-                />
+                <RunStatePill app={app} />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -363,9 +368,13 @@ function AppCard({
                 <MetricsBadge applicationId={app.id} />
             </div>
 
+            <ElsewhereLines entries={app.elsewhere} />
+
             {primary && (
                 // The single most stable/reachable domain (custom domain > free public
                 // subdomain > LAN name), so the card surfaces where the service actually lives.
+                // Below the production copy elsewhere when there is one: that is where
+                // the service actually answers people, and this one is the staging half.
                 <div className="flex min-w-0 items-center gap-1.5">
                     <a
                         href={`https://${primary.hostname}`}
@@ -1999,12 +2008,121 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     );
 }
 
+/** The tone of a provider's release status. */
+const ELSEWHERE_DOT: Readonly<Record<string, string>> = {
+    live: "bg-success-solid",
+    failed: "bg-danger-solid",
+    building: "bg-warning-solid animate-pulse",
+    queued: "bg-warning-solid animate-pulse"
+};
+
+const ELSEWHERE_STATUS = {
+    queued: "elsewhere.status.queued",
+    building: "elsewhere.status.building",
+    live: "elsewhere.status.live",
+    failed: "elsewhere.status.failed",
+    cancelled: "elsewhere.status.cancelled",
+    unknown: "elsewhere.status.unknown"
+} as const;
+
+/**
+ * Where the same service runs on another provider, as the card and the canvas
+ * say it: the provider, its live status, and the production domain - the address
+ * people actually use, with the Polaris one beneath it as the secondary.
+ */
+export function ElsewhereLines({ entries }: { entries: readonly ElsewhereSummary[] }) {
+    const t = useTranslations("deploy");
+    if (entries.length === 0) return null;
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            {entries.map((entry) => {
+                const host = entry.domains[0] ?? entry.url?.replace(/^https?:\/\//, "") ?? null;
+                const status = t(ELSEWHERE_STATUS[entry.status as keyof typeof ELSEWHERE_STATUS] ?? ELSEWHERE_STATUS.unknown);
+                return (
+                    <div key={entry.id} className="flex min-w-0 items-center gap-1.5 text-xs">
+                        <IntegrationLogo slug={entry.provider} className="size-3.5 w-4 shrink-0 object-contain text-muted-foreground" />
+                        <span
+                            role="img"
+                            aria-label={status}
+                            title={t("view.elsewhereStatus", { provider: entry.name, status })}
+                            className={cn("size-1.5 shrink-0 rounded-full", ELSEWHERE_DOT[entry.status] ?? "bg-foreground-subtle")}
+                        />
+                        {host ? (
+                            <a
+                                href={`https://${host}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="min-w-0 truncate font-medium text-foreground hover:text-primary hover:underline"
+                                title={host}
+                            >
+                                {host}
+                            </a>
+                        ) : (
+                            <span className="truncate text-muted-foreground">{entry.name}</span>
+                        )}
+                        <span className="shrink-0 text-[0.625rem] text-muted-foreground">{t("view.production")}</span>
+                        {entry.domains.length > 1 && (
+                            <span className="shrink-0 text-[0.625rem] text-muted-foreground" title={entry.domains.slice(1).join(", ")}>
+                                +{entry.domains.length - 1}
+                            </span>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/** The words for each run state. Queued is told apart from building because a
+ *  queue that does not move is its own problem. */
+const RUN_STATE_LABEL = {
+    never: "runState.never",
+    queued: "runState.queued",
+    deploying: "runState.deploying",
+    running: "runState.running",
+    stopped: "runState.stopped",
+    sleeping: "runState.sleeping",
+    crashed: "runState.crashed",
+    failed: "runState.failed"
+} as const;
+
+const RUN_STATE_HINT = {
+    crashed: "runStateHint.crashed",
+    sleeping: "runStateHint.sleeping",
+    stopped: "runStateHint.stopped"
+} as const;
+
+/** What a service's chip says: whether it is up now, never how its last deploy went. */
+export function runStateLabel(
+    app: Pick<ProjectApp, "runState" | "deployStatus">,
+    t: NamespaceTranslator<"deploy">
+): { label: string; hint: string | null; tone: ReturnType<typeof runStateTone> } {
+    const key = app.runState === "deploying" && app.deployStatus === "queued" ? "queued" : app.runState;
+    const hint = app.runState in RUN_STATE_HINT ? RUN_STATE_HINT[app.runState as keyof typeof RUN_STATE_HINT] : null;
+    return { label: t(RUN_STATE_LABEL[key]), hint: hint ? t(hint) : null, tone: runStateTone(app.runState) };
+}
+
+/** A service's run state as a chip, with the reason on hover where there is one. */
+export function RunStatePill({ app }: { app: Pick<ProjectApp, "runState" | "deployStatus"> }) {
+    const t = useTranslations("deploy");
+    const state = runStateLabel(app, t);
+    return (
+        <span title={state.hint ?? undefined} className="inline-flex shrink-0">
+            <StatusPill tone={state.tone} label={state.label} capitalize={false} />
+        </span>
+    );
+}
+
 export function StatusPill({
     tone,
-    label
+    label,
+    capitalize = true
 }: {
     tone: "success" | "warning" | "danger" | "idle";
     label: string;
+    /** Off for a label that is already words in the reader's language: it would
+     *  turn "En marcha" into "En Marcha". On for a raw status like "running". */
+    capitalize?: boolean;
 }) {
     const dot = {
         success: "bg-success-solid",
@@ -2021,7 +2139,7 @@ export function StatusPill({
     }[tone];
     return (
         <span
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs capitalize ${chip}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${capitalize ? "capitalize" : ""} ${chip}`}
         >
             <span
                 className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`}

@@ -17,6 +17,7 @@ import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { projectGlanceAction } from "./glance-actions";
 import { isInFlightStatus } from "@/lib/deploy/status";
+import { deployOutcome } from "@/lib/deploy/run-state";
 import { RelativeTime } from "@/components/relative-time";
 import { FAILED_DEPLOY_STATUSES } from "@/lib/deploy/attention";
 import { ArrowUpRight, ChevronDown, CircleAlert, Globe } from "lucide-react";
@@ -72,6 +73,18 @@ function deployVariant(status: string): "success" | "warning" | "danger" | "neut
     if (status === "running" || status === "success") return "success";
     return "neutral";
 }
+
+/** The words for a deploy's outcome. A finished release reads as succeeded, never
+ *  as "running": whether the service is up now is its own chip on the service. */
+const OUTCOME_LABEL = {
+    succeeded: "glance.outcome.succeeded",
+    failed: "glance.outcome.failed",
+    cancelled: "glance.outcome.cancelled",
+    queued: "glance.outcome.queued",
+    deploying: "glance.outcome.deploying",
+    stopped: "glance.outcome.stopped",
+    removed: "glance.outcome.removed"
+} as const;
 
 const HEALTH_DOT: Record<string, string> = {
     up: "bg-success-solid",
@@ -198,7 +211,9 @@ export function ProjectGlanceBar({
                     >
                         <span className="shrink-0">{t("glance.lastDeploy")}</span>
                         <Badge variant={deployVariant(last.status)} className="shrink-0 capitalize">
-                            {last.status.replace(/_/g, " ")}
+                            {deployOutcome(last.status) in OUTCOME_LABEL
+                                ? t(OUTCOME_LABEL[deployOutcome(last.status) as keyof typeof OUTCOME_LABEL])
+                                : last.status.replace(/_/g, " ")}
                         </Badge>
                         <RelativeTime iso={last.createdAt} formatStyle="narrow" className="shrink-0 tabular-nums" />
                         <span className="truncate" title={last.service}>{last.service}</span>

@@ -133,6 +133,20 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
                 notRouted: true
             };
         }
+        // Polaris's own page in any other state - the app behind the name is not
+        // running, or is waking up - is the edge answering in the app's place, and
+        // never the app being up. Its status already says so (502, 503), but that is
+        // the one thing the page cannot be trusted to keep: a requirement to sign in,
+        // a challenge or a CDN in front can turn the answer into something else
+        // first. The header is Polaris's and travels with the page.
+        if (response.headers.get(VACANT_HEADER) === VACANT_HEADER_VALUE) {
+            return {
+                status: "down",
+                code: response.status,
+                latencyMs: Date.now() - started,
+                detail: "Service not running"
+            };
+        }
         const status: "up" | "down" = response.status < 500 ? "up" : "down";
         return {
             status,
@@ -293,8 +307,36 @@ async function republishAppRoutes(): Promise<void> {
 /** Carried between passes, so an address that stays unrouted is not repaired every minute. */
 let repair: RepairState = NO_REPAIR;
 
+/**
+ * The health a domain of a stopped service carries instead of a probe result.
+ *
+ * Somebody stopped the service, so its addresses answer with the not-running page on
+ * purpose. Probing them would either report an outage that is not one or - behind a
+ * sign-in or a challenge that answers first - report them up, which is what the panel
+ * said about a service that had been stopped for weeks. Neither is the truth, which is
+ * that it is stopped.
+ */
+export const STOPPED_HEALTH = "stopped";
+
 /** Probe every enabled domain, with bounded concurrency. */
 export async function probeAllDomains(): Promise<void> {
+    // One write for every domain of every stopped service, and only for the rows that
+    // do not say so yet - after the first pass this touches nothing. Starting the
+    // service again lets the next probe write what it finds.
+    await prisma.domain.updateMany({
+        where: {
+            application: { desiredState: "stopped" },
+            healthStatus: { not: STOPPED_HEALTH }
+        },
+        data: {
+            healthStatus: STOPPED_HEALTH,
+            healthCode: null,
+            healthDetail: null,
+            healthCheckedAt: new Date(),
+            healthFailures: 0,
+            healthAlertedAt: null
+        }
+    });
     const domains = await prisma.domain.findMany({
         // A wildcard names no one address to probe - `https://*.example.com` is not a
         // URL - and a probe that cannot even be made would read as the site being down.
@@ -303,7 +345,7 @@ export async function probeAllDomains(): Promise<void> {
         where: {
             enabled: true,
             NOT: { hostname: { startsWith: "*." } },
-            application: { asleepSince: null }
+            application: { asleepSince: null, desiredState: { not: "stopped" } }
         },
         select: {
             id: true,
