@@ -56,8 +56,8 @@ vi.mock("@/lib/call-sounds", () => ({
     willBeHeard: async () => true
 }));
 
-vi.mock("@/app/(app)/chat/meeting-actions", () => ({
-    callElsewhereAction: async () => null
+vi.mock("@/lib/chat/call-elsewhere-request", () => ({
+    askCallElsewhere: async () => null
 }));
 
 /** Grace calling, in whichever conversation. */

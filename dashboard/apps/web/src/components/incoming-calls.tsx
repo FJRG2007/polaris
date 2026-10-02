@@ -52,7 +52,7 @@ import {
     tabIsWatched,
     type NoticeStanding
 } from "@/lib/desktop-notify";
-import { callElsewhereAction } from "@/app/(app)/chat/meeting-actions";
+import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
 import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging, willBeHeard } from "@/lib/call-sounds";
@@ -314,7 +314,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         let stopped = false;
 
         async function ask(): Promise<void> {
-            const elsewhere = await callElsewhereAction().catch(() => null);
+            const elsewhere = await askCallElsewhere();
             if (stopped || !elsewhere) return;
             settle(elsewhere.meetingId);
         }

@@ -28,7 +28,8 @@ import { useCallback, useEffect, useState } from "react";
 // The shape from the module that defines it: a "use server" file exports only
 // the actions themselves.
 import type { CallElsewhere as Found } from "@/lib/chat/meetings";
-import { callElsewhereAction, joinCallAction } from "./meeting-actions";
+import { joinCallAction } from "./meeting-actions";
+import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
 
 /** How long to wait before asking again after being dismissed, so that saying
  *  "not now" is not undone by the next thing that happens in any conversation. */
@@ -50,9 +51,7 @@ export function CallElsewhere() {
             setFound(null);
             return;
         }
-        void callElsewhereAction()
-            .then(setFound)
-            .catch(() => setFound(null));
+        void askCallElsewhere().then(setFound);
     }, [session]);
 
     useEffect(() => {

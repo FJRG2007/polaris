@@ -69,8 +69,8 @@ vi.mock("@/lib/call-sounds", () => ({
  *  case - nobody has picked the call up anywhere. */
 let seatElsewhere: { meetingId: string } | null = null;
 
-vi.mock("@/app/(app)/chat/meeting-actions", () => ({
-    callElsewhereAction: async () => seatElsewhere
+vi.mock("@/lib/chat/call-elsewhere-request", () => ({
+    askCallElsewhere: async () => seatElsewhere
 }));
 
 /** A call coming in, as the stream announces one. */
