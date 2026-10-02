@@ -265,21 +265,18 @@ export async function stashIn(
         );
         if (stayed.length > 0)
             copies = copies.filter((item) => !stayed.some((one) => one.copy === item));
+        try {
+            await writeCopy("stashed");
+        } catch (error) {
+            console.warn(
+                "polaris: keeping a copy of a bag failed",
+                owner.installedAppId,
+                String(error)
+            );
+        }
         theirs = after.filter((item) => !stash.isKit(item));
         const late = theirs.filter((item) => !stash.takeable(item));
-        if (late.length > 0) {
-            await writeCopy("stashed").catch(() => undefined);
-            return refuse("untakeable", late);
-        }
-    }
-    try {
-        await writeCopy("stashed");
-    } catch (error) {
-        console.warn(
-            "polaris: keeping a copy of a bag failed",
-            owner.installedAppId,
-            String(error)
-        );
+        if (late.length > 0) return refuse("untakeable", late);
     }
     if (theirs.length > 0) return refuse("unsettled", theirs);
     return { stash: current, refused: null };

@@ -153,13 +153,8 @@ export function takeable(item: InventoryItem): boolean {
     return (
         SLOTS.includes(item.slot) &&
         replaceSlot(item.slot) !== null &&
-        (fitsOneLine(item) || longLines("k", item) !== null)
+        (fitsOneLine(item) || longLines(longKey("00000000", item.slot), item) !== null)
     );
-}
-
-/** The stacks that are kept: everything a player carries that is theirs. */
-export function keepable(items: readonly InventoryItem[]): InventoryItem[] {
-    return items.filter((item) => !isKit(item) && takeable(item));
 }
 
 /**
@@ -191,19 +186,6 @@ export function sameStack(
         item.count === kept.count &&
         digest(item) === kept.data
     );
-}
-
-/** What to keep, from what a player carries. */
-export function keepFrom(
-    items: readonly InventoryItem[],
-    digest: (item: InventoryItem) => string | null
-): Kept[] {
-    return keepable(items).map((item) => ({
-        slot: item.slot,
-        id: item.id,
-        count: item.count,
-        data: digest(item)
-    }));
 }
 
 /** A slot emptied, once its copy is written. */

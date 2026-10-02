@@ -139,11 +139,19 @@ describe("putting away what somebody carries", () => {
         bag.set(102, chestplate("Dragonscale"));
         // The moment their chestplate is gone, they put another one on.
         meanwhile = () => bag.set(102, chestplate("Spare"));
-        const saves: unknown[] = [];
-        const result = await stashIn(server, owner, "Ana", async (kept) => void saves.push(kept));
+        const saves: string[] = [];
+        const result = await stashIn(
+            server,
+            owner,
+            "Ana",
+            async (kept) => void saves.push(kept.state)
+        );
         expect(result.refused).toBeNull();
         expect(bag.size).toBe(0);
         expect(result.stash!.state).toBe("stashed");
+        // Never left half-taken between rounds: what one round emptied is not
+        // read as never taken by a give-back after a later one stops.
+        expect(saves).toEqual(["taking", "stashed", "taking", "stashed"]);
         expect(result.stash!.kept.map((one) => one.slot).sort((a, b) => a - b)).toEqual([
             0, 9, 102
         ]);
