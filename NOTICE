@@ -1,0 +1,114 @@
+Polaris
+Copyright 2026 FJRG2007
+
+This product includes software developed by third parties, listed below with
+the licence it is used under. Anything not listed here is Polaris' own.
+
+--------------------------------------------------------------------------------
+
+GenOffice
+Copyright 2026 Mainfunc, Inc.
+Licensed under the Apache License, Version 2.0
+https://github.com/genspark-ai/genoffice
+
+Three parts of GenOffice are ported into Polaris.
+
+`dashboard/packages/core/src/sheets/` is its spreadsheet domain
+(`apps/sheets/src/domain`, plus the pivot definition types from
+`apps/sheets/src/gateway/xlsx-pivot.ts`): the pivot-table engine, the chart
+model and recommender, flash fill, range sorting, formula reference shifting,
+the A1 address reader and the in-memory workbook the rest are written against.
+
+Why it is here rather than written again: Polaris' spreadsheet is built on
+Univer, whose open edition ships the grid, the formulas and the formatting and
+deliberately does not ship pivot tables, charts or flash fill - those are what
+its makers sell. GenOffice had written exactly those, as pure TypeScript with
+no framework in it, under a licence that permits this.
+
+`dashboard/packages/pptx/` is `packages/pptx-engine`: the OOXML presentation
+model, its parser and its generator - layouts, masters, themes, charts, shapes,
+animations, comments, sections.
+
+`dashboard/packages/docx/` is `packages/docx-engine`: the OOXML document model,
+its parser, its fragment generators and a paragraph-level patching save -
+styles, numbering, sections, fields, tables, drawings, maths.
+
+`dashboard/packages/pptx-render/` is `packages/pptx-render`: drawing a parsed
+presentation - text layout, shape geometry, fills, preset geometries.
+
+`dashboard/packages/font-metrics/` is `packages/font-metrics`: reading the
+tables a layout needs to measure text, without a font renderer.
+
+`dashboard/packages/file-parse/` is `packages/file-parse`: taking the words out
+of a document whatever it is - the Office formats, PDF, and the binary ones from
+before them.
+
+`dashboard/packages/pdf2docx/` is `packages/pdf2docx`: turning a PDF into an
+editable Word document - text runs, columns, tables, images.
+
+Together these are why an exported `.docx` or `.pptx` from Polaris is a real
+Office package rather than a zip with the minimum set of parts in it, and why
+reading one is something this repository can do at all. Every ported package is
+held to the TypeScript strictness it was written under rather than Polaris' own,
+which is stated in its `tsconfig.json`; everything Polaris writes against them is
+still checked strictly at the call site.
+
+`dashboard/packages/office-layout/` is the framework-free geometry out of its
+three editors (`apps/docs`, `apps/slides`, `apps/pdf`): word counting in both
+kinds of script, print ranges, footnote marks, background removal, slide ruler
+ticks and snapping, CJK script classification, cover cropping, and a PDF's text
+blocks, columns, spreads and search index. Only the files that stand on their
+own came across - the pagination engine, for one, reaches the editor's own DOM
+and would have meant dragging half an application over to satisfy it.
+
+Also ported, each in its own package: `genoffice-i18n` (language detection and
+message lookup), `project-store` (a project's files and their recent history),
+`genoffice-agent` (its agent loop - turns, tools, results), `genoffice-ai` (its
+model providers and request shapes), `genoffice-search` (search and image
+generation through the Genspark CLI), `genoffice-ui` (its ribbon, colour picker,
+shape gallery and Markdown view), and `office-html` (the half of its shell
+helpers that is URL and remote-image safety rather than shell).
+
+Polaris has its own of several of those already and uses its own. They are here
+because the goal asked for the repository, and a package nobody imports still
+costs nothing to keep; `@polaris/genoffice-ui` in particular is kept strictly
+apart from `@polaris/ui`, which is Polaris' own design system.
+
+`dashboard/packages/genoffice-docs/`, `genoffice-slides/`, `genoffice-pdf/` and
+`genoffice-markdown/` are the four editor applications - their `renderer` half,
+which is React and Konva, together with the `shared` IPC contract, which is
+types only and describes the bridge each one expects.
+
+The bridge each of them talks to (`window.markdownApi`, `window.slidesApi` and
+so on) is an Electron channel injected by a preload script. **The markdown one
+is implemented**: opening a `.md` in Drive offers "Full editor" beside Pretty,
+Raw and the plain textarea, and that runs GenOffice's editor against a bridge
+answered by Drive - reading the file the viewer already read, writing through
+the same toolbar every other editor in Drive saves with. The docs and pdf
+bridges compile and are not yet reachable, and each needs the same treatment.
+
+Slides' bridge is no different - editing a deck in place still needs it, and
+it is still unreached. But its renderer does not need the bridge at all:
+`SlideThumb`, the component genoffice-slides itself draws its own thumbnails
+with, takes a parsed slide as plain data. The pptx packages above parse and
+lay out a `.pptx` server-side, and Drive's presentation viewer draws the
+result with that same component - eighty kilobytes rather than the three
+megabytes of the whole editor, and no bridge to answer.
+
+Polaris' own Office apps are unaffected and remain what `/office` serves. These
+are an alternative rather than a replacement, and they have no real-time
+collaboration in them - which is the first thing Polaris' own editors were
+built to do.
+
+What could NOT be taken, and why:
+
+- **The Electron main and preload processes** of all four applications, and six
+  of `electron-utils`' twelve modules - a menu bar, a native file dialog, a print
+  window. They import `electron`. There is no version of them that runs in a
+  browser.
+- **The pagination engine, the line-metrics table and the shape
+  adjust-handles**, as standalone geometry. They were tried for
+  `office-layout`, and each reaches its own editor's DOM - so they came across
+  inside their editor's package instead, where that DOM exists.
+
+Everything else in that repository is here.
