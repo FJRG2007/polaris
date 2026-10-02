@@ -37,6 +37,11 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 /** Messages handled per run; a backlog is worked through over several runs. */
 const BATCH = 25;
 
+/** The note on the report mailbox, stored on the engine; the screen says it through the catalog. */
+const REPORTS_DESCRIPTION =
+    // i18n-ignore
+    "DMARC reports about this server's domains arrive here; Polaris reads and files them.";
+
 /** The quota of the report mailbox. Reports are kept here as well as filed. */
 const REPORTS_QUOTA_BYTES = 512 * 1024 * 1024;
 
@@ -401,9 +406,7 @@ export async function ensureReportsMailbox(server: MailServer, without?: string)
                     domainId: primary.id,
                     password,
                     quotaBytes: REPORTS_QUOTA_BYTES,
-                    // i18n-ignore stored on the engine; the screen says it through the catalog
-                    description:
-                        "DMARC reports about this server's domains arrive here; Polaris reads and files them."
+                    description: REPORTS_DESCRIPTION
                 })
             ]),
             "account",
