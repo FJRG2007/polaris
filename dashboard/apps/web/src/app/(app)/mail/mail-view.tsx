@@ -2537,10 +2537,20 @@ function ThreadRow({
                         event.preventDefault();
                         goShallow(mailAddress({ open: thread.id }));
                     }}
-                    className={cn("min-w-0 flex-1", wide && "flex items-baseline gap-3")}
+                    // Wide is one line - sender, subject, snippet, date - but only
+                    // where a line has room for all four. Below `md` (a phone, a
+                    // narrow window) it is two: who and when, then what. One
+                    // line at 390 px cut the subject, the preview and the date
+                    // off the right-hand edge.
+                    className={cn("min-w-0 flex-1", wide && "md:flex md:items-baseline md:gap-3")}
                     aria-current={open ? "true" : undefined}
                 >
-                    <div className={cn("flex items-baseline gap-2", wide && "w-56 shrink-0")}>
+                    <div
+                        className={cn(
+                            "flex min-w-0 items-baseline gap-2",
+                            wide && "md:w-56 md:shrink-0"
+                        )}
+                    >
                         <span
                             // Same reason, same row: three names in a group
                             // conversation are cut after the first, and which
@@ -2560,9 +2570,18 @@ function ThreadRow({
                             </span>
                         ) : null}
                         <RowMarks thread={thread} />
-                        {wide ? null : <Stamp thread={thread} bySize={bySize} />}
+                        <Stamp
+                            thread={thread}
+                            bySize={bySize}
+                            className={wide ? "md:hidden" : undefined}
+                        />
                     </div>
-                    <div className={cn("min-w-0", wide && "flex flex-1 items-baseline gap-2")}>
+                    <div
+                        className={cn(
+                            "min-w-0",
+                            wide && "mt-0.5 flex items-baseline gap-2 md:mt-0 md:flex-1"
+                        )}
+                    >
                         <p
                             // The whole of it, for a row that is showing half.
                             // A subject is the one thing in a row somebody is
@@ -2589,7 +2608,9 @@ function ThreadRow({
                             </p>
                         </div>
                     </div>
-                    {wide ? <Stamp thread={thread} bySize={bySize} /> : null}
+                    {wide ? (
+                        <Stamp thread={thread} bySize={bySize} className="hidden md:flex" />
+                    ) : null}
                     {thread.labels.length > 0 && !wide ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                             {thread.labels.map((label) => (
@@ -2791,11 +2812,24 @@ function people(t: NamespaceTranslator<"mail">, thread: MailThreadView, mine: Re
  * how old it is - both are why somebody picks one row out of forty - and the
  * preview line is the one thing on the row that is genuinely prose.
  */
-function Stamp({ thread, bySize }: { thread: MailThreadView; bySize: boolean }) {
+function Stamp({
+    thread,
+    bySize,
+    className
+}: {
+    thread: MailThreadView;
+    bySize: boolean;
+    className?: string;
+}) {
     const format = useDisplayFormat();
     const t = useTranslations("mail");
     return (
-        <span className="flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-foreground-subtle">
+        <span
+            className={cn(
+                "flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-foreground-subtle",
+                className
+            )}
+        >
             {thread.hasAttachments ? (
                 <Paperclip className="size-3 shrink-0" aria-label={t("list.hasAttachments")} />
             ) : null}
