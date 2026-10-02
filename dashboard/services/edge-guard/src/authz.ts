@@ -35,6 +35,14 @@
  * Where the login lives comes from the rule too, for the same reason: this sidecar's
  * environment is written when it is deployed and cannot follow a domain configured
  * afterwards.
+ *
+ * While that Polaris cannot be reached, nothing here fails open and nothing waits on
+ * it. A visitor with a valid token keeps their access until its hard expiry - the
+ * membership backstop, which would otherwise send them away to refresh a claim nobody
+ * can refresh, stands down - and a visitor who needs to sign in, or whose account
+ * Polaris re-decided (a revoked session, a membership change, a ban: all in the
+ * snapshot on disk), gets the page saying sign-in is unavailable instead of a redirect
+ * to a login that does not answer.
  */
 
 import {
@@ -53,7 +61,7 @@ import {
     principalVerdict,
     principalsSuperseded,
     verifyEdgePass,
-    verifyEdgeToken,
+    verifyEdgeTokenFor,
     type GuardRule
 } from "@polaris/core/waf";
 
@@ -104,13 +112,20 @@ export interface GuardConfig {
     /** A fresh random value per request, for the puzzle it may issue. Injected so this
      *  function stays deterministic under test. */
     readonly nonce?: string;
+    /**
+     * Whether the Polaris at a login address is answering: false when it is known not
+     * to be, null or true otherwise. Omitted is "assume it is", which is what every
+     * guard did before this existed. See `control-plane.ts`.
+     */
+    readonly controlPlane?: (base: string) => boolean | null;
 }
 
 export type GuardDecision =
     | { readonly status: 200 }
     | { readonly status: 403; readonly reason: string }
     | { readonly status: 302; readonly location: string; readonly setCookie?: string }
-    | { readonly status: 503; readonly challenge: string; readonly bits: number };
+    | { readonly status: 503; readonly challenge: string; readonly bits: number }
+    | { readonly status: 503; readonly signInUnavailable: true };
 
 /** The originating client IP as Traefik forwarded it (leftmost X-Forwarded-For).
  *  Exported because the block page shows the visitor the same address the rules were
@@ -167,6 +182,32 @@ function loginRedirect(
 ): string {
     const base = rule.loginUrl ?? cfg.authorizeUrl;
     return `${base}/edge/authorize?redirect=${encodeURIComponent(returnTo ?? base)}`;
+}
+
+/** The Polaris a route signs visitors in through, as `loginRedirect` resolves it. */
+function loginBase(cfg: GuardConfig, rule: GuardRule): string {
+    return rule.loginUrl ?? cfg.authorizeUrl;
+}
+
+/** Whether that Polaris is known to be unreachable right now. Unknown is not down. */
+function signInDown(cfg: GuardConfig, rule: GuardRule): boolean {
+    const base = loginBase(cfg, rule);
+    return base !== "" && cfg.controlPlane?.(base) === false;
+}
+
+/**
+ * Send a visitor to sign in - or, when the Polaris that would do it is down, refuse
+ * with the page that says so. Never admits: a protected route stays protected.
+ */
+function signIn(
+    cfg: GuardConfig,
+    req: GuardRequest,
+    proto: string,
+    rule: GuardRule,
+    returnTo?: string
+): GuardDecision {
+    if (signInDown(cfg, rule)) return { status: 503, signInUnavailable: true };
+    return { status: 302, location: loginRedirect(cfg, req, proto, rule, returnTo) };
 }
 
 /**
@@ -317,10 +358,13 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         // redirect, so fail closed rather than admit the request.
         if (!host) return { status: 403, reason: "host unknown" };
         const uri = parseUri(req.forwardedUri, proto, host);
+        const trust = { secret: cfg.secret, keys: rule.keys };
         // Login handoff back from Polaris: mint the URL token into a same-domain cookie.
+        // A route that carries public keys reads the Ed25519 token; Polaris sends the
+        // HMAC one beside it for guards that predate them.
         if (uri && uri.pathname === CALLBACK_PATH) {
-            const token = uri.searchParams.get("token") ?? "";
-            const verified = verifyEdgeToken(token, cfg.secret, cfg.now, host);
+            const token = uri.searchParams.get((rule.keys?.length ?? 0) > 0 ? "etoken" : "token") ?? "";
+            const verified = verifyEdgeTokenFor(token, trust, cfg.now, host);
             if (verified) {
                 const maxAge = Math.max(1, verified.exp - cfg.now);
                 return {
@@ -332,11 +376,11 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
             // Round the login again, back to where the visitor was headed - not to this
             // URL, whose token is the thing that just failed.
             const headedFor = sameHostRedirect(uri.searchParams.get("redirect"), proto, host);
-            return { status: 302, location: loginRedirect(cfg, req, proto, rule, headedFor) };
+            return signIn(cfg, req, proto, rule, headedFor);
         }
         const token = readCookie(req.cookie, cfg.cookieName);
-        const verified = verifyEdgeToken(token, cfg.secret, cfg.now, host);
-        if (!verified) return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+        const verified = verifyEdgeTokenFor(token, trust, cfg.now, host);
+        if (!verified) return signIn(cfg, req, proto, rule);
         // Polaris re-decided this account after the token was minted - its membership
         // moved, it was banned, or its sessions were revoked. Asked here rather than
         // inside the principal check below, because "this account may no longer come in
@@ -344,8 +388,10 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         // sessions left them still served by every route they already held a token for.
         // Sending them back cannot loop - a token minted now is not superseded by a
         // change that predates it.
+        // With Polaris down that is a refusal rather than a redirect: the account was
+        // re-decided, and nothing can re-decide it in its favour until Polaris is back.
         if (principalsSuperseded(verified, cfg.intel?.movedAt(verified.sub) ?? null)) {
-            return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+            return signIn(cfg, req, proto, rule);
         }
         return admits(verified, rule, cfg, req, proto);
     }
@@ -377,11 +423,16 @@ function admits(
 ): GuardDecision {
     const named = (rule.loginAllowLists?.length ?? 0) > 0 || (rule.loginDeny?.length ?? 0) > 0;
     if (!named) return { status: 200 };
-    if (!token.prn) return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
+    if (!token.prn) return signIn(cfg, req, proto, rule);
     // The backstop, and only here: a route that names nobody keeps its token for its
     // full life, while one that decides by membership refuses to act on a claim old
     // enough that a change could have been missed on an edge no snapshot reaches.
-    if (membershipTooOld(token, cfg.now)) {
+    //
+    // Except while Polaris is down. The backstop exists to send the visitor for a
+    // fresher claim, and there is nowhere to get one: the claim is acted on until the
+    // token's hard expiry instead, with the snapshot on disk still refusing anybody
+    // Polaris re-decided before it went away.
+    if (membershipTooOld(token, cfg.now) && !signInDown(cfg, rule)) {
         return { status: 302, location: loginRedirect(cfg, req, proto, rule) };
     }
     // `user:<sub>` is proven by the signature over `sub` itself, so it holds even for a

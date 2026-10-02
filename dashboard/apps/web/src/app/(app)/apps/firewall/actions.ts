@@ -160,6 +160,8 @@ export interface WafScopeRule {
     sqlInjectionProtection: boolean;
     xssProtection: boolean;
     emailObfuscation: boolean;
+    frameProtection: boolean;
+    frameAncestors: string[];
     presets: string[];
     rules: WafCustomRule[];
 }

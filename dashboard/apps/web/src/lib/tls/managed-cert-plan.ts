@@ -136,6 +136,22 @@ export interface ServedNameFacts {
 }
 
 /**
+ * Whether a name another server serves needs a certificate handed to it at all.
+ *
+ * Only a wildcard does. An exact name - `example.com`, `api.example.com` - is
+ * ordered and renewed by that server's own edge over HTTP, with nothing from here,
+ * which is what keeps it valid however long this machine is switched off. Handing it
+ * a wildcard that covers it would take that away: the edge does not order a name a
+ * certificate it holds already covers, so the name would ride a certificate only
+ * this machine can renew, and expire during an outage that outlasts the renewal
+ * margin. A wildcard has no such choice - it needs the DNS challenge, and the DNS
+ * credential stays here.
+ */
+export function needsHandedCertificate(name: { readonly hostname: string }): boolean {
+    return name.hostname.startsWith("*.");
+}
+
+/**
  * Whether a server's edge may be handed a certificate - its private key with it -
  * for a name it serves. Covering the name is not enough: anybody can put a name
  * under somebody else's domain on a service of their own. The certificate's owner,

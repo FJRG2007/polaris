@@ -24,9 +24,9 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { quoteArg, DYNAMIC_DIR } from "@polaris/deploy";
 import { execCommand, openSshClient, type SshAuth } from "@polaris/ssh";
 import { renderDynamicConfig, type AppRoute, type Router } from "@/lib/deploy/router";
+import { quoteArg, DYNAMIC_DIR, EDGE_INTEL_DIR, EDGE_INTEL_FILE } from "@polaris/deploy";
 
 /**
  * How a pushed route ranks against the one a container declares in its own labels.
@@ -129,6 +129,28 @@ export function remoteCertificatesScript(
     return lines.join("\n");
 }
 
+/**
+ * The script that gives a server's guard the firewall's current address list and the
+ * accounts Polaris has re-decided.
+ *
+ * Written beside the target and renamed over it like everything else here: the guard
+ * re-reads the file whenever it changes, and one it caught half-written would parse as
+ * nothing - it keeps its last good list in that case, but there is no reason to make it.
+ */
+export function remoteIntelScript(json: string, nonce = randomBytes(6).toString("hex")): string {
+    const target = `${EDGE_INTEL_DIR}/${EDGE_INTEL_FILE}`;
+    const temporary = `${EDGE_INTEL_DIR}/.${EDGE_INTEL_FILE}.${nonce}`;
+    return [
+        "set -e",
+        `mkdir -p ${quoteArg(EDGE_INTEL_DIR)}`,
+        `printf %s ${quoteArg(Buffer.from(json, "utf8").toString("base64"))} | base64 -d > ${quoteArg(temporary)}`,
+        // Readable by the guard, which runs as an unprivileged user inside its
+        // container; nothing in it is a secret, only addresses and opaque account ids.
+        `chmod 644 ${quoteArg(temporary)}`,
+        `mv -f ${quoteArg(temporary)} ${quoteArg(target)}`
+    ].join("\n");
+}
+
 /** The script that takes Polaris's file off a server - for a server that no longer
  *  runs anything of ours, so its edge stops holding routes to nothing. */
 export function remoteClearScript(): string {
@@ -160,6 +182,11 @@ export class RemoteRouter implements Router {
             routePriority: PUSHED_ROUTE_PRIORITY
         });
         await this.run(routes.length === 0 ? remoteClearScript() : remoteWriteScript(yaml));
+    }
+
+    /** Give this server's guard the firewall's current address list. */
+    public async pushIntel(json: string): Promise<void> {
+        await this.run(remoteIntelScript(json));
     }
 
     /** Replace the certificates Polaris gave this server's edge with exactly these. */

@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { EDGE_TOKEN_TTL_SECONDS } from "@polaris/core/waf";
@@ -432,16 +433,98 @@ export async function publishWafIntel(): Promise<void> {
         moved.map((user) => [user.id, user.principalsMovedAt?.getTime() ?? 0] as const)
     );
     const path = snapshotPath();
+    const json = JSON.stringify(snapshot);
     try {
         await mkdir(dirname(path), { recursive: true });
         const temporary = join(dirname(path), `.waf-intel.${process.pid}.tmp`);
-        await writeFile(temporary, JSON.stringify(snapshot), "utf8");
+        await writeFile(temporary, json, "utf8");
         await rename(temporary, path);
     } catch (caught) {
         console.error(
             "polaris: publishing the firewall's address list failed:",
             caught instanceof Error ? caught.message : caught
         );
+    }
+    // Not awaited by the caller's tick beyond this: every server is tried, each on its
+    // own, and one that is asleep costs nothing but its own warning.
+    await pushIntelToServers(json, snapshot);
+}
+
+/** The setting that remembers what each server was last given, so a tick that
+ *  changed nothing opens no connection anywhere. */
+const pushedIntelKey = (hostId: string): string => `waf.intel.pushed.${hostId}`;
+
+/** Set while a push is running, so a slow server never stacks one tick's push on the
+ *  next one's. The next tick after it finishes carries whatever changed meanwhile. */
+let pushing = false;
+
+/**
+ * What a snapshot says, without when it was written - the part that decides whether a
+ * server needs it again. `at` changes every tick; nothing else does unless a ban,
+ * a feed or an account actually moved.
+ */
+export function intelFingerprint(snapshot: object): string {
+    // `undefined` is left out by JSON, which is the whole of dropping it.
+    return createHash("sha256").update(JSON.stringify({ ...snapshot, at: undefined })).digest("hex");
+}
+
+/**
+ * Give every other server's guard the same list this machine's reads.
+ *
+ * What lets a ban, the Tor list and a revoked session hold on a server Polaris is not
+ * running on, and keep holding while Polaris is unreachable: the guard there reads it
+ * from its own disk. Only servers that serve domains of their own are given it - those
+ * are the ones running a guard - and only when it changed.
+ */
+async function pushIntelToServers(json: string, snapshot: object): Promise<void> {
+    if (pushing) return;
+    pushing = true;
+    try {
+        const hosts = await prisma.host.findMany({
+            where: {
+                deployTargets: {
+                    some: {
+                        kind: { not: "local" },
+                        applications: { some: { domains: { some: { enabled: true, servedBy: { not: "polaris" } } } } }
+                    }
+                }
+            },
+            select: { id: true, ownerId: true }
+        });
+        if (hosts.length === 0) return;
+        const fingerprint = intelFingerprint(snapshot);
+        const [{ RemoteRouter }, { getHostConnection }] = await Promise.all([
+            import("@/lib/deploy/router-remote"),
+            import("@/lib/host-service")
+        ]);
+        for (const host of hosts) {
+            if ((await getSetting(pushedIntelKey(host.id))) === fingerprint) continue;
+            try {
+                const connection = await getHostConnection(host.id, host.ownerId);
+                await new RemoteRouter({
+                    address: connection.address,
+                    port: connection.port,
+                    username: connection.username,
+                    auth: connection.auth,
+                    hostKey: connection.hostKey
+                }).pushIntel(json);
+                await setSetting(pushedIntelKey(host.id), fingerprint);
+            } catch (caught) {
+                // That server keeps enforcing the last list it was given, bans with an
+                // end time still ending on time; tried again on the next tick.
+                console.warn(
+                    `polaris: could not hand the firewall's address list to server ${host.id}:`,
+                    caught instanceof Error ? caught.message : caught
+                );
+            }
+        }
+    } catch (caught) {
+        console.error(
+            "polaris: handing the firewall's address list to other servers failed:",
+            caught instanceof Error ? caught.message : caught
+        );
+    } finally {
+        pushing = false;
     }
 }
 

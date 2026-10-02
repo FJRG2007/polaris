@@ -10,6 +10,7 @@
 import { randomBytes } from "node:crypto";
 import type { GuardConfig } from "./authz.js";
 import { createIntelSource } from "./intel.js";
+import { createControlPlaneWatch } from "./control-plane.js";
 import { createProxyServer } from "./proxy.js";
 import { createGuardServer } from "./server.js";
 
@@ -23,6 +24,10 @@ const intel = createIntelSource(process.env.POLARIS_EDGE_INTEL_FILE);
  *  a restart. */
 const processKey = randomBytes(32).toString("base64url");
 
+/** Whether the Polaris each route signs visitors in through is answering. Probed in
+ *  the background, never on the request path - see control-plane.ts. */
+const controlPlane = createControlPlaneWatch();
+
 /** Resolve the guard config from the environment (re-read per request). */
 function loadConfig(): GuardConfig {
     const now = Date.now();
@@ -34,7 +39,8 @@ function loadConfig(): GuardConfig {
         now: Math.floor(now / 1000),
         intel: intel.current(now),
         challengeSecret: secret || processKey,
-        nonce: randomBytes(12).toString("base64url")
+        nonce: randomBytes(12).toString("base64url"),
+        controlPlane: (base) => controlPlane.reachable(base, now)
     };
 }
 

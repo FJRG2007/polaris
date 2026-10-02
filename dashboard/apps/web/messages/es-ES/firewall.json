@@ -345,6 +345,16 @@
         "obfuscation": "Ocultar direcciones de correo",
         "obfuscationHint": "Sustituye las direcciones de correo del HTML servido por un token que la página decodifica en el navegador, así que la dirección no está en el código fuente. Los visitantes no notan nada. Un recolector que maneje un navegador real sigue leyéndola."
     },
+    "framing": {
+        "title": "Bloquear marcos de otros sitios",
+        "hint": "Impide que otro sitio muestre estas páginas dentro de un marco suyo, el truco del clickjacking. Si una página ya indica quién puede enmarcarla, se respeta.",
+        "allowed": "Sitios que pueden incrustar",
+        "allowedHint": "Cada uno puede mostrar estas páginas en un marco. Vacío: solo este sitio.",
+        "allowedAbove": "También permitidos por un ámbito superior: {sites}",
+        "placeholder": "https://example.com",
+        "invalid": "Usa una dirección como https://example.com o https://*.example.com",
+        "polaris": "Siempre activo en Polaris. Los calendarios publicados se incrustan en cualquier sitio."
+    },
     "missing": {
         "text": "Esta regla no forma parte de esta versión de Polaris.",
         "back": "Volver a las reglas"

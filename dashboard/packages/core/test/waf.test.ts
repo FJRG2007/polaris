@@ -267,8 +267,9 @@ describe("edge token", () => {
 describe("wafRuleInputSchema", () => {
     it("accepts a valid rule and applies defaults", () => {
         const parsed = wafRuleInputSchema.parse({ ipAllowlist: ["10.0.0.0/8"] });
-        // The two injection checks and email obfuscation default ON, which is what "on
-        // everywhere" means at the schema level rather than at the UI's.
+        // The two injection checks, email obfuscation and framing protection default
+        // ON, which is what "on everywhere" means at the schema level rather than at
+        // the UI's.
         expect(parsed).toEqual({
             ipAllowlist: ["10.0.0.0/8"],
             ipDenylist: [],
@@ -279,6 +280,8 @@ describe("wafRuleInputSchema", () => {
             sqlInjectionProtection: true,
             xssProtection: true,
             emailObfuscation: true,
+            frameProtection: true,
+            frameAncestors: [],
             presets: [],
             rules: []
         });

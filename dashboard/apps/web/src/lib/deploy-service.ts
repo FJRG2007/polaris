@@ -22,6 +22,7 @@ import { resolveAutoDomain } from "./network-service";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { resolveMountTarget } from "./storage-service";
 import * as sourceUpload from "./deploy/source-upload";
+import { edgeLoginKeys } from "@/lib/edge-signing-key";
 import { hostPortForApp } from "@/lib/deploy/host-port";
 import { appBaseUrl, getPublicIp } from "./domain-service";
 import { balancedOver, copiesOf } from "./deploy/replicas";
@@ -1391,6 +1392,8 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
             sqlInjectionProtection: true,
             xssProtection: true,
             emailObfuscation: true,
+            frameProtection: true,
+            frameAncestors: [],
             presets: [],
             rules: []
         };
@@ -1399,6 +1402,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
         // it knows the address it was deployed with, and the address Polaris answers on
         // is a setting that changes without redeploying anything.
         const loginUrl = await appBaseUrl();
+        const loginKeys = await edgeLoginKeys();
         for (const domain of localDomains) {
             const rule = waf.get(domain.applicationId) ?? emptyWaf;
             // A remote app fronted by this edge is dialled on its own machine's
@@ -1469,7 +1473,9 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                 browserIntegrity: rule.browserIntegrity,
                 sqlInjectionProtection: rule.sqlInjectionProtection,
                 xssProtection: rule.xssProtection,
-                emailObfuscation: rule.emailObfuscation
+                emailObfuscation: rule.emailObfuscation,
+                frameAncestors: frameRuleOf(rule),
+                loginKeys
             });
         }
         for (const app of localTunnelApps) {
@@ -1505,7 +1511,9 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                 browserIntegrity: rule.browserIntegrity,
                 sqlInjectionProtection: rule.sqlInjectionProtection,
                 xssProtection: rule.xssProtection,
-                emailObfuscation: rule.emailObfuscation
+                emailObfuscation: rule.emailObfuscation,
+                frameAncestors: frameRuleOf(rule),
+                loginKeys
             });
         }
     }
@@ -1581,6 +1589,14 @@ type RoutableDomain = {
  * name without guessing, and a guessed upstream is a 502 in place of a working
  * site.
  */
+/** The framing rule a route carries: the allowed origins while protection is on,
+ *  nothing at all once a scope has switched it off. */
+function frameRuleOf(rule: { readonly frameProtection: boolean; readonly frameAncestors: readonly string[] }):
+    | readonly string[]
+    | undefined {
+    return rule.frameProtection ? rule.frameAncestors : undefined;
+}
+
 async function pushRemoteRoutes(
     domains: readonly RoutableDomain[],
     edgeOf: ReadonlyMap<string, EdgeRouteFields>,
@@ -1611,6 +1627,7 @@ async function pushRemoteRoutes(
     ]);
     const waf = await resolveWafBatch(pushable.map((domain) => domain.applicationId));
     const loginUrl = await appBaseUrl();
+    const loginKeys = await edgeLoginKeys();
 
     await Promise.all(
         [...byHost.entries()].map(async ([hostId, held]) => {
@@ -1665,7 +1682,10 @@ async function pushRemoteRoutes(
                         // dialling that server's guard instead of the container, and
                         // Polaris cannot see whether it is listening. See
                         // `router-remote`.
-                        emailObfuscation: false
+                        emailObfuscation: false,
+                        // The fallback header only, for the same reason.
+                        frameAncestors: rule ? frameRuleOf(rule) : [],
+                        loginKeys
                     } satisfies AppRoute;
                 });
                 await new RemoteRouter({
@@ -2428,6 +2448,7 @@ async function buildAppPlan(
         resolvedWaf.browserIntegrity ||
         resolvedWaf.sqlInjectionProtection ||
         resolvedWaf.xssProtection ||
+        resolvedWaf.frameProtection ||
         challenge
             ? // The login address rides along for the same reason it does on a local
               // route: the remote server's guard would otherwise redirect to whatever
@@ -2437,8 +2458,10 @@ async function buildAppPlan(
               // their next deploy.
               {
                   ...resolvedWaf,
+                  frameAncestors: frameRuleOf(resolvedWaf),
                   challenge,
-                  loginUrl: resolvedWaf.requireLogin ? await appBaseUrl() : undefined
+                  loginUrl: resolvedWaf.requireLogin ? await appBaseUrl() : undefined,
+                  loginKeys: resolvedWaf.requireLogin ? await edgeLoginKeys() : undefined
               }
             : undefined;
 

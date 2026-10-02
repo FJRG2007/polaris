@@ -31,7 +31,8 @@ import Fuse from "fuse.js";
 import { RuleList } from "./rule-list";
 import { Section } from "./page-parts";
 import { ruleDescription } from "./rule-language";
-import { Loader2, Mail, Search } from "lucide-react";
+import { ChipList } from "./chip-list";
+import { Frame, Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
 import { useCallback, useEffect, useState } from "react";
 import type { WafInheritedView } from "@/lib/waf-service";
@@ -43,6 +44,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { localizeManaged } from "./waf-words";
 import {
+    normalizeFrameOrigin,
     WAF_MANAGED_RULES,
     WAF_RULES_MAX,
     wafManagedRule,
@@ -73,6 +75,8 @@ const BLANK: WafScopeRule = {
     sqlInjectionProtection: true,
     xssProtection: true,
     emailObfuscation: true,
+    frameProtection: true,
+    frameAncestors: [],
     presets: [],
     rules: []
 };
@@ -493,6 +497,7 @@ export function WafEditor({
     );
     const filtering = needle !== "" || status !== "all";
     const obfuscationOffAbove = inherited !== null && !inherited.emailObfuscation;
+    const framingOffAbove = inherited !== null && !inherited.frameProtection;
 
     return (
         <div className="flex flex-col gap-4">
@@ -591,6 +596,15 @@ export function WafEditor({
                 </div>
             </Section>
 
+            <FramingSection
+                polaris={scopeType === "polaris"}
+                saved={saved}
+                offFromAbove={framingOffAbove}
+                allowedAbove={inherited?.frameAncestors ?? []}
+                busy={busy}
+                onChange={persist}
+            />
+
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <p className="text-xs text-muted-foreground">
                 {scopeType === "polaris"
@@ -603,6 +617,87 @@ export function WafEditor({
                 rule page made it read as part of that rule. */}
             {instancePanels}
         </div>
+    );
+}
+
+/**
+ * Clickjacking protection for the scope: one switch, and the sites allowed to frame it
+ * anyway.
+ *
+ * Saved as it changes, unlike the address lists: an entry here can only widen who may
+ * frame a page, never lock its author out of anything, so there is no half-finished
+ * state worth holding back. On Polaris's own scope it is fixed on - the dashboard sends
+ * the header itself, with the calendar's published embeds as the one exception, so a
+ * switch here would claim a choice the page cannot make.
+ */
+function FramingSection({
+    polaris,
+    saved,
+    offFromAbove,
+    allowedAbove,
+    busy,
+    onChange
+}: {
+    polaris: boolean;
+    saved: WafScopeRule;
+    offFromAbove: boolean;
+    allowedAbove: readonly string[];
+    busy: boolean;
+    onChange: (patch: Partial<WafScopeRule>) => void;
+}) {
+    const t = useTranslations("firewall");
+    const on = polaris || (saved.frameProtection && !offFromAbove);
+    return (
+        <Section title={t("framing.title")} hint={t("framing.hint")}>
+            <div className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 gap-2">
+                        <Frame className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <div className="min-w-0">
+                            <div className="text-sm">{t("framing.title")}</div>
+                            {polaris ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">{t("framing.polaris")}</p>
+                            ) : offFromAbove ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">{offAbove(t).why}</p>
+                            ) : null}
+                        </div>
+                    </div>
+                    <Switch
+                        checked={on}
+                        disabled={busy || polaris || offFromAbove}
+                        onChange={(next) => onChange({ frameProtection: next })}
+                        aria-label={t("framing.title")}
+                    />
+                </div>
+                {on && !polaris ? (
+                    <div className="flex flex-col gap-1.5">
+                        <div className="text-sm">{t("framing.allowed")}</div>
+                        <p className="text-xs text-muted-foreground">{t("framing.allowedHint")}</p>
+                        <ChipList
+                            entries={saved.frameAncestors}
+                            placeholder={t("framing.placeholder")}
+                            validate={(value) => normalizeFrameOrigin(value) !== null}
+                            invalidMessage={t("framing.invalid")}
+                            disabled={busy}
+                            onChange={(next) =>
+                                onChange({
+                                    // Stored in the one form the edge writes, so the chip
+                                    // shows exactly what a browser will be told.
+                                    frameAncestors: [
+                                        ...new Set(next.flatMap((entry) => normalizeFrameOrigin(entry) ?? []))
+                                    ]
+                                })
+                            }
+                        />
+                        {allowedAbove.length > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("framing.allowedAbove", { sites: allowedAbove.join(", ") })}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
+            </div>
+        </Section>
     );
 }
 

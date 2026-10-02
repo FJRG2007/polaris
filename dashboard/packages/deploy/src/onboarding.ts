@@ -57,6 +57,18 @@ export interface OnboardingOptions {
  */
 export const DYNAMIC_DIR = "/var/lib/polaris/traefik/dynamic";
 
+/**
+ * Where this server's guard reads the firewall's address list and the accounts
+ * Polaris has re-decided - bans, Tor exits, revoked sessions - pushed over SSH.
+ *
+ * On disk, not asked for: the guard keeps enforcing the last list it read for as long
+ * as Polaris is unreachable, and a ban written with an end time still ends on time.
+ */
+export const EDGE_INTEL_DIR = "/var/lib/polaris/edge-intel";
+
+/** The snapshot's file name, the same one the local guard reads. */
+export const EDGE_INTEL_FILE = "waf-intel.json";
+
 const DEFAULT_DEPLOY_ROOT = "/var/lib/polaris/deploy";
 const DEFAULT_VOLUME_ROOT = "/var/lib/polaris/volumes";
 const DEFAULT_TRAEFIK_IMAGE = "traefik:v3.1";
@@ -94,7 +106,7 @@ function ownerSteps(owner: string | undefined, deployRoot: string, volumeRoot: s
     const login = quoteArg(owner);
     return [
         `chown ${login} /var/lib/polaris ${deployRoot} ${volumeRoot}`,
-        `chown -R ${login} ${deployRoot} ${DYNAMIC_DIR}`,
+        `chown -R ${login} ${deployRoot} ${DYNAMIC_DIR} ${EDGE_INTEL_DIR}`,
         // Takes effect on the login's next connection, which is every command
         // Polaris sends after this one.
         `if ! id -nG ${login} | tr ' ' '\\n' | grep -qx docker; then usermod -aG docker ${login} 2>/dev/null || addgroup ${login} docker 2>/dev/null || echo "could not add the login to the docker group" >&2; fi`
@@ -119,6 +131,9 @@ export function onboardingScript(options: OnboardingOptions): string {
               [
                   "docker run -d --name polaris-edge-guard --restart unless-stopped",
                   `--network ${net}`,
+                  // Read-only: the guard only ever reads the list; Polaris writes it.
+                  `-v ${EDGE_INTEL_DIR}:/edge-intel:ro`,
+                  `-e POLARIS_EDGE_INTEL_FILE=/edge-intel/${EDGE_INTEL_FILE}`,
                   `-e POLARIS_AUTH_SECRET=${quoteArg(options.authSecret)}`,
                   `-e POLARIS_PUBLIC_URL=${quoteArg(options.publicUrl ?? "")}`,
                   guardImage
@@ -148,7 +163,7 @@ export function onboardingScript(options: OnboardingOptions): string {
         '  NIXPACKS_VERSION="$NIXPACKS_WANT" bash -c "$(curl -fsSL https://nixpacks.com/install.sh)";',
         "fi",
         "nixpacks --version",
-        `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik ${DYNAMIC_DIR}`,
+        `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik ${DYNAMIC_DIR} ${EDGE_INTEL_DIR}`,
         ...ownerSteps(options.owner, deployRoot, volumeRoot),
         `docker network inspect ${net} >/dev/null 2>&1 || docker network create ${net}`,
         'echo "== starting Traefik =="',

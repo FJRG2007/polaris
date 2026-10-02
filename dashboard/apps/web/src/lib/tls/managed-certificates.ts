@@ -28,6 +28,7 @@ import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-servi
 import {
     isDue,
     mayHandCertificate,
+    needsHandedCertificate,
     plannedCertificates,
     retryDelayMs,
     type CertificateHolder,
@@ -408,8 +409,12 @@ async function pushRemoteCertificates(): Promise<void> {
         import("@/lib/host-service")
     ]);
     for (const [hostId, held] of hosts) {
+        // Wildcards only: an exact name renews on that server's own edge (see
+        // `needsHandedCertificate`), and a server holding none is handed the empty
+        // set, which takes back what an earlier pass gave it.
+        const wildcards = held.names.filter(needsHandedCertificate);
         const given = certificates
-            .filter((certificate) => held.names.some((name) => mayHandCertificate(certificate, name)))
+            .filter((certificate) => wildcards.some((name) => mayHandCertificate(certificate, name)))
             .map(({ id, domain, certPem, keyPem }) => ({ id, domain, certPem, keyPem }));
         const fingerprint = createHash("sha256")
             .update(given.map((certificate) => `${certificate.id}:${certificate.certPem}`).join("\n"))

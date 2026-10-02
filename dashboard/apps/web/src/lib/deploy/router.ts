@@ -22,6 +22,8 @@ import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
 import type { AppEdgeConfig, WafCustomRule, WafPrincipalGrant } from "@polaris/core";
 import {
+    declaresFraming,
+    fallbackFrameHeaders,
     isWildcardHostname,
     normalizeDeployHostname,
     securityHeaderMap,
@@ -104,6 +106,16 @@ export interface AppRoute {
      *  but does NOT on its own put the guard in front of the route: forwardAuth never
      *  sees a response, so this one is applied by the guard's proxy mode instead. */
     readonly emailObfuscation?: boolean;
+    /**
+     * Who may frame the route besides the site itself; absent when framing protection
+     * is off for it. Applied by the guard's proxy where the route goes through it -
+     * merged with whatever the app sent - and otherwise as the one header that is safe
+     * to set without seeing the app's response (`fallbackFrameHeaders`).
+     */
+    readonly frameAncestors?: readonly string[];
+    /** The public keys a login token for this route must be signed with (see
+     *  `GuardRule.keys`). Only written into a rule that requires a login. */
+    readonly loginKeys?: readonly string[];
 }
 
 /** An edge that can be told the full set of app routes it should serve. */
@@ -205,7 +217,7 @@ export async function guardVacantReachable(now: number = Date.now()): Promise<bo
     return reachable;
 }
 
-let challengeProbe: { at: number; supported: boolean } | null = null;
+const featureProbes = new Map<string, { at: number; supported: boolean }>();
 
 /**
  * Whether the guard on this machine enforces the browser challenge.
@@ -216,7 +228,14 @@ let challengeProbe: { at: number; supported: boolean } | null = null;
  * and only a yes is remembered, for the same startup race as the vacant page.
  */
 export async function guardSupportsChallenge(now: number = Date.now()): Promise<boolean> {
-    if (challengeProbe && now - challengeProbe.at < PROXY_PROBE_TTL_MS) return challengeProbe.supported;
+    return guardSupportsFeature("challenge", now);
+}
+
+/** Whether the guard on this machine names `feature` on its health endpoint - the
+ *  general form of the challenge probe above, with the same startup-race rule. */
+export async function guardSupportsFeature(feature: string, now: number = Date.now()): Promise<boolean> {
+    const cached = featureProbes.get(feature);
+    if (cached && now - cached.at < PROXY_PROBE_TTL_MS) return cached.supported;
     let supported = false;
     try {
         const response = await fetch(`${guardUrl()}/health`, {
@@ -225,11 +244,12 @@ export async function guardSupportsChallenge(now: number = Date.now()): Promise<
         supported = (response.headers.get("x-polaris-guard-features") ?? "")
             .split(",")
             .map((feature) => feature.trim())
-            .includes("challenge");
+            .includes(feature);
     } catch {
         supported = false;
     }
-    challengeProbe = supported ? { at: now, supported } : null;
+    if (supported) featureProbes.set(feature, { at: now, supported });
+    else featureProbes.delete(feature);
     return supported;
 }
 
@@ -257,6 +277,10 @@ export interface RenderOptions {
      * stays as what serves the site when nothing has been pushed at all.
      */
     readonly routePriority?: number;
+    /** Whether the guard's proxy merges framing protection into a response. False (a
+     *  guard older than that) leaves a route on the blind fallback header instead of
+     *  sending it through a proxy that would do nothing to it. */
+    readonly frameAvailable?: boolean;
 }
 
 /**
@@ -271,7 +295,7 @@ export interface RenderOptions {
  */
 function proxied(route: AppRoute, options: RenderOptions): boolean {
     return (
-        route.emailObfuscation === true &&
+        (route.emailObfuscation === true || framedByGuard(route, options)) &&
         // The guard's proxy dials the one origin its header names, so a service with
         // several copies is balanced here instead - and goes unobfuscated.
         (route.dialHosts?.length ?? 0) <= 1 &&
@@ -279,6 +303,15 @@ function proxied(route: AppRoute, options: RenderOptions): boolean {
         (process.env.POLARIS_AUTH_SECRET ?? "") !== "" &&
         options.proxyAvailable !== false
     );
+}
+
+/**
+ * Whether framing protection is the guard's to apply on this route: it is on, and the
+ * guard's proxy knows how. The proxy can merge with the app's own headers, which the
+ * fallback cannot - see `protectFrameHeaders`.
+ */
+function framedByGuard(route: AppRoute, options: RenderOptions): boolean {
+    return route.frameAncestors !== undefined && options.frameAvailable === true;
 }
 
 /** The middleware names to attach to a route's primary (app-serving) router, adding
@@ -311,11 +344,15 @@ function routeMiddlewares(
             loginUrl: route.loginUrl,
             loginAllowLists: route.loginAllowLists ?? [],
             loginDeny: route.loginDeny ?? [],
+            keys: route.loginKeys,
             browserIntegrity: route.browserIntegrity === true,
             sqlInjectionProtection: route.sqlInjectionProtection === true,
             xssProtection: route.xssProtection === true,
             emailObfuscation: route.emailObfuscation === true,
             challenge: route.challenge === true,
+            // Only when this route really is the guard's to frame-protect: a route
+            // the guard cannot merge for gets the fallback header instead.
+            frameAncestors: isProxied && framedByGuard(route, options) ? route.frameAncestors : undefined,
             presets: route.presets ?? [],
             rules: route.rules ?? []
         });
@@ -417,6 +454,31 @@ function sourceByIp(route: AppRoute, indent: string): string {
     return `${indent}sourceCriterion:\n${indent}  ipStrategy:\n${indent}    depth: ${depth}`;
 }
 
+/**
+ * The framing header a route gets when the guard is not merging it in: protection on,
+ * not proxied for it, and nothing in the service's own header settings saying who may
+ * frame it.
+ */
+function frameFallback(
+    route: AppRoute,
+    explicit: Readonly<Record<string, string>>,
+    options: RenderOptions
+): Record<string, string> {
+    if (route.frameAncestors === undefined || declaresFraming(explicit)) return {};
+    if (proxied(route, options) && framedByGuard(route, options)) return {};
+    return fallbackFrameHeaders(route.frameAncestors);
+}
+
+/** A response-headers middleware named after the route, defined in `defs`. */
+function headersMiddleware(name: string, headers: Readonly<Record<string, string>>, defs: Map<string, string>): string {
+    const mw = `${name}-headers`;
+    const lines = Object.entries(headers)
+        .map(([key, value]) => `          ${yamlQuote(key)}: ${yamlQuote(value)}`)
+        .join("\n");
+    defs.set(mw, `    ${mw}:\n      headers:\n        customResponseHeaders:\n${lines}`);
+    return mw;
+}
+
 /** The edge middlewares a service asked for, by where they sit in the chain. */
 interface EdgeChain {
     /** Before the guard, so a flood is counted and cut off before the guard is asked
@@ -430,10 +492,19 @@ interface EdgeChain {
     readonly byPath: { readonly path: string; readonly middleware: string }[];
 }
 
-function edgeChain(route: AppRoute, name: string, defs: Map<string, string>): EdgeChain {
+function edgeChain(
+    route: AppRoute,
+    name: string,
+    defs: Map<string, string>,
+    options: RenderOptions = {}
+): EdgeChain {
     const chain: EdgeChain = { early: [], late: [], byPath: [] };
     const edge = route.edge;
-    if (!edge) return chain;
+    if (!edge) {
+        const fallback = frameFallback(route, {}, options);
+        if (Object.keys(fallback).length > 0) chain.late.push(headersMiddleware(name, fallback, defs));
+        return chain;
+    }
 
     edge.rateLimits.forEach((limit, index) => {
         const mw = `${name}-rate-${index}`;
@@ -459,13 +530,12 @@ function edgeChain(route: AppRoute, name: string, defs: Map<string, string>): Ed
         chain.early.push(mw);
     }
 
-    const headers = Object.entries(securityHeaderMap(edge.headers));
-    if (headers.length > 0) {
-        const mw = `${name}-headers`;
-        const lines = headers.map(([key, value]) => `          ${yamlQuote(key)}: ${yamlQuote(value)}`).join("\n");
-        defs.set(mw, `    ${mw}:\n      headers:\n        customResponseHeaders:\n${lines}`);
-        chain.late.push(mw);
-    }
+    const explicit = securityHeaderMap(edge.headers);
+    // The service's own header settings come last so they win: an operator who wrote
+    // an X-Frame-Options or a frame-ancestors there already chose, and the fallback is
+    // not added on top of that choice at all.
+    const headers = { ...frameFallback(route, explicit, options), ...explicit };
+    if (Object.keys(headers).length > 0) chain.late.push(headersMiddleware(name, headers, defs));
 
     // A www/apex redirect is only written when the name it sends visitors to is one the
     // service answers on too - otherwise it is a redirect into a 404.
@@ -660,7 +730,7 @@ export function renderDynamicConfig(
         if (!hostname || (route.pathPrefix !== undefined && !PATH_PREFIX.test(route.pathPrefix))) continue;
         const name = `polaris-app-${route.id}`;
         const dial = `${route.dialHost}:${route.dialPort}`;
-        const edge = edgeChain({ ...route, hostname }, name, defs);
+        const edge = edgeChain({ ...route, hostname }, name, defs, options);
         // First in the chain, so it wraps the rest of it and the service behind it. It
         // only ever fires on a status the app never returned, so nothing else in the
         // chain is affected by sitting inside it.
@@ -810,10 +880,12 @@ export class LocalRouter implements Router {
 
     public async sync(routes: readonly AppRoute[]): Promise<void> {
         // Only worth asking when something would actually be pointed at the proxy.
-        const wantsProxy = routes.some((route) => route.emailObfuscation === true);
-        const [proxyAvailable, vacantAvailable] = await Promise.all([
+        const wantsFrame = routes.some((route) => route.frameAncestors !== undefined);
+        const wantsProxy = wantsFrame || routes.some((route) => route.emailObfuscation === true);
+        const [proxyAvailable, vacantAvailable, frameAvailable] = await Promise.all([
             wantsProxy ? guardProxyReachable() : Promise.resolve(true),
-            guardVacantReachable()
+            guardVacantReachable(),
+            wantsFrame ? guardSupportsFeature("frame") : Promise.resolve(false)
         ]);
         if (wantsProxy && !proxyAvailable) {
             const affected = routes.filter((route) => route.emailObfuscation === true).length;
@@ -841,6 +913,7 @@ export class LocalRouter implements Router {
             renderDynamicConfig(routes, {
                 proxyAvailable,
                 vacantAvailable,
+                frameAvailable: frameAvailable && proxyAvailable,
                 vacantZones: this.vacantZones
             })
         );

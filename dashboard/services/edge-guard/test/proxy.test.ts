@@ -302,3 +302,74 @@ describe("the login handoff", () => {
         expect(response.headers.get("cache-control")).toBe("no-store");
     });
 });
+
+describe("framing protection", () => {
+    /** As `get`, with framing protection on for the route. */
+    async function framed(allowed: string[], obfuscate = false) {
+        const response = await fetch(`${proxyUrl}/`, {
+            headers: {
+                [ORIGIN_HEADER]: signEdgeOrigin(originUrl, SECRET),
+                "x-polaris-waf": encodeGuardRule({
+                    deny: [],
+                    requireLogin: false,
+                    emailObfuscation: obfuscate,
+                    frameAncestors: allowed,
+                    rules: []
+                })
+            }
+        });
+        return response.headers;
+    }
+
+    it("adds frame-ancestors and X-Frame-Options to a page that set neither", async () => {
+        respond = () => ({ body: "<html><body>hi</body></html>" });
+
+        const headers = await framed([]);
+
+        expect(headers.get("content-security-policy")).toBe("frame-ancestors 'self'");
+        expect(headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    });
+
+    it("adds its policy beside the app's own instead of replacing it", async () => {
+        respond = () => ({ headers: { "content-security-policy": "script-src 'self'" }, body: "<p>x</p>" });
+
+        const policy = (await framed([])).get("content-security-policy") ?? "";
+
+        // Two policies, both enforced by the browser: the app's script rule survives.
+        expect(policy).toContain("script-src 'self'");
+        expect(policy).toContain("frame-ancestors 'self'");
+    });
+
+    it("keeps an app's own frame-ancestors untouched", async () => {
+        respond = () => ({
+            headers: { "content-security-policy": "frame-ancestors https://partner.example" },
+            body: "<p>x</p>"
+        });
+
+        const headers = await framed([]);
+
+        expect(headers.get("content-security-policy")).toBe("frame-ancestors https://partner.example");
+        expect(headers.get("x-frame-options")).toBeNull();
+    });
+
+    it("names the allowed sites and sends no X-Frame-Options, which cannot", async () => {
+        respond = () => ({ body: "<p>x</p>" });
+
+        const headers = await framed(["https://partner.example"]);
+
+        expect(headers.get("content-security-policy")).toBe("frame-ancestors 'self' https://partner.example");
+        expect(headers.get("x-frame-options")).toBeNull();
+    });
+
+    it("applies on a rewritten page too", async () => {
+        respond = () => ({ body: "<html><body><p>hola@ejemplo.com</p></body></html>" });
+
+        expect((await framed([], true)).get("x-frame-options")).toBe("SAMEORIGIN");
+    });
+
+    it("adds nothing on a route with it off", async () => {
+        respond = () => ({ body: "<p>x</p>" });
+
+        expect((await get("/", { obfuscate: false })).headers.get("x-frame-options")).toBeNull();
+    });
+});

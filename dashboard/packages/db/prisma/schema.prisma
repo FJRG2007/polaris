@@ -5020,6 +5020,13 @@ model WafRule {
     // unioning: it rewrites the page rather than refusing it, so any scope can turn
     // it off for what it covers. Default true is what makes it on everywhere.
     emailObfuscation Boolean @default(true)
+    // Refuse to be shown in another site's frame (clickjacking): the edge adds
+    // `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` unless the app set its
+    // own. Intersects like emailObfuscation; default true is what protects every
+    // service, existing ones included, without an operator action.
+    frameProtection Boolean @default(true)
+    // Origins allowed to frame the scope anyway, as a JSON string array. Unions.
+    frameAncestors  String  @default("[]")
     // Enabled managed rule packs as a JSON array of ids (see waf-presets.ts). Ids,
     // not their contents: the pack's rules are expanded at the edge, so improving a
     // list ships as a release rather than a migration over everyone's saved rules.

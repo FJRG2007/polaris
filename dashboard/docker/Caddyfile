@@ -31,9 +31,10 @@
 	}
 
 	header {
-		# Deny framing and MIME sniffing; keep referrers off external origins.
+		# No MIME sniffing; keep referrers off external origins. Framing is the app's
+		# own header (next.config.mjs), because only it knows which page is meant to
+		# be framed: a published calendar's embed.
 		X-Content-Type-Options "nosniff"
-		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		# Never advertise the server software.
 		-Server

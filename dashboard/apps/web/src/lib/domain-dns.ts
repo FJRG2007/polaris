@@ -19,6 +19,9 @@
  * people and stand the fallback tunnel down.
  */
 
+import { prisma } from "@polaris/db";
+import { isPublicIpv4 } from "@polaris/core";
+import { isIP } from "node:net";
 import { resolve4 } from "node:dns/promises";
 import { randomLabel } from "@polaris/deploy";
 import { installedGames } from "./apps/game-zones";
@@ -383,8 +386,59 @@ export interface HostnameDnsResult {
     detail?: string;
 }
 
+/** What a served-by-its-own-server domain sits on, as the decision below reads it. */
+export interface DnsTargetFacts {
+    /** The service runs on another machine rather than this one. */
+    readonly remote: boolean;
+    /** "server" (that machine's own edge answers) or "polaris" (this one forwards). */
+    readonly servedBy: string;
+    /** The other machine's public IPv4 addresses, resolved from its SSH address. */
+    readonly serverAddresses: readonly string[];
+}
+
 /**
- * Point one hostname at this server through the connected Cloudflare account, so a
+ * Which address a custom domain's record must name.
+ *
+ * The machine whose edge actually answers for it - and for a service on another
+ * server that is that server, never this one. Pointing such a name at Polaris would
+ * be wrong twice over: this edge does not route a name another server serves (so it
+ * would simply 404), and if it did, every request would depend on the control plane
+ * being up. Null means that server has no public address Polaris can see, and the
+ * record is left for the operator rather than guessed - a guess here is a domain
+ * pointed at the wrong building.
+ */
+export function dnsAddressFor(facts: DnsTargetFacts, controlPlane: string | null): string | null {
+    if (!facts.remote || facts.servedBy === "polaris") return controlPlane;
+    return facts.serverAddresses.find(isPublicIpv4) ?? null;
+}
+
+/** The address a hostname's record should name, and which server that is when it is
+ *  not this one. One indexed lookup; a name with no domain row is this server's. */
+async function dnsTargetFor(hostname: string): Promise<{ ip: string | null; server?: string }> {
+    const domain = await prisma.domain
+        .findUnique({
+            where: { hostname },
+            select: {
+                servedBy: true,
+                application: {
+                    select: { target: { select: { kind: true, host: { select: { name: true, address: true } } } } }
+                }
+            }
+        })
+        .catch(() => null);
+    const host = domain?.application.target.kind !== "local" ? domain?.application.target.host : null;
+    if (!domain || !host || domain.servedBy === "polaris") return { ip: await detectPublicIp() };
+    const address = host.address.trim();
+    // An address is used as it is; a name is looked up, the way a visitor would.
+    const addresses = isIP(address) !== 0 ? [address] : await resolveOrEmpty(address);
+    return {
+        ip: dnsAddressFor({ remote: true, servedBy: domain.servedBy, serverAddresses: addresses }, null),
+        server: host.name
+    };
+}
+
+/**
+ * Point one hostname at the server that serves it through the connected Cloudflare account, so a
  * custom domain needs no visit to a DNS panel. This is what lets a service take any
  * name at all - one directly on the operator's own domain as readily as one on a
  * different domain entirely - without the wildcard record a deploy zone relies on.
@@ -396,12 +450,15 @@ export interface HostnameDnsResult {
  */
 export async function provisionHostnameDns(hostname: string): Promise<HostnameDnsResult> {
     const name = hostname.trim().toLowerCase();
-    const [token, ip] = await Promise.all([loadCloudflareToken(), detectPublicIp()]);
+    const [token, target] = await Promise.all([loadCloudflareToken(), dnsTargetFor(name)]);
+    const ip = target.ip;
     if (!ip) {
         return {
             status: "manual",
             ip: null,
-            detail: "Polaris could not detect this server's public IP, so it does not know what to point DNS at."
+            detail: target.server
+                ? `${target.server} has no public IPv4 address Polaris can see, so point this name at the address that reaches it yourself - never at Polaris, which would put Polaris in front of every request.`
+                : "Polaris could not detect this server's public IP, so it does not know what to point DNS at."
         };
     }
     // Asked of DNS before Cloudflare: a name a wildcard already covers needs no record

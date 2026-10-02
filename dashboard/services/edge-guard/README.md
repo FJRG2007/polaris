@@ -103,6 +103,30 @@ it before pointing the edge here at all - a sidecar too old to know these paths 
 with its generic `Bad gateway`, and an app's error page pointed at that would be worse
 than the 502 it replaced.
 
+## While Polaris is unreachable
+
+Every decision stays on this server. A route that requires a login carries Polaris's
+Ed25519 public key (`k`), and only a token signed by that key is accepted there - the
+shared secret this sidecar may also hold cannot mint one. Bans, Tor exits and accounts
+Polaris re-decided (revoked sessions, membership changes) come from the snapshot in
+`POLARIS_EDGE_INTEL_FILE`, which Polaris pushes to every server over SSH.
+
+The guard probes the login address's `/api/health` in the background, at most every 30
+seconds and only for routes that require a login. When it is known to be down:
+
+- A visitor with a valid token keeps access until the token's hard expiry (12 hours);
+  the 30-minute membership backstop stands down, since there is nowhere to refresh.
+- A visitor who needs to sign in, holds an expired token, or whose account Polaris
+  re-decided gets a 503 page saying sign-in is unavailable - never the app.
+
+## Framing protection
+
+A route whose rule carries `f` (allowed origins, possibly empty) is served through the
+proxy listener, which adds `Content-Security-Policy: frame-ancestors 'self' ...` as a
+separate policy beside the app's own and `X-Frame-Options: SAMEORIGIN` when no origin
+is allowed. An app that sent its own `frame-ancestors` is left untouched, and one that
+sent only `X-Frame-Options` gets the matching `frame-ancestors`.
+
 ## Fail-closed behavior
 
 - A denylist with an unresolvable client IP -> **403**.

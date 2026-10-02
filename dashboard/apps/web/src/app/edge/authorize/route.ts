@@ -24,7 +24,8 @@ import { resolveWaf } from "@/lib/waf-service";
 import { clientIp } from "@/lib/request-context";
 import { principalsOfUser } from "@polaris/auth";
 import { deployAppIdForHost } from "@/lib/deploy-service";
-import { EDGE_TOKEN_TTL_SECONDS, principalVerdict, signEdgeToken } from "@polaris/core/waf";
+import { edgeSigningKey } from "@/lib/edge-signing-key";
+import { EDGE_TOKEN_TTL_SECONDS, principalVerdict, signEdgeToken, signEdgeTokenEd25519 } from "@polaris/core/waf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,22 +114,25 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const secret = loadEnv().POLARIS_AUTH_SECRET;
-    const token = signEdgeToken(
-        {
-            sub: userId,
-            aud: appOrigin.host,
-            exp: now + EDGE_TOKEN_TTL_SECONDS,
-            // When these principals were true. What lets the guard tell a token that
-            // predates a membership change from one that reflects it.
-            iat: now,
-            // Carried so the guard can answer the same question offline on every later
-            // request, without Polaris and without a membership lookup at the edge.
-            prn: [...held]
-        },
-        secret
-    );
+    const claims = {
+        sub: userId,
+        aud: appOrigin.host,
+        // The hard expiry: however long Polaris is unreachable, the token stops here.
+        exp: now + EDGE_TOKEN_TTL_SECONDS,
+        // When these principals were true. What lets the guard tell a token that
+        // predates a membership change from one that reflects it.
+        iat: now,
+        // Carried so the guard can answer the same question offline on every later
+        // request, without Polaris and without a membership lookup at the edge.
+        prn: [...held]
+    };
     const callback = new URL("/edge/callback", appOrigin);
-    callback.searchParams.set("token", token);
+    // Two signatures over the same claims. A guard whose route carries Polaris's
+    // public key reads `etoken` and verifies it with that key alone; one older than
+    // that reads `token`, signed with the secret it was deployed with.
+    callback.searchParams.set("token", signEdgeToken(claims, secret));
+    const signing = await edgeSigningKey().catch(() => null);
+    if (signing) callback.searchParams.set("etoken", signEdgeTokenEd25519(claims, signing.privateKey));
     callback.searchParams.set("redirect", target as string);
     return redirect(callback.toString());
 }

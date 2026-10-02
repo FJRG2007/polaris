@@ -9,7 +9,14 @@
 import { createHash } from "node:crypto";
 import { encodeGuardRule } from "@polaris/core/waf";
 import type { AppEdgeConfig, WafCustomRule, WafPrincipalGrant } from "@polaris/core";
-import { isWildcardHostname, normalizeDeployHostname, securityHeaderMap } from "@polaris/core";
+import {
+    declaresFraming,
+    EMPTY_EDGE_CONFIG,
+    fallbackFrameHeaders,
+    isWildcardHostname,
+    normalizeDeployHostname,
+    securityHeaderMap
+} from "@polaris/core";
 
 export type CertResolver = "le" | "internal" | "none";
 
@@ -68,6 +75,17 @@ export interface TraefikWaf {
     readonly emailObfuscation?: boolean;
     /** Ask visitors for proof of a browser. Needs the guard, like the denylist. */
     readonly challenge?: boolean;
+    /**
+     * Who may frame the service besides the site itself; absent when framing
+     * protection is off. Labels cannot route through the guard's proxy (see
+     * `emailObfuscation`), so a label route always gets the fallback - the one header
+     * safe to set without seeing the app's response, `X-Frame-Options: SAMEORIGIN`,
+     * which a browser ignores whenever the app sent its own `frame-ancestors`.
+     */
+    readonly frameAncestors?: readonly string[];
+    /** The public keys a login token must be signed with, so this server's guard
+     *  verifies a sign-in with nothing that could mint one. */
+    readonly loginKeys?: readonly string[];
 }
 
 export interface TraefikServiceInput {
@@ -147,6 +165,7 @@ function wafMiddlewares(
             loginUrl: waf.loginUrl,
             loginAllowLists: waf.loginAllowLists ?? [],
             loginDeny: waf.loginDeny ?? [],
+            keys: waf.loginKeys,
             browserIntegrity: waf.browserIntegrity === true,
             sqlInjectionProtection: waf.sqlInjectionProtection === true,
             xssProtection: waf.xssProtection === true,
@@ -194,7 +213,8 @@ function edgeMiddlewares(
     edge: AppEdgeConfig,
     domain: TraefikDomain,
     siblings: ReadonlySet<string>,
-    labels: Record<string, string>
+    labels: Record<string, string>,
+    frameAncestors?: readonly string[]
 ): { early: string[]; late: string[]; byPath: { path: string; middleware: string }[] } {
     const early: string[] = [];
     const late: string[] = [];
@@ -224,7 +244,13 @@ function edgeMiddlewares(
         }
         early.push(`${name}@docker`);
     }
-    const headers = Object.entries(securityHeaderMap(edge.headers));
+    const explicit = securityHeaderMap(edge.headers);
+    // The service's own header settings win, and an X-Frame-Options or frame-ancestors
+    // written there means the operator already chose - no fallback on top of it.
+    const headers = Object.entries({
+        ...(declaresFraming(explicit) ? {} : fallbackFrameHeaders(frameAncestors)),
+        ...explicit
+    });
     if (headers.length > 0) {
         const name = `${serviceName}-headers`;
         for (const [key, value] of headers) labels[`${mwKey(name)}.headers.customresponseheaders.${key}`] = value;
@@ -310,15 +336,14 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
             hostMatcher(domain.hostname),
             ...(domain.pathPrefix ? [`PathPrefix(\`${domain.pathPrefix}\`)`] : [])
         ].join(" && ");
-        const edge = input.edge
-            ? edgeMiddlewares(
-                  domains.length === 1 ? input.serviceName : router,
-                  input.edge,
-                  domain,
-                  siblings,
-                  labels
-              )
-            : { early: [], late: [], byPath: [] };
+        const edge = edgeMiddlewares(
+            domains.length === 1 ? input.serviceName : router,
+            input.edge ?? EMPTY_EDGE_CONFIG,
+            domain,
+            siblings,
+            labels,
+            input.waf?.frameAncestors
+        );
         // The allowlist first, then the flood limits, then the guard, then what the
         // service asked to change about its answers - the local edge's order.
         const allow = waf.http;

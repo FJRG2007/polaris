@@ -313,6 +313,8 @@
         "guardNo": "No firewall decision-maker: an address allowlist still applies, a denylist, a rule pack or a sign-in rule cannot.",
         "pushYes": "It takes routes and firewall changes from Polaris as they happen.",
         "pushNo": "It only reads what a deployed container tells it, so a new domain or an edited firewall rule waits for that service to be built again, and a deploy replaces the running version with a short gap.",
+        "offlineYes": "Bans and signed-out sessions are kept on this server, so they still apply while Polaris is off.",
+        "offlineNo": "Bans and signed-out sessions from Polaris do not reach this server yet. Set it up again to fix that.",
         "settingUp": "Setting it up",
         "again": "Set it up again",
         "setUp": "Set this server up",
