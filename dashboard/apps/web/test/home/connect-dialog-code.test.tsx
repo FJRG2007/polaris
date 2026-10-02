@@ -86,6 +86,17 @@ describe("a Philips Air+ account", () => {
         expect(send.getAttribute("aria-disabled")).toBe("false");
     });
 
+    it("lowercases and trims the address once typing it is done", async () => {
+        drawn();
+        const email = screen.getByRole("textbox", { name: "Email" }) as HTMLInputElement;
+        fireEvent.change(email, { target: { value: "  Owner@Example.COM  " } });
+        fireEvent.blur(email);
+        expect(email.value).toBe("owner@example.com");
+        fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect(started[0]).toMatchObject({ fields: { email: "owner@example.com" } });
+    });
+
     it("asks for the code, keeps the box after a wrong one, and connects with a right one", async () => {
         const onConnected = drawn();
         fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
