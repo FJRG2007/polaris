@@ -1051,6 +1051,7 @@
         "web/src/components/dns/dns-record-dialog.tsx",
         "web/src/components/dns/dns-records-table.tsx",
         "web/src/components/dns/dns-zone-editor.tsx",
+        "web/src/components/domain-security/domain-security-panel.tsx",
         "web/src/lib/backups/refusal-text.ts",
         "web/src/lib/backups/service.ts",
         "web/src/lib/backups/words.ts",

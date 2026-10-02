@@ -20,11 +20,24 @@ import { PageSection } from "@/components/page-section";
 import type { OwnerDomainView } from "@/lib/owner-domains";
 import { useDisplayFormat } from "@/components/display-format";
 import { DnsZoneEditor } from "@/components/dns/dns-zone-editor";
+import type { GradeSummary } from "@/lib/domain-security/service";
+import { SecurityBadge } from "@/components/domain-security/security-badge";
+import { DomainSecurityPanel } from "@/components/domain-security/domain-security-panel";
 import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { Badge, Button, ConfirmDeleteDialog, DnsRecordTable, EmptyState, Input } from "@polaris/ui";
-import { AlertTriangle, CheckCircle2, Clock, Globe, KeyRound, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+    AlertTriangle,
+    CheckCircle2,
+    Clock,
+    Globe,
+    KeyRound,
+    Loader2,
+    Plus,
+    RefreshCw,
+    Trash2
+} from "lucide-react";
 import {
     addOwnerDomainAction,
     checkOwnerDomainAction,
@@ -48,12 +61,14 @@ type Words = NamespaceTranslator<"components">;
  *  English because the server holds the same rules; anything else passes. */
 function policyText(t: Words, message: string): string {
     if (message === "That is an address, not a domain") return t("ownerDomains.policy.address");
-    if (message === "A domain needs a suffix, like example.com") return t("ownerDomains.policy.suffix");
+    if (message === "A domain needs a suffix, like example.com")
+        return t("ownerDomains.policy.suffix");
     if (message === "Enter a domain like example.com") return t("ownerDomains.policy.shape");
     let match = /^(.+) is this Polaris's own domain$/.exec(message);
     if (match) return t("ownerDomains.policy.own", { host: match[1] ?? "" });
     match = /^This Polaris answers on (.+), so (.+) is not yours to claim$/.exec(message);
-    if (match) return t("ownerDomains.policy.parent", { host: match[1] ?? "", domain: match[2] ?? "" });
+    if (match)
+        return t("ownerDomains.policy.parent", { host: match[1] ?? "", domain: match[2] ?? "" });
     match = /^(.+) is part of this Polaris's own domain$/.exec(message);
     if (match) return t("ownerDomains.policy.child", { domain: match[1] ?? "" });
     return message;
@@ -65,10 +80,13 @@ export function OwnerDomainsView({
     canAdd,
     blockedReason,
     publicIp,
-    instanceDomains
+    instanceDomains,
+    grades = {}
 }: {
     owner: DomainOwnerRef;
     domains: OwnerDomainView[];
+    /** Each domain's last security grade, by domain, for the badge by its name. */
+    grades?: Record<string, GradeSummary>;
     canAdd: boolean;
     /** Why the form is not offered, when it is not. */
     blockedReason: string;
@@ -94,7 +112,8 @@ export function OwnerDomainsView({
     // to be a domain before there is any point asking whether it is one Polaris
     // already occupies.
     const malformed = domainProblem(value);
-    const reserved = !malformed && value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
+    const reserved =
+        !malformed && value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
     // What stops the Add button. A single letter is not a domain, and a button
     // that offers itself for input it will refuse has to be pressed before it
     // can be understood.
@@ -113,7 +132,10 @@ export function OwnerDomainsView({
     return (
         <div className="flex flex-col gap-6">
             {error && (
-                <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -131,8 +153,11 @@ export function OwnerDomainsView({
                         owner={owner}
                         domain={entry}
                         publicIp={publicIp}
+                        grade={grades[entry.domain] ?? null}
                         onChecked={replace}
-                        onRemoved={(id) => setDomains((current) => current.filter((row) => row.id !== id))}
+                        onRemoved={(id) =>
+                            setDomains((current) => current.filter((row) => row.id !== id))
+                        }
                         onError={setError}
                     />
                 ))
@@ -156,7 +181,8 @@ export function OwnerDomainsView({
                                 if (result?.error) setError(result.error);
                                 return;
                             }
-                            if (result.domain) setDomains((current) => [...current, result.domain!]);
+                            if (result.domain)
+                                setDomains((current) => [...current, result.domain!]);
                             setValue("");
                         }}
                     >
@@ -184,7 +210,9 @@ export function OwnerDomainsView({
                                 {refusal}
                             </p>
                         ) : (
-                            <p className="text-muted-foreground w-full text-xs">{t("ownerDomains.addHint")}</p>
+                            <p className="text-muted-foreground w-full text-xs">
+                                {t("ownerDomains.addHint")}
+                            </p>
                         )}
                     </form>
                 </PageSection>
@@ -201,6 +229,7 @@ function DomainSection({
     owner,
     domain,
     publicIp,
+    grade,
     onChecked,
     onRemoved,
     onError
@@ -208,6 +237,7 @@ function DomainSection({
     owner: DomainOwnerRef;
     domain: OwnerDomainView;
     publicIp: string | null;
+    grade: GradeSummary | null;
     onChecked: (domain: OwnerDomainView) => void;
     onRemoved: (id: string) => void;
     onError: (message: string) => void;
@@ -257,6 +287,9 @@ function DomainSection({
                             <Clock className="size-3 shrink-0" /> {t("ownerDomains.waitingDns")}
                         </Badge>
                     )}
+                    {domain.verified && grade && (
+                        <SecurityBadge grade={grade.grade} problems={grade.problems} />
+                    )}
                 </>
             }
             description={
@@ -264,7 +297,9 @@ function DomainSection({
                     {domain.checkedAt
                         ? t("ownerDomains.lastChecked", { when: format.dateTime(domain.checkedAt) })
                         : t("ownerDomains.notChecked")}
-                    {!ready && secondsLeft !== null && ` ${t("ownerDomains.checkingIn", { seconds: secondsLeft })}`}
+                    {!ready &&
+                        secondsLeft !== null &&
+                        ` ${t("ownerDomains.checkingIn", { seconds: secondsLeft })}`}
                 </span>
             }
             actions={
@@ -277,7 +312,9 @@ function DomainSection({
                         title={t("ownerDomains.checkNow")}
                         onClick={() => void check()}
                     >
-                        <RefreshCw className={busy ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"} />
+                        <RefreshCw
+                            className={busy ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"}
+                        />
                         {t("ownerDomains.check")}
                     </Button>
                     <Button
@@ -318,8 +355,17 @@ function DomainSection({
             )}
 
             {domain.verified && (
-                <CertificatePanel owner={owner} domain={domain} onChanged={onChecked} onError={onError} />
+                <CertificatePanel
+                    owner={owner}
+                    domain={domain}
+                    onChanged={onChecked}
+                    onError={onError}
+                />
             )}
+
+            {/* Spoofing, DNS, registration and HTTPS: checked once the domain is
+                proven to be theirs, since until then it is only a name typed in. */}
+            {domain.verified && <DomainSecurityPanel scope={owner} domain={domain.domain} />}
 
             {/* Editing records takes the domain's own token: this Polaris's
                 token may reach the zone, but it was never handed over for this. */}
@@ -423,7 +469,10 @@ function CertificatePanel({
     async function saveToken(value: string) {
         setSaving(true);
         onError("");
-        const result = await runAction(() => setOwnerDomainDnsTokenAction(owner, domain.id, value), onError);
+        const result = await runAction(
+            () => setOwnerDomainDnsTokenAction(owner, domain.id, value),
+            onError
+        );
         setSaving(false);
         if (result?.domain) {
             onChanged(result.domain);
@@ -434,7 +483,10 @@ function CertificatePanel({
     async function retry() {
         setSaving(true);
         onError("");
-        const result = await runAction(() => retryOwnerDomainCertificateAction(owner, domain.id), onError);
+        const result = await runAction(
+            () => retryOwnerDomainCertificateAction(owner, domain.id),
+            onError
+        );
         setSaving(false);
         if (result?.domain) onChanged(result.domain);
         else if (result?.error) onError(result.error);
@@ -457,9 +509,15 @@ function CertificatePanel({
                 ) : certificate?.status === "failed" ? (
                     <Badge variant="danger">{t("ownerDomains.cert.notIssued")}</Badge>
                 ) : (
-                    <Badge variant="neutral">{ordering ? t("ownerDomains.cert.orderingBadge") : t("ownerDomains.cert.waiting")}</Badge>
+                    <Badge variant="neutral">
+                        {ordering
+                            ? t("ownerDomains.cert.orderingBadge")
+                            : t("ownerDomains.cert.waiting")}
+                    </Badge>
                 )}
-                {ordering && <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />}
+                {ordering && (
+                    <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+                )}
             </div>
             <p className="text-muted-foreground text-xs">{summary}</p>
             {certificate?.detail && (
@@ -474,7 +532,12 @@ function CertificatePanel({
             )}
             {certificate?.nextAttemptAt && (
                 <div>
-                    <Button size="sm" variant="ghost" disabled={saving} onClick={() => void retry()}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={saving}
+                        onClick={() => void retry()}
+                    >
                         <RefreshCw className="size-4 shrink-0" /> {t("ownerDomains.cert.tryNow")}
                     </Button>
                 </div>
@@ -483,7 +546,12 @@ function CertificatePanel({
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                     <KeyRound className="text-muted-foreground size-3.5 shrink-0" />
                     <span className="text-muted-foreground">{t("ownerDomains.cert.ownToken")}</span>
-                    <Button size="sm" variant="ghost" disabled={saving} onClick={() => void saveToken("")}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={saving}
+                        onClick={() => void saveToken("")}
+                    >
                         {t("ownerDomains.cert.removeToken")}
                     </Button>
                 </div>
@@ -506,8 +574,14 @@ function CertificatePanel({
                             onChange={(event) => setToken(event.target.value)}
                         />
                     </label>
-                    <Button type="submit" size="sm" variant="secondary" disabled={saving || !token.trim()}>
-                        {saving && <Loader2 className="size-4 shrink-0 animate-spin" />} {t("ownerDomains.cert.saveToken")}
+                    <Button
+                        type="submit"
+                        size="sm"
+                        variant="secondary"
+                        disabled={saving || !token.trim()}
+                    >
+                        {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}{" "}
+                        {t("ownerDomains.cert.saveToken")}
                     </Button>
                     <p className="text-muted-foreground w-full text-xs">
                         {t("ownerDomains.cert.tokenHint", { domain: domain.domain })}

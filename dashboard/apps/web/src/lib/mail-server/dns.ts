@@ -19,7 +19,8 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { relaySpfInclude } from "./relay";
-import { Resolver } from "node:dns/promises";
+import type { Resolver } from "node:dns/promises";
+import { caaTagValue, publicResolver } from "@/lib/dns/public-resolver";
 import type { MailServer } from "@polaris/db";
 import { publishWithin } from "./dns-standing";
 import { recordAudit } from "@/lib/audit-service";
@@ -33,21 +34,11 @@ import {
     updateZoneRecord
 } from "@/lib/integrations/cloudflare-api";
 
-/** The resolvers asked, two operators so one having a bad day is not the answer. */
-const PUBLIC_RESOLVERS = ["1.1.1.1", "8.8.8.8"];
-
-/** A resolver that asks them, and nobody else. Exported because every check
- *  that has to see what the internet sees - the records here, and the reverse
- *  name in `health` - must ask the same two rather than the machine's own,
- *  which may answer for a name nobody outside can look up. */
-export function publicResolver(): Resolver {
-    const resolver = new Resolver({ timeout: 4000, tries: 2 });
-    resolver.setServers(PUBLIC_RESOLVERS);
-    return resolver;
-}
-
 /** What a public resolver says is at one name, in the shape the zone writes it. */
-export async function publishedValues(resolver: Resolver, record: core.ZoneRecord): Promise<string[] | null> {
+export async function publishedValues(
+    resolver: Resolver,
+    record: core.ZoneRecord
+): Promise<string[] | null> {
     try {
         switch (record.type) {
             case "MX":
@@ -62,8 +53,8 @@ export async function publishedValues(resolver: Resolver, record: core.ZoneRecor
                 );
             case "CAA":
                 return (await resolver.resolveCaa(record.name)).map((entry) => {
-                    const [tag, value] = Object.entries(entry).find(([key]) => key !== "critical") ?? ["", ""];
-                    return `${entry.critical} ${tag} ${String(value)}`;
+                    const { tag, value } = caaTagValue(entry);
+                    return `${entry.critical} ${tag} ${value}`;
                 });
             case "A":
                 return await resolver.resolve4(record.name);
@@ -92,12 +83,20 @@ export interface DomainDnsReport {
  * sends through a relay also needs the relay's provider in its SPF, or every
  * message the relay delivers fails the check the engine's own SPF passes.
  */
-export function expectedFor(domain: MailDomainView, spfInclude: string | null): core.ExpectedMailRecord[] {
-    return core.expectedMailRecords(core.parseZoneFile(domain.zoneFile, domain.name)).map((record) =>
-        record.purpose === "spf" && spfInclude
-            ? { ...record, value: core.mergeSpf(record.value, `v=spf1 ${spfInclude}`) ?? record.value }
-            : record
-    );
+export function expectedFor(
+    domain: MailDomainView,
+    spfInclude: string | null
+): core.ExpectedMailRecord[] {
+    return core
+        .expectedMailRecords(core.parseZoneFile(domain.zoneFile, domain.name))
+        .map((record) =>
+            record.purpose === "spf" && spfInclude
+                ? {
+                      ...record,
+                      value: core.mergeSpf(record.value, `v=spf1 ${spfInclude}`) ?? record.value
+                  }
+                : record
+        );
 }
 
 /**
@@ -113,9 +112,21 @@ export async function scanDns(server: MailServer): Promise<DomainDnsReport[]> {
         for (const record of expectedFor(domain, include)) {
             const published = await publishedValues(resolver, record).catch(() => undefined);
             if (published === undefined) {
-                graded.push({ record, verdict: "warn", published: [], note: "The public resolvers did not answer for this name.", checkable: true });
+                graded.push({
+                    record,
+                    verdict: "warn",
+                    published: [],
+                    note: "The public resolvers did not answer for this name.",
+                    checkable: true
+                });
             } else if (published === null) {
-                graded.push({ record, verdict: "warn", published: [], note: "Polaris cannot look this record type up.", checkable: false });
+                graded.push({
+                    record,
+                    verdict: "warn",
+                    published: [],
+                    note: "Polaris cannot look this record type up.",
+                    checkable: false
+                });
             } else {
                 graded.push({ ...core.gradeRecord(record, published), checkable: true });
             }
@@ -213,7 +224,10 @@ export interface DnsPlan {
 /** The Cloudflare token, or the sentence that says how to connect one. */
 async function cloudflareToken(): Promise<string> {
     const token = await loadCloudflareToken();
-    if (!token) throw new MailServerAccessError("Connect a Cloudflare API token under Integrations to publish records from here.");
+    if (!token)
+        throw new MailServerAccessError(
+            "Connect a Cloudflare API token under Integrations to publish records from here."
+        );
     return token;
 }
 
@@ -228,39 +242,81 @@ function atOrUnder(name: string, domain: string): boolean {
  * caller the operator's token may write for (see `dns-standing`), and only the
  * records at or under the domain they verified.
  */
-export async function planDns(actor: MailServerActor, server: MailServer, domainId: string): Promise<DnsPlan> {
+export async function planDns(
+    actor: MailServerActor,
+    server: MailServer,
+    domainId: string
+): Promise<DnsPlan> {
     const domain = (await listDomains(server)).find((one) => one.id === domainId);
     if (!domain) throw new MailServerAccessError("That domain is not on this mail server.");
     const within = await publishWithin(actor, server.orgId, domain.name);
     const token = await cloudflareToken();
     const zone = await resolveZoneForHostname(token, domain.name).catch(() => {
-        throw new MailServerAccessError(`${domain.name} is not a zone in the Cloudflare account Polaris is connected to.`);
+        throw new MailServerAccessError(
+            `${domain.name} is not a zone in the Cloudflare account Polaris is connected to.`
+        );
     });
     const planned: PlannedRecord[] = [];
     for (const record of expectedFor(domain, relaySpfInclude(server))) {
         if (record.type === "TLSA") {
-            planned.push({ record, action: "skip", value: record.value, existing: [], existingId: null, note: "Only meaningful on a zone signed with DNSSEC; publish it yourself if yours is." });
+            planned.push({
+                record,
+                action: "skip",
+                value: record.value,
+                existing: [],
+                existingId: null,
+                note: "Only meaningful on a zone signed with DNSSEC; publish it yourself if yours is."
+            });
             continue;
         }
         if (within && !atOrUnder(record.name, within)) {
-            planned.push({ record, action: "skip", value: record.value, existing: [], existingId: null, note: `Outside ${within}; add it at your DNS host.` });
+            planned.push({
+                record,
+                action: "skip",
+                value: record.value,
+                existing: [],
+                existingId: null,
+                note: `Outside ${within}; add it at your DNS host.`
+            });
             continue;
         }
         const existing = await listZoneRecords(token, zone.id, record.type, record.name);
         const values = existing.map((row) => row.content);
-        const same = (value: string) => core.gradeRecord({ ...record, value }, [record.value]).verdict === "pass";
+        const same = (value: string) =>
+            core.gradeRecord({ ...record, value }, [record.value]).verdict === "pass";
 
         if (record.purpose === "spf") {
             const spf = existing.find((row) => row.content.toLowerCase().startsWith("v=spf1"));
             if (!spf) {
-                planned.push({ record, action: "create", value: record.value, existing: [], existingId: null, note: null });
+                planned.push({
+                    record,
+                    action: "create",
+                    value: record.value,
+                    existing: [],
+                    existingId: null,
+                    note: null
+                });
                 continue;
             }
             const merged = core.mergeSpf(spf.content, record.value);
             planned.push(
                 merged === null
-                    ? { record, action: "unchanged", value: spf.content, existing: [spf.content], existingId: spf.id, note: "The SPF already published covers this server." }
-                    : { record, action: "update", value: merged, existing: [spf.content], existingId: spf.id, note: "Adds this server to the SPF already published, keeping everything in it." }
+                    ? {
+                          record,
+                          action: "unchanged",
+                          value: spf.content,
+                          existing: [spf.content],
+                          existingId: spf.id,
+                          note: "The SPF already published covers this server."
+                      }
+                    : {
+                          record,
+                          action: "update",
+                          value: merged,
+                          existing: [spf.content],
+                          existingId: spf.id,
+                          note: "Adds this server to the SPF already published, keeping everything in it."
+                      }
             );
             continue;
         }
@@ -268,16 +324,44 @@ export async function planDns(actor: MailServerActor, server: MailServer, domain
             const dmarc = existing.find((row) => row.content.toLowerCase().startsWith("v=dmarc1"));
             planned.push(
                 dmarc
-                    ? { record, action: "unchanged", value: dmarc.content, existing: [dmarc.content], existingId: dmarc.id, note: "A DMARC policy is already published; it is kept." }
-                    : { record, action: "create", value: record.value, existing: [], existingId: null, note: null }
+                    ? {
+                          record,
+                          action: "unchanged",
+                          value: dmarc.content,
+                          existing: [dmarc.content],
+                          existingId: dmarc.id,
+                          note: "A DMARC policy is already published; it is kept."
+                      }
+                    : {
+                          record,
+                          action: "create",
+                          value: record.value,
+                          existing: [],
+                          existingId: null,
+                          note: null
+                      }
             );
             continue;
         }
         const matching = existing.find((row) => same(row.content));
         if (matching) {
-            planned.push({ record, action: "unchanged", value: record.value, existing: values, existingId: matching.id, note: null });
+            planned.push({
+                record,
+                action: "unchanged",
+                value: record.value,
+                existing: values,
+                existingId: matching.id,
+                note: null
+            });
         } else if (existing.length === 0 || (record.type === "TXT" && record.purpose === "other")) {
-            planned.push({ record, action: "create", value: record.value, existing: values, existingId: null, note: null });
+            planned.push({
+                record,
+                action: "create",
+                value: record.value,
+                existing: values,
+                existingId: null,
+                note: null
+            });
         } else {
             planned.push({
                 record,
@@ -318,7 +402,12 @@ export async function applyDns(
     const results: ApplyResult[] = [];
     for (const entry of plan.records) {
         const base = { name: entry.record.name, type: entry.record.type };
-        const body = { type: entry.record.type, name: entry.record.name, value: entry.value, priority: entry.record.priority };
+        const body = {
+            type: entry.record.type,
+            name: entry.record.name,
+            value: entry.value,
+            priority: entry.record.priority
+        };
         try {
             if (entry.action === "create") {
                 await createZoneRecord(token, plan.zoneId, body);
@@ -328,14 +417,22 @@ export async function applyDns(
                 results.push({ ...base, outcome: "updated", note: entry.note });
             } else if (entry.action === "conflict" && replaceConflicts && entry.existingId) {
                 await updateZoneRecord(token, plan.zoneId, entry.existingId, body);
-                results.push({ ...base, outcome: "updated", note: `Replaced ${entry.existing.join(", ")}` });
+                results.push({
+                    ...base,
+                    outcome: "updated",
+                    note: `Replaced ${entry.existing.join(", ")}`
+                });
             } else if (entry.action === "unchanged") {
                 results.push({ ...base, outcome: "unchanged", note: entry.note });
             } else {
                 results.push({ ...base, outcome: "left", note: entry.note });
             }
         } catch (error) {
-            results.push({ ...base, outcome: "failed", note: error instanceof Error ? error.message : "Cloudflare refused it" });
+            results.push({
+                ...base,
+                outcome: "failed",
+                note: error instanceof Error ? error.message : "Cloudflare refused it"
+            });
         }
     }
     await recordAudit({

@@ -18,6 +18,7 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { DomainsView } from "./domains-view";
 import { Messages } from "@/components/i18n/messages";
+import { SecurityInventory } from "@/components/domain-security/security-inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,13 @@ export default async function DomainsPage() {
             />
             <Messages namespaces={["dns"]}>
                 <DomainsView />
+            </Messages>
+            {/* Every domain Polaris knows, checked for spoofing, DNS, registration
+                and HTTPS problems - read after the first paint like the rest. */}
+            <Messages namespaces={["domainSecurity"]}>
+                <div className="mt-6">
+                    <SecurityInventory />
+                </div>
             </Messages>
         </div>
     );

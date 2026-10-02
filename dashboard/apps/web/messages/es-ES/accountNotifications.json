@@ -271,6 +271,10 @@
             "label": "Alarma resuelta",
             "description": "Un objetivo vigilado vuelve a cumplir su condición."
         },
+        "domainSecurity": {
+            "label": "La seguridad de un dominio empeoró",
+            "description": "La revisión diaria encontró un dominio que gestionas expuesto a suplantación, a punto de caducar o mal configurado."
+        },
         "accountSignin": {
             "label": "Acceso por aprobar",
             "description": "Alguien ha iniciado sesión en tu cuenta y necesita tu aprobación."

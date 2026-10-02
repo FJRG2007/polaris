@@ -271,6 +271,10 @@
             "label": "Alarm cleared",
             "description": "A watched target came back within its condition."
         },
+        "domainSecurity": {
+            "label": "A domain's security got worse",
+            "description": "A daily check found a domain you manage open to spoofing, about to expire, or newly misconfigured."
+        },
         "accountSignin": {
             "label": "Sign-in waiting for approval",
             "description": "Someone signed in to your account and needs approving."
