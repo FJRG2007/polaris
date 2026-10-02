@@ -222,6 +222,15 @@ describe("a query that names one exact thing", () => {
         expect(search('"agent user"')).toEqual([]);
     });
 
+    it("is matched as one piece when it is pasted unquoted", () => {
+        const rows = [
+            task("Archivar sesiones", "user sessions, then the archive for 2024"),
+            task("Limpiar tablas", "Vaciar user_sessions_archive_2024 antes del viernes")
+        ];
+        expect(names(searchItems(rows, "user_sessions_archive_2024", TASK_FIELDS))).toEqual(["Limpiar tablas"]);
+        expect(names(searchItems(rows, "src/lib user", TASK_FIELDS))).toEqual([]);
+    });
+
     it.each([
         "https://github.com/diegosouzapw/OmniRoute",
         "mailto:someone@example.test",

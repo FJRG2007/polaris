@@ -26,7 +26,7 @@
  * is the kind of thing people stop bothering with.
  */
 
-import { searchItems } from "@polaris/core/search-text";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { forwardAction } from "./actions";
@@ -48,6 +48,11 @@ import {
     Input,
     cn
 } from "@polaris/ui";
+
+const TARGET_FIELDS: readonly SearchField<Target>[] = [
+    { text: (target) => target.name },
+    { text: (target) => target.place }
+];
 
 export function ForwardDialog({
     message,
@@ -122,10 +127,7 @@ export function ForwardDialog({
     const found = useMemo(
         () =>
             searching
-                ? searchItems(targets, query, [
-                      { text: (target) => target.name },
-                      { text: (target) => target.place }
-                  ])
+                ? searchItems(targets, query, TARGET_FIELDS)
                 : [],
         [targets, query, searching]
     );

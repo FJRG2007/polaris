@@ -27,7 +27,7 @@
  * on screen.
  */
 
-import { searchItems } from "@polaris/core/search-text";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { RuleList } from "./rule-list";
 import { Section } from "./page-parts";
 import { ruleDescription } from "./rule-language";
@@ -117,6 +117,11 @@ function managedPatch(
 }
 
 type Words = NamespaceTranslator<"firewall">;
+
+const RULE_FIELDS: readonly SearchField<{ name: string; description: string }>[] = [
+    { text: (row) => row.name },
+    { text: (row) => row.description }
+];
 
 /** Said once, because the row and the rule's own page both say it. */
 const armedAbove = (t: Words) => ({ label: t("scope.armedAbove"), why: t("scope.armedAboveWhy") });
@@ -509,7 +514,7 @@ export function WafEditor({
                           }))
                       ],
                       needle,
-                      [{ text: (row) => row.name }, { text: (row) => row.description }]
+                      RULE_FIELDS
                   ).map((row) => row.key)
               );
 

@@ -134,8 +134,8 @@ function parseQuery(query: string): ParsedQuery {
     const literal = isLiteralQuery(query);
     const whole = normalizeSearchText(literalNeedle(query));
     if (!whole) return { words: [], whole, fuzzy: false };
-    // A quoted query is one phrase; anything else is its words, each once.
-    const words = quoted(query.trim()) ? [whole] : [...new Set(whole.split(" "))];
+    // A literal query is one piece; anything else is its words, each once.
+    const words = literal ? [whole] : [...new Set(whole.split(" "))];
     return { words, whole, fuzzy: !literal };
 }
 

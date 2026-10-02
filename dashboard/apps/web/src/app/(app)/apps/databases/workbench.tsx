@@ -26,7 +26,7 @@
  * file browser uses, so what somebody has learnt in Drive works here.
  */
 
-import { searchItems } from "@polaris/core/search-text";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
@@ -94,6 +94,8 @@ type RelationOrder = (typeof RELATION_ORDERS)[number]["value"];
 /** Where this browser's preference is kept. A habit of the person reading rather
  *  than a property of the database, so it belongs here and not in a row. */
 const ORDER_KEY = "polaris.databases.order";
+
+const RELATION_FIELDS: readonly SearchField<DataRelation>[] = [{ text: (relation) => relation.name }];
 
 export function Workbench({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
     const t = useTranslations("databases");
@@ -216,7 +218,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
         const needle = find.trim();
         // A search is already ranked by how well each name matched; re-ordering
         // it by anything else throws that away.
-        if (needle) return searchItems(relations ?? [], needle, [{ text: (relation) => relation.name }]);
+        if (needle) return searchItems(relations ?? [], needle, RELATION_FIELDS);
         const list = [...(relations ?? [])];
         if (order === "rows") {
             // A table whose size the engine does not keep sinks rather than

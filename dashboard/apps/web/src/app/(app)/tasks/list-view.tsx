@@ -269,6 +269,11 @@ export function ListScreen({
         });
     }, [rows, rowById, needle, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
 
+    const searchFindsAny = useMemo(
+        () => !needle || searchItems(rows, needle, TASK_SEARCH_FIELDS, { limit: 1 }).length > 0,
+        [rows, needle]
+    );
+
     /**
      * What the reader asked to see, as opposed to what the data happens to be.
      *
@@ -1094,8 +1099,8 @@ export function ListScreen({
                 search nothing carries would otherwise read as an empty board. */}
             {needle && rows.length > 0 && visible.length === 0 && viewType !== "list" && viewType !== "table" && (
                 <EmptyState
-                    title={t("search.noMatch", { query: needle })}
-                    description={t("search.noMatchDescription")}
+                    title={searchFindsAny ? t("list.noMatch") : t("search.noMatch", { query: needle })}
+                    description={searchFindsAny ? t("list.noMatchDescription") : t("search.noMatchDescription")}
                 />
             )}
 

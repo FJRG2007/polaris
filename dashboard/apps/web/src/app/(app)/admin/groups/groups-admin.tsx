@@ -15,7 +15,7 @@
  * shows who is in the group and opens on the dialog that changes it.
  */
 
-import { searchItems } from "@polaris/core/search-text";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import { Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
@@ -56,6 +56,13 @@ export interface GroupRow {
     members: UserOption[];
 }
 
+const GROUP_FIELDS: readonly SearchField<GroupRow>[] = [
+    { text: (group) => group.name },
+    { text: (group) => group.description },
+    { text: (group) => group.members.map((member) => member.name) },
+    { text: (group) => group.members.map((member) => member.email) }
+];
+
 export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: UserOption[] }) {
     const t = useTranslations("admin");
     const router = useRouter();
@@ -76,12 +83,7 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
     // would be slower than reading it.
     const shown = useMemo(
         () =>
-            searchItems(groups, query, [
-                { text: (group) => group.name },
-                { text: (group) => group.description },
-                { text: (group) => group.members.map((member) => member.name) },
-                { text: (group) => group.members.map((member) => member.email) }
-            ]),
+            searchItems(groups, query, GROUP_FIELDS),
         [groups, query]
     );
 

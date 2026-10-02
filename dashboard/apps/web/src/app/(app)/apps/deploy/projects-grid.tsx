@@ -6,7 +6,7 @@
  * shows an "N/M services online" status. Clicking a card opens the project.
  */
 
-import { searchItems } from "@polaris/core/search-text";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
@@ -65,6 +65,8 @@ export interface ProjectCardData {
     total: number;
 }
 
+const PROJECT_FIELDS: readonly SearchField<ProjectCardData>[] = [{ text: (project) => project.name }];
+
 export function ProjectsGrid({
     projects,
     canManage,
@@ -118,7 +120,7 @@ export function ProjectsGrid({
         [projects, removing]
     );
     const filtered = useMemo(
-        () => searchItems(visible, search, [{ text: (project) => project.name }]),
+        () => searchItems(visible, search, PROJECT_FIELDS),
         [visible, search]
     );
     const count = visible.length;

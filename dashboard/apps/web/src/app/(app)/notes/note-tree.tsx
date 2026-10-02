@@ -20,7 +20,7 @@
 
 import { saveFile } from "@/components/transfers/move-file";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { searchItems } from "@polaris/core/search-text";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -87,6 +87,11 @@ const COLLAPSED_KEY = "polaris.notes.collapsed";
 
 /** The private shelf has no id, and something has to key it. */
 const OWN = "own";
+
+const NOTE_FIELDS: readonly SearchField<NoteSummary>[] = [
+    { text: (note) => note.title, weight: 3 },
+    { text: (note) => note.excerpt, weight: 1 }
+];
 
 /**
  * Where a download comes from.
@@ -268,10 +273,7 @@ export function NoteTree({
         // Ranked rather than filtered: somebody looking for a note is typing a
         // title from memory, so the title counts for more than the excerpt, and
         // a typo in it is still forgiven when nothing matches as typed.
-        const hits = searchItems(everything, term, [
-            { text: (note) => note.title, weight: 3 },
-            { text: (note) => note.excerpt, weight: 1 }
-        ]);
+        const hits = searchItems(everything, term, NOTE_FIELDS);
         return (
             <aside className="flex w-full flex-col gap-2 md:w-72 md:shrink-0">
                 <TreeSearch query={query} onQuery={setQuery} onNew={() => void create({ spaceId: null, folderId: null })} />

@@ -59,6 +59,12 @@ export function OrganizationsAdmin({
     );
 }
 
+const ORG_FIELDS: readonly core.SearchField<OrgRow>[] = [
+    { text: (org) => org.name },
+    { text: (org) => org.slug },
+    { text: (org) => org.ownerName }
+];
+
 /** What is living on this deployment right now. */
 function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
     const t = useTranslations("admin");
@@ -69,11 +75,7 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
     // worth finding by either half of it.
     const shown = useMemo(
         () =>
-            core.searchItems(orgs, query, [
-                { text: (org) => org.name },
-                { text: (org) => org.slug },
-                { text: (org) => org.ownerName }
-            ]),
+            core.searchItems(orgs, query, ORG_FIELDS),
         [orgs, query]
     );
 
