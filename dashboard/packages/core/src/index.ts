@@ -136,6 +136,7 @@ export * from "./schemas/cdn.js";
 export * from "./data-sql.js";
 export * from "./schemas/project.js";
 export * from "./schemas/project-access.js";
+export * from "./schemas/private-name.js";
 export * from "./schemas/share.js";
 export * from "./schemas/link-rules.js";
 export * from "./schemas/file-request.js";

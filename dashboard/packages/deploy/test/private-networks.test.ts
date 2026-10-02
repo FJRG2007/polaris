@@ -47,7 +47,7 @@ describe("private network names", () => {
         expect(serviceNetwork("0192a0b1-0000-7000-8000-000000000001")).toMatch(/^polaris-net-s[a-f0-9]{10}$/);
         expect(serviceNetwork("x")).not.toBe(environmentNetwork("x"));
         expect(isPrivateNetwork(environment)).toBe(true);
-        for (const other of [PROXY, "polaris-hub", "polaris-net-", "polaris-net-x0123456789", "polaris-net-eABCDEF0123"]) {
+        for (const other of [PROXY, "polaris-hub", "polaris-net-", "polaris-net-z0123456789", "polaris-net-eABCDEF0123"]) {
             expect(isPrivateNetwork(other)).toBe(false);
         }
     });

@@ -15,6 +15,7 @@ import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { tailIntoLog, waitUntilListening, waitUntilServing } from "./readiness.js";
 import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
+import { FORWARDER_IMAGE, withPortForwarders } from "../private-names.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, expandReplicas } from "../compose-spec.js";
 import type {
     AppDeployPlan,
@@ -105,6 +106,33 @@ async function composeUpRetryingLease(
         );
         await refetch.again();
         await ctx.ports.composeUp(spec, sink);
+    }
+}
+
+/**
+ * Whether the port-80 forwarder's image is on the machine, fetched if it is not.
+ * A convenience must never cost a deploy: a machine that cannot fetch it - no
+ * way out to the registry, a pull limit - deploys the service without one, and
+ * its log says so; the name and `:<port>` reach it all the same.
+ */
+async function forwarderReady(ctx: RuntimeContext, sink: OutputSink): Promise<boolean> {
+    try {
+        await ctx.ports.inspectImage(FORWARDER_IMAGE);
+        return true;
+    } catch {
+        // Not here yet.
+    }
+    try {
+        await ctx.ports.pull(FORWARDER_IMAGE, sink);
+        return true;
+    } catch (error) {
+        ctx.log(
+            Buffer.from(
+                `==> The port-80 forwarder could not be fetched (${reasonOf(error, "pull failed")}); the service is reached on its own port only
+`
+            )
+        );
+        return false;
     }
 }
 
@@ -373,10 +401,16 @@ export class ComposeRuntime implements RuntimeDriver {
         }
 
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
-        // One service per copy, since compose cannot scale a named container.
-        const spec = expandReplicas(
-            appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork),
-            effectivePlan.aliasCopies
+        // One service per copy, since compose cannot scale a named container, and
+        // beside each the port-80 forwarder when it has one - sending to the port
+        // as read from the image, which is the one the service really listens on.
+        const forwardTo =
+            effectivePlan.forwardPort === undefined || !(await forwarderReady(ctx, sink))
+                ? undefined
+                : (effectivePlan.expose?.container ?? effectivePlan.forwardPort);
+        const spec = withPortForwarders(
+            expandReplicas(appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork), effectivePlan.aliasCopies),
+            forwardTo
         );
         // Establish any NAS mounts the volumes bind onto, before the container comes
         // up - so `<mount_root>/<id>/...` resolves onto the NAS, not an empty dir.

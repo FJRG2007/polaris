@@ -126,6 +126,10 @@ export interface AppDeployPlan {
      *  the edge takes a new file, so this release answers to all of them (see
      *  `expandReplicas`). */
     readonly aliasCopies?: number;
+    /** The port `http://<name>.polaris.internal` is sent on to, when the service
+     *  does not listen on port 80 itself: a forwarder beside it answers there
+     *  (see `private-names.ts`). Absent where the target cannot run one. */
+    readonly forwardPort?: number;
     /** Rate limits, concurrency, security headers, redirects and rewrites, written into
      *  the edge labels beside the WAF so a remote server's own edge applies them. */
     readonly edge?: AppEdgeConfig;
@@ -198,6 +202,9 @@ export interface DbDeployPlan {
     /** The networks the database joins in place of the proxy network, as for an
      *  application. Absent or empty means the proxy network. */
     readonly networks?: readonly string[];
+    /** Its private names, keyed by the names network they go on (see
+     *  `AppDeployPlan.networkAliases`). */
+    readonly networkAliases?: Readonly<Record<string, readonly string[]>>;
     /** Further mounts beside the data volume. A PostgreSQL instance with
      *  point-in-time recovery mounts its archive folder here - a host folder
      *  confined under the volume root, which a recovered instance can mount too. */

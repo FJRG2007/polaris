@@ -521,6 +521,8 @@
         "web/src/app/(app)/apps/deploy/move-dialogs.tsx",
         "web/src/app/(app)/apps/deploy/new-environment-dialog.tsx",
         "web/src/app/(app)/apps/deploy/observability-view.tsx",
+        "web/src/app/(app)/apps/deploy/private-network-actions.ts",
+        "web/src/app/(app)/apps/deploy/private-network-panel.tsx",
         "web/src/app/(app)/apps/deploy/project-actions.ts",
         "web/src/app/(app)/apps/deploy/project-detail.tsx",
         "web/src/app/(app)/apps/deploy/project-glance-bar.tsx",

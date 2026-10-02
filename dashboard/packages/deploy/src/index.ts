@@ -107,19 +107,35 @@ export {
     PRIVATE_NETWORK_LABEL,
     PRIVATE_NETWORK_PREFIX,
     REMOTE_EDGE_CONTAINERS,
+    crossLinkNetwork,
     ensurePrivateNetworksScript,
     environmentNetwork,
     fallbackSubnet,
+    isNamesNetwork,
     isPrivateNetwork,
     joinsProxy,
     linksOfLayout,
+    namesNetwork,
+    ownNamesNetwork,
     privateNetworksOf,
+    serviceNamesNetwork,
     serviceNetwork,
     serviceNetworks,
     type NetworkMode,
     type NetworkPlanInput,
     type ServiceLink
 } from "./networks.js";
+export {
+    FORWARDER_IMAGE,
+    PORTLESS_PORT,
+    PRIVATE_DOMAIN_SUFFIX,
+    crossProjectDomain,
+    forwarderName,
+    forwarderService,
+    namesFor,
+    privateDomain,
+    withPortForwarders
+} from "./private-names.js";
 export { ComposeRuntime } from "./runtime/compose.js";
 export { mountFailureReason } from "./mount-failure.js";
 export { deployFailureReason, isOutOfSpace, parseReclaimedBytes } from "./deploy-failure.js";

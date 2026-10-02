@@ -193,15 +193,22 @@ export class HostdClient {
      * Polaris's own containers are attached to each one kept (a recreated edge
      * comes back without them), and any the set no longer names is removed.
      */
-    public async reconcilePrivateNetworks(keep: readonly string[]): Promise<{ kept: number; removed: number }> {
+    public async reconcilePrivateNetworks(
+        keep: readonly string[]
+    ): Promise<{ kept: number; removed: number; ipv6: string[] | null }> {
         const response = await this.call("POST", "/v1/deploy/networks/reconcile", JSON.stringify({ keep }));
         if (response.status !== 200) {
             throw new Error(`hostd network reconcile failed (${response.status}): ${response.body}`);
         }
-        const parsed = JSON.parse(response.body) as { kept?: unknown; removed?: unknown };
+        const parsed = JSON.parse(response.body) as { kept?: unknown; removed?: unknown; ipv6?: unknown };
         return {
             kept: typeof parsed.kept === "number" ? parsed.kept : 0,
-            removed: typeof parsed.removed === "number" ? parsed.removed : 0
+            removed: typeof parsed.removed === "number" ? parsed.removed : 0,
+            // Null from a daemon that predates it: which networks are dual stack is
+            // then unknown, not "none".
+            ipv6: Array.isArray(parsed.ipv6)
+                ? parsed.ipv6.filter((name): name is string => typeof name === "string")
+                : null
         };
     }
 

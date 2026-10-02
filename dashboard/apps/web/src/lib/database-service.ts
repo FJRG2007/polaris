@@ -23,6 +23,7 @@ import { loadEnv } from "@polaris/config";
 import { topologyMemberPlans } from "./database-topology";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
+import { prepareDeployNames } from "./deploy/private-names";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
 import { clusterNodeNames, dbPlanImages, serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
@@ -618,6 +619,17 @@ export async function deployDatabase(
     // own: the first node is the container everything else asks for.
     const nodes = databaseClusterNodes({ ...db, containerName: name });
     const nodeVolumes = nodes ? clusterNodeNames(volumeName, nodes.length) : [];
+    // Its private names, `<name>.polaris.internal`, on its environment's names
+    // network, beside the container name everything already reaches it by.
+    const names = await prepareDeployNames({
+        kind: "database",
+        id: db.id,
+        slug: db.slug,
+        privateNetwork: db.privateNetwork,
+        environment: db.environment,
+        projectSlug: db.environment.project.slug,
+        target: db.target
+    });
     const plan: DbDeployPlan = {
         ref: { name, project },
         image: db.image,
@@ -661,8 +673,11 @@ export async function deployDatabase(
             serviceId: db.id,
             target: db.target,
             published: db.exposePort !== null,
-            routed: false
-        })
+            routed: false,
+            names: names.enabled,
+            crossLinks: names.crossLinks
+        }),
+        ...(names.enabled ? { networkAliases: names.networkAliases } : {})
     };
 
     const deployment = await prisma.deployment.create({

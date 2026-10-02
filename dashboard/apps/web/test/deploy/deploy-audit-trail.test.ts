@@ -81,6 +81,12 @@ vi.mock("@/lib/waf-service", () => ({
 }));
 vi.mock("@/lib/deploy/edge-state", () => ({ challengeActive: async () => false, floodedServices: async () => new Map() }));
 vi.mock("@/lib/deploy/service-networks", () => ({ hasTunnel: async () => false, networksForService: () => [] }));
+// Private names are their own module's business; a target without them deploys as before.
+vi.mock("@/lib/deploy/private-names", () => ({
+    namesOn: () => false,
+    privateDomainOf: () => "",
+    prepareDeployNames: async () => ({ enabled: false, crossLinks: [], networkAliases: {}, domain: null })
+}));
 vi.mock("@/lib/deploy/github-deployment", () => ({
     announceDeployQueued: vi.fn(async () => undefined),
     announceDeployStarted: vi.fn(async () => undefined),

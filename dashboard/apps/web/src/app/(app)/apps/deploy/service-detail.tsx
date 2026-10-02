@@ -35,6 +35,7 @@ import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
 import { DeployBehaviourSection } from "./deploy-behaviour-section";
+import { PrivateNetworkPanel } from "./private-network-panel";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
@@ -3077,6 +3078,8 @@ function SettingsTab({
                     )}
                 </section>
             )}
+
+            <PrivateNetworkPanel kind="application" id={app.id} />
 
             {can("domains.manage") && (
                 <section className="flex flex-col gap-4">

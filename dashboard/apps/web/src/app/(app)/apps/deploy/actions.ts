@@ -23,6 +23,7 @@ import { getNetworkStatus } from "@/lib/network-service";
 import { githubRepoChoiceRefusal, githubTokenForUser } from "@/lib/github-access";
 import * as environments from "@/lib/deploy/environments";
 import { guardSupportsChallenge } from "@/lib/deploy/router";
+import { NEW_ENVIRONMENT_NETWORK_MODE } from "@/lib/deploy/service-networks";
 import * as templateSetup from "@/lib/deploy/template-setup";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
 import { setDomainCertificate } from "@/lib/domain-cert-service";
@@ -180,7 +181,8 @@ export async function createProjectAction(input: {
                 "deploy.manage"
             );
 
-        const project = await deployService.createProject(user.id, name, orgId);
+        // Closed to every other project from the start, like Railway's.
+        const project = await deployService.createProject(user.id, name, orgId, NEW_ENVIRONMENT_NETWORK_MODE);
         await recordDeployAudit({
             actorId: user.id,
             orgId: orgId ?? undefined,
@@ -252,7 +254,13 @@ export async function createEnvironmentAction(input: {
                   branch,
                   projectId: input.projectId
               })
-            : await deployService.createEnvironment(input.projectId, access.ownerId, name, branch);
+            : await deployService.createEnvironment(
+                  input.projectId,
+                  access.ownerId,
+                  name,
+                  branch,
+                  NEW_ENVIRONMENT_NETWORK_MODE
+              );
         if (cloneFrom && deploy) {
             // Queued, not awaited: the caller lands on the environment and watches
             // its services come up on the board.

@@ -40,6 +40,7 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { copyScopeValues, decryptedValue } from "./deploy/env-values";
 import { challengeActive, floodedServices } from "./deploy/edge-state";
 import { hasTunnel, networksForService } from "./deploy/service-networks";
+import { namesOn, prepareDeployNames, privateDomainOf } from "./deploy/private-names";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { resolveBuildMachine, type BuildMachine } from "./deploy/build-machine";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -299,7 +300,9 @@ export async function createEnvironment(
     projectId: string,
     ownerId: string,
     name: string,
-    branch?: string | null
+    branch?: string | null,
+    /** How its services see each other; the column's default when absent. */
+    networkMode?: string
 ) {
     const project = await prisma.project.findFirst({ where: { id: projectId, ownerId } });
     if (!project) throw new Error("Project not found");
@@ -308,7 +311,14 @@ export async function createEnvironment(
     const existing = await prisma.environment.findFirst({ where: { projectId, slug } });
     if (existing) throw new Error("An environment with that name already exists");
     return prisma.environment.create({
-        data: { projectId, name, slug, isDefault: false, branch: branch?.trim() || null }
+        data: {
+            projectId,
+            name,
+            slug,
+            isDefault: false,
+            branch: branch?.trim() || null,
+            ...(networkMode ? { networkMode } : {})
+        }
     });
 }
 
@@ -509,7 +519,14 @@ export async function deleteEnvironment(environmentId: string, ownerId: string) 
  * services, its domains and its certificates with it, and the people who could
  * reach it would change underneath a running deployment.
  */
-export async function createProject(ownerId: string, name: string, orgId: string | null = null) {
+export async function createProject(
+    ownerId: string,
+    name: string,
+    orgId: string | null = null,
+    /** How its first environment's services see each other; the column's
+     *  default when absent. */
+    networkMode?: string
+) {
     const slug = slugify(name);
     if (!slug) throw new Error("Project name must contain letters or digits");
     return prisma.project.create({
@@ -518,7 +535,14 @@ export async function createProject(ownerId: string, name: string, orgId: string
             orgId,
             name,
             slug,
-            environments: { create: { name: "Production", slug: "production", isDefault: true } }
+            environments: {
+                create: {
+                    name: "Production",
+                    slug: "production",
+                    isDefault: true,
+                    ...(networkMode ? { networkMode } : {})
+                }
+            }
         },
         include: { environments: true }
     });
@@ -2670,16 +2694,41 @@ async function buildAppPlan(
     // else its environment's own (or its links'), plus the proxy network only when
     // the edge has to dial it there.
     const routed = plan.domains.length > 0 || (await hasTunnel(app.id));
+    // And its private names, `<name>.polaris.internal`, on a network of their own
+    // (see `deploy/private-names.ts`), with the forwarder that answers port 80 for
+    // it where it listens elsewhere - plain compose only.
+    const names = await prepareDeployNames({
+        kind: "application",
+        id: app.id,
+        slug: app.slug,
+        privateNetwork: app.privateNetwork,
+        environment: app.environment,
+        projectSlug: project.slug,
+        target: app.target,
+        deploymentId: release?.id
+    });
     const networks = networksForService({
         environment: app.environment,
         serviceId: app.id,
         target: app.target,
         published: !plan.private,
-        routed
+        routed,
+        names: names.enabled,
+        crossLinks: names.crossLinks
     });
     // Something sends visitors to it, so it counts as up only once it accepts
     // connections on its port - that is the moment the edge is moved onto it.
-    const planned: AppDeployPlan = { ...plan, networks, ...(routed ? { awaitPort: true } : {}) };
+    const planned: AppDeployPlan = {
+        ...plan,
+        networks,
+        ...(routed ? { awaitPort: true } : {}),
+        ...(names.enabled
+            ? {
+                  networkAliases: { ...plan.networkAliases, ...names.networkAliases },
+                  ...(app.target.runtime === "compose" ? { forwardPort: containerPort } : {})
+              }
+            : {})
+    };
     let gitSource: GitSource | undefined;
     if (typeof source.repoUrl === "string" && source.repoUrl) {
         gitSource = {
@@ -2916,6 +2965,8 @@ async function systemEnv(
             slug: true,
             name: true,
             currentDeploymentId: true,
+            privateNetwork: true,
+            target: { select: { kind: true, hostId: true } },
             environment: {
                 select: {
                     id: true,
@@ -2943,7 +2994,9 @@ async function systemEnv(
         POLARIS_ENVIRONMENT_NAME: app.environment.name,
         POLARIS_SERVICE_ID: app.id,
         POLARIS_SERVICE_NAME: app.name,
-        POLARIS_PRIVATE_DOMAIN: release.address,
+        // Its private name where its server gives it one - this deploy is what
+        // gives its container that name - else the container name it always had.
+        POLARIS_PRIVATE_DOMAIN: namesOn(app.target) ? privateDomainOf(app) : release.address,
         ...(domain ? { POLARIS_PUBLIC_DOMAIN: domain } : {}),
         ...(app.environment.branch ? { POLARIS_GIT_BRANCH: app.environment.branch } : {}),
         ...(app.environment.pullRequest !== null

@@ -18,6 +18,7 @@ const reconciled: string[][] = [];
 vi.mock("@polaris/db", () => ({
     prisma: {
         environment: { findMany: async () => environments },
+        privateLink: { findMany: async () => [] },
         setting: {
             findFirst: async ({ where }: { where: { key: { in: string[] } } }) =>
                 settings.find((row) => where.key.in.includes(row.key)) ?? null

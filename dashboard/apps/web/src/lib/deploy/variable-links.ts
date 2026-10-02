@@ -32,8 +32,10 @@ const SERVICE_KEYS = ["POLARIS_PRIVATE_DOMAIN", "PORT", "POLARIS_PUBLIC_DOMAIN",
 
 /** The keys a managed database answers to; the values do not matter here. */
 function databaseKeys(engine: string, cluster: boolean, readable: boolean): Set<string> {
-    return new Set(
-        Object.keys(
+    return new Set([
+        // Its private name, which a database has beside its connection keys.
+        "POLARIS_PRIVATE_DOMAIN",
+        ...Object.keys(
             core.databaseReferenceKeys({
                 engine,
                 host: "",
@@ -46,7 +48,7 @@ function databaseKeys(engine: string, cluster: boolean, readable: boolean): Set<
                 readUri: readable ? "-" : null
             })
         )
-    );
+    ]);
 }
 
 /** Links for every variable of one scope that has any, keyed by variable id. Callers authorize the scope. */

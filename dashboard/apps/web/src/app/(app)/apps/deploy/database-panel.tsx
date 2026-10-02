@@ -19,6 +19,7 @@ import { DbEngineIcon } from "@/components/db-engine-icon";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import { PrivateNetworkPanel } from "./private-network-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import { KeyRound, Link2, Loader2, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import {
@@ -40,7 +41,7 @@ import {
 } from "@polaris/ui";
 
 type Overview = NonNullable<Awaited<ReturnType<typeof actions.databaseOverviewAction>>["overview"]>;
-type Tab = "versions" | "settings" | "pitr" | "copy" | "buckets" | "activity";
+type Tab = "versions" | "settings" | "network" | "pitr" | "copy" | "buckets" | "activity";
 
 /** A pending confirmation: what it says, and what it runs once agreed to. */
 interface Confirmation {
@@ -102,6 +103,8 @@ export function DatabaseManageDialog({
               ...(overview.redis || overview.mongo || overview.limits || overview.topology
                   ? [{ value: "settings" as const, label: t("database.tabs.settings") }]
                   : []),
+              // A database inside another instance is reached through that one's container.
+              ...(!overview.hosted ? [{ value: "network" as const, label: t("database.tabs.network") }] : []),
               ...(overview.pitr ? [{ value: "pitr" as const, label: t("database.tabs.pitr") }] : []),
               // A cluster's keys are spread over its masters; one dump cannot be loaded into it.
               ...(!overview.storage && !overview.redis?.clusterMasters
@@ -196,6 +199,8 @@ export function DatabaseManageDialog({
                                 <LimitsSection overview={overview} manage={manage} ask={ask} />
                                 <SettingsSection overview={overview} manage={manage} ask={ask} />
                             </div>
+                        ) : current === "network" ? (
+                            <PrivateNetworkPanel kind="database" id={database.id} />
                         ) : current === "pitr" && overview.pitr ? (
                             <PitrSection overview={overview} manage={manage} ask={ask} />
                         ) : current === "copy" ? (

@@ -4404,6 +4404,24 @@ model Environment {
     @@index([projectId])
 }
 
+// A way through from one project into another: the application `sourceId` may
+// call the service `targetId` (an application or a database) of another project
+// as `<name>.<project>.polaris.internal`, over a network only the two of them
+// join. Projects are closed to each other otherwise. Nothing references the two
+// services by key, so removing either leaves a row that is skipped and pruned.
+model PrivateLink {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    // "application" | "database"
+    targetKind  String
+    targetId    String   @db.Uuid
+    sourceId    String   @db.Uuid
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+
+    @@unique([targetKind, targetId, sourceId])
+    @@index([sourceId])
+}
+
 model Application {
     id                  String    @id @default(uuid(7)) @db.Uuid
     environmentId       String    @db.Uuid
@@ -4453,6 +4471,11 @@ model Application {
     watchPaths          String?
     // Last git SHA deployed, for the polling fallback and change detection.
     lastDeployedSha     String?
+    // JSON {name?, aliases[], former[{name, until}], live[]}: its private names -
+    // `<name>.polaris.internal` and the bare `<name>` - when they are not just its
+    // slug, the extra names it answers to, the names it was renamed from that keep
+    // answering for a while, and the names its running container was given.
+    privateNetwork      String    @default("{}")
     // Keep previous deployments running (Railway-style multi-version). Off by
     // default: a new deploy replaces the old container.
     keepReleases        Boolean   @default(false)
@@ -4708,6 +4731,8 @@ model ManagedDatabase {
     recoveredFromId     String?  @db.Uuid
     recoveryBase        String?
     recoveryTarget      DateTime?
+    // JSON: its private names, as on an application (`Application.privateNetwork`).
+    privateNetwork      String   @default("{}")
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
