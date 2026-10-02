@@ -24,6 +24,7 @@
 
 import type { DbEngine } from "@polaris/core";
 import type { DataTunnel } from "./tunnel";
+import type { DataTls } from "./tls";
 
 /** The engines the browser can open. The same set Polaris can provision, which
  *  is not a coincidence: a database Polaris made is the first thing anybody
@@ -61,7 +62,9 @@ export interface DataAddress {
      * is absent.
      */
     readonly authSource?: string | null;
-    readonly tls: boolean;
+    /** How the connection is encrypted and what its certificate is checked
+     *  against (see `tls.ts`). */
+    readonly tls: DataTls;
     /** Refuses anything that would write. Enforced by the driver, not by the
      *  screen: a statement box is a statement box. */
     readonly readOnly: boolean;
@@ -260,6 +263,17 @@ export const PAGE_ROWS = 100;
 
 /** The hard ceiling on one page, whatever is asked for. */
 export const MAX_ROWS = 1000;
+
+/** The most rows one typed statement brings back. The rest are read past and
+ *  dropped, so a `SELECT *` over a large table costs the statement's time limit
+ *  rather than this server's memory. */
+export const MAX_STATEMENT_ROWS = 1000;
+
+/** How long one statement may run before the engine is told to stop it. */
+export const STATEMENT_TIMEOUT_MS = 30_000;
+
+/** Said under a result that was cut short. Matched to the catalog by `words`. */
+export const TRUNCATED_NOTE = `Showing the first ${MAX_STATEMENT_ROWS} rows.`;
 
 /** Refused because the connection is read-only. Its own class so a screen can
  *  say the one useful thing about it rather than printing an engine's error. */

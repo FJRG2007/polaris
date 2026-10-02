@@ -5132,11 +5132,21 @@ model DataConnection {
     port                Int?
     database            String?
     username            String?
-    // Envelope-encrypted secret (JSON: password).
+    // Envelope-encrypted secret (JSON: password, and a client certificate key).
     encryptedCredential Bytes?
     credentialNonce     Bytes?
     credentialKeyId     String?
     tls                 Boolean   @default(false)
+    // disable | require | verify-ca | verify-full. Null on a row saved before
+    // modes existed, read as "require" when `tls` is on.
+    tlsMode             String?
+    // system | upload | server - what a verifying mode checks against.
+    tlsTrust            String?
+    // PEM: the uploaded authority, or the server's own certificate trusted on
+    // first use. Public data, not a secret.
+    tlsCaCert           String?
+    // PEM: the client certificate presented. Its key is sealed with the password.
+    tlsClientCert       String?
     readOnly            Boolean   @default(false)
     // null | server | manual | manual-jump
     sshMode             String?
@@ -5154,6 +5164,8 @@ model DataConnection {
     sshCredentialKeyId  String?
     // The SSH server's key (base64), pinned when the connection was saved.
     sshHostKey          String?
+    // "<type> <SHA256 fingerprint>" of the stored private key, for the form.
+    sshKeySummary       String?
     // The registered server a "manual-jump" login is reached through.
     sshJumpHostId       String?   @db.Uuid
     lastUsedAt          DateTime?

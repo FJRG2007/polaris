@@ -20,6 +20,7 @@
 
 import Redis from "ioredis";
 import * as data from "../driver";
+import { tlsConnectOptions } from "../tls";
 import { redisCommandWrites } from "@polaris/core";
 
 /** How many keys one SCAN asks the server to look at. Not the page size: SCAN
@@ -45,7 +46,7 @@ export class RedisDriver implements data.DataDriver {
             username: this.address.username || undefined,
             password: this.address.password || undefined,
             db,
-            tls: this.address.tls ? { rejectUnauthorized: false } : undefined,
+            tls: tlsConnectOptions(this.address.tls) ?? undefined,
             connectTimeout: 8000,
             commandTimeout: 30_000,
             // One attempt. A browser waiting on a screen is not a worker that
@@ -249,12 +250,15 @@ export class RedisDriver implements data.DataDriver {
             const client = await this.open(this.openedDb);
             const started = Date.now();
             const answer = await client.call(name, ...args);
+            const lines = flatten(answer);
+            const truncated = lines.length > data.MAX_STATEMENT_ROWS;
             results.push({
                 statement: line,
                 columns: ["reply"],
-                rows: flatten(answer).map((value) => [value]),
+                rows: lines.slice(0, data.MAX_STATEMENT_ROWS).map((value) => [value]),
                 affected: null,
-                ms: Date.now() - started
+                ms: Date.now() - started,
+                ...(truncated ? { note: data.TRUNCATED_NOTE } : {})
             });
         }
         return results;

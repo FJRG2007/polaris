@@ -94,9 +94,9 @@ describe("splitting a box of SQL", () => {
         expect(splitStatements('SELECT * FROM "odd;name"')).toEqual(['SELECT * FROM "odd;name"']);
     });
 
-    it("keeps a dollar-quoted body whole", () => {
+    it("keeps a PostgreSQL dollar-quoted body whole", () => {
         const body = "CREATE FUNCTION f() RETURNS int AS $$ BEGIN; RETURN 1; END; $$ LANGUAGE plpgsql";
-        expect(splitStatements(body)).toEqual([body]);
+        expect(splitStatements(body, "postgres")).toEqual([body]);
     });
 
     it("ignores the empty space between semicolons", () => {

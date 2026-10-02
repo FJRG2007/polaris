@@ -163,7 +163,7 @@ describe("the connection form", () => {
         await userEvent.click(screen.getByRole("radio", { name: "Private key" }));
 
         expect(save.hasAttribute("disabled")).toBe(true);
-        expect(screen.getByText(/Needed to sign in/)).toBeTruthy();
+        expect(screen.getByText(/drop the file here, or choose it/)).toBeTruthy();
     });
 
     it("makes the reader answer the jump picker when that bastion was removed", async () => {

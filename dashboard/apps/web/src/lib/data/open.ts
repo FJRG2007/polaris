@@ -9,6 +9,7 @@
  */
 
 import * as data from "./driver";
+import { tlsRefusal } from "./tls";
 import { openTunnel, TunnelError } from "./tunnel";
 
 export async function openDriver(address: data.DataAddress): Promise<data.DataDriver> {
@@ -77,6 +78,12 @@ async function withOpenDriver<T>(
     const driver = await openDriver(address);
     try {
         return await use(driver);
+    } catch (error) {
+        // A certificate that did not check out is the reader's to act on, and
+        // is said as itself rather than as whatever the driver wrapped it in.
+        const refusal = address.tls.mode === "disable" ? null : tlsRefusal(error, address.tls.name);
+        if (refusal) throw new data.DataRequestError(refusal);
+        throw error;
     } finally {
         await driver.close();
     }

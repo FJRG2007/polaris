@@ -13,6 +13,8 @@ import {
     captureHostKey,
     connectTunnel,
     openTunnel,
+    presentedHostKey,
+    sshFingerprint,
     TunnelError,
     type DataTunnel
 } from "@/lib/data/tunnel";
@@ -145,7 +147,7 @@ describe("captureHostKey", () => {
 
         await expect(
             captureHostKey(TARGET, null, { connect, forward: deps.forward })
-        ).rejects.toThrow(/different key than the one Polaris pinned/);
+        ).rejects.toThrow(/different SSH key than the one pinned/);
     });
 
     it("passes a failure that was not the key through as itself", async () => {
@@ -157,5 +159,57 @@ describe("captureHostKey", () => {
         await expect(
             captureHostKey(TARGET, null, { connect, forward: deps.forward })
         ).rejects.toThrow(/authentication methods failed/);
+    });
+});
+
+describe("a changed key on the way in", () => {
+    it("refuses a jump server whose key changed, naming it, before the target is tried", async () => {
+        const connect = async (options: SshConnectOptions) => {
+            if (options.host === "bastion.example.com") {
+                options.onHostKey?.("NOT-BBBB");
+                throw new Error("Handshake failed");
+            }
+            return client(options.host) as never;
+        };
+        const refused = await connectTunnel({ ...viaJump, jumpLabel: "bastion" }, { connect, forward: deps.forward }).catch(
+            (error: unknown) => error
+        );
+        expect(refused).toBeInstanceOf(TunnelError);
+        expect((refused as TunnelError).keyChanged).toEqual({ hop: "jump", presented: "NOT-BBBB" });
+        expect((refused as Error).message).toMatch(/^bastion answered with a different SSH key/);
+        expect(forwarded).toEqual([]);
+    });
+
+    it("says the target's changed key from openTunnel too, rather than 'check the server is up'", async () => {
+        const connect = async (options: SshConnectOptions) => {
+            options.onHostKey?.("CHANGED");
+            throw new Error("Handshake failed");
+        };
+        await expect(openTunnel(direct, "127.0.0.1", 5432, { connect, forward: deps.forward })).rejects.toThrow(
+            /different SSH key than the one pinned/
+        );
+    });
+
+    it("reads the presented key without offering any credential", async () => {
+        let offered: SshConnectOptions | null = null;
+        const connect = async (options: SshConnectOptions) => {
+            offered = options;
+            options.onHostKey?.("PRESENTED");
+            // A real verifier with an empty pin list refuses here, before auth.
+            throw new Error("Handshake failed");
+        };
+        const key = await presentedHostKey(
+            { host: "ssh.example.com", port: 22, username: "root" },
+            null,
+            null,
+            { connect, forward: deps.forward }
+        );
+        expect(key).toBe("PRESENTED");
+        expect(offered!.pinnedHostKey).toEqual([]);
+        expect(offered!.auth).toEqual({ method: "password", password: "" });
+    });
+
+    it("prints a key the way OpenSSH does", () => {
+        expect(sshFingerprint(Buffer.from("key").toString("base64"))).toMatch(/^SHA256:[A-Za-z0-9+/]{43}$/);
     });
 });

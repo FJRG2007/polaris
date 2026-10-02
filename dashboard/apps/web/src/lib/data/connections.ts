@@ -11,10 +11,12 @@
  * Reaching a managed database is the part with a real constraint in it. Its
  * hostname is its container's name on the deploy target's proxy network, which
  * is a name only that machine resolves. So: a database on the machine Polaris
- * runs on is reached by that name, one published on a port is reached at the
- * target's address and that port, and one on another machine with no published
- * port cannot be reached at all - which is said in those words, with the setting
- * that would fix it named, rather than left as a connection that times out.
+ * runs on is reached by that name, one published on a port on another machine is
+ * reached through that machine's own SSH login (Polaris has it, and its pinned
+ * key) at the port it is published on, and one on another machine with no
+ * published port cannot be reached at all - which is said in those words, with
+ * the setting that would fix it named, rather than left as a connection that
+ * times out.
  *
  * A database Polaris already knows about is offered without anything being
  * saved: the deploy row holds the address and the credentials, and Polaris' own
@@ -31,6 +33,21 @@
  * database's, encrypted the same way; `addressOf` resolves it fresh on every
  * open so a rotated key or a removed server is caught there rather than at a
  * saved address that quietly stopped being reachable.
+ *
+ * Three rules keep a stored secret where it was put:
+ *
+ * - **Every address typed here is judged before it is dialled** (`egress.ts`),
+ *   on save and again on every open, and the driver is pointed at the address
+ *   that was judged. Somebody who does not run the instance cannot point
+ *   Polaris at its own network.
+ * - **A kept secret is only kept for the same destination.** An edit that leaves
+ *   the password empty keeps the stored one only while the engine, the address
+ *   and the route to it are unchanged; pointing the connection somewhere else
+ *   asks for the password again, so a stored password is never sent to an
+ *   address it was not typed for. The SSH login follows the same rule.
+ * - **No secret leaves this module.** The views carry what a screen needs to
+ *   say - that a password, a key or a client certificate is stored, a key's
+ *   fingerprint, a certificate's subject - and never the thing itself.
  */
 
 import { prisma } from "@polaris/db";
@@ -38,15 +55,38 @@ import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { userHasPermission } from "@polaris/auth";
 import type { DataAddress, DataEngine } from "./driver";
+import { readPrivateKey, SshKeyError } from "./ssh-key";
+import { legacyTlsMode, NO_TLS, type DataTls } from "./tls";
 import { databaseCredentials } from "@/lib/database-service";
 import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
-import { captureHostKey, TunnelError, type DataTunnel } from "./tunnel";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
-import { getHostConnection, HostCredentialsError } from "@/lib/host-service";
+import { resolveEgress, EgressRefusal, type EgressScope } from "./egress";
+import { randomUUID, X509Certificate, createPrivateKey } from "node:crypto";
+import {
+    probeServerCertificate,
+    summarize,
+    CertificateProbeError,
+    type CertificateSummary
+} from "./tls-probe";
+import {
+    captureHostKey,
+    openTunnel,
+    presentedHostKey,
+    sshFingerprint,
+    TunnelError,
+    type DataTunnel
+} from "./tunnel";
+import {
+    getHostConnection,
+    getHostConnectionUnscoped,
+    HostCredentialsError
+} from "@/lib/host-service";
 import {
     saveConnectionSchema,
     type SaveConnectionInput,
-    type SshAuthMethod
+    type SshAuthMethod,
+    type TlsMode,
+    type TlsTrust
 } from "./connection-schema";
 
 export type { SaveConnectionInput } from "./connection-schema";
@@ -73,7 +113,10 @@ export interface DataConnectionView {
     readonly database: string | null;
     readonly username: string | null;
     readonly readOnly: boolean;
-    readonly tls: boolean;
+    /** Whether a password is stored. Never the password. */
+    readonly hasPassword: boolean;
+    /** How it is encrypted, without any key material. */
+    readonly tls: TlsView;
     /** The database's own address, for the form to edit. Null on a managed one. */
     readonly host: string | null;
     readonly port: number | null;
@@ -87,6 +130,20 @@ export interface DataConnectionView {
     readonly unreachable: boolean;
     readonly lastUsedAt: string | null;
     readonly createdAt: string | null;
+}
+
+/** A connection's encryption, as a screen may see it. */
+export interface TlsView {
+    readonly mode: TlsMode;
+    readonly trust: TlsTrust;
+    /** The authority it is checked against, when it is not a public one. */
+    readonly authority: CertificateSummary | null;
+    /** The client certificate it presents, when it presents one. Its key is
+     *  stored and never shown. */
+    readonly clientCertificate: CertificateSummary | null;
+    /** Saved before modes existed, with encryption on and nothing checked:
+     *  the form asks for a choice rather than inheriting that silently. */
+    readonly legacy: boolean;
 }
 
 /** A connection's SSH tunnel, as a screen may see it. */
@@ -108,6 +165,11 @@ export type TunnelView =
           readonly jumpHostName: string | null;
           /** True when the jump server this login needs was removed. */
           readonly jumpMissing: boolean;
+          /** The stored key's type and fingerprint, when the login is a key. */
+          readonly keyType: string | null;
+          readonly keyFingerprint: string | null;
+          /** The pinned SSH server key, as OpenSSH prints it. */
+          readonly hostKeyFingerprint: string | null;
       };
 
 export class DataConnectionError extends Error {
@@ -116,6 +178,24 @@ export class DataConnectionError extends Error {
         this.name = "DataConnectionError";
     }
 }
+
+/** The sentences this module refuses in that `words.ts` matches by shape. */
+export const CONNECTION_REFUSALS = {
+    passwordAgain:
+        "Enter the password again. The address changed, and a saved password is only sent to the address it was saved for.",
+    sshSecretAgain:
+        "Enter the SSH password or key again. The SSH server changed, and a saved login is only sent to the server it was saved for.",
+    caMissing: "Upload the certificate of the authority that signed the server's certificate.",
+    caInvalid: "That certificate file could not be read. Use a PEM file with one or more certificates.",
+    clientMissing: "Add the client certificate and its key.",
+    clientInvalid: "That client certificate and key could not be read, or do not belong together.",
+    keyChangedAgain: "The server's key changed again since you checked it. Check it again before trusting it.",
+    certificateChangedAgain:
+        "The server's certificate changed again since you checked it. Check it again before trusting it.",
+    notTrustOnFirstUse: "This connection does not trust the server's own certificate, so there is nothing to check.",
+    notManualTunnel: "This connection has no SSH login of its own to check.",
+    secretUnreadable: "The saved password could not be read. Enter it again."
+} as const;
 
 /** A database Polaris runs, offered as something to point a connection at. */
 export interface ManagedOption {
@@ -201,7 +281,8 @@ export async function listConnections(userId: string): Promise<DataConnectionVie
             database: row.database,
             username: row.username,
             readOnly: row.readOnly,
-            tls: row.tls,
+            hasPassword: Boolean(row.encryptedCredential),
+            tls: tlsView(row),
             host: row.managedDatabaseId ? null : row.host,
             port: row.managedDatabaseId ? null : row.port,
             tunnel,
@@ -213,6 +294,39 @@ export async function listConnections(userId: string): Promise<DataConnectionVie
     });
 }
 
+/** The columns a connection's encryption is read from. */
+interface TlsColumns {
+    readonly tls: boolean;
+    readonly tlsMode?: string | null;
+    readonly tlsTrust?: string | null;
+    readonly tlsCaCert?: string | null;
+    readonly tlsClientCert?: string | null;
+}
+
+function tlsView(row: TlsColumns): TlsView {
+    const mode = legacyTlsMode(row.tls, row.tlsMode);
+    return {
+        mode,
+        trust: trustOf(row.tlsTrust),
+        authority: mode.startsWith("verify") ? readableCertificate(row.tlsCaCert) : null,
+        clientCertificate: mode === "disable" ? null : readableCertificate(row.tlsClientCert),
+        legacy: !row.tlsMode && row.tls
+    };
+}
+
+function trustOf(value: string | null | undefined): TlsTrust {
+    return value === "upload" || value === "server" ? value : "system";
+}
+
+function readableCertificate(pem: string | null | undefined): CertificateSummary | null {
+    if (!pem) return null;
+    try {
+        return summarize(pem);
+    } catch {
+        return null;
+    }
+}
+
 /** The columns a tunnel is read from. */
 interface TunnelColumns {
     readonly sshMode?: string | null;
@@ -222,6 +336,8 @@ interface TunnelColumns {
     readonly sshUsername?: string | null;
     readonly sshAuthMethod?: string | null;
     readonly sshJumpHostId?: string | null;
+    readonly sshHostKey?: string | null;
+    readonly sshKeySummary?: string | null;
     readonly sshServer?: { readonly name: string } | null;
     readonly sshJump?: { readonly name: string } | null;
 }
@@ -235,15 +351,21 @@ function tunnelView(row: TunnelColumns): TunnelView | null {
         };
     }
     if (row.sshMode === "manual" || row.sshMode === "manual-jump") {
+        const authMethod = row.sshAuthMethod === "password" ? "password" : "key";
+        const [keyType, keyFingerprint] =
+            authMethod === "key" && row.sshKeySummary ? row.sshKeySummary.split(" ") : [];
         return {
             mode: "manual",
             host: row.sshHost ?? "",
             port: row.sshPort ?? 22,
             username: row.sshUsername ?? "",
-            authMethod: row.sshAuthMethod === "password" ? "password" : "key",
+            authMethod,
             jumpHostId: row.sshJumpHostId ?? null,
             jumpHostName: row.sshJump?.name ?? null,
-            jumpMissing: row.sshMode === "manual-jump" && !row.sshJumpHostId
+            jumpMissing: row.sshMode === "manual-jump" && !row.sshJumpHostId,
+            keyType: keyType ?? null,
+            keyFingerprint: keyFingerprint ?? null,
+            hostKeyFingerprint: row.sshHostKey ? sshFingerprint(row.sshHostKey) : null
         };
     }
     return null;
@@ -314,7 +436,8 @@ export async function listOpenable(userId: string): Promise<DataConnectionView[]
             // otherwise: opening a production database from a list should not be
             // enough to write to it.
             readOnly: true,
-            tls: false,
+            hasPassword: false,
+            tls: NO_TLS_VIEW,
             host: null,
             port: null,
             tunnel: null,
@@ -326,6 +449,14 @@ export async function listOpenable(userId: string): Promise<DataConnectionView[]
 
     return [...saved, ...(own ? [own] : []), ...offered];
 }
+
+const NO_TLS_VIEW: TlsView = {
+    mode: "disable",
+    trust: "system",
+    authority: null,
+    clientCertificate: null,
+    legacy: false
+};
 
 /**
  * Polaris' own database, for an account that runs the instance.
@@ -348,7 +479,8 @@ async function polarisDatabase(userId: string): Promise<DataConnectionView | nul
         database: address.database ?? null,
         username: address.username ?? null,
         readOnly: true,
-        tls: address.tls,
+        hasPassword: false,
+        tls: { ...NO_TLS_VIEW, mode: address.tls.mode },
         host: null,
         port: null,
         tunnel: null,
@@ -380,6 +512,13 @@ function polarisAddress(): DataAddress | null {
     const database = decodeURIComponent(url.pathname.replace(/^\//, ""));
     if (!database) return null;
 
+    const sslmode = url.searchParams.get("sslmode") ?? "";
+    const mode: TlsMode =
+        sslmode === "" || sslmode === "disable"
+            ? "disable"
+            : sslmode === "verify-ca" || sslmode === "verify-full"
+              ? sslmode
+              : "require";
     return {
         engine: "postgres",
         host: url.hostname,
@@ -387,17 +526,98 @@ function polarisAddress(): DataAddress | null {
         database,
         username: decodeURIComponent(url.username) || null,
         password: decodeURIComponent(url.password) || null,
-        tls:
-            (url.searchParams.get("sslmode") ?? "") !== "" &&
-            url.searchParams.get("sslmode") !== "disable",
+        tls: { ...NO_TLS, mode, name: url.hostname },
         readOnly: true
     };
+}
+
+/* --------------------------------------------------------------------------
+ * Saving.
+ * ----------------------------------------------------------------------- */
+
+/** The secrets a direct connection stores, sealed together. */
+interface DatabaseSecrets {
+    password?: string;
+    clientKey?: string;
+}
+
+/** A saved row, as far as saving and opening read it. */
+type StoredRow = NonNullable<Awaited<ReturnType<typeof prisma.dataConnection.findFirst>>>;
+
+/** Who may reach how far in, for this account. */
+async function egressScope(userId: string): Promise<EgressScope> {
+    return (await userHasPermission(userId, "system.manage")) ? "instance" : "member";
+}
+
+/** `resolveEgress`, with its refusal said as one of this module's. */
+async function judged(host: string, scope: EgressScope): Promise<string> {
+    try {
+        return (await resolveEgress(host, scope)).address;
+    } catch (error) {
+        if (error instanceof EgressRefusal) throw new DataConnectionError(error.message);
+        throw error;
+    }
+}
+
+/** Everything a save writes, and the address it describes - for a test to open
+ *  without writing anything. */
+interface PreparedConnection {
+    readonly fields: Record<string, unknown>;
+    readonly address: DataAddress | null;
 }
 
 /** Save a new connection or rewrite one this account owns. */
 export async function saveConnection(userId: string, input: SaveConnectionInput): Promise<string> {
     const parsed = validate(input);
+    const existing = parsed.id
+        ? await prisma.dataConnection.findFirst({ where: { id: parsed.id, ownerId: userId } })
+        : null;
+    if (parsed.id && !existing) throw new DataConnectionError("That connection is not there any more.");
 
+    const id = existing?.id ?? randomUUID();
+    const { fields } = await prepareConnection(userId, parsed, existing);
+
+    if (existing) {
+        await prisma.dataConnection.update({ where: { id: existing.id }, data: fields as never });
+        return existing.id;
+    }
+    const created = await prisma.dataConnection.create({
+        data: { id, ownerId: userId, ...fields } as never,
+        select: { id: true }
+    });
+    return created.id;
+}
+
+/**
+ * Open a connection as the form describes it, without saving anything, and say
+ * what answered. The same checks a save makes - the address, the SSH key, the
+ * certificate - and the same rules about which stored secrets an edit keeps.
+ */
+export async function testDraft(
+    userId: string,
+    input: SaveConnectionInput,
+    open: (address: DataAddress) => Promise<string>
+): Promise<string> {
+    const parsed = validate(input);
+    const existing = parsed.id
+        ? await prisma.dataConnection.findFirst({ where: { id: parsed.id, ownerId: userId } })
+        : null;
+    if (parsed.id && !existing) throw new DataConnectionError("That connection is not there any more.");
+    if (parsed.managedDatabaseId) {
+        return open(await managedAddress(userId, parsed.managedDatabaseId, true));
+    }
+    const { address } = await prepareConnection(userId, parsed, existing);
+    if (!address) throw new DataConnectionError("That connection is not valid.");
+    return open(address);
+}
+
+type Parsed = ReturnType<typeof validate>;
+
+async function prepareConnection(
+    userId: string,
+    parsed: Parsed,
+    existing: StoredRow | null
+): Promise<PreparedConnection> {
     if (parsed.managedDatabaseId) {
         // Proves the account may reach it, by the same rule the deploy screens
         // use - a database id in a form is a request, not a permission.
@@ -407,66 +627,261 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
             select: { engine: true, clusterMasters: true }
         });
         if (target && isRedisCluster(target)) throw new DataConnectionError(REDIS_CLUSTER);
+        return {
+            fields: {
+                ...baseFields(parsed),
+                ...CLEAR_TUNNEL,
+                ...CLEAR_TLS,
+                encryptedCredential: null,
+                credentialNonce: null,
+                credentialKeyId: null
+            },
+            address: null
+        };
     }
 
-    const existing = parsed.id
-        ? await prisma.dataConnection.findFirst({ where: { id: parsed.id, ownerId: userId } })
-        : null;
-    if (parsed.id && !existing)
-        throw new DataConnectionError("That connection is not there any more.");
+    const scope = await egressScope(userId);
+    const tunnel = await tunnelColumns(userId, parsed, existing, scope);
 
-    const secret =
-        parsed.password && !parsed.managedDatabaseId
-            ? encryptCredentials({ password: parsed.password }, loadEnv().POLARIS_MASTER_KEY)
-            : null;
-    const tunnel = parsed.managedDatabaseId
-        ? CLEAR_TUNNEL
-        : await tunnelColumns(userId, parsed, existing);
+    // Only now that the route is known: the database's own address is Polaris'
+    // to judge when it dials it, and the SSH server's when it does.
+    const dialled = parsed.ssh ? null : await judged(parsed.host, scope);
+
+    const sameDestination = existing !== null && sameRoute(existing, parsed, tunnel);
+    const previous = existing ? storedSecrets(existing, Boolean(parsed.password)) : {};
+    // A password is only ever sent to the address it was typed for.
+    if (!parsed.password && previous.password !== undefined && !sameDestination) {
+        throw new DataConnectionError(CONNECTION_REFUSALS.passwordAgain);
+    }
+    const stored = sameDestination ? previous : {};
+    const password = parsed.password ?? stored.password ?? null;
+
+    const tls = await tlsColumns(parsed, existing, sameDestination, stored, tunnel, dialled);
+
+    const secrets: DatabaseSecrets = {
+        ...(password !== null ? { password } : {}),
+        ...(tls.clientKey ? { clientKey: tls.clientKey } : {})
+    };
+    const sealed = Object.keys(secrets).length
+        ? encryptCredentials(secrets, loadEnv().POLARIS_MASTER_KEY)
+        : null;
 
     const fields = {
-        name: parsed.name,
+        ...baseFields(parsed),
+        ...tunnel.columns,
+        ...tls.columns,
+        encryptedCredential: sealed?.ciphertext ?? null,
+        credentialNonce: sealed?.nonce ?? null,
+        credentialKeyId: sealed?.keyId ?? null
+    };
+
+    const address: DataAddress = {
         engine: parsed.engine,
-        managedDatabaseId: parsed.managedDatabaseId,
-        host: parsed.host,
+        host: dialled ?? parsed.host,
         port: parsed.port,
         database: parsed.database,
         username: parsed.username,
-        tls: parsed.tls,
+        password,
+        tls: tls.settings,
         readOnly: parsed.readOnly,
-        ...tunnel
+        tunnel: tunnel.tunnel
     };
+    return { fields, address };
+}
 
-    if (existing) {
-        await prisma.dataConnection.update({
-            where: { id: existing.id },
-            data: {
-                ...fields,
-                // An edit that left the password alone keeps the stored one:
-                // asking for it again to rename a connection is how people end
-                // up keeping the password in a text file.
-                ...(secret
-                    ? {
-                          encryptedCredential: secret.ciphertext,
-                          credentialNonce: secret.nonce,
-                          credentialKeyId: secret.keyId
-                      }
-                    : {})
-            }
-        });
-        return existing.id;
+function baseFields(parsed: Parsed) {
+    const managed = parsed.managedDatabaseId !== null;
+    return {
+        name: parsed.name,
+        engine: parsed.engine,
+        managedDatabaseId: parsed.managedDatabaseId,
+        host: managed ? null : parsed.host,
+        port: managed ? null : parsed.port,
+        database: parsed.database,
+        username: parsed.username,
+        readOnly: parsed.readOnly
+    };
+}
+
+/**
+ * Whether an edit still points at the same database by the same route: the
+ * engine, the address and the port, and the tunnel's own destination. The one
+ * question that decides whether a stored secret may be kept.
+ */
+function sameRoute(existing: StoredRow, parsed: Parsed, tunnel: TunnelPlan): boolean {
+    const columns = tunnel.columns;
+    return (
+        existing.managedDatabaseId === null &&
+        existing.engine === parsed.engine &&
+        (existing.host ?? "") === (parsed.host ?? "") &&
+        existing.port === parsed.port &&
+        (existing.sshMode ?? null) === columns.sshMode &&
+        (existing.sshHostId ?? null) === columns.sshHostId &&
+        (existing.sshHost ?? null) === columns.sshHost &&
+        (existing.sshPort ?? null) === columns.sshPort &&
+        (existing.sshJumpHostId ?? null) === columns.sshJumpHostId
+    );
+}
+
+/**
+ * What a row holds, for an edit to keep. A blob sealed under a master key this
+ * instance no longer has cannot be kept, and is said as such unless the edit is
+ * replacing it anyway.
+ */
+function storedSecrets(row: StoredRow, replacing: boolean): DatabaseSecrets {
+    try {
+        return readSecrets(row);
+    } catch (error) {
+        if (replacing) return {};
+        console.error("databases: a saved connection's secret could not be read", error);
+        throw new DataConnectionError(CONNECTION_REFUSALS.secretUnreadable);
+    }
+}
+
+function readSecrets(row: StoredRow): DatabaseSecrets {
+    if (!row.encryptedCredential || !row.credentialNonce) return {};
+    return decryptCredentials<DatabaseSecrets>(
+        {
+            ciphertext: Buffer.from(row.encryptedCredential),
+            nonce: Buffer.from(row.credentialNonce),
+            keyId: row.credentialKeyId ?? ""
+        },
+        loadEnv().POLARIS_MASTER_KEY
+    );
+}
+
+/** Every TLS column, emptied: a managed connection has none of its own. */
+const CLEAR_TLS = {
+    tls: false,
+    tlsMode: null,
+    tlsTrust: null,
+    tlsCaCert: null,
+    tlsClientCert: null
+} as const;
+
+/** How many certificates an authority file may hold. */
+const MAX_AUTHORITIES = 16;
+
+/**
+ * The TLS columns for a save, and the settings a test opens with.
+ *
+ * - An uploaded authority is parsed, every certificate in it; an edit that
+ *   uploads nothing keeps the stored one.
+ * - "The server's own certificate" is read from the server now when there is
+ *   none stored for this destination, and kept otherwise. A certificate that
+ *   changed later is trusted again only from the connection's settings, after
+ *   the reader has seen it (`trustCertificate`).
+ * - A client certificate and its key are parsed and must belong together; the
+ *   key is sealed with the database's password, never stored in the clear.
+ */
+async function tlsColumns(
+    parsed: Parsed,
+    existing: StoredRow | null,
+    sameDestination: boolean,
+    stored: DatabaseSecrets,
+    tunnel: TunnelPlan,
+    dialled: string | null
+): Promise<{ columns: Record<string, unknown>; settings: DataTls; clientKey: string | null }> {
+    const mode = parsed.tlsMode;
+    if (mode === "disable") {
+        return { columns: { ...CLEAR_TLS }, settings: NO_TLS, clientKey: null };
+    }
+    const verifying = mode === "verify-ca" || mode === "verify-full";
+    const trust: TlsTrust = verifying ? parsed.tlsTrust : "system";
+
+    let ca: string | null = null;
+    if (trust === "upload") {
+        if (parsed.tlsCaCert) ca = readAuthorities(parsed.tlsCaCert);
+        else if (existing?.tlsTrust === "upload" && existing.tlsCaCert) ca = existing.tlsCaCert;
+        else throw new DataConnectionError(CONNECTION_REFUSALS.caMissing);
+    } else if (trust === "server") {
+        const kept =
+            sameDestination && existing?.tlsTrust === "server" && existing.tlsCaCert
+                ? existing.tlsCaCert
+                : null;
+        ca = kept ?? (await readServerCertificate(parsed, tunnel.tunnel, dialled)).anchor;
     }
 
-    const created = await prisma.dataConnection.create({
-        data: {
-            ownerId: userId,
-            ...fields,
-            encryptedCredential: secret?.ciphertext ?? null,
-            credentialNonce: secret?.nonce ?? null,
-            credentialKeyId: secret?.keyId ?? null
+    let clientCert: string | null = null;
+    let clientKey: string | null = null;
+    if (parsed.tlsClientAuth) {
+        if (parsed.tlsClientCert && parsed.tlsClientKey) {
+            clientCert = parsed.tlsClientCert;
+            clientKey = readClientPair(parsed.tlsClientCert, parsed.tlsClientKey);
+        } else if (existing?.tlsClientCert && sameDestination && stored.clientKey) {
+            clientCert = existing.tlsClientCert;
+            clientKey = stored.clientKey;
+        } else {
+            throw new DataConnectionError(CONNECTION_REFUSALS.clientMissing);
+        }
+    }
+
+    return {
+        columns: {
+            tls: true,
+            tlsMode: mode,
+            tlsTrust: trust,
+            tlsCaCert: ca,
+            tlsClientCert: clientCert
         },
-        select: { id: true }
-    });
-    return created.id;
+        settings: { mode, ca, clientCert, clientKey, name: parsed.host },
+        clientKey
+    };
+}
+
+/** Every certificate in an uploaded authority file, re-written as PEM so what is
+ *  stored is exactly what was parsed. */
+function readAuthorities(text: string): string {
+    const blocks = text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? [];
+    if (blocks.length === 0 || blocks.length > MAX_AUTHORITIES) {
+        throw new DataConnectionError(CONNECTION_REFUSALS.caInvalid);
+    }
+    try {
+        return blocks.map((block) => new X509Certificate(block).toString()).join("");
+    } catch {
+        throw new DataConnectionError(CONNECTION_REFUSALS.caInvalid);
+    }
+}
+
+/** A client certificate and its key, checked to belong together. Returns the
+ *  key as PKCS#8 PEM, which every driver reads. */
+function readClientPair(certificate: string, key: string): string {
+    try {
+        const parsedCertificate = new X509Certificate(certificate);
+        const parsedKey = createPrivateKey(key);
+        if (!parsedCertificate.checkPrivateKey(parsedKey)) throw new Error("mismatch");
+        return parsedKey.export({ type: "pkcs8", format: "pem" }).toString();
+    } catch {
+        throw new DataConnectionError(CONNECTION_REFUSALS.clientInvalid);
+    }
+}
+
+/** The certificate the server presents, through the tunnel when there is one. */
+async function readServerCertificate(
+    target: { engine: DataEngine; host: string; port: number },
+    tunnel: DataTunnel | null,
+    dialled: string | null
+) {
+    const probe = async (host: string, port: number) => {
+        try {
+            return await probeServerCertificate(target.engine, { host, port, name: target.host });
+        } catch (error) {
+            if (error instanceof CertificateProbeError) throw new DataConnectionError(error.message);
+            throw error;
+        }
+    };
+    if (!tunnel) return probe(dialled ?? target.host, target.port);
+    const forwarded = await openTunnel(tunnel, target.host, target.port).catch(rethrowTunnel);
+    try {
+        return await probe(forwarded.host, forwarded.port);
+    } finally {
+        forwarded.close();
+    }
+}
+
+function rethrowTunnel(error: unknown): never {
+    if (error instanceof TunnelError) throw new DataConnectionError(error.message);
+    throw error;
 }
 
 /** Every tunnel column, emptied: a direct connection, or a managed one. */
@@ -481,21 +896,25 @@ const CLEAR_TUNNEL = {
     sshCredentialNonce: null,
     sshCredentialKeyId: null,
     sshHostKey: null,
+    sshKeySummary: null,
     sshJumpHostId: null
-} as const;
+};
 
-/** What a saved row already holds for its tunnel, when one is being edited. */
-interface StoredTunnel {
-    readonly sshMode: string | null;
-    readonly sshHost: string | null;
-    readonly sshPort: number | null;
-    readonly sshUsername: string | null;
-    readonly sshAuthMethod: string | null;
-    readonly sshEncryptedCredential: Uint8Array | null;
-    readonly sshCredentialNonce: Uint8Array | null;
-    readonly sshCredentialKeyId: string | null;
-    readonly sshHostKey: string | null;
-    readonly sshJumpHostId: string | null;
+type TunnelColumnValues = {
+    -readonly [K in keyof typeof CLEAR_TUNNEL]: (typeof CLEAR_TUNNEL)[K] | string | number | Uint8Array;
+} & {
+    sshMode: string | null;
+    sshHostId: string | null;
+    sshHost: string | null;
+    sshPort: number | null;
+    sshJumpHostId: string | null;
+};
+
+/** What a save writes for the tunnel, and the tunnel a test or a certificate
+ *  read opens. */
+interface TunnelPlan {
+    readonly columns: TunnelColumnValues;
+    readonly tunnel: DataTunnel | null;
 }
 
 /**
@@ -505,68 +924,80 @@ interface StoredTunnel {
  * copied. A typed login is signed in to once - through the jump server when
  * there is one - both to prove it works and to capture the key to pin; an edit
  * that changed none of where it points or how it signs in keeps the pinned key
- * and the stored secret instead of asking for them again.
+ * and the stored secret instead of asking for them again. A stored secret is
+ * only ever offered to the server it was saved for: changing the SSH host, its
+ * port or the user asks for it again.
  */
 async function tunnelColumns(
     userId: string,
-    parsed: ReturnType<typeof validate>,
-    existing: StoredTunnel | null
-) {
+    parsed: Parsed,
+    existing: StoredRow | null,
+    scope: EgressScope
+): Promise<TunnelPlan> {
     const ssh = parsed.ssh;
-    if (!ssh) return CLEAR_TUNNEL;
+    if (!ssh) return { columns: { ...CLEAR_TUNNEL }, tunnel: null };
 
     if (ssh.mode === "server") {
-        await ownServer(userId, ssh.hostId, "The server to tunnel through is not one of yours.");
-        return { ...CLEAR_TUNNEL, sshMode: "server", sshHostId: ssh.hostId };
+        const server = await ownServer(userId, ssh.hostId, "The server to tunnel through is not one of yours.");
+        return {
+            columns: { ...CLEAR_TUNNEL, sshMode: "server", sshHostId: ssh.hostId },
+            tunnel: { target: serverOptions(server), jump: null, label: server.name }
+        };
     }
 
     const jump = ssh.jumpHostId
         ? await ownServer(userId, ssh.jumpHostId, "The server to jump through is not one of yours.")
         : null;
+    // Through a jump server the SSH host is that server's to reach, on its own
+    // network; straight to it, it is Polaris' and is judged like any address.
+    const dialled = jump ? ssh.host : await judged(ssh.host, scope);
 
     const stored =
         existing && (existing.sshMode === "manual" || existing.sshMode === "manual-jump")
             ? existing
             : null;
+    const sameServer =
+        stored !== null &&
+        stored.sshHost === ssh.host &&
+        stored.sshPort === ssh.port &&
+        stored.sshUsername === ssh.username;
     const typed = typedSecret(ssh);
     const keepSecret =
-        !typed && stored?.sshAuthMethod === ssh.authMethod && stored.sshEncryptedCredential;
+        !typed && sameServer && stored?.sshAuthMethod === ssh.authMethod && stored.sshEncryptedCredential;
     if (!typed && !keepSecret) {
+        if (!sameServer && stored?.sshEncryptedCredential && stored.sshAuthMethod === ssh.authMethod) {
+            throw new DataConnectionError(CONNECTION_REFUSALS.sshSecretAgain);
+        }
         throw new DataConnectionError(
             ssh.authMethod === "password"
                 ? "Enter the password for the SSH login."
                 : "Paste the private key for the SSH login."
         );
     }
-    const credentials: SshCredentials = typed ?? readSshCredentials(stored as StoredTunnel);
+    const credentials: SshCredentials = typed?.credentials ?? readSshCredentials(stored as StoredRow);
+    const keySummary = typed ? typed.summary : (stored?.sshKeySummary ?? null);
 
     // The key already on record for this same login. A re-save keeps being
     // checked against it - typing a new secret is a rotation, not a reason to
     // trust whatever answers at that address - and only the route to it can have
     // changed, so the jump server is no part of this.
-    const pinned: string | null =
-        stored?.sshHostKey &&
-        stored.sshHost === ssh.host &&
-        stored.sshPort === ssh.port &&
-        stored.sshUsername === ssh.username
-            ? stored.sshHostKey
-            : null;
-
-    const unchanged =
-        !typed && pinned !== null && (stored?.sshJumpHostId ?? null) === ssh.jumpHostId;
+    const pinned: string | null = sameServer && stored?.sshHostKey ? stored.sshHostKey : null;
+    const unchanged = !typed && pinned !== null && (stored?.sshJumpHostId ?? null) === ssh.jumpHostId;
 
     let hostKey = unchanged ? pinned : null;
     if (!hostKey) {
         try {
             hostKey = await captureHostKey(
                 {
-                    host: ssh.host,
+                    host: dialled,
                     port: ssh.port,
                     username: ssh.username,
                     auth: toSshAuth(credentials),
                     ...(pinned ? { pinnedHostKey: [pinned] } : {})
                 },
-                jump ? serverOptions(jump) : null
+                jump ? serverOptions(jump) : null,
+                undefined,
+                jump?.name ?? null
             );
         } catch (error) {
             // A key that stopped matching says so in its own words; anything else
@@ -581,19 +1012,34 @@ async function tunnelColumns(
         }
     }
 
-    const blob = typed ? encryptCredentials(typed, loadEnv().POLARIS_MASTER_KEY) : null;
+    const blob = typed ? encryptCredentials(typed.credentials, loadEnv().POLARIS_MASTER_KEY) : null;
     return {
-        ...CLEAR_TUNNEL,
-        sshMode: jump ? "manual-jump" : "manual",
-        sshHost: ssh.host,
-        sshPort: ssh.port,
-        sshUsername: ssh.username,
-        sshAuthMethod: ssh.authMethod,
-        sshEncryptedCredential: blob ? blob.ciphertext : (stored?.sshEncryptedCredential ?? null),
-        sshCredentialNonce: blob ? blob.nonce : (stored?.sshCredentialNonce ?? null),
-        sshCredentialKeyId: blob ? blob.keyId : (stored?.sshCredentialKeyId ?? null),
-        sshHostKey: hostKey,
-        sshJumpHostId: jump ? jump.id : null
+        columns: {
+            ...CLEAR_TUNNEL,
+            sshMode: jump ? "manual-jump" : "manual",
+            sshHost: ssh.host,
+            sshPort: ssh.port,
+            sshUsername: ssh.username,
+            sshAuthMethod: ssh.authMethod,
+            sshEncryptedCredential: blob ? blob.ciphertext : (stored?.sshEncryptedCredential ?? null),
+            sshCredentialNonce: blob ? blob.nonce : (stored?.sshCredentialNonce ?? null),
+            sshCredentialKeyId: blob ? blob.keyId : (stored?.sshCredentialKeyId ?? null),
+            sshHostKey: hostKey,
+            sshKeySummary: ssh.authMethod === "key" ? keySummary : null,
+            sshJumpHostId: jump ? jump.id : null
+        },
+        tunnel: {
+            target: {
+                host: dialled,
+                port: ssh.port,
+                username: ssh.username,
+                auth: toSshAuth(credentials),
+                pinnedHostKey: [hostKey]
+            },
+            jump: jump ? serverOptions(jump) : null,
+            label: ssh.host,
+            ...(jump ? { jumpLabel: jump.name } : {})
+        }
     };
 }
 
@@ -602,18 +1048,34 @@ type SshCredentials =
     | { method: "password"; password: string }
     | { method: "key"; privateKey: string; passphrase?: string };
 
+/**
+ * The secret typed into the form, read: a key is parsed (and converted when it is
+ * PKCS#8 or PuTTY), so a wrong passphrase or a public key is refused here, in a
+ * sentence, rather than by the SSH server as a failed sign-in.
+ */
 function typedSecret(
-    ssh: Extract<ReturnType<typeof validate>["ssh"], { mode: "manual" }>
-): SshCredentials | null {
-    if (ssh.authMethod === "password")
-        return ssh.password ? { method: "password", password: ssh.password } : null;
+    ssh: Extract<Parsed["ssh"], { mode: "manual" }>
+): { credentials: SshCredentials; summary: string | null } | null {
+    if (ssh.authMethod === "password") {
+        return ssh.password ? { credentials: { method: "password", password: ssh.password }, summary: null } : null;
+    }
     if (!ssh.privateKey) return null;
-    return ssh.passphrase
-        ? { method: "key", privateKey: ssh.privateKey, passphrase: ssh.passphrase }
-        : { method: "key", privateKey: ssh.privateKey };
+    let key;
+    try {
+        key = readPrivateKey(ssh.privateKey, ssh.passphrase);
+    } catch (error) {
+        if (error instanceof SshKeyError) throw new DataConnectionError(error.message);
+        throw error;
+    }
+    return {
+        credentials: key.passphrase
+            ? { method: "key", privateKey: key.privateKey, passphrase: key.passphrase }
+            : { method: "key", privateKey: key.privateKey },
+        summary: `${key.type} ${key.fingerprint}`
+    };
 }
 
-function readSshCredentials(row: StoredTunnel): SshCredentials {
+function readSshCredentials(row: StoredRow): SshCredentials {
     return decryptCredentials<SshCredentials>(
         {
             ciphertext: Buffer.from(row.sshEncryptedCredential as Uint8Array),
@@ -676,6 +1138,10 @@ export async function deleteConnection(userId: string, id: string): Promise<void
         throw new DataConnectionError("That connection is not there any more.");
 }
 
+/* --------------------------------------------------------------------------
+ * Opening.
+ * ----------------------------------------------------------------------- */
+
 /**
  * The address behind one saved connection, secret included.
  *
@@ -697,41 +1163,58 @@ export async function addressOf(userId: string, id: string): Promise<DataAddress
         return address;
     }
 
-    const row = await prisma.dataConnection.findFirst({ where: { id, ownerId: userId } });
-    if (!row) throw new DataConnectionError("That connection is not there any more.");
-
-    // Noted rather than awaited: the list orders by it, and nobody's page should
-    // wait on a write that only decides a sort order.
-    void prisma.dataConnection
-        .update({ where: { id: row.id }, data: { lastUsedAt: new Date() } })
-        .catch(() => undefined);
+    const row = await savedRow(userId, id);
 
     if (row.managedDatabaseId) {
-        return managedAddress(userId, row.managedDatabaseId, row.readOnly);
+        const resolved = await managedAddress(userId, row.managedDatabaseId, row.readOnly);
+        noteUse(row.id);
+        return resolved;
     }
 
-    const password =
-        row.encryptedCredential && row.credentialNonce
-            ? decryptCredentials<{ password: string }>(
-                  {
-                      ciphertext: Buffer.from(row.encryptedCredential),
-                      nonce: Buffer.from(row.credentialNonce),
-                      keyId: row.credentialKeyId ?? ""
-                  },
-                  loadEnv().POLARIS_MASTER_KEY
-              ).password
-            : null;
-
+    const secrets = readSecrets(row);
+    const tunnel = await resolveTunnel(userId, row);
+    const host = row.host ?? "127.0.0.1";
+    // Judged again on every open: the rule may have tightened, the account
+    // may have lost the permission, and the name may answer differently now.
+    const dialled = tunnel ? host : await judged(host, await egressScope(userId));
+    noteUse(row.id);
     return {
         engine: row.engine as DataEngine,
-        host: row.host ?? "127.0.0.1",
+        host: dialled,
         port: row.port ?? core.DB_ENGINE_INFO[row.engine as DataEngine].port,
         database: row.database,
         username: row.username,
-        password,
-        tls: row.tls,
+        password: secrets.password ?? null,
+        tls: rowTls(row, secrets),
         readOnly: row.readOnly,
-        tunnel: await resolveTunnel(userId, row)
+        tunnel
+    };
+}
+
+/** Noted rather than awaited: the list orders by it, and nobody's page should
+ *  wait on a write that only decides a sort order. Only once the address was
+ *  resolved, so a refused open is not a use. */
+function noteUse(id: string): void {
+    void prisma.dataConnection
+        .update({ where: { id }, data: { lastUsedAt: new Date() } })
+        .catch(() => undefined);
+}
+
+async function savedRow(userId: string, id: string): Promise<StoredRow> {
+    const row = await prisma.dataConnection.findFirst({ where: { id, ownerId: userId } });
+    if (!row) throw new DataConnectionError("That connection is not there any more.");
+    return row;
+}
+
+function rowTls(row: StoredRow, secrets: DatabaseSecrets): DataTls {
+    const mode = legacyTlsMode(row.tls, row.tlsMode);
+    if (mode === "disable") return NO_TLS;
+    return {
+        mode,
+        ca: mode.startsWith("verify") ? (row.tlsCaCert ?? null) : null,
+        clientCert: row.tlsClientCert ?? null,
+        clientKey: row.tlsClientCert ? (secrets.clientKey ?? null) : null,
+        name: row.host
     };
 }
 
@@ -739,10 +1222,7 @@ export async function addressOf(userId: string, id: string): Promise<DataAddress
  * The logins a saved tunnel needs, re-read on every open: a registered server's
  * from its own row, so rotating its key reaches every connection through it.
  */
-async function resolveTunnel(
-    userId: string,
-    row: StoredTunnel & TunnelColumns
-): Promise<DataTunnel | null> {
+async function resolveTunnel(userId: string, row: StoredRow): Promise<DataTunnel | null> {
     const view = tunnelView(row);
     if (!view) return null;
     const broken = tunnelBroken(view);
@@ -771,7 +1251,7 @@ async function resolveTunnel(
         : null;
     return {
         target: {
-            host: view.host,
+            host: jump ? view.host : await judged(view.host, await egressScope(userId)),
             port: view.port,
             username: view.username,
             auth: toSshAuth(readSshCredentials(row)),
@@ -779,17 +1259,155 @@ async function resolveTunnel(
         },
         jump: jump ? serverOptions(jump) : null,
         // i18n-ignore part of a refusal that lib/data/words says in the reader's words
-        label: jump ? `${view.host} (through ${jump.name})` : view.host
+        label: jump ? `${view.host} (through ${jump.name})` : view.host,
+        ...(jump ? { jumpLabel: jump.name } : {})
     };
 }
+
+/* --------------------------------------------------------------------------
+ * A key or a certificate that changed: read it, show it, trust it.
+ * ----------------------------------------------------------------------- */
+
+/** The pinned SSH key against the one the server presents now. */
+export interface HostKeyCheck {
+    readonly pinned: string | null;
+    readonly presented: string;
+    readonly matches: boolean;
+}
+
+async function manualTunnelRow(userId: string, id: string) {
+    const row = await savedRow(userId, id);
+    const view = tunnelView(row);
+    if (!view || view.mode !== "manual") throw new DataConnectionError(CONNECTION_REFUSALS.notManualTunnel);
+    const broken = tunnelBroken(view);
+    if (broken) throw new DataConnectionError(broken);
+    const jump = view.jumpHostId
+        ? await ownServer(userId, view.jumpHostId, "The server this tunnel jumps through is not one of yours any more.")
+        : null;
+    const host = jump ? view.host : await judged(view.host, await egressScope(userId));
+    return { row, view, jump, host };
+}
+
+/** Read the key the SSH server presents now, without signing in, next to the
+ *  one pinned for this connection. */
+export async function checkHostKey(userId: string, id: string): Promise<HostKeyCheck> {
+    const { row, view, jump, host } = await manualTunnelRow(userId, id);
+    const presented = await presentedHostKey(
+        { host, port: view.port, username: view.username },
+        jump ? serverOptions(jump) : null,
+        jump?.name ?? null
+    ).catch(rethrowTunnel);
+    return {
+        pinned: row.sshHostKey ? sshFingerprint(row.sshHostKey) : null,
+        presented: sshFingerprint(presented),
+        matches: presented === row.sshHostKey
+    };
+}
+
+/**
+ * Pin the key the SSH server presents now - but only the one the reader saw.
+ *
+ * The fingerprint they were shown comes back with the request, and the key is
+ * read again and compared with it: a server that changed its key a second time
+ * in between is not trusted on the strength of the first look. The stored login
+ * is then signed in with, against that key, before anything is written.
+ */
+export async function trustHostKey(userId: string, id: string, fingerprint: string): Promise<string> {
+    const { row, view, jump, host } = await manualTunnelRow(userId, id);
+    const presented = await presentedHostKey(
+        { host, port: view.port, username: view.username },
+        jump ? serverOptions(jump) : null,
+        jump?.name ?? null
+    ).catch(rethrowTunnel);
+    if (sshFingerprint(presented) !== fingerprint) {
+        throw new DataConnectionError(CONNECTION_REFUSALS.keyChangedAgain);
+    }
+    try {
+        await captureHostKey(
+            {
+                host,
+                port: view.port,
+                username: view.username,
+                auth: toSshAuth(readSshCredentials(row)),
+                pinnedHostKey: [presented]
+            },
+            jump ? serverOptions(jump) : null,
+            undefined,
+            jump?.name ?? null
+        );
+    } catch (error) {
+        if (error instanceof TunnelError) throw new DataConnectionError(error.message);
+        console.error("databases: the SSH login did not work against the new key", error);
+        throw new DataConnectionError(
+            `Polaris could not sign in to ${view.host}:${view.port} over SSH${
+                jump ? ` through ${jump.name}` : ""
+            }. Check the address, the user and the ${view.authMethod === "password" ? "password" : "key"}.`
+        );
+    }
+    await prisma.dataConnection.update({ where: { id: row.id }, data: { sshHostKey: presented } });
+    return sshFingerprint(presented);
+}
+
+/** The trusted certificate against the one the server presents now. */
+export interface CertificateCheck {
+    readonly trusted: CertificateSummary | null;
+    readonly presented: CertificateSummary;
+    readonly matches: boolean;
+}
+
+async function trustOnFirstUseRow(userId: string, id: string) {
+    const row = await savedRow(userId, id);
+    const mode = legacyTlsMode(row.tls, row.tlsMode);
+    if (row.managedDatabaseId || !mode.startsWith("verify") || row.tlsTrust !== "server") {
+        throw new DataConnectionError(CONNECTION_REFUSALS.notTrustOnFirstUse);
+    }
+    const tunnel = await resolveTunnel(userId, row);
+    const host = row.host ?? "127.0.0.1";
+    const dialled = tunnel ? null : await judged(host, await egressScope(userId));
+    const target = { engine: row.engine as DataEngine, host, port: row.port ?? 0 };
+    return { row, tunnel, dialled, target };
+}
+
+export async function checkCertificate(userId: string, id: string): Promise<CertificateCheck> {
+    const { row, tunnel, dialled, target } = await trustOnFirstUseRow(userId, id);
+    const presented = await readServerCertificate(target, tunnel, dialled);
+    const trusted = readableCertificate(row.tlsCaCert);
+    return {
+        trusted,
+        presented: presented.summary,
+        matches: trusted?.fingerprint === presented.summary.fingerprint
+    };
+}
+
+/** Trust the certificate the server presents now, if it is the one the reader
+ *  was shown. */
+export async function trustCertificate(userId: string, id: string, fingerprint: string): Promise<CertificateSummary> {
+    const { row, tunnel, dialled, target } = await trustOnFirstUseRow(userId, id);
+    const presented = await readServerCertificate(target, tunnel, dialled);
+    if (presented.summary.fingerprint !== fingerprint) {
+        throw new DataConnectionError(CONNECTION_REFUSALS.certificateChangedAgain);
+    }
+    await prisma.dataConnection.update({ where: { id: row.id }, data: { tlsCaCert: presented.anchor } });
+    return presented.summary;
+}
+
+/* --------------------------------------------------------------------------
+ * Databases Polaris runs.
+ * ----------------------------------------------------------------------- */
 
 /**
  * Where a database Polaris runs answers, from this process.
  *
  * The three cases in the module note, in the order they are preferred: the
  * container's own name when Polaris shares its machine and its network, the
- * published port on the target's address when there is one, and a refusal that
- * names the setting when there is not.
+ * published port reached through the target's own SSH login when it is on
+ * another machine, and a refusal that names the setting when there is no port.
+ *
+ * The SSH leg is the point: these databases speak without TLS, and a published
+ * port on another machine is otherwise crossed in the clear - password and rows
+ * alike - over whatever network lies between the two. A target registered
+ * without a pinned key is still reached at the published port directly, as it
+ * was before, since there is no key to hold the tunnel to.
  */
 export async function managedAddress(
     userId: string,
@@ -800,7 +1418,7 @@ export async function managedAddress(
         where: { id: databaseId, environment: { project: { ownerId: userId } } },
         include: {
             parent: { select: { containerName: true, exposePort: true } },
-            target: { select: { kind: true, host: { select: { address: true } } } }
+            target: { select: { kind: true, host: { select: { id: true, address: true } } } }
         }
     });
     if (!row) throw new DataConnectionError("That database is not there any more.");
@@ -820,15 +1438,36 @@ export async function managedAddress(
     const hosted = row.parent !== null;
 
     if (local && container) {
-        return address(engine, container, enginePort, credentials, readOnly, hosted);
+        return address(engine, container, enginePort, credentials, readOnly, hosted, null);
     }
     if (published) {
-        const host = local ? "127.0.0.1" : (row.target.host?.address as string);
-        return address(engine, host, published, credentials, readOnly, hosted);
+        if (local) return address(engine, "127.0.0.1", published, credentials, readOnly, hosted, null);
+        const tunnel = await targetTunnel(row.target.host?.id ?? null);
+        if (tunnel) return address(engine, "127.0.0.1", published, credentials, readOnly, hosted, tunnel);
+        const host = row.target.host?.address as string;
+        return address(engine, host, published, credentials, readOnly, hosted, null);
     }
     throw new DataConnectionError(
         "This database runs on another server and is not published on a port, so Polaris cannot reach it from here. Publish it on a port from the database's own screen, then open it again."
     );
+}
+
+/**
+ * The SSH login of the server a managed database runs on, as a tunnel - or null
+ * when it has no pinned key to hold one to. Not scoped to the account: the
+ * caller has already proved the account owns the project the database is in,
+ * which is what puts this server behind it.
+ */
+async function targetTunnel(hostId: string | null): Promise<DataTunnel | null> {
+    if (!hostId) return null;
+    try {
+        const server = await getHostConnectionUnscoped(hostId);
+        if (!server.hostKey) return null;
+        return { target: serverOptions(server), jump: null, label: server.name };
+    } catch (error) {
+        console.error("databases: a deploy target's SSH login could not be read", error);
+        return null;
+    }
 }
 
 function address(
@@ -837,7 +1476,8 @@ function address(
     port: number,
     credentials: { username: string; password: string; database: string },
     readOnly: boolean,
-    hosted: boolean
+    hosted: boolean,
+    tunnel: DataTunnel | null
 ): DataAddress {
     return {
         engine,
@@ -850,8 +1490,9 @@ function address(
         // itself, so that is where it signs in; a dedicated instance's account
         // is the root account the image creates, which lives in `admin`.
         authSource: engine === "mongo" ? (hosted ? credentials.database : "admin") : null,
-        tls: false,
-        readOnly
+        tls: NO_TLS,
+        readOnly,
+        tunnel
     };
 }
 
@@ -871,12 +1512,12 @@ function validate(input: SaveConnectionInput) {
     if (value.managedDatabaseId) {
         return {
             ...value,
-            host: null,
-            port: null,
+            host: "",
+            port: 0,
             database: null,
             username: null,
             password: null,
-            tls: false,
+            tlsMode: "disable" as TlsMode,
             ssh: null
         };
     }

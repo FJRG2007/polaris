@@ -48,6 +48,17 @@ export function quoteQualified(
     return parts.filter((part): part is string => Boolean(part)).map(quote).join(".");
 }
 
+/**
+ * Which engine's grammar a statement is read in. They disagree on exactly the
+ * characters that decide where a comment starts: `#` is a comment in MySQL and
+ * the XOR operator in PostgreSQL, `-- ` needs a space after it in MySQL, a
+ * backslash escapes a quote in a MySQL string and only in an `E'...'` string in
+ * PostgreSQL, and a MySQL comment that opens with `/*!` is not a comment at
+ * all - it is code the server runs. Reading one engine's statement with the
+ * other's rules is how a write ends up inside what the gate took for a comment.
+ */
+export type SqlDialect = "postgres" | "mysql";
+
 /** The statements a read-only connection is allowed to send. Anything not on
  *  this list is treated as a write. */
 const READ_KEYWORDS = new Set([
@@ -63,6 +74,18 @@ const READ_KEYWORDS = new Set([
 ]);
 
 /**
+ * Words that make a statement a write wherever they stand in it.
+ *
+ * The keywords are the obvious ones. The functions are the ones a read-only
+ * transaction does not stop, because what they change is not a table: ending
+ * somebody else's session, reloading the server's configuration, writing a
+ * file on the database server, reaching another database through `dblink`, or
+ * changing a setting the rest of the session runs under.
+ */
+const WRITE_WORDS =
+    /\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke|call|do|vacuum|reindex|copy|replace|rename|set|lock|refresh|comment|import|load|flush|kill|shutdown|handler|outfile|dumpfile|set_config|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_rotate_logfile|pg_promote|pg_switch_wal|pg_create_restore_point|pg_file_write|pg_file_rename|pg_file_unlink|pg_file_sync|lo_export|lo_import|lo_unlink|lo_create|lo_from_bytea|lo_put|lo_truncate|dblink\w*|pg_notify|nextval|setval|pg_stat_reset\w*|pg_advisory\w*|pg_try_advisory\w*|pg_log_backend_memory_contexts)\b/i;
+
+/**
  * A statement whose leading keyword reads, and which does not carry a writing
  * one behind it.
  *
@@ -71,22 +94,125 @@ const READ_KEYWORDS = new Set([
  * ANALYZE` is worse - it runs the statement it is explaining. So a leading
  * keyword that reads is not enough on its own: the body is searched for a
  * writing keyword standing on its own, and finding one makes the whole thing a
- * write.
+ * write. String contents are searched too, on purpose: a word that only looks
+ * like a write inside a string costs a refusal, and a string this reader got
+ * wrong would otherwise cost a write.
  */
-export function statementWrites(statement: string): boolean {
-    const bare = stripComments(statement).trim();
+export function statementWrites(statement: string, dialect: SqlDialect = "mysql"): boolean {
+    const bare = stripComments(statement, dialect).trim();
     if (!bare) return false;
     const leading = bare.match(/^[a-z]+/i)?.[0]?.toLowerCase() ?? "";
     if (!READ_KEYWORDS.has(leading)) return true;
     if (leading === "explain" && /\banalyz[es]e?\b/i.test(bare)) return true;
-    return /\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke|call|do|vacuum|reindex|copy|replace|rename|set|lock|refresh|comment|import|load|flush|kill|shutdown)\b/i.test(
-        bare
-    );
+    return WRITE_WORDS.test(bare);
 }
 
 /** Whether anything in this box writes. What a read-only connection refuses on. */
-export function anyStatementWrites(sql: string): boolean {
-    return splitStatements(sql).some(statementWrites);
+export function anyStatementWrites(sql: string, dialect: SqlDialect = "mysql"): boolean {
+    return splitStatements(sql, dialect).some((statement) => statementWrites(statement, dialect));
+}
+
+/** One run of a statement, as the engine would read it. */
+interface SqlPiece {
+    readonly kind: "code" | "quoted" | "comment" | "separator";
+    readonly text: string;
+}
+
+/** A dollar-quote tag: `$$`, or `$name$` where the name reads as an identifier. */
+const DOLLAR_TAG = /^\$(?:[A-Za-z_\u0080-\uFFFF][\w\u0080-\uFFFF]*)?\$/;
+
+/**
+ * A box of SQL cut into code, quoted runs, comments and separators, by the
+ * rules of one engine.
+ *
+ * Where this cannot be sure, it leans towards calling something code: code is
+ * searched for writing keywords and a comment is not, so the safe mistake is
+ * the one that leaves more text in view.
+ */
+function pieces(sql: string, dialect: SqlDialect): SqlPiece[] {
+    const out: SqlPiece[] = [];
+    let code = "";
+    const flush = () => {
+        if (code) out.push({ kind: "code", text: code });
+        code = "";
+    };
+    let index = 0;
+    while (index < sql.length) {
+        const char = sql[index] as string;
+        const next = sql[index + 1] ?? "";
+
+        // A line comment runs to the newline. MySQL only reads `--` as one when
+        // whitespace or a control character follows it: `1--1` is arithmetic.
+        const dashes =
+            char === "-" &&
+            next === "-" &&
+            (dialect === "postgres" ||
+                index + 2 >= sql.length ||
+                /[\s\x00-\x1f]/.test(sql[index + 2] as string));
+        if (dashes || (char === "#" && dialect === "mysql")) {
+            const end = sql.indexOf("\n", index);
+            const stop = end === -1 ? sql.length : end;
+            flush();
+            out.push({ kind: "comment", text: sql.slice(index, stop) });
+            index = stop;
+            continue;
+        }
+
+        if (char === "/" && next === "*") {
+            const end = sql.indexOf("*/", index + 2);
+            const stop = end === -1 ? sql.length : end + 2;
+            const body = sql.slice(index, stop);
+            // MySQL runs what is inside `/*! ... */` (and MariaDB `/*M! ... */`),
+            // so it is code, markers and all.
+            if (dialect === "mysql" && /^\/\*(!|M!)/.test(body)) {
+                code += body;
+            } else {
+                flush();
+                out.push({ kind: "comment", text: body });
+            }
+            index = stop;
+            continue;
+        }
+
+        // Dollar quoting: $tag$ ... $tag$, which is how a PL/pgSQL body is
+        // written and the one place a semicolon is certainly not a separator.
+        if (dialect === "postgres" && char === "$" && !/[A-Za-z0-9_]$/.test(code)) {
+            const dollar = sql.slice(index, index + 128).match(DOLLAR_TAG);
+            if (dollar) {
+                const tag = dollar[0];
+                const end = sql.indexOf(tag, index + tag.length);
+                const stop = end === -1 ? sql.length : end + tag.length;
+                flush();
+                out.push({ kind: "quoted", text: sql.slice(index, stop) });
+                index = stop;
+                continue;
+            }
+        }
+
+        if (char === "'" || char === '"' || (char === "`" && dialect === "mysql")) {
+            // PostgreSQL reads a backslash as an escape only in an E'' string.
+            const backslash =
+                char === "'" &&
+                (dialect === "mysql" || (/[eE]$/.test(code) && !/[A-Za-z0-9_][eE]$/.test(code)));
+            const stop = closingQuote(sql, index, char, backslash);
+            flush();
+            out.push({ kind: "quoted", text: sql.slice(index, stop) });
+            index = stop;
+            continue;
+        }
+
+        if (char === ";") {
+            flush();
+            out.push({ kind: "separator", text: ";" });
+            index += 1;
+            continue;
+        }
+
+        code += char;
+        index += 1;
+    }
+    flush();
+    return out;
 }
 
 /**
@@ -97,69 +223,28 @@ export function anyStatementWrites(sql: string): boolean {
  * definition into three broken ones. Comments are left in place: they are part
  * of the statement somebody typed and the engine reads them fine.
  */
-export function splitStatements(sql: string): string[] {
+export function splitStatements(sql: string, dialect: SqlDialect = "mysql"): string[] {
     const statements: string[] = [];
     let current = "";
-    let index = 0;
-    while (index < sql.length) {
-        const char = sql[index] as string;
-        const rest = sql.slice(index);
-
-        // A line comment runs to the newline; a block comment to its close.
-        // Copied across rather than skipped, so what is sent is what was typed.
-        const line = rest.match(/^(--|#)[^\n]*/);
-        if (line) {
-            current += line[0];
-            index += line[0].length;
-            continue;
-        }
-        if (rest.startsWith("/*")) {
-            const end = sql.indexOf("*/", index + 2);
-            const stop = end === -1 ? sql.length : end + 2;
-            current += sql.slice(index, stop);
-            index = stop;
-            continue;
-        }
-
-        // Dollar quoting: $tag$ ... $tag$, which is how a PL/pgSQL body is
-        // written and the one place a semicolon is certainly not a separator.
-        const dollar = rest.match(/^\$[A-Za-z_]*\$/);
-        if (dollar) {
-            const tag = dollar[0];
-            const end = sql.indexOf(tag, index + tag.length);
-            const stop = end === -1 ? sql.length : end + tag.length;
-            current += sql.slice(index, stop);
-            index = stop;
-            continue;
-        }
-
-        if (char === "'" || char === '"' || char === "`") {
-            const stop = closingQuote(sql, index, char);
-            current += sql.slice(index, stop);
-            index = stop;
-            continue;
-        }
-
-        if (char === ";") {
+    for (const piece of pieces(sql, dialect)) {
+        if (piece.kind === "separator") {
             if (current.trim()) statements.push(current.trim());
             current = "";
-            index += 1;
             continue;
         }
-
-        current += char;
-        index += 1;
+        current += piece.text;
     }
     if (current.trim()) statements.push(current.trim());
     return statements;
 }
 
 /** Where the quoted run starting at `from` ends, past the closing quote. A
- *  doubled quote is an escaped one and does not close it. */
-function closingQuote(sql: string, from: number, quote: string): number {
+ *  doubled quote is an escaped one and does not close it, and so is a quote
+ *  after a backslash where the engine reads a backslash as an escape. */
+function closingQuote(sql: string, from: number, quote: string, backslash: boolean): number {
     let index = from + 1;
     while (index < sql.length) {
-        if (sql[index] === "\\" && quote === "'") {
+        if (backslash && sql[index] === "\\") {
             index += 2;
             continue;
         }
@@ -176,13 +261,13 @@ function closingQuote(sql: string, from: number, quote: string): number {
 }
 
 /** The statement with its comments taken out, for reading its keywords. Never
- *  for sending: what is sent is what was typed. */
-function stripComments(statement: string): string {
-    return statement
-        .replace(/\/\*[\s\S]*?\*\//g, " ")
-        .replace(/(^|\s)(--|#)[^\n]*/g, "$1 ");
+ *  for sending: what is sent is what was typed. A comment marker inside a
+ *  string is part of the string, and stays. */
+function stripComments(statement: string, dialect: SqlDialect): string {
+    return pieces(statement, dialect)
+        .map((piece) => (piece.kind === "comment" ? " " : piece.text))
+        .join("");
 }
-
 /** The Redis commands a read-only connection may send. Everything else writes,
  *  including the ones that only look administrative - FLUSHALL is not a read. */
 const REDIS_READS = new Set([

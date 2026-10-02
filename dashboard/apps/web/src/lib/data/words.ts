@@ -32,6 +32,45 @@ const EXACT: Readonly<Record<string, Key>> = {
     "Unknown engine.": "refusals.unknownEngine",
     "Pick a database.": "refusals.pickDatabase",
     "Paste the private key this passphrase is for, or clear the passphrase.": "refusals.passphraseAlone",
+    "That file is too large.": "refusals.fileTooLarge",
+    "That is a public key. Use the private key - the file without .pub.": "refusals.publicKey",
+    "That is not a private key Polaris can read. Use an OpenSSH, PEM or PuTTY key.": "refusals.notAKey",
+    "This key is locked with a passphrase. Enter it below.": "refusals.keyLocked",
+    "That file holds a private key. Use the certificate here.": "refusals.certIsKey",
+    "That is not a PEM certificate.": "refusals.notACert",
+    "That is not a PEM private key.": "refusals.notAPemKey",
+    "Add the key that goes with this certificate.": "refusals.clientKeyMissing",
+    "Add the certificate that goes with this key.": "refusals.clientCertMissing",
+    // Reading a private key.
+    "That passphrase does not unlock this key.": "refusals.wrongPassphrase",
+    "Polaris cannot use this kind of key. Use an Ed25519, ECDSA or RSA key.": "refusals.keyUnsupported",
+    "This key asks for more work to unlock than Polaris allows. Save it again with fewer KDF rounds (100 or less).":
+        "refusals.keyTooCostly",
+    "This PuTTY key is locked in PuTTY's newer format, which Polaris cannot unlock. In PuTTYgen, export it as an OpenSSH key, or save it with no passphrase, and use that file.":
+        "refusals.puttyV3",
+    // TLS.
+    "The database's certificate is not signed by an authority this connection trusts, so nothing was sent to it. If its certificate was replaced, check it in the connection's settings.":
+        "refusals.certUntrusted",
+    "The database's certificate has expired or is not valid yet, so nothing was sent to it.": "refusals.certExpired",
+    "This database server does not accept encrypted connections. Turn encryption off for it, or turn TLS on at the server.":
+        "refusals.noTls",
+    "The server's certificate is signed by an authority it does not send, so there is nothing to trust on first use. Upload that authority's certificate instead.":
+        "refusals.noRoot",
+    // Saving and checking.
+    "Enter the password again. The address changed, and a saved password is only sent to the address it was saved for.":
+        "refusals.passwordAgain",
+    "Enter the SSH password or key again. The SSH server changed, and a saved login is only sent to the server it was saved for.":
+        "refusals.sshSecretAgain",
+    "Upload the certificate of the authority that signed the server's certificate.": "refusals.caMissing",
+    "That certificate file could not be read. Use a PEM file with one or more certificates.": "refusals.caInvalid",
+    "Add the client certificate and its key.": "refusals.clientMissing",
+    "That client certificate and key could not be read, or do not belong together.": "refusals.clientInvalid",
+    "The server's key changed again since you checked it. Check it again before trusting it.": "refusals.keyChangedAgain",
+    "The server's certificate changed again since you checked it. Check it again before trusting it.":
+        "refusals.certChangedAgain",
+    "This connection does not trust the server's own certificate, so there is nothing to check.": "refusals.notTofu",
+    "This connection has no SSH login of its own to check.": "refusals.notManualTunnel",
+    "The saved password could not be read. Enter it again.": "refusals.secretUnreadable",
     // The connection service.
     "The server to tunnel through is not one of yours.": "refusals.tunnelNotYours",
     "The server to jump through is not one of yours.": "refusals.jumpNotYours",
@@ -110,10 +149,38 @@ const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
         ["server"]
     ],
     [
-        /^(\S+) answered with a different key than the one Polaris pinned for this connection, so nothing was sent to it\. If that server was rebuilt, remove this connection and add it again\.$/,
+        /^(.+) answered with a different SSH key than the one pinned for this connection, so nothing was sent to it\. If that server was rebuilt, check the new key in the connection's settings and trust it there\.$/,
         "refusals.keyChanged",
         ["target"]
     ],
+    [
+        /^(.+) answered with a different SSH key than the one Polaris has on record for it, so nothing was sent to it\. Check that server under Servers\.$/,
+        "refusals.jumpKeyChanged",
+        ["server"]
+    ],
+    [
+        /^Polaris could not reach (\S+) to read its key\. Check that the server is up\.$/,
+        "refusals.keyUnreachable",
+        ["target"]
+    ],
+    [
+        /^Polaris could not reach (\S+) to read its certificate\.$/,
+        "refusals.certUnreachable",
+        ["target"]
+    ],
+    [/^The database's certificate is not for (.+), so nothing was sent to it\.$/, "refusals.certWrongName", ["host"]],
+    [
+        /^Polaris does not connect to (\S+): it is a link-local or metadata address, which never holds a database\.$/,
+        "refusals.egressForbidden",
+        ["host"]
+    ],
+    [
+        /^(\S+) is on a private network, which only an administrator can reach from Polaris\. Reach it over SSH through a server of yours instead\.$/,
+        "refusals.egressInternal",
+        ["host"]
+    ],
+    [/^Polaris could not find (\S+)\. Check the name\.$/, "refusals.egressUnresolved", ["host"]],
+    [/^Showing the first (\d+) rows\.$/, "bench.truncated", ["count"]],
     [/^(.+) cannot be empty\.$/, "refusals.cannotBeEmpty", ["column"]]
 ];
 

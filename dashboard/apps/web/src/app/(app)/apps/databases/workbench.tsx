@@ -29,6 +29,7 @@
 import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
+import { dataText } from "@/lib/data/words";
 import { StatsPanel } from "./stats-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as openTabs from "./workbench-tabs";
@@ -1234,6 +1235,11 @@ function QueryPanel({
                                     : t("bench.resultChanged", { count: result.affected, ms: result.ms })}
                             </span>
                         </div>
+                        {result.note && (
+                            <p className="border-b border-border px-3 py-1 text-xs text-warning">
+                                {dataText(t, result.note)}
+                            </p>
+                        )}
                         {result.rows.length > 0 && (
                             <div className="max-h-72 overflow-auto overscroll-contain">
                                 <table className="w-full text-xs">
