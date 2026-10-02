@@ -63,7 +63,8 @@ function drawn(onConnected = vi.fn()) {
                     button.getAttribute("aria-pressed") !== null &&
                     pattern.test(button.textContent ?? "")
             )!;
-    fireEvent.click(choice(/^Philips(?! Hue)/));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "philips air" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Philips(?! Hue)/ }));
     fireEvent.click(choice(/^Philips account/));
     return onConnected;
 }

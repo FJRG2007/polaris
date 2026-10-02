@@ -40,12 +40,20 @@
 
 import Link from "next/link";
 import * as actions from "../actions";
-import { useEffect, useMemo, useRef, useState } from "react";
 import * as kinds from "../../lib/device-kinds";
 import type { DeviceView } from "../../lib/device-kinds";
 import * as registry from "../../lib/device-connections";
-import { Check, ExternalLink, Loader2, RefreshCw, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceAccountView } from "../../lib/device-accounts";
+import {
+    Check,
+    ChevronRight,
+    ExternalLink,
+    Loader2,
+    RefreshCw,
+    Search,
+    Upload
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -59,10 +67,10 @@ import {
     Input,
     Select
 } from "@polaris/ui";
-import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
-import type { PlacesTranslator } from "../../lib/i18n";
+import { hostUi } from "@polaris/app-host/client";
 import { englishPlaces } from "../../../messages";
+import type { PlacesTranslator } from "../../lib/i18n";
 
 const { runAction } = hostUi.runAction;
 const { IntegrationLogo } = hostUi.logos;
@@ -137,6 +145,49 @@ function kindsOf(entry: registry.DeviceBrand, t: PlacesTranslator): string {
     return entry.kinds.map((kind) => kinds.kindText(kind, t).toLowerCase()).join(", ");
 }
 
+/** Case and accents folded away, so "cancion" finds "Canción". */
+function folded(text: string): string {
+    return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/**
+ * The makes that answer what was typed, the way Home Assistant's "add
+ * integration" list does: every word has to be somewhere in the make's name, what
+ * it brings in, or the names and words of its ways in - a word found nowhere
+ * leaves nothing, rather than a list of near misses. Names that start with the
+ * query come first, then the rest, each in alphabetical order.
+ */
+function matchingBrands(
+    brands: readonly registry.DeviceBrand[],
+    query: string,
+    t: PlacesTranslator
+): readonly registry.DeviceBrand[] {
+    const words = folded(query).split(/\s+/).filter(Boolean);
+    const named = (entry: registry.DeviceBrand) => folded(brandWords(entry.brand, t));
+    const sorted = [...brands].sort((a, b) => named(a).localeCompare(named(b)));
+    if (words.length === 0) return sorted;
+    const matches = sorted.filter((entry) => {
+        const ways = registry.connectionsOfBrand(entry.brand);
+        const haystack = folded(
+            [
+                brandWords(entry.brand, t),
+                kindsOf(entry, t),
+                ...ways.flatMap((way) => [
+                    way.label,
+                    registry.connectionWords(t, way).label,
+                    ...(way.search ?? [])
+                ])
+            ].join(" ")
+        );
+        return words.every((word) => haystack.includes(word));
+    });
+    const lead = words.join(" ");
+    return [
+        ...matches.filter((entry) => named(entry).startsWith(lead)),
+        ...matches.filter((entry) => !named(entry).startsWith(lead))
+    ];
+}
+
 function Field({
     connection,
     field,
@@ -209,10 +260,14 @@ export function ConnectDialog({
 }) {
     const t = usePlacesT();
     const brands = useMemo(() => registry.deviceBrands(), []);
-    const [brand, setBrand] = useState(brands[0]?.brand ?? "");
-    const [chosen, setChosen] = useState(
-        registry.recommendedConnection(brands[0]?.brand ?? "")?.id ?? ""
-    );
+    /** No make until one is picked from the list: the list is the first step. */
+    const [brand, setBrand] = useState("");
+    const [chosen, setChosen] = useState("");
+    const [query, setQuery] = useState("");
+    const shown = useMemo(() => matchingBrands(brands, query, t), [brands, query, t]);
+    const picked = brands.find((entry) => entry.brand === brand) ?? null;
+    /** The first step: the list of makes, before one is picked. */
+    const choosing = !reconnect && !picked;
     const [label, setLabel] = useState("");
     const [fields, setFields] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
@@ -254,6 +309,9 @@ export function ConnectDialog({
     // A closed dialog is waiting for nothing.
     useEffect(() => {
         if (open) return;
+        setBrand("");
+        setChosen("");
+        setQuery("");
         setPairing(null);
         setExpired(false);
         setCode("");
@@ -547,49 +605,95 @@ export function ConnectDialog({
                 ) : (
                     <>
                         <div className="flex flex-col gap-4">
-                            {!reconnect && !pairing && (
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs text-muted-foreground">
-                                        {t("connect.make")}
-                                    </span>
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        {brands.map((entry) => (
-                                            <button
-                                                key={entry.brand}
-                                                type="button"
-                                                onClick={() => pickBrand(entry.brand)}
-                                                aria-pressed={entry.brand === brand}
-                                                className={cn(
-                                                    "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
-                                                    entry.brand === brand
-                                                        ? "border-accent bg-accent/10"
-                                                        : "border-border bg-card hover:border-border-strong"
-                                                )}
-                                            >
-                                                <IntegrationLogo
-                                                    slug={entry.logo}
-                                                    className="size-6 w-8 shrink-0 object-contain"
-                                                />
-                                                <span className="flex min-w-0 flex-col">
-                                                    <span
-                                                        className="truncate text-sm font-medium"
-                                                        title={brandWords(entry.brand, t)}
-                                                    >
-                                                        {brandWords(entry.brand, t)}
-                                                    </span>
-                                                    <span
-                                                        className="truncate text-[0.6875rem] text-foreground-subtle"
-                                                        title={kindsOf(entry, t)}
-                                                    >
-                                                        {kindsOf(entry, t)}
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        ))}
+                            {choosing && (
+                                <div className="flex flex-col gap-2">
+                                    <div className="relative">
+                                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            autoFocus
+                                            type="search"
+                                            value={query}
+                                            className="pl-9"
+                                            spellCheck={false}
+                                            autoComplete="off"
+                                            placeholder={t("connect.search")}
+                                            aria-label={t("connect.search")}
+                                            onChange={(event) => setQuery(event.target.value)}
+                                            onKeyDown={(event) => {
+                                                if (event.key !== "Enter" || !shown[0]) return;
+                                                event.preventDefault();
+                                                pickBrand(shown[0].brand);
+                                            }}
+                                        />
                                     </div>
+                                    {shown.length === 0 ? (
+                                        <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+                                            {t("connect.noMatch", { query: query.trim() })}
+                                        </p>
+                                    ) : (
+                                        <ul
+                                            aria-label={t("connect.make")}
+                                            className="-mx-1 flex max-h-[min(24rem,55vh)] flex-col overflow-y-auto"
+                                        >
+                                            {shown.map((entry) => (
+                                                <li key={entry.brand}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => pickBrand(entry.brand)}
+                                                        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors duration-fast hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                                                    >
+                                                        <IntegrationLogo
+                                                            slug={entry.logo}
+                                                            className="size-6 w-8 shrink-0 object-contain"
+                                                        />
+                                                        <span className="flex min-w-0 flex-1 flex-col">
+                                                            <span
+                                                                className="truncate text-sm font-medium"
+                                                                title={brandWords(entry.brand, t)}
+                                                            >
+                                                                {brandWords(entry.brand, t)}
+                                                            </span>
+                                                            <span
+                                                                className="truncate text-[0.6875rem] text-foreground-subtle"
+                                                                title={kindsOf(entry, t)}
+                                                            >
+                                                                {kindsOf(entry, t)}
+                                                            </span>
+                                                        </span>
+                                                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
                             )}
 
+                            {!reconnect && !pairing && picked && (
+                                <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
+                                    <IntegrationLogo
+                                        slug={picked.logo}
+                                        className="size-6 w-8 shrink-0 object-contain"
+                                    />
+                                    <span className="flex min-w-0 flex-1 flex-col">
+                                        <span
+                                            className="truncate text-sm font-medium"
+                                            title={brandWords(picked.brand, t)}
+                                        >
+                                            {brandWords(picked.brand, t)}
+                                        </span>
+                                        <span
+                                            className="truncate text-[0.6875rem] text-foreground-subtle"
+                                            title={kindsOf(picked, t)}
+                                        >
+                                            {kindsOf(picked, t)}
+                                        </span>
+                                    </span>
+                                    <Button variant="ghost" size="sm" onClick={() => pickBrand("")}>
+                                        {t("connect.change")}
+                                    </Button>
+                                </div>
+                            )}
                             {!reconnect && !pairing && ofBrand.length > 1 && (
                                 <div className="flex flex-col gap-1.5">
                                     <span className="text-xs text-muted-foreground">
@@ -863,7 +967,7 @@ export function ConnectDialog({
                                     />
                                 ))}
 
-                            {!pairing && (
+                            {!pairing && !choosing && (
                                 <label className="flex flex-col gap-1.5">
                                     <span className="text-xs text-muted-foreground">
                                         {t("connect.label")}{" "}
@@ -949,7 +1053,7 @@ export function ConnectDialog({
                                         </Button>
                                     )}
                                 </>
-                            ) : (
+                            ) : choosing ? null : (
                                 <Button
                                     onClick={() =>
                                         void (connection?.pairing ? startPairing() : submit())
