@@ -31,6 +31,11 @@ export interface AccountsView {
     readonly links: LinkView[];
     /** Where to start linking one more account, by provider. */
     readonly linkUrls: { readonly google: string; readonly microsoft: string };
+    /** Whether that start goes anywhere: false while the operator has not set
+     *  up the provider's sign-in application, so the screen says so instead. */
+    readonly linkAvailable: { readonly google: boolean; readonly microsoft: boolean };
+    /** Whether the reader runs this Polaris, and so can set that up. */
+    readonly canManage: boolean;
     readonly presets: typeof sync.CALDAV_PRESETS;
     readonly holidays: typeof sync.HOLIDAY_CALENDARS;
 }
@@ -39,13 +44,17 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
     return outcome(async () => {
         const user = await requireCalendarUser();
         const { readInstanceSettings } = await import("../lib/instance-settings");
-        const [list, links, google, microsoft, settings] = await Promise.all([
-            sources.listSources(user),
-            host.calendarHost.listCalendarLinks(user.id),
-            host.calendarHost.calendarLinkUrl("google"),
-            host.calendarHost.calendarLinkUrl("microsoft"),
-            readInstanceSettings()
-        ]);
+        const admin = { admin: user.isAdmin };
+        const [list, links, google, microsoft, settings, googleReady, microsoftReady] =
+            await Promise.all([
+                sources.listSources(user),
+                host.calendarHost.listCalendarLinks(user.id),
+                host.calendarHost.calendarLinkUrl("google"),
+                host.calendarHost.calendarLinkUrl("microsoft"),
+                readInstanceSettings(),
+                host.calendarHost.calendarLinkAvailable("google", admin),
+                host.calendarHost.calendarLinkAvailable("microsoft", admin)
+            ]);
         const catalog = [
             ...sync.HOLIDAY_CALENDARS.map((feed) => feed.url),
             ...settings.suggested.map((entry) => entry.url)
@@ -57,6 +66,8 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
                 subscribed: await sources.subscribedAmong(user, catalog),
                 links: links.map((link) => ({ ...link, used: used.has(link.id) })),
                 linkUrls: { google, microsoft },
+                linkAvailable: { google: googleReady, microsoft: microsoftReady },
+                canManage: user.isAdmin,
                 presets: sync.CALDAV_PRESETS,
                 holidays: sync.HOLIDAY_CALENDARS
             }

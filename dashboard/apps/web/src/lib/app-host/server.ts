@@ -246,7 +246,9 @@ export const serverHost = {
         assignedTasks: later(load.calendarHost, "assignedTasks"),
         calendarAccessToken: later(load.calendarHost, "calendarAccessToken"),
         calendarFetch: later(load.calendarHost, "calendarFetch"),
+        calendarLinkAvailable: later(load.calendarHost, "calendarLinkAvailable"),
         calendarLinkUrl: later(load.calendarHost, "calendarLinkUrl"),
+        createDueTask: later(load.calendarHost, "createDueTask"),
         createMeetingLink: later(load.calendarHost, "createMeetingLink"),
         displayTimeZone: later(load.calendarHost, "displayTimeZone"),
         listCalendarLinks: later(load.calendarHost, "listCalendarLinks"),
@@ -257,6 +259,7 @@ export const serverHost = {
         sealCalendarSecret: later(load.calendarHost, "sealCalendarSecret"),
         searchPeople: later(load.calendarHost, "searchPeople"),
         sendCalendarEmail: later(load.calendarHost, "sendCalendarEmail"),
+        taskListsFor: later(load.calendarHost, "taskListsFor"),
         teamIdsOf: later(load.calendarHost, "teamIdsOf"),
         teamMemberIds: later(load.calendarHost, "teamMemberIds"),
         teamsOf: later(load.calendarHost, "teamsOf")

@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCalendarT } from "../i18n";
 import { SubscriptionsOff } from "./accounts-view";
 import type { AddCalendarsSlotProps } from "../slots";
@@ -26,9 +26,18 @@ import {
 
 type Tab = "subscribe" | "holidays" | "accounts";
 
-export function AddCalendarsDialog({ open, onOpenChange, onChanged }: AddCalendarsSlotProps) {
+export function AddCalendarsDialog({
+    open,
+    tab: initialTab = "subscribe",
+    onOpenChange,
+    onChanged
+}: AddCalendarsSlotProps) {
     const t = useCalendarT();
-    const [tab, setTab] = useState<Tab>("subscribe");
+    const [tab, setTab] = useState<Tab>(initialTab);
+    // Each opening starts on the tab it was opened for.
+    useEffect(() => {
+        if (open) setTab(initialTab);
+    }, [open, initialTab]);
     const instance = useCachedRead<{ settings: InstanceSettings; canManage: boolean }>(
         open ? cacheKey("instance") : null,
         () =>

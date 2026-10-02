@@ -89,6 +89,20 @@ export async function calendarLinkUrl(provider: CalendarLinkProvider): Promise<s
 }
 
 /**
+ * Whether linking this provider can work for this person right now - the same
+ * question the link route asks before it sends anybody anywhere. Without the
+ * operator's OAuth application there is no consent screen to reach, so the
+ * Calendar says what is missing instead of offering a button that bounces.
+ */
+export async function calendarLinkAvailable(
+    provider: CalendarLinkProvider,
+    options: { admin: boolean }
+): Promise<boolean> {
+    const { connectionLinkAvailable } = await import("@/lib/connections/oauth");
+    return connectionLinkAvailable(provider, { admin: options.admin });
+}
+
+/**
  * The link stopped being accepted - revoked, a changed password, or never
  * granted calendars. The app says "connect it again" rather than an error.
  */
@@ -368,6 +382,96 @@ export async function scheduleTask(
         dueDate: due?.at ?? null,
         ...(due ? { timed: due.timed } : {})
     });
+}
+
+/** A Tasks list somebody may create work in, as the calendar offers it. */
+export interface CalendarTaskList {
+    readonly id: string;
+    readonly name: string;
+    readonly spaceName: string;
+}
+
+/**
+ * The Tasks lists this account may add work to - member or better on the list's
+ * branch - or null when it may not create tasks at all. One read of the same
+ * tree the Tasks sidebar draws, so a folder grant reaches exactly what it
+ * reaches there.
+ */
+export async function taskListsFor(actor: {
+    id: string;
+    isAdmin: boolean;
+}): Promise<CalendarTaskList[] | null> {
+    const { userHasPermission } = await import("@polaris/auth");
+    if (!actor.isAdmin && !(await userHasPermission(actor.id, "tasks.manage"))) return null;
+    const access = await import("@/lib/tasks/access");
+    const spaces = await import("@/lib/tasks/space-service");
+    const core = await import("@polaris/core");
+    const tree = await spaces.listSpaceTree(
+        actor.id,
+        await access.visibleScope(actor),
+        actor.isAdmin
+    );
+    const writes = (role: string) =>
+        role === "owner" ||
+        core.spaceRoleAtLeast(role as Parameters<typeof core.spaceRoleAtLeast>[0], "member");
+    return tree.flatMap((space) => [
+        ...(writes(space.role) ? space.lists : []).map((list) => ({
+            id: list.id,
+            name: list.name,
+            spaceName: space.name
+        })),
+        ...space.folders
+            .filter((folder) => writes(folder.role))
+            .flatMap((folder) =>
+                folder.lists.map((list) => ({
+                    id: list.id,
+                    name: list.name,
+                    spaceName: space.name
+                }))
+            )
+    ]);
+}
+
+/**
+ * Create a Tasks task due at a moment, assigned to whoever made it so it shows
+ * on their calendar. Goes through the Tasks service and its access rules, so
+ * numbering, history, automations and the live boards see it as their own. A
+ * refusal (the list is gone, no longer theirs to add to) comes back in the
+ * reader's words rather than as an error.
+ */
+export async function createDueTask(
+    actor: { id: string; isAdmin: boolean },
+    input: { listId: string; name: string; due: { at: string; timed: boolean } }
+): Promise<{ id: string; reference: string } | { refused: string }> {
+    const { userHasPermission } = await import("@polaris/auth");
+    const access = await import("@/lib/tasks/access");
+    const { TaskRefusal } = await import("@/lib/tasks/refusal");
+    const { readerWords } = await import("@/lib/i18n/reader-words");
+    const core = await import("@polaris/core");
+    const tasks = await import("@/lib/tasks/task-service");
+    const { publishTaskChange } = await import("@/lib/tasks/live");
+    try {
+        if (!actor.isAdmin && !(await userHasPermission(actor.id, "tasks.manage")))
+            throw new access.TaskAccessError();
+        const { spaceId } = await access.requireList(actor, input.listId, "member");
+        const created = await tasks.createTask(
+            actor.id,
+            spaceId,
+            core.taskCreateSchema.parse({
+                listId: input.listId,
+                name: input.name,
+                dueDate: input.due.at,
+                timed: input.due.timed,
+                assigneeIds: [actor.id]
+            })
+        );
+        publishTaskChange({ spaceId, actorId: actor.id });
+        return created;
+    } catch (caught) {
+        if (caught instanceof TaskRefusal)
+            return { refused: (await readerWords("tasks"))(caught.key, caught.params) };
+        throw caught;
+    }
 }
 
 /**

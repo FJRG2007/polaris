@@ -12,6 +12,10 @@
  *
  * Drags, resizes, hiding, recolouring and reordering happen on screen first and
  * are put back, with a note saying why, if the server refuses them.
+ *
+ * Right-click (or a long press, or the menu key) on the grid opens its menu
+ * (`grid-menu.tsx`); what it offers is carried out by the same functions a
+ * click, a drag or a key uses here.
  */
 
 import Link from "next/link";
@@ -28,7 +32,8 @@ import {
     Printer,
     RefreshCw,
     Settings,
-    Trash2
+    Trash2,
+    X
 } from "lucide-react";
 import {
     Button,
@@ -63,7 +68,12 @@ import * as calendarActions from "../actions/calendars";
 import { Sidebar, type SidebarActions } from "./sidebar";
 import { EventCard, NewEventCard } from "./event-popover";
 import { gridEvents, type GridItem } from "./grid-events";
-import type { GridChange, GridMoment } from "./grid-view";
+import type { GridTarget } from "./grid-target";
+import type { GridChange, GridMoment, GridRange } from "./grid-view";
+import { GridMenu, type GridMenuActions, type MenuTarget } from "./grid-menu";
+import { NewTaskDialog, useTaskLists } from "./new-task-dialog";
+import { AddCalendarMenu } from "./accounts/add-calendar-menu";
+import type { PartStat } from "../engine";
 import * as preferenceActions from "../actions/preferences";
 import { CalendarSearch, type SearchResult } from "./search";
 import { EventEditor, type EditorTarget } from "./event-editor";
@@ -84,6 +94,14 @@ const GridView = lazy(() => import("./grid-view"));
 
 /** How often the window on screen is read again while the tab is in view. */
 const REFRESH_MS = 120_000;
+
+/** A press that opens the menu also ends a long-press selection; a selection
+ *  reported this soon after the menu opened is that one, not a new one. */
+const MENU_SETTLE_MS = 700;
+
+/** The event copied last. Kept for the tab's life, so it survives moving
+ *  between the calendar and its settings. */
+let copiedEvent: OccurrenceView | null = null;
 
 type Selected = { readonly id: string; readonly item: GridItem } | null;
 
@@ -219,6 +237,19 @@ export function CalendarScreen({ path }: { path: string[] }) {
         error: null
     });
     const undo = useRef<{ run: () => Promise<void> } | null>(null);
+    /** The range highlighted on the grid: a selection while its card is open,
+     *  or what the menu was opened on. */
+    const [selection, setSelection] = useState<GridRange | null>(null);
+    const selectionRef = useRef<GridRange | null>(null);
+    selectionRef.current = selection;
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuOpenedAt = useRef(0);
+    /** Tasks lists are read the first time a menu could offer one. */
+    const [menuUsed, setMenuUsed] = useState(false);
+    const taskLists = useTaskLists(menuUsed);
+    const [clipboard, setClipboard] = useState<OccurrenceView | null>(copiedEvent);
+    const [taskAt, setTaskAt] = useState<GridMoment | null>(null);
+    const [addTab, setAddTab] = useState<"subscribe" | "holidays">("subscribe");
 
     // The view the calendar was left on, once the settings have arrived - unless
     // the address named one.
@@ -253,6 +284,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
         if (window.location.pathname !== next)
             window.history.replaceState(window.history.state, "", next);
     }, [view, anchor, editor]);
+
+    // A highlighted range lasts while its new-event card or the menu is open.
+    useEffect(() => {
+        if (popover?.kind !== "new" && !menuOpen) setSelection(null);
+    }, [popover, menuOpen]);
 
     // Read again when the tab comes back, and now and then while it is seen.
     useEffect(() => {
@@ -526,7 +562,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
         onShare: (calendar) => setShareFor({ calendar, kind: "share" }),
         onPublish: (calendar) => setShareFor({ calendar, kind: "publish" }),
         onNew: (withTasks) => setCalendarDialog({ kind: "new", withTasks }),
-        onAddElsewhere: () => setAddOpen(true),
+        onAddFrom: (tab) => {
+            setAddTab(tab);
+            setAddOpen(true);
+            setDrawer(false);
+        },
         onPickDay: (day) => {
             setAnchor(day);
             setDrawer(false);
@@ -595,6 +635,8 @@ export function CalendarScreen({ path }: { path: string[] }) {
             setEditor({ kind: "new", form: newFormFor(start, finish, "", calendarId) });
             return;
         }
+        // The grid shows the time the card is about while it is open.
+        setSelection({ start, end: finish });
         setPopover({
             kind: "new",
             start,
@@ -800,23 +842,320 @@ export function CalendarScreen({ path }: { path: string[] }) {
         }
     };
 
+    /** Where a new event on a day starts when nobody said a time: the next
+     *  hour today, nine o'clock on any other day. */
+    const defaultStart = (day: string): GridMoment => {
+        const wall = time.wallOf(now, zone);
+        const hour = day === today ? Math.min(23, Number(wall.slice(11, 13)) + 1) : 9;
+        const at = time.gridInstant(
+            new Date(`${day}T${String(hour).padStart(2, "0")}:00:00Z`),
+            zone
+        );
+        return { at, day, allDay: false };
+    };
+
     const createNow = () => {
-        const base = anchor === today ? now : time.dayStart(anchor, zone);
-        const wall = time.wallOf(base, zone);
-        const hour = anchor === today ? Math.min(23, Number(wall.slice(11, 13)) + 1) : 9;
-        const at = time.dayStart(anchor, zone);
-        const start = new Date(at.getTime() + hour * 3_600_000);
-        const startMoment: GridMoment = { at: start, day: anchor, allDay: false };
+        const start = defaultStart(anchor);
         startCreate(
-            startMoment,
+            start,
             {
-                at: new Date(start.getTime() + newEventMinutes(preferences) * 60_000),
+                at: new Date(start.at.getTime() + newEventMinutes(preferences) * 60_000),
                 day: anchor,
                 allDay: false
             },
             null
         );
     };
+
+    // --- The grid's menu -----------------------------------------------------
+
+    /** A whole day, as a range of the grid. */
+    const dayRange = (day: string): GridRange => ({
+        start: { at: time.dayStart(day, zone), day, allDay: true },
+        end: { at: time.dayStart(time.addDays(day, 1), zone), day: time.addDays(day, 1), allDay: true }
+    });
+
+    /** What a range reads as at the top of the menu. */
+    const rangeLabel = (range: GridRange): string => {
+        if (range.start.allDay) {
+            const last = time.addDays(range.end.day, -1);
+            return last > range.start.day
+                ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).formatRange(
+                      time.dayDate(range.start.day),
+                      time.dayDate(last)
+                  )
+                : time.formatDay(range.start.day, locale, { dateStyle: "full" });
+        }
+        const slot = range.end.at.getTime() - range.start.at.getTime() <= preferences.slotMinutes * 60_000;
+        return slot
+            ? time.formatInstant(range.start.at, locale, zone, { dateStyle: "full", timeStyle: "short" })
+            : new Intl.DateTimeFormat(locale, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                  timeZone: zone
+              }).formatRange(range.start.at, range.end.at);
+    };
+
+    /** What a press on the grid stands for, for its menu. */
+    const resolveTarget = (
+        target: GridTarget,
+        point: DOMRect,
+        held: GridRange | null
+    ): MenuTarget | null => {
+        if (target.kind === "item") {
+            const found = events.find((event) => event.id === target.id);
+            const item = (found?.extendedProps as { item?: GridItem } | undefined)?.item;
+            if (!item) return null;
+            if (item.kind === "task") {
+                const day = item.task.due ? time.wallOf(item.task.due, zone).slice(0, 10) : null;
+                return { kind: "task", id: target.id, task: item.task, day, rect: point };
+            }
+            return { kind: "event", id: target.id, occurrence: item.occurrence, rect: point };
+        }
+        const pressed: GridRange = target.allDay
+            ? dayRange(target.day)
+            : (() => {
+                  const start = target.time
+                      ? {
+                            at: time.gridInstant(new Date(`${target.day}T${target.time}:00Z`), zone),
+                            day: target.day,
+                            allDay: false
+                        }
+                      : defaultStart(target.day);
+                  return {
+                      start,
+                      end: {
+                          at: new Date(start.at.getTime() + preferences.slotMinutes * 60_000),
+                          day: target.day,
+                          allDay: false
+                      }
+                  };
+              })();
+        // A range selected first, and pressed inside, is what the menu is about.
+        const inside =
+            held !== null &&
+            held.start.allDay === pressed.start.allDay &&
+            pressed.start.at.getTime() >= held.start.at.getTime() &&
+            pressed.start.at.getTime() < held.end.at.getTime();
+        const range = inside ? held : pressed;
+        return {
+            kind: "slot",
+            range,
+            day: target.day,
+            selected: inside,
+            when: rangeLabel(range),
+            point
+        };
+    };
+
+    /** Write a copied occurrence at a moment: the same length, the same kind. */
+    const pasteAt = async (at: GridMoment) => {
+        const source = clipboard;
+        if (!source) return;
+        let start: { date: string } | { dateTime: string; tzid: string };
+        let end: { date: string } | { dateTime: string; tzid: string };
+        if (source.allDay && source.startDate) {
+            const days = Math.max(
+                1,
+                time.daysBetween(source.startDate, source.endDate ?? time.addDays(source.startDate, 1))
+            );
+            start = { date: at.day };
+            end = { date: time.addDays(at.day, days) };
+        } else {
+            // A day without a time keeps the copied event's time of day.
+            const clock = at.allDay ? time.wallOf(source.start, zone).slice(11, 16) : null;
+            const startAt = clock
+                ? time.gridInstant(new Date(`${at.day}T${clock}:00Z`), zone)
+                : at.at;
+            const length = new Date(source.end).getTime() - new Date(source.start).getTime();
+            start = { dateTime: time.wallOf(startAt, zone).slice(0, 19), tzid: zone };
+            end = {
+                dateTime: time.wallOf(new Date(startAt.getTime() + Math.max(length, 60_000)), zone).slice(0, 19),
+                tzid: zone
+            };
+        }
+        const own = calendarsById.get(source.calendarId);
+        const calendarId =
+            own && own.writable && own.components.includes("VEVENT") && !own.hidden
+                ? own.id
+                : defaultCalendarId(calendars ?? [], preferences);
+        if (!calendarId) {
+            failed(t("gridMenu.pasteFailed"), new Error(t("popover.noWritable")));
+            return;
+        }
+        try {
+            const answer = await unwrap(
+                () =>
+                    eventActions.pasteEventAction({
+                        objectId: source.objectId,
+                        recurrenceKey: source.recurring ? source.recurrenceKey : null,
+                        calendarId,
+                        start,
+                        end,
+                        zone
+                    }),
+                t("screen.failed")
+            );
+            undo.current = {
+                run: async () => {
+                    await unwrap(
+                        () =>
+                            eventActions.deleteEventAction({
+                                objectId: answer.objectId,
+                                recurrenceKey: null,
+                                scope: "all",
+                                zone
+                            }),
+                        t("screen.failed")
+                    );
+                    eventsChanged();
+                }
+            };
+            toast.show({
+                key: "calendar-pasted",
+                title: t("gridMenu.pasted"),
+                actions: [{ label: t("screen.undo"), run: async () => await runUndo() }]
+            });
+            eventsChanged();
+        } catch (caught) {
+            failed(t("gridMenu.pasteFailed"), caught);
+        }
+    };
+
+    const copyOccurrence = (occurrence: OccurrenceView) => {
+        copiedEvent = occurrence;
+        setClipboard(occurrence);
+        toast.show({ key: "calendar-copied", title: t("gridMenu.copied") });
+    };
+
+    /** Change what the grid shows of one event at once, put back on failure. */
+    const changeShown = async (
+        objectId: string,
+        change: (occurrence: OccurrenceView) => OccurrenceView,
+        call: () => Promise<{ ok: boolean }>,
+        failure: string,
+        only?: OccurrenceView
+    ) => {
+        const previous = rangeRead.data;
+        if (previous)
+            replaceRange({
+                ...previous,
+                occurrences: previous.occurrences.map((entry) =>
+                    entry.objectId === objectId && (!only || sameOccurrence(entry, only))
+                        ? change(entry)
+                        : entry
+                )
+            });
+        try {
+            await unwrap(
+                call as () => Promise<{ ok: true } | { ok: false; error: string }>,
+                t("screen.failed")
+            );
+            eventsChanged();
+            return true;
+        } catch (caught) {
+            if (previous) replaceRange(previous);
+            failed(failure, caught);
+            return false;
+        }
+    };
+
+    const moveOccurrence = async (occurrence: OccurrenceView, calendarId: string) => {
+        const target = calendarsById.get(calendarId);
+        const moved = await changeShown(
+            occurrence.objectId,
+            (entry) => ({ ...entry, calendarId }),
+            () =>
+                eventActions.moveEventAction({ objectId: occurrence.objectId, calendarId, zone }),
+            t("grid.moveFailed")
+        );
+        if (!moved) return;
+        undo.current = {
+            run: async () => {
+                await unwrap(
+                    () =>
+                        eventActions.moveEventAction({
+                            objectId: occurrence.objectId,
+                            calendarId: occurrence.calendarId,
+                            zone
+                        }),
+                    t("screen.failed")
+                );
+                eventsChanged();
+            }
+        };
+        toast.show({
+            key: "calendar-moved-to",
+            title: t("gridMenu.movedTo", { name: target?.name ?? "" }),
+            actions: [{ label: t("screen.undo"), run: async () => await runUndo() }]
+        });
+    };
+
+    const colorOccurrence = (occurrence: OccurrenceView, color: string | null) => {
+        if (occurrence.color === color) return;
+        void changeShown(
+            occurrence.objectId,
+            (entry) => ({ ...entry, color }),
+            () => eventActions.setEventColorAction({ objectId: occurrence.objectId, color, zone }),
+            t("sidebar.colorFailed")
+        );
+    };
+
+    const respondTo = (occurrence: OccurrenceView, partstat: PartStat) => {
+        if (occurrence.myPartstat === partstat) return;
+        void changeShown(
+            occurrence.objectId,
+            (entry) => ({ ...entry, myPartstat: partstat }),
+            () =>
+                eventActions.respondToEventAction({
+                    objectId: occurrence.objectId,
+                    recurrenceKey: occurrence.recurring ? occurrence.recurrenceKey : null,
+                    partstat,
+                    zone
+                }),
+            t("respond.failed"),
+            occurrence.recurring ? occurrence : undefined
+        );
+    };
+
+    const menuActions: GridMenuActions = {
+        newEvent: (range, anchorRect) => startCreate(range.start, range.end, anchorRect),
+        newAllDay: (day, anchorRect) => {
+            const range = dayRange(day);
+            startCreate(range.start, range.end, anchorRect);
+        },
+        newTask: (at) => setTaskAt(at),
+        paste: (at) => void pasteAt(at),
+        goToDay: (day) => {
+            setAnchor(day);
+            chooseView("day");
+        },
+        openItem: (item, id, anchorRect) => openItem(item, id, anchorRect),
+        edit: (occurrence) => openEditor(occurrence),
+        duplicate: (occurrence) => void duplicateOccurrence(occurrence),
+        copy: copyOccurrence,
+        move: (occurrence, calendarId) => void moveOccurrence(occurrence, calendarId),
+        color: colorOccurrence,
+        respond: respondTo,
+        remove: (occurrence) => void deleteOccurrence(occurrence)
+    };
+
+    // Ctrl/Cmd+C on the selected event, when no text is selected to copy instead.
+    useEffect(() => {
+        const listener = (event: KeyboardEvent) => {
+            if (!(event.ctrlKey || event.metaKey) || event.altKey || event.defaultPrevented) return;
+            if (event.key.toLowerCase() !== "c") return;
+            const item = selected?.item;
+            if (item?.kind !== "event" || item.occurrence.busyOnly) return;
+            const target = event.target as HTMLElement | null;
+            if (target?.closest?.("input, textarea, [contenteditable='true'], [role='dialog']")) return;
+            if (window.getSelection()?.toString()) return;
+            event.preventDefault();
+            copyOccurrence(item.occurrence);
+        };
+        document.addEventListener("keydown", listener);
+        return () => document.removeEventListener("keydown", listener);
+    });
 
     const openSearchResult = (result: SearchResult) => {
         if (result.day && (result.day < span.start || result.day >= span.end))
@@ -1115,25 +1454,95 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             {t("grid.truncated")}
                         </p>
                     ) : null}
+                    {calendars &&
+                    calendars.length > 0 &&
+                    preferencesRead.data &&
+                    !preferences.dismissedHints.includes("link-accounts") &&
+                    !calendars.some((calendar) => calendar.source !== null) ? (
+                        <div
+                            role="note"
+                            className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-1.5 text-xs"
+                        >
+                            <span className="min-w-0 flex-1 text-muted-foreground">
+                                {t("linkHint.text")}
+                            </span>
+                            <AddCalendarMenu
+                                align="end"
+                                onCreate={(withTasks) =>
+                                    setCalendarDialog({ kind: "new", withTasks })
+                                }
+                                onAddFrom={AddCalendars ? sidebarActions.onAddFrom : null}
+                            >
+                                <Button size="xs" variant="outline">
+                                    <Plus />
+                                    {t("sidebar.add")}
+                                </Button>
+                            </AddCalendarMenu>
+                            <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                aria-label={t("linkHint.dismiss")}
+                                title={t("linkHint.dismiss")}
+                                onClick={() =>
+                                    void savePreferences({
+                                        dismissedHints: [...preferences.dismissedHints, "link-accounts"]
+                                    })
+                                }
+                            >
+                                <X />
+                            </Button>
+                        </div>
+                    ) : null}
                     {calendars && calendars.length === 0 ? (
                         <EmptyState
                             className="m-4"
                             title={t("grid.noCalendars")}
                             description={t("grid.noCalendarsHint")}
                             action={
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        setCalendarDialog({ kind: "new", withTasks: false })
-                                    }
-                                >
-                                    <Plus />
-                                    {t("sidebar.newCalendar")}
-                                </Button>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            setCalendarDialog({ kind: "new", withTasks: false })
+                                        }
+                                    >
+                                        <Plus />
+                                        {t("sidebar.newCalendar")}
+                                    </Button>
+                                    <AddCalendarMenu
+                                        onCreate={(withTasks) =>
+                                            setCalendarDialog({ kind: "new", withTasks })
+                                        }
+                                        onAddFrom={AddCalendars ? sidebarActions.onAddFrom : null}
+                                    >
+                                        <Button size="sm" variant="outline">
+                                            {t("sidebar.add")}
+                                        </Button>
+                                    </AddCalendarMenu>
+                                </div>
                             }
                         />
                     ) : (
                         <div className="min-h-0 flex-1">
+                            <GridMenu
+                                resolve={resolveTarget}
+                                heldRange={() => selectionRef.current}
+                                onOpenChange={(open, target) => {
+                                    setMenuOpen(open);
+                                    if (!open) return;
+                                    menuOpenedAt.current = Date.now();
+                                    setMenuUsed(true);
+                                    // What the menu is about stays highlighted while it is open.
+                                    setSelection(target?.kind === "slot" ? target.range : null);
+                                    // A card open on something else is done with.
+                                    setPopover(null);
+                                }}
+                                calendars={calendars ?? []}
+                                clipboard={clipboard}
+                                taskLists={taskLists.lists}
+                                showsOnlyDay={(day) => view === "day" && anchor === day}
+                                actions={menuActions}
+                            >
                             <Suspense fallback={<GridSkeleton />}>
                                 <GridView
                                     view={view}
@@ -1152,6 +1561,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                     businessHours={businessHours}
                                     events={events}
                                     selectedId={selected?.id ?? null}
+                                    selection={selection}
                                     words={{
                                         allDay: t("grid.allDay"),
                                         noEvents: t("grid.noEvents"),
@@ -1159,11 +1569,19 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                         more: (count) => t("grid.more", { count }),
                                         secondaryZone: t("grid.secondaryZone", {
                                             zone: preferences.secondaryTimezone ?? ""
-                                        })
+                                        }),
+                                        day: (day) =>
+                                            time.formatDay(day, locale, { dateStyle: "full" })
                                     }}
-                                    onSelectRange={(range, anchorRect) =>
-                                        startCreate(range.start, range.end, anchorRect)
-                                    }
+                                    onSelectRange={(range, anchorRect) => {
+                                        if (
+                                            menuOpen ||
+                                            Date.now() - menuOpenedAt.current < MENU_SETTLE_MS
+                                        )
+                                            return false;
+                                        startCreate(range.start, range.end, anchorRect);
+                                        return true;
+                                    }}
                                     onItemClick={(item, id, anchorRect) =>
                                         openItem(item, id, anchorRect)
                                     }
@@ -1184,6 +1602,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                     }}
                                 />
                             </Suspense>
+                            </GridMenu>
                         </div>
                     )}
                 </main>
@@ -1342,6 +1761,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
             {AddCalendars ? (
                 <AddCalendars
                     open={addOpen}
+                    tab={addTab}
                     onOpenChange={setAddOpen}
                     onChanged={() => {
                         calendarsRead.refresh();
@@ -1349,6 +1769,28 @@ export function CalendarScreen({ path }: { path: string[] }) {
                     }}
                 />
             ) : null}
+            <NewTaskDialog
+                at={taskAt}
+                zone={zone}
+                locale={locale}
+                onClose={() => setTaskAt(null)}
+                onCreated={(created) => {
+                    toast.show({
+                        key: "calendar-task-created",
+                        title: t("newTask.created", { reference: created.reference }),
+                        actions: [
+                            {
+                                label: t("newTask.open"),
+                                run: async () => {
+                                    router.push(`/tasks/t/${created.taskId}`);
+                                    return null;
+                                }
+                            }
+                        ]
+                    });
+                    eventsChanged();
+                }}
+            />
             <ShortcutsDialog
                 open={helpOpen}
                 onOpenChange={setHelpOpen}

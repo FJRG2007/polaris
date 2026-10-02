@@ -29,6 +29,8 @@ export interface CalendarDialogSlotProps {
 /** A dialog that adds calendars: a subscription, a linked account, holidays. */
 export interface AddCalendarsSlotProps {
     readonly open: boolean;
+    /** The tab it opens on. */
+    readonly tab?: "subscribe" | "holidays" | "accounts";
     readonly onOpenChange: (open: boolean) => void;
     readonly onChanged: () => void;
 }

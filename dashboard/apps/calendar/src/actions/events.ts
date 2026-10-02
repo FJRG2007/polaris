@@ -135,6 +135,79 @@ export async function duplicateEventAction(input: unknown): Promise<Outcome<{ ob
     }));
 }
 
+const pasteInput = z.object({
+    objectId: uuidSchema,
+    recurrenceKey,
+    calendarId: uuidSchema,
+    start: engine.dateValueSchema,
+    end: engine.dateValueSchema,
+    zone
+});
+
+/** Paste a copied occurrence as a new event at another time. */
+export async function pasteEventAction(input: unknown): Promise<Outcome<{ objectId: string }>> {
+    const parsed = pasteInput.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    const { start, end } = parsed.data;
+    // Both ends the same kind, and the end after the start.
+    const ordered =
+        "date" in start && "date" in end
+            ? end.date > start.date
+            : "dateTime" in start && "dateTime" in end
+              ? engine.valueToInstant(end, parsed.data.zone).getTime() >
+                engine.valueToInstant(start, parsed.data.zone).getTime()
+              : false;
+    if (!ordered) return invalid([{ message: "endBeforeStart" }]);
+    return outcome(async () => ({
+        objectId: await objects.pasteEvent(await requireCalendarUser(), {
+            objectId: parsed.data.objectId,
+            recurrenceKey: parsed.data.recurrenceKey,
+            calendarId: parsed.data.calendarId,
+            start,
+            end,
+            floatingZone: parsed.data.zone
+        })
+    }));
+}
+
+const moveInput = z.object({ objectId: uuidSchema, calendarId: uuidSchema, zone });
+
+/** Move a whole event to another calendar. */
+export async function moveEventAction(input: unknown): Promise<Outcome<{ objectId: string }>> {
+    const parsed = moveInput.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    return outcome(async () => ({
+        objectId: await objects.moveEvent(await requireCalendarUser(), {
+            objectId: parsed.data.objectId,
+            calendarId: parsed.data.calendarId,
+            floatingZone: parsed.data.zone
+        })
+    }));
+}
+
+const colorInput = z.object({
+    objectId: uuidSchema,
+    color: z
+        .string()
+        .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+        .nullable(),
+    zone
+});
+
+/** Colour a whole event, or hand it back the calendar's colour. */
+export async function setEventColorAction(input: unknown): Promise<Outcome<object>> {
+    const parsed = colorInput.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    return outcome(async () => {
+        await objects.setEventColor(await requireCalendarUser(), {
+            objectId: parsed.data.objectId,
+            color: parsed.data.color,
+            floatingZone: parsed.data.zone
+        });
+        return {};
+    });
+}
+
 const respondInput = z.object({
     objectId: uuidSchema,
     recurrenceKey,

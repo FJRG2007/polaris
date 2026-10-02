@@ -24,6 +24,7 @@ import {
     Palette,
     Pencil,
     Plus,
+    Settings2,
     Share2,
     Trash2,
     Users
@@ -46,6 +47,7 @@ import * as time from "./time";
 import { useCalendarT } from "./i18n";
 import { calendarSlots } from "./slots";
 import { MiniMonth } from "./mini-month";
+import { AddCalendarMenu } from "./accounts/add-calendar-menu";
 import { CALENDAR_COLORS } from "../lib/schemas";
 import { ownsSettings } from "./calendar-dialog";
 import { ColorDot, GroupHeading, useNow } from "./ui";
@@ -121,7 +123,8 @@ export interface SidebarActions {
     readonly onShare: (calendar: CalendarSummary) => void;
     readonly onPublish: (calendar: CalendarSummary) => void;
     readonly onNew: (withTasks: boolean) => void;
-    readonly onAddElsewhere: () => void;
+    /** Subscribe by address, or a holiday calendar: the add dialog on that tab. */
+    readonly onAddFrom: (tab: "subscribe" | "holidays") => void;
     readonly onPickDay: (day: string) => void;
     readonly onToggleSection: (section: string) => void;
     readonly onScheduleTask: (task: TaskItemView, day: string) => void;
@@ -189,33 +192,16 @@ export function Sidebar({
             />
 
             <div className="flex items-center gap-2">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="outline" className="w-full justify-start">
-                            <Plus />
-                            <span className="min-w-0 flex-1 truncate text-left">
-                                {t("sidebar.add")}
-                            </span>
-                            <ChevronDown className="text-foreground-subtle" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                        <DropdownMenuItem onSelect={() => actions.onNew(false)}>
-                            <CalendarPlus />
-                            {t("sidebar.newCalendar")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => actions.onNew(true)}>
-                            <ListTodo />
-                            {t("sidebar.newWithTasks")}
-                        </DropdownMenuItem>
-                        {calendarSlots.AddCalendars ? (
-                            <DropdownMenuItem onSelect={actions.onAddElsewhere}>
-                                <Plus />
-                                {t("sidebar.addElsewhere")}
-                            </DropdownMenuItem>
-                        ) : null}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <AddCalendarMenu
+                    onCreate={actions.onNew}
+                    onAddFrom={calendarSlots.AddCalendars ? actions.onAddFrom : null}
+                >
+                    <Button size="sm" variant="outline" className="w-full justify-start">
+                        <Plus />
+                        <span className="min-w-0 flex-1 truncate text-left">{t("sidebar.add")}</span>
+                        <ChevronDown className="text-foreground-subtle" />
+                    </Button>
+                </AddCalendarMenu>
             </div>
 
             {calendarsError && !calendars ? (
@@ -493,10 +479,14 @@ function CalendarRow({
                 />
             ) : null}
             {failing ? (
-                <AlertTriangle
+                <Link
+                    href="/calendar/settings/accounts"
                     aria-label={t("sidebar.syncProblem")}
-                    className="size-3.5 text-warning"
-                />
+                    title={t("sidebar.syncProblemFix")}
+                    className="shrink-0 rounded"
+                >
+                    <AlertTriangle aria-hidden className="size-3.5 text-warning" />
+                </Link>
             ) : null}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -584,6 +574,14 @@ function CalendarRow({
                         <DropdownMenuItem onSelect={() => actions.onPublish(calendar)}>
                             <Share2 />
                             {t("sidebar.publish")}
+                        </DropdownMenuItem>
+                    ) : null}
+                    {calendar.source ? (
+                        <DropdownMenuItem asChild>
+                            <Link href="/calendar/settings/accounts">
+                                <Settings2 />
+                                {t("sidebar.manageAccount")}
+                            </Link>
                         </DropdownMenuItem>
                     ) : null}
                     {calendar.reach !== "freebusy" ? (

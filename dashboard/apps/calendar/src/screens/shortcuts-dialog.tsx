@@ -3,7 +3,12 @@
 /** Every key the calendar answers to, opened with `?` and from the settings. */
 
 import { useCalendarT } from "./i18n";
-import { EDITOR_SHORTCUT_ROWS, SHORTCUT_ROWS } from "./shortcuts";
+import {
+    CLIPBOARD_SHORTCUT_ROWS,
+    EDITOR_SHORTCUT_ROWS,
+    GRID_SHORTCUT_ROWS,
+    SHORTCUT_ROWS
+} from "./shortcuts";
 import {
     applePlatform,
     Dialog,
@@ -54,6 +59,22 @@ export function ShortcutsTable({ enabled }: { enabled: boolean }) {
                             <td className="py-1.5 pr-3">{t(`shortcuts.labels.${row.label}`)}</td>
                             <td className="py-1.5">
                                 <Keys keys={row.keys} />
+                            </td>
+                        </tr>
+                    ))}
+                    {GRID_SHORTCUT_ROWS.map((row) => (
+                        <tr key={`grid-${row.label}`} className="border-t border-border">
+                            <td className="py-1.5 pr-3">{t(`shortcuts.labels.${row.label}`)}</td>
+                            <td className="py-1.5">
+                                <Keys keys={row.keys} />
+                            </td>
+                        </tr>
+                    ))}
+                    {CLIPBOARD_SHORTCUT_ROWS.map((row) => (
+                        <tr key={`clipboard-${row.label}`} className="border-t border-border">
+                            <td className="py-1.5 pr-3">{t(`shortcuts.labels.${row.label}`)}</td>
+                            <td className="py-1.5">
+                                <Keys keys={row.keys} modifier={modifier} />
                             </td>
                         </tr>
                     ))}

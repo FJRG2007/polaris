@@ -12,6 +12,7 @@
 import Link from "next/link";
 import { useCalendarT } from "../i18n";
 import { FieldRow, GroupHeading } from "../ui";
+import { ProviderLinkButton, ProviderUnavailable } from "./provider-link";
 import { addressSchema } from "../../lib/schemas";
 import { StatusNote, useIssueText } from "../public/kit";
 import { useEffect, useState } from "react";
@@ -146,6 +147,16 @@ export function AccountsView({
         accounts.refresh();
     }
 
+    // Arriving at one of the forms (`#caldav`, `#feed`, from the "Add calendar"
+    // menu or the settings) puts the reader in its first field.
+    useEffect(() => {
+        const id = window.location.hash.slice(1);
+        if (id !== "caldav" && id !== "feed") return;
+        const section = document.getElementById(id);
+        section?.scrollIntoView({ block: "start" });
+        section?.querySelector<HTMLElement>("input, button[role='combobox']")?.focus();
+    }, []);
+
     const data = accounts.data;
     const allow = instance.data?.settings.allowSubscriptions ?? true;
     const subscribed = data?.subscribed ?? [];
@@ -192,10 +203,12 @@ export function AccountsView({
                                 key={source.id}
                                 source={source}
                                 reconnectUrl={
-                                    source.kind === "google" || source.kind === "microsoft"
+                                    (source.kind === "google" || source.kind === "microsoft") &&
+                                    data.linkAvailable[source.kind]
                                         ? data.linkUrls[source.kind]
                                         : null
                                 }
+                                canManage={data.canManage}
                                 onReplace={(next) =>
                                     accounts.replace({
                                         ...data,
@@ -220,7 +233,7 @@ export function AccountsView({
                 )}
             </section>
 
-            <section className="flex flex-col gap-2">
+            <section id="linked" className="flex scroll-mt-4 flex-col gap-2">
                 <GroupHeading>{t("accounts.linkedTitle")}</GroupHeading>
                 {data ? (
                     <LinkedAccounts accounts={data} onChanged={changed} />
@@ -229,13 +242,19 @@ export function AccountsView({
                 )}
             </section>
 
-            <section className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
+            <section
+                id="caldav"
+                className="flex scroll-mt-4 flex-col gap-2 rounded-lg border border-border bg-card p-4"
+            >
                 <h2 className="text-sm font-semibold">{t("accounts.caldav.title")}</h2>
                 <p className="text-xs text-foreground-subtle">{t("accounts.caldav.lead")}</p>
                 <CalDavForm onAdded={changed} />
             </section>
 
-            <section className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
+            <section
+                id="feed"
+                className="flex scroll-mt-4 flex-col gap-2 rounded-lg border border-border bg-card p-4"
+            >
                 <h2 className="text-sm font-semibold">{t("accounts.feed.title")}</h2>
                 {allow ? (
                     <>
@@ -364,32 +383,38 @@ function LinkedAccounts({ accounts, onChanged }: { accounts: Accounts; onChanged
                                     ) : null}
                                     {t("accounts.useForCalendars")}
                                 </Button>
-                            ) : (
+                            ) : accounts.linkAvailable[link.provider] ? (
                                 <Button size="sm" variant="outline" asChild>
                                     <a href={accounts.linkUrls[link.provider]}>
                                         {t("accounts.reconnect")}
                                     </a>
                                 </Button>
+                            ) : (
+                                <ProviderUnavailable
+                                    provider={link.provider}
+                                    canManage={accounts.canManage}
+                                    className="basis-full"
+                                />
                             )}
                         </li>
                     ))}
                 </ul>
             ) : null}
-            <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" asChild>
-                    <a href={accounts.linkUrls.google}>
-                        <Logo slug="google" className="size-4" />
-                        {hasGoogle ? t("accounts.linkAnotherGoogle") : t("accounts.linkGoogle")}
-                    </a>
-                </Button>
-                <Button size="sm" variant="secondary" asChild>
-                    <a href={accounts.linkUrls.microsoft}>
-                        <Logo slug="microsoft" className="size-4" />
-                        {hasMicrosoft
+            <div className="flex flex-wrap items-start gap-2">
+                <ProviderLinkButton
+                    provider="google"
+                    accounts={accounts}
+                    label={hasGoogle ? t("accounts.linkAnotherGoogle") : t("accounts.linkGoogle")}
+                />
+                <ProviderLinkButton
+                    provider="microsoft"
+                    accounts={accounts}
+                    label={
+                        hasMicrosoft
                             ? t("accounts.linkAnotherMicrosoft")
-                            : t("accounts.linkMicrosoft")}
-                    </a>
-                </Button>
+                            : t("accounts.linkMicrosoft")
+                    }
+                />
             </div>
         </div>
     );
@@ -402,11 +427,14 @@ function statusTone(status: SourceView["status"]): "success" | "warning" | "dang
 function SourceRow({
     source,
     reconnectUrl,
+    canManage,
     onReplace,
     onRemoved
 }: {
     source: SourceView;
+    /** Where to authorize it again; null for a provider that cannot be reached. */
     reconnectUrl: string | null;
+    canManage: boolean;
     onReplace: (next: SourceView) => void;
     /** true: take it off the list now; false: the removal was refused, read the list again. */
     onRemoved: (gone: boolean) => void;
@@ -590,6 +618,11 @@ function SourceRow({
                     </Button>
                 </div>
             </div>
+            {source.status === "auth" &&
+            !reconnectUrl &&
+            (source.kind === "google" || source.kind === "microsoft") ? (
+                <ProviderUnavailable provider={source.kind} canManage={canManage} />
+            ) : null}
             {error ? <StatusNote tone="danger">{error}</StatusNote> : null}
             {source.kind === "caldav" ? (
                 <PasswordDialog

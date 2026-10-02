@@ -198,17 +198,21 @@ const RunnerAccessContext = createContext<Promise<RunnerAccessNoteData | null> |
 
 export function IntegrationsView({
     cards,
-    runnerAccess
+    runnerAccess,
+    configure = null
 }: {
     cards: IntegrationCard[];
     /** Null when GitHub is not connected, so there is nothing to check. */
     runnerAccess?: Promise<RunnerAccessNoteData | null>;
+    /** A service to open the setup of on arrival, named by another screen. */
+    configure?: string | null;
 }) {
     const t = useTranslations("admin");
 
     const router = useRouter();
-    const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
-    const [query, setQuery] = useState("");
+    const asked = configure ? (cards.find((card) => card.slug === configure) ?? null) : null;
+    const [configuring, setConfiguring] = useState<IntegrationCard | null>(asked);
+    const [query, setQuery] = useState(asked?.name ?? "");
     const ConfigureDialog = configuring ? dialogFor(configuring) : null;
 
     const needle = query.trim().toLowerCase();

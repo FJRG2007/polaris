@@ -82,6 +82,11 @@
         "neverSynced": "Not synced yet",
         "newAddress": "New address",
         "newPassword": "New password for {name}",
+        "notSetUp": {
+            "admin": "{provider} sign-in is not set up on this Polaris yet.",
+            "member": "{provider} is not set up on this Polaris yet. Ask your administrator to set it up.",
+            "setUp": "Set up {provider}"
+        },
         "outcome": {
             "cancelled": "Linking was canceled. Nothing changed.",
             "dismiss": "Dismiss",

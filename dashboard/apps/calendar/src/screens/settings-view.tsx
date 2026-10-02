@@ -77,9 +77,9 @@ function Row({
     );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
     return (
-        <Card>
+        <Card id={id} className={id ? "scroll-mt-4" : undefined}>
             <CardHeader>
                 <CardTitle>
                     <span role="heading" aria-level={2}>
@@ -111,6 +111,15 @@ export function SettingsView() {
                 .calendars
     );
     const preferences = preferencesRead.data;
+    const loaded = preferences !== null;
+
+    // A link to one section (`#transfer`, from the "Add calendar" menu) lands
+    // on it once the sections are drawn, which is after the settings arrive.
+    useEffect(() => {
+        if (!loaded) return;
+        const id = window.location.hash.slice(1);
+        if (id) document.getElementById(id)?.scrollIntoView({ block: "start" });
+    }, [loaded]);
 
     const save = async (patch: Partial<CalendarPreferences>) => {
         const current = preferencesRead.data;
@@ -437,7 +446,7 @@ export function SettingsView() {
                 </div>
             </Section>
 
-            <Section title={t("settingsPage.transfer")}>
+            <Section id="transfer" title={t("settingsPage.transfer")}>
                 <ImportExport
                     calendars={calendarsRead.data}
                     zone={time.displayZone(preferences.timezone, format.preferences.timeZone)}

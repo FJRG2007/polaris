@@ -71,8 +71,17 @@ async function provenApplications(): Promise<Map<string, boolean>> {
     return new Map(entries);
 }
 
-export default async function IntegrationsPage() {
+export default async function IntegrationsPage({
+    searchParams
+}: {
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
     await requireAdmin();
+    // `?configure=<slug>` opens that service's setup straight away: what another
+    // screen links to when it has just said the service is not set up yet.
+    const asked = (await searchParams).configure;
+    const configure =
+        typeof asked === "string" && /^[a-z0-9-]{1,40}$/.test(asked) ? asked : null;
     const t = await getTranslations("admin");
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
@@ -250,7 +259,7 @@ export default async function IntegrationsPage() {
                     })}
                 </p>
             </div>
-            <IntegrationsView cards={cards} runnerAccess={runners} />
+            <IntegrationsView cards={cards} runnerAccess={runners} configure={configure} />
         </div>
     );
 }

@@ -83,6 +83,19 @@ export const SHORTCUT_ROWS = [
     { keys: ["Esc"], label: "close" }
 ] as const;
 
+/** The grid's own, on a focused day or event (`grid-menu.tsx`). */
+export const GRID_SHORTCUT_ROWS = [
+    { keys: ["Left", "Right", "Up", "Down"], label: "moveFocus" },
+    { keys: ["Enter"], label: "createHere" },
+    { keys: ["Shift+F10"], label: "menu" }
+] as const;
+
+/** Copying and pasting events, with Ctrl (Cmd on a Mac). */
+export const CLIPBOARD_SHORTCUT_ROWS = [
+    { keys: ["C"], label: "copy" },
+    { keys: ["V"], label: "paste" }
+] as const;
+
 /** The editor's own, with Ctrl (Cmd on a Mac). */
 export const EDITOR_SHORTCUT_ROWS = [
     { keys: ["Enter"], label: "save" },
