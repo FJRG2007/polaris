@@ -10,9 +10,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { utils as sshUtils } from "ssh2";
+import { ed25519Pair } from "./fixtures/ed25519";
 
 /** A real key, since a typed key is now parsed before it is stored. */
-const KEY = sshUtils.generateKeyPairSync("ed25519").private;
+const KEY = ed25519Pair().private;
 
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "99999999-9999-4999-8999-999999999999";
