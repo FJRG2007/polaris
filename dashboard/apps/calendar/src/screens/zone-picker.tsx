@@ -3,13 +3,14 @@
 /**
  * Choosing a time zone: a field to type into and the matching zones under it.
  *
- * Four hundred zones do not fit a plain list, so it is searched - by name, by
- * city, by offset ("+02"). The list opens in the flow of the form rather than
+ * Four hundred zones do not fit a plain list, so it is searched - by city, by
+ * country, by zone name or abbreviation, by offset ("+02"). The list opens in the flow of the form rather than
  * floating over it: this sits inside dialogs, whose own scrolling clips a
  * floating list and whose focus trap fights one drawn outside them.
  */
 
 import * as engine from "../engine";
+import { cityOptions, searchCities } from "../lib/clock/cities";
 import { useCalendarT } from "./i18n";
 import { cn, Input } from "@polaris/ui";
 import { Check, Globe } from "lucide-react";
@@ -19,7 +20,17 @@ import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 interface ZoneOption {
     readonly value: string;
     readonly label: string;
-    readonly haystack: string;
+    /** Drawn quietly at the end of the row: a city's offset. */
+    readonly hint?: string;
+}
+
+/** Every zone named as a city ("Tokyo, Japan"), for the world clock. */
+function cityZoneOptions(locale: string, now: Date): ZoneOption[] {
+    return cityOptions(locale, now).map((city) => ({
+        value: city.zone,
+        label: [city.city, city.country || city.note].filter(Boolean).join(", "),
+        hint: city.offset
+    }));
 }
 
 let zoneCache: { locale: string; hour: number; options: ZoneOption[] } | null = null;
@@ -28,14 +39,10 @@ function zoneOptions(locale: string, now: Date): ZoneOption[] {
     const hour = Math.floor(now.getTime() / 3_600_000);
     if (zoneCache && zoneCache.locale === locale && zoneCache.hour === hour)
         return zoneCache.options;
-    const options = engine.listZones().map((zone) => {
-        const label = engine.zoneLabel(zone, now, locale);
-        return {
-            value: zone,
-            label,
-            haystack: `${label} ${zone.replace(/[_/]/g, " ")}`.toLowerCase()
-        };
-    });
+    const options = engine.listZones().map((zone) => ({
+        value: zone,
+        label: engine.zoneLabel(zone, now, locale)
+    }));
     zoneCache = { locale, hour, options };
     return options;
 }
@@ -48,7 +55,9 @@ export function ZonePicker({
     onChange,
     allowFloating = false,
     disabled,
-    label
+    label,
+    cities = false,
+    placeholder
 }: {
     id?: string;
     /** An IANA zone, or "" for floating when `allowFloating`. */
@@ -58,6 +67,9 @@ export function ZonePicker({
     disabled?: boolean;
     /** The accessible name, when no `<label>` points at `id`. */
     label?: string;
+    /** List zones as the cities they are named after, the world clock's way. */
+    cities?: boolean;
+    placeholder?: string;
 }) {
     const t = useCalendarT();
     const locale = hostUi.i18nProvider.useLocale();
@@ -66,24 +78,30 @@ export function ZonePicker({
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
     const input = useRef<HTMLInputElement>(null);
-    const options = useMemo(() => zoneOptions(locale, new Date()), [locale]);
+    const options = useMemo(
+        () => (cities ? cityZoneOptions(locale, new Date()) : zoneOptions(locale, new Date())),
+        [locale, cities]
+    );
 
     const shownValue =
         value === ""
             ? t("zonePicker.floating")
             : (options.find((option) => option.value === value)?.label ?? value);
     const matches = useMemo(() => {
-        const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const typed = query.trim();
+        // Found the world clock's way: by city, country in the reader's
+        // language, zone name, abbreviation or offset.
+        const byZone = new Map(options.map((option) => [option.value, option]));
         const found =
-            words.length === 0
+            typed === ""
                 ? options
-                : options.filter((option) => words.every((word) => option.haystack.includes(word)));
+                : searchCities(cityOptions(locale, new Date()), typed, MOST_SHOWN)
+                      .map((city) => byZone.get(city.zone))
+                      .filter((option): option is ZoneOption => option !== undefined);
         const floating: ZoneOption[] =
-            allowFloating && words.length === 0
-                ? [{ value: "", label: t("zonePicker.floating"), haystack: "" }]
-                : [];
+            allowFloating && typed === "" ? [{ value: "", label: t("zonePicker.floating") }] : [];
         return [...floating, ...found].slice(0, MOST_SHOWN);
-    }, [options, query, allowFloating, t]);
+    }, [options, query, allowFloating, t, locale]);
 
     const choose = (zone: string) => {
         onChange(zone);
@@ -135,7 +153,7 @@ export function ZonePicker({
                     disabled={disabled}
                     className="pl-8"
                     value={open ? query : shownValue}
-                    placeholder={t("zonePicker.search")}
+                    placeholder={placeholder ?? t("zonePicker.search")}
                     title={shownValue}
                     onFocus={() => setOpen(false)}
                     onClick={() => setOpen(true)}
@@ -189,6 +207,11 @@ export function ZonePicker({
                                 <span className="min-w-0 flex-1 truncate" title={option.label}>
                                     {option.label}
                                 </span>
+                                {option.hint ? (
+                                    <span className="shrink-0 text-xs text-foreground-subtle">
+                                        {option.hint}
+                                    </span>
+                                ) : null}
                                 {option.value === value ? (
                                     <Check aria-hidden className="size-4 text-primary" />
                                 ) : null}

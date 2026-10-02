@@ -10,7 +10,8 @@ import type { AppHostTypes } from "@polaris/app-host";
 
 type AppExtension = AppHostTypes["AppExtension"];
 
-const MINUTE = 60 * 1000;
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
 
 export const calendarExtension: AppExtension = {
     id: "calendar",
@@ -36,6 +37,19 @@ export const calendarExtension: AppExtension = {
             run: async () => (await import("./reminders")).fireDueReminders()
         },
         {
+            key: "calendar-clock",
+            // The Time area's alarms and timers ring through here when no tab
+            // is open to ring them, so it runs on the scheduler's quick tick:
+            // a timer heard a minute late is a timer that failed.
+            everyMs: 15 * SECOND,
+            // Not leased: each ring is claimed by a write conditional on the
+            // instant it was due, so a second runner finds it already moved on
+            // and says nothing - and a lease taken four times a minute would
+            // cost more than the pass it guards.
+            leaseMs: null,
+            run: async () => (await import("./clock/service")).fireDueClocks()
+        },
+        {
             key: "calendar-housekeeping",
             // Hourly: the trash and the booking pages age by days, not minutes.
             everyMs: 60 * MINUTE,
@@ -45,6 +59,11 @@ export const calendarExtension: AppExtension = {
             run: async () => (await import("./housekeeping")).sweepCalendarHousekeeping()
         }
     ],
+
+    // The running timers and stopwatch beside the bell, and the ring of an
+    // alarm or a timer in whatever screen is open. Drawn by the app's slot
+    // component, which reads its own data.
+    headerSlot: () => ({ app: "calendar", kind: "header-time", props: {} }),
 
     upcomingEvents: async (userId, limit) =>
         (await import("./upcoming")).upcomingEvents(userId, limit),

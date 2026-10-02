@@ -301,6 +301,50 @@ const MODELS: Record<string, Model> = {
         relations: { user: { model: "user", kind: "one", foreignKey: "userId", references: "id" } },
         unique: [["userId"]],
         updatedAt: true
+    },
+    clockAlarm: {
+        fields: {
+            id: uuid,
+            userId: undefined,
+            time: undefined,
+            days: 0,
+            label: "",
+            sound: "chime",
+            snoozeMinutes: 10,
+            enabled: true,
+            zone: undefined,
+            nextFireAt: null,
+            snoozed: false,
+            createdAt: now,
+            updatedAt: now
+        },
+        relations: { user: { model: "user", kind: "one", foreignKey: "userId", references: "id" } },
+        unique: [["id"]],
+        updatedAt: true
+    },
+    clockTimer: {
+        fields: {
+            id: uuid,
+            userId: undefined,
+            label: "",
+            durationMs: undefined,
+            sound: "chime",
+            endsAt: null,
+            remainingMs: null,
+            firedAt: null,
+            pomodoro: null,
+            createdAt: now,
+            updatedAt: now
+        },
+        relations: { user: { model: "user", kind: "one", foreignKey: "userId", references: "id" } },
+        unique: [["id"]],
+        updatedAt: true
+    },
+    clockStopwatch: {
+        fields: { userId: undefined, startedAt: null, elapsedMs: 0, laps: "[]", updatedAt: now },
+        relations: { user: { model: "user", kind: "one", foreignKey: "userId", references: "id" } },
+        unique: [["userId"]],
+        updatedAt: true
     }
 };
 
@@ -831,6 +875,9 @@ export function createFakeDb() {
         calendarReminder: delegate("calendarReminder"),
         calendarInvitation: delegate("calendarInvitation"),
         calendarPreference: delegate("calendarPreference"),
+        clockAlarm: delegate("clockAlarm"),
+        clockTimer: delegate("clockTimer"),
+        clockStopwatch: delegate("clockStopwatch"),
         $transaction: async (work: unknown): Promise<unknown> => {
             if (Array.isArray(work)) {
                 const results: unknown[] = [];

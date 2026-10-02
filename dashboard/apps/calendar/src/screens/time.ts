@@ -191,21 +191,35 @@ export interface CalendarRoute {
     readonly view: CalendarViewName | null;
     readonly date: DayString | null;
     readonly objectId: string | null;
+    /** `/calendar/new/<when>`: open a new event starting then (the Time
+     *  area's meeting planner hands over this way). */
+    readonly newAt: Date | null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** `/calendar/<view>/<date>` and `/calendar/e/<objectId>`; anything else is the
- *  calendar as it was left. */
+/** `/calendar/<view>/<date>`, `/calendar/e/<objectId>` and
+ *  `/calendar/new/<YYYY-MM-DDTHH:mmZ>`; anything else is the calendar as it was
+ *  left. */
 export function parseCalendarPath(path: readonly string[]): CalendarRoute {
-    const [first, second] = path;
+    const [first, raw] = path;
+    let second = raw;
+    try {
+        second = raw === undefined ? undefined : decodeURIComponent(raw);
+    } catch {
+        // A malformed escape is read as it was written, and matches nothing.
+    }
     if (first === "e" && second && UUID.test(second))
-        return { view: null, date: null, objectId: second.toLowerCase() };
+        return { view: null, date: null, objectId: second.toLowerCase(), newAt: null };
+    if (first === "new" && second && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/.test(second)) {
+        const at = new Date(second);
+        if (!Number.isNaN(at.getTime())) return { view: null, date: null, objectId: null, newAt: at };
+    }
     const view = (VIEWS as readonly string[]).includes(first ?? "")
         ? (first as CalendarViewName)
         : null;
     const date = second && isDayString(second) ? second : null;
-    return { view, date, objectId: null };
+    return { view, date, objectId: null, newAt: null };
 }
 
 export function calendarPath(view: CalendarViewName, date: DayString): string {

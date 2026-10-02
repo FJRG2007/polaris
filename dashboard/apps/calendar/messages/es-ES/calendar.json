@@ -261,7 +261,8 @@
         "today": "Hoy",
         "todayHint": "Ir a hoy",
         "trash": "Papelera",
-        "view": "Vista"
+        "view": "Vista",
+        "time": "Alarmas, temporizadores y reloj"
     },
     "legend": {
         "busyOnly": "Solo se comparte la hora contigo",
@@ -603,7 +604,8 @@
         "toggleFailed": "No se ha mostrado ni ocultado el calendario",
         "unmute": "Activar avisos",
         "unscheduled": "Tareas sin fecha",
-        "worldClock": "Reloj mundial"
+        "worldClock": "Reloj mundial",
+        "time": "Hora"
     },
     "tasksPanel": {
         "scheduleFailed": "No se ha dado fecha a la tarea",

@@ -1,0 +1,188 @@
+{
+    "time": {
+        "title": "Time",
+        "description": "Alarms, timers, a stopwatch and the world clock. They ring here and wherever your notifications go.",
+        "tabs": {
+            "label": "Time tools",
+            "alarms": "Alarms",
+            "timers": "Timers & focus",
+            "stopwatch": "Stopwatch",
+            "world": "World clock"
+        },
+        "loadFailed": "Your alarms and timers could not be read.",
+        "label": "Label",
+        "labelTooLong": "Keep the label to {max} characters.",
+        "sound": "Sound",
+        "preview": "Play the sound",
+        "sounds": {
+            "chime": "Chime",
+            "bell": "Bell",
+            "beep": "Beep",
+            "digital": "Digital",
+            "gentle": "Gentle"
+        },
+        "minutes": "{count, plural, one {# minute} other {# minutes}}",
+        "minutesShort": "{count} min",
+        "start": "Start",
+        "pause": "Pause",
+        "resume": "Resume",
+        "reset": "Start over",
+        "save": "Save",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "delete": "Delete",
+        "more": "More",
+        "length": {
+            "hours": "{hours} h {minutes} min",
+            "minutes": "{minutes} min",
+            "seconds": "{seconds} s"
+        },
+        "alarms": {
+            "add": "New alarm",
+            "zone": "Rings in {zone} time",
+            "emptyTitle": "No alarms",
+            "emptyBody": "Set one to ring once or on the days you choose.",
+            "once": "Once",
+            "everyDay": "Every day",
+            "weekdays": "Weekdays",
+            "weekends": "Every weekend",
+            "ringsIn": "Rings in {length}",
+            "snoozedUntil": "Snoozed until {time}",
+            "toggle": "Alarm at {time}",
+            "editOne": "Edit the alarm at {time}",
+            "skip": "Skip next ring",
+            "deleteTitle": "Delete this alarm?",
+            "deleteBody": "The alarm at {time} stops ringing for good.",
+            "newTitle": "New alarm",
+            "editTitle": "Edit alarm",
+            "time": "Time",
+            "repeat": "Repeat",
+            "nextOn": "next {when}",
+            "labelHint": "Wake up, Medicine",
+            "snooze": "Snooze"
+        },
+        "timers": {
+            "new": "Set a new timer",
+            "hours": "Hours",
+            "minutesField": "Minutes",
+            "secondsField": "Seconds",
+            "tooLong": "A timer can run for up to 99 hours, 59 minutes and 59 seconds.",
+            "presets": "Quick timers",
+            "startPreset": "Start a {length} timer",
+            "recent": "Used lately",
+            "labelHint": "Pasta, Laundry",
+            "full": "You have {max} timers, the most there can be. Delete one to add another.",
+            "emptyTitle": "No timers set up",
+            "emptyBody": "Start one above. It keeps counting if you close the tab or switch device.",
+            "untitled": "{length} timer",
+            "done": "Time's up",
+            "running": "Running",
+            "paused": "Paused",
+            "ready": "Ready",
+            "restart": "Restart",
+            "addMinute": "1 min",
+            "deleteTitle": "Delete this timer?",
+            "deleteBody": "It is still counting. It stops and will not ring."
+        },
+        "focus": {
+            "title": "Focus sessions",
+            "summary": "{focus} min focus, {short} min breaks, a {long} min break every {rounds} rounds.",
+            "settings": "Session lengths",
+            "focusMinutes": "Focus (min)",
+            "shortMinutes": "Break (min)",
+            "longMinutes": "Long break",
+            "rounds": "Rounds",
+            "auto": "Start each phase by itself",
+            "start": "Start focus",
+            "skip": "Skip to the next phase",
+            "round": "Round {round} of {rounds}",
+            "phase": {
+                "focus": "Focus",
+                "short": "Short break",
+                "long": "Long break"
+            }
+        },
+        "stopwatch": {
+            "lap": "Lap",
+            "lapTime": "Lap time",
+            "total": "Total",
+            "laps": "{count, plural, one {# lap} other {# laps}}",
+            "copy": "Copy laps",
+            "export": "Export laps as CSV",
+            "copied": "Laps copied",
+            "copyFailed": "The laps could not be copied.",
+            "copyLine": "Lap {lap}: {time} ({total})",
+            "fileName": "laps",
+            "fastest": "Fastest lap",
+            "slowest": "Slowest lap",
+            "spaceKey": "Space",
+            "lapKey": "L",
+            "resetKey": "R"
+        },
+        "world": {
+            "here": "Your time",
+            "cities": "Cities",
+            "add": "Add a city",
+            "searchHint": "City, country or zone",
+            "emptyTitle": "No cities yet",
+            "emptyBody": "Add the places you work with to see their time and plan meetings across them.",
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "tomorrow": "Tomorrow",
+            "sameTime": "same time",
+            "offsetHours": "{sign}{hours} h",
+            "offsetMinutes": "{sign}{minutes} min",
+            "offsetBoth": "{sign}{hours} h {minutes} min",
+            "clocksChange": "Clocks change {when}",
+            "moveUp": "Move up",
+            "moveDown": "Move down",
+            "remove": "Remove"
+        },
+        "planner": {
+            "title": "Meeting planner",
+            "lead": "Pick an hour to line it up across your cities. Green is working hours there, amber is awake but off, grey is night or weekend.",
+            "day": "Day",
+            "previousDay": "Go to previous day",
+            "nextDay": "Go to next day",
+            "you": "You",
+            "work": "Working hours",
+            "edge": "Awake, off work",
+            "off": "Night or weekend",
+            "createEvent": "Create event at this time"
+        },
+        "compare": {
+            "title": "In your world clock"
+        },
+        "indicator": {
+            "timer": "{name}: {left} left. Open timers",
+            "stopwatch": "Stopwatch at {reading}. Open stopwatch"
+        },
+        "ring": {
+            "stop": "Stop",
+            "snooze": "Snooze {minutes} min",
+            "more": "{count, plural, one {# more is ringing} other {# more are ringing}}"
+        },
+        "notify": {
+            "alarm": "Alarm",
+            "snoozed": "Alarm (snoozed)",
+            "alarmBody": "It is {time}.",
+            "timer": "Timer finished",
+            "timerBody": "Time's up.",
+            "phaseDone": {
+                "focus": "Focus done",
+                "short": "Break over",
+                "long": "Long break over"
+            },
+            "nextBreak": "Break: {minutes} min.",
+            "nextFocus": "Next focus: {minutes} min."
+        },
+        "errors": {
+            "gone": "That alarm or timer is no longer there. The list has been read again.",
+            "changed": "It changed on another device. The list has been read again; try once more.",
+            "tooManyAlarms": "You have 50 alarms, the most there can be. Delete one to add another.",
+            "tooManyTimers": "You have 30 timers, the most there can be. Delete one to add another.",
+            "tooManyLaps": "The stopwatch keeps 500 laps at most. Reset it to start again.",
+            "notACommand": "Write it like \"timer 10m\", \"alarm 7:30\" or \"stopwatch\"."
+        }
+    }
+}

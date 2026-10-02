@@ -42,6 +42,7 @@ import {
 import {
     SLOT_MINUTES,
     VIEWS,
+    WORLD_CLOCK_MAX,
     preferencesPatchSchema,
     type CalendarPreferences
 } from "../lib/preferences";
@@ -517,7 +518,7 @@ function WorldClockSettings({
                         }}
                     />
                 </div>
-            ) : zones.length < 8 ? (
+            ) : zones.length < WORLD_CLOCK_MAX ? (
                 <Button
                     size="sm"
                     variant="outline"

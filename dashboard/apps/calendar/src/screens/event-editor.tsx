@@ -17,6 +17,7 @@ import * as engine from "../engine";
 import { unwrap } from "./cached-read";
 import * as model from "./editor-model";
 import { ZonePicker } from "./zone-picker";
+import { ZoneComparison } from "./clock/zone-compare";
 import { useScopeChoice } from "./scope-dialog";
 import { editorShortcutFor } from "./shortcuts";
 import { useCalendarT, useRuleT } from "./i18n";
@@ -753,6 +754,15 @@ function EditForm({
                                             zone: readableZone(zone)
                                         })}
                                     </p>
+                                ) : null}
+                                {startInstant && endInstant ? (
+                                    <ZoneComparison
+                                        start={startInstant}
+                                        end={endInstant}
+                                        zone={zone}
+                                        eventZone={form.startZone || null}
+                                        preferences={preferences}
+                                    />
                                 ) : null}
                             </div>
                         ) : null}
