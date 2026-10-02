@@ -15,6 +15,11 @@
         "onDay": "On the day {one, select, other {at}} {at}",
         "weeks": "{n, plural, one {# week} other {# weeks}}"
     },
+    "dayKind": {
+        "day": "day",
+        "weekday": "weekday",
+        "weekend": "weekend day"
+    },
     "every": {
         "daily": "{interval, plural, one {Daily} other {Every # days}}",
         "hourly": "{interval, plural, one {Hourly} other {Every # hours}}",
