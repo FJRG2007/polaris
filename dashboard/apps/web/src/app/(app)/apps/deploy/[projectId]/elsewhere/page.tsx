@@ -18,7 +18,12 @@ import { ElsewhereView } from "@/app/(app)/apps/deploy/elsewhere-view";
 import { getProjectFull } from "@/lib/deploy-service";
 import { listConnections } from "@/lib/connections/store";
 import { requireProjectAccess, accessCan } from "@/lib/deploy-project-access";
-import { isProvider, listExternalServices, refreshStale, repoOfSource } from "@/lib/deploy/external-services";
+import {
+    isProvider,
+    listExternalServices,
+    refreshStale,
+    repoOfSource
+} from "@/lib/deploy/external-services";
 
 export const dynamic = "force-dynamic";
 

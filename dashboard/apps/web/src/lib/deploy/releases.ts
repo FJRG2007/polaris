@@ -182,7 +182,12 @@ export function restartReasons(
     hostPortOf: (id: string) => number = () => 0
 ): RestartReason[] {
     const reasons: RestartReason[] = [];
-    let source: { hostPort?: unknown; hostProtocol?: unknown; extraPorts?: unknown; tcpProxies?: unknown };
+    let source: {
+        hostPort?: unknown;
+        hostProtocol?: unknown;
+        extraPorts?: unknown;
+        tcpProxies?: unknown;
+    };
     try {
         source = JSON.parse(app.sourceConfig) as typeof source;
     } catch {

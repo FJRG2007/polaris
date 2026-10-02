@@ -63,9 +63,11 @@ export function serviceRunState(input: RunStateInput): ServiceRunState {
     if (status === "stopped" || status === "removed") return "stopped";
     if (FAILED_DEPLOY_STATUSES.includes(status) || status === "cancelled") return "failed";
     if (!input.collectorAlive) return "running";
-    if (input.lastSampleAt && input.now - input.lastSampleAt.getTime() < RECENT_SAMPLE_MS) return "running";
+    if (input.lastSampleAt && input.now - input.lastSampleAt.getTime() < RECENT_SAMPLE_MS)
+        return "running";
     // Just released: the first sample has not been taken yet.
-    if (input.releasedAt && input.now - input.releasedAt.getTime() < RECENT_SAMPLE_MS) return "running";
+    if (input.releasedAt && input.now - input.releasedAt.getTime() < RECENT_SAMPLE_MS)
+        return "running";
     return "crashed";
 }
 

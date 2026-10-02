@@ -12,7 +12,11 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { DomainReading, ServicePorts, TcpProxyView } from "@/lib/deploy/public-networking";
-import { DomainReadingView, TargetPortField, TcpProxyList } from "@/app/(app)/apps/deploy/public-networking";
+import {
+    DomainReadingView,
+    TargetPortField,
+    TcpProxyList
+} from "@/app/(app)/apps/deploy/public-networking";
 
 const tcpProxiesAction = vi.fn();
 const deployApplicationAction = vi.fn();
@@ -32,14 +36,20 @@ afterEach(() => {
 
 describe("the target port picker", () => {
     it("says it is still looking before any port has been seen", () => {
-        render(<TargetPortField ports={null} value="" onChange={() => undefined} />, { wrapper: MessagesWrapper });
+        render(<TargetPortField ports={null} value="" onChange={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
         expect(screen.getByText("Looking for the ports it listens on...")).toBeDefined();
     });
 
     it("shows the ports actually seen listening, with the service's own marked", () => {
         const ports: ServicePorts = { servicePort: 8080, ports: [8080, 9000], source: "runtime" };
-        render(<TargetPortField ports={ports} value="8080" onChange={() => undefined} />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("These are the ports it was seen listening on just now.")).toBeDefined();
+        render(<TargetPortField ports={ports} value="8080" onChange={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(
+            screen.getByText("These are the ports it was seen listening on just now.")
+        ).toBeDefined();
         expect(screen.getByText(":8080 (service port)")).toBeDefined();
     });
 });
@@ -71,7 +81,9 @@ describe("a domain's DNS and certificate, under its row", () => {
             />,
             { wrapper: MessagesWrapper }
         );
-        expect(screen.getByText("Waiting for DNS. Create one of these records at your DNS provider.")).toBeDefined();
+        expect(
+            screen.getByText("Waiting for DNS. Create one of these records at your DNS provider.")
+        ).toBeDefined();
         expect(screen.getByText("203.0.113.7")).toBeDefined();
     });
 
@@ -79,7 +91,14 @@ describe("a domain's DNS and certificate, under its row", () => {
         render(
             <DomainReadingView
                 reading={reading({
-                    dns: { verdict: "ok", addresses: ["203.0.113.7"], cnames: [], records: [], apex: false, wildcard: false }
+                    dns: {
+                        verdict: "ok",
+                        addresses: ["203.0.113.7"],
+                        cnames: [],
+                        records: [],
+                        apex: false,
+                        wildcard: false
+                    }
                 })}
             />,
             { wrapper: MessagesWrapper }
@@ -91,13 +110,30 @@ describe("a domain's DNS and certificate, under its row", () => {
         render(
             <DomainReadingView
                 reading={reading({
-                    dns: { verdict: "ok", addresses: ["203.0.113.7"], cnames: [], records: [], apex: false, wildcard: false },
-                    cert: { verdict: "valid", issuer: "Let's Encrypt", validTo: null, daysLeft: 76, supplied: false }
+                    dns: {
+                        verdict: "ok",
+                        addresses: ["203.0.113.7"],
+                        cnames: [],
+                        records: [],
+                        apex: false,
+                        wildcard: false
+                    },
+                    cert: {
+                        verdict: "valid",
+                        issuer: "Let's Encrypt",
+                        validTo: null,
+                        daysLeft: 76,
+                        supplied: false
+                    }
                 })}
             />,
             { wrapper: MessagesWrapper }
         );
-        expect(screen.getByText("Certificate from Let's Encrypt, valid for 76 more days. Renewed automatically 30 days before it expires.")).toBeDefined();
+        expect(
+            screen.getByText(
+                "Certificate from Let's Encrypt, valid for 76 more days. Renewed automatically 30 days before it expires."
+            )
+        ).toBeDefined();
     });
 });
 
@@ -110,9 +146,17 @@ describe("the service's TCP proxies", () => {
             deployed: true
         };
         tcpProxiesAction.mockResolvedValue(view);
-        render(<TcpProxyList applicationId="app-1" nonce={0} canEdit={true} onChanged={() => undefined} />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <TcpProxyList
+                applicationId="app-1"
+                nonce={0}
+                canEdit={true}
+                onChanged={() => undefined}
+            />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(await screen.findByText("203.0.113.7:30001")).toBeDefined();
         expect(screen.getByText("TCP to :25565")).toBeDefined();
         expect(screen.getByText(/forward TCP 30001 to 192\.168\.1\.10/)).toBeDefined();
@@ -128,11 +172,25 @@ describe("the service's TCP proxies", () => {
                 deployed: true
             });
         const { rerender } = render(
-            <TcpProxyList applicationId="app-1" nonce={0} canEdit={true} onChanged={() => undefined} />,
+            <TcpProxyList
+                applicationId="app-1"
+                nonce={0}
+                canEdit={true}
+                onChanged={() => undefined}
+            />,
             { wrapper: MessagesWrapper }
         );
-        rerender(<TcpProxyList applicationId="app-1" nonce={1} canEdit={true} onChanged={() => undefined} />);
-        expect(await screen.findByText("The change takes effect when the service is next started.")).toBeDefined();
+        rerender(
+            <TcpProxyList
+                applicationId="app-1"
+                nonce={1}
+                canEdit={true}
+                onChanged={() => undefined}
+            />
+        );
+        expect(
+            await screen.findByText("The change takes effect when the service is next started.")
+        ).toBeDefined();
         expect(screen.getByText("Redeploy now")).toBeDefined();
     });
 });

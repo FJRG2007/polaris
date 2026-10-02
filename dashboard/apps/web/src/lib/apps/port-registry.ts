@@ -68,7 +68,8 @@ export async function takenHostPorts(): Promise<Set<PortKey>> {
             if (!Array.isArray(list)) continue;
             for (const entry of list) {
                 const extra = entry as { host?: unknown; protocol?: unknown };
-                if (typeof extra.host === "number") taken.add(portKey(extra.host, asProtocol(extra.protocol)));
+                if (typeof extra.host === "number")
+                    taken.add(portKey(extra.host, asProtocol(extra.protocol)));
             }
         }
     }
@@ -88,7 +89,10 @@ export async function takenHostPorts(): Promise<Set<PortKey>> {
  * `port-block.ts`. An app whose preferred port sits outside the block is placed
  * inside it, because a port outside the block is a port nothing opened.
  */
-export async function availableHostPort(preferred: number, protocol: PortProtocol = "tcp"): Promise<number> {
+export async function availableHostPort(
+    preferred: number,
+    protocol: PortProtocol = "tcp"
+): Promise<number> {
     return availableHostPortRun(preferred, 1, protocol);
 }
 
@@ -113,7 +117,8 @@ export async function availableHostPortRun(
     count: number,
     protocol: PortProtocol = "tcp"
 ): Promise<number> {
-    if (!Number.isInteger(count) || count < 1) throw new Error("A run of ports is at least one port long");
+    if (!Number.isInteger(count) || count < 1)
+        throw new Error("A run of ports is at least one port long");
     const [taken, blocks] = await Promise.all([takenHostPorts(), getPortBlocks()]);
     const block = blocks[protocol];
     const fits = (start: number): boolean => {

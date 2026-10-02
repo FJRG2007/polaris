@@ -29,7 +29,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as actions from "@/app/(app)/apps/deploy/external-actions";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import type { ExternalServiceView } from "@/lib/deploy/external-services";
-import { ExternalLink, HardDriveDownload, Loader2, Plus, RefreshCw, RotateCw, Trash2 } from "lucide-react";
+import {
+    ExternalLink,
+    HardDriveDownload,
+    Loader2,
+    Plus,
+    RefreshCw,
+    RotateCw,
+    Trash2
+} from "lucide-react";
 import { MoveHomeDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import {
     Badge,
@@ -121,7 +129,9 @@ export function ElsewhereView({
     const [error, setError] = useState("");
 
     const settle = useCallback((service: ExternalServiceView) => {
-        setServices((current) => current.map((entry) => (entry.id === service.id ? service : entry)));
+        setServices((current) =>
+            current.map((entry) => (entry.id === service.id ? service : entry))
+        );
     }, []);
 
     const refresh = useCallback(
@@ -139,7 +149,8 @@ export function ElsewhereView({
         const timer = setInterval(() => {
             if (document.visibilityState !== "visible") return;
             for (const service of services) {
-                if (service.status === "queued" || service.status === "building") void refresh(service.id);
+                if (service.status === "queued" || service.status === "building")
+                    void refresh(service.id);
             }
         }, WATCH_MS);
         return () => clearInterval(timer);
@@ -190,7 +201,9 @@ export function ElsewhereView({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex flex-col gap-0.5">
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("elsewhere.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("elsewhere.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("elsewhere.intro")}</p>
                 </div>
                 {canAdd && accounts.length > 0 && (
@@ -202,7 +215,10 @@ export function ElsewhereView({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -213,7 +229,9 @@ export function ElsewhereView({
                     description={t("elsewhere.noAccountHint")}
                     action={
                         <Button size="sm" asChild>
-                            <Link href="/account/connections">{t("elsewhere.connectedAccounts")}</Link>
+                            <Link href="/account/connections">
+                                {t("elsewhere.connectedAccounts")}
+                            </Link>
                         </Button>
                     }
                 />
@@ -243,7 +261,10 @@ export function ElsewhereView({
                             />
                             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                                 <span className="flex flex-wrap items-center gap-2">
-                                    <span className="truncate text-sm font-medium" title={service.name}>
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        title={service.name}
+                                    >
                                         {service.name}
                                     </span>
                                     <Badge
@@ -255,7 +276,11 @@ export function ElsewhereView({
                                         {service.status === "building" && (
                                             <Loader2 className="size-3 shrink-0 animate-spin" />
                                         )}
-                                        {t(STATUS_WORDS[service.status as keyof typeof STATUS_WORDS] ?? STATUS_WORDS.unknown)}
+                                        {t(
+                                            STATUS_WORDS[
+                                                service.status as keyof typeof STATUS_WORDS
+                                            ] ?? STATUS_WORDS.unknown
+                                        )}
                                     </Badge>
                                 </span>
                                 <span
@@ -265,18 +290,26 @@ export function ElsewhereView({
                                     {[
                                         service.account,
                                         service.lastCommitMessage,
-                                        service.lastCommitSha ? service.lastCommitSha.slice(0, 7) : null,
-                                        service.lastDeployAt ? format.dateTime(service.lastDeployAt) : null
+                                        service.lastCommitSha
+                                            ? service.lastCommitSha.slice(0, 7)
+                                            : null,
+                                        service.lastDeployAt
+                                            ? format.dateTime(service.lastDeployAt)
+                                            : null
                                     ]
                                         .filter(Boolean)
                                         .join(" - ")}
                                 </span>
                                 {service.error && (
-                                    <span className="text-[0.6875rem] text-danger">{service.error}</span>
+                                    <span className="text-[0.6875rem] text-danger">
+                                        {service.error}
+                                    </span>
                                 )}
                                 {service.productionDomains.length > 0 && (
                                     <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-[0.6875rem]">
-                                        <span className="text-muted-foreground">{t("elsewhere.production")}</span>
+                                        <span className="text-muted-foreground">
+                                            {t("elsewhere.production")}
+                                        </span>
                                         {service.productionDomains.slice(0, 4).map((domain) => (
                                             <a
                                                 key={domain}
@@ -296,21 +329,36 @@ export function ElsewhereView({
                                         <Select
                                             value={
                                                 service.applicationId ??
-                                                applications.find((app) => app.repo && app.repo === service.repo)?.id ??
+                                                applications.find(
+                                                    (app) => app.repo && app.repo === service.repo
+                                                )?.id ??
                                                 NO_SERVICE
                                             }
-                                            onValueChange={(value) => void link(service, value === NO_SERVICE ? null : value)}
+                                            onValueChange={(value) =>
+                                                void link(
+                                                    service,
+                                                    value === NO_SERVICE ? null : value
+                                                )
+                                            }
                                             options={[
-                                                { value: NO_SERVICE, label: t("elsewhere.sameAsNone") },
-                                                ...applications.map((app) => ({ value: app.id, label: app.name }))
+                                                {
+                                                    value: NO_SERVICE,
+                                                    label: t("elsewhere.sameAsNone")
+                                                },
+                                                ...applications.map((app) => ({
+                                                    value: app.id,
+                                                    label: app.name
+                                                }))
                                             ]}
                                             className="h-7 w-48 text-xs"
-                                            aria-label={t("elsewhere.sameAsLabel", { name: service.name })}
+                                            aria-label={t("elsewhere.sameAsLabel", {
+                                                name: service.name
+                                            })}
                                         />
                                         {!service.applicationId &&
-                                            applications.some((app) => app.repo && app.repo === service.repo) && (
-                                                <span>{t("elsewhere.sameRepository")}</span>
-                                            )}
+                                            applications.some(
+                                                (app) => app.repo && app.repo === service.repo
+                                            ) && <span>{t("elsewhere.sameRepository")}</span>}
                                     </span>
                                 )}
                             </span>
@@ -328,11 +376,17 @@ export function ElsewhereView({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={t("elsewhere.openOnProvider", { name: service.name })}
+                                        aria-label={t("elsewhere.openOnProvider", {
+                                            name: service.name
+                                        })}
                                         title={t("elsewhere.openOnProviderTitle")}
                                         asChild
                                     >
-                                        <Link href={service.inspectUrl} target="_blank" rel="noreferrer">
+                                        <Link
+                                            href={service.inspectUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
                                             <IntegrationLogo
                                                 slug={service.provider}
                                                 className="size-4 w-5 shrink-0 object-contain"
@@ -368,7 +422,9 @@ export function ElsewhereView({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={t("elsewhere.bringHomeNamed", { name: service.name })}
+                                        aria-label={t("elsewhere.bringHomeNamed", {
+                                            name: service.name
+                                        })}
                                         title={t("elsewhere.bringHome")}
                                         onClick={() => setBringing(service)}
                                     >
@@ -379,7 +435,9 @@ export function ElsewhereView({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={t("elsewhere.removeNamed", { name: service.name })}
+                                        aria-label={t("elsewhere.removeNamed", {
+                                            name: service.name
+                                        })}
                                         title={t("elsewhere.removeFromBoard")}
                                         onClick={() => setRemoving(service)}
                                     >
@@ -495,7 +553,9 @@ function AddDialog({
     // one. What to store is on the choice itself now.
     const asksForChild = children.length > 0;
     const picked = asksForChild ? children.find((entry) => entry.id === child) : project;
-    const ready = Boolean(account && environment && chosen && (!asksForChild || child) && name.trim());
+    const ready = Boolean(
+        account && environment && chosen && (!asksForChild || child) && name.trim()
+    );
 
     const submit = async () => {
         if (!ready || saving) return;
@@ -540,7 +600,9 @@ function AddDialog({
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">{t("move.out.account")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("move.out.account")}
+                        </span>
                         <Select
                             value={account}
                             onValueChange={setAccount}
@@ -554,7 +616,8 @@ function AddDialog({
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            {t("move.out.projectThere")}<span className="text-danger"> *</span>
+                            {t("move.out.projectThere")}
+                            <span className="text-danger"> *</span>
                         </span>
                         {choices === null ? (
                             <Skeleton className="h-8 w-full" />
@@ -571,9 +634,13 @@ function AddDialog({
                                     const picked = choices.find((entry) => entry.id === next);
                                     // Named after the thing being added, which is
                                     // what somebody would have typed anyway.
-                                    if (picked && !name.trim()) setName(picked.name.split(" / ").at(-1) ?? "");
+                                    if (picked && !name.trim())
+                                        setName(picked.name.split(" / ").at(-1) ?? "");
                                 }}
-                                options={choices.map((entry) => ({ value: entry.id, label: entry.name }))}
+                                options={choices.map((entry) => ({
+                                    value: entry.id,
+                                    label: entry.name
+                                }))}
                                 aria-label={t("move.out.projectThere")}
                             />
                         )}
@@ -582,7 +649,8 @@ function AddDialog({
                     {asksForChild && project && (
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs text-muted-foreground">
-                                {t("move.out.service")}<span className="text-danger"> *</span>
+                                {t("move.out.service")}
+                                <span className="text-danger"> *</span>
                             </span>
                             {children.length === 0 ? (
                                 <span className="text-xs text-muted-foreground">
@@ -605,7 +673,8 @@ function AddDialog({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs text-muted-foreground">
-                                {t("move.home.nameHere")}<span className="text-danger"> *</span>
+                                {t("move.home.nameHere")}
+                                <span className="text-danger"> *</span>
                             </span>
                             <Input
                                 value={name}
@@ -615,7 +684,9 @@ function AddDialog({
                             />
                         </label>
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs text-muted-foreground">{t("move.home.environment")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("move.home.environment")}
+                            </span>
                             <Select
                                 value={environment}
                                 onValueChange={setEnvironment}
@@ -629,7 +700,10 @@ function AddDialog({
                     </div>
 
                     {error && (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     )}
@@ -639,7 +713,11 @@ function AddDialog({
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
                         {t("move.cancel")}
                     </Button>
-                    <Button onClick={() => void submit()} disabled={!ready || saving} aria-disabled={!ready || saving}>
+                    <Button
+                        onClick={() => void submit()}
+                        disabled={!ready || saving}
+                        aria-disabled={!ready || saving}
+                    >
                         {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
                         {saving ? t("elsewhere.adding") : t("elsewhere.addButton")}
                     </Button>

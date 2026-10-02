@@ -13,7 +13,9 @@ import { VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
 const mocks = vi.hoisted(() => ({ updateMany: vi.fn(), findMany: vi.fn(), update: vi.fn() }));
 
 vi.mock("@polaris/db", () => ({
-    prisma: { domain: { updateMany: mocks.updateMany, findMany: mocks.findMany, update: mocks.update } }
+    prisma: {
+        domain: { updateMany: mocks.updateMany, findMany: mocks.findMany, update: mocks.update }
+    }
 }));
 vi.mock("@/lib/deploy-service", () => ({ syncAppRoutes: async () => undefined }));
 vi.mock("@/lib/notifications/domain-events", () => ({
@@ -58,7 +60,10 @@ describe("the not-running page", () => {
                 async () =>
                     new Response("<html>not running</html>", {
                         status: 200,
-                        headers: { "content-type": "text/html", [VACANT_HEADER]: VACANT_HEADER_VALUE }
+                        headers: {
+                            "content-type": "text/html",
+                            [VACANT_HEADER]: VACANT_HEADER_VALUE
+                        }
                     })
             )
         );

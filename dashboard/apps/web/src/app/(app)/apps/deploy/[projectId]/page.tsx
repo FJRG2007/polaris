@@ -13,7 +13,12 @@ import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
-import { containerPortOf, getApplicationDeployStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
+import {
+    containerPortOf,
+    getApplicationDeployStatuses,
+    getProjectFull,
+    hostPortForApp
+} from "@/lib/deploy-service";
 
 export const dynamic = "force-dynamic";
 
@@ -92,17 +97,18 @@ export default async function DeployProjectPage({
     // Kept current on its own clock and never waited for: a provider having a bad
     // morning must not hold the board, which draws what was last read.
     void refreshStale(projectId).catch(() => undefined);
-    const [caps, statuses, serverIp, tunnelDomains, attention, serving, elsewhere] = await Promise.all([
-        canManage ? capabilitiesFor("deploy") : null,
-        getApplicationDeployStatuses(
-            allApps.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
-        ),
-        getPublicIp(),
-        listActiveTunnelDomains(appIds),
-        serviceAttention(appIds),
-        servingReleases(allApps.map((app) => ({ ...app, environment: { project } }))),
-        elsewhereByService(projectId, allApps)
-    ]);
+    const [caps, statuses, serverIp, tunnelDomains, attention, serving, elsewhere] =
+        await Promise.all([
+            canManage ? capabilitiesFor("deploy") : null,
+            getApplicationDeployStatuses(
+                allApps.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
+            ),
+            getPublicIp(),
+            listActiveTunnelDomains(appIds),
+            serviceAttention(appIds),
+            servingReleases(allApps.map((app) => ({ ...app, environment: { project } }))),
+            elsewhereByService(projectId, allApps)
+        ]);
     const localReady = Boolean(caps?.deploy);
     // Whether each service is up, apart from how its last deploy went.
     const runStates = await serviceRunStates(allApps, statuses);
@@ -181,8 +187,11 @@ export default async function DeployProjectPage({
                             targetPort:
                                 (domain.portPinned &&
                                     dialsPinnedPort(domain, {
-                                        remote: app.target.kind !== "local" && app.target.hostId !== null,
-                                        keptRelease: (serving.get(app.id)?.portSubject ?? app.id) !== app.id
+                                        remote:
+                                            app.target.kind !== "local" &&
+                                            app.target.hostId !== null,
+                                        keptRelease:
+                                            (serving.get(app.id)?.portSubject ?? app.id) !== app.id
                                     })) ||
                                 (app.target.kind !== "local" && domain.servedBy !== "polaris")
                                     ? domain.targetPort

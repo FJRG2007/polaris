@@ -109,8 +109,11 @@ export function dnsVerdict(
     reading: DnsReading,
     expected: { readonly ip: string | null; readonly cnameTargets: readonly string[] }
 ): DnsVerdict {
-    const targets = new Set(expected.cnameTargets.map((name) => name.toLowerCase().replace(/\.$/, "")));
-    if (reading.cnames.some((name) => targets.has(name.toLowerCase().replace(/\.$/, "")))) return "ok";
+    const targets = new Set(
+        expected.cnameTargets.map((name) => name.toLowerCase().replace(/\.$/, ""))
+    );
+    if (reading.cnames.some((name) => targets.has(name.toLowerCase().replace(/\.$/, ""))))
+        return "ok";
     if (reading.addresses.length === 0) return "missing";
     if (expected.ip && reading.addresses.includes(expected.ip)) return "ok";
     if (reading.addresses.some(isCloudflareAddress)) return "proxied";
@@ -124,7 +127,10 @@ export type CertVerdict = "valid" | "renewing" | "expired" | "untrusted";
  *  DNS-01 planner both do; inside that window a certificate is due, not wrong. */
 export const RENEW_WITHIN_DAYS = 30;
 
-export function certVerdict(cert: { readonly validTo: Date; readonly trusted: boolean }, now: number): CertVerdict {
+export function certVerdict(
+    cert: { readonly validTo: Date; readonly trusted: boolean },
+    now: number
+): CertVerdict {
     if (!cert.trusted) return "untrusted";
     const left = cert.validTo.getTime() - now;
     if (left <= 0) return "expired";

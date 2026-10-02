@@ -40,7 +40,8 @@ async function speaking<T>(run: () => Promise<T>): Promise<T> {
     try {
         return await run();
     } catch (caught) {
-        if (caught instanceof railway.RailwayError) throw new ProviderError(caught.message, caught.kind);
+        if (caught instanceof railway.RailwayError)
+            throw new ProviderError(caught.message, caught.kind);
         throw caught;
     }
 }
@@ -54,7 +55,9 @@ async function speaking<T>(run: () => Promise<T>): Promise<T> {
  * it is visible and can be changed by pointing at it again.
  */
 function environmentOf(environments: readonly railway.RailwayNamed[]): railway.RailwayNamed | null {
-    const named = environments.find((environment) => environment.name.toLowerCase() === "production");
+    const named = environments.find(
+        (environment) => environment.name.toLowerCase() === "production"
+    );
     return named ?? environments[0] ?? null;
 }
 
@@ -62,7 +65,10 @@ function environmentOf(environments: readonly railway.RailwayNamed[]): railway.R
  *  the row is missing one. Checked once rather than at each use: a row written
  *  before either was stored is the only way this happens, and it has to read as
  *  something somebody can act on rather than as an undefined. */
-function addressOf(ref: Readonly<Record<string, string>>): { service: string; environment: string } {
+function addressOf(ref: Readonly<Record<string, string>>): {
+    service: string;
+    environment: string;
+} {
     const service = ref.service;
     const environment = ref.environment;
     if (!service || !environment) {
@@ -144,7 +150,9 @@ export const railwayDriver: ProviderDriver = {
 
     async productionDomains(token, externalId, ref) {
         const { service, environment } = addressOf(ref);
-        return speaking(() => railway.railwayDomains(token, { project: externalId, service, environment }));
+        return speaking(() =>
+            railway.railwayDomains(token, { project: externalId, service, environment })
+        );
     },
 
     /**

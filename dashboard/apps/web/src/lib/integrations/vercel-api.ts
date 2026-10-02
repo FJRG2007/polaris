@@ -110,7 +110,9 @@ function detailOf(payload: unknown): string {
     if (!payload || typeof payload !== "object") return "";
     const body = payload as { error?: { message?: unknown } };
     const message = body.error?.message;
-    return typeof message === "string" && message.trim() && message.length < 200 ? message.trim() : "";
+    return typeof message === "string" && message.trim() && message.length < 200
+        ? message.trim()
+        : "";
 }
 
 /**
@@ -122,14 +124,17 @@ function detailOf(payload: unknown): string {
  * typed.
  */
 export async function vercelUser(token: string): Promise<VercelUser> {
-    const parsed = z
-        .object({ user: userSchema })
-        .safeParse(await call(token, "/v2/user"));
-    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    const parsed = z.object({ user: userSchema }).safeParse(await call(token, "/v2/user"));
+    if (!parsed.success)
+        throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data.user;
 }
 
-const teamSchema = z.object({ id: z.string(), name: z.string().default(""), slug: z.string().default("") });
+const teamSchema = z.object({
+    id: z.string(),
+    name: z.string().default(""),
+    slug: z.string().default("")
+});
 
 export type VercelTeam = z.infer<typeof teamSchema>;
 
@@ -144,7 +149,8 @@ export async function vercelTeams(token: string): Promise<VercelTeam[]> {
     const parsed = z
         .object({ teams: z.array(teamSchema).default([]) })
         .safeParse(await call(token, "/v2/teams?limit=100"));
-    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data.teams;
 }
 
@@ -158,12 +164,16 @@ export type VercelProject = z.infer<typeof projectSchema>;
 
 /** Every project the token reaches, in one scope. `team` is their id for a team,
  *  or nothing for the account's own. */
-export async function vercelProjects(token: string, team?: string | null): Promise<VercelProject[]> {
+export async function vercelProjects(
+    token: string,
+    team?: string | null
+): Promise<VercelProject[]> {
     const query = team ? `?limit=100&teamId=${encodeURIComponent(team)}` : "?limit=100";
     const parsed = z
         .object({ projects: z.array(projectSchema).default([]) })
         .safeParse(await call(token, `/v9/projects${query}`));
-    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data.projects;
 }
 
@@ -202,7 +212,8 @@ export async function vercelDeployments(
     const parsed = z
         .object({ deployments: z.array(deploymentSchema).default([]) })
         .safeParse(await call(token, `/v7/deployments?${query.toString()}`));
-    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data.deployments;
 }
 
@@ -233,7 +244,8 @@ export async function vercelProject(
     const parsed = oneProjectSchema.safeParse(
         await call(token, `/v9/projects/${encodeURIComponent(project)}${query}`)
     );
-    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data;
 }
 
@@ -259,8 +271,14 @@ export async function vercelProductionDomains(
     if (team) params.set("teamId", team);
     const parsed = z
         .object({ domains: z.array(projectDomainSchema).default([]) })
-        .safeParse(await call(token, `/v9/projects/${encodeURIComponent(project)}/domains?${params.toString()}`));
-    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+        .safeParse(
+            await call(
+                token,
+                `/v9/projects/${encodeURIComponent(project)}/domains?${params.toString()}`
+            )
+        );
+    if (!parsed.success)
+        throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data.domains
         .filter((domain) => !domain.redirect && domain.verified !== false)
         .map((domain) => domain.name.toLowerCase());
@@ -276,7 +294,10 @@ const envSchema = z.object({
      *  ciphertext rather than nothing, which is the one shape that would
      *  otherwise be copied somewhere else as if it were a password. */
     decrypted: z.boolean().nullable().default(null),
-    target: z.union([z.array(z.string()), z.string()]).nullable().default(null)
+    target: z
+        .union([z.array(z.string()), z.string()])
+        .nullable()
+        .default(null)
 });
 
 /**
@@ -299,8 +320,14 @@ export async function vercelProjectEnv(
     if (input.team) query.set("teamId", input.team);
     const parsed = z
         .object({ envs: z.array(envSchema).default([]) })
-        .safeParse(await call(token, `/v10/projects/${encodeURIComponent(project)}/env?${query.toString()}`));
-    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+        .safeParse(
+            await call(
+                token,
+                `/v10/projects/${encodeURIComponent(project)}/env?${query.toString()}`
+            )
+        );
+    if (!parsed.success)
+        throw new VercelError("Vercel answered with something unexpected.", "refused");
 
     const want = input.target ?? "production";
     const found: Record<string, string> = {};

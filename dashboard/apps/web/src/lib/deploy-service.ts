@@ -1438,7 +1438,8 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
             // that port: the host publishes only the service's own port.
             const pinnedPort = own && domain.portPinned ? domain.targetPort : null;
             const privately =
-                own && (!domain.application.publishPort || copies !== undefined || pinnedPort !== null);
+                own &&
+                (!domain.application.publishPort || copies !== undefined || pinnedPort !== null);
             const dialHost = privately
                 ? ownName
                 : remoteHostId
@@ -2462,23 +2463,25 @@ async function buildAppPlan(
     // Further doors into the same service (a Java Minecraft server that Bedrock
     // clients join answers on a UDP port beside its own).
     // TCP proxies added from the service's networking panel publish the same way.
-    const extraPorts = Array.isArray(source.extraPorts) || Array.isArray(source.tcpProxies)
-        ? [
-              ...(Array.isArray(source.extraPorts) ? source.extraPorts : []),
-              ...(Array.isArray(source.tcpProxies) ? source.tcpProxies : [])
-          ].flatMap((entry: unknown) => {
-              if (typeof entry !== "object" || entry === null) return [];
-              const port = entry as { host?: unknown; container?: unknown; protocol?: unknown };
-              if (typeof port.host !== "number" || typeof port.container !== "number") return [];
-              return [
-                  {
-                      host: port.host,
-                      container: port.container,
-                      ...(port.protocol === "udp" ? { protocol: "udp" as const } : {})
-                  }
-              ];
-          })
-        : [];
+    const extraPorts =
+        Array.isArray(source.extraPorts) || Array.isArray(source.tcpProxies)
+            ? [
+                  ...(Array.isArray(source.extraPorts) ? source.extraPorts : []),
+                  ...(Array.isArray(source.tcpProxies) ? source.tcpProxies : [])
+              ].flatMap((entry: unknown) => {
+                  if (typeof entry !== "object" || entry === null) return [];
+                  const port = entry as { host?: unknown; container?: unknown; protocol?: unknown };
+                  if (typeof port.host !== "number" || typeof port.container !== "number")
+                      return [];
+                  return [
+                      {
+                          host: port.host,
+                          container: port.container,
+                          ...(port.protocol === "udp" ? { protocol: "udp" as const } : {})
+                      }
+                  ];
+              })
+            : [];
 
     // Everything a builder produces from source reads PORT to decide where to
     // listen - it is the convention every framework and every buildpack follows -

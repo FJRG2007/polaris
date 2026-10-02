@@ -33,7 +33,9 @@ describe("parseListeningPorts", () => {
     });
 
     it("reads nothing out of a table it does not recognise", () => {
-        expect(net.parseListeningPorts("cat: /proc/net/tcp6: No such file or directory")).toEqual([]);
+        expect(net.parseListeningPorts("cat: /proc/net/tcp6: No such file or directory")).toEqual(
+            []
+        );
         expect(net.parseListeningPorts("")).toEqual([]);
     });
 });
@@ -42,7 +44,12 @@ describe("dnsVerdict", () => {
     const expected = { ip: "203.0.113.7", cnameTargets: ["web.plr.example.com"] };
 
     it("is ok for a CNAME to one of the service's own names, with or without the root dot", () => {
-        expect(net.dnsVerdict({ addresses: ["203.0.113.7"], cnames: ["web.plr.example.com."] }, expected)).toBe("ok");
+        expect(
+            net.dnsVerdict(
+                { addresses: ["203.0.113.7"], cnames: ["web.plr.example.com."] },
+                expected
+            )
+        ).toBe("ok");
     });
 
     it("is ok for an address that is this server", () => {
@@ -51,18 +58,25 @@ describe("dnsVerdict", () => {
 
     it("recognises Cloudflare's edge on both families", () => {
         expect(net.dnsVerdict({ addresses: ["104.16.1.1"], cnames: [] }, expected)).toBe("proxied");
-        expect(net.dnsVerdict({ addresses: ["2606:4700::6810:1"], cnames: [] }, expected)).toBe("proxied");
+        expect(net.dnsVerdict({ addresses: ["2606:4700::6810:1"], cnames: [] }, expected)).toBe(
+            "proxied"
+        );
     });
 
     it("tells a name pointing elsewhere from one that does not resolve", () => {
-        expect(net.dnsVerdict({ addresses: ["198.51.100.1"], cnames: [] }, expected)).toBe("elsewhere");
+        expect(net.dnsVerdict({ addresses: ["198.51.100.1"], cnames: [] }, expected)).toBe(
+            "elsewhere"
+        );
         expect(net.dnsVerdict({ addresses: [], cnames: [] }, expected)).toBe("missing");
     });
 
     it("never says ok without knowing where here is", () => {
-        expect(net.dnsVerdict({ addresses: ["203.0.113.7"], cnames: [] }, { ip: null, cnameTargets: [] })).toBe(
-            "elsewhere"
-        );
+        expect(
+            net.dnsVerdict(
+                { addresses: ["203.0.113.7"], cnames: [] },
+                { ip: null, cnameTargets: [] }
+            )
+        ).toBe("elsewhere");
     });
 });
 
@@ -71,18 +85,26 @@ describe("certVerdict", () => {
     const day = 86_400_000;
 
     it("reads a certificate with more than 30 days left as valid", () => {
-        expect(net.certVerdict({ validTo: new Date(now + 60 * day), trusted: true }, now)).toBe("valid");
+        expect(net.certVerdict({ validTo: new Date(now + 60 * day), trusted: true }, now)).toBe(
+            "valid"
+        );
         expect(net.daysUntil(new Date(now + 60 * day), now)).toBe(60);
     });
 
     it("reads one inside the renewal window as renewing, and a lapsed one as expired", () => {
-        expect(net.certVerdict({ validTo: new Date(now + 10 * day), trusted: true }, now)).toBe("renewing");
-        expect(net.certVerdict({ validTo: new Date(now - day), trusted: true }, now)).toBe("expired");
+        expect(net.certVerdict({ validTo: new Date(now + 10 * day), trusted: true }, now)).toBe(
+            "renewing"
+        );
+        expect(net.certVerdict({ validTo: new Date(now - day), trusted: true }, now)).toBe(
+            "expired"
+        );
         expect(net.daysUntil(new Date(now - day), now)).toBe(0);
     });
 
     it("reads the edge's own default certificate as untrusted, not valid", () => {
-        expect(net.certVerdict({ validTo: new Date(now + 300 * day), trusted: false }, now)).toBe("untrusted");
+        expect(net.certVerdict({ validTo: new Date(now + 300 * day), trusted: false }, now)).toBe(
+            "untrusted"
+        );
     });
 });
 
@@ -90,7 +112,9 @@ describe("TCP proxy ports", () => {
     it("picks a port in its own band, skipping the taken ones", () => {
         const first = net.pickProxyPort(new Set(), 0);
         expect(first).toBe(net.TCP_PROXY_PORT_MIN);
-        expect(net.pickProxyPort(new Set([net.TCP_PROXY_PORT_MIN]), 0)).toBe(net.TCP_PROXY_PORT_MIN + 1);
+        expect(net.pickProxyPort(new Set([net.TCP_PROXY_PORT_MIN]), 0)).toBe(
+            net.TCP_PROXY_PORT_MIN + 1
+        );
         const seeded = net.pickProxyPort(new Set(), 123_456);
         expect(seeded).toBeGreaterThanOrEqual(net.TCP_PROXY_PORT_MIN);
         expect(seeded).toBeLessThanOrEqual(net.TCP_PROXY_PORT_MAX);
@@ -103,7 +127,8 @@ describe("TCP proxy ports", () => {
 
     it("says so when the band is full", () => {
         const all = new Set<number>();
-        for (let port = net.TCP_PROXY_PORT_MIN; port <= net.TCP_PROXY_PORT_MAX; port += 1) all.add(port);
+        for (let port = net.TCP_PROXY_PORT_MIN; port <= net.TCP_PROXY_PORT_MAX; port += 1)
+            all.add(port);
         expect(net.pickProxyPort(all, 7)).toBeNull();
     });
 

@@ -115,7 +115,9 @@ async function ownedApp(applicationId: string, ownerId: string) {
                     host: { select: { address: true } }
                 }
             },
-            environment: { select: { project: { select: { slug: true, ownerId: true, orgId: true } } } },
+            environment: {
+                select: { project: { select: { slug: true, ownerId: true, orgId: true } } }
+            },
             domains: {
                 where: { kind: { not: "release" } },
                 orderBy: { createdAt: "asc" },
@@ -158,7 +160,10 @@ export interface ServicePorts {
  * configured port is offered instead - which is also what a service that is not
  * running gets, since there is nothing to ask.
  */
-export async function serviceListeningPorts(applicationId: string, ownerId: string): Promise<ServicePorts> {
+export async function serviceListeningPorts(
+    applicationId: string,
+    ownerId: string
+): Promise<ServicePorts> {
     const app = await ownedApp(applicationId, ownerId);
     const servicePort = containerPortOf(app);
     const fallback: ServicePorts = { servicePort, ports: [servicePort], source: "config" };
@@ -191,7 +196,11 @@ export async function serviceListeningPorts(applicationId: string, ownerId: stri
  * later becomes. Setting it back to the service's port unpins it, which is the
  * state every domain was in before this existed.
  */
-export async function setDomainPort(domainId: string, ownerId: string, port: number): Promise<void> {
+export async function setDomainPort(
+    domainId: string,
+    ownerId: string,
+    port: number
+): Promise<void> {
     if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new PublicNetRefusal("badPort");
     const domain = await prisma.domain.findFirst({
         where: { id: domainId, application: { environment: { project: { ownerId } } } },
@@ -219,7 +228,8 @@ export async function setDomainPort(domainId: string, ownerId: string, port: num
               })) > 0
             : false;
         const remote = target.kind !== "local" && target.hostId !== null;
-        if (!net.dialsPinnedPort(domain, { remote, keptRelease })) throw new PublicNetRefusal("portFixed");
+        if (!net.dialsPinnedPort(domain, { remote, keptRelease }))
+            throw new PublicNetRefusal("portFixed");
     }
     await prisma.domain.update({
         where: { id: domain.id },
@@ -234,14 +244,17 @@ async function zoneOf(
     hostname: string,
     project: { ownerId: string; orgId: string | null }
 ): Promise<{ label: string; host: string; subdomain: string } | null> {
-    const owner = project.orgId ? { kind: "org" as const, id: project.orgId } : { kind: "user" as const, id: project.ownerId };
+    const owner = project.orgId
+        ? { kind: "org" as const, id: project.orgId }
+        : { kind: "user" as const, id: project.ownerId };
     const zones = await listDeployZones(owner);
     for (const zone of zones) {
         if (zone.kind === "base") continue;
         const suffix = `.${zone.host}`;
         if (!hostname.endsWith(suffix)) continue;
         const subdomain = hostname.slice(0, -suffix.length);
-        if (subdomain && !subdomain.includes(".")) return { label: zone.label, host: zone.host, subdomain };
+        if (subdomain && !subdomain.includes("."))
+            return { label: zone.label, host: zone.host, subdomain };
     }
     return null;
 }
@@ -254,7 +267,11 @@ export async function renameableZone(domainId: string, ownerId: string) {
             hostname: true,
             kind: true,
             applicationId: true,
-            application: { select: { environment: { select: { project: { select: { ownerId: true, orgId: true } } } } } }
+            application: {
+                select: {
+                    environment: { select: { project: { select: { ownerId: true, orgId: true } } } }
+                }
+            }
         }
     });
     if (!domain || (domain.kind !== "auto" && domain.kind !== "random")) return null;
@@ -269,20 +286,36 @@ export async function renameableZone(domainId: string, ownerId: string) {
  * in DNS; the edge picks the new route up within seconds and the old name stops
  * answering for this service, as it does on Railway.
  */
-export async function renameDomain(domainId: string, ownerId: string, subdomain: string): Promise<string> {
+export async function renameDomain(
+    domainId: string,
+    ownerId: string,
+    subdomain: string
+): Promise<string> {
     const zone = await renameableZone(domainId, ownerId);
     if (!zone) throw new PublicNetRefusal("notRenameable");
-    const check = await checkZoneSubdomain(zone.applicationId, ownerId, { zoneLabel: zone.label, subdomain });
-    if (typeof check === "string") throw new PublicNetRefusal(check === "bad-name" ? "badName" : "zoneUnavailable");
+    const check = await checkZoneSubdomain(zone.applicationId, ownerId, {
+        zoneLabel: zone.label,
+        subdomain
+    });
+    if (typeof check === "string")
+        throw new PublicNetRefusal(check === "bad-name" ? "badName" : "zoneUnavailable");
     if (check.invalid) throw new PublicNetRefusal("badName");
     if (!check.hostname) throw new PublicNetRefusal("zoneUnavailable");
-    const current = await prisma.domain.findUnique({ where: { id: domainId }, select: { hostname: true } });
+    const current = await prisma.domain.findUnique({
+        where: { id: domainId },
+        select: { hostname: true }
+    });
     if (current?.hostname === check.hostname) return check.hostname;
     if (!check.available) throw new PublicNetRefusal("taken", { hostname: check.hostname });
     try {
         await prisma.domain.update({
             where: { id: domainId },
-            data: { hostname: check.hostname, healthStatus: "unknown", healthCheckedAt: null, healthFailures: 0 }
+            data: {
+                hostname: check.hostname,
+                healthStatus: "unknown",
+                healthCheckedAt: null,
+                healthFailures: 0
+            }
         });
     } catch (caught) {
         if (caught && typeof caught === "object" && "code" in caught && caught.code === "P2002") {
@@ -340,26 +373,39 @@ async function lookup(hostname: string): Promise<{ addresses: string[]; cnames: 
  *  of DNS rather than guessed from the number of labels, which is wrong for every
  *  `co.uk`. */
 async function isZoneApex(hostname: string): Promise<boolean> {
-    const soa = await withTimeout(resolveSoa(hostname).then(() => true), LOOKUP_TIMEOUT_MS, false);
+    const soa = await withTimeout(
+        resolveSoa(hostname).then(() => true),
+        LOOKUP_TIMEOUT_MS,
+        false
+    );
     return soa;
 }
 
 /** The certificate a visitor is shown on a hostname, read with one handshake.
  *  Only ever made to a public address, so a stored name never points this
  *  server's handshake at its own network. */
-async function readCertificate(hostname: string): Promise<{ validTo: Date; issuer: string | null; trusted: boolean } | null> {
+async function readCertificate(
+    hostname: string
+): Promise<{ validTo: Date; issuer: string | null; trusted: boolean } | null> {
     const { addresses } = await lookup(hostname);
     const address = addresses[0];
     if (!address || addresses.some((entry) => isPrivateIp(entry))) return null;
     return new Promise((resolve) => {
         let settled = false;
-        const finish = (value: { validTo: Date; issuer: string | null; trusted: boolean } | null) => {
+        const finish = (
+            value: { validTo: Date; issuer: string | null; trusted: boolean } | null
+        ) => {
             if (settled) return;
             settled = true;
             socket.destroy();
             resolve(value);
         };
-        const socket = connect({ host: address, port: 443, servername: hostname, rejectUnauthorized: false });
+        const socket = connect({
+            host: address,
+            port: 443,
+            servername: hostname,
+            rejectUnauthorized: false
+        });
         socket.setTimeout(LOOKUP_TIMEOUT_MS, () => finish(null));
         socket.once("error", () => finish(null));
         socket.once("secureConnect", () => {
@@ -367,7 +413,11 @@ async function readCertificate(hostname: string): Promise<{ validTo: Date; issue
             const validTo = peer?.valid_to ? new Date(peer.valid_to) : null;
             if (!validTo || Number.isNaN(validTo.getTime())) return finish(null);
             const issuer = peer.issuer?.O || peer.issuer?.CN || null;
-            finish({ validTo, issuer: typeof issuer === "string" ? issuer : null, trusted: socket.authorized });
+            finish({
+                validTo,
+                issuer: typeof issuer === "string" ? issuer : null,
+                trusted: socket.authorized
+            });
         });
     });
 }
@@ -383,10 +433,18 @@ async function readCertificate(hostname: string): Promise<{ validTo: Date; issue
  * DNS allows no CNAME, it is an A record to the server - which every provider
  * takes, so the flattening Railway needs there is not needed here.
  */
-export async function domainReadings(applicationId: string, ownerId: string): Promise<DomainReading[]> {
+export async function domainReadings(
+    applicationId: string,
+    ownerId: string
+): Promise<DomainReading[]> {
     const app = await ownedApp(applicationId, ownerId);
     const remote = app.target.kind !== "local" ? (app.target.host?.address?.trim() ?? null) : null;
-    const expectedIp = remote && /^[\d.]+$|:/.test(remote) ? remote : remote ? null : await detectPublicIp().catch(() => null);
+    const expectedIp =
+        remote && /^[\d.]+$|:/.test(remote)
+            ? remote
+            : remote
+              ? null
+              : await detectPublicIp().catch(() => null);
     const own = app.domains
         .filter((domain) => domain.kind === "auto" || domain.kind === "random")
         .map((domain) => domain.hostname)
@@ -410,16 +468,23 @@ export async function domainReadings(applicationId: string, ownerId: string): Pr
                 const brought = domain.kind === "custom" || domain.kind === "base";
                 let dns: DomainReading["dns"] = null;
                 if (brought) {
-                    const probeName = wildcard ? `polaris-check.${domain.hostname.slice(2)}` : domain.hostname;
+                    const probeName = wildcard
+                        ? `polaris-check.${domain.hostname.slice(2)}`
+                        : domain.hostname;
                     const [reading, apex] = await Promise.all([
                         lookup(probeName),
                         wildcard ? Promise.resolve(false) : isZoneApex(domain.hostname)
                     ]);
                     const records: DnsRecordAdvice[] = [];
                     const cnameTarget = own[0];
-                    if (cnameTarget && !apex) records.push({ type: "CNAME", name: domain.hostname, value: cnameTarget });
+                    if (cnameTarget && !apex)
+                        records.push({ type: "CNAME", name: domain.hostname, value: cnameTarget });
                     if (expectedIp) {
-                        records.push({ type: expectedIp.includes(":") ? "AAAA" : "A", name: domain.hostname, value: expectedIp });
+                        records.push({
+                            type: expectedIp.includes(":") ? "AAAA" : "A",
+                            name: domain.hostname,
+                            value: expectedIp
+                        });
                     }
                     dns = {
                         verdict: net.dnsVerdict(reading, { ip: expectedIp, cnameTargets: own }),
@@ -432,16 +497,27 @@ export async function domainReadings(applicationId: string, ownerId: string): Pr
                 }
                 let cert: DomainReading["cert"] = null;
                 if (domain.certPem) {
-                    cert = { verdict: "valid", issuer: null, validTo: null, daysLeft: null, supplied: true };
+                    cert = {
+                        verdict: "valid",
+                        issuer: null,
+                        validTo: null,
+                        daysLeft: null,
+                        supplied: true
+                    };
                 } else if (wildcard) {
                     const row = managed.find(
-                        (entry) => entry.domain === domain.hostname || entry.domain === domain.hostname.slice(2)
+                        (entry) =>
+                            entry.domain === domain.hostname ||
+                            entry.domain === domain.hostname.slice(2)
                     );
                     if (row) {
                         cert = {
                             verdict:
                                 row.status === "issued" && row.expiresAt
-                                    ? net.certVerdict({ validTo: row.expiresAt, trusted: true }, now)
+                                    ? net.certVerdict(
+                                          { validTo: row.expiresAt, trusted: true },
+                                          now
+                                      )
                                     : row.status === "failed"
                                       ? "failed"
                                       : "pending",
@@ -461,7 +537,13 @@ export async function domainReadings(applicationId: string, ownerId: string): Pr
                               daysLeft: net.daysUntil(seen.validTo, now),
                               supplied: false
                           }
-                        : { verdict: "unknown", issuer: null, validTo: null, daysLeft: null, supplied: false };
+                        : {
+                              verdict: "unknown",
+                              issuer: null,
+                              validTo: null,
+                              daysLeft: null,
+                              supplied: false
+                          };
                 }
                 return { id: domain.id, hostname: domain.hostname, dns, cert };
             })
@@ -480,7 +562,9 @@ export interface TcpProxyView {
     readonly deployed: boolean;
 }
 
-async function hostsFor(app: Awaited<ReturnType<typeof ownedApp>>): Promise<{ publicHost: string | null; lanHost: string | null }> {
+async function hostsFor(
+    app: Awaited<ReturnType<typeof ownedApp>>
+): Promise<{ publicHost: string | null; lanHost: string | null }> {
     if (app.target.kind !== "local") {
         const address = app.target.host?.address?.trim() || null;
         return { publicHost: address, lanHost: null };
@@ -492,7 +576,10 @@ async function hostsFor(app: Awaited<ReturnType<typeof ownedApp>>): Promise<{ pu
     return { publicHost, lanHost: lanHost && lanHost !== publicHost ? lanHost : null };
 }
 
-export async function listTcpProxies(applicationId: string, ownerId: string): Promise<TcpProxyView> {
+export async function listTcpProxies(
+    applicationId: string,
+    ownerId: string
+): Promise<TcpProxyView> {
     const app = await ownedApp(applicationId, ownerId);
     return {
         proxies: net.tcpProxiesOf(parseSource(app.sourceConfig)),
@@ -510,7 +597,11 @@ export async function listTcpProxies(applicationId: string, ownerId: string): Pr
  * already publishes. It takes effect when the service is next started, which
  * the panel offers to do at once.
  */
-export async function addTcpProxy(applicationId: string, ownerId: string, containerPort: number): Promise<net.TcpProxy> {
+export async function addTcpProxy(
+    applicationId: string,
+    ownerId: string,
+    containerPort: number
+): Promise<net.TcpProxy> {
     if (!Number.isInteger(containerPort) || containerPort < 1 || containerPort > 65_535) {
         throw new PublicNetRefusal("badPort");
     }
@@ -519,10 +610,16 @@ export async function addTcpProxy(applicationId: string, ownerId: string, contai
         const proxies = net.tcpProxiesOf(source);
         const existing = proxies.find((entry) => entry.container === containerPort);
         if (existing) return { result: existing, next: null };
-        if (proxies.length >= TCP_PROXY_LIMIT) throw new PublicNetRefusal("proxyLimit", { count: TCP_PROXY_LIMIT });
+        if (proxies.length >= TCP_PROXY_LIMIT)
+            throw new PublicNetRefusal("proxyLimit", { count: TCP_PROXY_LIMIT });
         const others = await tx.application.findMany({ select: { sourceConfig: true } });
-        const taken = new Set(others.flatMap((row) => net.publishedPortsOf(parseSource(row.sourceConfig))));
-        const host = net.pickProxyPort(taken, parseInt(app.id.replace(/-/g, "").slice(-6), 16) + containerPort);
+        const taken = new Set(
+            others.flatMap((row) => net.publishedPortsOf(parseSource(row.sourceConfig)))
+        );
+        const host = net.pickProxyPort(
+            taken,
+            parseInt(app.id.replace(/-/g, "").slice(-6), 16) + containerPort
+        );
         if (host === null) throw new PublicNetRefusal("rangeFull");
         const added: net.TcpProxy = { container: containerPort, host };
         return { result: added, next: { ...source, tcpProxies: [...proxies, added] } };
@@ -531,7 +628,11 @@ export async function addTcpProxy(applicationId: string, ownerId: string, contai
     return proxy;
 }
 
-export async function removeTcpProxy(applicationId: string, ownerId: string, containerPort: number): Promise<void> {
+export async function removeTcpProxy(
+    applicationId: string,
+    ownerId: string,
+    containerPort: number
+): Promise<void> {
     const app = await ownedApp(applicationId, ownerId);
     await rewriteSource(app.id, async (source) => {
         const kept = net.tcpProxiesOf(source).filter((proxy) => proxy.container !== containerPort);
@@ -572,8 +673,9 @@ async function rewriteSource<T>(applicationId: string, edit: SourceEdit<T>): Pro
                 { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
             );
         } catch (error) {
-            const conflict = error instanceof SourceConflict
-                || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034");
+            const conflict =
+                error instanceof SourceConflict ||
+                (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034");
             if (!conflict || attempt >= 5) throw error;
         }
     }

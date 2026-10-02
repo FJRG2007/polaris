@@ -33,8 +33,14 @@ beforeEach(() => findMany.mockReset());
 afterEach(() => vi.unstubAllGlobals());
 
 describe("which service a provider's copy belongs to", () => {
-    const portfolio = { id: "app-1", sourceConfig: JSON.stringify({ repoUrl: "https://github.com/FJRG2007/portfolio-v3" }) };
-    const other = { id: "app-2", sourceConfig: JSON.stringify({ repoUrl: "https://github.com/FJRG2007/other" }) };
+    const portfolio = {
+        id: "app-1",
+        sourceConfig: JSON.stringify({ repoUrl: "https://github.com/FJRG2007/portfolio-v3" })
+    };
+    const other = {
+        id: "app-2",
+        sourceConfig: JSON.stringify({ repoUrl: "https://github.com/FJRG2007/other" })
+    };
 
     it("matches the service building the same repository", async () => {
         findMany.mockResolvedValue([row]);
@@ -67,9 +73,9 @@ describe("which service a provider's copy belongs to", () => {
     });
 
     it("reads a repository however it was written", () => {
-        expect(repoOfSource(JSON.stringify({ repoUrl: "git@github.com:FJRG2007/Portfolio-V3.git" }))).toBe(
-            "fjrg2007/portfolio-v3"
-        );
+        expect(
+            repoOfSource(JSON.stringify({ repoUrl: "git@github.com:FJRG2007/Portfolio-V3.git" }))
+        ).toBe("fjrg2007/portfolio-v3");
         expect(repoOfSource(JSON.stringify({ imageRef: "nginx" }))).toBeNull();
     });
 });
@@ -81,9 +87,25 @@ describe("the provider's production domains", () => {
                 new Response(
                     JSON.stringify({
                         domains: [
-                            { name: "fjrg2007.com", apexName: "fjrg2007.com", projectId: "prj", verified: true },
-                            { name: "www.fjrg2007.com", apexName: "fjrg2007.com", projectId: "prj", verified: true, redirect: "fjrg2007.com" },
-                            { name: "pending.example.com", apexName: "example.com", projectId: "prj", verified: false }
+                            {
+                                name: "fjrg2007.com",
+                                apexName: "fjrg2007.com",
+                                projectId: "prj",
+                                verified: true
+                            },
+                            {
+                                name: "www.fjrg2007.com",
+                                apexName: "fjrg2007.com",
+                                projectId: "prj",
+                                verified: true,
+                                redirect: "fjrg2007.com"
+                            },
+                            {
+                                name: "pending.example.com",
+                                apexName: "example.com",
+                                projectId: "prj",
+                                verified: false
+                            }
                         ],
                         pagination: { count: 3, next: null, prev: null }
                     }),
@@ -115,10 +137,9 @@ describe("the provider's production domains", () => {
                 )
         );
         vi.stubGlobal("fetch", fetchMock);
-        expect(await railwayDomains("token", { project: "p", service: "s", environment: "e" })).toEqual([
-            "shop.example.com",
-            "web-production.up.railway.app"
-        ]);
+        expect(
+            await railwayDomains("token", { project: "p", service: "s", environment: "e" })
+        ).toEqual(["shop.example.com", "web-production.up.railway.app"]);
         const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
         expect(body.variables).toEqual({ projectId: "p", environmentId: "e", serviceId: "s" });
     });

@@ -49,7 +49,12 @@ import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-step
 import { RunStatePill, ServiceIcon, serviceKindOf, type ProjectApp } from "./deploy-view";
 import { Fragment, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { addTcpProxyAction, setDomainPortByHostnameAction } from "./public-networking-actions";
-import { isTunnelHostname, runtimeVersionSchema, type DisplayFormat, type ProjectCapability } from "@polaris/core";
+import {
+    isTunnelHostname,
+    runtimeVersionSchema,
+    type DisplayFormat,
+    type ProjectCapability
+} from "@polaris/core";
 import {
     CONSUMPTION_METRICS,
     MetricsHistory,
@@ -3033,7 +3038,13 @@ function SettingsTab({
             }
             // A port other than the service's own is pinned on the new address, so
             // the edge dials it there whatever the service's port later becomes.
-            if (!result.error && isDomainExposure && result.hostname && ports && targetPort() !== ports.servicePort) {
+            if (
+                !result.error &&
+                isDomainExposure &&
+                result.hostname &&
+                ports &&
+                targetPort() !== ports.servicePort
+            ) {
                 const pinned = await setDomainPortByHostnameAction({
                     applicationId: app.id,
                     hostname: result.hostname,
@@ -3053,7 +3064,9 @@ function SettingsTab({
                 setSubdomainCheck(null);
                 checkedSubdomain.current = null;
                 setConnectorToken("");
-                setPort(ports ? String(ports.servicePort) : app.port != null ? String(app.port) : "");
+                setPort(
+                    ports ? String(ports.servicePort) : app.port != null ? String(app.port) : ""
+                );
                 setTunnelNonce((nonce) => nonce + 1);
                 if (exposure === "tcp") setTcpNonce((nonce) => nonce + 1);
                 onChanged();
@@ -3065,12 +3078,12 @@ function SettingsTab({
         exposure === "tcp"
             ? t("publicNet.tcpAdd")
             : exposure === "cf-quick" || exposure === "ngrok"
-            ? t("settings.expose")
-            : exposure === "cf-named"
-              ? cfConnected
-                  ? t("settings.setUp")
-                  : t("settings.connect")
-              : t("settings.addDomain");
+              ? t("settings.expose")
+              : exposure === "cf-named"
+                ? cfConnected
+                    ? t("settings.setUp")
+                    : t("settings.connect")
+                : t("settings.addDomain");
     // The zone the name goes in, for the suffix beside the field.
     const zone = zones.find((entry) => entry.label === zoneKey) ?? zones[0];
     const zoneHost = zone?.host ?? "";
@@ -3085,7 +3098,9 @@ function SettingsTab({
         subdomainCheck?.available === false;
     const submitDisabled =
         pending ||
-        ((isDomainExposure || exposure === "tcp") && publicNet.portValue(port.trim()) === null && port.trim() !== "") ||
+        ((isDomainExposure || exposure === "tcp") &&
+            publicNet.portValue(port.trim()) === null &&
+            port.trim() !== "") ||
         duckMissing ||
         hostnameIsTunnel ||
         subdomainTaken ||
@@ -3132,7 +3147,13 @@ function SettingsTab({
                             <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => choose(zones.some((zone) => zone.kind !== "base") ? "zone" : "subdomain")}
+                                onClick={() =>
+                                    choose(
+                                        zones.some((zone) => zone.kind !== "base")
+                                            ? "zone"
+                                            : "subdomain"
+                                    )
+                                }
                             >
                                 <Globe className="size-3.5" /> {t("publicNet.generate")}
                             </Button>
@@ -3151,131 +3172,139 @@ function SettingsTab({
                             const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
                             return (
                                 <Fragment key={domain.id}>
-                                <li className="group flex min-w-0 items-center gap-2">
-                                    {domain.enabled && (
-                                        <span
-                                            title={
-                                                domain.healthStatus === "stopped"
-                                                    ? t("publicNet.serviceStopped")
-                                                    : domain.healthStatus === "down"
-                                                    ? domain.healthDetail
-                                                        ? t("settings.notReachableDetail", {
-                                                              detail: domain.healthDetail
-                                                          })
-                                                        : t("settings.notReachable")
-                                                    : domain.healthStatus === "up"
-                                                      ? domain.healthCode
-                                                          ? t("settings.reachableCode", {
-                                                                code: domain.healthCode
-                                                            })
-                                                          : t("settings.reachable")
-                                                      : t("settings.checking")
-                                            }
-                                            className={cn(
-                                                "size-2 shrink-0 rounded-full",
-                                                domain.healthStatus === "up" && "bg-success-solid",
-                                                domain.healthStatus === "down" && "bg-danger-solid",
-                                                domain.healthStatus !== "up" &&
-                                                    domain.healthStatus !== "down" &&
-                                                    "animate-pulse bg-muted-foreground/40"
-                                            )}
-                                        />
-                                    )}
-                                    {domain.enabled ? (
-                                        <a
-                                            href={`https://${domain.hostname}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
-                                        >
-                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                        </a>
-                                    ) : (
-                                        <span
-                                            title={t("settings.domainDisabled")}
-                                            className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
-                                        >
-                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                        </span>
-                                    )}
-                                    {(domain.kind === "lan" ||
-                                        domain.hostname.endsWith(".plr.local")) && (
-                                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
-                                            {t("settings.local")}
-                                        </span>
-                                    )}
-                                    {domain.targetPort !== undefined && (
-                                        <span
-                                            className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground"
-                                            title={t("publicNet.dialsPort", { port: domain.targetPort })}
-                                        >
-                                            :{domain.targetPort}
-                                        </span>
-                                    )}
-                                    {domain.targetPort !== undefined && (
-                                        <publicNet.EditDomainButton
-                                            domain={domain}
-                                            applicationId={app.id}
-                                            ports={ports}
-                                            onChanged={onChanged}
-                                        />
-                                    )}
-                                    <DomainCertificateButton
-                                        domainId={domain.id}
-                                        hostname={domain.hostname}
-                                        supplied={domain.hasCertificate === true}
-                                        onChanged={onChanged}
-                                    />
-                                    {domain.cdn !== undefined &&
-                                        domain.kind !== "lan" &&
-                                        !domain.hostname.endsWith(".plr.local") && (
-                                            <DomainCdnButton
-                                                domainId={domain.id}
-                                                hostname={domain.hostname}
-                                                enabled={domain.cdn}
+                                    <li className="group flex min-w-0 items-center gap-2">
+                                        {domain.enabled && (
+                                            <span
+                                                title={
+                                                    domain.healthStatus === "stopped"
+                                                        ? t("publicNet.serviceStopped")
+                                                        : domain.healthStatus === "down"
+                                                          ? domain.healthDetail
+                                                              ? t("settings.notReachableDetail", {
+                                                                    detail: domain.healthDetail
+                                                                })
+                                                              : t("settings.notReachable")
+                                                          : domain.healthStatus === "up"
+                                                            ? domain.healthCode
+                                                                ? t("settings.reachableCode", {
+                                                                      code: domain.healthCode
+                                                                  })
+                                                                : t("settings.reachable")
+                                                            : t("settings.checking")
+                                                }
+                                                className={cn(
+                                                    "size-2 shrink-0 rounded-full",
+                                                    domain.healthStatus === "up" &&
+                                                        "bg-success-solid",
+                                                    domain.healthStatus === "down" &&
+                                                        "bg-danger-solid",
+                                                    domain.healthStatus !== "up" &&
+                                                        domain.healthStatus !== "down" &&
+                                                        "animate-pulse bg-muted-foreground/40"
+                                                )}
+                                            />
+                                        )}
+                                        {domain.enabled ? (
+                                            <a
+                                                href={`https://${domain.hostname}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
+                                            >
+                                                <Globe className="size-3 shrink-0" />{" "}
+                                                {domain.hostname}
+                                            </a>
+                                        ) : (
+                                            <span
+                                                title={t("settings.domainDisabled")}
+                                                className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
+                                            >
+                                                <Globe className="size-3 shrink-0" />{" "}
+                                                {domain.hostname}
+                                            </span>
+                                        )}
+                                        {(domain.kind === "lan" ||
+                                            domain.hostname.endsWith(".plr.local")) && (
+                                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
+                                                {t("settings.local")}
+                                            </span>
+                                        )}
+                                        {domain.targetPort !== undefined && (
+                                            <span
+                                                className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground"
+                                                title={t("publicNet.dialsPort", {
+                                                    port: domain.targetPort
+                                                })}
+                                            >
+                                                :{domain.targetPort}
+                                            </span>
+                                        )}
+                                        {domain.targetPort !== undefined && (
+                                            <publicNet.EditDomainButton
+                                                domain={domain}
+                                                applicationId={app.id}
+                                                ports={ports}
                                                 onChanged={onChanged}
                                             />
                                         )}
-                                    <Switch
-                                        checked={domain.enabled}
-                                        onChange={(next) =>
-                                            startTransition(async () => {
-                                                await deployActions.setDomainEnabledAction(
-                                                    domain.id,
-                                                    next
-                                                );
-                                                onChanged();
-                                            })
-                                        }
-                                        aria-label={
-                                            domain.enabled
-                                                ? t("settings.disableDomain")
-                                                : t("settings.enableDomain")
-                                        }
-                                    />
-                                    <span className="flex w-5 shrink-0 items-center justify-center">
-                                        <button
-                                            type="button"
-                                            title={t("settings.removeDomain")}
-                                            onClick={() =>
+                                        <DomainCertificateButton
+                                            domainId={domain.id}
+                                            hostname={domain.hostname}
+                                            supplied={domain.hasCertificate === true}
+                                            onChanged={onChanged}
+                                        />
+                                        {domain.cdn !== undefined &&
+                                            domain.kind !== "lan" &&
+                                            !domain.hostname.endsWith(".plr.local") && (
+                                                <DomainCdnButton
+                                                    domainId={domain.id}
+                                                    hostname={domain.hostname}
+                                                    enabled={domain.cdn}
+                                                    onChanged={onChanged}
+                                                />
+                                            )}
+                                        <Switch
+                                            checked={domain.enabled}
+                                            onChange={(next) =>
                                                 startTransition(async () => {
-                                                    await deployActions.removeDomainAction(
-                                                        domain.id
+                                                    await deployActions.setDomainEnabledAction(
+                                                        domain.id,
+                                                        next
                                                     );
                                                     onChanged();
                                                 })
                                             }
-                                            className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                        >
-                                            <Trash2 className="size-3.5" />
-                                        </button>
-                                    </span>
-                                </li>
-                                {domain.enabled && readings.has(domain.id) && (
-                                    <li className="empty:hidden">
-                                        <publicNet.DomainReadingView reading={readings.get(domain.id)} />
+                                            aria-label={
+                                                domain.enabled
+                                                    ? t("settings.disableDomain")
+                                                    : t("settings.enableDomain")
+                                            }
+                                        />
+                                        <span className="flex w-5 shrink-0 items-center justify-center">
+                                            <button
+                                                type="button"
+                                                title={t("settings.removeDomain")}
+                                                onClick={() =>
+                                                    startTransition(async () => {
+                                                        await deployActions.removeDomainAction(
+                                                            domain.id
+                                                        );
+                                                        onChanged();
+                                                    })
+                                                }
+                                                className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                                            >
+                                                <Trash2 className="size-3.5" />
+                                            </button>
+                                        </span>
                                     </li>
-                                )}
+                                    {domain.enabled && readings.has(domain.id) && (
+                                        <li className="empty:hidden">
+                                            <publicNet.DomainReadingView
+                                                reading={readings.get(domain.id)}
+                                            />
+                                        </li>
+                                    )}
                                 </Fragment>
                             );
                         })}
@@ -3449,7 +3478,11 @@ function SettingsTab({
                                 </a>
                             )}
                             {(isDomainExposure || exposure === "tcp") && (
-                                <publicNet.TargetPortField ports={ports} value={port} onChange={setPort} />
+                                <publicNet.TargetPortField
+                                    ports={ports}
+                                    value={port}
+                                    onChange={setPort}
+                                />
                             )}
                             {dnsNote && (
                                 <p className="text-xs text-muted-foreground">{dnsNote.text}</p>

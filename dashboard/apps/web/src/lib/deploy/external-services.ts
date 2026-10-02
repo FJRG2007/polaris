@@ -135,7 +135,9 @@ export function domainsOf(json: string | null): string[] {
     if (!json) return [];
     try {
         const value = JSON.parse(json) as unknown;
-        return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(value)
+            ? value.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -271,7 +273,8 @@ export async function refreshExternalService(
     let failure: string | null = null;
     // The domains and the repository, when their own clock says so. Each is
     // best-effort: a provider that will not say keeps what was last read.
-    let slow: { productionDomains?: string; repo?: string | null; domainsCheckedAt: Date } | null = null;
+    let slow: { productionDomains?: string; repo?: string | null; domainsCheckedAt: Date } | null =
+        null;
     try {
         const token = await tokenFor(row);
         const driver = driverFor(row.provider);

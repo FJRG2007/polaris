@@ -28,7 +28,9 @@ export async function serviceRunStates(
 ): Promise<Record<string, ServiceRunState>> {
     if (apps.length === 0) return {};
     const since = new Date(now - RECENT_SAMPLE_MS);
-    const releaseIds = apps.map((app) => app.currentDeploymentId).filter((id): id is string => id !== null);
+    const releaseIds = apps
+        .map((app) => app.currentDeploymentId)
+        .filter((id): id is string => id !== null);
     const [releases, samples] = await Promise.all([
         releaseIds.length
             ? prisma.deployment.findMany({
@@ -45,8 +47,21 @@ export async function serviceRunStates(
         })
     ]);
     const placed = await prisma.application.findMany({
-        where: { id: { in: [...new Set([...apps.map((app) => app.id), ...samples.map((row) => row.subjectId)])] } },
-        select: { id: true, sourceType: true, target: { select: { kind: true, hostId: true, runtime: true } } }
+        where: {
+            id: {
+                in: [
+                    ...new Set([
+                        ...apps.map((app) => app.id),
+                        ...samples.map((row) => row.subjectId)
+                    ])
+                ]
+            }
+        },
+        select: {
+            id: true,
+            sourceType: true,
+            target: { select: { kind: true, hostId: true, runtime: true } }
+        }
     });
     const placement = new Map(placed.map((row) => [row.id, row]));
     const sampledMachines = new Set(
@@ -63,7 +78,9 @@ export async function serviceRunStates(
             deployStatus: deployStatuses[app.id] ?? null,
             desiredState: app.desiredState,
             asleep: app.asleepSince !== null,
-            releasedAt: app.currentDeploymentId ? (releasedAt.get(app.currentDeploymentId) ?? null) : null,
+            releasedAt: app.currentDeploymentId
+                ? (releasedAt.get(app.currentDeploymentId) ?? null)
+                : null,
             lastSampleAt: lastSample.get(app.id) ?? null,
             collectorAlive: vouchable(placement.get(app.id), sampledMachines),
             now
@@ -84,7 +101,16 @@ function machineOf(target: { readonly kind: string; readonly hostId: string | nu
  * an absent sample says nothing.
  */
 function vouchable(
-    app: { readonly sourceType: string; readonly target: { readonly kind: string; readonly hostId: string | null; readonly runtime: string } } | undefined,
+    app:
+        | {
+              readonly sourceType: string;
+              readonly target: {
+                  readonly kind: string;
+                  readonly hostId: string | null;
+                  readonly runtime: string;
+              };
+          }
+        | undefined,
     sampledMachines: ReadonlySet<string>
 ): boolean {
     if (!app || app.sourceType === "compose" || app.target.runtime === "swarm") return false;

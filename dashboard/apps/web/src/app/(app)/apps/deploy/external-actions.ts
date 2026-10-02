@@ -78,7 +78,8 @@ async function requireServiceAccess(
 ): Promise<ProjectAccess> {
     const access = await requireProjectAccess(projectId, userId, capability);
     const environmentId = await external.externalServiceEnvironment(projectId, serviceId);
-    if (!accessInEnvironment(access, environmentId)) throw new Error(await reply("common.serviceNotFound"));
+    if (!accessInEnvironment(access, environmentId))
+        throw new Error(await reply("common.serviceNotFound"));
     return access;
 }
 
@@ -102,8 +103,7 @@ export async function addExternalServiceAction(
 ): Promise<{ service?: external.ExternalServiceView; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = addSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: await firstIssue(parsed.error, "common.checkDetails") };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // Through the environment it lands in, which the form names: an access
         // limited to development cannot put a row in production.
@@ -307,8 +307,7 @@ export async function moveOutAction(
     const service = idSchema.safeParse(applicationId);
     if (!service.success) return { error: await reply("common.unknownService") };
     const parsed = moveOutSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: await firstIssue(parsed.error, "common.checkDetails") };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // Reached through the environment the row lands in rather than through
         // the project, so an access limited to development cannot put one in
@@ -320,7 +319,8 @@ export async function moveOutAction(
             "service.create"
         );
         if (access.projectId !== projectId) return { error: await reply("common.projectNotFound") };
-        if (!accessCan(access, "service.configure")) return { error: await reply("common.projectNotFound") };
+        if (!accessCan(access, "service.configure"))
+            return { error: await reply("common.projectNotFound") };
         // And the service being moved, in the environment it is in: the row lands
         // where the form says, but the secrets read and the service stopped are
         // this one's, which may be in an environment the access does not reach.
@@ -395,8 +395,7 @@ export async function moveHomeAction(
     const service = idSchema.safeParse(serviceId);
     if (!service.success) return { error: await reply("common.unknownService") };
     const parsed = moveHomeSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: await firstIssue(parsed.error, "common.checkDetails") };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // The environment is where the new service is created, and it arrives on
         // a form. Authorized through itself rather than through the project:

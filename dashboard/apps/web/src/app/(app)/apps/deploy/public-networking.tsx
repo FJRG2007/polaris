@@ -18,8 +18,27 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { DomainReading, ServicePorts, TcpProxyView } from "@/lib/deploy/public-networking";
-import { CheckCircle2, Cloud, Loader2, Lock, Network, Pencil, TriangleAlert, X } from "lucide-react";
-import { Button, cn, CopyButton, Dialog, DialogContent, DialogTitle, DnsRecordTable, Input, Select } from "@polaris/ui";
+import {
+    CheckCircle2,
+    Cloud,
+    Loader2,
+    Lock,
+    Network,
+    Pencil,
+    TriangleAlert,
+    X
+} from "lucide-react";
+import {
+    Button,
+    cn,
+    CopyButton,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    DnsRecordTable,
+    Input,
+    Select
+} from "@polaris/ui";
 
 type ServiceT = NamespaceTranslator<"deployService">;
 
@@ -98,7 +117,9 @@ export function TargetPortField({
                 {showCustom && (
                     <Input
                         value={value}
-                        onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
+                        onChange={(event) =>
+                            onChange(event.target.value.replace(/[^0-9]/g, "").slice(0, 5))
+                        }
                         inputMode="numeric"
                         placeholder="8080"
                         aria-label={t("publicNet.portCustom")}
@@ -141,10 +162,18 @@ export function EditDomainButton({
 }) {
     const t = useTranslations("deployService");
     const [open, setOpen] = useState(false);
-    const [zone, setZone] = useState<{ zoneHost: string; subdomain: string; zoneLabel: string } | null>(null);
+    const [zone, setZone] = useState<{
+        zoneHost: string;
+        subdomain: string;
+        zoneLabel: string;
+    } | null>(null);
     const [subdomain, setSubdomain] = useState("");
     const [port, setPort] = useState("");
-    const [check, setCheck] = useState<{ available: boolean; invalid?: boolean; hostname: string } | null>(null);
+    const [check, setCheck] = useState<{
+        available: boolean;
+        invalid?: boolean;
+        hostname: string;
+    } | null>(null);
     const [checking, setChecking] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -198,7 +227,8 @@ export function EditDomainButton({
     const renamed = Boolean(zone && typed && typed !== zone.subdomain);
     const portChanged = port !== current;
     const chosenPort = portValue(port);
-    const nameBlocked = renamed && (checking || !check || check.invalid === true || !check.available);
+    const nameBlocked =
+        renamed && (checking || !check || check.invalid === true || !check.available);
     const changed = renamed || portChanged;
 
     function save(): void {
@@ -209,14 +239,20 @@ export function EditDomainButton({
                     setError(t("publicNet.portInvalid"));
                     return;
                 }
-                const result = await netActions.setDomainPortAction({ domainId: domain.id, port: chosenPort });
+                const result = await netActions.setDomainPortAction({
+                    domainId: domain.id,
+                    port: chosenPort
+                });
                 if (result.error) {
                     setError(result.error);
                     return;
                 }
             }
             if (renamed) {
-                const result = await netActions.renameDomainAction({ domainId: domain.id, subdomain: typed });
+                const result = await netActions.renameDomainAction({
+                    domainId: domain.id,
+                    subdomain: typed
+                });
                 if (result.error) {
                     setError(result.error);
                     return;
@@ -251,7 +287,11 @@ export function EditDomainButton({
                                         onChange={(event) => setSubdomain(event.target.value)}
                                         autoComplete="off"
                                         spellCheck={false}
-                                        aria-invalid={renamed && check !== null && (!check.available || check.invalid === true)}
+                                        aria-invalid={
+                                            renamed &&
+                                            check !== null &&
+                                            (!check.available || check.invalid === true)
+                                        }
                                         aria-label={t("publicNet.subdomain")}
                                         className="min-w-0 flex-1"
                                     />
@@ -280,7 +320,10 @@ export function EditDomainButton({
                                 )}
                             </div>
                         ) : (
-                            <p className="truncate text-xs text-muted-foreground" title={domain.hostname}>
+                            <p
+                                className="truncate text-xs text-muted-foreground"
+                                title={domain.hostname}
+                            >
                                 {domain.hostname}
                             </p>
                         )}
@@ -292,10 +335,19 @@ export function EditDomainButton({
                             </Button>
                             <Button
                                 size="sm"
-                                disabled={pending || !changed || nameBlocked || (portChanged && chosenPort === null)}
+                                disabled={
+                                    pending ||
+                                    !changed ||
+                                    nameBlocked ||
+                                    (portChanged && chosenPort === null)
+                                }
                                 onClick={save}
                             >
-                                {pending ? <Loader2 className="size-4 animate-spin" /> : t("publicNet.update")}
+                                {pending ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    t("publicNet.update")
+                                )}
                             </Button>
                         </div>
                     </div>
@@ -307,7 +359,10 @@ export function EditDomainButton({
 
 /** Every domain's DNS and certificate, read when the panel opens and again on
  *  demand - the panel is where somebody waits for a record to turn green. */
-export function useDomainReadings(applicationId: string, key: string): {
+export function useDomainReadings(
+    applicationId: string,
+    key: string
+): {
     readings: Map<string, DomainReading>;
     refresh: () => void;
     loading: boolean;
@@ -373,7 +428,11 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
                 <p
                     className={cn(
                         "inline-flex min-w-0 items-start gap-1.5",
-                        dns.verdict === "ok" ? "text-success-ink" : dns.verdict === "proxied" ? "text-foreground" : "text-warning-ink"
+                        dns.verdict === "ok"
+                            ? "text-success-ink"
+                            : dns.verdict === "proxied"
+                              ? "text-foreground"
+                              : "text-warning-ink"
                     )}
                 >
                     {dns.verdict === "ok" ? (
@@ -390,7 +449,9 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
                               ? t("publicNet.dnsProxied")
                               : dns.verdict === "missing"
                                 ? t("publicNet.dnsMissing")
-                                : t("publicNet.dnsElsewhere", { addresses: dns.addresses.slice(0, 3).join(", ") })}
+                                : t("publicNet.dnsElsewhere", {
+                                      addresses: dns.addresses.slice(0, 3).join(", ")
+                                  })}
                     </span>
                 </p>
             )}
@@ -402,7 +463,12 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
                             name: record.name,
                             value: record.value,
                             status: dns.verdict === "elsewhere" ? "conflict" : "waiting",
-                            note: index === 0 && dns.records.length > 1 ? t("publicNet.recordPreferred") : index > 0 ? t("publicNet.recordOr") : undefined
+                            note:
+                                index === 0 && dns.records.length > 1
+                                    ? t("publicNet.recordPreferred")
+                                    : index > 0
+                                      ? t("publicNet.recordOr")
+                                      : undefined
                         }))}
                     />
                     <p className="text-muted-foreground">
@@ -414,7 +480,9 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
                     </p>
                 </>
             )}
-            {dns?.verdict === "proxied" && <p className="text-muted-foreground">{t("publicNet.cloudflareHint")}</p>}
+            {dns?.verdict === "proxied" && (
+                <p className="text-muted-foreground">{t("publicNet.cloudflareHint")}</p>
+            )}
             {cert && (
                 <p
                     className={cn(
@@ -487,7 +555,12 @@ export function TcpProxyList({
             }
             setStale(true);
             setView((current) =>
-                current ? { ...current, proxies: current.proxies.filter((proxy) => proxy.container !== port) } : current
+                current
+                    ? {
+                          ...current,
+                          proxies: current.proxies.filter((proxy) => proxy.container !== port)
+                      }
+                    : current
             );
             onChanged();
         });
@@ -549,7 +622,8 @@ export function TcpProxyList({
                     <span>{t("publicNet.tcpApply")}</span>
                     {canEdit && (
                         <Button size="sm" variant="outline" disabled={pending} onClick={apply}>
-                            {pending && <Loader2 className="size-3.5 animate-spin" />} {t("publicNet.tcpApplyNow")}
+                            {pending && <Loader2 className="size-3.5 animate-spin" />}{" "}
+                            {t("publicNet.tcpApplyNow")}
                         </Button>
                     )}
                 </li>

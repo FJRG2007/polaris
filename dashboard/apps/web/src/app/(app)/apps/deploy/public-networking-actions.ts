@@ -33,7 +33,10 @@ const REFUSAL = {
     portFixed: "publicNet.portFixed"
 } as const;
 
-async function refusal(caught: unknown, fallback: "publicNet.failed" = "publicNet.failed"): Promise<{ error: string }> {
+async function refusal(
+    caught: unknown,
+    fallback: "publicNet.failed" = "publicNet.failed"
+): Promise<{ error: string }> {
     if (caught instanceof publicNet.PublicNetRefusal) {
         return { error: await reply(REFUSAL[caught.code], { ...caught.params }) };
     }
@@ -44,7 +47,9 @@ const idSchema = z.string().uuid();
 const portSchema = z.coerce.number().int().min(1).max(65_535);
 
 /** Ports the service listens on, for the target-port picker. */
-export async function servicePortsAction(applicationId: string): Promise<publicNet.ServicePorts | { error: string }> {
+export async function servicePortsAction(
+    applicationId: string
+): Promise<publicNet.ServicePorts | { error: string }> {
     const user = await requirePermission("deploy.read");
     const id = idSchema.safeParse(applicationId);
     if (!id.success) return { error: await reply("common.invalidRequest") };
@@ -74,7 +79,10 @@ export async function domainReadingsAction(
 const domainPortSchema = z.object({ domainId: idSchema, port: portSchema });
 
 /** Point one domain at a port of the service. */
-export async function setDomainPortAction(input: { domainId: string; port: number }): Promise<{ error?: string }> {
+export async function setDomainPortAction(input: {
+    domainId: string;
+    port: number;
+}): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = domainPortSchema.safeParse(input);
     if (!parsed.success) return { error: await reply("publicNet.badPort") };
@@ -132,7 +140,9 @@ export async function renameableDomainAction(
     try {
         const access = await requireDomainAccess(id.data, user.id, "project.read");
         const zone = await publicNet.renameableZone(id.data, access.ownerId);
-        return zone ? { zoneHost: zone.host, subdomain: zone.subdomain, zoneLabel: zone.label } : null;
+        return zone
+            ? { zoneHost: zone.host, subdomain: zone.subdomain, zoneLabel: zone.label }
+            : null;
     } catch {
         return null;
     }
@@ -153,7 +163,11 @@ export async function renameDomainAction(input: {
     if (!parsed.success) return { error: await reply("publicNet.badName") };
     try {
         const access = await requireDomainAccess(parsed.data.domainId, user.id, "domains.manage");
-        const hostname = await publicNet.renameDomain(parsed.data.domainId, access.ownerId, parsed.data.subdomain);
+        const hostname = await publicNet.renameDomain(
+            parsed.data.domainId,
+            access.ownerId,
+            parsed.data.subdomain
+        );
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.domain.rename",
@@ -168,7 +182,9 @@ export async function renameDomainAction(input: {
 }
 
 /** The service's TCP proxies and the addresses they are reached on. */
-export async function tcpProxiesAction(applicationId: string): Promise<publicNet.TcpProxyView | { error: string }> {
+export async function tcpProxiesAction(
+    applicationId: string
+): Promise<publicNet.TcpProxyView | { error: string }> {
     const user = await requirePermission("deploy.read");
     const id = idSchema.safeParse(applicationId);
     if (!id.success) return { error: await reply("common.invalidRequest") };
@@ -190,8 +206,16 @@ export async function addTcpProxyAction(input: {
     const parsed = proxySchema.safeParse(input);
     if (!parsed.success) return { error: await reply("publicNet.badPort") };
     try {
-        const access = await requireApplicationAccess(parsed.data.applicationId, user.id, "domains.manage");
-        const proxy = await publicNet.addTcpProxy(parsed.data.applicationId, access.ownerId, parsed.data.port);
+        const access = await requireApplicationAccess(
+            parsed.data.applicationId,
+            user.id,
+            "domains.manage"
+        );
+        const proxy = await publicNet.addTcpProxy(
+            parsed.data.applicationId,
+            access.ownerId,
+            parsed.data.port
+        );
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.tcp_proxy.add",
@@ -205,12 +229,19 @@ export async function addTcpProxyAction(input: {
     }
 }
 
-export async function removeTcpProxyAction(input: { applicationId: string; port: number }): Promise<{ error?: string }> {
+export async function removeTcpProxyAction(input: {
+    applicationId: string;
+    port: number;
+}): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = proxySchema.safeParse(input);
     if (!parsed.success) return { error: await reply("publicNet.badPort") };
     try {
-        const access = await requireApplicationAccess(parsed.data.applicationId, user.id, "domains.manage");
+        const access = await requireApplicationAccess(
+            parsed.data.applicationId,
+            user.id,
+            "domains.manage"
+        );
         await publicNet.removeTcpProxy(parsed.data.applicationId, access.ownerId, parsed.data.port);
         await recordDeployAudit({
             actorId: user.id,
