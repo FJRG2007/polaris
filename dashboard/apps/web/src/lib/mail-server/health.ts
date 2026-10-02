@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { reached } from "./steps";
 import * as core from "@polaris/core";
-import { publicResolver } from "./dns";
+import { publicResolver } from "@/lib/dns/public-resolver";
 import { adminCredentials } from "./access";
 import { queuedMessages } from "./operations";
 import { connect as tlsConnect } from "node:tls";

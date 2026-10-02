@@ -144,6 +144,14 @@ describe("what the resolvers answered", () => {
         expect(await dns.publishedValues(resolver, record("TLSA"))).toBeNull();
     });
 
+    it("reads a CAA answer that also carries its record type", async () => {
+        // Newer Node puts `type: "CAA"` on each answer; reading the first key that
+        // is not `critical` took that for the tag and graded every CAA as wrong.
+        const resolver = { resolveCaa: async () => [{ critical: 0, type: "CAA", issue: "letsencrypt.org" }] } as never;
+        const record = { name: "example.com", type: "CAA", ttl: null, value: "", priority: null };
+        expect(await dns.publishedValues(resolver, record)).toEqual(["0 issue letsencrypt.org"]);
+    });
+
     it("reads no such name as nothing published, and anything else as no answer", async () => {
         const missing = { resolveMx: async () => Promise.reject(Object.assign(new Error("x"), { code: "ENOTFOUND" })) } as never;
         const down = { resolveMx: async () => Promise.reject(Object.assign(new Error("x"), { code: "ETIMEOUT" })) } as never;

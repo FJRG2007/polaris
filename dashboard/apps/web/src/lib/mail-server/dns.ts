@@ -19,7 +19,8 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { relaySpfInclude } from "./relay";
-import { Resolver } from "node:dns/promises";
+import type { Resolver } from "node:dns/promises";
+import { caaTagValue, publicResolver } from "@/lib/dns/public-resolver";
 import type { MailServer } from "@polaris/db";
 import { publishWithin } from "./dns-standing";
 import { recordAudit } from "@/lib/audit-service";
@@ -32,19 +33,6 @@ import {
     resolveZoneForHostname,
     updateZoneRecord
 } from "@/lib/integrations/cloudflare-api";
-
-/** The resolvers asked, two operators so one having a bad day is not the answer. */
-const PUBLIC_RESOLVERS = ["1.1.1.1", "8.8.8.8"];
-
-/** A resolver that asks them, and nobody else. Exported because every check
- *  that has to see what the internet sees - the records here, and the reverse
- *  name in `health` - must ask the same two rather than the machine's own,
- *  which may answer for a name nobody outside can look up. */
-export function publicResolver(): Resolver {
-    const resolver = new Resolver({ timeout: 4000, tries: 2 });
-    resolver.setServers(PUBLIC_RESOLVERS);
-    return resolver;
-}
 
 /** What a public resolver says is at one name, in the shape the zone writes it. */
 export async function publishedValues(resolver: Resolver, record: core.ZoneRecord): Promise<string[] | null> {
@@ -62,8 +50,8 @@ export async function publishedValues(resolver: Resolver, record: core.ZoneRecor
                 );
             case "CAA":
                 return (await resolver.resolveCaa(record.name)).map((entry) => {
-                    const [tag, value] = Object.entries(entry).find(([key]) => key !== "critical") ?? ["", ""];
-                    return `${entry.critical} ${tag} ${String(value)}`;
+                    const { tag, value } = caaTagValue(entry);
+                    return `${entry.critical} ${tag} ${value}`;
                 });
             case "A":
                 return await resolver.resolve4(record.name);
