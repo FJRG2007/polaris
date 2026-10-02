@@ -7,10 +7,11 @@
  * Two halves, and the split is what keeps it cheap. Pages and the resource index
  * - deploy projects and services, servers, runner pools, installed apps - are
  * known up front and matched here with the shared search, so a typo in a name
- * still lands, a word nothing has finds nothing, and typing costs nothing. Tasks, pages, notes and people are too many to hold and too
- * live to cache, so they are searched in the database, one scope at a time, and
- * only behind a command: "/tasks", "/servers lirio-0", "@ana". Typing a name on
- * its own never starts four searches nobody asked for.
+ * still lands, a word nothing has finds nothing, and typing costs nothing.
+ * Tasks, pages, notes and people are too many to hold and too live to cache, so
+ * they are searched in the database, one scope at a time, and only behind a
+ * command: "/tasks", "/servers lirio-0", "@ana". Typing a name on its own never
+ * starts four searches nobody asked for.
  *
  * What was searched before is kept in this browser and on the account. The local
  * copy is what the panel opens with - instantly, on the first frame - and the
@@ -19,10 +20,10 @@
  */
 
 import * as core from "@polaris/core";
-import { usePathname, useRouter } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
 import * as recentStore from "@/lib/search/recent";
 import { PlainNames } from "@/components/person-name";
+import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
@@ -33,8 +34,8 @@ import {
     searchScope,
     type SearchScopeDefinition
 } from "@/lib/search/scopes";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { CommandRow, EntryRow, HitRow, HitSkeleton, RecentRow } from "@/components/search-rows";
 import {
     COMMAND_ENTRY_FIELDS,

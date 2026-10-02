@@ -16,8 +16,9 @@
  *   not count, so "cancion" finds "Canción".
  * - Ranked by where they matched: the title being exactly the query, then the
  *   title starting with it, then every word starting a word of the title, then
- *   every word inside the title, then the rest by how heavily weighted the fields that carried them are. Within a
- *   rank, the order the screen already had - its recency, its rank - stands.
+ *   every word inside the title, then the rest by how heavily weighted the
+ *   fields that carried them are. Within a rank, the order the screen already
+ *   had - its recency, its rank - stands.
  * - A typo is forgiven only when nothing matched as typed, only against the
  *   words of the title, and only for words long enough to carry one. A
  *   description is never fuzzy-matched: in a paragraph, almost any word is one
