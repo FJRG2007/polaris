@@ -24,7 +24,12 @@ import type { DriveEntry } from "@/app/(app)/drive/types";
 import { filesToItems, gatherDropItems } from "@/lib/drop-items";
 import { iconColorClass, iconComponent } from "@/app/(app)/drive/item-icons";
 import { searchItems } from "@polaris/core/search-text";
-import { matchesStructured, NAME_SEARCH, parseSearch, PATH_SEARCH } from "@/app/(app)/drive/search-query";
+import {
+    matchesStructured,
+    NAME_SEARCH,
+    parseSearch,
+    PATH_SEARCH
+} from "@/app/(app)/drive/search-query";
 import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
 import {
     FILE_CATEGORIES,
@@ -124,7 +129,11 @@ function parentOf(path: string): string {
 }
 
 /** A short, non-leaky message for a failed write, from the route's status/reason. */
-function writeErrorMessage(t: NamespaceTranslator<"publicPages">, status: number, reason: string): string {
+function writeErrorMessage(
+    t: NamespaceTranslator<"publicPages">,
+    status: number,
+    reason: string
+): string {
     if (reason.endsWith("_disabled") || status === 403) return t("share.errors.notAllowed");
     if (reason === "cannot_rename_root" || reason === "cannot_delete_root") {
         return t("share.errors.root");
@@ -690,7 +699,9 @@ export function ShareExplorer({
             {allowDownload ? (
                 <ContextMenuItem onSelect={() => downloadSelection([entry])}>
                     <Download className="size-4" />
-                    {entry.kind === "dir" ? td("filesView.menu.downloadZip") : td("filesView.menu.download")}
+                    {entry.kind === "dir"
+                        ? td("filesView.menu.downloadZip")
+                        : td("filesView.menu.download")}
                 </ContextMenuItem>
             ) : null}
             {allowRename ? (
@@ -769,7 +780,9 @@ export function ShareExplorer({
                                 onClick={() => fileInput.current?.click()}
                             >
                                 <Upload className="size-4" />
-                                {uploading ? td("filesView.toolbar.uploading") : td("filesView.toolbar.upload")}
+                                {uploading
+                                    ? td("filesView.toolbar.uploading")
+                                    : td("filesView.toolbar.upload")}
                             </Button>
                             <input
                                 ref={fileInput}
@@ -788,7 +801,9 @@ export function ShareExplorer({
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => openHref(zipUrl(token, [path || rootPath]), t("share.theFolder"))}
+                            onClick={() =>
+                                openHref(zipUrl(token, [path || rootPath]), t("share.theFolder"))
+                            }
                         >
                             <Download className="size-4" />
                             {t("share.downloadAll")}
@@ -849,7 +864,11 @@ export function ShareExplorer({
                         type="button"
                         onClick={() => setSortDir((prev) => (prev === "asc" ? "desc" : "asc"))}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted"
-                        aria-label={sortDir === "asc" ? t("share.sort.descending") : t("share.sort.ascending")}
+                        aria-label={
+                            sortDir === "asc"
+                                ? t("share.sort.descending")
+                                : t("share.sort.ascending")
+                        }
                     >
                         {sortDir === "asc" ? (
                             <ArrowDownAZ className="size-4" />
@@ -1003,7 +1022,9 @@ export function ShareExplorer({
             >
                 {selectedEntries.length > 0 ? (
                     <>
-                        <span className="font-medium">{t("share.selected", { count: selectedEntries.length })}</span>
+                        <span className="font-medium">
+                            {t("share.selected", { count: selectedEntries.length })}
+                        </span>
                         <div className="ml-auto flex items-center gap-1">
                             {allowDownload ? (
                                 <Button
@@ -1132,7 +1153,9 @@ export function ShareExplorer({
                                 aria-label={td("filesView.selection.selectAll")}
                             />
                             <span className="flex-1">{td("filesView.details.name")}</span>
-                            <span className="hidden w-40 sm:block">{td("filesView.details.modified")}</span>
+                            <span className="hidden w-40 sm:block">
+                                {td("filesView.details.modified")}
+                            </span>
                             <span className="w-20 text-right">{td("filesView.details.size")}</span>
                             <span className="w-16" />
                         </div>
@@ -1178,7 +1201,10 @@ export function ShareExplorer({
                                                         checked={isSelected}
                                                         onClick={(event) => event.stopPropagation()}
                                                         onChange={() => toggleOne(entry.path)}
-                                                        aria-label={td("filesView.selection.selectItem", { name: entry.name })}
+                                                        aria-label={td(
+                                                            "filesView.selection.selectItem",
+                                                            { name: entry.name }
+                                                        )}
                                                     />
                                                     <EntryIcon
                                                         entry={entry}

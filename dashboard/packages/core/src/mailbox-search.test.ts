@@ -127,13 +127,21 @@ describe("what a search admits", () => {
     it("matches a sender by name or by address", () => {
         expect(search.mailSearchAdmits(message(), search.parseMailSearch("from:ana"))).toBe(true);
         expect(search.mailSearchAdmits(message(), search.parseMailSearch("from:ruiz"))).toBe(true);
-        expect(search.mailSearchAdmits(message(), search.parseMailSearch("from:example.com"))).toBe(true);
-        expect(search.mailSearchAdmits(message(), search.parseMailSearch("from:carlos"))).toBe(false);
+        expect(search.mailSearchAdmits(message(), search.parseMailSearch("from:example.com"))).toBe(
+            true
+        );
+        expect(search.mailSearchAdmits(message(), search.parseMailSearch("from:carlos"))).toBe(
+            false
+        );
     });
 
     it("holds an exact phrase to the letter", () => {
-        expect(search.mailSearchAdmits(message(), search.parseMailSearch('"la factura del mes"'))).toBe(true);
-        expect(search.mailSearchAdmits(message(), search.parseMailSearch('"la factura del anio"'))).toBe(false);
+        expect(
+            search.mailSearchAdmits(message(), search.parseMailSearch('"la factura del mes"'))
+        ).toBe(true);
+        expect(
+            search.mailSearchAdmits(message(), search.parseMailSearch('"la factura del anio"'))
+        ).toBe(false);
     });
 
     it("refuses a message carrying a word that was excluded", () => {
@@ -143,9 +151,14 @@ describe("what a search admits", () => {
     });
 
     it("knows an attachment from a link", () => {
-        expect(search.mailSearchAdmits(message(), search.parseMailSearch("has:attachment"))).toBe(true);
+        expect(search.mailSearchAdmits(message(), search.parseMailSearch("has:attachment"))).toBe(
+            true
+        );
         expect(
-            search.mailSearchAdmits(message({ hasAttachments: false }), search.parseMailSearch("has:attachment"))
+            search.mailSearchAdmits(
+                message({ hasAttachments: false }),
+                search.parseMailSearch("has:attachment")
+            )
         ).toBe(false);
         expect(search.mailSearchAdmits(message(), search.parseMailSearch("has:link"))).toBe(true);
         expect(
@@ -169,23 +182,40 @@ describe("what a search admits", () => {
         const sameDay = message({ sentAt: new Date("2026-09-01T23:30:00") });
         // `before:` the same day includes the whole of it, which is what anybody
         // means by it - not midnight at its start.
-        expect(search.mailSearchAdmits(sameDay, search.parseMailSearch("before:2026-09-01"))).toBe(true);
-        expect(search.mailSearchAdmits(sameDay, search.parseMailSearch("after:2026-09-01"))).toBe(true);
-        expect(search.mailSearchAdmits(sameDay, search.parseMailSearch("after:2026-09-02"))).toBe(false);
+        expect(search.mailSearchAdmits(sameDay, search.parseMailSearch("before:2026-09-01"))).toBe(
+            true
+        );
+        expect(search.mailSearchAdmits(sameDay, search.parseMailSearch("after:2026-09-01"))).toBe(
+            true
+        );
+        expect(search.mailSearchAdmits(sameDay, search.parseMailSearch("after:2026-09-02"))).toBe(
+            false
+        );
     });
 
     it("reads the state a message is in", () => {
-        expect(search.mailSearchAdmits(message({ seen: false }), search.parseMailSearch("is:unread"))).toBe(true);
-        expect(search.mailSearchAdmits(message({ seen: true }), search.parseMailSearch("is:unread"))).toBe(false);
-        expect(search.mailSearchAdmits(message({ seen: true }), search.parseMailSearch("is:read"))).toBe(true);
-        expect(search.mailSearchAdmits(message({ flagged: true }), search.parseMailSearch("is:starred"))).toBe(
-            true
-        );
+        expect(
+            search.mailSearchAdmits(message({ seen: false }), search.parseMailSearch("is:unread"))
+        ).toBe(true);
+        expect(
+            search.mailSearchAdmits(message({ seen: true }), search.parseMailSearch("is:unread"))
+        ).toBe(false);
+        expect(
+            search.mailSearchAdmits(message({ seen: true }), search.parseMailSearch("is:read"))
+        ).toBe(true);
+        expect(
+            search.mailSearchAdmits(
+                message({ flagged: true }),
+                search.parseMailSearch("is:starred")
+            )
+        ).toBe(true);
     });
 
     it("leaves the loose words alone, because those are ranked rather than tested", () => {
         // A word nobody in the message ever wrote still gets through here; the
         // shared search over what comes back is what decides.
-        expect(search.mailSearchAdmits(message(), search.parseMailSearch("cualquiercosa"))).toBe(true);
+        expect(search.mailSearchAdmits(message(), search.parseMailSearch("cualquiercosa"))).toBe(
+            true
+        );
     });
 });

@@ -29,7 +29,12 @@ const labels = (query: string, limit = 10): string[] =>
 
 describe("searching a catalogue", () => {
     it("puts the item called exactly that first, and the one inside a longer name last", () => {
-        expect(labels("diamond")).toEqual(["Diamond", "Diamond Sword", "Diamond Ore", "Block of Diamond"]);
+        expect(labels("diamond")).toEqual([
+            "Diamond",
+            "Diamond Sword",
+            "Diamond Ore",
+            "Block of Diamond"
+        ]);
     });
 
     it("answers a precise query precisely", () => {

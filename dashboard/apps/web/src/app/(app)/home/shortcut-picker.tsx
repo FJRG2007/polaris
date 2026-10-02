@@ -65,13 +65,18 @@ export function ShortcutPicker({
 
     const appKey = appIds.join(",");
     const pool = useMemo(
-        () => [...navigationEntries(isAdmin, appKey ? appKey.split(",") : [], gate), ...resourceEntries(resources)],
+        () => [
+            ...navigationEntries(isAdmin, appKey ? appKey.split(",") : [], gate),
+            ...resourceEntries(resources)
+        ],
         [isAdmin, appKey, gate, resources]
     );
 
     const trimmed = query.trim();
     const results = useMemo(() => {
-        const matches = trimmed ? searchItems(pool, trimmed, COMMAND_ENTRY_FIELDS, { limit: MAX_RESULTS }) : pool;
+        const matches = trimmed
+            ? searchItems(pool, trimmed, COMMAND_ENTRY_FIELDS, { limit: MAX_RESULTS })
+            : pool;
         return matches.slice(0, MAX_RESULTS);
     }, [trimmed, pool]);
 
@@ -100,7 +105,7 @@ export function ShortcutPicker({
                         autoCorrect="off"
                         spellCheck={false}
                         bare
-                            className="h-12"
+                        className="h-12"
                     />
                 </div>
                 <div className="max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain p-2">
@@ -123,9 +128,14 @@ export function ShortcutPicker({
                                         held ? "cursor-default opacity-60" : "hover:bg-muted"
                                     )}
                                 >
-                                    <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                    <Icon
+                                        className="size-4 shrink-0 text-muted-foreground"
+                                        aria-hidden="true"
+                                    />
                                     <span className="flex min-w-0 flex-1 flex-col">
-                                        <span className="truncate text-sm" title={entry.label}>{entry.label}</span>
+                                        <span className="truncate text-sm" title={entry.label}>
+                                            {entry.label}
+                                        </span>
                                         <span className="truncate text-xs text-muted-foreground">
                                             {entry.context ?? entry.group}
                                         </span>

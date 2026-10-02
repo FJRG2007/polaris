@@ -38,7 +38,10 @@ const TASK_FIELDS: readonly SearchField<Task>[] = [
 ];
 
 const TASKS: readonly Task[] = [
-    task("Migrar base de datos de producción", "Mover el clúster al nuevo servidor antes del viernes"),
+    task(
+        "Migrar base de datos de producción",
+        "Mover el clúster al nuevo servidor antes del viernes"
+    ),
     task("Revisar la factura de enero", "Comprobar importes con contabilidad", ["finanzas"]),
     task("Canción para el vídeo de bienvenida", "Buscar una pista libre de derechos"),
     task("Bloquear el user agent de los scrapers", "Lista en el WAF", ["seguridad"]),
@@ -109,7 +112,9 @@ describe("a typo", () => {
         // Fuse's Bitap also answered "Actualizar dependencias" here: "actua" is
         // "factrua" without its f and its r.
         expect(search("factrua")).toEqual(["Revisar la factura de enero"]);
-        expect(names(searchItems([task("Diamond"), task("Dirt")], "dimaond", TASK_FIELDS))).toEqual(["Diamond"]);
+        expect(names(searchItems([task("Diamond"), task("Dirt")], "dimaond", TASK_FIELDS))).toEqual(
+            ["Diamond"]
+        );
     });
 
     it("finds two words of the title typed as one", () => {
@@ -183,7 +188,11 @@ describe("ranking", () => {
 
     it("keeps the order given between rows that matched equally well", () => {
         const twins = [task("Deploy A"), task("Deploy B"), task("Deploy C")];
-        expect(names(searchItems(twins, "deploy", TASK_FIELDS))).toEqual(["Deploy A", "Deploy B", "Deploy C"]);
+        expect(names(searchItems(twins, "deploy", TASK_FIELDS))).toEqual([
+            "Deploy A",
+            "Deploy B",
+            "Deploy C"
+        ]);
     });
 
     it("lets a list break those ties its own way", () => {
@@ -227,7 +236,9 @@ describe("a query that names one exact thing", () => {
             task("Archivar sesiones", "user sessions, then the archive for 2024"),
             task("Limpiar tablas", "Vaciar user_sessions_archive_2024 antes del viernes")
         ];
-        expect(names(searchItems(rows, "user_sessions_archive_2024", TASK_FIELDS))).toEqual(["Limpiar tablas"]);
+        expect(names(searchItems(rows, "user_sessions_archive_2024", TASK_FIELDS))).toEqual([
+            "Limpiar tablas"
+        ]);
         expect(names(searchItems(rows, "src/lib user", TASK_FIELDS))).toEqual([]);
     });
 
@@ -243,12 +254,17 @@ describe("a query that names one exact thing", () => {
         expect(isLiteralQuery(query)).toBe(true);
     });
 
-    it.each(["useragent", "restart the relay", "ENG-42", "camera", "a", "/", "the deploy that keeps falling over on tuesday"])(
-        "is not read into %j",
-        (query) => {
-            expect(isLiteralQuery(query)).toBe(false);
-        }
-    );
+    it.each([
+        "useragent",
+        "restart the relay",
+        "ENG-42",
+        "camera",
+        "a",
+        "/",
+        "the deploy that keeps falling over on tuesday"
+    ])("is not read into %j", (query) => {
+        expect(isLiteralQuery(query)).toBe(false);
+    });
 
     it("is looked for without its quotes", () => {
         expect(literalNeedle('"user agent"')).toBe("user agent");

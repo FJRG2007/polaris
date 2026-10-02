@@ -215,7 +215,9 @@ export function ModelPicker({
 
                         {!loading && results.length === 0 && !offerTyped ? (
                             <p className="text-muted-foreground px-3 py-6 text-center text-sm">
-                                {models.length === 0 ? t("modelPicker.noModels") : t("modelPicker.noMatch")}
+                                {models.length === 0
+                                    ? t("modelPicker.noModels")
+                                    : t("modelPicker.noMatch")}
                             </p>
                         ) : null}
                     </div>

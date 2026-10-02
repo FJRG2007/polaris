@@ -27,7 +27,12 @@ import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
 import { Dialog, DialogContent, DialogTitle, Input, SegmentedControl, cn } from "@polaris/ui";
-import { CHAT_SCOPE_FILTERS, scopeWords, searchScope, type SearchScopeDefinition } from "@/lib/search/scopes";
+import {
+    CHAT_SCOPE_FILTERS,
+    scopeWords,
+    searchScope,
+    type SearchScopeDefinition
+} from "@/lib/search/scopes";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { CommandRow, EntryRow, HitRow, HitSkeleton, RecentRow } from "@/components/search-rows";
@@ -589,7 +594,9 @@ export function CommandPalette({
                                     type="button"
                                     onClick={clearScope}
                                     title={t("search.everything")}
-                                    aria-label={t("search.stop", { scope: scopeWords(t, scope.id).label })}
+                                    aria-label={t("search.stop", {
+                                        scope: scopeWords(t, scope.id).label
+                                    })}
                                     className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                                 >
                                     <X className="size-3" aria-hidden="true" />
@@ -604,13 +611,17 @@ export function CommandPalette({
                             onChange={(event) => onFieldChange(event.target.value)}
                             onKeyDown={onFieldKeyDown}
                             placeholder={
-                                scope ? scopeWords(t, scope.id).placeholder : t("search.placeholder")
+                                scope
+                                    ? scopeWords(t, scope.id).placeholder
+                                    : t("search.placeholder")
                             }
                             enterKeyHint="go"
                             autoCapitalize="none"
                             autoCorrect="off"
                             spellCheck={false}
-                            aria-label={scope ? scopeWords(t, scope.id).placeholder : t("search.label")}
+                            aria-label={
+                                scope ? scopeWords(t, scope.id).placeholder : t("search.label")
+                            }
                             // The arrow keys move a highlight through the list
                             // while the caret stays here, so the field has to be
                             // the thing that says which row is current: without
@@ -648,7 +659,10 @@ export function CommandPalette({
                                 }}
                                 options={CHAT_SCOPE_FILTERS.map((filter) => ({
                                     value: filter.id,
-                                    label: filter.id === "chat" ? t("search.all") : scopeWords(t, filter.id).label
+                                    label:
+                                        filter.id === "chat"
+                                            ? t("search.all")
+                                            : scopeWords(t, filter.id).label
                                 }))}
                             />
                         </div>
@@ -678,7 +692,10 @@ export function CommandPalette({
                                     {scope
                                         ? trimmed
                                             ? t("search.noScopeMatch", {
-                                                  scope: scopeWords(t, scope.id).label.toLowerCase(),
+                                                  scope: scopeWords(
+                                                      t,
+                                                      scope.id
+                                                  ).label.toLowerCase(),
                                                   query: trimmed
                                               })
                                             : t("search.nothingIn", {
@@ -749,7 +766,8 @@ export function CommandPalette({
                                                         entry={row.entry}
                                                         scopeLabel={
                                                             row.entry.scope
-                                                                ? scopeWords(t, row.entry.scope).label
+                                                                ? scopeWords(t, row.entry.scope)
+                                                                      .label
                                                                 : null
                                                         }
                                                         selected={selected}
@@ -781,9 +799,7 @@ export function CommandPalette({
                         <span className={cn(scope && "hidden sm:inline")}>
                             {t("search.hintMove")}
                         </span>
-                        <span>
-                            {scope ? t("search.hintClear") : t("search.hintType")}
-                        </span>
+                        <span>{scope ? t("search.hintClear") : t("search.hintType")}</span>
                     </div>
                 </DialogContent>
             </Dialog>

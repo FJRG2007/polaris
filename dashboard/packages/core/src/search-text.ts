@@ -228,7 +228,11 @@ const containedIn = (values: readonly string[], word: string): boolean =>
  * across the fields - with the fraction below 1 ranking those by the weight of
  * the fields that carried them.
  */
-function exactRank<T>(row: Normalized, parsed: ParsedQuery, fields: readonly SearchField<T>[]): number | null {
+function exactRank<T>(
+    row: Normalized,
+    parsed: ParsedQuery,
+    fields: readonly SearchField<T>[]
+): number | null {
     const title = row.fields[0] ?? [];
     if (title.includes(parsed.whole)) return 0;
     if (title.some((value) => value.startsWith(parsed.whole))) return 1;
@@ -342,7 +346,9 @@ export function searchItems<T>(
     }
     ranked.sort(
         (left, right) =>
-            left.rank - right.rank || (tieBreak?.(items[left.at]!, items[right.at]!) ?? 0) || left.at - right.at
+            left.rank - right.rank ||
+            (tieBreak?.(items[left.at]!, items[right.at]!) ?? 0) ||
+            left.at - right.at
     );
     const found = ranked.map((entry) => items[entry.at]!);
     return limit === undefined ? found : found.slice(0, limit);

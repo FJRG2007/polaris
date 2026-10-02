@@ -492,7 +492,13 @@ export function ListScreen({
         // Before the write rather than after, because this is what the reader
         // sees the instant they let go, and the round trip is not something they
         // should be watching.
-        settle(core.arrangeAround(visibleFacts.map((facts) => facts.id), taskId, position));
+        settle(
+            core.arrangeAround(
+                visibleFacts.map((facts) => facts.id),
+                taskId,
+                position
+            )
+        );
         // The column of tasks with no status is keyed by an empty string. Sent
         // as-is it fails validation and the drop silently does nothing, so it
         // becomes an explicit null: "put this back to having no status".
@@ -691,7 +697,8 @@ export function ListScreen({
      */
     const copySelection = (targets: readonly TaskRow[]) => {
         if (targets.length === 0) return;
-        const label = targets.length === 1 ? targets[0]!.name : t("bulk.tasks", { count: targets.length });
+        const label =
+            targets.length === 1 ? targets[0]!.name : t("bulk.tasks", { count: targets.length });
         writeTaskClipboard({ taskIds: targets.map((task) => task.id), label });
         toast.show({ key: "tasks-copy", title: t("bulk.copied", { label }) });
     };
@@ -725,12 +732,16 @@ export function ListScreen({
         if (!report) return;
         const left: string[] = [];
         if (report.droppedStatuses > 0) left.push(t("paste.aStatus"));
-        if (report.droppedTags > 0) left.push(report.droppedTags === 1 ? t("paste.aTag") : t("paste.tags"));
+        if (report.droppedTags > 0)
+            left.push(report.droppedTags === 1 ? t("paste.aTag") : t("paste.tags"));
         if (report.droppedAssignees > 0) left.push(t("paste.people"));
         toast.show({
             key: "tasks-paste",
             title: t("paste.pasted", { count: report.created }),
-            body: left.length > 0 ? t("paste.leftOff", { items: left.join(t("paste.joiner")) }) : undefined
+            body:
+                left.length > 0
+                    ? t("paste.leftOff", { items: left.join(t("paste.joiner")) })
+                    : undefined
         });
         refresh();
     };
@@ -910,7 +921,10 @@ export function ListScreen({
         <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                    <h1 title={title} className="truncate text-[1.0625rem] font-semibold tracking-tight">
+                    <h1
+                        title={title}
+                        className="truncate text-[1.0625rem] font-semibold tracking-tight"
+                    >
                         {title}
                     </h1>
                     {subtitle && (
@@ -1036,7 +1050,10 @@ export function ListScreen({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -1097,12 +1114,24 @@ export function ListScreen({
             {/* List and Table say so in their own rows; the board, the calendar
                 and the timeline keep drawing their columns and days, so a
                 search nothing carries would otherwise read as an empty board. */}
-            {needle && rows.length > 0 && visible.length === 0 && viewType !== "list" && viewType !== "table" && (
-                <EmptyState
-                    title={searchFindsAny ? t("list.noMatch") : t("search.noMatch", { query: needle })}
-                    description={searchFindsAny ? t("list.noMatchDescription") : t("search.noMatchDescription")}
-                />
-            )}
+            {needle &&
+                rows.length > 0 &&
+                visible.length === 0 &&
+                viewType !== "list" &&
+                viewType !== "table" && (
+                    <EmptyState
+                        title={
+                            searchFindsAny
+                                ? t("list.noMatch")
+                                : t("search.noMatch", { query: needle })
+                        }
+                        description={
+                            searchFindsAny
+                                ? t("list.noMatchDescription")
+                                : t("search.noMatchDescription")
+                        }
+                    />
+                )}
 
             {rows.length === 0 && (
                 <EmptyState
@@ -1127,9 +1156,7 @@ export function ListScreen({
                 />
             )}
 
-            <p className="text-[0.6875rem] text-muted-foreground">
-                {t("hint")}
-            </p>
+            <p className="text-[0.6875rem] text-muted-foreground">{t("hint")}</p>
 
             {createTarget && (
                 <TaskCreateDialog
@@ -1170,7 +1197,9 @@ export function ListScreen({
                 // One task is named; a selection is counted, since a dialog
                 // listing forty names says less than the number does.
                 name={
-                    deleting.length === 1 ? (deleting[0]?.name ?? "") : t("bulk.tasks", { count: deleting.length })
+                    deleting.length === 1
+                        ? (deleting[0]?.name ?? "")
+                        : t("bulk.tasks", { count: deleting.length })
                 }
                 kind={deleting.length === 1 ? "task" : "tasks"}
                 // One row of many is asked plainly, the way every other single
@@ -1181,7 +1210,11 @@ export function ListScreen({
                 title={t("bulk.deleteTitle", { count: deleting.length })}
                 question={t.rich("bulk.deleteQuestion", {
                     name: deleting[0]?.name ?? "",
-                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
                 })}
                 description={t("bulk.deleteDescription")}
                 confirmLabel={t("bulk.deleteConfirm", { count: deleting.length })}

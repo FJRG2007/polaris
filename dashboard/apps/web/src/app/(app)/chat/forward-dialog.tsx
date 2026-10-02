@@ -125,10 +125,7 @@ export function ForwardDialog({
      */
     const searching = query.trim().length > 0;
     const found = useMemo(
-        () =>
-            searching
-                ? searchItems(targets, query, TARGET_FIELDS)
-                : [],
+        () => (searching ? searchItems(targets, query, TARGET_FIELDS) : []),
         [targets, query, searching]
     );
 
@@ -193,9 +190,7 @@ export function ForwardDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("forward.forwardThisMessage")}</DialogTitle>
-                    <DialogDescription>
-                        {t("forward.itArrivesQuotedSoWho")}
-                    </DialogDescription>
+                    <DialogDescription>{t("forward.itArrivesQuotedSoWho")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
@@ -254,7 +249,9 @@ export function ForwardDialog({
 
                         {listed.length === 0 && !openServers ? (
                             <li className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                {searching ? t("forward.nothingMatchesThat") : t("forward.nothingToForwardToYet")}
+                                {searching
+                                    ? t("forward.nothingMatchesThat")
+                                    : t("forward.nothingToForwardToYet")}
                             </li>
                         ) : (
                             listed.map((target) => {
@@ -333,7 +330,9 @@ export function ForwardDialog({
                         ) : (
                             <Forward className="size-4" />
                         )}
-                        {chosen.length > 1 ? t("forward.forwardTo", { count: chosen.length }) : t("forward.forward")}
+                        {chosen.length > 1
+                            ? t("forward.forwardTo", { count: chosen.length })
+                            : t("forward.forward")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -253,7 +253,9 @@ function PeopleDialog({
             <DialogContent className="max-w-sm">
                 <PlainNames>
                     <DialogTitle>
-                        {which === "followers" ? t("profile.followersTitle", { name }) : t("profile.followingTitle", { name })}
+                        {which === "followers"
+                            ? t("profile.followersTitle", { name })
+                            : t("profile.followingTitle", { name })}
                     </DialogTitle>
 
                     <div className="relative">

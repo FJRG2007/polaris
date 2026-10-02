@@ -168,7 +168,9 @@ export function MarketplaceView({
         const term = query.trim();
         if (term) {
             const hits = searchItems(all, term, APP_FIELDS);
-            return hits.length === 0 ? [] : [{ category: t("view.results"), apps: sortOffered(hits) }];
+            return hits.length === 0
+                ? []
+                : [{ category: t("view.results"), apps: sortOffered(hits) }];
         }
         return groups.map((group) => ({ category: group.category, apps: sortOffered(group.apps) }));
     }, [groups, all, query, t]);
@@ -190,10 +192,7 @@ export function MarketplaceView({
 
     return (
         <div className="flex flex-col gap-6">
-            <PageHeader
-                title={t("view.title")}
-                description={t("view.description")}
-            />
+            <PageHeader title={t("view.title")} description={t("view.description")} />
 
             {/* Above everything, the way a store puts it: the first thing
                 somebody arriving with a name in mind reaches for. */}
@@ -368,7 +367,11 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {manifest
-                                                    ? categoryLabel(words, manifest.category, navLabel)
+                                                    ? categoryLabel(
+                                                          words,
+                                                          manifest.category,
+                                                          navLabel
+                                                      )
                                                     : item.catalogId}
                                             </p>
                                         </div>

@@ -146,7 +146,10 @@ describe("searching the board for a word no task carries", () => {
     it("blames the filter, not the search, when the filter is what emptied the board", () => {
         // Narrowed to urgent work before the search box is touched - the kind of
         // link a dashboard widget hands out already filtered.
-        screen({ match: "all", conditions: [{ field: "priority", operator: "is", values: ["urgent"] }] });
+        screen({
+            match: "all",
+            conditions: [{ field: "priority", operator: "is", values: ["urgent"] }]
+        });
 
         // The search alone would find this task - it carries the word - but the
         // filter still excludes it, so the board is empty for the filter's reason.

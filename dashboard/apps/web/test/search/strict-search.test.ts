@@ -44,7 +44,9 @@ describe("the files search", () => {
     it("finds a nested file by its path", () => {
         const parsed = parseSearch("documentos/notas");
         expect(parsed.pathMode).toBe(true);
-        expect(searchItems(entries, parsed.fuzzy, PATH_SEARCH).map((entry) => entry.name)).toEqual(["notas.txt"]);
+        expect(searchItems(entries, parsed.fuzzy, PATH_SEARCH).map((entry) => entry.name)).toEqual([
+            "notas.txt"
+        ]);
     });
 
     it("answers nothing for a name no file has", () => {
@@ -53,7 +55,10 @@ describe("the files search", () => {
 });
 
 describe("the command palette and the shortcut picker", () => {
-    const pool = navigationEntries(true, POLARIS_APPS.map((app) => app.id));
+    const pool = navigationEntries(
+        true,
+        POLARIS_APPS.map((app) => app.id)
+    );
 
     it("puts the page called what was typed first", () => {
         const found = searchItems(pool, "drive", COMMAND_ENTRY_FIELDS);

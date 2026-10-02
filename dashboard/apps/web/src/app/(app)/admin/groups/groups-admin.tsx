@@ -81,11 +81,7 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
     // the group a person is in types that person's name. Over the rows already on
     // the page - a deployment's groups are a short list, and asking the server
     // would be slower than reading it.
-    const shown = useMemo(
-        () =>
-            searchItems(groups, query, GROUP_FIELDS),
-        [groups, query]
-    );
+    const shown = useMemo(() => searchItems(groups, query, GROUP_FIELDS), [groups, query]);
 
     function mutate(run: () => Promise<unknown>) {
         startTransition(async () => {
@@ -118,8 +114,12 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">{t("groups.table.group")}</th>
-                            <th className="hidden px-3 py-2 font-medium sm:table-cell">{t("groups.table.members")}</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("groups.table.people")}</th>
+                            <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                                {t("groups.table.members")}
+                            </th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                {t("groups.table.people")}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -158,7 +158,9 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                             <div className="min-w-0">
                                                 <p className="flex items-center gap-1.5 truncate font-medium">
                                                     {group.name}
-                                                    {group.isSystem ? <Badge>{t("groups.system")}</Badge> : null}
+                                                    {group.isSystem ? (
+                                                        <Badge>{t("groups.system")}</Badge>
+                                                    ) : null}
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
                                                     {group.description || t("groups.noDescription")}
@@ -324,7 +326,9 @@ function GroupDialog({
                     {/* Padded on the right so a long name does not run under the
                         dialog's own close button. */}
                     <DialogTitle className="flex items-center gap-2 pr-6">
-                        <span className="truncate" title={group.name}>{group.name}</span>
+                        <span className="truncate" title={group.name}>
+                            {group.name}
+                        </span>
                         {group.isSystem ? <Badge>{t("groups.system")}</Badge> : null}
                     </DialogTitle>
                     <DialogDescription>
@@ -334,7 +338,9 @@ function GroupDialog({
 
                 <div className="flex flex-col gap-1">
                     {group.members.length === 0 ? (
-                        <p className="py-2 text-sm text-muted-foreground">{t("groups.dialog.noMembers")}</p>
+                        <p className="py-2 text-sm text-muted-foreground">
+                            {t("groups.dialog.noMembers")}
+                        </p>
                     ) : (
                         group.members.map((member) => (
                             <PersonRow

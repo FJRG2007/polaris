@@ -68,7 +68,9 @@ export function parseSearch(query: string): ParsedQuery {
     if (explicit) {
         result.pathMode = /[\\/]/.test(explicit[1]!);
         try {
-            result.patterns.push(new RegExp(explicit[1]!, (explicit[2] ?? "").replace(/g/g, "") || "i"));
+            result.patterns.push(
+                new RegExp(explicit[1]!, (explicit[2] ?? "").replace(/g/g, "") || "i")
+            );
         } catch {
             result.error = "Invalid regular expression";
         }
@@ -86,7 +88,8 @@ export function parseSearch(query: string): ParsedQuery {
         } else if (isPathToken(token)) {
             result.pathMode = true;
             const normalized = normalizePathTarget(token);
-            if (token.includes("*") || token.includes("?")) result.patterns.push(globToRegExp(normalized));
+            if (token.includes("*") || token.includes("?"))
+                result.patterns.push(globToRegExp(normalized));
             else fuzzyWords.push(normalized);
         } else if (token.includes("*") || token.includes("?")) {
             result.patterns.push(globToRegExp(token));

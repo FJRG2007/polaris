@@ -445,7 +445,9 @@ async function matchingThreads(
     const exact = searchable.filter((message) => core.mailSearchAdmits(message, terms));
     if (!terms.text) return new Set(exact.map((message) => message.threadId));
 
-    return new Set(core.searchItems(exact, terms.text, MAIL_SEARCH_FIELDS).map((message) => message.threadId));
+    return new Set(
+        core.searchItems(exact, terms.text, MAIL_SEARCH_FIELDS).map((message) => message.threadId)
+    );
 }
 
 /** One message as the search box reads it. */

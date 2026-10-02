@@ -73,11 +73,7 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
 
     // Over the rows already here, by name, handle or owner - an owner's name is
     // worth finding by either half of it.
-    const shown = useMemo(
-        () =>
-            core.searchItems(orgs, query, ORG_FIELDS),
-        [orgs, query]
-    );
+    const shown = useMemo(() => core.searchItems(orgs, query, ORG_FIELDS), [orgs, query]);
 
     // An administrator is answered as the owner of every organization, so the
     // row opens the real thing rather than a read-only copy of half of it.
@@ -100,11 +96,21 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">{t("organizations.table.organization")}</th>
-                            <th className="hidden px-3 py-2 font-medium sm:table-cell">{t("organizations.table.owner")}</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("organizations.table.members")}</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("organizations.table.teams")}</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("organizations.table.spaces")}</th>
+                            <th className="px-3 py-2 font-medium">
+                                {t("organizations.table.organization")}
+                            </th>
+                            <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                                {t("organizations.table.owner")}
+                            </th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                {t("organizations.table.members")}
+                            </th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                {t("organizations.table.teams")}
+                            </th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                {t("organizations.table.spaces")}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -144,7 +150,10 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                         <div className="flex items-center gap-3">
                                             <OrgAvatar org={org} size={36} />
                                             <div className="min-w-0">
-                                                <p className="truncate font-medium" title={org.name}>
+                                                <p
+                                                    className="truncate font-medium"
+                                                    title={org.name}
+                                                >
                                                     {org.name}
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
@@ -154,7 +163,9 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                         </div>
                                     </td>
                                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
-                                        <span className="truncate" title={org.ownerName}>{org.ownerName}</span>
+                                        <span className="truncate" title={org.ownerName}>
+                                            {org.ownerName}
+                                        </span>
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                         {org.memberCount}
@@ -328,17 +339,24 @@ function OrganizationPolicyForm({
                         )}
                     </div>
 
-                    <p className="text-xs text-muted-foreground">{t("organizations.policy.lowering")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("organizations.policy.lowering")}
+                    </p>
 
                     {error && (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     )}
 
                     <div className="flex items-center justify-end gap-3">
                         {saved && !changed && (
-                            <span className="text-xs text-muted-foreground">{t("organizations.policy.saved")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("organizations.policy.saved")}
+                            </span>
                         )}
                         <Button
                             type="submit"

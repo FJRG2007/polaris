@@ -109,7 +109,8 @@ export function NotificationsView() {
         if (order === "oldest") sorted.reverse();
         // Stable, so the unread keep the order they were already in rather than
         // being shuffled among themselves.
-        if (order === "unread") sorted.sort((left, right) => Number(left.read) - Number(right.read));
+        if (order === "unread")
+            sorted.sort((left, right) => Number(left.read) - Number(right.read));
         return needle ? searchItems(sorted, needle, NOTIFICATION_FIELDS) : sorted;
     }, [needle, narrowed, order]);
 
@@ -143,7 +144,10 @@ export function NotificationsView() {
 
     const eventOptions = [
         { value: ALL_EVENTS, label: t("history.allEvents") },
-        ...NOTIFICATION_EVENTS.map((entry) => ({ value: entry.id, label: eventLabel(t, entry.id) ?? entry.label }))
+        ...NOTIFICATION_EVENTS.map((entry) => ({
+            value: entry.id,
+            label: eventLabel(t, entry.id) ?? entry.label
+        }))
     ];
 
     return (
@@ -183,7 +187,10 @@ export function NotificationsView() {
                     <Select
                         value={state}
                         onValueChange={(value) => setState(value as StateFilter)}
-                        options={STATES.map((value) => ({ value, label: t(`history.states.${value}` as const) }))}
+                        options={STATES.map((value) => ({
+                            value,
+                            label: t(`history.states.${value}` as const)
+                        }))}
                         aria-label={t("history.filterState")}
                     />
                 </div>
@@ -194,7 +201,10 @@ export function NotificationsView() {
                         // A search ranks by how well each row matched, so a
                         // position among those rows is not one anybody chose.
                         disabled={needle !== ""}
-                        options={ORDERS.map((value) => ({ value, label: t(`history.orders.${value}` as const) }))}
+                        options={ORDERS.map((value) => ({
+                            value,
+                            label: t(`history.orders.${value}` as const)
+                        }))}
                         aria-label={t("history.order")}
                     />
                 </div>
@@ -262,9 +272,15 @@ export function NotificationsView() {
                             checked={allShownPicked}
                             indeterminate={selected.length > 0 && !allShownPicked}
                             onChange={() =>
-                                setPicked(allShownPicked ? new Set() : new Set(rows.map((row) => row.id)))
+                                setPicked(
+                                    allShownPicked ? new Set() : new Set(rows.map((row) => row.id))
+                                )
                             }
-                            aria-label={allShownPicked ? t("history.clearSelection") : t("history.selectAll")}
+                            aria-label={
+                                allShownPicked
+                                    ? t("history.clearSelection")
+                                    : t("history.selectAll")
+                            }
                         />
                         <span className="text-xs text-muted-foreground">
                             {t("history.count", { count: rows.length })}
@@ -290,7 +306,11 @@ export function NotificationsView() {
             {!ended && (rows.length > 0 || narrowing) ? (
                 <div className="flex justify-center">
                     <Button size="sm" variant="ghost" onClick={loadOlder} disabled={loading}>
-                        {loading ? <Loader2 className="size-4 animate-spin" /> : <ChevronDown className="size-4" />}
+                        {loading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <ChevronDown className="size-4" />
+                        )}
                         {t("history.loadOlder")}
                     </Button>
                 </div>
@@ -334,7 +354,9 @@ function NotificationRow({
             <NotificationFace row={row} className="mt-0.5" />
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-[0.8125rem] font-medium leading-5">
-                    {!row.read ? <span className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
+                    {!row.read ? (
+                        <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                    ) : null}
                     {row.href ? (
                         <NotificationLink href={row.href} onOpen={onRead}>
                             {row.title}
@@ -343,7 +365,9 @@ function NotificationRow({
                         <span className="truncate">{row.title}</span>
                     )}
                 </p>
-                {row.body ? <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.body}</p> : null}
+                {row.body ? (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.body}</p>
+                ) : null}
                 <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-muted-foreground/70">
                     <RelativeTime iso={row.createdAt} />
                     <span aria-hidden="true">-</span>
@@ -363,11 +387,19 @@ function NotificationRow({
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
                 {!row.read ? (
-                    <RowAction label={t("history.markAsRead")} onClick={onRead} className="hover:text-success">
+                    <RowAction
+                        label={t("history.markAsRead")}
+                        onClick={onRead}
+                        className="hover:text-success"
+                    >
                         <Check className="size-3.5" />
                     </RowAction>
                 ) : null}
-                <RowAction label={t("history.delete")} onClick={onRemove} className="hover:text-danger">
+                <RowAction
+                    label={t("history.delete")}
+                    onClick={onRemove}
+                    className="hover:text-danger"
+                >
                     <X className="size-3.5" />
                 </RowAction>
             </div>
@@ -394,7 +426,13 @@ function NotificationLink({
         );
     }
     return (
-        <a href={href} target="_blank" rel="noreferrer noopener" onClick={onOpen} className={className}>
+        <a
+            href={href}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={onOpen}
+            className={className}
+        >
             {children}
         </a>
     );
@@ -418,10 +456,7 @@ function RowAction({
             onClick={onClick}
             aria-label={label}
             title={label}
-            className={cn(
-                "rounded p-1 text-muted-foreground transition-colors ",
-                className
-            )}
+            className={cn("rounded p-1 text-muted-foreground transition-colors ", className)}
         >
             {children}
         </button>

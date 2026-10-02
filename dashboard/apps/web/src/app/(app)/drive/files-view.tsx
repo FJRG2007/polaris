@@ -178,7 +178,7 @@ function SortHeading({
     onChoose: (column: SortKey) => void;
     className?: string;
 }) {
-        const t = useTranslations("drive");
+    const t = useTranslations("drive");
     const active = sortKey === column;
     return (
         <div className={cn("flex items-center", className)}>
@@ -304,7 +304,8 @@ function folderTally(t: DriveT, entries: readonly DriveEntry[]): string {
  *  bytes rather than under-reporting them. */
 function selectionTally(t: DriveT, entries: readonly DriveEntry[]): string {
     const count = entries.length;
-    if (entries.some((entry) => entry.kind === "dir")) return t("filesView.tally.selected", { count });
+    if (entries.some((entry) => entry.kind === "dir"))
+        return t("filesView.tally.selected", { count });
     const bytes = entries.reduce((total, entry) => total + BigInt(entry.size || "0"), 0n);
     return t("filesView.tally.selectedWithSize", { count, size: formatBytes(bytes) });
 }
@@ -550,9 +551,12 @@ export function FilesView({
         if (entry.kind !== "dir") return undefined;
         const weight = insights.sizes.get(entry.path);
         if (!weight) {
-                        return insights.pending.has(entry.path) ? t("filesView.size.measuring") : undefined;
+            return insights.pending.has(entry.path) ? t("filesView.size.measuring") : undefined;
         }
-        const contents = t("filesView.size.contents", { files: weight.files, folders: weight.folders });
+        const contents = t("filesView.size.contents", {
+            files: weight.files,
+            folders: weight.folders
+        });
         return weight.partial ? t("filesView.size.partial", { contents }) : contents;
     }
 
@@ -990,7 +994,7 @@ export function FilesView({
     // Anything but a single file comes down as an archive, and the button says so.
     const zipLabel =
         selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
-                        ? t("filesView.selection.downloadZip")
+            ? t("filesView.selection.downloadZip")
             : t("filesView.selection.download");
     // Each selected item gets its own link, so the count is worth saying out loud.
     const shareLabel =
@@ -1076,7 +1080,8 @@ export function FilesView({
                 event.dataTransfer.setData("application/x-polaris-path", entry.path);
                 event.dataTransfer.effectAllowed = "move";
                 const carried = draggedGroup(entry.path).length;
-                if (carried > 1) showCountDragImage(event, t("filesView.dragCount", { count: carried }));
+                if (carried > 1)
+                    showCountDragImage(event, t("filesView.dragCount", { count: carried }));
             },
             onDragEnd: () => {
                 dragPath.current = null;
@@ -1142,7 +1147,9 @@ export function FilesView({
     function entryMenu(entry: DriveEntry) {
         const targets = menuTargets(entry);
         const many = targets.length > 1;
-        const label = many ? t("filesView.menu.itemsSelected", { count: targets.length }) : entry.name;
+        const label = many
+            ? t("filesView.menu.itemsSelected", { count: targets.length })
+            : entry.name;
         // A mixed selection commits to one direction rather than flipping each
         // item: anything not yet starred/hidden decides, so a second pass undoes
         // the first instead of leaving the group half-and-half.
@@ -1182,7 +1189,9 @@ export function FilesView({
                             <ContextMenuItem onSelect={() => pasteInto(entry.path)}>
                                 <ClipboardPaste className="size-4" />
                                 {clipboard.entries.length > 1
-                                    ? t("filesView.menu.pasteHereCount", { count: clipboard.entries.length })
+                                    ? t("filesView.menu.pasteHereCount", {
+                                          count: clipboard.entries.length
+                                      })
                                     : t("filesView.menu.pasteHere")}
                             </ContextMenuItem>
                         ) : null}
@@ -1217,12 +1226,16 @@ export function FilesView({
                 )}
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
                     <Copy className="size-4" />
-                    {many ? t("filesView.menu.copyMany", { count: targets.length }) : t("filesView.menu.copy")}
+                    {many
+                        ? t("filesView.menu.copyMany", { count: targets.length })
+                        : t("filesView.menu.copy")}
                     <MenuShortcut keys="Mod+C" />
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "cut" })}>
                     <Scissors className="size-4" />
-                    {many ? t("filesView.menu.cutMany", { count: targets.length }) : t("filesView.menu.cut")}
+                    {many
+                        ? t("filesView.menu.cutMany", { count: targets.length })
+                        : t("filesView.menu.cut")}
                     <MenuShortcut keys="Mod+X" />
                 </ContextMenuItem>
                 {abilities.write ? (
@@ -1266,7 +1279,9 @@ export function FilesView({
                 {onShare ? (
                     <ContextMenuItem onSelect={() => onShare(targets)}>
                         <Share2 className="size-4" />
-                        {many ? t("filesView.menu.getLinks", { count: targets.length }) : t("filesView.menu.getLink")}
+                        {many
+                            ? t("filesView.menu.getLinks", { count: targets.length })
+                            : t("filesView.menu.getLink")}
                     </ContextMenuItem>
                 ) : null}
                 <ContextMenuSeparator />
@@ -1276,7 +1291,9 @@ export function FilesView({
                     }}
                 >
                     <Star className={cn("size-4", !starring && "fill-amber-400 text-amber-400")} />
-                    {starring ? t("filesView.menu.favoriteAdd") : t("filesView.menu.favoriteRemove")}
+                    {starring
+                        ? t("filesView.menu.favoriteAdd")
+                        : t("filesView.menu.favoriteRemove")}
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setIconTargets(targets)}>
                     <Palette className="size-4" />
@@ -1296,7 +1313,9 @@ export function FilesView({
                     <>
                         <ContextMenuItem onSelect={() => openNote(entry)}>
                             <StickyNote className="size-4" />
-                            {entry.note ? t("filesView.menu.editNote") : t("filesView.menu.addNote")}
+                            {entry.note
+                                ? t("filesView.menu.editNote")
+                                : t("filesView.menu.addNote")}
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => setDetailsTarget(entry)}>
                             <Info className="size-4" />
@@ -1331,8 +1350,12 @@ export function FilesView({
                                     onSelect={() => onDeletePermanent(targets)}
                                 >
                                     <Trash2 className="size-4" />
-                                    {onDelete ? t("filesView.menu.deletePermanently") : t("filesView.menu.delete")}
-                                    {onDelete ? null : <MenuShortcut>{t("filesView.menu.deleteKey")}</MenuShortcut>}
+                                    {onDelete
+                                        ? t("filesView.menu.deletePermanently")
+                                        : t("filesView.menu.delete")}
+                                    {onDelete ? null : (
+                                        <MenuShortcut>{t("filesView.menu.deleteKey")}</MenuShortcut>
+                                    )}
                                 </ContextMenuItem>
                                 {!many && entry.kind === "dir" ? (
                                     <>
@@ -1350,7 +1373,9 @@ export function FilesView({
                                             onSelect={() => onEmptyFolder(entry, true)}
                                         >
                                             <Eraser className="size-4" />
-                                            {onDelete ? t("filesView.menu.emptyPermanently") : t("filesView.menu.empty")}
+                                            {onDelete
+                                                ? t("filesView.menu.emptyPermanently")
+                                                : t("filesView.menu.empty")}
                                         </ContextMenuItem>
                                     </>
                                 ) : null}
@@ -1738,7 +1763,9 @@ export function FilesView({
                                 ) : (
                                     <Download className="size-4" />
                                 )}
-                                {preparing > 0 ? t("filesView.viewer.fetching") : t("filesView.viewer.download")}
+                                {preparing > 0
+                                    ? t("filesView.viewer.fetching")
+                                    : t("filesView.viewer.download")}
                             </Button>
                         </div>
                     </div>
@@ -1768,7 +1795,9 @@ export function FilesView({
                             {/* A location of your own starts at Home. One somebody
                                 shared starts at what they shared, and calling that
                                 Home would say the folder is the whole storage. */}
-                            {rootPath === "" ? t("filesView.home") : (rootPath.split("/").pop() ?? t("filesView.home"))}
+                            {rootPath === ""
+                                ? t("filesView.home")
+                                : (rootPath.split("/").pop() ?? t("filesView.home"))}
                         </Link>
                         {segments.slice(depthOf(rootPath)).map((segment, index) => {
                             const target = segments
@@ -1802,12 +1831,18 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={paste}
                                 disabled={pending}
-                                title={t("filesView.toolbar.pasteItems", { count: clipboard.entries.length })}
-                                aria-label={t("filesView.toolbar.pasteItems", { count: clipboard.entries.length })}
+                                title={t("filesView.toolbar.pasteItems", {
+                                    count: clipboard.entries.length
+                                })}
+                                aria-label={t("filesView.toolbar.pasteItems", {
+                                    count: clipboard.entries.length
+                                })}
                             >
                                 <ClipboardPaste className="size-4" />
                                 <span className="hidden sm:inline">
-                                    {t("filesView.toolbar.pasteCount", { count: clipboard.entries.length })}
+                                    {t("filesView.toolbar.pasteCount", {
+                                        count: clipboard.entries.length
+                                    })}
                                 </span>
                             </Button>
                         ) : null}
@@ -1821,7 +1856,9 @@ export function FilesView({
                                 aria-label={t("filesView.toolbar.shareFolder")}
                             >
                                 <Users className="size-4" />
-                                <span className="hidden sm:inline">{t("filesView.toolbar.share")}</span>
+                                <span className="hidden sm:inline">
+                                    {t("filesView.toolbar.share")}
+                                </span>
                             </Button>
                         ) : null}
                         {onShareFolder ? (
@@ -1844,11 +1881,15 @@ export function FilesView({
                                     onRequestFiles(path, segments[segments.length - 1] ?? "")
                                 }
                                 disabled={pending}
-                                title={t("filesView.toolbar.requestFilesHint", { shortcut: SHORTCUT_HINTS["request-files"] })}
+                                title={t("filesView.toolbar.requestFilesHint", {
+                                    shortcut: SHORTCUT_HINTS["request-files"]
+                                })}
                                 aria-label={t("filesView.toolbar.requestFiles")}
                             >
                                 <Inbox className="size-4" />
-                                <span className="hidden sm:inline">{t("filesView.toolbar.requestFiles")}</span>
+                                <span className="hidden sm:inline">
+                                    {t("filesView.toolbar.requestFiles")}
+                                </span>
                             </Button>
                         ) : null}
                         {abilities.write ? (
@@ -1857,11 +1898,15 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={onNewFolder}
                                 disabled={pending}
-                                title={t("filesView.toolbar.newFolderHint", { shortcut: SHORTCUT_HINTS["new-folder"] })}
+                                title={t("filesView.toolbar.newFolderHint", {
+                                    shortcut: SHORTCUT_HINTS["new-folder"]
+                                })}
                                 aria-label={t("filesView.toolbar.newFolder")}
                             >
                                 <FolderPlus className="size-4" />
-                                <span className="hidden sm:inline">{t("filesView.toolbar.newFolder")}</span>
+                                <span className="hidden sm:inline">
+                                    {t("filesView.toolbar.newFolder")}
+                                </span>
                             </Button>
                         ) : null}
                         <DropdownMenu>
@@ -1879,7 +1924,9 @@ export function FilesView({
                                 >
                                     <Upload className="size-4" />
                                     <span className="hidden sm:inline">
-                                        {uploading ? t("filesView.toolbar.uploading") : t("filesView.toolbar.upload")}
+                                        {uploading
+                                            ? t("filesView.toolbar.uploading")
+                                            : t("filesView.toolbar.upload")}
                                     </span>
                                 </Button>
                             </DropdownMenuTrigger>
@@ -1973,7 +2020,10 @@ export function FilesView({
                             <DropdownMenuTrigger asChild>
                                 <button
                                     type="button"
-                                    aria-label={t("filesView.sort.sorted", { column: sortKey, dir: sortDir })}
+                                    aria-label={t("filesView.sort.sorted", {
+                                        column: sortKey,
+                                        dir: sortDir
+                                    })}
                                     title={t("filesView.sort.title")}
                                     className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 >
@@ -1988,10 +2038,12 @@ export function FilesView({
                                         onSelect={() => chooseSort(key)}
                                         className="gap-2"
                                     >
-                                                                                {sortLabel(t, key)}
+                                        {sortLabel(t, key)}
                                         {sortKey === key ? (
                                             <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
-                                                {sortDir === "asc" ? t("filesView.sort.ascending") : t("filesView.sort.descending")}
+                                                {sortDir === "asc"
+                                                    ? t("filesView.sort.ascending")
+                                                    : t("filesView.sort.descending")}
                                             </span>
                                         ) : null}
                                     </DropdownMenuItem>
@@ -2044,7 +2096,11 @@ export function FilesView({
                         size="sm"
                         variant={starredOnly ? "secondary" : "ghost"}
                         onClick={() => setStarredOnly((prev) => !prev)}
-                        aria-label={starredOnly ? t("filesView.filters.showAll") : t("filesView.filters.starredOnly")}
+                        aria-label={
+                            starredOnly
+                                ? t("filesView.filters.showAll")
+                                : t("filesView.filters.starredOnly")
+                        }
                     >
                         <Star
                             className={cn("size-4", starredOnly && "fill-amber-400 text-amber-400")}
@@ -2055,7 +2111,11 @@ export function FilesView({
                         size="sm"
                         variant={showHidden ? "secondary" : "ghost"}
                         onClick={() => setShowHidden((prev) => !prev)}
-                        aria-label={showHidden ? t("filesView.filters.hideHidden") : t("filesView.filters.showHidden")}
+                        aria-label={
+                            showHidden
+                                ? t("filesView.filters.hideHidden")
+                                : t("filesView.filters.showHidden")
+                        }
                     >
                         {showHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                         {t("filesView.filters.hidden")}
@@ -2088,7 +2148,7 @@ export function FilesView({
                                             : "border-border text-muted-foreground hover:bg-muted"
                                     )}
                                 >
-                                                                        {t(`fileCategories.${category.id}`)}
+                                    {t(`fileCategories.${category.id}`)}
                                 </button>
                             ))}
                         </div>
@@ -2149,7 +2209,7 @@ export function FilesView({
                                 }}
                                 className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
                             >
-                                                                {t("filesView.filters.clear")}
+                                {t("filesView.filters.clear")}
                             </button>
                         ) : null}
                     </div>
@@ -2176,8 +2236,12 @@ export function FilesView({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => downloadSelection(connectionId, selectedEntries)}
-                                    title={preparing > 0 ? t("filesView.selection.fetching") : zipLabel}
-                                    aria-label={preparing > 0 ? t("filesView.selection.fetching") : zipLabel}
+                                    title={
+                                        preparing > 0 ? t("filesView.selection.fetching") : zipLabel
+                                    }
+                                    aria-label={
+                                        preparing > 0 ? t("filesView.selection.fetching") : zipLabel
+                                    }
                                 >
                                     {preparing > 0 ? (
                                         <Loader2 className="size-4 animate-spin" />
@@ -2185,7 +2249,9 @@ export function FilesView({
                                         <Download className="size-4" />
                                     )}
                                     <span className="hidden sm:inline">
-                                        {preparing > 0 ? t("filesView.selection.fetching") : zipLabel}
+                                        {preparing > 0
+                                            ? t("filesView.selection.fetching")
+                                            : zipLabel}
                                     </span>
                                 </Button>
                                 <SelectionZipMenu
@@ -2202,7 +2268,9 @@ export function FilesView({
                                         aria-label={shareLabel}
                                     >
                                         <Share2 className="size-4" />
-                                        <span className="hidden sm:inline">{t("filesView.selection.share")}</span>
+                                        <span className="hidden sm:inline">
+                                            {t("filesView.selection.share")}
+                                        </span>
                                     </Button>
                                 ) : null}
                                 <Button
@@ -2214,7 +2282,9 @@ export function FilesView({
                                     aria-label={t("filesView.selection.delete")}
                                 >
                                     <Trash2 className="size-4" />
-                                    <span className="hidden sm:inline">{t("filesView.selection.delete")}</span>
+                                    <span className="hidden sm:inline">
+                                        {t("filesView.selection.delete")}
+                                    </span>
                                 </Button>
                                 <Button
                                     size="sm"
@@ -2224,7 +2294,9 @@ export function FilesView({
                                     aria-label={t("filesView.selection.clearSelection")}
                                 >
                                     <X className="size-4" />
-                                    <span className="hidden sm:inline">{t("filesView.selection.clear")}</span>
+                                    <span className="hidden sm:inline">
+                                        {t("filesView.selection.clear")}
+                                    </span>
                                 </Button>
                             </div>
                         </>
@@ -2267,7 +2339,9 @@ export function FilesView({
                                                             selectedEntries.length > 0
                                                         }
                                                         onChange={toggleAll}
-                                                        aria-label={t("filesView.selection.selectAll")}
+                                                        aria-label={t(
+                                                            "filesView.selection.selectAll"
+                                                        )}
                                                     />
                                                 </label>
                                             </div>
@@ -2409,7 +2483,9 @@ export function FilesView({
                                                                         !insights.sizes.has(
                                                                             entry.path
                                                                         )
-                                                                                                                                                        ? t("filesView.entry.folder")
+                                                                            ? t(
+                                                                                  "filesView.entry.folder"
+                                                                              )
                                                                             : sizeLabel(entry)}
                                                                     </span>
                                                                     <div className="flex items-center gap-1">
@@ -2424,7 +2500,9 @@ export function FilesView({
                                                                         ) ? (
                                                                             <KeyRound
                                                                                 className="size-3 text-warning"
-                                                                                aria-label={t("filesView.entry.needsPassword")}
+                                                                                aria-label={t(
+                                                                                    "filesView.entry.needsPassword"
+                                                                                )}
                                                                             />
                                                                         ) : null}
                                                                         {entry.note ? (
@@ -2550,7 +2628,12 @@ export function FilesView({
                                                                                     onChange={() =>
                                                                                         undefined
                                                                                     }
-                                                                                    aria-label={t("filesView.selection.selectItem", { name: entry.name })}
+                                                                                    aria-label={t(
+                                                                                        "filesView.selection.selectItem",
+                                                                                        {
+                                                                                            name: entry.name
+                                                                                        }
+                                                                                    )}
                                                                                 />
                                                                             </label>
                                                                         </div>
@@ -2632,27 +2715,38 @@ export function FilesView({
                                                                                         "/"
                                                                                     ) ? (
                                                                                         <span className="shrink truncate text-xs text-muted-foreground">
-                                                                                            {t("filesView.entry.inFolder", {
-                                                                                                path: parentOf(entry.path)
-                                                                                            })}
+                                                                                            {t(
+                                                                                                "filesView.entry.inFolder",
+                                                                                                {
+                                                                                                    path: parentOf(
+                                                                                                        entry.path
+                                                                                                    )
+                                                                                                }
+                                                                                            )}
                                                                                         </span>
                                                                                     ) : null}
                                                                                     {entry.favorite ? (
                                                                                         <Star
                                                                                             className="size-3 shrink-0 fill-amber-400 text-amber-400"
-                                                                                            aria-label={t("filesView.entry.favorite")}
+                                                                                            aria-label={t(
+                                                                                                "filesView.entry.favorite"
+                                                                                            )}
                                                                                         />
                                                                                     ) : null}
                                                                                     {entry.locked ? (
                                                                                         <Lock
                                                                                             className="size-3 shrink-0 text-muted-foreground"
-                                                                                            aria-label={t("filesView.entry.gated")}
+                                                                                            aria-label={t(
+                                                                                                "filesView.entry.gated"
+                                                                                            )}
                                                                                         />
                                                                                     ) : null}
                                                                                     {entry.note ? (
                                                                                         <StickyNote
                                                                                             className="size-3 shrink-0 text-amber-500"
-                                                                                            aria-label={t("filesView.entry.hasNote")}
+                                                                                            aria-label={t(
+                                                                                                "filesView.entry.hasNote"
+                                                                                            )}
                                                                                         />
                                                                                     ) : null}
                                                                                 </Link>
@@ -2681,15 +2775,22 @@ export function FilesView({
                                                                                         "/"
                                                                                     ) ? (
                                                                                         <span className="shrink truncate text-xs text-muted-foreground">
-                                                                                            {t("filesView.entry.inFolder", {
-                                                                                                path: parentOf(entry.path)
-                                                                                            })}
+                                                                                            {t(
+                                                                                                "filesView.entry.inFolder",
+                                                                                                {
+                                                                                                    path: parentOf(
+                                                                                                        entry.path
+                                                                                                    )
+                                                                                                }
+                                                                                            )}
                                                                                         </span>
                                                                                     ) : null}
                                                                                     {entry.favorite ? (
                                                                                         <Star
                                                                                             className="size-3 shrink-0 fill-amber-400 text-amber-400"
-                                                                                            aria-label={t("filesView.entry.favorite")}
+                                                                                            aria-label={t(
+                                                                                                "filesView.entry.favorite"
+                                                                                            )}
                                                                                         />
                                                                                     ) : null}
                                                                                     {insights.locked.has(
@@ -2697,13 +2798,17 @@ export function FilesView({
                                                                                     ) ? (
                                                                                         <KeyRound
                                                                                             className="size-3 shrink-0 text-warning"
-                                                                                            aria-label={t("filesView.entry.needsPassword")}
+                                                                                            aria-label={t(
+                                                                                                "filesView.entry.needsPassword"
+                                                                                            )}
                                                                                         />
                                                                                     ) : null}
                                                                                     {entry.note ? (
                                                                                         <StickyNote
                                                                                             className="size-3 shrink-0 text-amber-500"
-                                                                                            aria-label={t("filesView.entry.hasNote")}
+                                                                                            aria-label={t(
+                                                                                                "filesView.entry.hasNote"
+                                                                                            )}
                                                                                         />
                                                                                     ) : null}
                                                                                 </a>
@@ -2744,8 +2849,18 @@ export function FilesView({
                                                                                             )
                                                                                         );
                                                                                     }}
-                                                                                    title={t("filesView.entry.share", { name: entry.name })}
-                                                                                    aria-label={t("filesView.entry.share", { name: entry.name })}
+                                                                                    title={t(
+                                                                                        "filesView.entry.share",
+                                                                                        {
+                                                                                            name: entry.name
+                                                                                        }
+                                                                                    )}
+                                                                                    aria-label={t(
+                                                                                        "filesView.entry.share",
+                                                                                        {
+                                                                                            name: entry.name
+                                                                                        }
+                                                                                    )}
                                                                                 >
                                                                                     <Share2 className="size-4" />
                                                                                 </Button>
@@ -2836,7 +2951,9 @@ export function FilesView({
                             <ContextMenuItem onSelect={paste}>
                                 <ClipboardPaste className="size-4" />
                                 {clipboard.entries.length > 1
-                                    ? t("filesView.menu.pasteCount", { count: clipboard.entries.length })
+                                    ? t("filesView.menu.pasteCount", {
+                                          count: clipboard.entries.length
+                                      })
                                     : t("filesView.menu.paste")}
                             </ContextMenuItem>
                         ) : null}
@@ -2877,7 +2994,9 @@ export function FilesView({
                                     ? t("filesView.panel.folder")
                                     : extensionOf(selectedEntries[0].name)
                                       ? t("filesView.panel.fileOfType", {
-                                            extension: extensionOf(selectedEntries[0].name).toUpperCase()
+                                            extension: extensionOf(
+                                                selectedEntries[0].name
+                                            ).toUpperCase()
                                         })
                                       : t("filesView.panel.file")}
                             </dd>
@@ -2895,17 +3014,23 @@ export function FilesView({
                             </dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <dt className="text-muted-foreground">{t("filesView.panel.location")}</dt>
+                            <dt className="text-muted-foreground">
+                                {t("filesView.panel.location")}
+                            </dt>
                             <dd className="break-all">
                                 /{selectedEntries[0].path.split("/").slice(0, -1).join("/")}
                             </dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <dt className="text-muted-foreground">{t("filesView.panel.created")}</dt>
+                            <dt className="text-muted-foreground">
+                                {t("filesView.panel.created")}
+                            </dt>
                             <dd>{format.dateTime(selectedEntries[0].createdAt)}</dd>
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <dt className="text-muted-foreground">{t("filesView.panel.modified")}</dt>
+                            <dt className="text-muted-foreground">
+                                {t("filesView.panel.modified")}
+                            </dt>
                             <dd>{format.dateTime(selectedEntries[0].modifiedAt)}</dd>
                         </div>
                     </dl>
@@ -2958,13 +3083,19 @@ export function FilesView({
                                     selectedEntries[0].favorite && "fill-amber-400 text-amber-400"
                                 )}
                             />
-                            {selectedEntries[0].favorite ? t("filesView.panel.starred") : t("filesView.panel.star")}
+                            {selectedEntries[0].favorite
+                                ? t("filesView.panel.starred")
+                                : t("filesView.panel.star")}
                         </Button>
                     </div>
                     <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-                        <span className="text-xs font-medium text-muted-foreground">{t("filesView.activity.title")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("filesView.activity.title")}
+                        </span>
                         {activityLoading ? (
-                            <p className="text-xs text-muted-foreground/60">{t("filesView.activity.loading")}</p>
+                            <p className="text-xs text-muted-foreground/60">
+                                {t("filesView.activity.loading")}
+                            </p>
                         ) : activity.length === 0 ? (
                             <p className="text-xs text-muted-foreground/60">
                                 {t("filesView.activity.empty")}
@@ -2982,7 +3113,7 @@ export function FilesView({
                                                 <Icon className="size-3" />
                                             </span>
                                             <div className="flex min-w-0 flex-col">
-                                                                                                <span>
+                                                <span>
                                                     {item.actor
                                                         ? t.rich("filesView.activity.by", {
                                                               action: activityLabel(t, item.action),
@@ -2993,14 +3124,19 @@ export function FilesView({
                                                                           key="actor"
                                                                           type="button"
                                                                           onClick={() =>
-                                                                              setProfileUserId(item.actorId)
+                                                                              setProfileUserId(
+                                                                                  item.actorId
+                                                                              )
                                                                           }
                                                                           className="font-medium text-primary hover:underline"
                                                                       >
                                                                           {chunks}
                                                                       </button>
                                                                   ) : (
-                                                                      <span key="actor" className="font-medium">
+                                                                      <span
+                                                                          key="actor"
+                                                                          className="font-medium"
+                                                                      >
                                                                           {chunks}
                                                                       </span>
                                                                   )
@@ -3019,13 +3155,17 @@ export function FilesView({
                     </div>
                     <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">{t("filesView.panel.note")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("filesView.panel.note")}
+                            </span>
                             <button
                                 type="button"
                                 onClick={() => selectedEntries[0] && openNote(selectedEntries[0])}
                                 className="text-xs text-primary hover:underline"
                             >
-                                {selectedEntries[0].note ? t("filesView.panel.edit") : t("filesView.panel.add")}
+                                {selectedEntries[0].note
+                                    ? t("filesView.panel.edit")
+                                    : t("filesView.panel.add")}
                             </button>
                         </div>
                         {selectedEntries[0].note ? (
@@ -3033,7 +3173,9 @@ export function FilesView({
                                 {selectedEntries[0].note}
                             </p>
                         ) : (
-                            <p className="text-xs text-muted-foreground/60">{t("filesView.panel.noNote")}</p>
+                            <p className="text-xs text-muted-foreground/60">
+                                {t("filesView.panel.noNote")}
+                            </p>
                         )}
                     </div>
                 </aside>
@@ -3139,7 +3281,9 @@ export function FilesView({
                                 <button
                                     key={color.id}
                                     type="button"
-                                    aria-label={t(`filesView.icon.colors.${color.id}` as NamespaceKey<"drive">)}
+                                    aria-label={t(
+                                        `filesView.icon.colors.${color.id}` as NamespaceKey<"drive">
+                                    )}
                                     onClick={() =>
                                         applyIcon(iconPreview?.icon ?? "folder", color.id)
                                     }
@@ -3168,7 +3312,7 @@ export function FilesView({
                                     setIconTargets(null);
                                 }}
                             >
-                                                                {t("filesView.icon.reset")}
+                                {t("filesView.icon.reset")}
                             </Button>
                             <Button type="button" size="sm" onClick={() => setIconTargets(null)}>
                                 {t("filesView.icon.done")}
@@ -3200,7 +3344,9 @@ export function FilesView({
                                         })
                                       : t("filesView.panel.file")}
                             </dd>
-                            <dt className="text-muted-foreground">{t("filesView.details.location")}</dt>
+                            <dt className="text-muted-foreground">
+                                {t("filesView.details.location")}
+                            </dt>
                             <dd className="truncate">
                                 /{detailsTarget.path.split("/").slice(0, -1).join("/")}
                             </dd>
@@ -3213,7 +3359,9 @@ export function FilesView({
                                           bytes: Number(detailsTarget.size).toLocaleString()
                                       })}
                             </dd>
-                            <dt className="text-muted-foreground">{t("filesView.details.modified")}</dt>
+                            <dt className="text-muted-foreground">
+                                {t("filesView.details.modified")}
+                            </dt>
                             <dd>{format.dateTime(detailsTarget.modifiedAt)}</dd>
                         </dl>
                     ) : null}
@@ -3257,7 +3405,7 @@ export function FilesView({
                                     setNoteTarget(null);
                                 }}
                             >
-                                                                {t("filesView.note.remove")}
+                                {t("filesView.note.remove")}
                             </Button>
                             <Button type="submit" size="sm">
                                 {tc("actions.save")}
@@ -3276,9 +3424,7 @@ export function FilesView({
                         <DialogTitle>
                             {t("filesView.move.title", { count: moveTargets?.length ?? 0 })}
                         </DialogTitle>
-                        <DialogDescription>
-                            {t("filesView.move.hint")}
-                        </DialogDescription>
+                        <DialogDescription>{t("filesView.move.hint")}</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitMove} className="flex flex-col gap-3">
                         <FolderTree
