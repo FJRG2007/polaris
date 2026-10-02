@@ -451,7 +451,10 @@ export function SandboxedHtml({
     const [heard, setHeard] = useState(false);
     useEffect(() => {
         if (heard || clean === null || !origin) return;
-        const timer = setTimeout(() => setHeight((current) => Math.max(current, UNHEARD_HEIGHT)), 2500);
+        const timer = setTimeout(
+            () => setHeight((current) => Math.max(current, UNHEARD_HEIGHT)),
+            2500
+        );
         return () => clearTimeout(timer);
     }, [heard, clean, origin]);
 
@@ -478,10 +481,7 @@ export function SandboxedHtml({
 
     if (clean === null || !origin) {
         return (
-            <div
-                className="h-24 animate-pulse rounded-md bg-card"
-                aria-label={t("body.opening")}
-            />
+            <div className="h-24 animate-pulse rounded-md bg-card" aria-label={t("body.opening")} />
         );
     }
 

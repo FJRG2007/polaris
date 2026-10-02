@@ -135,7 +135,9 @@ function draw(to: readonly core.MailAddress[], cc: readonly core.MailAddress[]):
                 context={CONTEXT}
                 markRead="never"
             />
-        </ToastProvider>, { wrapper: MessagesWrapper });
+        </ToastProvider>,
+        { wrapper: MessagesWrapper }
+    );
 }
 
 /** One row of the header, read the way somebody reads it. */

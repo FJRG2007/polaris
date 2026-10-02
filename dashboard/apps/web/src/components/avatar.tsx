@@ -418,7 +418,8 @@ export function Avatar({
     // cannot - see `callBadge`.
     if (inRoom && callBadge && size >= PRESENCE_FLOOR) {
         const Icon = callBadge === "deafened" ? HeadphoneOff : MicOff;
-        const words = callBadge === "deafened" ? t("avatar.notListening") : t("avatar.microphoneOff");
+        const words =
+            callBadge === "deafened" ? t("avatar.notListening") : t("avatar.microphoneOff");
         return (
             <span className="relative inline-flex h-fit shrink-0 align-middle">
                 {shown}

@@ -94,13 +94,18 @@ describe("marking it read", () => {
         // somebody else's server before the list stopped being bold. And when
         // that failed it failed in silence, which is "I open it and it does not
         // go read" reported as a mystery.
-        const messages = await readFile(new URL("../../src/lib/mailbox/messages.ts", import.meta.url), "utf8");
+        const messages = await readFile(
+            new URL("../../src/lib/mailbox/messages.ts", import.meta.url),
+            "utf8"
+        );
         expect(messages).toContain("const flag = FLAG_ACTIONS[action];");
         expect(messages).toContain("return await setFlag(userId, whole, flag);");
         const set = messages.slice(messages.indexOf("async function setFlag("));
         const body = set.slice(0, set.indexOf("/** What one folder"));
         // The row and the conversation's counts first...
-        expect(body.indexOf("prisma.mailMessage.updateMany")).toBeLessThan(body.indexOf("withImap"));
+        expect(body.indexOf("prisma.mailMessage.updateMany")).toBeLessThan(
+            body.indexOf("withImap")
+        );
         expect(body).toContain("await refreshThreadsFor(accountIds)");
         // ...and the server after the answer has gone, on the same `after` the
         // folder catch-up already uses.
@@ -110,7 +115,10 @@ describe("marking it read", () => {
     it("leaves a move alone, which must not be believed before the server agrees", async () => {
         // Deleting a row for a message the server still holds is a message that
         // comes back on the next sync having been gone from the screen.
-        const messages = await readFile(new URL("../../src/lib/mailbox/messages.ts", import.meta.url), "utf8");
+        const messages = await readFile(
+            new URL("../../src/lib/mailbox/messages.ts", import.meta.url),
+            "utf8"
+        );
         const move = messages.slice(messages.indexOf("const role = MOVE_ACTIONS[action];"));
         expect(move).toContain("await client.messageMove(uids, target.path, { uid: true })");
         // The server first, the row after - the opposite order to a flag.

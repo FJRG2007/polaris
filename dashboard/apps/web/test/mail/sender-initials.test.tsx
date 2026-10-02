@@ -87,7 +87,9 @@ describe("a sender's face", () => {
     });
 
     it("takes the same room before and after the picture", () => {
-        const { container } = render(<SenderFace name="Ana" address="ana@example.test" size={28} />);
+        const { container } = render(
+            <SenderFace name="Ana" address="ana@example.test" size={28} />
+        );
         const before = `${face(container).style.width}x${face(container).style.height}`;
         pictureArrives(container, 64);
         expect(`${face(container).style.width}x${face(container).style.height}`).toBe(before);

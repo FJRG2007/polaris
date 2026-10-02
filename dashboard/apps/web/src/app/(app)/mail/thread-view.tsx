@@ -430,7 +430,9 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={context.permanentDelete ? t("view.deleteForever") : t("view.trash")}
+                        aria-label={
+                            context.permanentDelete ? t("view.deleteForever") : t("view.trash")
+                        }
                         title={context.permanentDelete ? t("view.deleteForever") : t("view.trash")}
                         disabled={busy}
                         onClick={() => act(context.permanentDelete ? "delete" : "trash")}
@@ -559,7 +561,9 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { pinned: !thread.pinned },
-                            thread.pinned ? t("thread.announce.unpinned") : t("thread.announce.pinned")
+                            thread.pinned
+                                ? t("thread.announce.unpinned")
+                                : t("thread.announce.pinned")
                         )
                     }
                 >
@@ -574,9 +578,7 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { muted: !thread.muted },
-                            thread.muted
-                                ? t("thread.announce.unmuted")
-                                : t("thread.announce.muted")
+                            thread.muted ? t("thread.announce.unmuted") : t("thread.announce.muted")
                         )
                     }
                 >
@@ -1164,7 +1166,9 @@ function MessageCard({
                                                     );
                                                 }}
                                                 className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
-                                                aria-label={t("view.saveNamed", { name: file.name })}
+                                                aria-label={t("view.saveNamed", {
+                                                    name: file.name
+                                                })}
                                                 title={t("view.saveNamed", { name: file.name })}
                                                 download
                                             >

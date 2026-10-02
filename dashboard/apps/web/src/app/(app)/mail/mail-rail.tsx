@@ -311,7 +311,10 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                                 key={swatch.hex}
                                                                 type="button"
                                                                 title={swatchName(t, swatch.name)}
-                                                                aria-label={swatchName(t, swatch.name)}
+                                                                aria-label={swatchName(
+                                                                    t,
+                                                                    swatch.name
+                                                                )}
                                                                 onClick={() =>
                                                                     void colour(
                                                                         folder.id,
@@ -514,9 +517,7 @@ function RenameFolderDialog({ folder, onClose }: { folder: MailFolderView; onClo
                             aria-label={t("rail.folderName")}
                         />
                     </label>
-                    <p className="text-[12px] text-foreground-subtle">
-                        {t("rail.renameHint")}
-                    </p>
+                    <p className="text-[12px] text-foreground-subtle">{t("rail.renameHint")}</p>
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
@@ -712,8 +713,10 @@ function AccountLink({
     );
 }
 
-function whyBroken(t: NamespaceTranslator<"mail">, account: { state: string; auth: string }): string {
+function whyBroken(
+    t: NamespaceTranslator<"mail">,
+    account: { state: string; auth: string }
+): string {
     if (account.state !== "auth") return t("rail.unreachable");
     return account.auth === "oauth" ? t("rail.needsConnecting") : t("rail.passwordRefused");
 }
-

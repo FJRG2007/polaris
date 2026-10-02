@@ -578,8 +578,7 @@ export function MailShell({
                 const said = refusalOf(outcome);
                 toast.show({
                     title:
-                        said ??
-                        t("shell.moved", { count: messageIds.length, folder: folderName })
+                        said ?? t("shell.moved", { count: messageIds.length, folder: folderName })
                 });
                 if (!said) refreshMailbox();
             })();
@@ -608,7 +607,8 @@ export function MailShell({
      */
     const inView = useMemo(() => mailboxInView(pathname, folders), [pathname, folders]);
     useEffect(() => {
-        if (inView && accounts.some((account) => account.id === inView)) rememberSender(shelf, inView);
+        if (inView && accounts.some((account) => account.id === inView))
+            rememberSender(shelf, inView);
     }, [inView, accounts, shelf]);
 
     const openComposer = useCallback(

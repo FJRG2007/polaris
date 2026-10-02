@@ -37,7 +37,15 @@ import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 import { EMPTY_QUERY, type MailListQuery } from "@/lib/mailbox/views";
 
 /** The merged views, which name their words in the `mail` catalog. */
-export type MailViewName = "inbox" | "starred" | "important" | "snoozed" | "sent" | "archive" | "junk" | "trash";
+export type MailViewName =
+    | "inbox"
+    | "starred"
+    | "important"
+    | "snoozed"
+    | "sent"
+    | "archive"
+    | "junk"
+    | "trash";
 
 /** What a screen says about itself: its title and what it says when empty. */
 export type ListWords = Pick<MailViewContext, "title" | "emptyTitle" | "emptyBody">;

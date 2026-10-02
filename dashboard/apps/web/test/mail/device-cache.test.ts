@@ -27,7 +27,9 @@ const BEA = "018f2b7a-0000-7000-8000-0000000000b2";
 const WORK = "018f2b7a-0000-7000-8000-0000000000c3";
 const HOME = "018f2b7a-0000-7000-8000-0000000000d4";
 
-function memoryBackend(): MailCacheBackend & { rows: Map<string, { meta: MailCacheMeta; value: unknown }> } {
+function memoryBackend(): MailCacheBackend & {
+    rows: Map<string, { meta: MailCacheMeta; value: unknown }>;
+} {
     const rows = new Map<string, { meta: MailCacheMeta; value: unknown }>();
     return {
         rows,
@@ -69,7 +71,10 @@ function meta(overrides: Partial<MailCacheMeta>): MailCacheMeta {
 describe("whose mail it gives back", () => {
     it("never answers one reader with another's", async () => {
         const backend = memoryBackend();
-        const cache = createMailCache(() => backend, () => "b1");
+        const cache = createMailCache(
+            () => backend,
+            () => "b1"
+        );
         cache.setOwner(ANA);
         cache.write("thread", "t1", { subject: "Ana's" }, WORK);
         await settle();
@@ -80,7 +85,10 @@ describe("whose mail it gives back", () => {
 
     it("refuses an entry whose stamp is somebody else's even under the right key", async () => {
         const backend = memoryBackend();
-        const cache = createMailCache(() => backend, () => "b1");
+        const cache = createMailCache(
+            () => backend,
+            () => "b1"
+        );
         cache.setOwner(BEA);
         const key = mailCacheKey(BEA, "thread", "t1");
         await backend.put(meta({ key, owner: ANA, at: Date.now() }), { subject: "Ana's" });
@@ -89,7 +97,10 @@ describe("whose mail it gives back", () => {
 
     it("deletes another reader's entries as soon as the new one is known", async () => {
         const backend = memoryBackend();
-        const cache = createMailCache(() => backend, () => "b1");
+        const cache = createMailCache(
+            () => backend,
+            () => "b1"
+        );
         cache.setOwner(ANA);
         cache.write("message", "m1", { html: "<p>hi</p>" }, WORK);
         await settle();
@@ -102,7 +113,10 @@ describe("whose mail it gives back", () => {
 
     it("answers nothing before anybody is signed in", async () => {
         const backend = memoryBackend();
-        const cache = createMailCache(() => backend, () => "b1");
+        const cache = createMailCache(
+            () => backend,
+            () => "b1"
+        );
         cache.write("list", "inbox", { threads: [] }, "");
         await settle();
         expect(backend.rows.size).toBe(0);
@@ -111,7 +125,10 @@ describe("whose mail it gives back", () => {
 
     it("is emptied entirely by a sign-out", async () => {
         const backend = memoryBackend();
-        const cache = createMailCache(() => backend, () => "b1");
+        const cache = createMailCache(
+            () => backend,
+            () => "b1"
+        );
         cache.setOwner(ANA);
         cache.write("list", "inbox", { threads: [] }, "");
         cache.write("message", "m1", { html: "" }, WORK);
@@ -125,7 +142,10 @@ describe("whose mail it gives back", () => {
 describe("what it keeps", () => {
     it("gives back what it was given, for the same reader", async () => {
         const backend = memoryBackend();
-        const cache = createMailCache(() => backend, () => "b1");
+        const cache = createMailCache(
+            () => backend,
+            () => "b1"
+        );
         cache.setOwner(ANA);
         cache.write("list", "personal.role=inbox", { threads: [{ id: "t1" }], cursor: "" }, "");
         await settle();
@@ -138,7 +158,10 @@ describe("what it keeps", () => {
     it("refuses what another build wrote", async () => {
         const backend = memoryBackend();
         let build = "b1";
-        const cache = createMailCache(() => backend, () => build);
+        const cache = createMailCache(
+            () => backend,
+            () => build
+        );
         cache.setOwner(ANA);
         cache.write("thread", "t1", { subject: "old shape" }, WORK);
         await settle();
@@ -149,7 +172,11 @@ describe("what it keeps", () => {
     it("refuses an entry older than it is worth", async () => {
         const backend = memoryBackend();
         let now = 1_000_000;
-        const cache = createMailCache(() => backend, () => "b1", () => now);
+        const cache = createMailCache(
+            () => backend,
+            () => "b1",
+            () => now
+        );
         cache.setOwner(ANA);
         cache.write("message", "m1", { html: "" }, WORK);
         await settle();
@@ -159,7 +186,10 @@ describe("what it keeps", () => {
 
     it("refuses what came from a mailbox that is no longer linked", async () => {
         const backend = memoryBackend();
-        const cache = createMailCache(() => backend, () => "b1");
+        const cache = createMailCache(
+            () => backend,
+            () => "b1"
+        );
         cache.setOwner(ANA);
         cache.write("thread", "t1", { subject: "work" }, WORK);
         cache.write("thread", "t2", { subject: "home" }, HOME);
@@ -170,7 +200,10 @@ describe("what it keeps", () => {
     });
 
     it("works as if nothing were kept where there is no storage at all", async () => {
-        const cache = createMailCache(() => null, () => "b1");
+        const cache = createMailCache(
+            () => null,
+            () => "b1"
+        );
         cache.setOwner(ANA);
         cache.write("list", "inbox", { threads: [] }, "");
         expect(await cache.read("list", "inbox")).toBeNull();
@@ -185,7 +218,10 @@ describe("what it keeps", () => {
             remove: () => Promise.reject(new Error("quota")),
             clear: () => Promise.reject(new Error("quota"))
         };
-        const cache = createMailCache(() => broken, () => "b1");
+        const cache = createMailCache(
+            () => broken,
+            () => "b1"
+        );
         cache.setOwner(ANA);
         cache.write("list", "inbox", { threads: [] }, "");
         expect(await cache.read("list", "inbox")).toBeNull();

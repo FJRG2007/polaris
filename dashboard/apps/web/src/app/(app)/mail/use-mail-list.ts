@@ -206,8 +206,7 @@ export function useMailThread(
     const load = useCallback(
         // See above: named to be depended on, not to be sent. The answer asked
         // for ahead is taken first, once - see `claimThread`.
-        (signal: AbortSignal) =>
-            claimThread(threadId, revision) ?? fetchThread(threadId, signal),
+        (signal: AbortSignal) => claimThread(threadId, revision) ?? fetchThread(threadId, signal),
         [threadId, revision]
     );
 

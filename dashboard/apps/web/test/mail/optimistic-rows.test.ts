@@ -11,7 +11,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { optimistically, stillOwed, withPatch, type ThreadPatch } from "@/app/(app)/mail/optimistic";
+import {
+    optimistically,
+    stillOwed,
+    withPatch,
+    type ThreadPatch
+} from "@/app/(app)/mail/optimistic";
 
 /** A row as the list draws it: the server's, with the overlay laid over. */
 function drawn<T extends object>(row: T & { id: string }, held: Record<string, ThreadPatch>): T {
