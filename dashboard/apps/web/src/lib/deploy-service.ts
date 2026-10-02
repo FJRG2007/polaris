@@ -40,7 +40,7 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { copyScopeValues, decryptedValue } from "./deploy/env-values";
 import { challengeActive, floodedServices } from "./deploy/edge-state";
 import { hasTunnel, networksForService } from "./deploy/service-networks";
-import { namesOn, prepareDeployNames, privateDomainOf } from "./deploy/private-names";
+import { answeringLabels, namesOn, prepareDeployNames, privateNameOf, recordLiveNames } from "./deploy/private-names";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { resolveBuildMachine, type BuildMachine } from "./deploy/build-machine";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -90,6 +90,7 @@ import {
     releaseImage,
     normalizeZoneName,
     parseHttpLogs,
+    privateDomain,
     releaseDomain,
     resolveDockerfilePath,
     serviceName,
@@ -2389,6 +2390,8 @@ async function buildAppPlan(
     unresolved: string[];
     /** The image the service now needs in place of the stored one, when they differ. */
     imageRefChange?: string;
+    /** The private names this plan gives the service, or null where it gives none. */
+    liveNames: string[] | null;
 }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -2705,7 +2708,7 @@ async function buildAppPlan(
         environment: app.environment,
         projectSlug: project.slug,
         target: app.target,
-        deploymentId: release?.id
+        kept
     });
     const networks = networksForService({
         environment: app.environment,
@@ -2794,6 +2797,7 @@ async function buildAppPlan(
         buildConfig: app.buildConfig,
         buildCommands,
         keepsHistory: deployReleases.keepsReleases(app),
+        liveNames: names.enabled && !kept ? names.live : null,
         cutover: release ? cutover : await changesOver(app, ownerId),
         unresolved: references.unresolved,
         imageRefChange: imageRef !== storedImage ? imageRef : undefined
@@ -2966,6 +2970,8 @@ async function systemEnv(
             name: true,
             currentDeploymentId: true,
             privateNetwork: true,
+            keepReleases: true,
+            volumes: { select: { id: true } },
             target: { select: { kind: true, hostId: true } },
             environment: {
                 select: {
@@ -2987,6 +2993,14 @@ async function systemEnv(
     if (!app || app.environment.id !== environmentId) return {};
     const release = await deployReleases.currentReleaseRef(app);
     const domain = app.domains[0]?.hostname;
+    // Its private name where this deploy gives its container that name: not on a
+    // server that gives none, not to a release kept beside others, and not while
+    // another service of the environment keeps it.
+    const name = privateNameOf(app);
+    const named =
+        namesOn(app.target) &&
+        !deployReleases.keepsReleases(app) &&
+        (await answeringLabels({ ...app, kind: "application" }, app.environment.id)).includes(name);
     return {
         POLARIS_PROJECT_ID: app.environment.project.id,
         POLARIS_PROJECT_NAME: app.environment.project.name,
@@ -2994,9 +3008,7 @@ async function systemEnv(
         POLARIS_ENVIRONMENT_NAME: app.environment.name,
         POLARIS_SERVICE_ID: app.id,
         POLARIS_SERVICE_NAME: app.name,
-        // Its private name where its server gives it one - this deploy is what
-        // gives its container that name - else the container name it always had.
-        POLARIS_PRIVATE_DOMAIN: namesOn(app.target) ? privateDomainOf(app) : release.address,
+        POLARIS_PRIVATE_DOMAIN: named ? privateDomain(name) : release.address,
         ...(domain ? { POLARIS_PUBLIC_DOMAIN: domain } : {}),
         ...(app.environment.branch ? { POLARIS_GIT_BRANCH: app.environment.branch } : {}),
         ...(app.environment.pullRequest !== null
@@ -3192,6 +3204,7 @@ export async function deployApplication(
     // own before the plan is handed to the runtime, and one that keeps its history
     // also the hostname it will answer on. Only those cases pay for the second plan.
     let planned = plan;
+    let liveNames = built.liveNames;
     if (keepsHistory || cutover) {
         const release = { id: deployment.id, commitSha, cutover };
         if (keepsHistory) {
@@ -3200,10 +3213,14 @@ export async function deployApplication(
                 return null;
             });
         }
-        planned = (await buildAppPlan(applicationId, ownerId, release)).plan;
+        ({ plan: planned, liveNames } = await buildAppPlan(applicationId, ownerId, release));
     } else if (scaled?.cutover) {
         planned = (await buildAppPlan(applicationId, ownerId, scaled)).plan;
     }
+    // The names this release carries count as live once it is the one serving. A
+    // scale step in place adds copies to the release already serving, which keeps
+    // what it was recorded with.
+    if (liveNames && !scaled?.cutover) await recordLiveNames("application", applicationId, liveNames, deployment.id);
     // Every release is kept under a name of its own so it can be run again later
     // exactly as it was; a rollback runs one of those instead of making one. The
     // build also goes at the commit it names, when there is one - the branch head

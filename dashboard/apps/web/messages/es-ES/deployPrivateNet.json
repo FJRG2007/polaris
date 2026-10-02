@@ -11,11 +11,15 @@
         "starting": "Arrancando",
         "pending": "Falta redesplegar",
         "offline": "Parado",
+        "taken": "Nombre en uso",
+        "kept": "Nombre por versión",
         "unsupported": "Hay que actualizar"
     },
     "statusHint": {
         "pending": "Se desplegó antes de sus nombres actuales. El próximo despliegue se los da.",
         "offline": "Sus nombres vuelven a responder en cuanto esté en marcha.",
+        "taken": "{service} ya responde a este nombre, así que este servicio se despliega sin él. Pon otro nombre a uno de los dos.",
+        "kept": "Mantiene en marcha los despliegues anteriores, así que cada uno se alcanza por su propia dirección y estos nombres no se asignan. Desactiva Conservar despliegues anteriores para usarlos.",
         "unsupported": "El Polaris de este servidor es anterior a los nombres privados. Actualízalo desde <link>Ajustes</link> para activarlos."
     },
     "shortName": "También puedes llamarme <code>{name}</code>",
@@ -29,8 +33,10 @@
     "update": "Guardar",
     "renameHint": "El nombre anterior sigue respondiendo {days} días, así que los servicios desplegados con él siguen funcionando.",
     "renamed": "Renombrado. Se está redesplegando para que responda el nombre nuevo.",
+    "renamedNext": "Renombrado. Toma el nombre nuevo en su próximo despliegue, así que sus conexiones no se cortan ahora.",
     "renamedLater": "Renombrado. Tomará el nombre en su primer despliegue.",
     "savedRedeploy": "Guardado. Se está redesplegando para que respondan los nombres.",
+    "savedNext": "Guardado. Toma los nombres en su próximo despliegue, así que sus conexiones no se cortan ahora.",
     "savedLater": "Guardado. Tomará los nombres en su primer despliegue.",
     "former": "Sigue respondiendo a <code>{name}</code> hasta el {date}",
     "aliases": "Otros nombres",

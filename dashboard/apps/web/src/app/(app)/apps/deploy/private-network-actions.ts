@@ -6,8 +6,9 @@
  * Reading takes seeing the project; every change takes `service.configure` on
  * the service - and, for a link between two projects, on the other service as
  * well, so nobody opens a way into a project they could not configure. A change
- * redeploys the service so its container answers to the new names; a service
- * that was never deployed takes them on its first deploy.
+ * redeploys an application so its container answers to the new names; a running
+ * database takes them on its next deploy, and a service never deployed on its
+ * first.
  */
 
 import { z } from "zod";
@@ -110,7 +111,7 @@ export async function renamePrivateNameAction(
     kind: Kind,
     id: string,
     name: string
-): Promise<{ error?: string; redeploying?: boolean }> {
+): Promise<{ error?: string; applied?: names.NamesApplied }> {
     const user = await requirePermission("deploy.manage");
     const parsed = nameSchema.safeParse(name);
     if (!parsed.success) return { error: (await words())(PROBLEM_KEYS.tooLong) };
@@ -124,9 +125,9 @@ export async function renamePrivateNameAction(
             targetId: service.id,
             metadata: { from: renamed.previous, to: renamed.name }
         });
-        const redeploying = await names.redeployForNames(service.kind, service.id, user.id);
+        const applied = await names.redeployForNames(service.kind, service.id, user.id);
         revalidatePath(DEPLOY_PATH);
-        return { redeploying };
+        return { applied };
     } catch (caught) {
         return { error: await refusal(caught) };
     }
@@ -136,7 +137,7 @@ export async function setPrivateAliasesAction(
     kind: Kind,
     id: string,
     aliases: string[]
-): Promise<{ error?: string; redeploying?: boolean }> {
+): Promise<{ error?: string; applied?: names.NamesApplied }> {
     const user = await requirePermission("deploy.manage");
     const parsed = aliasesSchema.safeParse(aliases);
     if (!parsed.success) return { error: (await words())("tooManyAliases", { max: PRIVATE_ALIASES_MAX }) };
@@ -150,9 +151,9 @@ export async function setPrivateAliasesAction(
             targetId: service.id,
             metadata: { aliases: saved }
         });
-        const redeploying = await names.redeployForNames(service.kind, service.id, user.id);
+        const applied = await names.redeployForNames(service.kind, service.id, user.id);
         revalidatePath(DEPLOY_PATH);
-        return { redeploying };
+        return { applied };
     } catch (caught) {
         return { error: await refusal(caught) };
     }

@@ -17,6 +17,7 @@
  * Pure: the specs are built here and validated again by the daemon.
  */
 
+import { shortHash } from "./naming.js";
 import { isNamesNetwork } from "./networks.js";
 import type { ComposeSpec, ComposeSpecService } from "./compose-spec.js";
 
@@ -53,16 +54,31 @@ export function namesFor(name: string, extra: readonly string[] = []): string[] 
 /** Longest container name DNS (and docker) will take. */
 const MAX_NAME = 63;
 
-/** The forwarder's container name: the service's own, cut to fit, then `-p80`. */
+/** The forwarder's container name: the service's own, then `-p80` - with a hash
+ *  of the whole name before it when cut to fit, so copies and releases whose names
+ *  differ only at the end never share one. */
 export function forwarderName(serviceName: string): string {
     const suffix = `-p${PORTLESS_PORT}`;
-    return `${serviceName.slice(0, MAX_NAME - suffix.length)}${suffix}`;
+    if (serviceName.length + suffix.length <= MAX_NAME) return `${serviceName}${suffix}`;
+    const hash = `-${shortHash(serviceName, 8)}`;
+    return `${serviceName.slice(0, MAX_NAME - hash.length - suffix.length)}${hash}${suffix}`;
+}
+
+/** A shell test for a listener on `port` in the namespace, from `/proc/net/tcp{,6}`
+ *  (`sl local_address rem_address st`, 0A being LISTEN). */
+function listening(port: number): string {
+    const hex = port.toString(16).toUpperCase().padStart(4, "0");
+    return `grep -qE ':${hex} [0-9A-F]+:[0-9A-F]{4} 0A ' /proc/net/tcp /proc/net/tcp6 2>/dev/null`;
 }
 
 /**
  * The forwarder's script. One listener per address family - the IPv6 one is
  * best effort, since a container on an IPv4-only network has no IPv6 to bind -
  * both sending to the service on the loopback it shares with it.
+ *
+ * It waits for the service to listen first, so it never takes port 80 from a
+ * service still starting that wants it, and then stays idle where the service
+ * answers on 80 itself - binding there would fail and restart it forever.
  *
  * And it ends itself when the namespace it joined is gone. A service that
  * restarts gets a new namespace, while the forwarder would go on holding the old
@@ -71,10 +87,13 @@ export function forwarderName(serviceName: string): string {
  */
 export function forwarderScript(port: number): string {
     const target = `TCP4:127.0.0.1:${port}`;
+    const alive = "ls /sys/class/net | grep -qv '^lo$' || exit 1";
     return [
+        `until ${listening(port)}; do sleep 1; ${alive}; done;`,
+        `if ${listening(PORTLESS_PORT)}; then while sleep 15; do ${alive}; done; fi;`,
         `socat TCP4-LISTEN:${PORTLESS_PORT},fork,reuseaddr ${target} & pid=$!`,
         `socat TCP6-LISTEN:${PORTLESS_PORT},fork,reuseaddr,ipv6only=1 ${target} 2>/dev/null &`,
-        "while sleep 15; do kill -0 $pid 2>/dev/null || exit 1; ls /sys/class/net | grep -qv '^lo$' || exit 1; done"
+        `while sleep 15; do kill -0 $pid 2>/dev/null || exit 1; ${alive}; done`
     ].join(" ");
 }
 

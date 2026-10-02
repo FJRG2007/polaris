@@ -123,7 +123,7 @@ describe("what is stored", () => {
 });
 
 describe("a deploy's names", () => {
-    it("go on the environment's names network, and are recorded as live for that deployment", async () => {
+    it("go on the environment's names network, and are only recorded as live when the caller says", async () => {
         const given = await names.prepareDeployNames({
             kind: "application",
             id: "a2",
@@ -131,16 +131,69 @@ describe("a deploy's names", () => {
             privateNetwork: applications[1]!.privateNetwork,
             environment: { id: "env-1", networkMode: "environment" },
             projectSlug: "shop",
-            target: LOCAL,
-            deploymentId: "dep-1"
+            target: LOCAL
         });
         const own = deploy.namesNetwork("env-1");
         expect(given.enabled).toBe(true);
         expect(given.domain).toBe("web.polaris.internal");
         expect(given.networkAliases).toEqual({ [own]: ["web.polaris.internal", "web", "site.polaris.internal", "site"] });
-        const live = names.parsePrivateNetwork(updates.at(-1)!.privateNetwork).live;
-        expect(live?.deploymentId).toBe("dep-1");
-        expect(live?.names).toContain("web.polaris.internal");
+        expect(given.live).toContain("web.polaris.internal");
+        expect(updates).toHaveLength(0);
+
+        await names.recordLiveNames("application", "a2", given.live, "dep-1");
+        const stored = names.parsePrivateNetwork(applications[1]!.privateNetwork);
+        expect(stored.live).toEqual({ deploymentId: "dep-1", names: given.live });
+        // What was chosen is kept as it is.
+        expect(stored.aliases).toEqual(["site"]);
+    });
+
+    it("are not given to a release kept beside others, which still joins the networks", async () => {
+        links = [{ id: "l1", targetKind: "application", targetId: "a1", sourceId: "other" }];
+        const given = await names.prepareDeployNames({
+            kind: "application",
+            id: "a1",
+            slug: "api",
+            privateNetwork: "{}",
+            environment: { id: "env-1", networkMode: "environment" },
+            projectSlug: "shop",
+            target: LOCAL,
+            kept: true
+        });
+        expect(given.enabled).toBe(true);
+        expect(given.networkAliases).toEqual({});
+        expect(given.live).toEqual([]);
+        expect(given.domain).toBeNull();
+        expect(given.crossLinks).toEqual([deploy.crossLinkNetwork("l1")]);
+    });
+
+    it("leave out a name another service of the environment keeps", async () => {
+        // An application created after the database, both called `postgres` by their slugs.
+        applications.push({ id: "z9", slug: "postgres", name: "Postgres app", environmentId: "env-1", privateNetwork: "{}" });
+        const app = await names.prepareDeployNames({
+            kind: "application",
+            id: "z9",
+            slug: "postgres",
+            privateNetwork: "{}",
+            environment: { id: "env-1", networkMode: "environment" },
+            projectSlug: "shop",
+            target: LOCAL
+        });
+        expect(app.networkAliases).toEqual({});
+        expect(app.domain).toBeNull();
+        const database = await names.prepareDeployNames({
+            kind: "database",
+            id: "d1",
+            slug: "postgres",
+            privateNetwork: "{}",
+            environment: { id: "env-1", networkMode: "environment" },
+            projectSlug: "shop",
+            target: LOCAL
+        });
+        expect(database.domain).toBe("postgres.polaris.internal");
+
+        // A name somebody chose wins over one a slug made, whoever came first.
+        applications.at(-1)!.privateNetwork = JSON.stringify({ aliases: ["postgres"] });
+        expect(await names.answeringLabels({ kind: "database", id: "d1", slug: "postgres", privateNetwork: "{}" }, "env-1")).toEqual([]);
     });
 
     it("give a linked service its project-qualified name on the link's network only", async () => {
@@ -190,6 +243,10 @@ describe("a reference to a service", () => {
         expect(
             names.referencedDomain({ slug: "api", privateNetwork: live("d1"), currentDeploymentId: "d1" }, container)
         ).toBe("api.polaris.internal");
+        // An application's names recorded against no deployment are never taken as live.
+        expect(
+            names.referencedDomain({ slug: "api", privateNetwork: live(), currentDeploymentId: "d1" }, container)
+        ).toBe(container);
         // A renamed service is referenced by its new name once that is live.
         const renamed = JSON.stringify({ name: "backend", live: { names: ["backend.polaris.internal"] } });
         expect(names.referencedDomain({ slug: "api", privateNetwork: renamed }, container)).toBe("backend.polaris.internal");

@@ -12,10 +12,16 @@
  * - `former`: names it was renamed from, each until a date. They keep answering
  *   so a service deployed with the old name in its variables goes on reaching it
  *   until it is deployed again and picks up the new one.
- * - `live`: the names its running container was given, and for an application
- *   the deployment that gave them. A reference only resolves to the private name
- *   once the service behind it answers to it - a dependant deployed first would
- *   otherwise be handed a name nothing answers yet.
+ * - `live`: the names its container was given, recorded once a deploy carries
+ *   them: for an application against that deployment, which only counts once it
+ *   is the one serving; for a database once its deploy came up. A reference only
+ *   resolves to the private name once the service behind it answers to it - a
+ *   dependant deployed first would otherwise be handed a name nothing answers yet.
+ *
+ * Two services of an environment can come to answer to one name without anybody
+ * choosing it twice - an application and a database both called `postgres`. The
+ * name then stays with one of them (see `keepsLabel`) and the other is deployed
+ * without it, so a lookup never lands on either at random.
  *
  * A target makes names where its daemon says it does (this machine) or always
  * (another server: the deploy script makes the networks over SSH). Where it does
@@ -35,6 +41,7 @@ import {
     privateDomain,
     slugify
 } from "@polaris/deploy";
+import { keepsReleases } from "./releases";
 import { decryptedValue } from "./env-values";
 import { networkModeOf } from "./service-networks";
 
@@ -150,11 +157,13 @@ export function containerPortOf(application: {
 export interface DeployNames {
     /** Whether the target carries names at all. Off leaves the deploy as before. */
     readonly enabled: boolean;
+    /** The names this deploy gives the service, to record as live once it serves. */
+    readonly live: string[];
     /** The networks of the links to other projects this service is on. */
     readonly crossLinks: string[];
     /** Its names on each names network, for `networkAliases`. */
     readonly networkAliases: Record<string, string[]>;
-    /** `<name>.polaris.internal`, or null where names are off. */
+    /** `<name>.polaris.internal`, or null where names are off or it is not given. */
     readonly domain: string | null;
 }
 
@@ -163,8 +172,13 @@ export interface DeployNames {
  * its names on its own names network and - where another project calls it - on
  * the link's network as `<name>.<project>.polaris.internal`.
  *
- * Records the names as live, against the deployment for an application, so
- * references to it resolve to the private name once that deployment serves.
+ * A release kept running beside the others (`kept`) still joins the networks,
+ * to call the services beside it, but answers to none of the service's names:
+ * every kept release would, and a lookup would land on any of them. Each is
+ * reached by its own container name instead, as before names.
+ *
+ * Nothing is recorded here - the plan may still be refused or fail. The caller
+ * records `live` (`recordLiveNames`) once the deploy is under way or has come up.
  */
 export async function prepareDeployNames(input: {
     readonly kind: PrivateKind;
@@ -174,12 +188,10 @@ export async function prepareDeployNames(input: {
     readonly environment: { readonly id: string; readonly networkMode: string };
     readonly projectSlug: string;
     readonly target: TargetFacts;
-    readonly deploymentId?: string;
+    readonly kept?: boolean;
 }): Promise<DeployNames> {
-    if (!namesOn(input.target)) return { enabled: false, crossLinks: [], networkAliases: {}, domain: null };
-    const now = new Date();
-    const stored = parsePrivateNetwork(input.privateNetwork);
-    const labels = labelsOf(input, now);
+    if (!namesOn(input.target)) return { enabled: false, live: [], crossLinks: [], networkAliases: {}, domain: null };
+    const labels = input.kept ? [] : await answeringLabels(input, input.environment.id);
     const own = ownNamesNetwork({
         mode: networkModeOf(input.environment.networkMode),
         environmentId: input.environment.id,
@@ -194,26 +206,114 @@ export async function prepareDeployNames(input: {
         orderBy: { createdAt: "asc" },
         take: 64
     });
-    const networkAliases: Record<string, string[]> = { [own]: namesFor(labels[0]!, labels.slice(1)) };
+    const networkAliases: Record<string, string[]> = labels.length > 0 ? { [own]: namesFor(labels[0]!, labels.slice(1)) } : {};
     for (const link of links) {
-        if (link.targetKind === input.kind && link.targetId === input.id) {
+        if (labels.length > 0 && link.targetKind === input.kind && link.targetId === input.id) {
             networkAliases[crossLinkNetwork(link.id)] = labels.map((label) => crossProjectDomain(label, input.projectSlug));
         }
     }
-    const live = [...new Set(Object.values(networkAliases).flat())].sort();
-    // Expired former names are dropped as they stop being given out.
-    const former = stored.former.filter((entry) => Date.parse(entry.until) > now.getTime());
-    await persist(input.kind, input.id, {
-        ...stored,
-        former,
-        live: { ...(input.deploymentId ? { deploymentId: input.deploymentId } : {}), names: live }
-    });
+    const primary = privateNameOf(input);
     return {
         enabled: true,
+        live: [...new Set(Object.values(networkAliases).flat())].sort(),
         crossLinks: links.map((link) => crossLinkNetwork(link.id)),
         networkAliases,
-        domain: privateDomain(labels[0]!)
+        domain: labels.includes(primary) ? privateDomain(primary) : null
     };
+}
+
+/**
+ * Record the names a deploy gave a service as live: for an application against
+ * its deployment, which only counts once that deployment is the one serving.
+ * Read fresh, so a rename made while it deployed is kept; expired former names
+ * are dropped as they stop being given out.
+ */
+export async function recordLiveNames(
+    kind: PrivateKind,
+    id: string,
+    names: readonly string[],
+    deploymentId?: string
+): Promise<void> {
+    const row =
+        kind === "application"
+            ? await prisma.application.findUnique({ where: { id }, select: { privateNetwork: true } })
+            : await prisma.managedDatabase.findUnique({ where: { id }, select: { privateNetwork: true } });
+    if (!row) return;
+    const stored = parsePrivateNetwork(row.privateNetwork);
+    const now = Date.now();
+    await persist(kind, id, {
+        ...stored,
+        former: stored.former.filter((entry) => Date.parse(entry.until) > now),
+        live: { ...(deploymentId ? { deploymentId } : {}), names: [...names] }
+    });
+}
+
+/**
+ * The labels a service is given on a deploy: every one it answers to, less the
+ * ones another service of its environment keeps (see `keepsLabel`).
+ */
+export async function answeringLabels(
+    service: { kind: PrivateKind; id: string; slug: string; privateNetwork: string },
+    environmentId: string
+): Promise<string[]> {
+    const own = claimantOf(service);
+    const clashes = contestedLabels(own, await environmentLabels(environmentId));
+    for (const [label, holder] of clashes) {
+        console.warn(`polaris: private name ${label} of ${service.kind} ${service.id} is kept by ${holder}; left out`);
+    }
+    return own.labels.filter((label) => !clashes.has(label));
+}
+
+/** A service as a claim on names: what it answers to, and the name its slug
+ *  gave it when none was chosen. */
+export interface Claimant {
+    readonly kind: PrivateKind;
+    readonly id: string;
+    /** What the reader calls it. */
+    readonly label: string;
+    readonly labels: readonly string[];
+    readonly defaulted: string | null;
+}
+
+function claimantOf(service: {
+    kind: PrivateKind;
+    id: string;
+    slug: string;
+    name?: string;
+    privateNetwork: string;
+}): Claimant {
+    const stored = parsePrivateNetwork(service.privateNetwork);
+    const slugName = core.defaultPrivateName(service.slug);
+    const chosen = [stored.name, ...stored.aliases, ...stored.former.map((entry) => entry.name)];
+    return {
+        kind: service.kind,
+        id: service.id,
+        label: service.name ?? service.slug,
+        labels: labelsOf(service),
+        defaulted: chosen.includes(slugName) ? null : slugName
+    };
+}
+
+/**
+ * Whether `holder` keeps a label both it and `other` answer to: a name somebody
+ * chose (a name, an extra one, a former one still answering) over one a slug
+ * made, then the service made first - ids are time-ordered.
+ */
+export function keepsLabel(holder: Claimant, other: Claimant, label: string): boolean {
+    const rank = (one: Claimant) => (one.defaulted === label ? 1 : 0);
+    return rank(holder) !== rank(other) ? rank(holder) < rank(other) : holder.id < other.id;
+}
+
+/** The labels of `own` another service keeps, each with what the reader calls it. */
+export function contestedLabels(own: Claimant, others: readonly Claimant[]): Map<string, string> {
+    const contested = new Map<string, string>();
+    for (const label of own.labels) {
+        const holder = others.find(
+            (one) => !(one.kind === own.kind && one.id === own.id) && one.labels.includes(label) && keepsLabel(one, own, label)
+        );
+        if (holder) contested.set(label, holder.label);
+    }
+    return contested;
 }
 
 async function persist(kind: PrivateKind, id: string, stored: StoredPrivateNetwork): Promise<void> {
@@ -244,7 +344,7 @@ export function referencedDomain(
     const live = stored.live;
     if (!live || !live.names.includes(domain)) return containerName;
     // An application's names are live once the deployment that carried them serves.
-    if (live.deploymentId && service.currentDeploymentId !== undefined && live.deploymentId !== service.currentDeploymentId) {
+    if (service.currentDeploymentId !== undefined && live.deploymentId !== service.currentDeploymentId) {
         return containerName;
     }
     return domain;
@@ -263,9 +363,7 @@ export interface NameCheck {
 }
 
 /** Every label each service of an environment answers to, by service. */
-async function environmentLabels(environmentId: string): Promise<
-    { kind: PrivateKind; id: string; label: string; labels: string[] }[]
-> {
+async function environmentLabels(environmentId: string): Promise<Claimant[]> {
     const [applications, databases] = await Promise.all([
         prisma.application.findMany({
             where: { environmentId },
@@ -277,8 +375,8 @@ async function environmentLabels(environmentId: string): Promise<
         })
     ]);
     return [
-        ...applications.map((one) => ({ kind: "application" as const, id: one.id, label: one.name, labels: labelsOf(one) })),
-        ...databases.map((one) => ({ kind: "database" as const, id: one.id, label: one.name, labels: labelsOf(one) }))
+        ...applications.map((one) => claimantOf({ ...one, kind: "application" })),
+        ...databases.map((one) => claimantOf({ ...one, kind: "database" }))
     ];
 }
 
@@ -450,6 +548,10 @@ export type PrivateNetworkStatus =
     | "pending"
     /** Stopped or failed. */
     | "offline"
+    /** Another service of its environment keeps its name (see `keepsLabel`). */
+    | "taken"
+    /** It keeps its releases running side by side, each on its own address. */
+    | "kept"
     /** Its server's daemon predates names: an update gives them. */
     | "unsupported";
 
@@ -481,6 +583,8 @@ export interface PrivateNetworkView {
     /** "dual" for IPv4 and IPv6, "ipv4", or null when not known. */
     readonly family: "dual" | "ipv4" | null;
     readonly status: PrivateNetworkStatus;
+    /** For "taken": the service that keeps the name. */
+    readonly takenBy: string | null;
     readonly serverName: string;
     /** The port it listens on, or null for one it does not say. */
     readonly port: number | null;
@@ -516,6 +620,8 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
                       currentDeploymentId: true,
                       sourceType: true,
                       sourceConfig: true,
+                      keepReleases: true,
+                      volumes: { select: { id: true } },
                       environment: { select: environmentSelect },
                       target: { select: targetSelect },
                       domains: { where: { enabled: true, deploymentId: null }, select: { targetPort: true, kind: true } }
@@ -550,24 +656,38 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
         const { getApplicationDeployStatuses } = await import("@/lib/deploy-service");
         // Never deployed reads as not running: nothing answers to its names yet.
         state = (await getApplicationDeployStatuses([service]))[service.id] ?? "never";
-        liveNow = stored.live?.deploymentId === undefined || stored.live.deploymentId === service.currentDeploymentId;
+        liveNow = stored.live?.deploymentId !== undefined && stored.live.deploymentId === service.currentDeploymentId;
     } else {
         state = service.status;
         liveNow = true;
     }
-    const wanted = [privateDomain(name), ...stored.aliases.map(privateDomain)];
+    const kept = "keepReleases" in service && keepsReleases(service);
+    const clashes = contestedLabels(
+        claimantOf({ ...service, kind }),
+        enabled && !kept ? await environmentLabels(service.environment.id) : []
+    );
+    const links = await crossLinksOf(kind, service.id);
+    const wanted = [
+        ...[name, ...stored.aliases].filter((one) => !clashes.has(one)).map(privateDomain),
+        // And the name each linked project calls it by, on that link's network.
+        ...(clashes.has(name) ? [] : links.filter((link) => link.direction === "in").map((link) => link.domain))
+    ];
     const carries = liveNow && wanted.every((one) => stored.live?.names.includes(one));
     const status: PrivateNetworkStatus = !enabled
         ? "unsupported"
-        : STARTING.has(state)
-          ? "starting"
-          : !UP.has(state)
-            ? "offline"
-            : carries
-              ? "ready"
-              : "pending";
+        : kept
+          ? "kept"
+          : clashes.has(name)
+            ? "taken"
+            : STARTING.has(state)
+              ? "starting"
+              : !UP.has(state)
+                ? "offline"
+                : carries
+                  ? "ready"
+                  : "pending";
 
-    const [family, peers, links] = await Promise.all([
+    const [family, peers] = await Promise.all([
         (async () => {
             if (!local) return null;
             const { dualStackNetworks } = await import("./service-networks");
@@ -581,8 +701,7 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
             select: { id: true, name: true, target: { select: { id: true, name: true } } },
             orderBy: { name: "asc" },
             take: 200
-        }),
-        crossLinksOf(kind, service.id)
+        })
     ]);
 
     // Who can call it by name: in `links` mode the services linking to it, else
@@ -611,6 +730,7 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
         former: stored.former.filter((entry) => Date.parse(entry.until) > Date.now()),
         family,
         status,
+        takenBy: clashes.get(name) ?? null,
         serverName: service.target.name,
         port,
         portless:
@@ -785,27 +905,27 @@ export class PrivateLinkRefusal extends Error {
     }
 }
 
+/** When a service's container takes the names it has now: redeployed "now",
+ *  on its "next" deploy, or on its "first" one. */
+export type NamesApplied = "now" | "next" | "first";
+
 /**
- * Redeploy a service so its container takes the names it has now, when it is
- * running at all - one never deployed takes them on its first deploy.
+ * Redeploy an application so its container takes the names it has now, when it
+ * is running at all - one never deployed takes them on its first deploy. A
+ * running database is left as it is: recreating it cuts every connection to it,
+ * which nobody asked for by renaming it, so it takes them on its next deploy.
  */
-export async function redeployForNames(kind: PrivateKind, id: string, actorId: string): Promise<boolean> {
+export async function redeployForNames(kind: PrivateKind, id: string, actorId: string): Promise<NamesApplied> {
     if (kind === "application") {
         const app = await prisma.application.findUnique({
             where: { id },
             select: { currentDeploymentId: true, environment: { select: { project: { select: { ownerId: true } } } } }
         });
-        if (!app?.currentDeploymentId) return false;
+        if (!app?.currentDeploymentId) return "first";
         const { redeployForEnvScope } = await import("@/lib/deploy-service");
         await redeployForEnvScope("application", id, app.environment.project.ownerId, actorId, { reason: "private-names" });
-        return true;
+        return "now";
     }
-    const db = await prisma.managedDatabase.findUnique({
-        where: { id },
-        select: { status: true, parentId: true, environment: { select: { project: { select: { ownerId: true } } } } }
-    });
-    if (!db || db.parentId || db.status !== "running") return false;
-    const { deployDatabase } = await import("@/lib/database-service");
-    await deployDatabase(id, db.environment.project.ownerId, actorId);
-    return true;
+    const db = await prisma.managedDatabase.findUnique({ where: { id }, select: { status: true, parentId: true } });
+    return db && !db.parentId && db.status === "running" ? "next" : "first";
 }

@@ -179,11 +179,24 @@ describe("the port-80 forwarder", () => {
         expect(FORWARDER_IMAGE).toMatch(/@sha256:[a-f0-9]{64}$/);
         expect(forwarderName("x".repeat(80)).length).toBeLessThanOrEqual(63);
         expect(forwarderName("api")).toBe("api-p80");
+        // Copies whose names differ only past the cut still get forwarders of their own.
+        const long = "x".repeat(60);
+        expect(forwarderName(`${long}-r2`)).not.toBe(forwarderName(`${long}-r3`));
+        expect(forwarderName(`${long}-r2`).length).toBeLessThanOrEqual(63);
         // A control character would be refused by the daemon and folded by YAML.
         expect(forwarderScript(3000)).not.toMatch(/[\x00-\x1f]/);
         // And survives the compose escaping every spec crosses: `$` doubled.
         const escaped = forCompose(withPortForwarders(named(), 3000));
         expect(escaped.services[1]!.command?.[0]).toContain("$$pid");
+    });
+
+    it("waits for the service's port, and stays idle where the service answers on 80 itself", () => {
+        const script = forwarderScript(3000);
+        const wait = script.indexOf(":0BB8 ");
+        const own80 = script.indexOf(":0050 ");
+        expect(wait).toBeGreaterThan(-1);
+        expect(own80).toBeGreaterThan(wait);
+        expect(script.indexOf("TCP4-LISTEN:80")).toBeGreaterThan(own80);
     });
 
     it("renders as a shared namespace for a server reached over SSH", () => {

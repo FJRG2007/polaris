@@ -11,11 +11,15 @@
         "starting": "Starting",
         "pending": "Redeploy to apply",
         "offline": "Not running",
+        "taken": "Name in use",
+        "kept": "Per-release names",
         "unsupported": "Needs an update"
     },
     "statusHint": {
         "pending": "It was deployed before its current names. The next deploy gives them to it.",
         "offline": "Its names answer again once it is running.",
+        "taken": "{service} already answers to this name, so this service is deployed without it. Give one of them another name.",
+        "kept": "It keeps previous deployments running, so each is reached by its own address and these names are not given out. Turn off Keep previous deployments to use them.",
         "unsupported": "This server's Polaris predates private names. Update it from <link>Settings</link> to turn them on."
     },
     "shortName": "You can also simply call me <code>{name}</code>",
@@ -29,8 +33,10 @@
     "update": "Update",
     "renameHint": "The old name keeps answering for {days} days, so services deployed with it go on working.",
     "renamed": "Renamed. It is being redeployed so the new name answers.",
+    "renamedNext": "Renamed. It takes the new name on its next deploy, so its connections are not cut now.",
     "renamedLater": "Renamed. It takes the name on its first deploy.",
     "savedRedeploy": "Saved. It is being redeployed so the names answer.",
+    "savedNext": "Saved. It takes the names on its next deploy, so its connections are not cut now.",
     "savedLater": "Saved. It takes the names on its first deploy.",
     "former": "Still answers to <code>{name}</code> until {date}",
     "aliases": "Other names",

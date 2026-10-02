@@ -18,7 +18,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Badge, Button, CopyButton, Input, Select, Skeleton } from "@polaris/ui";
-import type { PrivateNetworkStatus, PrivateNetworkView } from "@/lib/deploy/private-names";
+import type { NamesApplied, PrivateNetworkStatus, PrivateNetworkView } from "@/lib/deploy/private-names";
 import { CheckCircle2, CircleAlert, CircleDashed, Clock, Loader2, Network, Pencil, Plus, X } from "lucide-react";
 import { FORMER_NAME_GRACE_DAYS, normalizePrivateName, privateNameProblem, type PrivateNameProblem } from "@polaris/core";
 import {
@@ -46,11 +46,22 @@ const PROBLEM_KEYS = {
     reserved: "problems.reserved"
 } as const satisfies Record<PrivateNameProblem, string>;
 
+const APPLIED_RENAME = { now: "renamed", next: "renamedNext", first: "renamedLater" } as const satisfies Record<
+    NamesApplied,
+    string
+>;
+const APPLIED_SAVE = { now: "savedRedeploy", next: "savedNext", first: "savedLater" } as const satisfies Record<
+    NamesApplied,
+    string
+>;
+
 const STATUS_TONE: Record<PrivateNetworkStatus, string> = {
     ready: "text-success-ink",
     starting: "text-warning-ink",
     pending: "text-warning-ink",
     offline: "text-muted-foreground",
+    taken: "text-warning-ink",
+    kept: "text-muted-foreground",
     unsupported: "text-warning-ink"
 };
 
@@ -164,6 +175,9 @@ function PanelBody({
     const format = useDisplayFormat();
     const [editing, setEditing] = useState(false);
     const enabled = view.status !== "unsupported";
+    // Its names answer, or will once it runs: not while another service keeps
+    // its name, nor for a service that keeps its releases side by side.
+    const answers = enabled && view.status !== "taken" && view.status !== "kept";
     const settingsHref = `/apps/deploy/${view.projectId}/settings/environments`;
 
     return (
@@ -212,13 +226,18 @@ function PanelBody({
                         })}
                     </p>
                 )}
-                {(view.status === "pending" || view.status === "offline") && (
+                {(view.status === "pending" || view.status === "offline" || view.status === "kept") && (
                     <p className="text-xs text-muted-foreground">{t(`statusHint.${view.status}`)}</p>
                 )}
-                {enabled && (
+                {view.status === "taken" && (
+                    <p className="text-xs text-muted-foreground">
+                        {t("statusHint.taken", { service: view.takenBy ?? "" })}
+                    </p>
+                )}
+                {answers && (
                     <p className="text-xs text-muted-foreground">{t.rich("shortName", { name: view.name, code })}</p>
                 )}
-                {enabled && view.port !== null && (
+                {answers && view.port !== null && (
                     <p className="text-xs text-muted-foreground">
                         {view.portless && view.port !== 80
                             ? t.rich("portless", { url: `http://${view.domain}`, port: view.port, code })
@@ -349,7 +368,7 @@ function RenameForm({
                 setError(result.error);
                 return;
             }
-            await onDone(result.redeploying ? t("renamed") : t("renamedLater"));
+            await onDone(t(APPLIED_RENAME[result.applied ?? "first"]));
         });
     }
 
@@ -445,7 +464,7 @@ function AliasEditor({
                 return;
             }
             setDraft("");
-            await onChanged(result.redeploying ? t("savedRedeploy") : t("savedLater"));
+            await onChanged(t(APPLIED_SAVE[result.applied ?? "first"]));
         });
     }
 

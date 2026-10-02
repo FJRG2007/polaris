@@ -23,7 +23,7 @@ import { loadEnv } from "@polaris/config";
 import { topologyMemberPlans } from "./database-topology";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
-import { prepareDeployNames } from "./deploy/private-names";
+import { prepareDeployNames, recordLiveNames } from "./deploy/private-names";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
 import { clusterNodeNames, dbPlanImages, serviceName, shortHash, slugify, type DbDeployPlan } from "@polaris/deploy";
@@ -706,6 +706,8 @@ export async function deployDatabase(
             where: { id: db.id },
             data: { status: running ? "running" : "failed" }
         });
+        // Its names count as live once the container carrying them came up.
+        if (running && names.enabled) await recordLiveNames("database", db.id, names.live);
         // What an engine needs once it answers and a compose file cannot say: the
         // object store's identities, a replica set's initiation, the archive's
         // first base backup. Its own failures are recorded on the instance's
