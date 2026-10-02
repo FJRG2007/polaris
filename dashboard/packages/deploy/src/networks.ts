@@ -260,7 +260,8 @@ export function ensurePrivateNetworksScript(names: readonly string[], swarm: boo
  * link network is ever named; one that is not there is nothing to close.
  */
 export function cutLinkNetworkScript(name: string): string[] {
-    if (!/^polaris-net-x[a-f0-9]{10}$/.test(name)) throw new Error("only a link network can be cut");
+    if (!/^polaris-net-x[a-f0-9]{10}$/.test(name))
+        throw new Error("only a link network can be cut");
     const attached = `docker network inspect --format '{{range $id, $c := .Containers}}{{$id}} {{end}}' ${name}`;
     return [
         `if docker network inspect ${name} >/dev/null 2>&1; then ` +
