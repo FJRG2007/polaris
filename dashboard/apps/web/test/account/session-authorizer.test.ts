@@ -31,7 +31,7 @@ vi.mock("next/headers", () => ({ headers: async () => new Headers(), cookies: as
 vi.mock("@polaris/auth", () => ({ verifyQuickPin: async () => pinAccepted }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
-vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "85.87.156.88" }));
+vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "198.51.100.88" }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         // The account's own rule about addresses, which the directory reads to
@@ -61,7 +61,7 @@ function sessionRow(id: string, userAgent: string, state: Record<string, unknown
         id,
         createdAt: new Date("2026-08-01T10:00:00Z"),
         expiresAt: new Date("2026-09-01T10:00:00Z"),
-        ipAddress: "85.87.156.88",
+        ipAddress: "198.51.100.88",
         userAgent,
         state: { userAgent, lastSeenAt: new Date("2026-08-04T10:00:00Z"), approval: "approved", ...state }
     };

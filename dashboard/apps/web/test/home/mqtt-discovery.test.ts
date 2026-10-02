@@ -26,7 +26,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/mqtt-broker", () => ({
 const { mqttDiscoveryDriver } = await import("@polaris-app/places/src/lib/drivers/mqtt-discovery");
 
 const BROKER = {
-    host: "192.168.1.20",
+    host: "10.0.1.20",
     port: "1883",
     username: "",
     password: "",

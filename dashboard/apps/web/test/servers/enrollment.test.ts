@@ -17,10 +17,10 @@ import {
 
 describe("enrollmentAddressCandidates", () => {
     it("leads with the address it observed over the ones it was told", () => {
-        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "192.168.1.7"])).toEqual([
+        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "10.0.1.7"])).toEqual([
             "203.0.113.8",
             "10.0.0.5",
-            "192.168.1.7"
+            "10.0.1.7"
         ]);
     });
 
@@ -29,19 +29,19 @@ describe("enrollmentAddressCandidates", () => {
     // reported addresses is the only thing between that and an enrollment that
     // fails on a machine which was reachable all along.
     it("keeps the reported addresses behind an observed one that is not the machine", () => {
-        expect(enrollmentAddressCandidates("192.168.1.1", ["192.168.1.142"])).toEqual([
-            "192.168.1.1",
-            "192.168.1.142"
+        expect(enrollmentAddressCandidates("10.0.1.1", ["10.0.1.142"])).toEqual([
+            "10.0.1.1",
+            "10.0.1.142"
         ]);
     });
 
     it("falls back to a reported address when nothing was observed", () => {
-        expect(enrollmentAddressCandidates(undefined, ["192.168.1.7"])).toEqual(["192.168.1.7"]);
+        expect(enrollmentAddressCandidates(undefined, ["10.0.1.7"])).toEqual(["10.0.1.7"]);
     });
 
     it("never offers loopback, which is Polaris's own proxy and not the machine", () => {
-        expect(enrollmentAddressCandidates("127.0.0.1", ["192.168.1.7"])).toEqual(["192.168.1.7"]);
-        expect(enrollmentAddressCandidates("::1", ["192.168.1.7"])).toEqual(["192.168.1.7"]);
+        expect(enrollmentAddressCandidates("127.0.0.1", ["10.0.1.7"])).toEqual(["10.0.1.7"]);
+        expect(enrollmentAddressCandidates("::1", ["10.0.1.7"])).toEqual(["10.0.1.7"]);
         expect(enrollmentAddressCandidates("127.0.0.1", ["127.0.0.1", "localhost"])).toEqual([]);
     });
 
@@ -58,15 +58,15 @@ describe("enrollmentAddressCandidates", () => {
      */
     it("prefers the address on Polaris's own network when it knows what that is", () => {
         expect(
-            enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "192.168.1.7"], "192.168.1.50")
-        ).toEqual(["192.168.1.7", "10.0.0.5", "203.0.113.8"]);
+            enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "10.0.1.7"], "10.0.1.50")
+        ).toEqual(["10.0.1.7", "10.0.0.5", "203.0.113.8"]);
     });
 
     it("still knocks on the public address, second", () => {
         // Being near is a reason to try first, never a reason to stop trying:
         // the LAN address may be stale, and the public one may be the only one
         // that answers.
-        expect(enrollmentAddressCandidates("203.0.113.8", ["192.168.1.7"], "192.168.1.50")).toContain(
+        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.1.7"], "10.0.1.50")).toContain(
             "203.0.113.8"
         );
     });
@@ -82,8 +82,8 @@ describe("enrollmentAddressCandidates", () => {
     });
 
     it("does not knock twice on the same address", () => {
-        expect(enrollmentAddressCandidates("192.168.1.7", ["192.168.1.7", "10.0.0.5"])).toEqual([
-            "192.168.1.7",
+        expect(enrollmentAddressCandidates("10.0.1.7", ["10.0.1.7", "10.0.0.5"])).toEqual([
+            "10.0.1.7",
             "10.0.0.5"
         ]);
     });

@@ -31,22 +31,22 @@ afterEach(() => {
 describe("localDialHost", () => {
     it("uses the host name the edge was configured with", async () => {
         process.env.POLARIS_APP_DIAL_HOST = "host.docker.internal";
-        state.publicIp = "192.168.1.138";
+        state.publicIp = "10.0.1.138";
         const { localDialHost } = await load();
         expect(await localDialHost()).toBe("host.docker.internal");
     });
 
     it("falls back to the server's address when no name is configured", async () => {
-        state.publicIp = "192.168.1.142";
+        state.publicIp = "10.0.1.142";
         const { localDialHost } = await load();
-        expect(await localDialHost()).toBe("192.168.1.142");
+        expect(await localDialHost()).toBe("10.0.1.142");
     });
 
     it("treats a blank variable as unset rather than as an empty host", async () => {
         process.env.POLARIS_APP_DIAL_HOST = "   ";
-        state.publicIp = "192.168.1.142";
+        state.publicIp = "10.0.1.142";
         const { localDialHost } = await load();
-        expect(await localDialHost()).toBe("192.168.1.142");
+        expect(await localDialHost()).toBe("10.0.1.142");
     });
 
     it("answers null when neither is known, so the caller leaves routing alone", async () => {

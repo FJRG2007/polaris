@@ -20,7 +20,7 @@ describe("what a server is planned", () => {
     });
 
     it("no longer sizes a modded server as if it were vanilla", () => {
-        // The Offgrid case: NeoForge, six mods, five people at a time. It was
+        // The case this was written for: NeoForge, six mods, five people at a time. It was
         // running on 1536 MB and died in the lighting engine.
         const modded = plan.plannedHeapMb({ concurrentPlayers: 5, loader: "neoforge", mods: 6 });
         expect(modded).toBeGreaterThan(1536);

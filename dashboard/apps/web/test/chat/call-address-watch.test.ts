@@ -21,7 +21,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let settings: Record<string, string | null> = {};
-let publicIp: string | null = "85.87.158.186";
+let publicIp: string | null = "198.51.100.186";
 let shipped = true;
 let startedAt: string | null = "2026-08-26T13:24:22.000Z";
 let restartFails = false;
@@ -69,7 +69,7 @@ const watch = await import("@/lib/chat/call-address-watch");
 
 beforeEach(() => {
     settings = {};
-    publicIp = "85.87.158.186";
+    publicIp = "198.51.100.186";
     shipped = true;
     startedAt = "2026-08-26T13:24:22.000Z";
     restartFails = false;
@@ -85,11 +85,11 @@ describe("the address a call is sent to", () => {
 
         expect(state.stale).toBe(false);
         expect(notified).toHaveLength(0);
-        expect(settings["chat.calls.publicIpSeen"]).toBe("85.87.158.186");
+        expect(settings["chat.calls.publicIpSeen"]).toBe("198.51.100.186");
     });
 
     it("repairs it and says so when the line moved under a running server", async () => {
-        settings["chat.calls.publicIpSeen"] = "85.87.153.18";
+        settings["chat.calls.publicIpSeen"] = "198.51.100.18";
 
         const state = await watch.watchCallAddress();
 
@@ -101,11 +101,11 @@ describe("the address a call is sent to", () => {
         expect(notified[0]?.title).toContain("repaired");
         // Nothing for anybody to do, so nothing is demanded of them.
         expect(notified[0]?.actionRequired).toBe(false);
-        expect(notified[0]?.body).toContain("85.87.158.186");
+        expect(notified[0]?.body).toContain("198.51.100.186");
     });
 
     it("asks for help only when it genuinely cannot help itself", async () => {
-        settings["chat.calls.publicIpSeen"] = "85.87.153.18";
+        settings["chat.calls.publicIpSeen"] = "198.51.100.18";
         restartFails = true;
 
         const state = await watch.watchCallAddress();
@@ -119,9 +119,9 @@ describe("the address a call is sent to", () => {
     });
 
     it("leaves a server that started after the change alone", async () => {
-        settings["chat.calls.publicIpSeen"] = "85.87.153.18";
+        settings["chat.calls.publicIpSeen"] = "198.51.100.18";
         settings["chat.calls.publicIpChangedAt"] = "2026-09-01T00:00:00.000Z";
-        publicIp = "85.87.153.18";
+        publicIp = "198.51.100.18";
         startedAt = "2026-09-02T00:00:00.000Z";
 
         const state = await watch.watchCallAddress();
@@ -134,7 +134,7 @@ describe("the address a call is sent to", () => {
     });
 
     it("does not touch a call server somebody else runs", async () => {
-        settings["chat.calls.publicIpSeen"] = "85.87.153.18";
+        settings["chat.calls.publicIpSeen"] = "198.51.100.18";
         shipped = false;
 
         const state = await watch.watchCallAddress();
@@ -148,7 +148,7 @@ describe("the address a call is sent to", () => {
     });
 
     it("stays quiet on a connection with no public address", async () => {
-        settings["chat.calls.publicIpSeen"] = "85.87.153.18";
+        settings["chat.calls.publicIpSeen"] = "198.51.100.18";
         publicIp = null;
 
         const state = await watch.watchCallAddress();
@@ -158,6 +158,6 @@ describe("the address a call is sent to", () => {
         // with a blank on a line that is briefly down.
         expect(state.stale).toBe(false);
         expect(notified).toHaveLength(0);
-        expect(settings["chat.calls.publicIpSeen"]).toBe("85.87.153.18");
+        expect(settings["chat.calls.publicIpSeen"]).toBe("198.51.100.18");
     });
 });

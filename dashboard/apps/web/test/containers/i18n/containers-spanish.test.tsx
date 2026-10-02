@@ -34,7 +34,7 @@ const { ContainersView } = await import("@/app/(app)/apps/containers/containers-
 
 const connections: DockerConnectionSummary[] = [
     { id: "local", name: "Local host", transport: "socket", status: "active", local: true },
-    { id: `host:${HOST}`, name: "lirio-2", transport: "ssh", status: "active", host: true, hostId: HOST }
+    { id: `host:${HOST}`, name: "node-2", transport: "ssh", status: "active", host: true, hostId: HOST }
 ];
 
 describe("the host list", () => {
@@ -53,7 +53,7 @@ describe("the host list", () => {
         );
         expect(markup).toContain("Hosts de Docker");
         expect(markup).toContain("Apagado");
-        expect(markup).toContain("lirio-2 no responde");
+        expect(markup).toContain("node-2 no responde");
         expect(markup).toContain("su página de servidor");
         expect(markup).not.toContain("Offline");
     });

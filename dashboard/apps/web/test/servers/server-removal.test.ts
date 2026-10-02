@@ -114,7 +114,7 @@ describe("removing a server", () => {
     beforeEach(() => {
         calls.length = 0;
         vi.clearAllMocks();
-        hostFindFirst.mockResolvedValue({ id: HOST, name: "lirio-1", username: "polaris", sudo: false });
+        hostFindFirst.mockResolvedValue({ id: HOST, name: "node-1", username: "polaris", sudo: false });
         hostFindMany.mockResolvedValue([]);
         appRows = [];
         deployAndWait.mockResolvedValue(null);
@@ -174,7 +174,7 @@ describe("removing a server", () => {
     it("reports what is at stake before anything is destroyed", async () => {
         oneService("api", true);
         volumeCount.mockResolvedValue(2);
-        hostFindMany.mockResolvedValue([{ id: OTHER_HOST, name: "lirio-2" }]);
+        hostFindMany.mockResolvedValue([{ id: OTHER_HOST, name: "node-2" }]);
 
         const plan = await getServerRemovalPlan(OWNER, HOST);
 

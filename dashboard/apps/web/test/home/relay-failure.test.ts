@@ -41,7 +41,7 @@ describe("why a camera would not open", () => {
     });
 
     it("tells a camera that went quiet from one that said no", () => {
-        const said = explainRelayFailure('ERR > error="dial tcp 192.168.1.150:8800: i/o timeout"');
+        const said = explainRelayFailure('ERR > error="dial tcp 10.0.1.150:8800: i/o timeout"');
         expect(said).toContain("stopped answering");
         expect(said).not.toContain("password");
     });
@@ -69,8 +69,8 @@ describe("a failure nothing recognises", () => {
     it("never hands back the camera password with them", () => {
         // The relay quotes the source it was given, and on this protocol the
         // source is the password.
-        const said = relaySaid('ERR > error="dial tapo://hunter2@192.168.1.150: refused"');
-        expect(said).toBe("dial tapo://***@192.168.1.150: refused");
+        const said = relaySaid('ERR > error="dial tapo://hunter2@10.0.1.150: refused"');
+        expect(said).toBe("dial tapo://***@10.0.1.150: refused");
         expect(said).not.toContain("hunter2");
     });
 

@@ -40,7 +40,7 @@ describe("what is not yet a domain", () => {
     });
 
     it("refuses an address, and says which it is", () => {
-        expect(domainProblem("192.168.1.10")).toBe("That is an address, not a domain");
+        expect(domainProblem("10.0.1.10")).toBe("That is an address, not a domain");
     });
 
     it("refuses a label that cannot be one", () => {

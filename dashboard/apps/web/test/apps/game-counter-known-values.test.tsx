@@ -36,12 +36,12 @@ const { FieldNote } =
 afterEach(cleanup);
 
 const TITLE = "Polaris | {server.name}";
-const KNOWN = { "server.name": "Offgrid" };
+const KNOWN = { "server.name": "ExampleSMP" };
 
 describe("counting a text", () => {
     it("counts the server's name as it is, once it is known", () => {
         expect(visibleLength(TITLE)).toBe(42);
-        expect(visibleLength(TITLE, KNOWN)).toBe(17);
+        expect(visibleLength(TITLE, KNOWN)).toBe(20);
     });
 
     it("counts an empty known value at its fallback, and an unknown one at its widest", () => {
@@ -70,6 +70,6 @@ describe("what is refused", () => {
 describe("the counter under a field", () => {
     it("shows the length with the server's name in it", () => {
         render(<FieldNote text={TITLE} max={32} known={KNOWN} />);
-        expect(screen.getByText("17/32")).toBeTruthy();
+        expect(screen.getByText("20/32")).toBeTruthy();
     });
 });

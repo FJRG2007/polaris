@@ -2,7 +2,7 @@
  * One scoped search, for the commands that cannot be answered from the index the
  * palette already holds.
  *
- * `GET /api/search/lookup?scope=tasks&q=orphion`. The scope is required and
+ * `GET /api/search/lookup?scope=tasks&q=storefront`. The scope is required and
  * closed: there is no "search everything" here, because running four searches
  * for a name somebody was halfway through typing is exactly what the commands
  * exist to avoid. Callers debounce, drop stale replies and keep the answer for a

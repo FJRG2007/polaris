@@ -21,10 +21,10 @@ function entry(over: Partial<HttpLogEntry>): HttpLogEntry {
 describe("parseHttpLogs", () => {
     it("parses nginx/Apache Combined Log Format", () => {
         const raw =
-            '192.168.1.131 - - [21/Jul/2026:12:32:05 +0000] "GET /health HTTP/1.1" 304 0 "-" "Mozilla/5.0 Chrome/145" "-"';
+            '10.0.1.131 - - [21/Jul/2026:12:32:05 +0000] "GET /health HTTP/1.1" 304 0 "-" "Mozilla/5.0 Chrome/145" "-"';
         const [entry] = parseHttpLogs(raw);
         expect(entry).toMatchObject({
-            ip: "192.168.1.131",
+            ip: "10.0.1.131",
             method: "GET",
             path: "/health",
             status: 304,
@@ -68,7 +68,7 @@ describe("parseHttpLogs", () => {
     it("drops non-access lines (startup notices, malformed JSON) and keeps only requests", () => {
         const raw = [
             "2026/07/21 12:31:32 [notice] 1#1: start worker process 27",
-            '192.168.1.131 - - [21/Jul/2026:12:32:05 +0000] "GET / HTTP/1.1" 200 5 "-" "UA"',
+            '10.0.1.131 - - [21/Jul/2026:12:32:05 +0000] "GET / HTTP/1.1" 200 5 "-" "UA"',
             "{ not valid json",
             '{"msg":"router created","level":"info"}'
         ].join("\n");

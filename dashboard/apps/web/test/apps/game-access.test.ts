@@ -226,11 +226,11 @@ describe("gameReachAdvice", () => {
     // The failure the whole thing exists for: DNS right, server up, port never
     // forwarded, and nothing anywhere saying so.
     it("asks for the forward on a home line, naming the port and the machine", () => {
-        const advice = gameReachAdvice("home-nat", ports, false, "192.168.1.142");
+        const advice = gameReachAdvice("home-nat", ports, false, "10.0.1.142");
         expect(advice.ok).toBe(false);
         expect(advice.forward).toBe(true);
         expect(advice.title).toContain("TCP 25565");
-        expect(advice.steps.join(" ")).toContain("192.168.1.142");
+        expect(advice.steps.join(" ")).toContain("10.0.1.142");
     });
 
     it("asks for a firewall rule rather than a forward in a data centre", () => {
@@ -254,11 +254,11 @@ describe("gameReachAdvice", () => {
     // Under the range policy the operator is not being asked to open this server's
     // port; they are being asked to open the block it came out of, once.
     it("asks for the range rather than the port when that is what covers it", () => {
-        const advice = gameReachAdvice("home-nat", ports, false, "192.168.1.142", "range");
+        const advice = gameReachAdvice("home-nat", ports, false, "10.0.1.142", "range");
         const steps = advice.steps.join(" ");
 
         expect(steps).toContain("TCP 25565-25664");
-        expect(steps).toContain("192.168.1.142");
+        expect(steps).toContain("10.0.1.142");
         expect(steps).toContain("last time");
     });
 

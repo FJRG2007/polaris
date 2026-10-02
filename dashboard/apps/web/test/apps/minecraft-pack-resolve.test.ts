@@ -101,7 +101,7 @@ beforeEach(() => {
 describe("the pack a player installs", () => {
     it("carries the server's mods and the players' own, each marked with where it runs", async () => {
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "securitycraft?",
@@ -118,7 +118,7 @@ describe("the pack a player installs", () => {
     it("says which entries have no build here rather than dropping them", async () => {
         builds.delete("xaeros-minimap");
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "securitycraft?",
@@ -139,7 +139,7 @@ describe("the pack a player installs", () => {
             url: "https://evil.example/xaeros.jar"
         });
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "securitycraft?",
@@ -153,7 +153,7 @@ describe("the pack a player installs", () => {
     it("carries a checksum only when it is one, so a run never compares against nonsense", async () => {
         builds.set("securitycraft", { ...build("securitycraft"), sha1: "not-a-checksum" });
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "securitycraft?",
@@ -167,7 +167,7 @@ describe("the pack a player installs", () => {
         builds.set("spark-server", build("spark-server"));
         sides.set("spark-server", "unsupported");
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "securitycraft?,spark-server",
@@ -189,7 +189,7 @@ describe("the pack a player installs", () => {
         needs.set("core-lib", ["config-lib"]);
         needs.set("xaeros-minimap", ["balm"]);
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "trashslot,rechiseled",
@@ -212,7 +212,7 @@ describe("the pack a player installs", () => {
         needs.set("rechiseled", ["fusion"]);
         sides.set("fusion", "unsupported");
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "rechiseled",
@@ -227,7 +227,7 @@ describe("the pack a player installs", () => {
         builds.set("somelib", build("somelib"));
         needs.set("somemod", ["somelib"]);
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "somemod:beta",
@@ -244,7 +244,7 @@ describe("the pack a player installs", () => {
         ids.set("P7dR8mSH", "fabric-api");
         needs.set("sodium", ["fabric-api"]);
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "FABRIC",
             version: "1.21.4",
             projects: "P7dR8mSH",
@@ -259,7 +259,7 @@ describe("the pack a player installs", () => {
 
     it("hands out a mod on both lists once", async () => {
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "securitycraft",
@@ -453,7 +453,7 @@ describe("what the game can do without", () => {
         builds.set("lights", build("lights"));
         sides.set("lights", "optional");
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "securitycraft?,lights?",
@@ -483,7 +483,7 @@ describe("what the game can do without", () => {
         sides.set("balm", "optional");
         needs.set("trashslot", ["balm"]);
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "trashslot,balm?",
@@ -495,7 +495,7 @@ describe("what the game can do without", () => {
     it("keeps whatever the operator put on the players' own list", async () => {
         sides.set("xaeros-minimap", "optional");
         const pack = await resolvePack({
-            name: "Offgrid",
+            name: "ExampleSMP",
             software: "NEOFORGE",
             version: "1.21.4",
             projects: "",

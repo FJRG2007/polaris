@@ -511,16 +511,16 @@ describe("the players list", () => {
     });
 
     it("lists whoever is online, even before the game has written their counts", () => {
-        // Reckmy was mining and not in the table: nothing found yet, and the
+        // Grumm was mining and not in the table: nothing found yet, and the
         // server had not saved the stats that would have put him there.
         const { suspects } = buildSuspects({
             honeypots: [],
             movement: [],
-            mining: [{ name: "Solojose", figures: figures(4, 129) }],
-            players: ["Reckmy", "solojose"]
+            mining: [{ name: "Notch", figures: figures(4, 129) }],
+            players: ["Grumm", "notch"]
         });
-        expect(suspects.map((one) => one.name).sort()).toEqual(["Reckmy", "Solojose"]);
-        expect(suspects.find((one) => one.name === "Reckmy")).toMatchObject({
+        expect(suspects.map((one) => one.name).sort()).toEqual(["Grumm", "Notch"]);
+        expect(suspects.find((one) => one.name === "Grumm")).toMatchObject({
             xray: { level: "unlikely" },
             movement: { level: "unlikely" },
             mining: null,

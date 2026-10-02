@@ -37,7 +37,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris/auth", () => ({ verifyQuickPin: async () => false }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
-vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "85.87.156.88" }));
+vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "198.51.100.88" }));
 
 const { clientHost } = await import("../../src/lib/request-context");
 const { listUserSessions } = await import("../../src/lib/session-directory");
@@ -48,7 +48,7 @@ function sessionRow(id: string, state: Record<string, unknown> | null) {
         id,
         createdAt: new Date("2026-08-01T10:00:00Z"),
         expiresAt: new Date("2026-08-08T10:00:00Z"),
-        ipAddress: "192.168.1.131",
+        ipAddress: "10.0.1.131",
         userAgent: "Mozilla/5.0 (Windows NT 10.0) Chrome/140",
         state
     };

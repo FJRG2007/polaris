@@ -3,7 +3,7 @@
  *
  * Three ways in, because people reach for different ones: "/services" is the
  * deliberate spelling, "@ana" is the one everybody already knows from every
- * comment box, and "services orphion" is what somebody types when they were not
+ * comment box, and "services storefront" is what somebody types when they were not
  * thinking about commands at all. All three end at the same place - a scope and
  * the words after it.
  *
@@ -13,7 +13,7 @@
  * A slashed word can take effect the moment it is complete, but only when no
  * longer command starts with it. "/task" is not taken, because the next
  * keystroke may well be the "s" of "/tasks" - taking it would swallow that "s"
- * into the query and search tasks for "s orphion". "/svc" has nothing after it
+ * into the query and search tasks for "s storefront". "/svc" has nothing after it
  * and is taken at once. Either way the space still commits, so "/task " works.
  */
 

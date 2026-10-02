@@ -22,7 +22,7 @@ describe("reading a MAC somebody typed", () => {
         ["aa:bb-cc:dd:ee:ff", "mixed separators"],
         ["aabb.ccdd.eeff.0011", "too many groups"],
         ["gg:bb:cc:dd:ee:ff", "not hex"],
-        ["192.168.1.30", "an IP address"],
+        ["10.0.1.30", "an IP address"],
         ["fe80::1", "an IPv6 address"],
         ["00:00:00:00:00:00", "the all-zero address"],
         ["ff:ff:ff:ff:ff:ff", "broadcast"],

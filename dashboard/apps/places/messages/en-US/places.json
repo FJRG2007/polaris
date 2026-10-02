@@ -410,7 +410,7 @@
         "noPtz": "This camera does not move",
         "notInstalled": "Home is not installed",
         "recognizerMissing": "The recognizer was installed but cannot be found",
-        "recognizerAddress": "Write the address as http://192.168.1.20:8000",
+        "recognizerAddress": "Write the address as http://10.0.1.20:8000",
         "clipGone": "Clip not found",
         "relayQuiet": "The camera relay was installed but is not answering yet",
         "relayRefused": "The relay would not accept that camera",
@@ -463,7 +463,7 @@
         "schemaPlace": "Unknown place",
         "schemaCamera": "Unknown camera",
         "schemaPerson": "Unknown person",
-        "schemaSubnet": "Write it as 192.168.1.0/24",
+        "schemaSubnet": "Write it as 10.0.1.0/24",
         "schemaConnect": "Pick how to connect it",
         "relayStatus": "The relay refused it ({status}).",
         "noSignIn": "That connection is missing its sign-in",
@@ -481,8 +481,8 @@
         "tplinkAccount": "The device would not accept that TP-Link account. Use the email and password you sign into the Tapo or Kasa app with.",
         "tplinkNothing": "That TP-Link device is not a plug, a switch or a bulb, so there is nothing here to control.",
         "tplinkCannot": "A TP-Link device cannot be told to do that",
-        "addressNoPath": "Write the address as 192.168.1.30, with no path",
-        "addressForbidden": "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.",
+        "addressNoPath": "Write the address as 10.0.1.30, with no path",
+        "addressForbidden": "Polaris does not connect to that address. Use the device's address on your network, such as 10.0.1.30.",
         "shellyNot": "That address answered, but not as a Shelly.",
         "shellyPassword": "The Shelly refused the password. It is the one set in the Shelly app under the device's authentication settings.",
         "shellyNeedsPassword": "This Shelly has a password. Add it to the connection.",
@@ -598,7 +598,7 @@
                 "host": {
                     "label": "Broker address",
                     "hint": "A name or address on the same network as the locks. Nuki's firmware will not connect to anything outside it.",
-                    "placeholder": "192.168.1.20"
+                    "placeholder": "10.0.1.20"
                 },
                 "port": {
                     "label": "Port"
@@ -628,7 +628,7 @@
                 "host": {
                     "label": "Broker address",
                     "hint": "A name or address Polaris can reach on this network.",
-                    "placeholder": "192.168.1.20"
+                    "placeholder": "10.0.1.20"
                 },
                 "port": {
                     "label": "Port"
@@ -703,7 +703,7 @@
                 "host": {
                     "label": "Device address",
                     "hint": "On the same network as Polaris.",
-                    "placeholder": "192.168.1.40"
+                    "placeholder": "10.0.1.40"
                 },
                 "email": {
                     "label": "TP-Link email",
@@ -726,7 +726,7 @@
                 "host": {
                     "label": "Device address",
                     "hint": "On the same network as Polaris.",
-                    "placeholder": "192.168.1.41"
+                    "placeholder": "10.0.1.41"
                 },
                 "email": {
                     "label": "TP-Link email",
@@ -749,7 +749,7 @@
                 "host": {
                     "label": "Device address",
                     "hint": "On the same network as Polaris.",
-                    "placeholder": "192.168.1.30"
+                    "placeholder": "10.0.1.30"
                 },
                 "password": {
                     "label": "Password",
@@ -774,7 +774,7 @@
                 "host": {
                     "label": "Bridge address",
                     "hint": "On the same network as Polaris.",
-                    "placeholder": "192.168.1.20"
+                    "placeholder": "10.0.1.20"
                 },
                 "appKey": {
                     "label": "Application key",
@@ -795,7 +795,7 @@
                 "host": {
                     "label": "Hub address",
                     "hint": "On the same network as Polaris.",
-                    "placeholder": "192.168.1.25"
+                    "placeholder": "10.0.1.25"
                 }
             }
         },
@@ -869,7 +869,7 @@
                 "host": {
                     "label": "Unit address",
                     "hint": "Optional. Empty pairs every unit found. The Gree+ app shows each unit's MAC.",
-                    "placeholder": "192.168.1.40"
+                    "placeholder": "10.0.1.40"
                 }
             }
         },
@@ -885,7 +885,7 @@
                 "host": {
                     "label": "Unit address",
                     "hint": "Optional. Empty looks for every unit on this network; your router lists each unit's address among its connected devices.",
-                    "placeholder": "192.168.1.40"
+                    "placeholder": "10.0.1.40"
                 }
             }
         },
@@ -954,8 +954,8 @@
         "nothingToAsk": "There is nothing to ask this camera on.",
         "asleep": "Nothing answered at that address. One of these closes everything down while it sleeps, so open it once in the Tapo app and ask again - and check the address is the one the app shows for it.",
         "nothingAtAddress": "Nothing answered at that address. Check it is the one the Tapo app shows for this camera.",
-        "subnet": "Write the network as 192.168.1.0/24.",
-        "subnetRemote": "Give the address range on that network, like 192.168.1.0/24.",
+        "subnet": "Write the network as 10.0.1.0/24.",
+        "subnetRemote": "Give the address range on that network, like 10.0.1.0/24.",
         "cameraNotSaved": "That camera could not be saved.",
         "areasUnread": "Those areas could not be read.",
         "areaNotSaved": "That area could not be saved.",

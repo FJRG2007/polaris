@@ -19,7 +19,7 @@ import { enrollmentRefusalText } from "@/app/(app)/apps/servers/enrollment-refus
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("@/components/use-live-resource", () => ({
     useLiveResource: () => ({
-        data: { servers: [], machineName: "lirio-0" } satisfies ServerStatusPayload,
+        data: { servers: [], machineName: "node-0" } satisfies ServerStatusPayload,
         loading: false,
         error: null,
         stale: null,
@@ -40,10 +40,10 @@ const { ServersView } = await import("@/app/(app)/apps/servers/servers-view");
 const row: ServerRow = {
     id: "33333333-3333-4333-8333-333333333333",
     kind: "host",
-    name: "lirio-2",
+    name: "node-2",
     detail: "polaris",
     os: "Ubuntu 24.04.1 LTS",
-    address: "192.168.1.160",
+    address: "10.0.1.160",
     port: 22,
     authMethod: "key",
     sudo: true,
@@ -57,7 +57,7 @@ const row: ServerRow = {
 describe("the Servers table", () => {
     it("is drawn in Spanish, with a server whose place is not set yet", () => {
         const markup = renderToStaticMarkup(
-            withMessages(<ServersView servers={[row]} machineName="lirio-0" />, "es-ES")
+            withMessages(<ServersView servers={[row]} machineName="node-0" />, "es-ES")
         );
         expect(markup).toContain("Servidores");
         expect(markup).toContain("Ubicación");

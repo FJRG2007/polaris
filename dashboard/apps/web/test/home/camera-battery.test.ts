@@ -27,18 +27,18 @@ import {
     reportsOwnAlerts
 } from "@polaris-app/places/src/lib/vendors";
 
-const c410 = { vendor: "tapo-battery", address: "192.168.1.64", rtspPort: 554 };
+const c410 = { vendor: "tapo-battery", address: "10.0.1.64", rtspPort: 554 };
 
 describe("a battery Tapo, as the relay is told about it", () => {
     it("is opened over the maker's protocol, on the password alone", () => {
         expect(relaySource(c410, "main", { password: "hunter2" })).toBe(
-            "tapo://hunter2@192.168.1.64?subtype=0"
+            "tapo://hunter2@10.0.1.64?subtype=0"
         );
     });
 
     it("reads the small stream by subtype, since it has no paths to read it by", () => {
         expect(relaySource(c410, "sub", { password: "hunter2" })).toBe(
-            "tapo://hunter2@192.168.1.64?subtype=1"
+            "tapo://hunter2@10.0.1.64?subtype=1"
         );
     });
 
@@ -51,8 +51,8 @@ describe("a battery Tapo, as the relay is told about it", () => {
 
     it("encodes a Tapo password that a URL would eat", () => {
         const source = relaySource(c410, "main", { password: "p@ss/word" });
-        expect(source).toBe("tapo://p%40ss%2Fword@192.168.1.64?subtype=0");
-        expect(new URL(source).hostname).toBe("192.168.1.64");
+        expect(source).toBe("tapo://p%40ss%2Fword@10.0.1.64?subtype=0");
+        expect(new URL(source).hostname).toBe("10.0.1.64");
     });
 });
 
@@ -134,7 +134,7 @@ describe("what is stored when the rung was never named", () => {
     const payload = (vendor: string) => ({
         name: "Garden",
         vendor,
-        address: "192.168.1.64",
+        address: "10.0.1.64",
         detection: DEFAULT_DETECTION
     });
 
@@ -151,7 +151,7 @@ describe("what is stored when the rung was never named", () => {
     });
 
     it("leaves everything else the schema settles alone", () => {
-        const parsed = parseCameraInput({ ...payload("tapo-battery"), address: "192.168.1.64" });
+        const parsed = parseCameraInput({ ...payload("tapo-battery"), address: "10.0.1.64" });
         expect(parsed.rtspPort).toBe(554);
         expect(parsed.recording).toBe("motion");
         expect(parsed.enabled).toBe(true);
@@ -163,14 +163,14 @@ describe("carrying the relay's own words back without the password in them", () 
         // The reason this exists: the older redaction looks for `user:pass@` and
         // a Tapo source has nothing before the @ but the secret, so it went
         // through untouched and onto the screen.
-        expect(redactSource("dial tapo://hunter2@192.168.1.150?subtype=1: 401")).toBe(
-            "dial tapo://***@192.168.1.150?subtype=1: 401"
+        expect(redactSource("dial tapo://hunter2@10.0.1.150?subtype=1: 401")).toBe(
+            "dial tapo://***@10.0.1.150?subtype=1: 401"
         );
     });
 
     it("takes out one with a name beside it too", () => {
-        expect(redactSource("rtsp://polaris:secret@192.168.1.50:554/stream1 refused")).toBe(
-            "rtsp://***@192.168.1.50:554/stream1 refused"
+        expect(redactSource("rtsp://polaris:secret@10.0.1.50:554/stream1 refused")).toBe(
+            "rtsp://***@10.0.1.50:554/stream1 refused"
         );
     });
 
@@ -186,8 +186,8 @@ describe("carrying the relay's own words back without the password in them", () 
     });
 
     it("leaves an address that carries no credential alone", () => {
-        expect(redactSource("dial tcp 192.168.1.150:8800: connect: timeout")).toBe(
-            "dial tcp 192.168.1.150:8800: connect: timeout"
+        expect(redactSource("dial tcp 10.0.1.150:8800: connect: timeout")).toBe(
+            "dial tcp 10.0.1.150:8800: connect: timeout"
         );
     });
 });

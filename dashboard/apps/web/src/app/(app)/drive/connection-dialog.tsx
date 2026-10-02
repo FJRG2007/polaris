@@ -645,7 +645,7 @@ export function ConnectionDialog() {
                                 <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
                                     {t("connection.detectLabel")}
                                     <Input
-                                        placeholder="192.168.1.145"
+                                        placeholder="10.0.1.145"
                                         value={detectIp}
                                         onChange={(event) => setDetectIp(event.target.value)}
                                     />

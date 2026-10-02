@@ -2,7 +2,7 @@
  * A NAS that took a new DHCP lease is found again on its network and followed -
  * and only when it proves to be the same device.
  *
- * The incident: "UNAS Pro" was configured at .129; its lease moved it to .134;
+ * The incident: a NAS was configured at .129; its lease moved it to .134;
  * nothing answered at .129 and Polaris kept dialling it. These run that story
  * against a fake network (a neighbour table and an SMB answer per address), plus
  * the ways it must NOT end: a different SMB server at the new address, one that
@@ -15,9 +15,9 @@ import type { SmbProbeResult } from "@/lib/storage-whereabouts/smb-probe";
 
 const ID = "018f2b7a-0000-7000-8000-0000000000a1";
 const NAS: DeviceIdentity = {
-    mac: "6c:63:f8:6e:53:50",
+    mac: "00:00:5e:00:53:50",
     serverGuid: "0123456789abcdef0123456789abcdef",
-    netbiosName: "UNAS-PRO"
+    netbiosName: "OFFICE-NAS"
 };
 
 /** The connection row, as the database holds it. */
@@ -94,10 +94,10 @@ function network() {
     });
 }
 
-function connection(identity: DeviceIdentity | null, host = "192.168.1.129") {
+function connection(identity: DeviceIdentity | null, host = "10.0.1.129") {
     row = {
         id: ID,
-        name: "UNAS Pro",
+        name: "Office NAS",
         kind: "unifi-unas",
         config: JSON.stringify({
             kind: "unifi-unas",
@@ -128,55 +128,55 @@ beforeEach(() => {
 describe("a NAS whose lease moved", () => {
     it("is found by its hardware address in the host's table, followed, and announced", async () => {
         connection(NAS);
-        devices.set("192.168.1.134", NAS);
-        table.set("192.168.1.134", NAS.mac!);
+        devices.set("10.0.1.134", NAS);
+        table.set("10.0.1.134", NAS.mac!);
 
         const outcome = await follow.searchFor(ID);
 
         expect(outcome).toEqual({
             kind: "followed",
-            from: "192.168.1.129",
-            to: "192.168.1.134",
+            from: "10.0.1.129",
+            to: "10.0.1.134",
             mac: NAS.mac
         });
-        expect(hostOf()).toBe("192.168.1.134");
-        expect(row.deviceIdentity).toMatchObject({ address: "192.168.1.134", mac: NAS.mac });
+        expect(hostOf()).toBe("10.0.1.134");
+        expect(row.deviceIdentity).toMatchObject({ address: "10.0.1.134", mac: NAS.mac });
         await vi.waitFor(() => expect(reportStorageMoved).toHaveBeenCalled());
         expect(reportStorageMoved).toHaveBeenCalledWith({
             id: ID,
-            name: "UNAS Pro",
-            from: "192.168.1.129",
-            to: "192.168.1.134",
+            name: "Office NAS",
+            from: "10.0.1.129",
+            to: "10.0.1.134",
             mac: NAS.mac
         });
         expect(forgetConnectionState).toHaveBeenCalledWith(ID);
         expect(forgetStorageFailure).toHaveBeenCalledWith(ID);
         // Found in the table: nothing else on the network was asked.
-        expect(probed).toEqual(["192.168.1.129", "192.168.1.134"]);
+        expect(probed).toEqual(["10.0.1.129", "10.0.1.134"]);
     });
 
     it("is found by sweeping the /24 when the host has not spoken to it yet", async () => {
         connection(NAS);
-        devices.set("192.168.1.20", {
+        devices.set("10.0.1.20", {
             serverGuid: "ffffffffffffffffffffffffffff0001",
             netbiosName: "PRINTER"
         });
-        devices.set("192.168.1.134", NAS);
+        devices.set("10.0.1.134", NAS);
 
         const outcome = await follow.searchFor(ID);
 
-        expect(outcome).toMatchObject({ kind: "followed", to: "192.168.1.134" });
-        expect(hostOf()).toBe("192.168.1.134");
+        expect(outcome).toMatchObject({ kind: "followed", to: "10.0.1.134" });
+        expect(hostOf()).toBe("10.0.1.134");
     });
 
     it("is recognised by hardware address after the sweep when its GUID changed on restart", async () => {
         connection(NAS);
-        devices.set("192.168.1.134", { ...NAS, serverGuid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
-        learnedBySweep.set("192.168.1.134", NAS.mac!);
+        devices.set("10.0.1.134", { ...NAS, serverGuid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+        learnedBySweep.set("10.0.1.134", NAS.mac!);
 
         const outcome = await follow.searchFor(ID);
 
-        expect(outcome).toMatchObject({ kind: "followed", to: "192.168.1.134", mac: NAS.mac });
+        expect(outcome).toMatchObject({ kind: "followed", to: "10.0.1.134", mac: NAS.mac });
         expect(row.deviceIdentity).toMatchObject({
             serverGuid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         });
@@ -186,47 +186,47 @@ describe("a NAS whose lease moved", () => {
 describe("what must not be followed", () => {
     it("a different SMB server under the same name", async () => {
         connection(NAS);
-        devices.set("192.168.1.134", {
+        devices.set("10.0.1.134", {
             serverGuid: "ffffffffffffffffffffffffffff0002",
-            netbiosName: "UNAS-PRO"
+            netbiosName: "OFFICE-NAS"
         });
-        learnedBySweep.set("192.168.1.134", "aa:bb:cc:dd:ee:ff");
+        learnedBySweep.set("10.0.1.134", "aa:bb:cc:dd:ee:ff");
 
         const outcome = await follow.searchFor(ID);
 
-        expect(outcome).toEqual({ kind: "gone", address: "192.168.1.129" });
-        expect(hostOf()).toBe("192.168.1.129");
+        expect(outcome).toEqual({ kind: "gone", address: "10.0.1.129" });
+        expect(hostOf()).toBe("10.0.1.129");
         expect(updateMany).not.toHaveBeenCalled();
         expect(reportStorageMoved).not.toHaveBeenCalled();
     });
 
     it("anything at all, when it is off: it is reported gone", async () => {
         connection(NAS);
-        expect(await follow.searchFor(ID)).toEqual({ kind: "gone", address: "192.168.1.129" });
+        expect(await follow.searchFor(ID)).toEqual({ kind: "gone", address: "10.0.1.129" });
         // The whole /24 was asked, and nothing else.
         expect(new Set(probed).size).toBe(254);
-        expect(probed.every((address) => address.startsWith("192.168.1."))).toBe(true);
+        expect(probed.every((address) => address.startsWith("10.0.1."))).toBe(true);
     });
 
     it("anything, when nothing was ever remembered: it lists who answers instead", async () => {
         connection(null);
-        devices.set("192.168.1.134", NAS);
-        table.set("192.168.1.134", NAS.mac!);
+        devices.set("10.0.1.134", NAS);
+        table.set("10.0.1.134", NAS.mac!);
 
         const outcome = await follow.searchFor(ID);
 
         expect(outcome).toEqual({
             kind: "candidates",
-            candidates: [{ address: "192.168.1.134", label: "UNAS-PRO", mac: NAS.mac }]
+            candidates: [{ address: "10.0.1.134", label: "OFFICE-NAS", mac: NAS.mac }]
         });
         expect(updateMany).not.toHaveBeenCalled();
     });
 
     it("nothing, when it is where it was", async () => {
         connection(NAS);
-        devices.set("192.168.1.129", NAS);
-        expect(await follow.searchFor(ID)).toEqual({ kind: "answering", address: "192.168.1.129" });
-        expect(probed).toEqual(["192.168.1.129"]);
+        devices.set("10.0.1.129", NAS);
+        expect(await follow.searchFor(ID)).toEqual({ kind: "answering", address: "10.0.1.129" });
+        expect(probed).toEqual(["10.0.1.129"]);
     });
 });
 
@@ -235,8 +235,8 @@ describe("a search past its deadline", () => {
         vi.useFakeTimers();
         try {
             connection(NAS);
-            devices.set("192.168.1.134", NAS);
-            table.set("192.168.1.134", NAS.mac!);
+            devices.set("10.0.1.134", NAS);
+            table.set("10.0.1.134", NAS.mac!);
             let release!: () => void;
             const held = new Promise<void>((resolve) => (release = resolve));
             follow.useNetwork({
@@ -259,7 +259,7 @@ describe("a search past its deadline", () => {
             await vi.advanceTimersByTimeAsync(0);
             expect(updateMany).not.toHaveBeenCalled();
             expect(reportStorageMoved).not.toHaveBeenCalled();
-            expect(hostOf()).toBe("192.168.1.129");
+            expect(hostOf()).toBe("10.0.1.129");
         } finally {
             vi.useRealTimers();
         }
@@ -275,31 +275,31 @@ describe("how often it looks", () => {
         await follow.searchFor(ID);
         await follow.searchFor(ID, { force: true });
         expect(probed.length).toBe(asked);
-        expect(follow.lastSearch(ID)?.outcome).toEqual({ kind: "gone", address: "192.168.1.129" });
+        expect(follow.lastSearch(ID)?.outcome).toEqual({ kind: "gone", address: "10.0.1.129" });
     });
 
     it("shares one search between callers that ask at once", async () => {
         connection(NAS);
         const [one, two] = await Promise.all([follow.searchFor(ID), follow.searchFor(ID)]);
         expect(one).toEqual(two);
-        expect(probed.filter((address) => address === "192.168.1.129")).toHaveLength(1);
+        expect(probed.filter((address) => address === "10.0.1.129")).toHaveLength(1);
     });
 });
 
 describe("before the password goes anywhere", () => {
     it("lets it through to the remembered device", async () => {
         connection(NAS);
-        devices.set("192.168.1.129", NAS);
+        devices.set("10.0.1.129", NAS);
         await expect(follow.confirmBeforeCredentials(row)).resolves.toBeUndefined();
     });
 
     it("refuses a different SMB server that picked up the old address", async () => {
         connection(NAS);
-        devices.set("192.168.1.129", {
+        devices.set("10.0.1.129", {
             serverGuid: "ffffffffffffffffffffffffffff0003",
             netbiosName: "DESKTOP-7"
         });
-        table.set("192.168.1.129", "aa:bb:cc:dd:ee:01");
+        table.set("10.0.1.129", "aa:bb:cc:dd:ee:01");
         await expect(follow.confirmBeforeCredentials(row)).rejects.toBeInstanceOf(
             follow.DeviceNotConfirmed
         );
@@ -307,10 +307,10 @@ describe("before the password goes anywhere", () => {
         // says who holds the address rather than calling the NAS off.
         expect(await follow.searchFor(ID)).toEqual({
             kind: "impostor",
-            address: "192.168.1.129",
+            address: "10.0.1.129",
             label: "DESKTOP-7"
         });
-        expect(hostOf()).toBe("192.168.1.129");
+        expect(hostOf()).toBe("10.0.1.129");
     });
 
     it("refuses when nothing answers, rather than signing in to whatever answers later", async () => {
@@ -329,31 +329,31 @@ describe("before the password goes anywhere", () => {
 describe("an address somebody typed", () => {
     it("is refused when a different device answers there and the password is kept", async () => {
         connection(NAS);
-        devices.set("192.168.1.50", {
+        devices.set("10.0.1.50", {
             serverGuid: "ffffffffffffffffffffffffffff0004",
             netbiosName: "OTHER"
         });
         await expect(
-            follow.identityForEdit(row, { kind: "unifi-unas", host: "192.168.1.50" }, false)
+            follow.identityForEdit(row, { kind: "unifi-unas", host: "10.0.1.50" }, false)
         ).rejects.toBeInstanceOf(follow.AddressRefused);
     });
 
     it("is refused when nothing answers there", async () => {
         connection(NAS);
         await expect(
-            follow.identityForEdit(row, { kind: "unifi-unas", host: "192.168.1.51" }, false)
+            follow.identityForEdit(row, { kind: "unifi-unas", host: "10.0.1.51" }, false)
         ).rejects.toMatchObject({ check: "silent" });
     });
 
     it("keeps the identity when the same device answers there", async () => {
         connection(NAS);
-        devices.set("192.168.1.134", NAS);
+        devices.set("10.0.1.134", NAS);
         const identity = await follow.identityForEdit(
             row,
-            { kind: "unifi-unas", host: "192.168.1.134" },
+            { kind: "unifi-unas", host: "10.0.1.134" },
             false
         );
-        expect(identity).toMatchObject({ serverGuid: NAS.serverGuid, address: "192.168.1.134" });
+        expect(identity).toMatchObject({ serverGuid: NAS.serverGuid, address: "10.0.1.134" });
     });
 
     it("forgets the identity when new credentials come with the new address", async () => {
@@ -367,7 +367,7 @@ describe("an address somebody typed", () => {
     it("leaves everything alone when the address did not change", async () => {
         connection(NAS);
         expect(
-            await follow.identityForEdit(row, { kind: "unifi-unas", host: "192.168.1.129" }, false)
+            await follow.identityForEdit(row, { kind: "unifi-unas", host: "10.0.1.129" }, false)
         ).toBeUndefined();
     });
 });
@@ -375,9 +375,9 @@ describe("an address somebody typed", () => {
 describe("remembering", () => {
     it("keeps who answered once the credentials have worked, hardware address included", async () => {
         connection(null);
-        devices.set("192.168.1.129", NAS);
-        table.set("192.168.1.129", NAS.mac!);
+        devices.set("10.0.1.129", NAS);
+        table.set("10.0.1.129", NAS.mac!);
         await follow.rememberAfterSuccess(row);
-        expect(row.deviceIdentity).toMatchObject({ ...NAS, address: "192.168.1.129" });
+        expect(row.deviceIdentity).toMatchObject({ ...NAS, address: "10.0.1.129" });
     });
 });

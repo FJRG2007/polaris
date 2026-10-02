@@ -97,7 +97,7 @@ const RCON = [
     )
 ];
 
-/** A day of FJRG2007 dropping and coming back: disconnect, time out, get kicked,
+/** A day of PlayerOne dropping and coming back: disconnect, time out, get kicked,
  *  log in from another client, and one crash that printed no leave at all. */
 const DAY = [
     line(
@@ -112,18 +112,18 @@ const DAY = [
         "minecraft/DedicatedServer",
         'Done (38.211s)! For help, type "help"'
     ),
-    ...login("2026-09-29T08:00:00.000000000Z", "FJRG2007", 51001),
-    ...login("2026-09-29T08:05:00.000000000Z", "PICHURRINA", 51002),
+    ...login("2026-09-29T08:00:00.000000000Z", "PlayerOne", 51001),
+    ...login("2026-09-29T08:05:00.000000000Z", "DINNERBONE", 51002),
     ...RCON,
-    ...leave("2026-09-29T10:00:00.000000000Z", "FJRG2007", "Disconnected"),
-    ...login("2026-09-29T10:00:25.000000000Z", "FJRG2007", 51003),
-    ...leave("2026-09-29T12:00:00.000000000Z", "FJRG2007", "Timed out"),
-    ...login("2026-09-29T12:00:40.000000000Z", "FJRG2007", 51004),
-    ...leave("2026-09-29T13:00:00.000000000Z", "FJRG2007", "Kicked by an operator"),
-    ...login("2026-09-29T13:00:10.000000000Z", "FJRG2007", 51005),
+    ...leave("2026-09-29T10:00:00.000000000Z", "PlayerOne", "Disconnected"),
+    ...login("2026-09-29T10:00:25.000000000Z", "PlayerOne", 51003),
+    ...leave("2026-09-29T12:00:00.000000000Z", "PlayerOne", "Timed out"),
+    ...login("2026-09-29T12:00:40.000000000Z", "PlayerOne", 51004),
+    ...leave("2026-09-29T13:00:00.000000000Z", "PlayerOne", "Kicked by an operator"),
+    ...login("2026-09-29T13:00:10.000000000Z", "PlayerOne", 51005),
     // A second client: the server drops the first connection and prints both.
-    ...leave("2026-09-29T14:00:00.000000000Z", "FJRG2007", "You logged in from another location"),
-    ...login("2026-09-29T14:00:00.500000000Z", "FJRG2007", 51006),
+    ...leave("2026-09-29T14:00:00.000000000Z", "PlayerOne", "You logged in from another location"),
+    ...login("2026-09-29T14:00:00.500000000Z", "PlayerOne", 51006),
     // The server dies: no leave for anybody, and the next thing printed is a
     // new server starting.
     line(
@@ -138,8 +138,8 @@ const DAY = [
         "minecraft/DedicatedServer",
         "Starting minecraft server version 1.21.4"
     ),
-    ...login("2026-09-29T15:03:00.000000000Z", "PICHURRINA", 51007),
-    ...login("2026-09-29T15:04:00.000000000Z", "FJRG2007", 51008),
+    ...login("2026-09-29T15:03:00.000000000Z", "DINNERBONE", 51007),
+    ...login("2026-09-29T15:04:00.000000000Z", "PlayerOne", 51008),
     ""
 ].join("\n");
 
@@ -150,7 +150,7 @@ describe("the log, read as connections", () => {
     const byPlayer = sessionsByPlayer(events);
 
     it("keeps every reconnect as its own arrival", () => {
-        const fj = byPlayer.get("fjrg2007") ?? [];
+        const fj = byPlayer.get("playerone") ?? [];
         expect(fj.map((event) => `${event.kind}@${event.at?.slice(11, 19)}`)).toEqual([
             "join@08:00:00",
             "leave@10:00:00",
@@ -168,27 +168,27 @@ describe("the log, read as connections", () => {
     });
 
     it("prints one departure for the two lines Java writes, not two", () => {
-        const leaves = (byPlayer.get("fjrg2007") ?? []).filter((event) => event.kind === "leave");
+        const leaves = (byPlayer.get("playerone") ?? []).filter((event) => event.kind === "leave");
         expect(leaves).toHaveLength(5);
     });
 
     it("says the current connection began at the last arrival", () => {
-        expect(logConnection(byPlayer.get("fjrg2007") ?? [])).toEqual({
+        expect(logConnection(byPlayer.get("playerone") ?? [])).toEqual({
             online: true,
             since: "2026-09-29T15:04:00.000000000Z",
             lastLeft: "2026-09-29T15:01:30.000000000Z"
         });
-        // Nothing was printed for PICHURRINA leaving before the crash; her visit
+        // Nothing was printed for DINNERBONE leaving before the crash; her visit
         // since the morning ended with the server, and the one she is on began
         // after it.
-        expect(logConnection(byPlayer.get("pichurrina") ?? [])).toMatchObject({
+        expect(logConnection(byPlayer.get("dinnerbone") ?? [])).toMatchObject({
             online: true,
             since: "2026-09-29T15:03:00.000000000Z"
         });
     });
 
     it("answers 'playing since' with the current connection, not the first of the day", () => {
-        expect(playerActivity(byPlayer.get("fjrg2007") ?? [], true, NOW_MS)).toEqual({
+        expect(playerActivity(byPlayer.get("playerone") ?? [], true, NOW_MS)).toEqual({
             presence: "playing",
             lastSeen: "2026-09-29T15:04:00.000000000Z"
         });
@@ -202,25 +202,25 @@ describe("the log, read as connections", () => {
                 "2026-09-29T08:00:00.000000000Z",
                 MAIN,
                 "minecraft/PlayerList",
-                "FJRG2007[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
+                "PlayerOne[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
             ),
             line(
                 "2026-09-29T09:00:00.000000000Z",
                 MAIN,
                 "minecraft/ServerGamePacketListenerImpl",
-                "FJRG2007 lost connection: Disconnected"
+                "PlayerOne lost connection: Disconnected"
             ),
             line(
                 "2026-09-29T09:00:30.000000000Z",
                 MAIN,
                 "minecraft/PlayerList",
-                "FJRG2007[/203.0.113.9:51002] logged in with entity id 2 at (0.5, 64.0, 0.5)"
+                "PlayerOne[/203.0.113.9:51002] logged in with entity id 2 at (0.5, 64.0, 0.5)"
             ),
             line(
                 "2026-09-29T11:00:00.000000000Z",
                 MAIN,
                 "minecraft/PlayerList",
-                "FJRG2007[/203.0.113.9:51003] logged in with entity id 3 at (0.5, 64.0, 0.5)"
+                "PlayerOne[/203.0.113.9:51003] logged in with entity id 3 at (0.5, 64.0, 0.5)"
             )
         ].join("\n");
         const events = parsePlayerSessions(log);
@@ -230,7 +230,7 @@ describe("the log, read as connections", () => {
 
     it("ends every visit at a clean stop, and prints the leaves after it once", () => {
         const log = [
-            ...login("2026-09-29T08:00:00.000000000Z", "FJRG2007", 51001),
+            ...login("2026-09-29T08:00:00.000000000Z", "PlayerOne", 51001),
             line(
                 "2026-09-29T09:00:00.000000000Z",
                 MAIN,
@@ -243,7 +243,7 @@ describe("the log, read as connections", () => {
                 "minecraft/MinecraftServer",
                 "Stopping server"
             ),
-            ...leave("2026-09-29T09:00:00.300000000Z", "FJRG2007", "Server closed"),
+            ...leave("2026-09-29T09:00:00.300000000Z", "PlayerOne", "Server closed"),
             line(
                 "2026-09-29T09:05:00.000000000Z",
                 MAIN,
@@ -268,7 +268,7 @@ describe("the log, read as connections", () => {
                 "2026-09-29T08:00:01.000000000Z",
                 MAIN,
                 "minecraft/ServerConfigurationPacketListenerImpl",
-                "FJRG2007 lost connection: Disconnected"
+                "PlayerOne lost connection: Disconnected"
             )
         ].join("\n");
         expect(parsePlayerSessions(log)).toEqual([]);
@@ -276,7 +276,7 @@ describe("the log, read as connections", () => {
 
     it("reads the lines the same through a terminal, which ends each with a return", () => {
         const events = parsePlayerSessions(DAY.replaceAll("\n", "\r\n"));
-        expect(logConnection(sessionsByPlayer(events).get("fjrg2007") ?? []).since).toBe(
+        expect(logConnection(sessionsByPlayer(events).get("playerone") ?? []).since).toBe(
             "2026-09-29T15:04:00.000000000Z"
         );
     });
@@ -300,18 +300,18 @@ describe("the record, kept true to the log", () => {
     const at = (iso: string) => new Date(iso);
 
     it("splits a visit when the player dropped and came back between two looks", () => {
-        // The minute's look saw FJRG2007 at 09:59 and again at 10:01: never absent.
+        // The minute's look saw PlayerOne at 09:59 and again at 10:01: never absent.
         const open = [
-            { id: "v1", name: "FJRG2007", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
+            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
         ];
-        const roster = [{ name: "FJRG2007", id: null }];
+        const roster = [{ name: "PlayerOne", id: null }];
         const change = rosterChange(open, roster);
         expect(change).toEqual({ arrived: [], left: [], adopted: [] });
 
         const log = [
-            ...login("2026-09-29T08:00:00.000000000Z", "FJRG2007", 51001),
-            ...leave("2026-09-29T10:00:00.000000000Z", "FJRG2007", "Disconnected"),
-            ...login("2026-09-29T10:00:25.000000000Z", "FJRG2007", 51003)
+            ...login("2026-09-29T08:00:00.000000000Z", "PlayerOne", 51001),
+            ...leave("2026-09-29T10:00:00.000000000Z", "PlayerOne", "Disconnected"),
+            ...login("2026-09-29T10:00:25.000000000Z", "PlayerOne", 51003)
         ].join("\n");
         const writes = sessionWrites(
             open,
@@ -322,17 +322,17 @@ describe("the record, kept true to the log", () => {
         );
         expect(writes.close).toEqual([{ id: "v1", leftAt: at("2026-09-29T10:00:00.000Z") }]);
         expect(writes.open).toEqual([
-            { player: { name: "FJRG2007", id: null }, joinedAt: at("2026-09-29T10:00:25.000Z") }
+            { player: { name: "PlayerOne", id: null }, joinedAt: at("2026-09-29T10:00:25.000Z") }
         ]);
     });
 
     it("leaves a visit alone when the log's arrival is the one that opened it", () => {
         // Opened by the look a few seconds after the join line: the same connection.
         const open = [
-            { id: "v1", name: "FJRG2007", playerId: null, joinedAt: at("2026-09-29T08:00:03.000Z") }
+            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:03.000Z") }
         ];
-        const roster = [{ name: "FJRG2007", id: null }];
-        const log = login("2026-09-29T08:00:00.000000000Z", "FJRG2007", 51001).join("\n");
+        const roster = [{ name: "PlayerOne", id: null }];
+        const log = login("2026-09-29T08:00:00.000000000Z", "PlayerOne", 51001).join("\n");
         const writes = sessionWrites(
             open,
             rosterChange(open, roster),
@@ -347,12 +347,12 @@ describe("the record, kept true to the log", () => {
         const open = [
             {
                 id: "v1",
-                name: "PICHURRINA",
+                name: "DINNERBONE",
                 playerId: null,
                 joinedAt: at("2026-09-29T08:05:00.000Z")
             }
         ];
-        const roster = [{ name: "PICHURRINA", id: null }];
+        const roster = [{ name: "DINNERBONE", id: null }];
         const writes = sessionWrites(
             open,
             rosterChange(open, roster),
@@ -368,16 +368,16 @@ describe("the record, kept true to the log", () => {
         const open = [
             {
                 id: "v1",
-                name: "PICHURRINA",
+                name: "DINNERBONE",
                 playerId: null,
                 joinedAt: at("2026-09-29T08:05:00.000Z")
             }
         ];
-        const roster = [{ name: "FJRG2007", id: null }];
+        const roster = [{ name: "PlayerOne", id: null }];
         const log = [
-            ...login("2026-09-29T08:05:00.000000000Z", "PICHURRINA", 51002),
-            ...leave("2026-09-29T08:40:10.000000000Z", "PICHURRINA", "Disconnected"),
-            ...login("2026-09-29T08:40:20.000000000Z", "FJRG2007", 51001)
+            ...login("2026-09-29T08:05:00.000000000Z", "DINNERBONE", 51002),
+            ...leave("2026-09-29T08:40:10.000000000Z", "DINNERBONE", "Disconnected"),
+            ...login("2026-09-29T08:40:20.000000000Z", "PlayerOne", 51001)
         ].join("\n");
         const writes = sessionWrites(
             open,
@@ -388,7 +388,7 @@ describe("the record, kept true to the log", () => {
         );
         expect(writes.close).toEqual([{ id: "v1", leftAt: at("2026-09-29T08:40:10.000Z") }]);
         expect(writes.open).toEqual([
-            { player: { name: "FJRG2007", id: null }, joinedAt: at("2026-09-29T08:40:20.000Z") }
+            { player: { name: "PlayerOne", id: null }, joinedAt: at("2026-09-29T08:40:20.000Z") }
         ]);
     });
 
@@ -396,7 +396,7 @@ describe("the record, kept true to the log", () => {
         // A leave line lost to the tail, a crash, a log that could not be read:
         // the server's own answer to who is on is what ends it.
         const open = [
-            { id: "v1", name: "FJRG2007", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
+            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
         ];
         const now = at("2026-09-29T09:00:00.000Z");
         const change = rosterChange(open, []);
@@ -404,7 +404,7 @@ describe("the record, kept true to the log", () => {
             { id: "v1", leftAt: now }
         ]);
         const stillOn = logged(
-            login("2026-09-29T08:00:00.000000000Z", "FJRG2007", 51001).join("\n")
+            login("2026-09-29T08:00:00.000000000Z", "PlayerOne", 51001).join("\n")
         );
         expect(sessionWrites(open, change, [], stillOn, now).close).toEqual([
             { id: "v1", leftAt: now }
@@ -424,12 +424,12 @@ describe("the record, kept true to the log", () => {
         // The server's machine is 30s ahead: the arrival was opened at the look,
         // and once the look's clock passes the logged join it sits past the start.
         const open = [
-            { id: "v1", name: "FJRG2007", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
+            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
         ];
-        const roster = [{ name: "FJRG2007", id: null }];
+        const roster = [{ name: "PlayerOne", id: null }];
         const log = [
-            ...leave("2026-09-29T07:00:00.000000000Z", "FJRG2007", "Disconnected"),
-            ...login("2026-09-29T08:00:30.000000000Z", "FJRG2007", 51001)
+            ...leave("2026-09-29T07:00:00.000000000Z", "PlayerOne", "Disconnected"),
+            ...login("2026-09-29T08:00:30.000000000Z", "PlayerOne", 51001)
         ].join("\n");
         const writes = sessionWrites(
             open,
@@ -443,8 +443,8 @@ describe("the record, kept true to the log", () => {
 
     it("never dates an arrival after the look that saw it", () => {
         const now = at("2026-09-29T08:00:00.000Z");
-        const roster = [{ name: "FJRG2007", id: null }];
-        const ahead = logged(login("2026-09-29T08:00:05.000000000Z", "FJRG2007", 51001).join("\n"));
+        const roster = [{ name: "PlayerOne", id: null }];
+        const ahead = logged(login("2026-09-29T08:00:05.000000000Z", "PlayerOne", 51001).join("\n"));
         expect(
             sessionWrites([], rosterChange([], roster), roster, ahead, now).open[0]?.joinedAt
         ).toEqual(now);
@@ -466,10 +466,10 @@ function status(players: string[]): MinecraftStatus {
 }
 
 describe("the players table", () => {
-    const key = seenKey({ name: "FJRG2007", id: null });
+    const key = seenKey({ name: "PlayerOne", id: null });
 
     it("never says 'playing since' the end of the last visit", () => {
-        // The log's tail no longer reaches FJRG2007 - RCON chatter filled it - and
+        // The log's tail no longer reaches PlayerOne - RCON chatter filled it - and
         // the record's newest departure was last night. That is when he left, not
         // when he arrived.
         const seen = {
@@ -481,7 +481,7 @@ describe("the players table", () => {
         };
         const tail = parsePlayerSessions(RCON.join("\n"));
         expect(tail).toEqual([]);
-        const [row] = foldPlayers(status(["FJRG2007"]), null, null, tail, NOW_MS, seen);
+        const [row] = foldPlayers(status(["PlayerOne"]), null, null, tail, NOW_MS, seen);
         expect(row).toMatchObject({ presence: "playing", lastSeen: "2026-09-29T15:04:00.000Z" });
     });
 
@@ -493,7 +493,7 @@ describe("the players table", () => {
                 open: null
             }
         };
-        const [row] = foldPlayers(status(["FJRG2007"]), null, null, [], NOW_MS, seen);
+        const [row] = foldPlayers(status(["PlayerOne"]), null, null, [], NOW_MS, seen);
         expect(row).toMatchObject({ presence: "playing", lastSeen: null });
     });
 
@@ -514,8 +514,8 @@ describe("the players table", () => {
             }
         };
         const pick = (seen: typeof later | typeof earlier) =>
-            foldPlayers(status(["FJRG2007", "PICHURRINA"]), null, null, events, NOW_MS, seen).find(
-                (row) => row.name === "FJRG2007"
+            foldPlayers(status(["PlayerOne", "DINNERBONE"]), null, null, events, NOW_MS, seen).find(
+                (row) => row.name === "PlayerOne"
             )?.lastSeen;
         expect(pick(earlier)).toBe("2026-09-29T15:04:00.000000000Z");
         expect(pick(later)).toBe("2026-09-29T15:30:00.000Z");
@@ -530,15 +530,15 @@ describe("the players table", () => {
             }
         };
         const live = withLiveSince(seen, [
-            { name: "FJRG2007", id: null, since: "2026-09-29T15:59:30.000Z" }
+            { name: "PlayerOne", id: null, since: "2026-09-29T15:59:30.000Z" }
         ]);
-        const [row] = foldPlayers(status(["FJRG2007"]), null, null, [], NOW_MS, live);
+        const [row] = foldPlayers(status(["PlayerOne"]), null, null, [], NOW_MS, live);
         expect(row?.lastSeen).toBe("2026-09-29T15:59:30.000Z");
         // A frame with nothing new hands the same object back, so nothing redraws.
         expect(
-            withLiveSince(live, [{ name: "FJRG2007", id: null, since: "2026-09-29T15:59:30.000Z" }])
+            withLiveSince(live, [{ name: "PlayerOne", id: null, since: "2026-09-29T15:59:30.000Z" }])
         ).toBe(live);
-        expect(withLiveSince(seen, [{ name: "FJRG2007", id: null }])).toBe(seen);
+        expect(withLiveSince(seen, [{ name: "PlayerOne", id: null }])).toBe(seen);
     });
 });
 

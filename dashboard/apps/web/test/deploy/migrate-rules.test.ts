@@ -24,7 +24,7 @@ describe("what is worth carrying", () => {
         // afternoon to find at worst.
         expect(
             carriable({
-                POLARIS_INSTANCE: "lirio-0",
+                POLARIS_INSTANCE: "node-0",
                 OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
                 API_KEY: "keep me"
             })

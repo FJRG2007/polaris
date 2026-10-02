@@ -79,7 +79,7 @@ const { parsePlayerSessions } = await import(
 );
 
 const SERVER = "aaaaaaaa-1111-4111-8111-111111111111";
-const FJ = [{ name: "FJRG2007", id: null }];
+const FJ = [{ name: "PlayerOne", id: null }];
 
 /** A NeoForge 1.21.4 console line as docker returns it. */
 function line(stamp: string, logger: string, message: string): string {
@@ -105,16 +105,16 @@ describe("recordRoster", () => {
             line(
                 "2026-09-29T08:00:00.000000000Z",
                 "PlayerList",
-                "FJRG2007[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
+                "PlayerOne[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
             ),
-            line("2026-09-29T08:00:00.500000000Z", "MinecraftServer", "FJRG2007 joined the game")
+            line("2026-09-29T08:00:00.500000000Z", "MinecraftServer", "PlayerOne joined the game")
         );
         await recordRoster(SERVER, FJ, at("2026-09-29T08:00:40.000Z"), {
             log: "always",
             readLog: firstLog
         });
         expect(fake.rows).toMatchObject([
-            { name: "FJRG2007", joinedAt: at("2026-09-29T08:00:00.000Z"), leftAt: null }
+            { name: "PlayerOne", joinedAt: at("2026-09-29T08:00:00.000Z"), leftAt: null }
         ]);
 
         // Between two looks a minute apart he dropped and came back.
@@ -122,21 +122,21 @@ describe("recordRoster", () => {
             line(
                 "2026-09-29T08:00:00.000000000Z",
                 "PlayerList",
-                "FJRG2007[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
+                "PlayerOne[/203.0.113.9:51001] logged in with entity id 1 at (0.5, 64.0, 0.5)"
             ),
-            line("2026-09-29T08:00:00.500000000Z", "MinecraftServer", "FJRG2007 joined the game"),
+            line("2026-09-29T08:00:00.500000000Z", "MinecraftServer", "PlayerOne joined the game"),
             line(
                 "2026-09-29T08:30:10.000000000Z",
                 "ServerGamePacketListenerImpl",
-                "FJRG2007 lost connection: Timed out"
+                "PlayerOne lost connection: Timed out"
             ),
-            line("2026-09-29T08:30:10.100000000Z", "MinecraftServer", "FJRG2007 left the game"),
+            line("2026-09-29T08:30:10.100000000Z", "MinecraftServer", "PlayerOne left the game"),
             line(
                 "2026-09-29T08:30:30.000000000Z",
                 "PlayerList",
-                "FJRG2007[/203.0.113.9:51002] logged in with entity id 2 at (0.5, 64.0, 0.5)"
+                "PlayerOne[/203.0.113.9:51002] logged in with entity id 2 at (0.5, 64.0, 0.5)"
             ),
-            line("2026-09-29T08:30:30.400000000Z", "MinecraftServer", "FJRG2007 joined the game")
+            line("2026-09-29T08:30:30.400000000Z", "MinecraftServer", "PlayerOne joined the game")
         );
         const record = await recordRoster(SERVER, FJ, at("2026-09-29T08:30:40.000Z"), {
             log: "always",
@@ -146,7 +146,7 @@ describe("recordRoster", () => {
             { joinedAt: at("2026-09-29T08:00:00.000Z"), leftAt: at("2026-09-29T08:30:10.000Z") },
             { joinedAt: at("2026-09-29T08:30:30.000Z"), leftAt: null }
         ]);
-        expect(record.since.get("@fjrg2007")).toEqual(at("2026-09-29T08:30:30.000Z"));
+        expect(record.since.get("@playerone")).toEqual(at("2026-09-29T08:30:30.000Z"));
 
         // The next look, with nothing new in the log, changes nothing.
         await recordRoster(SERVER, FJ, at("2026-09-29T08:31:40.000Z"), {

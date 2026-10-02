@@ -140,12 +140,12 @@ describe("a message with a file on its way", () => {
 
         await act(async () =>
             calls[0]!.answer({
-                error: "Files cannot be saved right now: the storage UNAS Pro is not reachable."
+                error: "Files cannot be saved right now: the storage Office NAS is not reachable."
             })
         );
 
         const alert = await screen.findByRole("alert");
-        expect(alert.textContent).toContain("the storage UNAS Pro is not reachable");
+        expect(alert.textContent).toContain("the storage Office NAS is not reachable");
         // The file is still in front of the sender.
         expect(screen.getByText("numbers.csv")).toBeTruthy();
 

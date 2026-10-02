@@ -55,7 +55,7 @@ describe("createAuth", () => {
     });
 
     it("leaves passkeys unregistered on an address that cannot hold one", () => {
-        expect(relyingParty(authModule.createAuth({}, "192.168.1.40:3000"))).toBeNull();
+        expect(relyingParty(authModule.createAuth({}, "10.0.1.40:3000"))).toBeNull();
     });
 });
 
@@ -92,7 +92,7 @@ describe("resolvePasskeyAddress", () => {
 
     it("refuses an address that could never hold a passkey", async () => {
         const { resolvePasskeyAddress } = authModule;
-        expect(await resolvePasskeyAddress(requestFrom({ host: "192.168.1.40:3000" }), {})).toBeNull();
+        expect(await resolvePasskeyAddress(requestFrom({ host: "10.0.1.40:3000" }), {})).toBeNull();
         expect(await resolvePasskeyAddress(requestFrom({ host: "polaris.local:notaport" }), {})).toBeNull();
     });
 });

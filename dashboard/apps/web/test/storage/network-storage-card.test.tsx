@@ -31,14 +31,14 @@ const ID = "018f2b7a-0000-7000-8000-0000000000f6";
 
 const unknown: WhereaboutsView = {
     id: ID,
-    name: "UNAS Pro",
-    address: "192.168.1.129",
+    name: "Office NAS",
+    address: "10.0.1.129",
     remembered: null,
     last: {
         at: "2026-10-01T12:05:00.000Z",
         outcome: {
             kind: "candidates",
-            candidates: [{ address: "192.168.1.134", label: "UNAS-PRO", mac: "6c:63:f8:6e:53:50" }]
+            candidates: [{ address: "10.0.1.134", label: "OFFICE-NAS", mac: "00:00:5e:00:53:50" }]
         }
     }
 };
@@ -48,14 +48,14 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("storage on the network", () => {
     it("asks before using a device it cannot prove, then uses it", async () => {
-        setStorageAddressAction.mockResolvedValueOnce({ confirm: { device: "UNAS-PRO" } });
+        setStorageAddressAction.mockResolvedValueOnce({ confirm: { device: "OFFICE-NAS" } });
         setStorageAddressAction.mockResolvedValueOnce({
             view: {
                 ...unknown,
-                address: "192.168.1.134",
+                address: "10.0.1.134",
                 remembered: {
-                    mac: "6c:63:f8:6e:53:50",
-                    label: "UNAS-PRO",
+                    mac: "00:00:5e:00:53:50",
+                    label: "OFFICE-NAS",
                     seenAt: "2026-10-01T12:06:00.000Z"
                 },
                 last: null
@@ -72,34 +72,34 @@ describe("storage on the network", () => {
         ).toBeTruthy();
         expect(setStorageAddressAction).toHaveBeenLastCalledWith({
             id: ID,
-            address: "192.168.1.134",
+            address: "10.0.1.134",
             accept: false
         });
 
         fireEvent.click(screen.getByRole("button", { name: "Use it" }));
         expect(
-            await screen.findByText("Known as UNAS-PRO (6c:63:f8:6e:53:50).", { exact: false })
+            await screen.findByText("Known as OFFICE-NAS (00:00:5e:00:53:50).", { exact: false })
         ).toBeTruthy();
         expect(setStorageAddressAction).toHaveBeenLastCalledWith({
             id: ID,
-            address: "192.168.1.134",
+            address: "10.0.1.134",
             accept: true
         });
         expect((screen.getByRole("textbox", { name: "Address" }) as HTMLInputElement).value).toBe(
-            "192.168.1.134"
+            "10.0.1.134"
         );
     });
 
     it("says why an address was refused", async () => {
         setStorageAddressAction.mockResolvedValueOnce({
-            error: "A different device answers at 192.168.1.50 (OTHER), so the password of UNAS Pro is not sent there."
+            error: "A different device answers at 10.0.1.50 (OTHER), so the password of Office NAS is not sent there."
         });
         render(withMessages(<NetworkStorageCard storages={[unknown]} />));
 
         const field = screen.getByRole("textbox", { name: "Address" });
-        fireEvent.change(field, { target: { value: "192.168.1.50" } });
+        fireEvent.change(field, { target: { value: "10.0.1.50" } });
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
-        expect(await screen.findByText(/A different device answers at 192.168.1.50/)).toBeTruthy();
+        expect(await screen.findByText(/A different device answers at 10.0.1.50/)).toBeTruthy();
     });
 
     it("will not save an address that is not on a local network", () => {
@@ -108,7 +108,7 @@ describe("storage on the network", () => {
             target: { value: "8.8.8.8" }
         });
         expect(
-            screen.getByText("Write an address on this network, like 192.168.1.30")
+            screen.getByText("Write an address on this network, like 10.0.1.30")
         ).toBeTruthy();
         expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(
             true
@@ -119,14 +119,14 @@ describe("storage on the network", () => {
         findStorageAgainAction.mockResolvedValueOnce({
             view: {
                 ...unknown,
-                address: "192.168.1.134",
+                address: "10.0.1.134",
                 last: {
                     at: "2026-10-01T12:07:00.000Z",
                     outcome: {
                         kind: "followed",
-                        from: "192.168.1.129",
-                        to: "192.168.1.134",
-                        mac: "6c:63:f8:6e:53:50"
+                        from: "10.0.1.129",
+                        to: "10.0.1.134",
+                        mac: "00:00:5e:00:53:50"
                     }
                 }
             }
@@ -135,7 +135,7 @@ describe("storage on the network", () => {
         fireEvent.click(screen.getByRole("button", { name: "Find it again" }));
         expect(
             await screen.findByText(
-                "Moved from 192.168.1.129 to 192.168.1.134, and Polaris follows it. Reserve 192.168.1.134 for 6c:63:f8:6e:53:50 in your router so it stays there."
+                "Moved from 10.0.1.129 to 10.0.1.134, and Polaris follows it. Reserve 10.0.1.134 for 00:00:5e:00:53:50 in your router so it stays there."
             )
         ).toBeTruthy();
         expect(findStorageAgainAction).toHaveBeenCalledWith(ID);
@@ -146,13 +146,13 @@ describe("storage on the network", () => {
             ...unknown,
             last: {
                 at: "2026-10-01T12:08:00.000Z",
-                outcome: { kind: "impostor", address: "192.168.1.129", label: "DESKTOP-7" }
+                outcome: { kind: "impostor", address: "10.0.1.129", label: "DESKTOP-7" }
             }
         };
         const { container } = render(withMessages(<NetworkStorageCard storages={[impostor]} />));
         expect(
             screen.getByText(
-                "A different device answers at 192.168.1.129 (DESKTOP-7), so its password is not sent there, and it was not found anywhere else on the network."
+                "A different device answers at 10.0.1.129 (DESKTOP-7), so its password is not sent there, and it was not found anywhere else on the network."
             )
         ).toBeTruthy();
 

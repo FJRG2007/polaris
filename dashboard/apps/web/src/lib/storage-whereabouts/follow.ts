@@ -1,7 +1,7 @@
 /**
  * A storage on the local network follows its device, not its address.
  *
- * The incident this exists for: a UNAS Pro configured at one address took a new
+ * The incident this exists for: a NAS configured at one address took a new
  * DHCP lease, nothing answered at the old one any more, and Polaris kept dialling
  * it - uploads fell back to this server and every profile photo broke - while the
  * box sat on the shelf answering three addresses further along. The operator

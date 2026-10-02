@@ -325,7 +325,7 @@ export type AlertRuleInput = z.infer<typeof alertRuleInputSchema>;
 
 /** What a discovery sweep is asked for: one subnet, or the one Polaris is on. */
 export const discoveryInputSchema = z.object({
-    /** CIDR to sweep, e.g. "192.168.1.0/24". Empty means the network Polaris
+    /** CIDR to sweep, e.g. "10.0.1.0/24". Empty means the network Polaris
      *  itself sits on. */
     subnet: z
         .string()
@@ -333,7 +333,7 @@ export const discoveryInputSchema = z.object({
         .max(64)
         .refine(
             (value) => value === "" || /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/.test(value),
-            "Write it as 192.168.1.0/24"
+            "Write it as 10.0.1.0/24"
         )
         .default(""),
     /** A server to sweep from, for a network Polaris cannot see itself. */

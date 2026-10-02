@@ -102,7 +102,7 @@ describe("renderRunError ProviderModelNotFoundError (#816)", () => {
 });
 
 /**
- * The surface the user actually reads. Four runs against FJRG2007/experiments
+ * The surface the user actually reads. Four runs against acme/experiments
  * were told they had exceeded a 131,072-token window they never approached,
  * and to split a PR that did not exist - the run was triggered by an issue.
  * What had happened is that Groq's free tier allows 8,000 tokens a minute.

@@ -119,7 +119,7 @@ export interface RecentSearch extends RecentSearchInput {
  *
  * Opening the same task twice is one memory with a newer timestamp, not two
  * rows; and a query is remembered by the words rather than the casing, so
- * "Orphion" does not sit under "orphion" in the same list.
+ * "Storefront" does not sit under "storefront" in the same list.
  */
 export function recentSearchKey(
     entry: Pick<RecentSearch, "kind" | "scope" | "term" | "href">

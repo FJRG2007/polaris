@@ -3,7 +3,7 @@
  *
  * Pinned here for the case that went wrong: an address saved by IP under the
  * default site match. Its "base domain" was the last two octets, so a login for
- * the router at `192.168.1.1` was offered on any host ending in `.1.1`.
+ * the router at `10.0.1.1` was offered on any host ending in `.1.1`.
  */
 
 import { describe, expect, it } from "vitest";
@@ -17,7 +17,7 @@ describe("baseDomain", () => {
     });
 
     it("keeps an IP address whole", () => {
-        expect(baseDomain("192.168.1.1")).toBe("192.168.1.1");
+        expect(baseDomain("10.0.1.1")).toBe("10.0.1.1");
         expect(baseDomain("[::1]")).toBe("[::1]");
     });
 });
@@ -35,9 +35,9 @@ describe("uriMatches under the site match", () => {
     });
 
     it("covers only the same address for a login saved by IP", () => {
-        expect(uriMatches("http://192.168.1.1", null, "http://192.168.1.1/admin")).toBe(true);
-        expect(uriMatches("http://192.168.1.1", null, "http://10.0.1.1/")).toBe(false);
-        expect(uriMatches("http://192.168.1.1", null, "http://203.0.1.1/")).toBe(false);
-        expect(uriMatches("192.168.1.1", URI_MATCH_DOMAIN, "http://172.16.1.1:8080/")).toBe(false);
+        expect(uriMatches("http://10.0.1.1", null, "http://10.0.1.1/admin")).toBe(true);
+        expect(uriMatches("http://10.0.1.1", null, "http://10.9.1.1/")).toBe(false);
+        expect(uriMatches("http://10.0.1.1", null, "http://203.0.1.1/")).toBe(false);
+        expect(uriMatches("10.0.1.1", URI_MATCH_DOMAIN, "http://172.16.1.1:8080/")).toBe(false);
     });
 });

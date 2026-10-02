@@ -15,8 +15,8 @@
 import { describe, expect, it } from "vitest";
 import { classifyStale } from "@/lib/domain-address-sync";
 
-const OLD = "85.87.156.88";
-const NEW = "85.87.153.18";
+const OLD = "198.51.100.88";
+const NEW = "198.51.100.18";
 
 const zone = [
     { name: "polaris.example.com", addresses: [OLD] },

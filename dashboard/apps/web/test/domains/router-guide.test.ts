@@ -225,7 +225,7 @@ describe("the rules a game server needs", () => {
 
 describe("finding the router's own address", () => {
     it("proposes the gateway from this server's address", () => {
-        expect(likelyGateway("192.168.1.142")).toBe("192.168.1.1");
+        expect(likelyGateway("10.0.1.142")).toBe("10.0.1.1");
         expect(likelyGateway("10.0.5.7")).toBe("10.0.5.1");
     });
 

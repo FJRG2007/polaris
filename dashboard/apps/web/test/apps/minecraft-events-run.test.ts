@@ -997,7 +997,7 @@ function answer(sent: string): string {
             world.unsureGround -= 1;
             return "That position is not loaded";
         }
-        // As Offgrid answers: a chain that holds says "Test passed"; one where any
+        // As a real server answers: a chain that holds says "Test passed"; one where any
         // condition fails says nothing at all.
         return world.built ? "Test passed" : "\u001b[0m\n";
     }
@@ -1480,7 +1480,7 @@ vi.mock("@polaris/db", () => ({
         installedApp: {
             findUnique: async () => ({
                 ownerId: "owner",
-                name: "Offgrid",
+                name: "ExampleSMP",
                 catalogId: "minecraft",
                 status: "running",
                 config: JSON.stringify(config)

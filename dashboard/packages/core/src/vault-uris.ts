@@ -113,7 +113,7 @@ const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/;
 
 export function baseDomain(host: string): string {
     // An address is not a name: its labels are octets, and the "last two" of
-    // `192.168.1.1` are `1.1`, which every host ending in `.1.1` would match. The
+    // `10.0.1.1` are `1.1`, which every host ending in `.1.1` would match. The
     // whole address is the only site it can mean, as Bitwarden reads it too.
     if (IPV4.test(host) || host.includes(":")) return host.toLowerCase();
     const labels = host.toLowerCase().split(".").filter(Boolean);
@@ -167,7 +167,7 @@ export function withoutWildcard(value: string): string {
  * What is wrong with what somebody has typed into a website box, or null.
  *
  * Deliberately permissive about what an address is. A vault holds `localhost:8080`,
- * the router at `192.168.1.1` and a machine called `nas` as readily as it holds
+ * the router at `10.0.1.1` and a machine called `nas` as readily as it holds
  * `example.com`, and a form that refused those would be a form arguing with
  * somebody about their own network. What it refuses is what cannot be an address
  * at all - text with spaces in it, a scheme with nothing after it.

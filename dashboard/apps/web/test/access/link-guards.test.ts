@@ -97,7 +97,7 @@ describe("linkIpAllowed", () => {
 
     it("matches the rules against the address", () => {
         expect(linkIpAllowed('["10.0.0.0/8"]', "10.4.1.7")).toBe(true);
-        expect(linkIpAllowed('["10.0.0.0/8"]', "192.168.1.7")).toBe(false);
+        expect(linkIpAllowed('["10.0.0.0/8"]', "172.16.1.7")).toBe(false);
     });
 });
 

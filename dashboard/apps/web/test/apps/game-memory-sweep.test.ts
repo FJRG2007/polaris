@@ -107,7 +107,7 @@ const { resetHeapMb, sweepMemoryPlans } = await import("@polaris-app/game-server
 function server(config: Record<string, unknown>): Install {
     return {
         id: INSTALL,
-        name: "Offgrid",
+        name: "ExampleSMP",
         catalogId: "minecraft",
         applicationId: APP,
         config: JSON.stringify(config),

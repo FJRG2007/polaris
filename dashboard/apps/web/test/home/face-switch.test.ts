@@ -92,7 +92,7 @@ describe("switched off", () => {
         secrets = { faceInstallId: "install-1", faceEnabled: false };
         expect(await recognizerFor("home-1")).toBeNull();
         secrets = {
-            faceApiUrl: "http://192.168.1.20:8000",
+            faceApiUrl: "http://10.0.1.20:8000",
             faceApiKey: "their-key",
             faceEnabled: false
         };
@@ -107,9 +107,9 @@ describe("switched off", () => {
     });
 
     it("keeps a typed address, so turning it back on does not lose it", async () => {
-        secrets = { faceApiUrl: "http://192.168.1.20:8000", faceApiKey: "their-key" };
+        secrets = { faceApiUrl: "http://10.0.1.20:8000", faceApiKey: "their-key" };
         await setFaceEnabled("home-1", false);
-        expect(written?.faceApiUrl).toBe("http://192.168.1.20:8000");
+        expect(written?.faceApiUrl).toBe("http://10.0.1.20:8000");
         // Nothing of Polaris' to stop: it never started it.
         expect(setApplicationRunning).not.toHaveBeenCalled();
     });

@@ -37,7 +37,7 @@ const passkeyQueries: Record<string, unknown>[] = [];
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
-vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "85.87.156.88" }));
+vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "198.51.100.88" }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_APP_URL: "https://polaris.example.com" }) }));
 vi.mock("@polaris/auth", () => ({
     TRUST_DEVICE_COOKIE_NAMES: ["polaris.trust_device"],
@@ -79,7 +79,7 @@ function pass(overrides: Partial<Pass> = {}): Pass {
         id: "trust-device-aaaaaaaa",
         current: false,
         userAgent: CHROME,
-        ip: "192.168.1.131",
+        ip: "10.0.1.131",
         host: "polaris.local",
         rememberedAt: "2026-07-20T10:00:00.000Z",
         lastSeenAt: "2026-08-01T10:00:00.000Z",
@@ -89,7 +89,7 @@ function pass(overrides: Partial<Pass> = {}): Pass {
 }
 
 /** One Session row as the directory selects it. */
-function session(id: string, userAgent: string, host: string, ip = "85.87.156.88") {
+function session(id: string, userAgent: string, host: string, ip = "198.51.100.88") {
     return {
         id,
         createdAt: new Date("2026-08-01T10:00:00Z"),
@@ -111,7 +111,7 @@ beforeEach(() => {
 describe("opening a remembered device", () => {
     it("gathers what it has open on every name, not only the one it was remembered on", async () => {
         sessionRows = [
-            session("session-1", CHROME, "polaris.local", "192.168.1.131"),
+            session("session-1", CHROME, "polaris.local", "10.0.1.131"),
             session("session-2", CHROME, "polaris.example.com"),
             session("session-3", SAFARI, "polaris.example.com")
         ];
@@ -133,8 +133,8 @@ describe("opening a remembered device", () => {
 
     it("pairs the local address it was remembered at with the network's public one", async () => {
         const detail = await trustedDeviceDetail("user-1", "session-1", "trust-device-aaaaaaaa");
-        expect(detail?.device.ip).toBe("192.168.1.131");
-        expect(detail?.device.publicIp).toBe("85.87.156.88");
+        expect(detail?.device.ip).toBe("10.0.1.131");
+        expect(detail?.device.publicIp).toBe("198.51.100.88");
     });
 
     // Nothing describes it, so nothing can be attributed to it - but it is still

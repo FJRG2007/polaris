@@ -57,11 +57,11 @@ describe("the gap", () => {
     it("reads each person against everybody else, yourself included", () => {
         const all = new Map([
             [SELF, talked(-27)],
-            ["miguel", talked(-42)],
+            ["sam", talked(-42)],
             ["ana", talked(-26)]
         ]);
-        expect(gapFor(all, "miguel")).toBeCloseTo(15.5, 1);
-        expect(gapWords(gapFor(all, "miguel"))).toBe("quieter");
+        expect(gapFor(all, "sam")).toBeCloseTo(15.5, 1);
+        expect(gapWords(gapFor(all, "sam"))).toBe("quieter");
         expect(gapWords(gapFor(all, "ana"))).toBe("louder");
         expect(gapWords(gapFor(all, "nobody"))).toBe("unknown");
         expect(gapWords(2)).toBe("same");

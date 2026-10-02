@@ -309,7 +309,7 @@ describe("mail about the safety of an account", () => {
     it("lands under Security, not under Updates", () => {
         // The one that was reported: a secret-scanning alert read as ordinary
         // transactional mail and sat with the receipts.
-        expect(categoriseMail(message("Action needed: Secrets detected in FJRG2007/rook"))).toBe(
+        expect(categoriseMail(message("Action needed: Secrets detected in acme/rook"))).toBe(
             "security"
         );
         expect(categoriseMail(message("Security alert: unusual sign-in"))).toBe("security");
@@ -360,7 +360,7 @@ describe("mail about the safety of an account", () => {
         // within the hour, and this is the most important mail of somebody's
         // week.
         expect(
-            isDisposableSecurityMail(message("Action needed: Secrets detected in FJRG2007/rook"))
+            isDisposableSecurityMail(message("Action needed: Secrets detected in acme/rook"))
         ).toBe(false);
         expect(isDisposableSecurityMail(message("Security alert: unusual sign-in"))).toBe(false);
     });

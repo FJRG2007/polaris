@@ -89,16 +89,16 @@ describe("the commands, in the order the game needs them", () => {
         const lines = announcementCommands(
             "java",
             draft({
-                target: "ErMigue04",
+                target: "Jeb_04",
                 actionbar: "gift",
                 chat: "thanks",
                 sound: "minecraft:entity.player.levelup"
             })
         );
         expect(lines.map((line) => line.split(" ").slice(0, 3).join(" "))).toEqual([
-            "title ErMigue04 actionbar",
-            'tellraw ErMigue04 [{"text":""},{"text":"[Polaris]',
-            "execute as ErMigue04"
+            "title Jeb_04 actionbar",
+            'tellraw Jeb_04 [{"text":""},{"text":"[Polaris]',
+            "execute as Jeb_04"
         ]);
         expect(lines[2]).toContain("playsound minecraft:entity.player.levelup");
     });
@@ -133,7 +133,7 @@ describe("the commands, in the order the game needs them", () => {
 
     it("never puts anything but a player name or everybody where the target goes", () => {
         expect(isAnnouncementTarget("@a")).toBe(true);
-        expect(isAnnouncementTarget("ErMigue04")).toBe(true);
+        expect(isAnnouncementTarget("Jeb_04")).toBe(true);
         expect(isAnnouncementTarget("@e[type=creeper]")).toBe(false);
         expect(isAnnouncementTarget("a b")).toBe(false);
         expect(() => announcementCommands("java", draft({ target: "@e", title: "x" }))).toThrow();
@@ -230,17 +230,17 @@ describe("templates a server keeps", () => {
  */
 describe("a part with a lot of formatting", () => {
     const warning =
-        "&8[&cDymo&8] &fReckmy&7, we have detected possible &cX-Ray &7use.\n&7This is your &efirst warning&7. If it happens again, you will receive a &ctemporary ban&7. &8(&7Read the &brules &7with &b/rules&8)";
+        "&8[&cServer&8] &fGrumm&7, we have detected possible &cX-Ray &7use.\n&7This is your &efirst warning&7. If it happens again, you will receive a &ctemporary ban&7. &8(&7Read the &brules &7with &b/rules&8)";
 
     it("sends a warning with ten colour changes, which the old 512 limit refused", () => {
         const problems = announcementProblems(
-            { ...BLANK_ANNOUNCEMENT, target: "Reckmy", chat: warning, tagged: false },
+            { ...BLANK_ANNOUNCEMENT, target: "Grumm", chat: warning, tagged: false },
             "java"
         );
         expect(problems.chat).toBeUndefined();
         const [line] = announcementCommands("java", {
             ...BLANK_ANNOUNCEMENT,
-            target: "Reckmy",
+            target: "Grumm",
             chat: warning,
             tagged: false
         });

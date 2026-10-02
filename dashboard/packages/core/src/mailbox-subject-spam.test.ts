@@ -47,7 +47,7 @@ describe("what a subject line gives away", () => {
             // manufactured deadline, and the reader's own address in the subject
             // to make a template look personal.
             const ids = raised(
-                "🔔 Action Required: Verify 'fjrg2007@tpeoficial.com' for ICANN Domain Compliance"
+                "🔔 Action Required: Verify 'user@example.com' for ICANN Domain Compliance"
             );
             expect(ids).toContain("subject_alarm_mark");
             expect(ids).toContain("subject_urgency");

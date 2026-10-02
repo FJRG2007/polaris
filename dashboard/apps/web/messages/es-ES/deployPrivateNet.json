@@ -41,7 +41,7 @@
     "former": "Sigue respondiendo a <code>{name}</code> hasta el {date}",
     "aliases": "Otros nombres",
     "aliasesHint": "Nombres extra a los que responde, para un cliente que espera uno fijo.",
-    "aliasPlaceholder": "p. ej. dymoapi",
+    "aliasPlaceholder": "p. ej. api",
     "addAlias": "Añadir",
     "removeAlias": "Quitar {name}",
     "reach": "Quién lo llama",

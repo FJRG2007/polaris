@@ -52,7 +52,7 @@ describe("browserOrigin", () => {
     });
 
     it("leaves an address the browser is demonstrably using alone", () => {
-        expect(browserOrigin("http://192.168.1.40:3000")).toBe("http://192.168.1.40:3000");
+        expect(browserOrigin("http://10.0.1.40:3000")).toBe("http://10.0.1.40:3000");
         expect(browserOrigin("https://polaris.example.com")).toBe("https://polaris.example.com");
     });
 });
@@ -75,8 +75,8 @@ describe("requestOrigin", () => {
     });
 
     it("keeps the port, which is part of the address a browser returns to", () => {
-        const request = new Request("http://0.0.0.0:3000/x", { headers: { host: "192.168.1.40:3000" } });
-        expect(requestOrigin(request)).toBe("http://192.168.1.40:3000");
+        const request = new Request("http://0.0.0.0:3000/x", { headers: { host: "10.0.1.40:3000" } });
+        expect(requestOrigin(request)).toBe("http://10.0.1.40:3000");
     });
 
     it("never hands back the bind address, whichever header carried it", () => {

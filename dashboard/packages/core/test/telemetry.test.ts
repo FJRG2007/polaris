@@ -34,7 +34,7 @@ const crash = {
     level: "error",
     release: "polaris@1.4.2",
     environment: "production",
-    server_name: "lirio-0",
+    server_name: "node-0",
     transaction: "GET /api/deploy",
     request: { url: "https://example.test/api/deploy", method: "get" },
     user: { id: "u1", email: "someone@example.test" },

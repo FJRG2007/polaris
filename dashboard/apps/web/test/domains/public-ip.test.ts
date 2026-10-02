@@ -60,37 +60,37 @@ describe("getPublicIp", () => {
     });
 
     it("corrects a detected address that has gone stale", async () => {
-        await ensurePublicIp("192.168.1.138");
-        state.detected = "192.168.1.142";
-        expect(await getPublicIp()).toBe("192.168.1.142");
+        await ensurePublicIp("10.0.1.138");
+        state.detected = "10.0.1.142";
+        expect(await getPublicIp()).toBe("10.0.1.142");
     });
 
     it("keeps the stored address when nothing is detected", async () => {
-        await ensurePublicIp("192.168.1.138");
-        expect(await getPublicIp()).toBe("192.168.1.138");
+        await ensurePublicIp("10.0.1.138");
+        expect(await getPublicIp()).toBe("10.0.1.138");
     });
 
     it("keeps an address that was entered by hand", async () => {
         await setDomainConfig({ publicIp: "203.0.113.9" });
-        state.detected = "192.168.1.142";
+        state.detected = "10.0.1.142";
         expect(await getPublicIp()).toBe("203.0.113.9");
     });
 
     it("hands the address back to detection when the entered one is cleared", async () => {
         await setDomainConfig({ publicIp: "203.0.113.9" });
         await setDomainConfig({ publicIp: "" });
-        state.detected = "192.168.1.142";
-        expect(await getPublicIp()).toBe("192.168.1.142");
+        state.detected = "10.0.1.142";
+        expect(await getPublicIp()).toBe("10.0.1.142");
     });
 
     it("uses detection before the install-time variable", async () => {
-        process.env.POLARIS_PUBLIC_IP = "192.168.1.138";
-        state.detected = "192.168.1.142";
-        expect(await getPublicIp()).toBe("192.168.1.142");
+        process.env.POLARIS_PUBLIC_IP = "10.0.1.138";
+        state.detected = "10.0.1.142";
+        expect(await getPublicIp()).toBe("10.0.1.142");
     });
 
     it("falls back to the install-time variable when nothing else is known", async () => {
-        process.env.POLARIS_PUBLIC_IP = "192.168.1.138";
-        expect(await getPublicIp()).toBe("192.168.1.138");
+        process.env.POLARIS_PUBLIC_IP = "10.0.1.138";
+        expect(await getPublicIp()).toBe("10.0.1.138");
     });
 });

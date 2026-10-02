@@ -48,7 +48,7 @@ const BASE_VIEW: PrivateNetworkView = {
     projectId: "project-1",
     name: "api",
     domain: "api.polaris.internal",
-    aliases: ["dymoapi"],
+    aliases: ["paymentsapi"],
     former: [{ name: "backend", until: "2026-10-09T00:00:00.000Z" }],
     family: "dual",
     status: "ready",
@@ -161,7 +161,7 @@ describe("the private networking panel", () => {
         const user = userEvent.setup();
         await mountReady();
 
-        const aliasInput = screen.getByPlaceholderText("e.g. dymoapi");
+        const aliasInput = screen.getByPlaceholderText("e.g. api");
         await user.type(aliasInput, "legacy-api");
 
         // The server is not asked to resolve yet, so the optimistic add and its

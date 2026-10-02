@@ -142,7 +142,7 @@ describe("the service's TCP proxies", () => {
         const view: TcpProxyView = {
             proxies: [{ container: 25565, host: 30001 }],
             publicHost: "203.0.113.7",
-            lanHost: "192.168.1.10",
+            lanHost: "10.0.1.10",
             deployed: true
         };
         tcpProxiesAction.mockResolvedValue(view);
@@ -159,7 +159,7 @@ describe("the service's TCP proxies", () => {
         );
         expect(await screen.findByText("203.0.113.7:30001")).toBeDefined();
         expect(screen.getByText("TCP to :25565")).toBeDefined();
-        expect(screen.getByText(/forward TCP 30001 to 192\.168\.1\.10/)).toBeDefined();
+        expect(screen.getByText(/forward TCP 30001 to 10\.0\.1\.10/)).toBeDefined();
     });
 
     it("warns a newly added proxy is not reachable until the service redeploys", async () => {

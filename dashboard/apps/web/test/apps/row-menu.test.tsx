@@ -24,7 +24,7 @@ vi.mock("@polaris/app-host/client", () => ({
 const kicked = vi.fn();
 
 const ENTRIES: RowMenuEntry[] = [
-    { kind: "label", text: "ErMigue04" },
+    { kind: "label", text: "Jeb_04" },
     { kind: "separator" },
     { kind: "item", text: "Kick them", onSelect: kicked },
     { kind: "item", text: "Teleport", disabled: true, onSelect: () => undefined },
@@ -44,14 +44,14 @@ describe("the menu on a player row", () => {
                 <tbody>
                     <RowContextMenu entries={ENTRIES}>
                         <tr>
-                            <td>ErMigue04</td>
+                            <td>Jeb_04</td>
                         </tr>
                     </RowContextMenu>
                 </tbody>
             </table>
         );
 
-        fireEvent.contextMenu(screen.getByText("ErMigue04"));
+        fireEvent.contextMenu(screen.getByText("Jeb_04"));
 
         expect(await screen.findByText("Kick them")).toBeTruthy();
         expect(screen.getByText("Teleport")).toBeTruthy();
@@ -65,14 +65,14 @@ describe("the menu on a player row", () => {
                 <tbody>
                     <RowContextMenu entries={ENTRIES}>
                         <tr>
-                            <td>ErMigue04</td>
+                            <td>Jeb_04</td>
                         </tr>
                     </RowContextMenu>
                 </tbody>
             </table>
         );
 
-        fireEvent.contextMenu(screen.getByText("ErMigue04"));
+        fireEvent.contextMenu(screen.getByText("Jeb_04"));
         fireEvent.click(await screen.findByText("Kick them"));
 
         expect(kicked).toHaveBeenCalledTimes(1);
@@ -84,14 +84,14 @@ describe("the menu on a player row", () => {
                 <tbody>
                     <RowContextMenu entries={ENTRIES}>
                         <tr>
-                            <td>ErMigue04</td>
+                            <td>Jeb_04</td>
                         </tr>
                     </RowContextMenu>
                 </tbody>
             </table>
         );
 
-        fireEvent.contextMenu(screen.getByText("ErMigue04"));
+        fireEvent.contextMenu(screen.getByText("Jeb_04"));
         const teleport = await screen.findByText("Teleport");
 
         // Radix marks a disabled item rather than dropping it, which is what the
@@ -100,7 +100,7 @@ describe("the menu on a player row", () => {
     });
 
     it("draws the same list behind the three dots", async () => {
-        render(<RowMenuButton entries={ENTRIES} label="More for ErMigue04" />);
+        render(<RowMenuButton entries={ENTRIES} label="More for Jeb_04" />);
 
         // Opened with a pointer rather than from the keyboard, which is how the
         // three dots are actually used. It also avoids the one thing a keyboard
@@ -109,7 +109,7 @@ describe("the menu on a player row", () => {
         // be found, and the walk lands after the test is over and the menu
         // unmounted - an uncaught TypeError that fails the whole run while every
         // test still reads as passed.
-        fireEvent.pointerDown(screen.getByLabelText("More for ErMigue04"), {
+        fireEvent.pointerDown(screen.getByLabelText("More for Jeb_04"), {
             button: 0,
             ctrlKey: false,
             pointerType: "mouse"

@@ -235,14 +235,14 @@ describe("naming the pass the browser reading the page holds", () => {
         expect(
             await twoFactor.adoptTrustedDevice(USER, "trust-device-mine", {
                 userAgent: "Chrome/1",
-                ip: "192.168.1.131",
+                ip: "10.0.1.131",
                 host: "polaris.local"
             })
         ).toBe(true);
 
         const listed = await twoFactor.listTrustedDevices(USER, null);
         expect(listed[0]?.userAgent).toBe("Chrome/1");
-        expect(listed[0]?.ip).toBe("192.168.1.131");
+        expect(listed[0]?.ip).toBe("10.0.1.131");
         expect(listed[0]?.host).toBe("polaris.local");
     });
 

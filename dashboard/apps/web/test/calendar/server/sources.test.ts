@@ -264,7 +264,7 @@ describe("calendar sources", () => {
         fake.fetchHandler = async () => new Response(feed(), { status: 200 });
         await expect(
             sources.addFeed(alice, {
-                url: "http://192.168.1.20/calendar.ics",
+                url: "http://10.0.1.20/calendar.ics",
                 name: "LAN",
                 color: "#2ca02c",
                 refreshMinutes: 60
@@ -285,7 +285,7 @@ describe("calendar sources", () => {
         const admin = addUser({ name: "Root", email: "root@example.test", isAdmin: true });
         fake.fetchHandler = async () => new Response(feed(), { status: 200 });
         const id = await sources.addFeed(admin, {
-            url: "http://192.168.1.20/calendar.ics",
+            url: "http://10.0.1.20/calendar.ics",
             name: "LAN",
             color: "#2ca02c",
             refreshMinutes: 60
@@ -294,7 +294,7 @@ describe("calendar sources", () => {
             Buffer.from(db.byId("calendarSource", id)?.encryptedSecret as Uint8Array).toString(
                 "utf8"
             )
-        ).toBe("http://192.168.1.20/calendar.ics");
+        ).toBe("http://10.0.1.20/calendar.ics");
         expect(fake.fetches[0]?.allowPrivate).toBe(true);
         await world.settle();
     });

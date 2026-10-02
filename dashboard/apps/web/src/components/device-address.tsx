@@ -3,7 +3,7 @@
  * session table, the remembered-devices table, and the panel for one device.
  *
  * A deployment answers on the local network as well as from outside, so the same
- * laptop shows up once as 192.168.1.131 and once as the address its line is seen
+ * laptop shows up once as 10.0.1.131 and once as the address its line is seen
  * at - and read on their own, those two rows are two strangers. Wherever the
  * address is a local one it is therefore shown with the public one under it, so
  * the rows for one device can be recognised as one device.

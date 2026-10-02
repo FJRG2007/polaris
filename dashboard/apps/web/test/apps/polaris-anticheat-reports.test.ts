@@ -37,7 +37,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
             findFirst: async () => ({ applicationId: "app-1", ownerId: "owner-1" }),
-            findUnique: async () => ({ name: "Offgrid", config: fake.config })
+            findUnique: async () => ({ name: "ExampleSMP", config: fake.config })
         },
         minecraftAnticheatFlag: {
             createMany: async ({ data }: { data: typeof fake.rows }) => {
@@ -182,7 +182,7 @@ describe("taking a report", () => {
         expect(fake.notified).toHaveLength(1);
         expect(fake.notified[0]).toMatchObject({
             userId: "owner-1",
-            title: "CheaterBot is likely cheating on Offgrid"
+            title: "CheaterBot is likely cheating on ExampleSMP"
         });
         await report({ flags: [flag()] });
         expect(fake.notified).toHaveLength(1);

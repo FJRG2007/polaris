@@ -213,9 +213,9 @@ export async function detectPublicIp(force = false): Promise<string | null> {
  * ever probing on the way.
  *
  * For the pages that pair it with a private address: a device seen at
- * 192.168.1.131 reached Polaris over the local network, so it is on that
+ * 10.0.1.131 reached Polaris over the local network, so it is on that
  * network, and what the internet sees of it is what the internet sees of this
- * box. Saying only "192.168.1.131" leaves a person unable to connect the phone
+ * box. Saying only "10.0.1.131" leaves a person unable to connect the phone
  * on the sofa with the three sessions listed under a public address, which are
  * the same phone.
  *

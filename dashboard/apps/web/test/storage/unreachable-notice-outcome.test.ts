@@ -43,8 +43,8 @@ function said(): { title: string; body: string; event: string } {
 
 describe("the unreachable notice", () => {
     it("says it is off or disconnected when it is nowhere on the network", async () => {
-        outcome = { kind: "gone", address: "192.168.1.129" };
-        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
+        outcome = { kind: "gone", address: "10.0.1.129" };
+        await alert.reportStorageUnreachable({ id: ID, name: "Office NAS" });
         expect(said().event).toBe("storage.unreachable");
         expect(said().body).toMatch(/not answering anywhere, so it is off or disconnected/);
     });
@@ -52,43 +52,43 @@ describe("the unreachable notice", () => {
     it("names who answers when Polaris cannot prove which device it is", async () => {
         outcome = {
             kind: "candidates",
-            candidates: [{ address: "192.168.1.134", label: "UNAS-PRO", mac: "6c:63:f8:6e:53:50" }]
+            candidates: [{ address: "10.0.1.134", label: "OFFICE-NAS", mac: "00:00:5e:00:53:50" }]
         };
-        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
+        await alert.reportStorageUnreachable({ id: ID, name: "Office NAS" });
         expect(said().body).toContain(
-            "An SMB server answers on the network, the first at 192.168.1.134 (UNAS-PRO)"
+            "An SMB server answers on the network, the first at 10.0.1.134 (OFFICE-NAS)"
         );
     });
 
     it("is not sent at all when the search found it and followed it", async () => {
         outcome = {
             kind: "followed",
-            from: "192.168.1.129",
-            to: "192.168.1.134",
-            mac: "6c:63:f8:6e:53:50"
+            from: "10.0.1.129",
+            to: "10.0.1.134",
+            mac: "00:00:5e:00:53:50"
         };
-        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
+        await alert.reportStorageUnreachable({ id: ID, name: "Office NAS" });
         expect(notify).not.toHaveBeenCalled();
     });
 
     it("is still sent when the device answers where it is but would not take the file", async () => {
-        outcome = { kind: "answering", address: "192.168.1.129" };
-        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
+        outcome = { kind: "answering", address: "10.0.1.129" };
+        await alert.reportStorageUnreachable({ id: ID, name: "Office NAS" });
         expect(said().event).toBe("storage.unreachable");
-        expect(said().body).toContain("It answers at 192.168.1.129, but would not take the file");
+        expect(said().body).toContain("It answers at 10.0.1.129, but would not take the file");
     });
 
     it("names the device that holds the address when the storage is not found elsewhere", async () => {
-        outcome = { kind: "impostor", address: "192.168.1.129", label: "DESKTOP-7" };
-        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
-        expect(said().body).toContain("A different device answers at 192.168.1.129 (DESKTOP-7)");
+        outcome = { kind: "impostor", address: "10.0.1.129", label: "DESKTOP-7" };
+        await alert.reportStorageUnreachable({ id: ID, name: "Office NAS" });
+        expect(said().body).toContain("A different device answers at 10.0.1.129 (DESKTOP-7)");
         expect(said().body).not.toMatch(/off or disconnected/);
     });
 
     it("is written in the administrator's language", async () => {
         locale = "es-ES";
-        outcome = { kind: "gone", address: "192.168.1.129" };
-        await alert.reportStorageUnreachable({ id: ID, name: "UNAS Pro" });
+        outcome = { kind: "gone", address: "10.0.1.129" };
+        await alert.reportStorageUnreachable({ id: ID, name: "Office NAS" });
         expect(said().body).toMatch(/apagado o desconectado/);
     });
 });
@@ -97,17 +97,17 @@ describe("the moved notice", () => {
     it("says where it went and names the hardware address to reserve", async () => {
         await alert.reportStorageMoved({
             id: ID,
-            name: "UNAS Pro",
-            from: "192.168.1.129",
-            to: "192.168.1.134",
-            mac: "6c:63:f8:6e:53:50"
+            name: "Office NAS",
+            from: "10.0.1.129",
+            to: "10.0.1.134",
+            mac: "00:00:5e:00:53:50"
         });
         expect(said()).toMatchObject({
             event: "storage.moved",
-            title: "UNAS Pro moved to a new address"
+            title: "Office NAS moved to a new address"
         });
         expect(said().body).toBe(
-            "UNAS Pro moved from 192.168.1.129 to 192.168.1.134 on your network, and Polaris follows it there now. So it does not move again, reserve 192.168.1.134 for the device 6c:63:f8:6e:53:50 in your router's DHCP settings."
+            "Office NAS moved from 10.0.1.129 to 10.0.1.134 on your network, and Polaris follows it there now. So it does not move again, reserve 10.0.1.134 for the device 00:00:5e:00:53:50 in your router's DHCP settings."
         );
     });
 });

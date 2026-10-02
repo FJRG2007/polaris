@@ -38,7 +38,7 @@ function device(overrides: Partial<TrustedDeviceRow> = {}): TrustedDeviceRow {
         id: "trust-device-aaaaaaaa",
         current: false,
         device: "Chrome on Android",
-        ip: "192.168.1.131",
+        ip: "10.0.1.131",
         publicIp: null,
         host: "polaris.local",
         rememberedAt: "2026-07-20T10:00:00.000Z",
@@ -63,7 +63,7 @@ describe("the remembered-devices card", () => {
     it("shows what the device was and where it signed in from", () => {
         const markup = render([device()]);
         expect(markup).toContain("Chrome on Android");
-        expect(markup).toContain("192.168.1.131");
+        expect(markup).toContain("10.0.1.131");
         expect(markup).toContain("polaris.local");
         // The expiry is ahead of us, so it has to be phrased as such.
         expect(markup).toContain("future:2026-08-19T10:00:00.000Z");
@@ -95,9 +95,9 @@ describe("the remembered-devices card", () => {
     });
 
     it("pairs a local address with the one its network is seen at", () => {
-        const markup = render([device({ ip: "192.168.1.131", publicIp: "85.87.156.88" })]);
-        expect(markup).toContain("192.168.1.131");
-        expect(markup).toContain("85.87.156.88");
+        const markup = render([device({ ip: "10.0.1.131", publicIp: "198.51.100.88" })]);
+        expect(markup).toContain("10.0.1.131");
+        expect(markup).toContain("198.51.100.88");
     });
 
     it("only offers the blunt control when there is more than one to end", () => {

@@ -35,7 +35,7 @@ describe("classifyAddress", () => {
             "127.0.0.1",
             "10.1.2.3",
             "172.20.0.5",
-            "192.168.1.10",
+            "10.0.1.10",
             "100.64.0.1",
             "::1",
             "fd12::1"
@@ -64,9 +64,9 @@ describe("resolveEgress", () => {
     });
 
     it("lets whoever runs the instance reach its own network", async () => {
-        await expect(resolveEgress("192.168.1.20", "instance")).resolves.toEqual({
-            address: "192.168.1.20",
-            name: "192.168.1.20"
+        await expect(resolveEgress("10.0.1.20", "instance")).resolves.toEqual({
+            address: "10.0.1.20",
+            name: "10.0.1.20"
         });
     });
 

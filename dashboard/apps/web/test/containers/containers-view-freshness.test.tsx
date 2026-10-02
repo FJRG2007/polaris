@@ -54,7 +54,7 @@ vi.mock("../../src/app/(app)/apps/containers/polaris-footprint", () => ({
 const { ContainersView } = await import("../../src/app/(app)/apps/containers/containers-view");
 
 const overview: OverviewData = {
-    name: "lirio-0",
+    name: "node-0",
     serverVersion: "27.0.0",
     containers: 2,
     running: 1,

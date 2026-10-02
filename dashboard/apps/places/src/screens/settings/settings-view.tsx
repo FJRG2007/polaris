@@ -505,7 +505,7 @@ export function HomeSettingsView({
                                         value={url}
                                         onChange={(event) => setUrl(event.target.value)}
                                         className="w-72"
-                                        placeholder="http://192.168.1.20:8000"
+                                        placeholder="http://10.0.1.20:8000"
                                         aria-label={t("settings.recognizerAddress")}
                                     />
                                 </label>

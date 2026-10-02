@@ -41,7 +41,7 @@
     "former": "Still answers to <code>{name}</code> until {date}",
     "aliases": "Other names",
     "aliasesHint": "Extra names it answers to, for a client that expects a fixed one.",
-    "aliasPlaceholder": "e.g. dymoapi",
+    "aliasPlaceholder": "e.g. api",
     "addAlias": "Add",
     "removeAlias": "Remove {name}",
     "reach": "Who can call it",

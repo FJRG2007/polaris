@@ -4,7 +4,7 @@ import { environmentFromAddress, serverEnvironmentGroup } from "../src/schemas/h
 
 describe("isPrivateIp", () => {
     it("treats RFC1918, loopback, link-local and CGNAT space as private", () => {
-        for (const ip of ["10.0.0.5", "172.16.4.1", "192.168.1.138", "127.0.0.1", "169.254.10.1", "100.100.1.1"]) {
+        for (const ip of ["10.0.0.5", "172.16.4.1", "192.168.50.138", "127.0.0.1", "169.254.10.1", "100.100.1.1"]) {
             expect(isPrivateIp(ip)).toBe(true);
         }
     });
@@ -22,13 +22,13 @@ describe("isPrivateIp", () => {
 
     it("classifies an IPv4-mapped IPv6 address by its IPv4 form", () => {
         expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
-        expect(isPrivateIp("::ffff:192.168.1.10")).toBe(true);
+        expect(isPrivateIp("::ffff:10.0.1.10")).toBe(true);
     });
 });
 
 describe("isIpv4 / isPublicIpv4", () => {
     it("accepts IPv4 literals and the IPv4-mapped form", () => {
-        expect(isIpv4("192.168.1.10")).toBe(true);
+        expect(isIpv4("10.0.1.10")).toBe(true);
         expect(isIpv4("::ffff:8.8.8.8")).toBe(true);
     });
 
@@ -40,7 +40,7 @@ describe("isIpv4 / isPublicIpv4", () => {
 
     it("calls only a routable IPv4 publicly usable", () => {
         expect(isPublicIpv4("8.8.8.8")).toBe(true);
-        expect(isPublicIpv4("192.168.1.10")).toBe(false);
+        expect(isPublicIpv4("10.0.1.10")).toBe(false);
         // Routable, but its colons cannot survive into a DNS label.
         expect(isPublicIpv4("2606:4700::1111")).toBe(false);
     });
@@ -51,7 +51,7 @@ describe("isCarrierGradeNat", () => {
         expect(isCarrierGradeNat("100.64.0.1")).toBe(true);
         expect(isCarrierGradeNat("100.127.255.254")).toBe(true);
         expect(isCarrierGradeNat("100.128.0.1")).toBe(false);
-        expect(isCarrierGradeNat("192.168.1.1")).toBe(false);
+        expect(isCarrierGradeNat("10.0.1.1")).toBe(false);
         expect(isCarrierGradeNat("nas.local")).toBe(false);
         expect(isCarrierGradeNat("::ffff:100.70.3.4")).toBe(true);
     });
@@ -59,7 +59,7 @@ describe("isCarrierGradeNat", () => {
 
 describe("environmentFromAddress", () => {
     it("reads a private address as a home/office LAN server", () => {
-        expect(environmentFromAddress("192.168.1.10")).toBe("home-nat");
+        expect(environmentFromAddress("10.0.1.10")).toBe("home-nat");
         expect(environmentFromAddress(" 10.8.0.4 ")).toBe("home-nat");
     });
 
@@ -68,7 +68,7 @@ describe("environmentFromAddress", () => {
     });
 
     it("reads a public address as a server holding its own IP", () => {
-        expect(environmentFromAddress("51.15.20.30")).toBe("vps");
+        expect(environmentFromAddress("5.6.7.8")).toBe("vps");
     });
 
     it("does not call a reserved or documentation address a public server", () => {

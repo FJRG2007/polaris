@@ -19,7 +19,7 @@ fix_commit: null
 ---
 
 ## Summary
-A login saved for http://192.168.1.1 matched any host ending in .1.1, so the extension filled the router's credentials into another device's page.
+A login saved for http://10.0.1.1 matched any host ending in .1.1, so the extension filled the router's credentials into another device's page.
 
 ## Root cause / data flow
 baseDomain kept the last two labels without recognising IP addresses.
@@ -27,7 +27,7 @@ baseDomain kept the last two labels without recognising IP addresses.
 ## Evidence
 White-box source trace; not exercised against a running instance.
 
-uriMatches("http://192.168.1.1", null, "http://10.0.1.1/") returned true.
+uriMatches("http://10.0.1.1", null, "http://10.9.1.1/") returned true.
 
 ## Impact
 Credentials typed into an attacker-controlled LAN host when the user fills.

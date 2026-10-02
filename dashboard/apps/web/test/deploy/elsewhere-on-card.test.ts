@@ -21,12 +21,12 @@ const { railwayDomains } = await import("@/lib/integrations/railway-api");
 const row = {
     id: "ext-1",
     provider: "vercel",
-    name: "portfolio-v3",
+    name: "portfolio",
     status: "live",
-    url: "https://portfolio-v3-abc123.vercel.app",
+    url: "https://portfolio-abc123.vercel.app",
     applicationId: null as string | null,
-    repo: "fjrg2007/portfolio-v3" as string | null,
-    productionDomains: JSON.stringify(["fjrg2007.com"])
+    repo: "acme/portfolio" as string | null,
+    productionDomains: JSON.stringify(["example.com"])
 };
 
 beforeEach(() => findMany.mockReset());
@@ -35,11 +35,11 @@ afterEach(() => vi.unstubAllGlobals());
 describe("which service a provider's copy belongs to", () => {
     const portfolio = {
         id: "app-1",
-        sourceConfig: JSON.stringify({ repoUrl: "https://github.com/FJRG2007/portfolio-v3" })
+        sourceConfig: JSON.stringify({ repoUrl: "https://github.com/acme/portfolio" })
     };
     const other = {
         id: "app-2",
-        sourceConfig: JSON.stringify({ repoUrl: "https://github.com/FJRG2007/other" })
+        sourceConfig: JSON.stringify({ repoUrl: "https://github.com/acme/other" })
     };
 
     it("matches the service building the same repository", async () => {
@@ -49,10 +49,10 @@ describe("which service a provider's copy belongs to", () => {
             {
                 id: "ext-1",
                 provider: "vercel",
-                name: "portfolio-v3",
+                name: "portfolio",
                 status: "live",
-                domains: ["fjrg2007.com"],
-                url: "https://portfolio-v3-abc123.vercel.app",
+                domains: ["example.com"],
+                url: "https://portfolio-abc123.vercel.app",
                 linked: "repository"
             }
         ]);
@@ -74,8 +74,8 @@ describe("which service a provider's copy belongs to", () => {
 
     it("reads a repository however it was written", () => {
         expect(
-            repoOfSource(JSON.stringify({ repoUrl: "git@github.com:FJRG2007/Portfolio-V3.git" }))
-        ).toBe("fjrg2007/portfolio-v3");
+            repoOfSource(JSON.stringify({ repoUrl: "git@github.com:acme/portfolio.git" }))
+        ).toBe("acme/portfolio");
         expect(repoOfSource(JSON.stringify({ imageRef: "nginx" }))).toBeNull();
     });
 });
@@ -88,17 +88,17 @@ describe("the provider's production domains", () => {
                     JSON.stringify({
                         domains: [
                             {
-                                name: "fjrg2007.com",
-                                apexName: "fjrg2007.com",
+                                name: "example.com",
+                                apexName: "example.com",
                                 projectId: "prj",
                                 verified: true
                             },
                             {
-                                name: "www.fjrg2007.com",
-                                apexName: "fjrg2007.com",
+                                name: "www.example.com",
+                                apexName: "example.com",
                                 projectId: "prj",
                                 verified: true,
-                                redirect: "fjrg2007.com"
+                                redirect: "example.com"
                             },
                             {
                                 name: "pending.example.com",
@@ -113,7 +113,7 @@ describe("the provider's production domains", () => {
                 )
         );
         vi.stubGlobal("fetch", fetchMock);
-        expect(await vercelProductionDomains("token", "prj_1", "team_9")).toEqual(["fjrg2007.com"]);
+        expect(await vercelProductionDomains("token", "prj_1", "team_9")).toEqual(["example.com"]);
         const url = String(fetchMock.mock.calls[0]?.[0]);
         expect(url).toContain("/v9/projects/prj_1/domains?");
         expect(url).toContain("production=true");

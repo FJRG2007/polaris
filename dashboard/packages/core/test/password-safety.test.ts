@@ -11,11 +11,11 @@
 import { describe, expect, it } from "vitest";
 import { normalizeForComparison, passwordMatchesIdentity } from "../src/password-safety.js";
 
-const IDENTITY = ["Francisco Ruiz", "fjrg2007@tpeoficial.com", "fjrg2007", "polaris"];
+const IDENTITY = ["Jane Doe", "jdoe@example.com", "jdoe2007", "polaris"];
 
 describe("normalizing for comparison", () => {
     it("makes casing, accents and punctuation stop being differences", () => {
-        expect(normalizeForComparison("F.J.R.G_2007")).toBe("fjrg2007");
+        expect(normalizeForComparison("J.D.O.E_2007")).toBe("jdoe2007");
         expect(normalizeForComparison("José-María")).toBe("josemaria");
         expect(normalizeForComparison("  Polaris!  ")).toBe("polaris");
     });
@@ -23,18 +23,18 @@ describe("normalizing for comparison", () => {
 
 describe("a password built out of the account", () => {
     it("is refused however it is dressed up", () => {
-        for (const candidate of ["Fjrg2007", "F.J.R.G_2007", "myfjrg2007pass", "PolarisRules1"]) {
+        for (const candidate of ["Jdoe2007", "J.D.O.E_2007", "myjdoe2007pass", "PolarisRules1"]) {
             expect(passwordMatchesIdentity(candidate, IDENTITY)).toBe(true);
         }
     });
 
     it("is refused when it is the address, or just its local part", () => {
-        expect(passwordMatchesIdentity("fjrg2007@tpeoficial.com", IDENTITY)).toBe(true);
-        expect(passwordMatchesIdentity("my.fjrg2007.pass", IDENTITY)).toBe(true);
+        expect(passwordMatchesIdentity("jdoe@example.com", IDENTITY)).toBe(true);
+        expect(passwordMatchesIdentity("my.jdoe2007.pass", IDENTITY)).toBe(true);
     });
 
     it("is refused when it is a word out of the display name", () => {
-        expect(passwordMatchesIdentity("francisco-rules", IDENTITY)).toBe(true);
+        expect(passwordMatchesIdentity("jane-rules", IDENTITY)).toBe(true);
     });
 });
 
@@ -48,7 +48,7 @@ describe("a password unrelated to the account", () => {
     it("does not treat the mail provider as part of the identity", () => {
         // Everybody at a provider shares its domain, so refusing it would refuse a
         // password on a fact about somebody else's mail server.
-        expect(passwordMatchesIdentity("tpeoficial-weather-42", ["someone@tpeoficial.com"])).toBe(false);
+        expect(passwordMatchesIdentity("example-weather-42", ["someone@example.com"])).toBe(false);
     });
 
     it("is not tripped by a short fragment two strings happen to share", () => {

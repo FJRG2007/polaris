@@ -53,7 +53,7 @@ const connections: DockerConnectionSummary[] = [
     { id: "local", name: "Local host", transport: "socket", status: "active", local: true },
     {
         id: `host:${HOST}`,
-        name: "lirio-2",
+        name: "node-2",
         transport: "ssh",
         status: "active",
         host: true,
@@ -93,7 +93,7 @@ describe("a server that is not answering", () => {
     it("is not asked for its containers when it is the one selected", () => {
         reachability = [{ id: HOST, state: "down", detail: "No route to that address" }];
         const markup = render(`host:${HOST}`);
-        expect(markup).toContain("lirio-2 is not answering");
+        expect(markup).toContain("node-2 is not answering");
         expect(markup).toContain(`/apps/servers/${HOST}`);
         expect(snapshotRequested).toEqual([false]);
     });

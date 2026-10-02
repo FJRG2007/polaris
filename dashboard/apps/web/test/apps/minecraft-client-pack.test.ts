@@ -35,7 +35,7 @@ import {
  * onto every player's machine. It is used for every generated script here, so
  * anything that would end the comment it sits in ends the tests too.
  */
-const HOSTILE = 'Offgrid\nrm -rf "$HOME/.minecraft"\n#';
+const HOSTILE = 'ExampleSMP\nrm -rf "$HOME/.minecraft"\n#';
 
 /** A jar is only ever bytes to these scripts, so the fixtures are bytes. */
 const JARS: Record<string, string> = {
@@ -73,9 +73,9 @@ describe("the mod list both installers read", () => {
     });
 
     it("says in both scripts which server it is for", () => {
-        expect(shellInstaller("https://polaris.test/pack.tsv", "Offgrid")).toContain('"Offgrid"');
-        expect(powershellInstaller("https://polaris.test/pack.tsv", "Offgrid")).toContain(
-            '"Offgrid"'
+        expect(shellInstaller("https://polaris.test/pack.tsv", "ExampleSMP")).toContain('"ExampleSMP"');
+        expect(powershellInstaller("https://polaris.test/pack.tsv", "ExampleSMP")).toContain(
+            '"ExampleSMP"'
         );
     });
 });
@@ -87,7 +87,7 @@ describe("the mod list both installers read", () => {
  */
 describe("what a script may carry of somebody else's text", () => {
     it("keeps a name to one line, and to what a name is made of", () => {
-        expect(scriptName(HOSTILE)).toBe("Offgrid rm -rf HOME .minecraft");
+        expect(scriptName(HOSTILE)).toBe("ExampleSMP rm -rf HOME .minecraft");
         expect(scriptName("Ñandú survival")).toBe("Ñandú survival");
         expect(scriptName("\n\n")).toBe("this server");
         expect(scriptName("x".repeat(80))).toHaveLength(48);
@@ -99,9 +99,9 @@ describe("what a script may carry of somebody else's text", () => {
             const script = build(url, HOSTILE);
             // The name cannot add a line, so the script is the one a plain name
             // makes, with a longer comment on it.
-            expect(script.split("\n")).toHaveLength(build(url, "Offgrid").split("\n").length);
+            expect(script.split("\n")).toHaveLength(build(url, "ExampleSMP").split("\n").length);
             expect(script).not.toContain('rm -rf "$HOME');
-            expect(script.split("\n").filter((line) => line.includes("Offgrid"))).toEqual([
+            expect(script.split("\n").filter((line) => line.includes("ExampleSMP"))).toEqual([
                 script.split("\n")[build === shellInstaller ? 1 : 0]
             ]);
             const header = script.split("\n").slice(0, build === shellInstaller ? 3 : 2);

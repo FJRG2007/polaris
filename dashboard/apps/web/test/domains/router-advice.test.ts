@@ -181,11 +181,11 @@ describe("every advice", () => {
     });
 
     it("carries what the panel needs to walk the operator through their router", () => {
-        const advice = routerAdvice("home-nat", "polaris.example.com", ROUTER, "192.168.1.20");
+        const advice = routerAdvice("home-nat", "polaris.example.com", ROUTER, "10.0.1.20");
 
         expect(advice.forward).toBe(true);
         expect(advice.server).toBe("ZTE web server 1.0");
-        expect(advice.lanIp).toBe("192.168.1.20");
+        expect(advice.lanIp).toBe("10.0.1.20");
     });
 
     it("offers no port forward where no forward can help", () => {
@@ -273,7 +273,7 @@ describe("probing who answers", () => {
         // A router bouncing the request to its own portal is not evidence of anything.
         vi.stubGlobal(
             "fetch",
-            async () => new Response(null, { status: 302, headers: { location: "http://192.168.1.1/login.html" } })
+            async () => new Response(null, { status: 302, headers: { location: "http://10.0.1.1/login.html" } })
         );
 
         expect(await probeEdge("a.example.com")).toMatchObject({ answer: "other" });

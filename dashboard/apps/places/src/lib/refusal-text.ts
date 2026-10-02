@@ -85,7 +85,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Unknown place", "refusals.schemaPlace"],
     ["Unknown camera", "refusals.schemaCamera"],
     ["Unknown person", "refusals.schemaPerson"],
-    ["Write it as 192.168.1.0/24", "refusals.schemaSubnet"],
+    ["Write it as 10.0.1.0/24", "refusals.schemaSubnet"],
     ["Pick how to connect it", "refusals.schemaConnect"],
     ["Event not found", "refusals.eventGone"],
     ["Give them a name", "refusals.giveThemName"],
@@ -102,7 +102,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["This camera does not move", "refusals.noPtz"],
     ["Home is not installed", "refusals.notInstalled"],
     ["The recognizer was installed but cannot be found", "refusals.recognizerMissing"],
-    ["Write the address as http://192.168.1.20:8000", "refusals.recognizerAddress"],
+    ["Write the address as http://10.0.1.20:8000", "refusals.recognizerAddress"],
     ["Clip not found", "refusals.clipGone"],
     ["The camera relay was installed but is not answering yet", "refusals.relayQuiet"],
     ["The relay would not accept that camera", "refusals.relayRefused"],
@@ -162,9 +162,9 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.tplinkNothing"
     ],
     ["A TP-Link device cannot be told to do that", "refusals.tplinkCannot"],
-    ["Write the address as 192.168.1.30, with no path", "refusals.addressNoPath"],
+    ["Write the address as 10.0.1.30, with no path", "refusals.addressNoPath"],
     [
-        "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.",
+        "Polaris does not connect to that address. Use the device's address on your network, such as 10.0.1.30.",
         "refusals.addressForbidden"
     ],
     ["That address answered, but not as a Shelly.", "refusals.shellyNot"],

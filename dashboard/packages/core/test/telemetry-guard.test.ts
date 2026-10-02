@@ -39,7 +39,7 @@ const from = (ip: string | null, userAgent: string | null = "sentry.python/2.1.0
 describe("where a report may come from", () => {
     it("takes this network on the default policy", () => {
         expect(reporterRefusal(rules(), from("10.1.2.3"))).toBeNull();
-        expect(reporterRefusal(rules(), from("192.168.1.40"))).toBeNull();
+        expect(reporterRefusal(rules(), from("10.0.1.40"))).toBeNull();
         expect(reporterRefusal(rules(), from("127.0.0.1"))).toBeNull();
     });
 

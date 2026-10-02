@@ -32,7 +32,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/nuki-mqtt", () => ({
 const { nukiLocalDriver } = await import("@polaris-app/places/src/lib/drivers/nuki-local");
 
 const BROKER = {
-    host: "192.168.1.20",
+    host: "10.0.1.20",
     port: "1883",
     username: "polaris",
     password: "x",

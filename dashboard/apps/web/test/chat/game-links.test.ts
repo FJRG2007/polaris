@@ -187,7 +187,7 @@ describe("what may be linked", () => {
         fake.spaces = [
             {
                 id: "s-owned",
-                name: "Offgrid",
+                name: "ExampleSMP",
                 channels: [
                     { id: "v1", name: "voice", kind: "voice", private: false, members: [] },
                     { id: "t1", name: "general", kind: "text", private: false, members: [] },

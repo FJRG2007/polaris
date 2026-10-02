@@ -25,14 +25,14 @@ import {
 
 describe("addresses", () => {
     it("keeps just the host, however it was pasted", () => {
-        expect(normalizeAddress("  RTSP://192.168.1.50:554/stream1  ")).toBe("192.168.1.50:554");
+        expect(normalizeAddress("  RTSP://10.0.1.50:554/stream1  ")).toBe("10.0.1.50:554");
         expect(normalizeAddress("http://Camera.local/")).toBe("camera.local");
-        expect(normalizeAddress("192.168.1.50")).toBe("192.168.1.50");
+        expect(normalizeAddress("10.0.1.50")).toBe("10.0.1.50");
     });
 
     it("gives a stream path its leading slash and takes a host off it", () => {
         expect(normalizeStreamPath("stream1")).toBe("/stream1");
-        expect(normalizeStreamPath("rtsp://192.168.1.50:554/h264Preview_01_main")).toBe(
+        expect(normalizeStreamPath("rtsp://10.0.1.50:554/h264Preview_01_main")).toBe(
             "/h264Preview_01_main"
         );
         expect(normalizeStreamPath("  ")).toBe("");
@@ -52,17 +52,17 @@ describe("addresses", () => {
 });
 
 describe("stream URLs", () => {
-    const camera = { address: "192.168.1.50", rtspPort: 554 };
+    const camera = { address: "10.0.1.50", rtspPort: 554 };
 
     it("encodes credentials, because camera passwords contain @ and /", () => {
         const url = rtspUrl(camera, "/stream1", { username: "polaris", password: "p@ss/word" });
-        expect(url).toBe("rtsp://polaris:p%40ss%2Fword@192.168.1.50:554/stream1");
+        expect(url).toBe("rtsp://polaris:p%40ss%2Fword@10.0.1.50:554/stream1");
         // The host must still be the camera - an unencoded @ moves it.
-        expect(new URL(url).hostname).toBe("192.168.1.50");
+        expect(new URL(url).hostname).toBe("10.0.1.50");
     });
 
     it("leaves out credentials when the camera needs none", () => {
-        expect(rtspUrl(camera, "/stream1")).toBe("rtsp://192.168.1.50:554/stream1");
+        expect(rtspUrl(camera, "/stream1")).toBe("rtsp://10.0.1.50:554/stream1");
     });
 
     it("brackets a bare IPv6 address", () => {
@@ -73,7 +73,7 @@ describe("stream URLs", () => {
 
     it("hides the password from anything a person reads", () => {
         const url = rtspUrl(camera, "/stream1", { username: "polaris", password: "hunter2" });
-        expect(redactRtspUrl(url)).toBe("rtsp://polaris:***@192.168.1.50:554/stream1");
+        expect(redactRtspUrl(url)).toBe("rtsp://polaris:***@10.0.1.50:554/stream1");
         expect(redactRtspUrl(url)).not.toContain("hunter2");
     });
 
@@ -121,14 +121,14 @@ describe("what a camera says", () => {
 
 describe("sweeping a subnet", () => {
     it("lists the hosts of a /24 and leaves out network and broadcast", () => {
-        const hosts = hostsInCidr("192.168.1.0/24");
+        const hosts = hostsInCidr("10.0.1.0/24");
         expect(hosts).toHaveLength(254);
-        expect(hosts[0]).toBe("192.168.1.1");
-        expect(hosts.at(-1)).toBe("192.168.1.254");
+        expect(hosts[0]).toBe("10.0.1.1");
+        expect(hosts.at(-1)).toBe("10.0.1.254");
     });
 
     it("takes the network address from any host in the range", () => {
-        expect(hostsInCidr("192.168.1.77/24")[0]).toBe("192.168.1.1");
+        expect(hostsInCidr("10.0.1.77/24")[0]).toBe("10.0.1.1");
     });
 
     it("refuses a range too wide to sweep", () => {

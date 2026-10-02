@@ -27,7 +27,7 @@ const server = {
             const slot = Number(/Slot:(-?\d+)b/.exec(argv[4] ?? "")?.[1]);
             const stack = fake.slots.get(slot);
             if (!stack) return "Found no elements matching Inventory";
-            return `Reckmy has the following entity data: {Slot: ${slot}b, id: "${stack.id}", count: ${stack.count}}`;
+            return `Grumm has the following entity data: {Slot: ${slot}b, id: "${stack.id}", count: ${stack.count}}`;
         }
         // item replace entity <player> <slot> with <item> <count>
         fake.wrote.push(argv.join(" "));
@@ -36,7 +36,7 @@ const server = {
         const count = Number(argv[7]);
         if (item === "minecraft:air" || item === "air") fake.slots.delete(slot);
         else fake.slots.set(slot, { id: item, count });
-        return "Replaced a slot on Reckmy with ...";
+        return "Replaced a slot on Grumm with ...";
     }
 };
 
@@ -68,7 +68,7 @@ async function drag(from: number, to: number, count?: number) {
         const held = fake.slots.get(slot);
         return held ? stack(slot, held.id, held.count) : null;
     };
-    await moveStack("owner", "install", "Reckmy", from, to, { from: seen(from), to: seen(to) }, count);
+    await moveStack("owner", "install", "Grumm", from, to, { from: seen(from), to: seen(to) }, count);
 }
 
 beforeEach(() => {

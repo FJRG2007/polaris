@@ -45,7 +45,7 @@ describe("which names count as public", () => {
     it("leaves the names the compose labels already serve", () => {
         // These have their own router and the internal certificate; routing them here
         // would ask Let's Encrypt for a certificate it can never issue.
-        for (const name of ["polaris.local", "polaris", "polaris.internal", "box.lan", "192.168.1.138"]) {
+        for (const name of ["polaris.local", "polaris", "polaris.internal", "box.lan", "10.0.1.138"]) {
             expect(publicHostname(name)).toBeNull();
         }
     });
@@ -124,16 +124,16 @@ describe("guarding the dashboard itself", () => {
 
     it("narrows the route to an allowlist natively", () => {
         // Traefik enforces this one itself, so it keeps working with the guard down.
-        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["192.168.1.0/24"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["10.0.1.0/24"] });
 
-        expect(config).toContain("      ipAllowList:\n        sourceRange: [\"192.168.1.0/24\"]");
+        expect(config).toContain("      ipAllowList:\n        sourceRange: [\"10.0.1.0/24\"]");
         expect(config).toContain("middlewares: [polaris-dashboard-allow]");
     });
 
     it("keeps the allowlist on the :80 redirect router as well", () => {
         // Otherwise a blocked address still reaches the redirect and learns the name
         // is served here.
-        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["192.168.1.0/24"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["10.0.1.0/24"] });
 
         expect(config).toContain("middlewares: [polaris-dashboard-allow, polaris-dashboard-redirect-https]");
     });

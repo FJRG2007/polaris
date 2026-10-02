@@ -37,8 +37,8 @@ describe("a path, which is what this instance's own call server is", () => {
     });
 
     it("keeps a non-default port, since that is part of the host", () => {
-        pageAt("http:", "192.168.1.10:8080");
-        expect(callServerUrl("/livekit")).toBe("ws://192.168.1.10:8080/livekit");
+        pageAt("http:", "10.0.1.10:8080");
+        expect(callServerUrl("/livekit")).toBe("ws://10.0.1.10:8080/livekit");
     });
 
     it("leaves no doubled slash where the client appends its own", () => {

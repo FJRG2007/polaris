@@ -41,8 +41,8 @@ const reading: GamePortsReading = {
     ],
     // Listening: the server is up and simply unproven, which is the state that
     // has anything to say about the router at all.
-    advice: gameReachAdvice("home-nat", pending, false, "192.168.1.142", "range", DEFAULT_PORT_BLOCKS, true),
-    lanIp: "192.168.1.142",
+    advice: gameReachAdvice("home-nat", pending, false, "10.0.1.142", "range", DEFAULT_PORT_BLOCKS, true),
+    lanIp: "10.0.1.142",
     policy: "range",
     blocks: DEFAULT_PORT_BLOCKS
 };
@@ -71,7 +71,7 @@ describe("the game ports section", () => {
     it("asks for nothing at all while the server is still starting", () => {
         const starting: GamePortsReading = {
             ...reading,
-            advice: gameReachAdvice("home-nat", pending, false, "192.168.1.142", "range", DEFAULT_PORT_BLOCKS, false)
+            advice: gameReachAdvice("home-nat", pending, false, "10.0.1.142", "range", DEFAULT_PORT_BLOCKS, false)
         };
         const markup = markupFor(starting);
 
@@ -101,7 +101,7 @@ describe("the game ports section", () => {
         const off: GamePortsReading = {
             ...reading,
             servers: reading.servers.map((server) => ({ ...server, confirmed: true, running: false })),
-            advice: gameReachAdvice("home-nat", [], true, "192.168.1.142", "range", DEFAULT_PORT_BLOCKS, null)
+            advice: gameReachAdvice("home-nat", [], true, "10.0.1.142", "range", DEFAULT_PORT_BLOCKS, null)
         };
         const markup = markupFor(off);
 
@@ -113,7 +113,7 @@ describe("the game ports section", () => {
         const done: GamePortsReading = {
             ...reading,
             servers: reading.servers.map((server) => ({ ...server, confirmed: true })),
-            advice: gameReachAdvice("home-nat", pending, true, "192.168.1.142", "range", DEFAULT_PORT_BLOCKS, true)
+            advice: gameReachAdvice("home-nat", pending, true, "10.0.1.142", "range", DEFAULT_PORT_BLOCKS, true)
         };
         const markup = markupFor(done);
 

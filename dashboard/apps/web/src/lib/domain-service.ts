@@ -192,7 +192,7 @@ function isRoutableIpv4(value: string): boolean {
 
 /**
  * Auto-fill the free-subdomain public IP from a detected server address the first
- * time (Caddy sets `X-Server-Ip` to the connection's local host, e.g. 192.168.1.138,
+ * time (Caddy sets `X-Server-Ip` to the connection's local host, e.g. 10.0.1.138,
  * even when reached by hostname), so free subdomains work with zero setup - the way
  * Dokploy/Coolify do. An address already recorded is never overwritten; a detected
  * one written here does not outrank what the responder sees on the host today, so a

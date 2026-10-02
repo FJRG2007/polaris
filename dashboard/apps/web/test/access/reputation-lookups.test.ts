@@ -140,7 +140,7 @@ describe("asking a provider about the addresses in the log", () => {
     });
 
     it("leaves addresses nobody outside can reach alone", async () => {
-        await checkReputation(["192.168.1.5", "127.0.0.1", "10.0.0.3", "172.16.0.9"]);
+        await checkReputation(["192.168.50.5", "127.0.0.1", "10.0.0.3", "172.16.0.9"]);
         expect(asked).toEqual([]);
     });
 

@@ -150,7 +150,7 @@ describe("what is wrong with what was typed", () => {
             "https://example.com/login?next=x",
             "*.example.com",
             "localhost:8080",
-            "192.168.1.1",
+            "10.0.1.1",
             "nas"
         ]) {
             expect(uris.uriProblem(value, null)).toBeNull();

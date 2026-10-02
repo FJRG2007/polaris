@@ -486,14 +486,14 @@ describe("a status, as Places reads it", () => {
 
 describe("connecting", () => {
     it("reads a unit at a typed address and keeps where and what it is", async () => {
-        unit("192.168.1.40", {
+        unit("10.0.1.40", {
             status: ac3829(),
             info: { modelid: "AC3829/10", name: "Bedroom", device_id: "info-1" }
         });
-        const stored = await driver.philipsCoapDriver.verify({ host: "192.168.1.40" });
+        const stored = await driver.philipsCoapDriver.verify({ host: "10.0.1.40" });
         expect(JSON.parse(stored!.units!)).toEqual([
             {
-                address: "192.168.1.40",
+                address: "10.0.1.40",
                 deviceId: "abc123",
                 infoId: "info-1",
                 model: "AC3829/10",
@@ -504,12 +504,12 @@ describe("connecting", () => {
     });
 
     it("looks through the subnet when no address is typed", async () => {
-        subnet.addresses = ["192.168.1.10", "192.168.1.40", "192.168.1.41"];
-        unit("192.168.1.40", {
+        subnet.addresses = ["10.0.1.10", "10.0.1.40", "10.0.1.41"];
+        unit("10.0.1.40", {
             status: ac3829(),
             info: { modelid: "AC3829/10", name: "Bedroom", device_id: "info-1" }
         });
-        unit("192.168.1.41", {
+        unit("10.0.1.41", {
             status: { ...ac3829(), DeviceId: "def456", name: "Hall" },
             info: { modelid: "AC3829/10", name: "Hall", device_id: "info-2" }
         });
@@ -520,48 +520,48 @@ describe("connecting", () => {
     });
 
     it("reads the units it finds at the same time", async () => {
-        subnet.addresses = ["192.168.1.40", "192.168.1.41"];
-        unit("192.168.1.40", {
+        subnet.addresses = ["10.0.1.40", "10.0.1.41"];
+        unit("10.0.1.40", {
             status: ac3829(),
             deafSyncs: 1,
             info: { modelid: "AC3829/10", name: "Bedroom", device_id: "info-1" }
         });
-        unit("192.168.1.41", {
+        unit("10.0.1.41", {
             status: { ...ac3829(), DeviceId: "def456" },
             deafSyncs: 1,
             info: { modelid: "AC3829/10", name: "Hall", device_id: "info-2" }
         });
         const stored = await driver.philipsCoapDriver.verify({ host: "" });
         expect(JSON.parse(stored!.units!)).toHaveLength(2);
-        expect(opened.slice(0, 2).sort()).toEqual(["192.168.1.40", "192.168.1.41"]);
+        expect(opened.slice(0, 2).sort()).toEqual(["10.0.1.40", "10.0.1.41"]);
     });
 
     it("says so when nothing on the network is a Philips", async () => {
-        subnet.addresses = ["192.168.1.10"];
+        subnet.addresses = ["10.0.1.10"];
         await expect(driver.philipsCoapDriver.verify({ host: "" })).rejects.toThrow(
             "No Philips air purifier answered on this network"
         );
-        await expect(driver.philipsCoapDriver.verify({ host: "192.168.1.99" })).rejects.toThrow(
+        await expect(driver.philipsCoapDriver.verify({ host: "10.0.1.99" })).rejects.toThrow(
             "No Philips air purifier answered at that address"
         );
     });
 
     it("says the firmware does not allow local control when the port is closed", async () => {
-        unit("192.168.1.40", { refused: true });
-        await expect(driver.philipsCoapDriver.verify({ host: "192.168.1.40" })).rejects.toThrow(
+        unit("10.0.1.40", { refused: true });
+        await expect(driver.philipsCoapDriver.verify({ host: "10.0.1.40" })).rejects.toThrow(
             api.PHILIPS_LOCAL_OFF
         );
     });
 
     it("says the same of a unit that says who it is and will not be read", async () => {
-        unit("192.168.1.40", {
+        unit("10.0.1.40", {
             infoOnly: true,
             info: { modelid: "AC3829/10", name: "Bedroom", device_id: "info-1" }
         });
-        await expect(driver.philipsCoapDriver.verify({ host: "192.168.1.40" })).rejects.toThrow(
+        await expect(driver.philipsCoapDriver.verify({ host: "10.0.1.40" })).rejects.toThrow(
             "This model's firmware does not allow local control"
         );
-        subnet.addresses = ["192.168.1.40"];
+        subnet.addresses = ["10.0.1.40"];
         await expect(driver.philipsCoapDriver.verify({ host: "" })).rejects.toThrow(
             "This model's firmware does not allow local control"
         );
@@ -571,7 +571,7 @@ describe("connecting", () => {
 const STORED = (deviceId = "abc123", model = "AC3829/10") => ({
     units: JSON.stringify([
         {
-            address: "192.168.1.40",
+            address: "10.0.1.40",
             deviceId,
             infoId: "info-1",
             model,
@@ -583,7 +583,7 @@ const STORED = (deviceId = "abc123", model = "AC3829/10") => ({
 
 describe("reading", () => {
     it("draws a unit as an air purifier with its dust as the row's reading", async () => {
-        unit("192.168.1.40", { status: ac3829() });
+        unit("10.0.1.40", { status: ac3829() });
         const [row] = await driver.philipsCoapDriver.list(STORED());
         expect(row).toMatchObject({
             externalId: "abc123",
@@ -599,14 +599,14 @@ describe("reading", () => {
     });
 
     it("wakes a wedged unit with a fresh sync on a new link", async () => {
-        const fake = unit("192.168.1.40", { status: ac3829(), deafSyncs: 1 });
+        const fake = unit("10.0.1.40", { status: ac3829(), deafSyncs: 1 });
         const [row] = await driver.philipsCoapDriver.list(STORED());
         expect(row!.online).toBe(true);
         expect(fake.links).toBe(2);
     });
 
     it("leaves a unit that will not answer alone for a while rather than asking every time", async () => {
-        const fake = unit("192.168.1.40", { status: ac3829(), deafSyncs: 10 });
+        const fake = unit("10.0.1.40", { status: ac3829(), deafSyncs: 10 });
         const [first] = await driver.philipsCoapDriver.list(STORED());
         expect(first).toMatchObject({ online: false, state: "unknown", kind: "air" });
         const opened = fake.links;
@@ -616,16 +616,16 @@ describe("reading", () => {
     });
 
     it("finds a unit again by its id after it moves, and keeps the new address", async () => {
-        subnet.addresses = ["192.168.1.40", "192.168.1.77"];
-        unit("192.168.1.40", { deafSyncs: 10 });
-        unit("192.168.1.77", {
+        subnet.addresses = ["10.0.1.40", "10.0.1.77"];
+        unit("10.0.1.40", { deafSyncs: 10 });
+        unit("10.0.1.77", {
             status: ac3829(),
             info: { modelid: "AC3829/10", name: "Bedroom", device_id: "info-1" }
         });
         const [row] = await driver.philipsCoapDriver.list(STORED());
         expect(row!.online).toBe(true);
         const renewed = await driver.philipsCoapDriver.renew!(STORED());
-        expect(JSON.parse(renewed!.units!)[0].address).toBe("192.168.1.77");
+        expect(JSON.parse(renewed!.units!)[0].address).toBe("10.0.1.77");
     });
 
     it("refuses a stored connection it cannot read", async () => {
@@ -637,7 +637,7 @@ describe("reading", () => {
 
 describe("operating", () => {
     it("sends the preset's values, sealed, and the unit lands on them", async () => {
-        const fake = unit("192.168.1.40", { status: ac3829() });
+        const fake = unit("10.0.1.40", { status: ac3829() });
         await driver.philipsCoapDriver.act(
             STORED(),
             { externalId: "abc123", kind: "air" },
@@ -650,7 +650,7 @@ describe("operating", () => {
     });
 
     it("switches a model the table does not list with the key scheme its status uses", async () => {
-        const fake = unit("192.168.1.40", {
+        const fake = unit("10.0.1.40", {
             status: { "D03-02": "ON", DeviceId: "abc123", modelid: "AC9999/10" }
         });
         await driver.philipsCoapDriver.act(
@@ -672,7 +672,7 @@ describe("operating", () => {
     });
 
     it("says the unit refused when it never says success", async () => {
-        unit("192.168.1.40", { status: ac3829(), infoOnly: true });
+        unit("10.0.1.40", { status: ac3829(), infoOnly: true });
         await expect(
             driver.philipsCoapDriver.act(
                 STORED(),
@@ -696,12 +696,12 @@ describe("a unit whose firmware only pushes", () => {
     });
 
     it("is read by nudging its light and ends with the light where the owner left it", async () => {
-        const fake = unit("192.168.1.40", {
+        const fake = unit("10.0.1.40", {
             status: HU1509(),
             pushOnly: true,
             info: { modelid: "HU1509/00", name: "Nursery", device_id: "info-9" }
         });
-        const stored = await driver.philipsCoapDriver.verify({ host: "192.168.1.40" });
+        const stored = await driver.philipsCoapDriver.verify({ host: "10.0.1.40" });
         expect(JSON.parse(stored!.units!)[0]).toMatchObject({
             deviceId: "hu-1",
             model: "HU1509/00"
@@ -723,7 +723,7 @@ describe("a unit whose firmware only pushes", () => {
     });
 
     it("keeps one link open and takes its pushes, with commands on that same link", async () => {
-        const fake = unit("192.168.1.40", { status: HU1509(), pushOnly: true });
+        const fake = unit("10.0.1.40", { status: HU1509(), pushOnly: true });
         const stored = STORED("hu-1", "HU1509/00");
         await driver.philipsCoapDriver.list(stored);
         expect(fake.links).toBe(1);
@@ -740,7 +740,7 @@ describe("a unit whose firmware only pushes", () => {
     });
 
     it("lets go of the link when the connection is removed", async () => {
-        const fake = unit("192.168.1.40", { status: HU1509(), pushOnly: true });
+        const fake = unit("10.0.1.40", { status: HU1509(), pushOnly: true });
         const stored = STORED("hu-1", "HU1509/00");
         await driver.philipsCoapDriver.list(stored);
         await driver.philipsCoapDriver.forget!(stored);

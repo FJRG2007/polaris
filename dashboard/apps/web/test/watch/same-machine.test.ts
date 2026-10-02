@@ -113,7 +113,7 @@ beforeEach(() => {
 
 describe("collecting from a server that is the machine Polaris runs on", () => {
     it("writes one series for the box, not one per way of reaching it", async () => {
-        hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: null }];
+        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
         daemons = { h1: SAME };
 
         await collectMetricsOnce({ storage: false });
@@ -124,7 +124,7 @@ describe("collecting from a server that is the machine Polaris runs on", () => {
     });
 
     it("remembers which daemon each side turned out to be", async () => {
-        hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: null }];
+        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
         daemons = { h1: SAME };
 
         await collectMetricsOnce({ storage: false });
@@ -135,8 +135,8 @@ describe("collecting from a server that is the machine Polaris runs on", () => {
 
     it("still measures a server that is a different machine", async () => {
         hosts = [
-            { id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: null },
-            { id: "h2", name: "lirio-2", ownerId: "u1", address: "192.168.1.160", username: "polaris", dockerId: OTHER }
+            { id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null },
+            { id: "h2", name: "node-2", ownerId: "u1", address: "10.0.1.160", username: "polaris", dockerId: OTHER }
         ];
         daemons = { h1: SAME, h2: OTHER };
 
@@ -149,21 +149,21 @@ describe("collecting from a server that is the machine Polaris runs on", () => {
 
 describe("the servers Watch shows", () => {
     it("shows the box once, under the name it was enrolled with", async () => {
-        hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: SAME }];
+        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: SAME }];
         localDockerIdValue = SAME;
 
         const cards = await getWatchServers("u1");
 
         expect(cards).toHaveLength(1);
         expect(cards[0]?.id).toBe(LOCAL_SUBJECT);
-        expect(cards[0]?.name).toBe("lirio-0");
+        expect(cards[0]?.name).toBe("node-0");
         // And it says why there is only one of it.
-        expect(cards[0]?.detail).toContain("polaris@192.168.1.138");
+        expect(cards[0]?.detail).toContain("polaris@10.0.1.138");
         expect(cards[0]?.detail).toContain("the machine Polaris runs on");
     });
 
     it("keeps a genuinely remote server as its own card", async () => {
-        hosts = [{ id: "h2", name: "lirio-2", ownerId: "u1", address: "192.168.1.160", username: "polaris", dockerId: OTHER }];
+        hosts = [{ id: "h2", name: "node-2", ownerId: "u1", address: "10.0.1.160", username: "polaris", dockerId: OTHER }];
         localDockerIdValue = SAME;
 
         const cards = await getWatchServers("u1");
@@ -173,20 +173,20 @@ describe("the servers Watch shows", () => {
     });
 
     it("lists the box's containers once, not once per route to it", async () => {
-        hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: SAME }];
+        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: SAME }];
         localDockerIdValue = SAME;
 
         const cards = await getWatchContainers("u1");
 
         expect(cards).toHaveLength(1);
-        expect(cards[0]?.detail).toContain("lirio-0");
+        expect(cards[0]?.detail).toContain("node-0");
     });
 
     it("does not merge a server it has not identified yet", async () => {
         // Nothing sampled since the server was added, and no address to go on.
         // Guessing here would hide a real machine, which is worse than briefly
         // showing one twice.
-        hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: null }];
+        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
         localDockerIdValue = SAME;
 
         const cards = await getWatchServers("u1");
@@ -198,18 +198,18 @@ describe("the servers Watch shows", () => {
     // SSH - which is precisely the server that otherwise sits there reporting
     // nothing. The address is known before anything has been sampled.
     it("merges a server enrolled at this machine's own address", async () => {
-        hosts = [{ id: "h1", name: "lirio-0", ownerId: "u1", address: "192.168.1.138", username: "polaris", dockerId: null }];
-        lanIp = "192.168.1.138";
+        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
+        lanIp = "10.0.1.138";
 
         const cards = await getWatchServers("u1");
 
         expect(cards).toHaveLength(1);
-        expect(cards[0]?.name).toBe("lirio-0");
+        expect(cards[0]?.name).toBe("node-0");
     });
 
     it("leaves a server at another address alone", async () => {
-        hosts = [{ id: "h2", name: "lirio-2", ownerId: "u1", address: "192.168.1.160", username: "polaris", dockerId: null }];
-        lanIp = "192.168.1.138";
+        hosts = [{ id: "h2", name: "node-2", ownerId: "u1", address: "10.0.1.160", username: "polaris", dockerId: null }];
+        lanIp = "10.0.1.138";
 
         const cards = await getWatchServers("u1");
 

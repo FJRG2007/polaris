@@ -223,7 +223,7 @@ describe("proving a server's ports", () => {
 
     it("knocks on nothing when this line has no address of its own", async () => {
         const { port, server } = await listener();
-        publicIp = "192.168.1.142";
+        publicIp = "10.0.1.142";
 
         // The forward is exactly what is in question, so a probe that never leaves
         // the network can only ever answer the wrong question.
@@ -237,7 +237,7 @@ describe("recording what arrived", () => {
     it("refuses a join from this same network", async () => {
         // The one case where it means nothing: the operator testing from their own
         // desk never went near the router.
-        expect(await noteReachedFrom("desk", "192.168.1.50")).toBe(false);
+        expect(await noteReachedFrom("desk", "10.0.1.50")).toBe(false);
         expect(patched).toEqual([]);
     });
 

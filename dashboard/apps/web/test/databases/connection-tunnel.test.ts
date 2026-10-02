@@ -104,7 +104,7 @@ vi.mock("@/lib/host-service", () => {
         if (hostId === SERVER) {
             return {
                 id: SERVER,
-                name: "lirio-0",
+                name: "node-0",
                 address: "10.0.0.2",
                 port: 22,
                 username: "polaris",
@@ -531,7 +531,7 @@ describe("opening one", () => {
                 pinnedHostKey: ["SERVERKEY"]
             },
             jump: null,
-            label: "lirio-0"
+            label: "node-0"
         });
         // The database's own address is untouched: it is what the SSH server sees.
         expect(address).toMatchObject({ host: "127.0.0.1", port: 5432 });
@@ -649,15 +649,15 @@ describe("opening one", () => {
 
 describe("the list", () => {
     it("says where a tunnelled connection is reached through", async () => {
-        saved = [row({ sshMode: "server", sshHostId: SERVER, sshServer: { name: "lirio-0" } })];
+        saved = [row({ sshMode: "server", sshHostId: SERVER, sshServer: { name: "node-0" } })];
 
         const [listed] = await listConnections(ALICE);
 
-        expect(listed?.where).toBe("127.0.0.1:5432 via lirio-0");
+        expect(listed?.where).toBe("127.0.0.1:5432 via node-0");
         expect(listed?.tunnel).toMatchObject({
             mode: "server",
             hostId: SERVER,
-            hostName: "lirio-0"
+            hostName: "node-0"
         });
     });
 });

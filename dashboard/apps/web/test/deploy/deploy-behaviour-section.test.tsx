@@ -81,7 +81,7 @@ describe("the Deploys section of a service page", () => {
     it("shows the operator's own networks with the name a container there calls this service by", async () => {
         behaviourAction.mockResolvedValue({
             view: view({
-                externalNetworks: [{ name: "app_network", aliases: ["dymo-api", "dymoapi"] }]
+                externalNetworks: [{ name: "app_network", aliases: ["payments-api", "paymentsapi"] }]
             })
         });
         render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {
@@ -89,7 +89,7 @@ describe("the Deploys section of a service page", () => {
         });
 
         expect(await screen.findByDisplayValue("app_network")).toBeDefined();
-        expect(screen.getByDisplayValue("dymo-api, dymoapi")).toBeDefined();
+        expect(screen.getByDisplayValue("payments-api, paymentsapi")).toBeDefined();
     });
 
     it("reports the load failure in words instead of leaving the section blank", async () => {

@@ -90,8 +90,8 @@ describe("a line typed into the console", () => {
             "@polaris-app/game-servers/src/lib/minecraft/broadcast"
         );
         for (const verb of ["tell", "msg", "w"]) {
-            const argv = consoleBroadcastArgv("java", `${verb} ErMigue04 ven al spawn`);
-            expect(argv?.slice(0, 2)).toEqual(["tellraw", "ErMigue04"]);
+            const argv = consoleBroadcastArgv("java", `${verb} Jeb_04 ven al spawn`);
+            expect(argv?.slice(0, 2)).toEqual(["tellraw", "Jeb_04"]);
             expect(JSON.parse(argv?.[2] ?? "[]")).toEqual([
                 { text: "[Polaris] ", color: "gray" },
                 { text: "ven al spawn", color: "gray", italic: true }
@@ -103,9 +103,9 @@ describe("a line typed into the console", () => {
         const { consoleBroadcastArgv } = await import(
             "@polaris-app/game-servers/src/lib/minecraft/broadcast"
         );
-        expect(consoleBroadcastArgv("java", "op ErMigue04")).toBeNull();
+        expect(consoleBroadcastArgv("java", "op Jeb_04")).toBeNull();
         expect(consoleBroadcastArgv("java", "say")).toBeNull();
-        expect(consoleBroadcastArgv("java", "tell ErMigue04")).toBeNull();
+        expect(consoleBroadcastArgv("java", "tell Jeb_04")).toBeNull();
         expect(consoleBroadcastArgv("java", "sayhello")).toBeNull();
     });
 });

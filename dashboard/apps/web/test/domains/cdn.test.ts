@@ -73,7 +73,7 @@ describe("setDomainCdn", () => {
 
     it("sets only proxied on the name's own record", async () => {
         mocks.findAddressRecords.mockResolvedValue([
-            { id: "r1", type: "A", name: "app.example.com", content: "51.15.20.30", proxied: false, ttl: 300 }
+            { id: "r1", type: "A", name: "app.example.com", content: "5.6.7.8", proxied: false, ttl: 300 }
         ]);
         await cdn.setDomainCdn("d1", CALLER, true);
         expect(mocks.setRecordProxied).toHaveBeenCalledWith("cf-token", "zone-1", "r1", true);
@@ -84,14 +84,14 @@ describe("setDomainCdn", () => {
     it("gives a wildcard-covered name a record of its own with the wildcard's address", async () => {
         mocks.findAddressRecords.mockImplementation(async (_token: string, _zone: string, name: string) =>
             name === "*.example.com"
-                ? [{ id: "w1", type: "A", name, content: "51.15.20.30", proxied: false, ttl: 1 }]
+                ? [{ id: "w1", type: "A", name, content: "5.6.7.8", proxied: false, ttl: 1 }]
                 : []
         );
         await cdn.setDomainCdn("d1", CALLER, true);
         expect(mocks.createAddressRecord).toHaveBeenCalledWith("cf-token", "zone-1", {
             type: "A",
             name: "app.example.com",
-            content: "51.15.20.30",
+            content: "5.6.7.8",
             proxied: true
         });
         expect(mocks.setRecordProxied).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe("whose name it is", () => {
         mocks.resolveZoneForHostname.mockResolvedValue({ id: "zone-1", name: "example.com" });
         mocks.zoneSslMode.mockResolvedValue("strict");
         mocks.findAddressRecords.mockResolvedValue([
-            { id: "r1", type: "A", name: "mail.example.com", content: "51.15.20.30", proxied: false, ttl: 300 }
+            { id: "r1", type: "A", name: "mail.example.com", content: "5.6.7.8", proxied: false, ttl: 300 }
         ]);
         mocks.dashboardHosts.mockResolvedValue(["polaris.example.com"]);
         mocks.deployZoneHosts.mockResolvedValue(["plr.example.com"]);

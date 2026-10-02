@@ -322,7 +322,7 @@ describe("isRouterKeylimitExhaustedError", () => {
 });
 
 /**
- * Four runs against FJRG2007/experiments were reported as "this run exceeded the
+ * Four runs against acme/experiments were reported as "this run exceeded the
  * model's context window - pick a model with a larger context window, or split
  * this PR into smaller ones". The model was gpt-oss-120b on Groq, whose window
  * is 131,072 tokens and was never approached: Groq refused at 8,000 tokens per

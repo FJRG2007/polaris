@@ -171,14 +171,14 @@ describe("merging the account's copy", () => {
             {
                 kind: "result",
                 scope: "servers",
-                term: "lirio",
-                label: "lirio-0",
+                term: "node",
+                label: "node-0",
                 href: "/apps/servers",
                 usedAt: "2026-08-06T09:00:00.000Z"
             }
         ]);
-        expect(merged.map((entry) => entry.label)).toContain("lirio-0");
+        expect(merged.map((entry) => entry.label)).toContain("node-0");
         expect(Array.isArray(stored())).toBe(true);
-        expect(readRecentSearches().map((entry) => entry.label)).toContain("lirio-0");
+        expect(readRecentSearches().map((entry) => entry.label)).toContain("node-0");
     });
 });

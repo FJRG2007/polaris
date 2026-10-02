@@ -47,7 +47,7 @@ type Seed = { installedAppId: string; env: { key: string; value: string; isSecre
 function server(software: string, version: string) {
     return createGameServerSchema.parse({
         game: "minecraft",
-        name: "Offgrid",
+        name: "ExampleSMP",
         serverId: "local",
         ownerPlayer: "Steve",
         ownerAddress: "203.0.113.9",

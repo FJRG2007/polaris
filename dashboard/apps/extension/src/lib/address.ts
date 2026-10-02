@@ -52,7 +52,7 @@ export function readOrigin(typed: string): string | null {
  * Deliberately not a list of valid endings: a self-hosted Polaris answers on
  * whatever its owner owns, including names no public suffix list has heard of,
  * and refusing those would be refusing the people this is built for. An address
- * with a port and nothing else - `192.168.1.4:8080` - passes on the dot rule
+ * with a port and nothing else - `10.0.1.4:8080` - passes on the dot rule
  * already, which is the intent.
  */
 export function looksLikeAddress(typed: string): boolean {

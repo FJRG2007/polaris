@@ -8,7 +8,7 @@
  *
  * - `name`: the name its owner chose. Absent means its slug, so every service has
  *   a name from the moment it exists and nothing has to be backfilled.
- * - `aliases`: extra names it answers to - an SDK that insists on `dymoapi`.
+ * - `aliases`: extra names it answers to - an SDK that insists on `paymentsapi`.
  * - `former`: names it was renamed from, each until a date. They keep answering
  *   so a service deployed with the old name in its variables goes on reaching it
  *   until it is deployed again and picks up the new one.

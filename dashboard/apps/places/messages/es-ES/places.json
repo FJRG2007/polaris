@@ -410,7 +410,7 @@
         "noPtz": "Esta cámara no se mueve",
         "notInstalled": "Places no está instalado",
         "recognizerMissing": "El reconocedor se instaló pero no aparece",
-        "recognizerAddress": "Escribe la dirección como http://192.168.1.20:8000",
+        "recognizerAddress": "Escribe la dirección como http://10.0.1.20:8000",
         "clipGone": "Clip inexistente",
         "relayQuiet": "El relé de cámaras se instaló pero aún no responde",
         "relayRefused": "El relé no aceptó esa cámara",
@@ -463,7 +463,7 @@
         "schemaPlace": "Sitio desconocido",
         "schemaCamera": "Cámara desconocida",
         "schemaPerson": "Persona no válida",
-        "schemaSubnet": "Escríbelo como 192.168.1.0/24",
+        "schemaSubnet": "Escríbelo como 10.0.1.0/24",
         "schemaConnect": "Elige cómo conectarlo",
         "relayStatus": "El relé lo rechazó ({status}).",
         "noSignIn": "A esa conexión le falta su inicio de sesión",
@@ -481,8 +481,8 @@
         "tplinkAccount": "El dispositivo no aceptó esa cuenta de TP-Link. Usa el correo y la contraseña con los que entras en la app Tapo o Kasa.",
         "tplinkNothing": "Ese dispositivo TP-Link no es un enchufe, un interruptor ni una bombilla, así que no hay nada que controlar.",
         "tplinkCannot": "A un dispositivo TP-Link no se le puede pedir eso",
-        "addressNoPath": "Escribe la dirección como 192.168.1.30, sin ruta",
-        "addressForbidden": "Polaris no se conecta a esa dirección. Usa la dirección del dispositivo en tu red, como 192.168.1.30.",
+        "addressNoPath": "Escribe la dirección como 10.0.1.30, sin ruta",
+        "addressForbidden": "Polaris no se conecta a esa dirección. Usa la dirección del dispositivo en tu red, como 10.0.1.30.",
         "shellyNot": "Esa dirección respondió, pero no como un Shelly.",
         "shellyPassword": "El Shelly rechazó la contraseña. Es la que se fija en la app Shelly, en los ajustes de autenticación del dispositivo.",
         "shellyNeedsPassword": "Este Shelly tiene contraseña. Añádela a la conexión.",
@@ -598,7 +598,7 @@
                 "host": {
                     "label": "Bróker",
                     "hint": "Un nombre o dirección en la misma red que las cerraduras. El firmware de Nuki no se conecta a nada fuera de ella.",
-                    "placeholder": "192.168.1.20"
+                    "placeholder": "10.0.1.20"
                 },
                 "port": {
                     "label": "Puerto"
@@ -628,7 +628,7 @@
                 "host": {
                     "label": "Bróker",
                     "hint": "Un nombre o dirección al que Polaris llegue en esta red.",
-                    "placeholder": "192.168.1.20"
+                    "placeholder": "10.0.1.20"
                 },
                 "port": {
                     "label": "Puerto"
@@ -703,7 +703,7 @@
                 "host": {
                     "label": "Dirección",
                     "hint": "En la misma red que Polaris.",
-                    "placeholder": "192.168.1.40"
+                    "placeholder": "10.0.1.40"
                 },
                 "email": {
                     "label": "Correo TP-Link",
@@ -726,7 +726,7 @@
                 "host": {
                     "label": "Dirección",
                     "hint": "En la misma red que Polaris.",
-                    "placeholder": "192.168.1.41"
+                    "placeholder": "10.0.1.41"
                 },
                 "email": {
                     "label": "Correo TP-Link",
@@ -749,7 +749,7 @@
                 "host": {
                     "label": "Dirección",
                     "hint": "En la misma red que Polaris.",
-                    "placeholder": "192.168.1.30"
+                    "placeholder": "10.0.1.30"
                 },
                 "password": {
                     "label": "Contraseña",
@@ -774,7 +774,7 @@
                 "host": {
                     "label": "Dirección",
                     "hint": "En la misma red que Polaris.",
-                    "placeholder": "192.168.1.20"
+                    "placeholder": "10.0.1.20"
                 },
                 "appKey": {
                     "label": "Clave de app",
@@ -795,7 +795,7 @@
                 "host": {
                     "label": "Dirección",
                     "hint": "En la misma red que Polaris.",
-                    "placeholder": "192.168.1.25"
+                    "placeholder": "10.0.1.25"
                 }
             }
         },
@@ -869,7 +869,7 @@
                 "host": {
                     "label": "Dirección",
                     "hint": "Opcional. Vacía empareja todos los que encuentre. La app Gree+ muestra la MAC de cada uno.",
-                    "placeholder": "192.168.1.40"
+                    "placeholder": "10.0.1.40"
                 }
             }
         },
@@ -885,7 +885,7 @@
                 "host": {
                     "label": "Dirección",
                     "hint": "Opcional. Vacía busca todos los aparatos de esta red; tu router muestra la dirección de cada uno entre sus dispositivos conectados.",
-                    "placeholder": "192.168.1.40"
+                    "placeholder": "10.0.1.40"
                 }
             }
         },
@@ -954,8 +954,8 @@
         "nothingToAsk": "No hay nada en lo que preguntar a esta cámara.",
         "asleep": "Nada respondió en esa dirección. Estas lo cierran todo mientras duermen, así que ábrela una vez en la app Tapo y vuelve a preguntar; y comprueba que la dirección es la que muestra la app.",
         "nothingAtAddress": "Nada respondió en esa dirección. Comprueba que es la que muestra la app Tapo para esta cámara.",
-        "subnet": "Escribe la red como 192.168.1.0/24.",
-        "subnetRemote": "Indica el rango de direcciones de esa red, como 192.168.1.0/24.",
+        "subnet": "Escribe la red como 10.0.1.0/24.",
+        "subnetRemote": "Indica el rango de direcciones de esa red, como 10.0.1.0/24.",
         "cameraNotSaved": "No se pudo guardar esa cámara.",
         "areasUnread": "No se pudieron leer esas áreas.",
         "areaNotSaved": "No se pudo guardar esa área.",

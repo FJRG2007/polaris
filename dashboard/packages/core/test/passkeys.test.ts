@@ -15,8 +15,8 @@ describe("passkeyRelyingPartyId", () => {
     });
 
     it("refuses an address that is not a name", () => {
-        expect(passkeyRelyingPartyId("192.168.1.40")).toBeNull();
-        expect(passkeyRelyingPartyId("http://192.168.1.40:3000")).toBeNull();
+        expect(passkeyRelyingPartyId("10.0.1.40")).toBeNull();
+        expect(passkeyRelyingPartyId("http://10.0.1.40:3000")).toBeNull();
         expect(passkeyRelyingPartyId("[::1]:3000")).toBeNull();
         expect(passkeyRelyingPartyId("-polaris.local")).toBeNull();
         expect(passkeyRelyingPartyId("pola ris.local")).toBeNull();

@@ -5,7 +5,7 @@
  *
  * Two ways of answering, chosen with a switch above the box rather than guessed
  * from what is typed: `cafe` is a name and `cafe12` could be the start of a MAC,
- * `192.168.1.30` is all hex digits and dots, and an IPv6 address has colons. A
+ * `10.0.1.30` is all hex digits and dots, and an IPv6 address has colons. A
  * box that reformatted itself the moment it thought it saw a MAC would be wrong
  * for somebody in every one of those cases.
  *

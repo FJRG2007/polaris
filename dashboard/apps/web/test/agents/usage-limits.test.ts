@@ -44,7 +44,7 @@ vi.mock("@polaris/db", () => ({
 
 const { checkUsageLimits } = await import("@/lib/agents/agent-usage-limits");
 
-const RUN = { ownerId: "user-1", repoFullName: "FJRG2007/experiments" };
+const RUN = { ownerId: "user-1", repoFullName: "acme/experiments" };
 
 beforeEach(() => {
     state.rules = [];
@@ -93,11 +93,11 @@ describe("checkUsageLimits", () => {
     });
 
     it("applies a rule on the GitHub account the repository is under", async () => {
-        state.rules = [{ subjectType: "org", subjectId: "fjrg2007", metric: "runs", period: "day", amount: 1 }];
+        state.rules = [{ subjectType: "org", subjectId: "acme", metric: "runs", period: "day", amount: 1 }];
         state.runs = 1;
         const verdict = await checkUsageLimits(RUN);
         expect(verdict.allowed).toBe(false);
-        expect(verdict.reason).toContain("Repositories under fjrg2007");
+        expect(verdict.reason).toContain("Repositories under acme");
     });
 
     it("applies a rule on a role the person is in, counted for that person", async () => {
@@ -128,7 +128,7 @@ describe("checkUsageLimits", () => {
         // No precedence to learn: every rule that applies has to pass.
         state.rules = [
             { subjectType: "everyone", subjectId: "", metric: "runs", period: "day", amount: 1000 },
-            { subjectType: "repo", subjectId: "FJRG2007/experiments", metric: "runs", period: "day", amount: 2 }
+            { subjectType: "repo", subjectId: "acme/experiments", metric: "runs", period: "day", amount: 2 }
         ];
         state.runs = 3;
         expect((await checkUsageLimits(RUN)).allowed).toBe(false);
@@ -137,7 +137,7 @@ describe("checkUsageLimits", () => {
     it("matches a repository whatever case it was typed in", async () => {
         // GitHub names are case-insensitive; a rule that missed for a capital
         // letter would look like it was being ignored.
-        state.rules = [{ subjectType: "repo", subjectId: "fjrg2007/EXPERIMENTS", metric: "runs", period: "day", amount: 0 }];
+        state.rules = [{ subjectType: "repo", subjectId: "acme/EXPERIMENTS", metric: "runs", period: "day", amount: 0 }];
         expect((await checkUsageLimits(RUN)).allowed).toBe(false);
     });
 

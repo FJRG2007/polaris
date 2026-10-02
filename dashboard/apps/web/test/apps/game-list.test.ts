@@ -29,7 +29,7 @@ function facts(over: Partial<GameServerFacts> = {}): GameServerFacts {
         catalogName: "Minecraft",
         game: "minecraft",
         applicationId: "app",
-        serverName: "lirio-0",
+        serverName: "node-0",
         running: true,
         address: "survival.mc.example.com",
         slots: 20,
@@ -104,7 +104,7 @@ describe("searching and filtering", () => {
         server("Island", {
             game: "ark",
             catalogName: "ARK",
-            facts: facts({ address: "island.ark.example.com", serverName: "lirio-2", release: null }),
+            facts: facts({ address: "island.ark.example.com", serverName: "node-2", release: null }),
             live: live({ answering: false, containerRunning: false })
         }),
         server("Creative", {
@@ -115,7 +115,7 @@ describe("searching and filtering", () => {
 
     it("matches the address and the machine, not only the name", () => {
         expect(filterServers(servers, "ark.example", "", "").map((row) => row.name)).toEqual(["Island"]);
-        expect(filterServers(servers, "lirio-2", "", "").map((row) => row.name)).toEqual(["Island"]);
+        expect(filterServers(servers, "node-2", "", "").map((row) => row.name)).toEqual(["Island"]);
         expect(filterServers(servers, "1.21.4", "", "").map((row) => row.name)).toEqual(["Survival", "Creative"]);
     });
 

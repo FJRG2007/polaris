@@ -53,7 +53,7 @@ function device(overrides: Partial<TrustedDeviceRow> = {}): TrustedDeviceRow {
         id: "trust-device-aaaaaaaa",
         current: false,
         device: "Chrome on Android",
-        ip: "192.168.1.131",
+        ip: "10.0.1.131",
         publicIp: null,
         host: "polaris.local",
         rememberedAt: "2026-07-20T10:00:00.000Z",

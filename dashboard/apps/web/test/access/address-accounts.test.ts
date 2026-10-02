@@ -125,10 +125,10 @@ describe("accounts at an address", () => {
     // matches the column or the other table's, so asking both at once scans every
     // session ever opened.
     it("asks separately for sessions opened at the address and sessions that moved to it", async () => {
-        await accountsAtAddress("85.87.156.88", NOW);
+        await accountsAtAddress("198.51.100.88", NOW);
         expect(sessionQueries.map((query) => query.where)).toEqual([
-            { ipAddress: "85.87.156.88" },
-            { state: { is: { ip: "85.87.156.88" } } }
+            { ipAddress: "198.51.100.88" },
+            { state: { is: { ip: "198.51.100.88" } } }
         ]);
     });
 
@@ -138,16 +138,16 @@ describe("accounts at an address", () => {
             session(),
             session({ id: "session-2", createdAt: new Date("2026-08-04T11:00:00Z") })
         ];
-        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("198.51.100.88", NOW);
         expect(accounts[0]?.sessions.map((entry) => entry.id)).toEqual(["session-2", "session-1"]);
     });
 
     // The log stores the address hashed, so it can only be asked this way - and
     // only about the sign-ins, not about everything the account has ever done.
     it("asks the log by hash, for the sign-in outcomes alone", async () => {
-        await accountsAtAddress("85.87.156.88", NOW);
+        await accountsAtAddress("198.51.100.88", NOW);
         expect(auditQuery?.where).toEqual({
-            ipHash: "hashed:85.87.156.88",
+            ipHash: "hashed:198.51.100.88",
             actorId: { not: null },
             action: {
                 in: ["account.signin", "account.signin.blocked", "account.signin.awaiting-approval"]
@@ -157,7 +157,7 @@ describe("accounts at an address", () => {
 
     it("gathers an account's sessions under it, and names it by its email when it has no name", async () => {
         sessionRows = [session(), session({ id: "session-2", userId: "user-2" })];
-        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("198.51.100.88", NOW);
         expect(accounts.map((account) => account.name)).toEqual([
             "Ada Lovelace",
             "grace@example.com"
@@ -174,7 +174,7 @@ describe("accounts at an address", () => {
             session({ id: "session-old", expiresAt: new Date("2026-08-03T10:00:00Z") }),
             session({ id: "session-now" })
         ];
-        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("198.51.100.88", NOW);
         expect(accounts[0]?.sessions.map((entry) => entry.live)).toEqual([false, true]);
         expect(accounts[0]?.live).toBe(1);
     });
@@ -185,7 +185,7 @@ describe("accounts at an address", () => {
         auditGroups = [
             group({ actorId: "user-2", action: "account.signin.blocked", _count: { _all: 12 } })
         ];
-        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("198.51.100.88", NOW);
         expect(accounts).toHaveLength(1);
         expect(accounts[0]?.id).toBe("user-2");
         expect(accounts[0]?.signIns).toEqual({ accepted: 0, refused: 12, awaiting: 0 });
@@ -199,7 +199,7 @@ describe("accounts at an address", () => {
             group({ action: "account.signin.awaiting-approval", _count: { _all: 1 } }),
             group({ actorId: "user-2", _count: { _all: 5 } })
         ];
-        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("198.51.100.88", NOW);
         const ada = accounts.find((account) => account.id === "user-1");
         expect(ada?.signIns).toEqual({ accepted: 3, refused: 2, awaiting: 1 });
         expect(accounts.find((account) => account.id === "user-2")?.signIns.accepted).toBe(5);
@@ -210,19 +210,19 @@ describe("accounts at an address", () => {
     it("puts an account that is signed in now above one that only tried", async () => {
         sessionRows = [session({ userId: "user-2" })];
         auditGroups = [group({ _max: { at: new Date("2026-08-04T11:59:00Z") } })];
-        const { list: accounts } = await accountsAtAddress("85.87.156.88", NOW);
+        const { list: accounts } = await accountsAtAddress("198.51.100.88", NOW);
         expect(accounts.map((account) => account.id)).toEqual(["user-2", "user-1"]);
     });
 
     it("has nothing to say about an address nobody has ever been seen on", async () => {
-        expect(await accountsAtAddress("85.87.156.88", NOW)).toEqual({ list: [], more: false });
+        expect(await accountsAtAddress("198.51.100.88", NOW)).toEqual({ list: [], more: false });
     });
 
     // The log is asked about the gateway a whole company signs in through as
     // readily as about one attacker, and it holds a group per account and
     // outcome, so the question itself has to be bounded rather than the answer.
     it("asks the log for the most recent sign-ins only, and a bounded number of them", async () => {
-        await accountsAtAddress("85.87.156.88", NOW);
+        await accountsAtAddress("198.51.100.88", NOW);
         expect(auditQuery?.orderBy).toEqual({ _max: { at: "desc" } });
         expect(typeof auditQuery?.take).toBe("number");
     });
@@ -236,7 +236,7 @@ describe("accounts at an address", () => {
         auditGroups = Array.from({ length: 400 }, (_, index) =>
             group({ actorId: `other-${index}` })
         );
-        await accountsAtAddress("85.87.156.88", NOW);
+        await accountsAtAddress("198.51.100.88", NOW);
         const asked = userQuery?.id.in ?? [];
         expect(asked.length).toBeLessThanOrEqual(50);
         // Whoever a ban would actually cut off is who survives the cut.
@@ -257,7 +257,7 @@ describe("accounts at an address", () => {
             ),
             session({ id: "held", createdAt: new Date("2026-07-01T10:00:00Z") })
         ];
-        await accountsAtAddress("85.87.156.88", NOW);
+        await accountsAtAddress("198.51.100.88", NOW);
         expect(userQuery?.id.in).toContain("user-1");
     });
 });

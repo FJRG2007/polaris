@@ -2299,13 +2299,13 @@ describe("a team duel and a build battle", () => {
 
 describe("reading scores the way a real server answers", () => {
     it("takes the objective's display name in the brackets, not its id", () => {
-        // What Offgrid answered at the end of a blood moon: the panel's title.
+        // What a real server answered at the end of a blood moon: the panel's title.
         const output =
-            "PICHURRINA has 73 [Blood moon]FJRG2007 has 47 [Blood moon]Reckmy has 0 [Blood moon]";
+            "DINNERBONE has 73 [Blood moon]PlayerOne has 47 [Blood moon]Grumm has 0 [Blood moon]";
         expect([...commands.readScores(output)]).toEqual([
-            ["PICHURRINA", 73],
-            ["FJRG2007", 47],
-            ["Reckmy", 0]
+            ["DINNERBONE", 73],
+            ["PlayerOne", 47],
+            ["Grumm", 0]
         ]);
         expect([...commands.readScores("Ana has 5 [Luna de sangre]\nBen has 2 [pe_hurt]")]).toEqual(
             [

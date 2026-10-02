@@ -65,7 +65,7 @@ const render = (ui: ReactElement) => draw(ui, { wrapper: MessagesWrapper });
 afterEach(cleanup);
 
 const CONSUMPTION: Consumption = {
-    machine: { name: "lirio", ncpu: 8, memTotalBytes: 32 * GB },
+    machine: { name: "node", ncpu: 8, memTotalBytes: 32 * GB },
     groups: [
         group({
             id: "polaris",
@@ -100,7 +100,7 @@ const CONSUMPTION: Consumption = {
 describe("the split at the top", () => {
     it("names the machine and says how much of it is in containers", () => {
         const { container } = render(<ConsumptionSplit consumption={CONSUMPTION} />);
-        expect(screen.getByText("lirio")).toBeTruthy();
+        expect(screen.getByText("node")).toBeTruthy();
         expect(container.textContent).toContain("9.9 GB of 32 GB in containers");
         expect(container.textContent).toContain("8 cores");
     });

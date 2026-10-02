@@ -3,8 +3,8 @@
  *
  * Deleting an app keeps its volumes, on purpose: a delete can be a mistake, and
  * a world or a database is the one thing a redeploy cannot bring back. But kept
- * for ever, they are what a server's disk fills with - lirio-0 held 2 GB of five
- * Minecraft servers deleted in August, a month later, listed as "Check first"
+ * for ever, they are what a server's disk fills with - one host held 2 GB of five
+ * Minecraft servers deleted a month earlier, still listed as "Check first"
  * for somebody to find and decide about by hand.
  *
  * So the storage screen's own verdict decides, and only its strictest one: a

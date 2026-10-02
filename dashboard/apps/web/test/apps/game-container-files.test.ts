@@ -2,7 +2,7 @@
  * Reading a game server's files past what one command can answer.
  *
  * The host daemon cuts a command's output at 16 KiB and says nothing about it.
- * Offgrid's playtime leaderboard named one player of seven - the one whose file
+ * A server's playtime leaderboard named one player of seven - the one whose file
  * came first - because every file was read as one answer. The fake here cuts the
  * way the daemon does, and serves `readFile` whole the way its stream does, so
  * each reader is held to getting everything, byte for byte.

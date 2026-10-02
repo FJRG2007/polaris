@@ -177,10 +177,10 @@ export async function setFaceRecognition(
         try {
             parsed = new URL(trimmedUrl);
         } catch {
-            throw new HomeError("Write the address as http://192.168.1.20:8000");
+            throw new HomeError("Write the address as http://10.0.1.20:8000");
         }
         if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) {
-            throw new HomeError("Write the address as http://192.168.1.20:8000");
+            throw new HomeError("Write the address as http://10.0.1.20:8000");
         }
     }
     const current = await readSecrets(installedAppId);

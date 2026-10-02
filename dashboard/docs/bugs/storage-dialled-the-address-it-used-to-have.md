@@ -25,7 +25,7 @@
 
 ## What was seen
 
-A UniFi UNAS Pro on the local network took a new DHCP lease. Uploads to it
+A NAS on the local network took a new DHCP lease. Uploads to it
 started failing, and every profile photo that lived on it broke - not for one
 person, for everybody, all at once, with nothing in the deploy or the
 configuration having changed.
@@ -33,7 +33,7 @@ configuration having changed.
 ## What it actually was
 
 A storage connection on the local network is a fixed address in
-`StorageConnection.config` (`{"host": "192.168.1.30", ...}`), and nothing ever
+`StorageConnection.config` (`{"host": "10.0.1.30", ...}`), and nothing ever
 revisited it. The box itself had not gone anywhere: it was still on the shelf,
 still answering SMB, just on a different address its router had handed it.
 Polaris kept dialling the old one, which nothing answered, so every upload fell

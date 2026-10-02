@@ -23,7 +23,7 @@ import { forbiddenAddress, forbiddenError } from "./lan-address";
  *  is ever at. */
 export async function unitAddressOf(typed: string): Promise<string> {
     const name = deviceHost(typed);
-    if (!name) throw new HomeError("Write the address as 192.168.1.30, with no path");
+    if (!name) throw new HomeError("Write the address as 10.0.1.30, with no path");
     let address = name;
     if (isIP(name) !== 4) {
         try {

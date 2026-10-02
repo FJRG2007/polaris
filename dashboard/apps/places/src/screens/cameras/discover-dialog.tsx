@@ -89,7 +89,7 @@ export function DiscoverDialog({
                             <Input
                                 value={subnet}
                                 onChange={(event) => setSubnet(event.target.value)}
-                                placeholder="192.168.1.0/24"
+                                placeholder="10.0.1.0/24"
                             />
                         </label>
                         <Button onClick={scan} disabled={busy || (Boolean(from) && !subnet.trim())}>

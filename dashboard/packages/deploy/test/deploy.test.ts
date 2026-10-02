@@ -56,16 +56,16 @@ describe("subdomain", () => {
 
 describe("release subdomain", () => {
     it("adds the commit to the service's own name and leaves that name alone", () => {
-        const service = magicDomain("invoices", "51.15.20.30");
+        const service = magicDomain("invoices", "5.6.7.8");
         const release = releaseDomain(service, "9f8e7d6");
         expect(release).not.toBe(service);
         expect(release).toContain("-9f8e7d6-");
-        expect(magicDomain("invoices", "51.15.20.30")).toBe(service);
+        expect(magicDomain("invoices", "5.6.7.8")).toBe(service);
     });
 
     it("keeps the encoded address at the end, where wildcard DNS reads it", () => {
-        expect(releaseDomain("invoices-a1b2c3-51-15-20-30.sslip.io", "9f8e7d6")).toBe(
-            "invoices-a1b2c3-9f8e7d6-51-15-20-30.sslip.io"
+        expect(releaseDomain("invoices-a1b2c3-5-6-7-8.sslip.io", "9f8e7d6")).toBe(
+            "invoices-a1b2c3-9f8e7d6-5-6-7-8.sslip.io"
         );
     });
 

@@ -80,14 +80,14 @@ describe("the addresses a call may be answered on", () => {
         // house where two people in the same room have their call sent out to
         // the router and back, on a router that will usually not do it.
         for (const real of [
-            "192.168.1.142",
+            "10.0.1.142",
             "192.168.0.10",
             "10.0.0.5",
             "10.42.7.1",
             // Docker never allocates from this one, so it is left alone: an
             // office LAN occasionally sits in it.
             "172.16.0.5",
-            "85.87.158.186"
+            "198.51.100.186"
         ]) {
             expect([real, excluded(real)]).toEqual([real, false]);
         }

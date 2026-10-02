@@ -142,7 +142,7 @@ describe("the server a pool runs on", () => {
     });
 
     it.each([
-        ["a name that is not an id", "lirio-0"],
+        ["a name that is not an id", "node-0"],
         ["a path traversal", "../local"],
         ["nothing", ""]
     ])("refuses %s as a server", (_case, serverId) => {

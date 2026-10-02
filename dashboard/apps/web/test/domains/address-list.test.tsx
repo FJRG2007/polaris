@@ -65,7 +65,7 @@ describe("the deployment's address list", () => {
     it("leaves the addresses it cannot remove without the control", () => {
         const markup = render([
             address({ kind: "app", host: "polaris.local", url: "http://polaris.local" }),
-            address({ kind: "local", host: "192.168.1.20", url: "http://192.168.1.20" })
+            address({ kind: "local", host: "10.0.1.20", url: "http://10.0.1.20" })
         ]);
         expect(markup).not.toContain("aria-label=\"Stop using");
     });

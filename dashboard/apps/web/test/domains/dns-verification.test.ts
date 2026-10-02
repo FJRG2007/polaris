@@ -37,7 +37,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("node:dns/promises", () => ({ resolve4 }));
-vi.mock("../../src/lib/network-service", () => ({ detectPublicIp: async () => "51.15.20.30" }));
+vi.mock("../../src/lib/network-service", () => ({ detectPublicIp: async () => "5.6.7.8" }));
 vi.mock("../../src/lib/domain-service", () => ({ setDomainConfig }));
 vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: async () => null }));
 
@@ -78,7 +78,7 @@ describe("checkZoneDns", () => {
     });
 
     it("still mints hostnames when nothing answers, but hands out no links", async () => {
-        resolve4.mockResolvedValue(["51.15.20.30"]);
+        resolve4.mockResolvedValue(["5.6.7.8"]);
         serving(false);
         await checkZoneDns();
         // The DNS is right, so the layout is usable - a router that will not loop a
@@ -106,7 +106,7 @@ describe("checkZoneDns", () => {
     it("keeps the layout verified while a game's wildcard is still missing", async () => {
         installs.push({ catalogId: "minecraft-manager" });
         resolve4.mockImplementation(async (hostname: string) =>
-            hostname.includes(".mc.") ? Promise.reject(new Error("NXDOMAIN")) : ["51.15.20.30"]
+            hostname.includes(".mc.") ? Promise.reject(new Error("NXDOMAIN")) : ["5.6.7.8"]
         );
         const report = await checkZoneDns();
         expect(await zoneDnsVerified()).toBe(true);
@@ -116,7 +116,7 @@ describe("checkZoneDns", () => {
 
     it("reports a game's wildcard as done once it answers here", async () => {
         installs.push({ catalogId: "minecraft-manager" });
-        resolve4.mockResolvedValue(["51.15.20.30"]);
+        resolve4.mockResolvedValue(["5.6.7.8"]);
         const report = await checkZoneDns();
         expect(report.gameZones[0]).toMatchObject({ wildcard: "*.mc.example.com", ok: true });
     });
@@ -126,7 +126,7 @@ describe("checkZoneDns", () => {
         // which games are played. A server does, and it is also the moment the
         // record starts mattering.
         installs.push({ catalogId: "ark" });
-        resolve4.mockResolvedValue(["51.15.20.30"]);
+        resolve4.mockResolvedValue(["5.6.7.8"]);
         const report = await checkZoneDns();
         expect(report.gameZones).toHaveLength(1);
         expect(report.gameZones[0]).toMatchObject({ game: "ARK: Survival Evolved", wildcard: "*.ark.example.com" });
@@ -136,7 +136,7 @@ describe("checkZoneDns", () => {
         // Including one that has only turned the app on: a record for a game
         // nobody plays is a checklist item that can only ever be red.
         installs.push({ catalogId: "game-servers" });
-        resolve4.mockResolvedValue(["51.15.20.30"]);
+        resolve4.mockResolvedValue(["5.6.7.8"]);
         expect((await checkZoneDns()).gameZones).toEqual([]);
     });
 
@@ -148,7 +148,7 @@ describe("checkZoneDns", () => {
     });
 
     it("moves it once every zone answers with this server, and only once", async () => {
-        resolve4.mockResolvedValue(["51.15.20.30"]);
+        resolve4.mockResolvedValue(["5.6.7.8"]);
         await checkZoneDns();
         expect(await zoneDnsVerified()).toBe(true);
         expect(setDomainConfig).toHaveBeenCalledWith({ appDomain: "polaris.example.com" });
@@ -160,14 +160,14 @@ describe("checkZoneDns", () => {
 
     it("stays put when the operator did not ask for it", async () => {
         await setDashboardZoneIntent(false);
-        resolve4.mockResolvedValue(["51.15.20.30"]);
+        resolve4.mockResolvedValue(["5.6.7.8"]);
         await checkZoneDns();
         expect(await zoneDnsVerified()).toBe(true);
         expect(setDomainConfig).not.toHaveBeenCalled();
     });
 
     it("makes a changed layout earn its proof again", async () => {
-        resolve4.mockResolvedValue(["51.15.20.30"]);
+        resolve4.mockResolvedValue(["5.6.7.8"]);
         await checkZoneDns();
         await saveDomainZones({ ...LAYOUT, baseDomain: "other.example.com" });
         expect(await zoneDnsVerified()).toBe(false);

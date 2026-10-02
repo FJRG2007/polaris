@@ -19,7 +19,7 @@ const { kindForTopic } = await import("@polaris-app/places/src/lib/watcher");
 
 describe("what the relay is told to open", () => {
     const camera = {
-        address: "192.168.1.50",
+        address: "10.0.1.50",
         rtspPort: 554,
         mainPath: "/stream1",
         subPath: "/stream2"
@@ -28,36 +28,36 @@ describe("what the relay is told to open", () => {
     it("uses the maker's own protocol when there is one, with the password alone", () => {
         expect(
             relaySource({ ...camera, vendor: "tapo-cloud" }, "main", { password: "hunter2" })
-        ).toBe("tapo://hunter2@192.168.1.50?subtype=0");
+        ).toBe("tapo://hunter2@10.0.1.50?subtype=0");
     });
 
     it("asks that protocol for the small stream by subtype, not by path", () => {
         expect(
             relaySource({ ...camera, vendor: "tapo-cloud" }, "sub", { password: "hunter2" })
-        ).toBe("tapo://hunter2@192.168.1.50?subtype=1");
+        ).toBe("tapo://hunter2@10.0.1.50?subtype=1");
     });
 
     it("encodes a password with characters a URL would eat", () => {
         const source = relaySource({ ...camera, vendor: "tapo-cloud" }, "main", {
             password: "p@ss/word"
         });
-        expect(source).toBe("tapo://p%40ss%2Fword@192.168.1.50?subtype=0");
-        expect(new URL(source).hostname).toBe("192.168.1.50");
+        expect(source).toBe("tapo://p%40ss%2Fword@10.0.1.50?subtype=0");
+        expect(new URL(source).hostname).toBe("10.0.1.50");
     });
 
     it("falls back to RTSP for everything else, on the right stream", () => {
         const auth = { username: "polaris", password: "secret" };
         expect(relaySource({ ...camera, vendor: "reolink" }, "main", auth)).toBe(
-            "rtsp://polaris:secret@192.168.1.50:554/stream1"
+            "rtsp://polaris:secret@10.0.1.50:554/stream1"
         );
         expect(relaySource({ ...camera, vendor: "reolink" }, "sub", auth)).toBe(
-            "rtsp://polaris:secret@192.168.1.50:554/stream2"
+            "rtsp://polaris:secret@10.0.1.50:554/stream2"
         );
     });
 
     it("reads the main stream when the camera publishes only one", () => {
         const single = { ...camera, subPath: "", vendor: "generic" };
-        expect(relaySource(single, "sub", {})).toBe("rtsp://192.168.1.50:554/stream1");
+        expect(relaySource(single, "sub", {})).toBe("rtsp://10.0.1.50:554/stream1");
     });
 });
 
@@ -86,7 +86,7 @@ describe("where a camera keeps its services", () => {
     // "/onvif/ptz_service" is why the arrows did nothing on a camera that
     // answered everything else perfectly.
     const capabilities =
-        "<tds:GetCapabilitiesResponse><tds:Capabilities><tt:Events><tt:XAddr>http://192.168.1.50:2020/onvif/event</tt:XAddr></tt:Events><tt:Media><tt:XAddr>http://192.168.1.50:2020/onvif/Media</tt:XAddr></tt:Media><tt:PTZ><tt:XAddr>http://192.168.1.50:2020/onvif/PTZ</tt:XAddr></tt:PTZ></tds:Capabilities></tds:GetCapabilitiesResponse>";
+        "<tds:GetCapabilitiesResponse><tds:Capabilities><tt:Events><tt:XAddr>http://10.0.1.50:2020/onvif/event</tt:XAddr></tt:Events><tt:Media><tt:XAddr>http://10.0.1.50:2020/onvif/Media</tt:XAddr></tt:Media><tt:PTZ><tt:XAddr>http://10.0.1.50:2020/onvif/PTZ</tt:XAddr></tt:PTZ></tds:Capabilities></tds:GetCapabilitiesResponse>";
 
     it("reads each service out of its own section, not the first XAddr it sees", () => {
         expect(parseServices(capabilities)).toEqual({

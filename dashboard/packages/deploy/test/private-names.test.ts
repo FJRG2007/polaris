@@ -139,11 +139,11 @@ describe("a service's names in its spec", () => {
     it("are the full and the bare form of each name", () => {
         expect(privateDomain("api")).toBe("api.polaris.internal");
         expect(crossProjectDomain("api", "shop")).toBe("api.shop.polaris.internal");
-        expect(namesFor("api", ["dymoapi"])).toEqual([
+        expect(namesFor("api", ["paymentsapi"])).toEqual([
             "api.polaris.internal",
             "api",
-            "dymoapi.polaris.internal",
-            "dymoapi"
+            "paymentsapi.polaris.internal",
+            "paymentsapi"
         ]);
     });
 

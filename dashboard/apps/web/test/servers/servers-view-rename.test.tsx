@@ -29,7 +29,7 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("@/components/use-live-resource", () => ({
     useLiveResource: () => ({
-        data: { servers: [], machineName: "lirio-0" },
+        data: { servers: [], machineName: "node-0" },
         loading: false,
         error: null,
         stale: null,
@@ -92,7 +92,7 @@ beforeEach(() => {
     renames = [];
     renameAnswer = {};
     removing = null;
-    render(<ServersView servers={[server()]} machineName="lirio-0" />, { wrapper: MessagesWrapper });
+    render(<ServersView servers={[server()]} machineName="node-0" />, { wrapper: MessagesWrapper });
 });
 
 afterEach(cleanup);

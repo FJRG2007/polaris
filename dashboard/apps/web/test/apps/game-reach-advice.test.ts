@@ -17,7 +17,7 @@ const BLOCKS = { tcp: { start: 25565, end: 25664 }, udp: { start: 19132, end: 19
 
 describe("a server that is not up yet", () => {
     it("says its port cannot be checked, and asks for nothing", () => {
-        const advice = gameReachAdvice("home-nat", TCP, false, "192.168.1.142", "range", BLOCKS, false);
+        const advice = gameReachAdvice("home-nat", TCP, false, "10.0.1.142", "range", BLOCKS, false);
 
         expect(advice.ok).toBe(false);
         // The whole point: nothing to do, and no mention of the router - there is
@@ -50,7 +50,7 @@ describe("a server that is turned off", () => {
 
 describe("a server that is up but unproven", () => {
     it("says it is unconfirmed rather than that nothing has opened it", () => {
-        const advice = gameReachAdvice("home-nat", TCP, false, "192.168.1.142", "range", BLOCKS, true);
+        const advice = gameReachAdvice("home-nat", TCP, false, "10.0.1.142", "range", BLOCKS, true);
 
         expect(advice.forward).toBe(true);
         expect(advice.title).toContain("not confirmed");
@@ -71,7 +71,7 @@ describe("a server that is up but unproven", () => {
 
 describe("a server something has arrived on", () => {
     it("is finished, whatever the port is doing this second", () => {
-        const advice = gameReachAdvice("home-nat", TCP, true, "192.168.1.142", "range", BLOCKS, false);
+        const advice = gameReachAdvice("home-nat", TCP, true, "10.0.1.142", "range", BLOCKS, false);
 
         expect(advice.ok).toBe(true);
         expect(advice.actionable).toBe(false);
@@ -81,7 +81,7 @@ describe("a server something has arrived on", () => {
 
 describe("when nothing was measured", () => {
     it("keeps the old advice for a caller that did not check", () => {
-        const advice = gameReachAdvice("home-nat", TCP, false, "192.168.1.142", "range", BLOCKS, null);
+        const advice = gameReachAdvice("home-nat", TCP, false, "10.0.1.142", "range", BLOCKS, null);
 
         expect(advice.forward).toBe(true);
         expect(advice.actionable).toBe(true);
@@ -125,8 +125,8 @@ describe("naming the ports", () => {
     });
 
     it("agrees with itself about one port and about several", () => {
-        const one = gameReachAdvice("home-nat", TCP, false, "192.168.1.142", "range", BLOCKS, null);
-        const many = gameReachAdvice("home-nat", ARK, false, "192.168.1.142", "range", BLOCKS, null);
+        const one = gameReachAdvice("home-nat", TCP, false, "10.0.1.142", "range", BLOCKS, null);
+        const many = gameReachAdvice("home-nat", ARK, false, "10.0.1.142", "range", BLOCKS, null);
 
         expect(one.title).toContain("is not confirmed");
         expect(many.title).toContain("are not confirmed");

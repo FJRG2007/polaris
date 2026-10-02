@@ -31,7 +31,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-address", async (original)
 });
 
 const FORBIDDEN =
-    "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.";
+    "Polaris does not connect to that address. Use the device's address on your network, such as 10.0.1.30.";
 
 // Test-only certificates, generated for this file and used nowhere else. The
 // first is its own authority and names itself like a Hue bridge id.
@@ -207,7 +207,7 @@ describe("plain http", () => {
 
 describe("an address somebody typed", () => {
     it("takes an address, a name, or either with a scheme and a port", () => {
-        expect(lan.deviceOrigin("192.168.1.30", "http")).toBe("http://192.168.1.30");
+        expect(lan.deviceOrigin("10.0.1.30", "http")).toBe("http://10.0.1.30");
         expect(lan.deviceOrigin("hub.local", "https", 8443)).toBe("https://hub.local:8443");
         expect(lan.deviceOrigin("https://ha.example.test:8123/", "http")).toBe(
             "https://ha.example.test:8123"
@@ -218,7 +218,7 @@ describe("an address somebody typed", () => {
         expect(lan.deviceOrigin("https://ha.example.test", "http", 8123)).toBe(
             "https://ha.example.test"
         );
-        expect(lan.deviceHost("https://192.168.1.2:9999")).toBe("192.168.1.2");
+        expect(lan.deviceHost("https://10.0.1.2:9999")).toBe("10.0.1.2");
     });
 
     it("keeps a port that was typed even when it is the scheme's own", () => {
@@ -230,10 +230,10 @@ describe("an address somebody typed", () => {
     });
 
     it("refuses anything carrying a path, a query or credentials", () => {
-        expect(lan.deviceOrigin("http://192.168.1.30/api", "http")).toBeNull();
-        expect(lan.deviceOrigin("http://admin:pw@192.168.1.30", "http")).toBeNull();
-        expect(lan.deviceOrigin("192.168.1.30?x=1", "http")).toBeNull();
-        expect(lan.deviceOrigin("ftp://192.168.1.30", "http")).toBeNull();
+        expect(lan.deviceOrigin("http://10.0.1.30/api", "http")).toBeNull();
+        expect(lan.deviceOrigin("http://admin:pw@10.0.1.30", "http")).toBeNull();
+        expect(lan.deviceOrigin("10.0.1.30?x=1", "http")).toBeNull();
+        expect(lan.deviceOrigin("ftp://10.0.1.30", "http")).toBeNull();
         expect(lan.deviceOrigin("", "http")).toBeNull();
     });
 });
@@ -295,7 +295,7 @@ describe("an address no device is at", () => {
             expect(actual.forbiddenAddress(blocked), blocked).toBe(true);
         }
         for (const allowed of [
-            "192.168.1.30",
+            "10.0.1.30",
             "10.0.0.5",
             "172.17.0.1",
             "fd12:3456::1",

@@ -12,11 +12,11 @@ import { describe, expect, it } from "vitest";
 import { filterCameras, zonesOf } from "@polaris-app/places/src/lib/camera-filter";
 
 const CAMERAS = [
-    { name: "Front door", zone: "Outside", address: "192.168.1.10" },
-    { name: "Back door", zone: "Garden", address: "192.168.1.11" },
-    { name: "Garage", zone: "Outside", address: "192.168.1.12" },
-    { name: "Landing", zone: "", address: "192.168.1.13" },
-    { name: "Studio Camera", zone: "Inside", address: "192.168.1.143" }
+    { name: "Front door", zone: "Outside", address: "10.0.1.10" },
+    { name: "Back door", zone: "Garden", address: "10.0.1.11" },
+    { name: "Garage", zone: "Outside", address: "10.0.1.12" },
+    { name: "Landing", zone: "", address: "10.0.1.13" },
+    { name: "Studio Camera", zone: "Inside", address: "10.0.1.143" }
 ];
 
 describe("the areas a house is using", () => {

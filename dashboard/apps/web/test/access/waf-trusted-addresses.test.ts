@@ -71,7 +71,7 @@ const { getWafIgnoreList, recordWafBan, setWafIgnoreList, wafTrustedAddresses } 
     "../../src/lib/waf-intel-service"
 );
 
-const OPERATOR = "85.87.156.88";
+const OPERATOR = "198.51.100.88";
 
 function ban(ip: string): BanRow {
     return { ip, reason: "ban", source: "not-found", note: "Missing-page flood", until: null, offences: 6 };

@@ -481,7 +481,7 @@ describe("working out where a domain's mail lives", () => {
     it("knows a consumer address by its domain without asking anything", () => {
         expect(providers.serviceForAddress("someone@gmail.com")?.slug).toBe("gmail");
         expect(providers.serviceForAddress("SOMEONE@Hotmail.com")?.slug).toBe("outlook");
-        expect(providers.serviceForAddress("someone@tpeoficial.com")).toBeNull();
+        expect(providers.serviceForAddress("someone@example.net")).toBeNull();
     });
 });
 

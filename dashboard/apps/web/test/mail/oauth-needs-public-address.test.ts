@@ -29,7 +29,7 @@ describe("what counts as an address a provider can reach", () => {
             "http://polaris.lan",
             "https://box.internal",
             "http://localhost:3000",
-            "https://192.168.1.142",
+            "https://10.0.1.142",
             "http://polaris"
         ]) {
             expect(publicHostname(value), value).toBeNull();

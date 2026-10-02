@@ -39,7 +39,7 @@ vi.mock("@/app/(app)/apps/databases/actions", () => ({
     listManagedAction: async () => ({ databases: [] }),
     listTunnelServersAction: async () => ({
         servers: [
-            { id: "22222222-2222-4222-8222-222222222222", name: "lirio-0", address: "10.0.0.2" }
+            { id: "22222222-2222-4222-8222-222222222222", name: "node-0", address: "10.0.0.2" }
         ]
     }),
     saveConnectionAction: async (input: unknown) => {
@@ -167,7 +167,7 @@ describe("the connection form", () => {
         expect(screen.getByRole("button", { name: /Add it/ }).hasAttribute("disabled")).toBe(true);
 
         await userEvent.click(screen.getByRole("combobox", { name: "Server to tunnel through" }));
-        await userEvent.click(await screen.findByRole("option", { name: /lirio-0/ }));
+        await userEvent.click(await screen.findByRole("option", { name: /node-0/ }));
 
         expect(screen.getByRole("button", { name: /Add it/ }).hasAttribute("disabled")).toBe(false);
     });

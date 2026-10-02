@@ -10,7 +10,7 @@
  * still lands, a word nothing has finds nothing, and typing costs nothing.
  * Tasks, pages, notes and people are too many to hold and too live to cache, so
  * they are searched in the database, one scope at a time, and only behind a
- * command: "/tasks", "/servers lirio-0", "@ana". Typing a name on its own never
+ * command: "/tasks", "/servers node-0", "@ana". Typing a name on its own never
  * starts four searches nobody asked for.
  *
  * What was searched before is kept in this browser and on the account. The local
@@ -283,8 +283,8 @@ export function CommandPalette({
      * is remembered instead, and remembering both would say the same thing twice.
      *
      * What counts as "found something" is the rows the panel drew, not the rows
-     * that came back from the server - otherwise "/services orphion" would be
-     * forgotten and "/tasks orphion" remembered, which is a distinction only the
+     * that came back from the server - otherwise "/services storefront" would be
+     * forgotten and "/tasks storefront" remembered, which is a distinction only the
      * implementation can see.
      */
     function onOpenChange(next: boolean): void {

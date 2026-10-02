@@ -305,7 +305,7 @@ describe("who it is shown to", () => {
     });
 
     it("is a player an operator linked to follow the account's sign-ins, with nothing connected", async () => {
-        // Offgrid, 2026-09-27: every player linked from the Players list, none of
+        // A server with every player linked from the Players list, none of
         // them with a Minecraft name on their account, and only the owner saw
         // anything. A player held to where the account signs in is its holder.
         fake.connections = [];

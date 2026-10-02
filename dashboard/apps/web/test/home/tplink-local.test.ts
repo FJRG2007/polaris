@@ -184,7 +184,7 @@ const { tapoLocalDriver, kasaLocalDriver } = await import(
     "@polaris-app/places/src/lib/drivers/tplink-local"
 );
 
-const TAPO = { host: "192.168.1.40", email: "owner@example.test", password: "correct horse" };
+const TAPO = { host: "10.0.1.40", email: "owner@example.test", password: "correct horse" };
 const b64 = (value: string) => Buffer.from(value).toString("base64");
 
 beforeEach(() => {
@@ -369,7 +369,7 @@ describe("a Tapo", () => {
 });
 
 describe("a Kasa", () => {
-    const KASA = { host: "192.168.1.41" };
+    const KASA = { host: "10.0.1.41" };
     const HS300 = {
         system: {
             get_sysinfo: {

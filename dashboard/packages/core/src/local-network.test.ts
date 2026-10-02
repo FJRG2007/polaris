@@ -17,7 +17,7 @@ import { alreadyLocal, isLocalAddress, localCandidates, sameLocalNetwork } from 
 
 describe("what counts as local", () => {
     it("is the three private ranges", () => {
-        for (const address of ["10.0.0.5", "10.255.255.254", "172.16.0.1", "172.31.4.9", "192.168.1.7"]) {
+        for (const address of ["10.0.0.5", "10.255.255.254", "172.16.0.1", "172.31.4.9", "192.168.50.7"]) {
             expect(isLocalAddress(address)).toBe(true);
         }
     });
@@ -46,8 +46,8 @@ describe("what counts as local", () => {
 
 describe("the same piece of wire", () => {
     it("is the first three octets", () => {
-        expect(sameLocalNetwork("192.168.1.7", "192.168.1.50")).toBe(true);
-        expect(sameLocalNetwork("192.168.1.7", "192.168.2.50")).toBe(false);
+        expect(sameLocalNetwork("10.0.1.7", "10.0.1.50")).toBe(true);
+        expect(sameLocalNetwork("10.0.1.7", "192.168.2.50")).toBe(false);
     });
 
     it("is never true of an address that is not local at all", () => {
@@ -56,10 +56,10 @@ describe("the same piece of wire", () => {
 });
 
 describe("where a machine might be reached", () => {
-    const NEAR = "192.168.1.50";
+    const NEAR = "10.0.1.50";
 
     it("puts an address on our own network first", () => {
-        expect(localCandidates(["10.8.0.4", "192.168.1.7"], NEAR)).toEqual(["192.168.1.7", "10.8.0.4"]);
+        expect(localCandidates(["10.8.0.4", "10.0.1.7"], NEAR)).toEqual(["10.0.1.7", "10.8.0.4"]);
     });
 
     it("keeps a private address on another network as a second-best", () => {
@@ -75,25 +75,25 @@ describe("where a machine might be reached", () => {
     it("never offers Polaris its own address", () => {
         // On a host-networked install that is the box Polaris runs on, and a
         // server pointed at it would be a server pointed at Polaris.
-        expect(localCandidates([NEAR, "192.168.1.7"], NEAR)).toEqual(["192.168.1.7"]);
+        expect(localCandidates([NEAR, "10.0.1.7"], NEAR)).toEqual(["10.0.1.7"]);
     });
 
     it("says nothing when Polaris does not know where it is", () => {
-        expect(localCandidates(["192.168.1.7"], null)).toEqual([]);
-        expect(localCandidates(["192.168.1.7"], "203.0.113.9")).toEqual([]);
+        expect(localCandidates(["10.0.1.7"], null)).toEqual([]);
+        expect(localCandidates(["10.0.1.7"], "203.0.113.9")).toEqual([]);
     });
 
     it("does not offer the same address twice", () => {
         // Two interfaces on one network, or a machine that lists an address
         // under both of the tools this asks.
-        expect(localCandidates(["192.168.1.7", " 192.168.1.7 "], NEAR)).toEqual(["192.168.1.7"]);
+        expect(localCandidates(["10.0.1.7", " 10.0.1.7 "], NEAR)).toEqual(["10.0.1.7"]);
     });
 });
 
 describe("a server already reached directly", () => {
     it("has nothing to offer", () => {
-        expect(alreadyLocal("192.168.1.7", "192.168.1.50")).toBe(true);
-        expect(alreadyLocal("server.example.com", "192.168.1.50")).toBe(false);
-        expect(alreadyLocal("192.168.1.7", null)).toBe(false);
+        expect(alreadyLocal("10.0.1.7", "10.0.1.50")).toBe(true);
+        expect(alreadyLocal("server.example.com", "10.0.1.50")).toBe(false);
+        expect(alreadyLocal("10.0.1.7", null)).toBe(false);
     });
 });

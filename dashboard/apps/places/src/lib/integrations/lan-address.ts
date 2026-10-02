@@ -46,7 +46,7 @@ export function forbiddenAddress(address: string): boolean {
 
 export function forbiddenError(): DriverError {
     return new DriverError(
-        "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.",
+        "Polaris does not connect to that address. Use the device's address on your network, such as 10.0.1.30.",
         "refused"
     );
 }

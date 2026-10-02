@@ -22,9 +22,9 @@ const { translate } = await import("@/lib/i18n/translate");
 
 const playing: ActivityView = {
     source: "minecraft",
-    key: "server:Offgrid",
+    key: "server:ExampleSMP",
     name: "Minecraft",
-    details: "Offgrid",
+    details: "ExampleSMP",
     state: "",
     imageUrl: "/api/apps/installed/s1/minecraft/card-icon",
     linkUrl: null,
@@ -43,7 +43,7 @@ describe("the card for a game server", () => {
     it("shows the server's picture with the game's mark in the corner", () => {
         const { container } = render(<ActivityCard activity={playing} />, { wrapper: MessagesWrapper });
         expect(images(container)).toEqual(["/api/apps/installed/s1/minecraft/card-icon", "/logos/minecraft.webp"]);
-        expect(screen.getByText("Offgrid")).toBeTruthy();
+        expect(screen.getByText("ExampleSMP")).toBeTruthy();
     });
 
     it("falls back to the game's mark alone when the server has no picture", () => {
