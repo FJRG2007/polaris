@@ -256,8 +256,8 @@ export const saveConnectionSchema = z
                 context.addIssue({
                     code: "custom",
                     path: ["ssh", "passphrase"],
-                    // i18n-ignore said in the reader's words by lib/data/words
                     message:
+                        // i18n-ignore said in the reader's words by lib/data/words
                         "Paste the private key this passphrase is for, or clear the passphrase."
                 });
             }
@@ -301,8 +301,8 @@ export const saveConnectionSchema = z
             context.addIssue({
                 code: "custom",
                 path: ["tlsClientKey"],
-                // i18n-ignore said in the reader's words by lib/data/words
                 message:
+                    // i18n-ignore said in the reader's words by lib/data/words
                     "This key is locked with a passphrase. Save a copy without one and use that file."
             });
         }
