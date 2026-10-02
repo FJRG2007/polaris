@@ -445,9 +445,10 @@ export async function publishWafIntel(): Promise<void> {
             caught instanceof Error ? caught.message : caught
         );
     }
-    // Not awaited by the caller's tick beyond this: every server is tried, each on its
-    // own, and one that is asleep costs nothing but its own warning.
-    await pushIntelToServers(json, snapshot);
+    // Not awaited: callers include the operator's own firewall clicks, and a server
+    // that is asleep must not hold one for an SSH timeout. Every server is tried, each
+    // on its own, and one that is asleep costs nothing but its own warning.
+    void pushIntelToServers(json, snapshot);
 }
 
 /** The setting that remembers what each server was last given, so a tick that

@@ -52,11 +52,18 @@ describe("certificates on another server", () => {
 
 describe("the address list a server's guard keeps", () => {
     it("is written beside its target and renamed over it", () => {
-        const script = remoteIntelScript('{"v":1}', "n0nce");
+        const script = remoteIntelScript("n0nce");
 
         expect(script).toContain("/var/lib/polaris/edge-intel/.waf-intel.json.n0nce");
         expect(script).toMatch(/mv -f \S+\.n0nce \S*\/var\/lib\/polaris\/edge-intel\/waf-intel\.json/);
-        expect(script).toContain(Buffer.from('{"v":1}').toString("base64"));
+        expect(script).toMatch(/cat > \S+\.n0nce/);
+    });
+
+    it("arrives on stdin, so its size is not bounded by the command line", () => {
+        const script = remoteIntelScript("n0nce");
+
+        expect(script).not.toContain("base64");
+        expect(script.length).toBeLessThan(512);
     });
 
     it("is pushed again only when what it says changed, not when it was written", () => {

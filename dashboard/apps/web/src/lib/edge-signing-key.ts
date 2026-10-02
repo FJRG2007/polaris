@@ -8,13 +8,16 @@
  * one. That is the difference from the HMAC token every guard can verify AND sign,
  * because verifying needs the same secret.
  *
- * Read once per process and cached; created on first use. Two processes racing the
- * first creation each write a pair and the second write wins - a token signed by the
- * loser fails once and the visitor signs in again, which is the whole cost.
+ * Read once per process and cached; created on first use. Created only where nothing
+ * is stored yet (or replaced only if what is stored is still the unreadable value this
+ * process saw), then read back: two processes racing the first creation both end up
+ * signing with whichever pair was stored, never with one whose public half was
+ * overwritten.
  */
 
+import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
-import { getSetting, setSetting } from "@/lib/setting-store";
+import { getSetting } from "@/lib/setting-store";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { createPrivateKey, createPublicKey, generateKeyPairSync, type KeyObject } from "node:crypto";
 
@@ -60,20 +63,33 @@ export function publicKeyOf(privateKey: KeyObject): string {
     return jwk.x;
 }
 
-async function loadOrCreate(): Promise<EdgeSigningKey> {
-    const stored = unseal(await getSetting(KEY_SETTING));
-    if (stored) {
-        try {
-            const privateKey = createPrivateKey(stored);
-            return { privateKey, publicKey: publicKeyOf(privateKey) };
-        } catch {
-            // Unreadable (a master key that changed): make a new pair below. Tokens
-            // signed by the old one stop verifying and their holders sign in again.
-        }
+function readKey(raw: string | null): EdgeSigningKey | null {
+    const stored = unseal(raw);
+    if (!stored) return null;
+    try {
+        const privateKey = createPrivateKey(stored);
+        return { privateKey, publicKey: publicKeyOf(privateKey) };
+    } catch {
+        return null;
     }
+}
+
+async function loadOrCreate(): Promise<EdgeSigningKey> {
+    const raw = await getSetting(KEY_SETTING);
+    const existing = readKey(raw);
+    if (existing) return existing;
+    // Missing, or unreadable (a master key that changed): make a new pair. Tokens signed
+    // by an old one stop verifying and their holders sign in again.
     const { privateKey } = generateKeyPairSync("ed25519");
-    await setSetting(KEY_SETTING, seal(privateKey.export({ format: "pem", type: "pkcs8" }).toString()));
-    return { privateKey, publicKey: publicKeyOf(privateKey) };
+    const value = seal(privateKey.export({ format: "pem", type: "pkcs8" }).toString());
+    if (raw === null) {
+        await prisma.setting.createMany({ data: [{ key: KEY_SETTING, value, scope: "global" }], skipDuplicates: true });
+    } else {
+        await prisma.setting.updateMany({ where: { key: KEY_SETTING, value: raw }, data: { value } });
+    }
+    const settled = readKey(await getSetting(KEY_SETTING));
+    if (!settled) throw new Error("The edge signing key could not be stored");
+    return settled;
 }
 
 /** The signing key, made on first use. */

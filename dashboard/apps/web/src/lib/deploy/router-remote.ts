@@ -137,13 +137,15 @@ export function remoteCertificatesScript(
  * re-reads the file whenever it changes, and one it caught half-written would parse as
  * nothing - it keeps its last good list in that case, but there is no reason to make it.
  */
-export function remoteIntelScript(json: string, nonce = randomBytes(6).toString("hex")): string {
+export function remoteIntelScript(nonce = randomBytes(6).toString("hex")): string {
     const target = `${EDGE_INTEL_DIR}/${EDGE_INTEL_FILE}`;
     const temporary = `${EDGE_INTEL_DIR}/.${EDGE_INTEL_FILE}.${nonce}`;
     return [
         "set -e",
         `mkdir -p ${quoteArg(EDGE_INTEL_DIR)}`,
-        `printf %s ${quoteArg(Buffer.from(json, "utf8").toString("base64"))} | base64 -d > ${quoteArg(temporary)}`,
+        // From stdin rather than the command line: the list grows with every ban and
+        // feed, and a command line is capped at a size a large one passes.
+        `cat > ${quoteArg(temporary)}`,
         // Readable by the guard, which runs as an unprivileged user inside its
         // container; nothing in it is a secret, only addresses and opaque account ids.
         `chmod 644 ${quoteArg(temporary)}`,
@@ -186,7 +188,7 @@ export class RemoteRouter implements Router {
 
     /** Give this server's guard the firewall's current address list. */
     public async pushIntel(json: string): Promise<void> {
-        await this.run(remoteIntelScript(json));
+        await this.run(remoteIntelScript(), "its address list", json);
     }
 
     /** Replace the certificates Polaris gave this server's edge with exactly these. */
@@ -196,7 +198,7 @@ export class RemoteRouter implements Router {
         await this.run(remoteCertificatesScript(certificates));
     }
 
-    private async run(script: string): Promise<void> {
+    private async run(script: string, what = "its routes", input?: string): Promise<void> {
         const client = await openSshClient({
             host: this.edge.address,
             port: this.edge.port,
@@ -207,13 +209,14 @@ export class RemoteRouter implements Router {
         try {
             let complaint = "";
             const result = await execCommand(client, script, {
+                input,
                 onStderr: (chunk) => {
                     complaint += chunk.toString("utf8");
                 }
             });
             if (result.code !== 0) {
                 throw new Error(
-                    `That server would not take its routes${complaint.trim() ? `: ${complaint.trim().slice(0, 200)}` : ""}`
+                    `That server would not take ${what}${complaint.trim() ? `: ${complaint.trim().slice(0, 200)}` : ""}`
                 );
             }
         } finally {

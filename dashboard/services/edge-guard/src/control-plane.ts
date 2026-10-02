@@ -22,6 +22,14 @@
 /** How old an answer may be before the next request starts a fresh probe. */
 const CHECK_EVERY_MS = 30_000;
 
+/** How soon a single failed probe is checked again. One failure is not an answer - a
+ *  dropped packet or a restart in progress looks the same - so it is confirmed quickly
+ *  rather than left standing for a whole interval. */
+const RECHECK_MS = 5000;
+
+/** Consecutive failed probes before the address is reported down. */
+const DOWN_AFTER = 2;
+
 /** How long one probe may take. Polaris's health route answers in milliseconds when it
  *  is up; a probe still waiting after this is a Polaris the visitor would also be
  *  waiting on. */
@@ -42,11 +50,12 @@ interface Probe {
     reachable: boolean | null;
     checkedAt: number;
     pending: boolean;
+    failures: number;
 }
 
 /** `probe` is injected so tests decide what Polaris answers without a network. */
 export function createControlPlaneWatch(
-    probe: (base: string) => Promise<boolean> = defaultProbe,
+    probe: (base: string) => Promise<boolean> = probeHealth,
     clock: () => number = Date.now
 ): ControlPlaneWatch {
     const bases = new Map<string, Probe>();
@@ -55,16 +64,19 @@ export function createControlPlaneWatch(
             let entry = bases.get(base);
             if (!entry) {
                 if (bases.size >= MAX_BASES) return null;
-                entry = { reachable: null, checkedAt: -Infinity, pending: false };
+                entry = { reachable: null, checkedAt: -Infinity, pending: false, failures: 0 };
                 bases.set(base, entry);
             }
-            if (!entry.pending && now - entry.checkedAt >= CHECK_EVERY_MS) {
+            const unconfirmed = entry.failures > 0 && entry.failures < DOWN_AFTER;
+            if (!entry.pending && now - entry.checkedAt >= (unconfirmed ? RECHECK_MS : CHECK_EVERY_MS)) {
                 const held = entry;
                 held.pending = true;
                 void probe(base)
                     .catch(() => false)
                     .then((up) => {
-                        held.reachable = up;
+                        held.failures = up ? 0 : held.failures + 1;
+                        if (up) held.reachable = true;
+                        else if (held.failures >= DOWN_AFTER) held.reachable = false;
                         held.checkedAt = clock();
                         held.pending = false;
                     });
@@ -74,16 +86,20 @@ export function createControlPlaneWatch(
     };
 }
 
-/** Ask Polaris's health route. Any answer at all from it means the sign-in page is
- *  there to be reached; a 503 is a Polaris without its database, which cannot sign
- *  anybody in either. */
-async function defaultProbe(base: string): Promise<boolean> {
+/**
+ * Ask Polaris's health route. Any answer below 500 means something is serving the
+ * sign-in page - a redirect to the canonical host, or a 403 from a firewall rule that
+ * does not admit this server, is Polaris answering. Only a 5xx (a Polaris without its
+ * database, or a proxy with nothing behind it), a refused connection or a timeout is
+ * down.
+ */
+export async function probeHealth(base: string): Promise<boolean> {
     try {
         const response = await fetch(`${base}/api/health`, {
             signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
             redirect: "manual"
         });
-        return response.ok;
+        return response.status < 500;
     } catch {
         return false;
     }

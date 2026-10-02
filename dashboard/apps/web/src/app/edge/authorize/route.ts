@@ -131,7 +131,10 @@ export async function GET(request: Request): Promise<Response> {
     // public key reads `etoken` and verifies it with that key alone; one older than
     // that reads `token`, signed with the secret it was deployed with.
     callback.searchParams.set("token", signEdgeToken(claims, secret));
-    const signing = await edgeSigningKey().catch(() => null);
+    const signing = await edgeSigningKey().catch((error: unknown) => {
+        console.error("polaris: the edge signing key could not be read:", error instanceof Error ? error.message : error);
+        return null;
+    });
     if (signing) callback.searchParams.set("etoken", signEdgeTokenEd25519(claims, signing.privateKey));
     callback.searchParams.set("redirect", target as string);
     return redirect(callback.toString());

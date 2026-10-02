@@ -9,10 +9,10 @@
  * is told sign-in is unavailable instead of being sent to a login that does not answer.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { buildWafIntel, indexWafIntel } from "@polaris/core";
 import { evaluate, type GuardConfig } from "../src/authz.js";
-import { createControlPlaneWatch } from "../src/control-plane.js";
+import { createControlPlaneWatch, probeHealth } from "../src/control-plane.js";
 import { generateKeyPairSync, createPublicKey } from "node:crypto";
 import { encodeGuardRule, signEdgeToken, signEdgeTokenEd25519, type WafPrincipalGrant } from "@polaris/core/waf";
 
@@ -158,24 +158,86 @@ describe("the control plane watch", () => {
 
         expect(watch.reachable(POLARIS, 0)).toBeNull();
         await settle();
-        expect(watch.reachable(POLARIS, 1000)).toBe(false);
+        expect(watch.reachable(POLARIS, 1000)).toBeNull();
         expect(calls).toBe(1);
 
-        up = true;
-        clock = 31_000;
-        watch.reachable(POLARIS, 31_000);
+        clock = 6000;
+        watch.reachable(POLARIS, 6000);
         await settle();
-        expect(watch.reachable(POLARIS, 31_500)).toBe(true);
+        expect(watch.reachable(POLARIS, 6500)).toBe(false);
         expect(calls).toBe(2);
+
+        watch.reachable(POLARIS, 12_000);
+        expect(calls).toBe(2);
+
+        up = true;
+        clock = 37_000;
+        watch.reachable(POLARIS, 37_000);
+        await settle();
+        expect(watch.reachable(POLARIS, 37_500)).toBe(true);
+        expect(calls).toBe(3);
     });
 
-    it("counts a probe that throws as unreachable", async () => {
+    it("does not report down on a single failure after being up", async () => {
+        let up = true;
+        let clock = 0;
+        const watch = createControlPlaneWatch(async () => up, () => clock);
+
+        watch.reachable(POLARIS, 0);
+        await settle();
+        expect(watch.reachable(POLARIS, 100)).toBe(true);
+
+        up = false;
+        clock = 30_000;
+        watch.reachable(POLARIS, 30_000);
+        await settle();
+        expect(watch.reachable(POLARIS, 30_100)).toBe(true);
+
+        up = true;
+        clock = 35_000;
+        watch.reachable(POLARIS, 35_000);
+        await settle();
+        expect(watch.reachable(POLARIS, 35_100)).toBe(true);
+    });
+
+    it("counts a probe that throws as unreachable once it repeats", async () => {
+        let clock = 0;
         const watch = createControlPlaneWatch(async () => {
             throw new Error("connection refused");
-        });
+        }, () => clock);
 
-        watch.reachable(POLARIS);
+        watch.reachable(POLARIS, 0);
         await settle();
-        expect(watch.reachable(POLARIS)).toBe(false);
+        expect(watch.reachable(POLARIS, 0)).toBeNull();
+        clock = 5000;
+        watch.reachable(POLARIS, 5000);
+        await settle();
+        expect(watch.reachable(POLARIS, 5000)).toBe(false);
+    });
+});
+
+describe("the health probe", () => {
+    const answering = (status: number) => async () => new Response(null, { status });
+    const original = globalThis.fetch;
+    afterEach(() => {
+        globalThis.fetch = original;
+    });
+
+    it("counts any answer below 500 as Polaris being there", async () => {
+        for (const status of [200, 301, 302, 401, 403, 404]) {
+            globalThis.fetch = answering(status) as typeof fetch;
+            expect(await probeHealth(POLARIS)).toBe(true);
+        }
+    });
+
+    it("counts a 5xx or a refused connection as down", async () => {
+        for (const status of [500, 502, 503, 504]) {
+            globalThis.fetch = answering(status) as typeof fetch;
+            expect(await probeHealth(POLARIS)).toBe(false);
+        }
+        globalThis.fetch = (async () => {
+            throw new TypeError("fetch failed");
+        }) as typeof fetch;
+        expect(await probeHealth(POLARIS)).toBe(false);
     });
 });

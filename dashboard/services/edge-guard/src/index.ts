@@ -10,7 +10,7 @@
 import { randomBytes } from "node:crypto";
 import type { GuardConfig } from "./authz.js";
 import { createIntelSource } from "./intel.js";
-import { createControlPlaneWatch } from "./control-plane.js";
+import { createControlPlaneWatch, probeHealth } from "./control-plane.js";
 import { createProxyServer } from "./proxy.js";
 import { createGuardServer } from "./server.js";
 
@@ -25,8 +25,14 @@ const intel = createIntelSource(process.env.POLARIS_EDGE_INTEL_FILE);
 const processKey = randomBytes(32).toString("base64url");
 
 /** Whether the Polaris each route signs visitors in through is answering. Probed in
- *  the background, never on the request path - see control-plane.ts. */
-const controlPlane = createControlPlaneWatch();
+ *  the background, never on the request path - see control-plane.ts.
+ *
+ *  POLARIS_CONTROL_PLANE_URL is the address this container reaches Polaris on directly,
+ *  set only where the two share a network. The public address is what visitors use, but
+ *  from beside Polaris it is often unreachable (no hairpin NAT, split DNS), which would
+ *  read as Polaris being down while it is up. */
+const probeVia = (process.env.POLARIS_CONTROL_PLANE_URL ?? "").replace(/\/+$/, "");
+const controlPlane = createControlPlaneWatch((base) => probeHealth(probeVia || base));
 
 /** Resolve the guard config from the environment (re-read per request). */
 function loadConfig(): GuardConfig {
