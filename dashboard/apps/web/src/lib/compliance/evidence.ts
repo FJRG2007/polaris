@@ -23,7 +23,11 @@
  */
 
 import type * as core from "@polaris/core";
-import { EVIDENCE_SECTIONS, evidenceWordsIn, type EvidenceWords } from "@/lib/compliance/evidence-sections";
+import {
+    EVIDENCE_SECTIONS,
+    evidenceWordsIn,
+    type EvidenceWords
+} from "@/lib/compliance/evidence-sections";
 
 /** Written into every export, so a reader of the file knows which shape it has. */
 export const EVIDENCE_FORMAT = "polaris-evidence/1";
@@ -56,7 +60,11 @@ export type EvidenceArea = (typeof EVIDENCE_AREAS)[number];
  */
 export const EVIDENCE_CHANGE_ACTIONS: Readonly<Record<EvidenceArea, readonly string[]>> = {
     // The mail channel decides whether an accepted email code can be armed at all.
-    authentication: ["instance.security.updated", "auth-mail.channel.set", "auth-mail.channel.cleared"],
+    authentication: [
+        "instance.security.updated",
+        "auth-mail.channel.set",
+        "auth-mail.channel.cleared"
+    ],
     sessions: [
         "account.session-limits.updated",
         "account.session-binding.updated",
@@ -91,6 +99,10 @@ export const EVIDENCE_CHANGE_ACTIONS: Readonly<Record<EvidenceArea, readonly str
         "deploy.domain.add",
         "deploy.domain.remove",
         "deploy.domain.toggle",
+        "deploy.domain.port",
+        "deploy.domain.rename",
+        "deploy.tcp_proxy.add",
+        "deploy.tcp_proxy.remove",
         "deploy.domain.cert.set",
         "deploy.domain.cert.clear"
     ],
@@ -149,7 +161,11 @@ export interface EvidenceSection {
     /** Where each part of it is set, in the words the screens use. */
     readonly where: readonly { readonly label: string; readonly href: string }[];
     readonly facts: readonly EvidenceFact[];
-    readonly rows?: { readonly title: string; readonly total: number; readonly items: readonly EvidenceRow[] };
+    readonly rows?: {
+        readonly title: string;
+        readonly total: number;
+        readonly items: readonly EvidenceRow[];
+    };
     readonly notes: readonly string[];
     readonly lastChange: EvidenceChange | null;
 }
@@ -209,7 +225,11 @@ export interface EvidenceReadings {
         readonly loginApproval: number;
         readonly open: number;
     };
-    readonly administrators: readonly { readonly id: string; readonly name: string; readonly secondFactor: boolean }[];
+    readonly administrators: readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly secondFactor: boolean;
+    }[];
     readonly audit: {
         readonly retention: core.RetentionPolicy;
         readonly sealed: number;
@@ -305,7 +325,10 @@ export function outsidePolaris(t: EvidenceWords["t"]): readonly string[] {
 
 /** The whole report, from one set of readings, in the words it is handed -
  *  English when it is handed none. */
-export function buildEvidence(readings: EvidenceReadings, words: EvidenceWords = evidenceWordsIn()): EvidenceReport {
+export function buildEvidence(
+    readings: EvidenceReadings,
+    words: EvidenceWords = evidenceWordsIn()
+): EvidenceReport {
     return {
         format: EVIDENCE_FORMAT,
         generatedAt: readings.now.toISOString(),

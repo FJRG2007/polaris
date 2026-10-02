@@ -10,6 +10,7 @@
 
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
+import { IntegrationLogo } from "@/components/logos";
 import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
@@ -24,6 +25,8 @@ import { dbEngineOptions } from "@/components/db-engine-select";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
+import { runStateTone, type ServiceRunState } from "@/lib/deploy/run-state";
+import type { ElsewhereSummary } from "@/lib/deploy/external-services";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
@@ -35,6 +38,7 @@ import {
     type TopologyValue
 } from "./database-topology-field";
 import {
+    cn,
     Badge,
     Button,
     ConfirmDeleteDialog,
@@ -115,6 +119,10 @@ export interface ProjectSummary {
             sourceType: string;
             currentDeploymentId: string | null;
             deployStatus: string | null;
+            /** Whether it is up now, apart from how its last deploy went. */
+            runState: ServiceRunState;
+            /** The same service running on another provider, production first. */
+            elsewhere: ElsewhereSummary[];
             targetId: string;
             /** Server the app runs on: "local" or a Host id (for the Settings picker). */
             serverId: string;
@@ -163,6 +171,8 @@ export interface ProjectSummary {
                 /** Served through Cloudflare's proxy. Absent on a tunnel's name,
                  *  which has no domain row of its own to change. */
                 cdn?: boolean;
+                /** The port this address dials; absent on a tunnel's name. */
+                targetPort?: number;
             }[];
             volumes: {
                 id: string;
@@ -346,10 +356,7 @@ function AppCard({
                         {app.name}
                     </span>
                 </button>
-                <StatusPill
-                    tone={dbTone(app.deployStatus ?? "")}
-                    label={app.deployStatus ?? t("view.notDeployed")}
-                />
+                <RunStatePill app={app} />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -363,9 +370,13 @@ function AppCard({
                 <MetricsBadge applicationId={app.id} />
             </div>
 
+            <ElsewhereLines entries={app.elsewhere} />
+
             {primary && (
                 // The single most stable/reachable domain (custom domain > free public
                 // subdomain > LAN name), so the card surfaces where the service actually lives.
+                // Below the production copy elsewhere when there is one: that is where
+                // the service actually answers people, and this one is the staging half.
                 <div className="flex min-w-0 items-center gap-1.5">
                     <a
                         href={`https://${primary.hostname}`}
@@ -565,7 +576,9 @@ function DatabaseCard({
                 )}
                 <Badge>{dbEngineLabel(database.engine)}</Badge>
                 {database.hostedOnInstance && <Badge>{t("view.sharedInstance")}</Badge>}
-                {database.hostedCount ? <Badge>{t("view.hosts", { count: database.hostedCount })}</Badge> : null}
+                {database.hostedCount ? (
+                    <Badge>{t("view.hosts", { count: database.hostedCount })}</Badge>
+                ) : null}
             </div>
 
             {error && <p className="text-xs text-danger">{error}</p>}
@@ -722,7 +735,9 @@ function DatabaseConnectionDialog({
                                 connection.cluster
                                     ? t("view.connection.uriCluster")
                                     : connection.hosts.length > 1
-                                      ? t("view.connection.uriMembers", { count: connection.hosts.length })
+                                      ? t("view.connection.uriMembers", {
+                                            count: connection.hosts.length
+                                        })
                                       : t("view.connection.uriHint")
                             }
                         >
@@ -732,7 +747,9 @@ function DatabaseConnectionDialog({
                             <>
                                 <Field
                                     label={t("view.connection.nodes")}
-                                    hint={t("view.connection.nodesHint", { masters: connection.cluster.masters })}
+                                    hint={t("view.connection.nodesHint", {
+                                        masters: connection.cluster.masters
+                                    })}
                                 >
                                     <CopyRow value={connection.cluster.nodes.join(",")} />
                                 </Field>
@@ -748,7 +765,10 @@ function DatabaseConnectionDialog({
                             <Field
                                 label={t("view.connection.readUri")}
                                 hint={t("view.connection.readUriHint", {
-                                    reference: connection.reference.replace("DATABASE_URL", "READ_URL")
+                                    reference: connection.reference.replace(
+                                        "DATABASE_URL",
+                                        "READ_URL"
+                                    )
                                 })}
                             >
                                 <CopyRow value={connection.readUri} secret={!revealed} />
@@ -785,7 +805,9 @@ function DatabaseConnectionDialog({
                                 ) : (
                                     <Eye className="size-4" />
                                 )}
-                                {revealed ? t("view.connection.hidePassword") : t("view.connection.showPassword")}
+                                {revealed
+                                    ? t("view.connection.hidePassword")
+                                    : t("view.connection.showPassword")}
                             </Button>
                             {connection.exposedPort && (
                                 <span className="text-xs text-muted-foreground">
@@ -1051,7 +1073,9 @@ function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDon
 }
 
 /** What a template creates besides its own service, in the picker's words. */
-function templateExtra(template: ServiceTemplate): { engine: string } | { companion: string } | null {
+function templateExtra(
+    template: ServiceTemplate
+): { engine: string } | { companion: string } | null {
     if (template.database) return { engine: dbEngineLabel(template.database.engine) };
     if (template.companion) return { companion: template.companion.label };
     return null;
@@ -1104,8 +1128,12 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                                     return (
                                         <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                                             {"engine" in extra
-                                                ? t("view.template.withEngine", { engine: extra.engine })
-                                                : t("view.template.withCompanion", { companion: extra.companion })}
+                                                ? t("view.template.withEngine", {
+                                                      engine: extra.engine
+                                                  })
+                                                : t("view.template.withCompanion", {
+                                                      companion: extra.companion
+                                                  })}
                                         </span>
                                     );
                                 })()}
@@ -1139,7 +1167,9 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {picked.database && (
                 <p className="text-xs text-muted-foreground">
-                    {t("view.template.createsDatabase", { engine: dbEngineLabel(picked.database.engine) })}
+                    {t("view.template.createsDatabase", {
+                        engine: dbEngineLabel(picked.database.engine)
+                    })}
                 </p>
             )}
             {picked.companion && (
@@ -1222,7 +1252,8 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !image.trim()}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.image.deploy")}
+                    {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                    {t("view.image.deploy")}
                 </Button>
             </div>
         </div>
@@ -1362,7 +1393,11 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
                     {t.rich("view.github.publicOnly", {
                         link: (chunks) => (
-                            <a key="link" href="/account/connections" className="text-primary hover:underline">
+                            <a
+                                key="link"
+                                href="/account/connections"
+                                className="text-primary hover:underline"
+                            >
                                 {chunks}
                             </a>
                         )
@@ -1455,7 +1490,9 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                             label={t("view.github.dockerfilePath")}
                             hint={
                                 rootDirectory.trim()
-                                    ? t("view.github.relativeTo", { directory: rootDirectory.trim() })
+                                    ? t("view.github.relativeTo", {
+                                          directory: rootDirectory.trim()
+                                      })
                                     : undefined
                             }
                         >
@@ -1481,7 +1518,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !canSubmit}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.github.deploy")}
+                    {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                    {t("view.github.deploy")}
                 </Button>
             </div>
         </div>
@@ -1652,13 +1690,22 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     {info.namedDatabases && (
                         <Field
                             label={t("view.database.runsOn")}
-                            hint={hosted ? t("view.database.runsOnShared") : t("view.database.runsOnOwn")}
+                            hint={
+                                hosted
+                                    ? t("view.database.runsOnShared")
+                                    : t("view.database.runsOnOwn")
+                            }
                         >
                             <Select
                                 value={instanceId}
                                 onValueChange={setInstanceId}
                                 options={[
-                                    { value: DEDICATED, label: t("view.database.newInstance", { engine: info.label }) },
+                                    {
+                                        value: DEDICATED,
+                                        label: t("view.database.newInstance", {
+                                            engine: info.label
+                                        })
+                                    },
                                     ...instances.map((instance) => ({
                                         value: instance.id,
                                         label: t("view.database.instanceOption", {
@@ -1716,7 +1763,10 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
 
                     {info.namedUsers && (
                         <>
-                            <Field label={t("view.database.databaseName")} hint={t("view.database.databaseNameHint")}>
+                            <Field
+                                label={t("view.database.databaseName")}
+                                hint={t("view.database.databaseNameHint")}
+                            >
                                 <Input
                                     value={databaseName}
                                     onChange={(event) => setDatabaseName(event.target.value)}
@@ -1771,7 +1821,8 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !parsed.success}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.database.add")}
+                    {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                    {t("view.database.add")}
                 </Button>
             </div>
         </div>
@@ -1819,13 +1870,17 @@ function AutoDeployDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{t("view.autoDeployDialog.title", { name: app.name })}</DialogTitle>
+                    <DialogTitle>
+                        {t("view.autoDeployDialog.title", { name: app.name })}
+                    </DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
                             <span className="font-medium">{t("view.autoDeployDialog.onPush")}</span>
-                            <span className="block text-xs text-muted-foreground">{t("view.autoDeployDialog.onPushHint")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("view.autoDeployDialog.onPushHint")}
+                            </span>
                         </span>
                         <Switch
                             checked={enabled}
@@ -1845,7 +1900,9 @@ function AutoDeployDialog({
                     </Field>
                     <Field
                         label={t("view.autoDeployDialog.commitFilter")}
-                        hint={t("view.autoDeployDialog.commitFilterHint", { pattern: "regex:<pattern>" })}
+                        hint={t("view.autoDeployDialog.commitFilterHint", {
+                            pattern: "regex:<pattern>"
+                        })}
                     >
                         <Input
                             value={filter}
@@ -1874,7 +1931,8 @@ function AutoDeployDialog({
                             {t("view.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} {t("view.save")}
+                            {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {t("view.save")}
                         </Button>
                     </div>
                 </div>
@@ -1954,14 +2012,19 @@ function DomainDialog({
                                             })
                                         }
                                         aria-label={
-                                            domain.enabled ? t("view.domainDialog.disable") : t("view.domainDialog.enable")
+                                            domain.enabled
+                                                ? t("view.domainDialog.disable")
+                                                : t("view.domainDialog.enable")
                                         }
                                     />
                                 </div>
                             ))}
                         </div>
                     )}
-                    <Field label={t("view.domainDialog.custom")} hint={t("view.domainDialog.customHint")}>
+                    <Field
+                        label={t("view.domainDialog.custom")}
+                        hint={t("view.domainDialog.customHint")}
+                    >
                         <Input
                             value={hostname}
                             onChange={(event) => setHostname(event.target.value)}
@@ -1980,7 +2043,8 @@ function DomainDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end">
                         <Button onClick={submit} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} {t("view.domainDialog.add")}
+                            {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {t("view.domainDialog.add")}
                         </Button>
                     </div>
                 </div>
@@ -1999,12 +2063,143 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     );
 }
 
+/** The tone of a provider's release status. */
+const ELSEWHERE_DOT: Readonly<Record<string, string>> = {
+    live: "bg-success-solid",
+    failed: "bg-danger-solid",
+    building: "bg-warning-solid animate-pulse",
+    queued: "bg-warning-solid animate-pulse"
+};
+
+const ELSEWHERE_STATUS = {
+    queued: "elsewhere.status.queued",
+    building: "elsewhere.status.building",
+    live: "elsewhere.status.live",
+    failed: "elsewhere.status.failed",
+    cancelled: "elsewhere.status.cancelled",
+    unknown: "elsewhere.status.unknown"
+} as const;
+
+/**
+ * Where the same service runs on another provider, as the card and the canvas
+ * say it: the provider, its live status, and the production domain - the address
+ * people actually use, with the Polaris one beneath it as the secondary.
+ */
+export function ElsewhereLines({ entries }: { entries: readonly ElsewhereSummary[] }) {
+    const t = useTranslations("deploy");
+    if (entries.length === 0) return null;
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            {entries.map((entry) => {
+                const host = entry.domains[0] ?? entry.url?.replace(/^https?:\/\//, "") ?? null;
+                const status = t(
+                    ELSEWHERE_STATUS[entry.status as keyof typeof ELSEWHERE_STATUS] ??
+                        ELSEWHERE_STATUS.unknown
+                );
+                return (
+                    <div key={entry.id} className="flex min-w-0 items-center gap-1.5 text-xs">
+                        <IntegrationLogo
+                            slug={entry.provider}
+                            className="size-3.5 w-4 shrink-0 object-contain text-muted-foreground"
+                        />
+                        <span
+                            role="img"
+                            aria-label={status}
+                            title={t("view.elsewhereStatus", { provider: entry.name, status })}
+                            className={cn(
+                                "size-1.5 shrink-0 rounded-full",
+                                ELSEWHERE_DOT[entry.status] ?? "bg-foreground-subtle"
+                            )}
+                        />
+                        {host ? (
+                            <a
+                                href={`https://${host}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="min-w-0 truncate font-medium text-foreground hover:text-primary hover:underline"
+                                title={host}
+                            >
+                                {host}
+                            </a>
+                        ) : (
+                            <span className="truncate text-muted-foreground">{entry.name}</span>
+                        )}
+                        <span className="shrink-0 text-[0.625rem] text-muted-foreground">
+                            {t("view.production")}
+                        </span>
+                        {entry.domains.length > 1 && (
+                            <span
+                                className="shrink-0 text-[0.625rem] text-muted-foreground"
+                                title={entry.domains.slice(1).join(", ")}
+                            >
+                                +{entry.domains.length - 1}
+                            </span>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/** The words for each run state. Queued is told apart from building because a
+ *  queue that does not move is its own problem. */
+const RUN_STATE_LABEL = {
+    never: "runState.never",
+    queued: "runState.queued",
+    deploying: "runState.deploying",
+    running: "runState.running",
+    stopped: "runState.stopped",
+    sleeping: "runState.sleeping",
+    crashed: "runState.crashed",
+    failed: "runState.failed"
+} as const;
+
+const RUN_STATE_HINT = {
+    crashed: "runStateHint.crashed",
+    sleeping: "runStateHint.sleeping",
+    stopped: "runStateHint.stopped"
+} as const;
+
+/** What a service's chip says: whether it is up now, never how its last deploy went. */
+export function runStateLabel(
+    app: Pick<ProjectApp, "runState" | "deployStatus">,
+    t: NamespaceTranslator<"deploy">
+): { label: string; hint: string | null; tone: ReturnType<typeof runStateTone> } {
+    const key =
+        app.runState === "deploying" && app.deployStatus === "queued" ? "queued" : app.runState;
+    const hint =
+        app.runState in RUN_STATE_HINT
+            ? RUN_STATE_HINT[app.runState as keyof typeof RUN_STATE_HINT]
+            : null;
+    return {
+        label: t(RUN_STATE_LABEL[key]),
+        hint: hint ? t(hint) : null,
+        tone: runStateTone(app.runState)
+    };
+}
+
+/** A service's run state as a chip, with the reason on hover where there is one. */
+export function RunStatePill({ app }: { app: Pick<ProjectApp, "runState" | "deployStatus"> }) {
+    const t = useTranslations("deploy");
+    const state = runStateLabel(app, t);
+    return (
+        <span title={state.hint ?? undefined} className="inline-flex shrink-0">
+            <StatusPill tone={state.tone} label={state.label} capitalize={false} />
+        </span>
+    );
+}
+
 export function StatusPill({
     tone,
-    label
+    label,
+    capitalize = true
 }: {
     tone: "success" | "warning" | "danger" | "idle";
     label: string;
+    /** Off for a label that is already words in the reader's language: it would
+     *  turn "En marcha" into "En Marcha". On for a raw status like "running". */
+    capitalize?: boolean;
 }) {
     const dot = {
         success: "bg-success-solid",
@@ -2021,7 +2216,7 @@ export function StatusPill({
     }[tone];
     return (
         <span
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs capitalize ${chip}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${capitalize ? "capitalize" : ""} ${chip}`}
         >
             <span
                 className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`}
@@ -2105,7 +2300,9 @@ function MetricsBadge({ applicationId }: { applicationId: string }) {
 
     if (!data?.state) return null;
     const parts = [data.state];
-    if (typeof data.cpuPercent === "number") parts.push(t("view.metricCpu", { percent: data.cpuPercent.toFixed(0) }));
-    if (typeof data.memPercent === "number") parts.push(t("view.metricMem", { percent: data.memPercent.toFixed(0) }));
+    if (typeof data.cpuPercent === "number")
+        parts.push(t("view.metricCpu", { percent: data.cpuPercent.toFixed(0) }));
+    if (typeof data.memPercent === "number")
+        parts.push(t("view.metricMem", { percent: data.memPercent.toFixed(0) }));
     return <Badge>{parts.join(" · ")}</Badge>;
 }

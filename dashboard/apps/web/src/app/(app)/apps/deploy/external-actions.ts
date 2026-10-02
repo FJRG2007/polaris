@@ -17,10 +17,10 @@ import { firstIssue, reply } from "./reply";
 import * as migrate from "@/lib/deploy/migrate";
 import { requirePermission } from "@/lib/session";
 import { recordDeployAudit } from "@/lib/deploy-audit";
-import { githubRepoChoiceRefusal } from "@/lib/github-access";
 import type { ProjectCapability } from "@polaris/core";
 import { listConnections } from "@/lib/connections/store";
 import * as external from "@/lib/deploy/external-services";
+import { githubRepoChoiceRefusal } from "@/lib/github-access";
 import { listDeployTargets } from "@/lib/deploy-target-service";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import {
@@ -78,7 +78,8 @@ async function requireServiceAccess(
 ): Promise<ProjectAccess> {
     const access = await requireProjectAccess(projectId, userId, capability);
     const environmentId = await external.externalServiceEnvironment(projectId, serviceId);
-    if (!accessInEnvironment(access, environmentId)) throw new Error(await reply("common.serviceNotFound"));
+    if (!accessInEnvironment(access, environmentId))
+        throw new Error(await reply("common.serviceNotFound"));
     return access;
 }
 
@@ -102,8 +103,7 @@ export async function addExternalServiceAction(
 ): Promise<{ service?: external.ExternalServiceView; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = addSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: await firstIssue(parsed.error, "common.checkDetails") };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // Through the environment it lands in, which the form names: an access
         // limited to development cannot put a row in production.
@@ -169,6 +169,32 @@ export async function renameExternalServiceAction(
         return {
             service: await external.renameExternalService(projectId, parsed.data, named.data)
         };
+    } catch (caught) {
+        return { error: await refusal(caught) };
+    }
+}
+
+/**
+ * Say which service of this project a row is the same thing as, so that
+ * service's card shows where its production copy answers - or that it is none.
+ * The service must be one the caller reaches too: the link puts this row on its
+ * card.
+ */
+export async function linkExternalServiceAction(
+    projectId: string,
+    id: string,
+    applicationId: string | null
+): Promise<{ service?: external.ExternalServiceView; error?: string }> {
+    const user = await requirePermission("deploy.read");
+    const parsed = idSchema.safeParse(id);
+    const target = idSchema.nullable().safeParse(applicationId);
+    if (!parsed.success || !target.success) return { error: await reply("common.unknownService") };
+    try {
+        await requireServiceAccess(projectId, parsed.data, user.id, "service.configure");
+        if (target.data) await requireApplicationAccess(target.data, user.id, "service.configure");
+        const service = await external.linkExternalService(projectId, parsed.data, target.data);
+        revalidatePath(`/apps/deploy/${projectId}`);
+        return { service };
     } catch (caught) {
         return { error: await refusal(caught) };
     }
@@ -281,8 +307,7 @@ export async function moveOutAction(
     const service = idSchema.safeParse(applicationId);
     if (!service.success) return { error: await reply("common.unknownService") };
     const parsed = moveOutSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: await firstIssue(parsed.error, "common.checkDetails") };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // Reached through the environment the row lands in rather than through
         // the project, so an access limited to development cannot put one in
@@ -294,7 +319,8 @@ export async function moveOutAction(
             "service.create"
         );
         if (access.projectId !== projectId) return { error: await reply("common.projectNotFound") };
-        if (!accessCan(access, "service.configure")) return { error: await reply("common.projectNotFound") };
+        if (!accessCan(access, "service.configure"))
+            return { error: await reply("common.projectNotFound") };
         // And the service being moved, in the environment it is in: the row lands
         // where the form says, but the secrets read and the service stopped are
         // this one's, which may be in an environment the access does not reach.
@@ -369,8 +395,7 @@ export async function moveHomeAction(
     const service = idSchema.safeParse(serviceId);
     if (!service.success) return { error: await reply("common.unknownService") };
     const parsed = moveHomeSchema.safeParse(input);
-    if (!parsed.success)
-        return { error: await firstIssue(parsed.error, "common.checkDetails") };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "common.checkDetails") };
     try {
         // The environment is where the new service is created, and it arrives on
         // a form. Authorized through itself rather than through the project:

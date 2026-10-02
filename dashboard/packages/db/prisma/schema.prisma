@@ -4631,6 +4631,17 @@ model ExternalService {
     error             String?
     checkedAt         DateTime?
 
+    /// The Polaris service this is the same thing as, when somebody said so (or a
+    /// move did). Soft pointer, no FK: deleting either half leaves the other alone.
+    applicationId     String?   @db.Uuid
+    /// `owner/name` of the repository the provider builds, as it reports it - what
+    /// matches a row to a Polaris service built from the same repository.
+    repo              String?
+    /// JSON array of the hostnames the provider serves production on.
+    productionDomains String?
+    /// When the two above were last read: on their own, slower clock.
+    domainsCheckedAt  DateTime?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
@@ -4638,6 +4649,7 @@ model ExternalService {
 
     @@unique([environmentId, slug])
     @@index([environmentId])
+    @@index([applicationId])
     @@index([connectionId])
 }
 
@@ -4907,6 +4919,10 @@ model Domain {
     // release is current. Soft pointer (no FK), like Deployment.deployableId.
     deploymentId  String?  @db.Uuid
     targetPort    Int
+    // Set when somebody chose this port for this one address - a second port of
+    // the service on a name of its own. Unpinned, the edge follows the service's
+    // own port, which is what every domain did before this existed.
+    portPinned    Boolean  @default(false)
     https         Boolean  @default(true)
     // When off, the hostname stops serving the app (its route is dropped) but the
     // record is kept so it can be re-enabled from the service's domain settings.

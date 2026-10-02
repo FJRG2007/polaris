@@ -37,7 +37,8 @@ async function speaking<T>(run: () => Promise<T>): Promise<T> {
     try {
         return await run();
     } catch (caught) {
-        if (caught instanceof vercel.VercelError) throw new ProviderError(caught.message, caught.kind);
+        if (caught instanceof vercel.VercelError)
+            throw new ProviderError(caught.message, caught.kind);
         throw caught;
     }
 }
@@ -127,6 +128,10 @@ export const vercelDriver: ProviderDriver = {
         } satisfies ExternalState;
     },
 
+    async productionDomains(token, externalId, ref) {
+        return speaking(() => vercel.vercelProductionDomains(token, externalId, ref.team ?? null));
+    },
+
     /**
      * The repository behind the project.
      *
@@ -139,7 +144,9 @@ export const vercelDriver: ProviderDriver = {
      * host nobody named would be a clone command that fails at the far end.
      */
     async source(token, externalId, ref) {
-        const project = await speaking(() => vercel.vercelProject(token, externalId, ref.team ?? null));
+        const project = await speaking(() =>
+            vercel.vercelProject(token, externalId, ref.team ?? null)
+        );
         const link = project.link;
         if (!link?.org || !link.repo) return null;
         const repo = `${link.org}/${link.repo}`;
@@ -158,13 +165,19 @@ export const vercelDriver: ProviderDriver = {
 
     async variables(token, externalId, ref) {
         return speaking(() =>
-            vercel.vercelProjectEnv(token, externalId, { team: ref.team ?? null, target: "production" })
+            vercel.vercelProjectEnv(token, externalId, {
+                team: ref.team ?? null,
+                target: "production"
+            })
         );
     },
 
     async putVariables(token, externalId, ref, values) {
         await speaking(() =>
-            vercel.vercelSetEnv(token, externalId, values, { team: ref.team ?? null, target: "production" })
+            vercel.vercelSetEnv(token, externalId, values, {
+                team: ref.team ?? null,
+                target: "production"
+            })
         );
     },
 

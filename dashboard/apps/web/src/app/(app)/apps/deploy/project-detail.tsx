@@ -118,7 +118,10 @@ export function ProjectDetail({
                         {t.rich("detail.localNotReady", {
                             daemon: "polaris-hostd",
                             code: (chunks) => (
-                                <code key="hostd" className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
+                                <code
+                                    key="hostd"
+                                    className="rounded bg-muted px-1 py-0.5 text-xs text-foreground"
+                                >
                                     {chunks}
                                 </code>
                             )
@@ -179,9 +182,7 @@ export function ProjectDetail({
                         />
                     )
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        {t("detail.noEnvironments")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("detail.noEnvironments")}</p>
                 )}
 
                 {detailApp && (
@@ -227,7 +228,8 @@ function ViewToggle({
 function EnvSummary({ environment }: { environment: ProjectSummary["environments"][number] }) {
     const t = useTranslations("deployProject");
     const online =
-        environment.applications.filter((app) => app.currentDeploymentId).length +
+        // Up now, not merely deployed once: a stopped service is not online.
+        environment.applications.filter((app) => app.runState === "running").length +
         environment.databases.filter((db) =>
             ["running", "active", "healthy", "ready"].includes(db.status.toLowerCase())
         ).length;
@@ -239,7 +241,8 @@ function EnvSummary({ environment }: { environment: ProjectSummary["environments
             : partial
               ? "border-warning-edge bg-warning-soft text-warning-ink"
               : "border-success-edge bg-success-soft text-success-ink";
-    const dot = total === 0 ? "bg-muted-foreground" : partial ? "bg-warning-solid" : "bg-success-solid";
+    const dot =
+        total === 0 ? "bg-muted-foreground" : partial ? "bg-warning-solid" : "bg-success-solid";
     return (
         <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${chip}`}

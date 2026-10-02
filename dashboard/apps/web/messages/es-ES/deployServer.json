@@ -230,5 +230,18 @@
     "behaviour": {
         "loadFailed": "No se pudo leer cómo se despliega este servicio",
         "saveFailed": "No se pudo guardar cómo se despliega este servicio"
+    },
+    "publicNet": {
+        "notFound": "Ese servicio o dominio ya no existe.",
+        "badPort": "Usa un puerto entre 1 y 65535.",
+        "notRenameable": "Solo se puede renombrar un nombre que Polaris generó en una de sus zonas. Añade un dominio nuevo.",
+        "badName": "Usa letras, números y guiones en el subdominio.",
+        "zoneUnavailable": "Esa zona no admite nombres nuevos ahora mismo. Revísala en Dominios.",
+        "taken": "{hostname} ya está en uso.",
+        "renameFailed": "No se pudo renombrar el dominio.",
+        "proxyLimit": "Un servicio admite {count} proxies TCP.",
+        "rangeFull": "Todos los puertos públicos del rango de proxies TCP están ocupados en este servidor.",
+        "portFixed": "Este dominio llega por el puerto propio del servicio. Cambia el puerto del servicio.",
+        "failed": "No se pudo completar. Inténtalo de nuevo en un momento."
     }
 }

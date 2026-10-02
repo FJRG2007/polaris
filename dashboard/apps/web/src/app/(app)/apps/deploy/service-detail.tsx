@@ -14,6 +14,7 @@ import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
 import { DomainCdnButton } from "./domain-cdn";
 import { EdgeSettings } from "./edge-settings";
+import * as publicNet from "./public-networking";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { ScalingSection } from "./scaling-section";
@@ -36,17 +37,18 @@ import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
 import { DeployBehaviourSection } from "./deploy-behaviour-section";
 import { useDisplayFormat } from "@/components/display-format";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { TabAttentionDot, tabAttention } from "./attention-dot";
 import { DesktopServiceActions } from "@/components/desktop-app";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { describeServiceEvent, unresolvedSetupFailure } from "./service-history";
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
-import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { RunStatePill, ServiceIcon, serviceKindOf, type ProjectApp } from "./deploy-view";
+import { Fragment, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { addTcpProxyAction, setDomainPortByHostnameAction } from "./public-networking-actions";
 import {
     isTunnelHostname,
     runtimeVersionSchema,
@@ -100,6 +102,7 @@ import {
     Maximize2,
     Minimize2,
     MoreVertical,
+    Network,
     Pin,
     PinOff,
     Play,
@@ -231,9 +234,7 @@ export function ServiceDetail({
                     <DialogTitle className="truncate text-base font-semibold">
                         {app.name}
                     </DialogTitle>
-                    {app.deployStatus && (
-                        <StatusPill tone={dbTone(app.deployStatus)} label={app.deployStatus} />
-                    )}
+                    {app.deployStatus && <RunStatePill app={app} />}
                     {staged && (
                         <span className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                             {t("panel.removalPending")}
@@ -2409,7 +2410,8 @@ type ExposureKind =
     | "proxy"
     | "cf-named"
     | "cf-quick"
-    | "ngrok";
+    | "ngrok"
+    | "tcp";
 
 const EXPOSURE_OPTIONS: {
     value: ExposureKind;
@@ -2456,6 +2458,11 @@ const EXPOSURE_OPTIONS: {
         value: "proxy",
         label: "exposure.proxy",
         icon: <Globe className="size-4 text-muted-foreground" />
+    },
+    {
+        value: "tcp",
+        label: "exposure.tcp",
+        icon: <Network className="size-4 text-muted-foreground" />
     }
 ];
 
@@ -2680,7 +2687,10 @@ function useDomainHealth(
     const [rounds, setRounds] = useState(0);
     const settled = domains
         .filter((domain) => domain.enabled)
-        .every((domain) => (health.get(domain.id)?.healthStatus ?? domain.healthStatus) === "up");
+        .every((domain) => {
+            const status = health.get(domain.id)?.healthStatus ?? domain.healthStatus;
+            return status === "up" || status === "stopped";
+        });
 
     useEffect(() => {
         if (settled || rounds > 30) return;
@@ -2733,7 +2743,6 @@ function SettingsTab({
     const [label, setLabel] = useState("");
     const [connectorToken, setConnectorToken] = useState("");
     const [port, setPort] = useState(app.port != null ? String(app.port) : "");
-    const [advanced, setAdvanced] = useState(false);
     const [exposure, setExposure] = useState<ExposureKind>("subdomain");
     // Set as soon as the operator picks a method, so the async zone default below
     // never overrides a deliberate choice.
@@ -2759,7 +2768,20 @@ function SettingsTab({
      *  re-rendering does not ask again for a name nothing changed about. */
     const checkedSubdomain = useRef<string | null>(null);
     const [tunnelNonce, setTunnelNonce] = useState(0);
+    const [tcpNonce, setTcpNonce] = useState(0);
     const health = useDomainHealth(app.id, app.domains);
+    // The ports the service listens on, for the target-port picker, and what each
+    // domain's DNS and certificate say - both read once the panel is open.
+    const ports = publicNet.useServicePorts(app.id);
+    const readings = publicNet.useDomainReadings(
+        app.id,
+        app.domains.map((domain) => `${domain.id}:${domain.hostname}:${domain.enabled}`).join(",")
+    ).readings;
+    const addForm = useRef<HTMLDivElement>(null);
+    // The picker starts on the port the service's own domains follow, once known.
+    useEffect(() => {
+        if (ports && port === "") setPort(String(ports.servicePort));
+    }, [ports]);
     const [error, setError] = useState<string | null>(null);
     // Kept after a successful add: a custom domain works only once its DNS points here,
     // and whether Polaris managed that itself is the one thing the operator has to know.
@@ -2922,9 +2944,22 @@ function SettingsTab({
     // The target port the route stores: the Advanced override, else the app's known
     // port, else a sensible default. Routing serves on 80/443 regardless.
     function targetPort(): number {
-        const override = Number(port.trim());
-        if (advanced && Number.isInteger(override) && override > 0) return override;
-        return app.port ?? (app.sourceType === "image" ? 80 : 3000);
+        return (
+            publicNet.portValue(port.trim()) ??
+            ports?.servicePort ??
+            app.port ??
+            (app.sourceType === "image" ? 80 : 3000)
+        );
+    }
+
+    /** Jump to the add form with one method chosen: the three buttons Railway puts
+     *  at the top of the panel, here as shortcuts into the one selector. */
+    function choose(kind: ExposureKind): void {
+        exposureTouched.current = true;
+        setExposure(kind);
+        setDnsNote(null);
+        setError(null);
+        addForm.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
     // One action for every exposure: domains go through deployActions.addDomainAction, the three
@@ -2998,6 +3033,24 @@ function SettingsTab({
                 result = await deployActions.startQuickTunnelAction(app.id);
             } else if (exposure === "ngrok") {
                 result = await deployActions.startNgrokTunnelAction(app.id);
+            } else if (exposure === "tcp") {
+                result = await addTcpProxyAction({ applicationId: app.id, port: targetPort() });
+            }
+            // A port other than the service's own is pinned on the new address, so
+            // the edge dials it there whatever the service's port later becomes.
+            if (
+                !result.error &&
+                isDomainExposure &&
+                result.hostname &&
+                ports &&
+                targetPort() !== ports.servicePort
+            ) {
+                const pinned = await setDomainPortByHostnameAction({
+                    applicationId: app.id,
+                    hostname: result.hostname,
+                    port: targetPort()
+                });
+                if (pinned.error) result = { ...result, error: pinned.error };
             }
             if (result.error) setError(result.error);
             else {
@@ -3011,22 +3064,26 @@ function SettingsTab({
                 setSubdomainCheck(null);
                 checkedSubdomain.current = null;
                 setConnectorToken("");
-                setAdvanced(false);
-                setPort(app.port != null ? String(app.port) : "");
+                setPort(
+                    ports ? String(ports.servicePort) : app.port != null ? String(app.port) : ""
+                );
                 setTunnelNonce((nonce) => nonce + 1);
+                if (exposure === "tcp") setTcpNonce((nonce) => nonce + 1);
                 onChanged();
             }
         });
     }
 
     const submitLabel =
-        exposure === "cf-quick" || exposure === "ngrok"
-            ? t("settings.expose")
-            : exposure === "cf-named"
-              ? cfConnected
-                  ? t("settings.setUp")
-                  : t("settings.connect")
-              : t("settings.addDomain");
+        exposure === "tcp"
+            ? t("publicNet.tcpAdd")
+            : exposure === "cf-quick" || exposure === "ngrok"
+              ? t("settings.expose")
+              : exposure === "cf-named"
+                ? cfConnected
+                    ? t("settings.setUp")
+                    : t("settings.connect")
+                : t("settings.addDomain");
     // The zone the name goes in, for the suffix beside the field.
     const zone = zones.find((entry) => entry.label === zoneKey) ?? zones[0];
     const zoneHost = zone?.host ?? "";
@@ -3041,6 +3098,9 @@ function SettingsTab({
         subdomainCheck?.available === false;
     const submitDisabled =
         pending ||
+        ((isDomainExposure || exposure === "tcp") &&
+            publicNet.portValue(port.trim()) === null &&
+            port.trim() !== "") ||
         duckMissing ||
         hostnameIsTunnel ||
         subdomainTaken ||
@@ -3081,10 +3141,29 @@ function SettingsTab({
             {can("domains.manage") && (
                 <section className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
-                        <h3 className="text-sm font-medium">{t("settings.publicAccess")}</h3>
-                        <p className="text-xs text-muted-foreground">
-                            {t("settings.publicAccessIntro")}
-                        </p>
+                        <h3 className="text-sm font-medium">{t("publicNet.title")}</h3>
+                        <p className="text-xs text-muted-foreground">{t("publicNet.intro")}</p>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                    choose(
+                                        zones.some((zone) => zone.kind !== "base")
+                                            ? "zone"
+                                            : "subdomain"
+                                    )
+                                }
+                            >
+                                <Globe className="size-3.5" /> {t("publicNet.generate")}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => choose("le")}>
+                                <Plus className="size-3.5" /> {t("publicNet.custom")}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => choose("tcp")}>
+                                <Network className="size-3.5" /> {t("publicNet.tcp")}
+                            </Button>
+                        </div>
                     </div>
                     <ServedByChoice app={app} onChanged={onChanged} />
 
@@ -3092,108 +3171,141 @@ function SettingsTab({
                         {app.domains.map((rendered) => {
                             const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
                             return (
-                                <li key={domain.id} className="group flex items-center gap-2">
-                                    {domain.enabled && (
-                                        <span
-                                            title={
-                                                domain.healthStatus === "down"
-                                                    ? domain.healthDetail
-                                                        ? t("settings.notReachableDetail", {
-                                                              detail: domain.healthDetail
-                                                          })
-                                                        : t("settings.notReachable")
-                                                    : domain.healthStatus === "up"
-                                                      ? domain.healthCode
-                                                          ? t("settings.reachableCode", {
-                                                                code: domain.healthCode
-                                                            })
-                                                          : t("settings.reachable")
-                                                      : t("settings.checking")
-                                            }
-                                            className={cn(
-                                                "size-2 shrink-0 rounded-full",
-                                                domain.healthStatus === "up" && "bg-success-solid",
-                                                domain.healthStatus === "down" && "bg-danger-solid",
-                                                domain.healthStatus !== "up" &&
-                                                    domain.healthStatus !== "down" &&
-                                                    "animate-pulse bg-muted-foreground/40"
-                                            )}
-                                        />
-                                    )}
-                                    {domain.enabled ? (
-                                        <a
-                                            href={`https://${domain.hostname}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
-                                        >
-                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                        </a>
-                                    ) : (
-                                        <span
-                                            title={t("settings.domainDisabled")}
-                                            className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
-                                        >
-                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                        </span>
-                                    )}
-                                    {(domain.kind === "lan" ||
-                                        domain.hostname.endsWith(".plr.local")) && (
-                                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
-                                            {t("settings.local")}
-                                        </span>
-                                    )}
-                                    <DomainCertificateButton
-                                        domainId={domain.id}
-                                        hostname={domain.hostname}
-                                        supplied={domain.hasCertificate === true}
-                                        onChanged={onChanged}
-                                    />
-                                    {domain.cdn !== undefined &&
-                                        domain.kind !== "lan" &&
-                                        !domain.hostname.endsWith(".plr.local") && (
-                                            <DomainCdnButton
-                                                domainId={domain.id}
-                                                hostname={domain.hostname}
-                                                enabled={domain.cdn}
+                                <Fragment key={domain.id}>
+                                    <li className="group flex min-w-0 items-center gap-2">
+                                        {domain.enabled && (
+                                            <span
+                                                title={
+                                                    domain.healthStatus === "stopped"
+                                                        ? t("publicNet.serviceStopped")
+                                                        : domain.healthStatus === "down"
+                                                          ? domain.healthDetail
+                                                              ? t("settings.notReachableDetail", {
+                                                                    detail: domain.healthDetail
+                                                                })
+                                                              : t("settings.notReachable")
+                                                          : domain.healthStatus === "up"
+                                                            ? domain.healthCode
+                                                                ? t("settings.reachableCode", {
+                                                                      code: domain.healthCode
+                                                                  })
+                                                                : t("settings.reachable")
+                                                            : t("settings.checking")
+                                                }
+                                                className={cn(
+                                                    "size-2 shrink-0 rounded-full",
+                                                    domain.healthStatus === "up" &&
+                                                        "bg-success-solid",
+                                                    domain.healthStatus === "down" &&
+                                                        "bg-danger-solid",
+                                                    domain.healthStatus !== "up" &&
+                                                        domain.healthStatus !== "down" &&
+                                                        "animate-pulse bg-muted-foreground/40"
+                                                )}
+                                            />
+                                        )}
+                                        {domain.enabled ? (
+                                            <a
+                                                href={`https://${domain.hostname}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
+                                            >
+                                                <Globe className="size-3 shrink-0" />{" "}
+                                                {domain.hostname}
+                                            </a>
+                                        ) : (
+                                            <span
+                                                title={t("settings.domainDisabled")}
+                                                className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
+                                            >
+                                                <Globe className="size-3 shrink-0" />{" "}
+                                                {domain.hostname}
+                                            </span>
+                                        )}
+                                        {(domain.kind === "lan" ||
+                                            domain.hostname.endsWith(".plr.local")) && (
+                                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
+                                                {t("settings.local")}
+                                            </span>
+                                        )}
+                                        {domain.targetPort !== undefined && (
+                                            <span
+                                                className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 font-mono text-[0.625rem] text-muted-foreground"
+                                                title={t("publicNet.dialsPort", {
+                                                    port: domain.targetPort
+                                                })}
+                                            >
+                                                :{domain.targetPort}
+                                            </span>
+                                        )}
+                                        {domain.targetPort !== undefined && (
+                                            <publicNet.EditDomainButton
+                                                domain={domain}
+                                                applicationId={app.id}
+                                                ports={ports}
                                                 onChanged={onChanged}
                                             />
                                         )}
-                                    <Switch
-                                        checked={domain.enabled}
-                                        onChange={(next) =>
-                                            startTransition(async () => {
-                                                await deployActions.setDomainEnabledAction(
-                                                    domain.id,
-                                                    next
-                                                );
-                                                onChanged();
-                                            })
-                                        }
-                                        aria-label={
-                                            domain.enabled
-                                                ? t("settings.disableDomain")
-                                                : t("settings.enableDomain")
-                                        }
-                                    />
-                                    <span className="flex w-5 shrink-0 items-center justify-center">
-                                        <button
-                                            type="button"
-                                            title={t("settings.removeDomain")}
-                                            onClick={() =>
+                                        <DomainCertificateButton
+                                            domainId={domain.id}
+                                            hostname={domain.hostname}
+                                            supplied={domain.hasCertificate === true}
+                                            onChanged={onChanged}
+                                        />
+                                        {domain.cdn !== undefined &&
+                                            domain.kind !== "lan" &&
+                                            !domain.hostname.endsWith(".plr.local") && (
+                                                <DomainCdnButton
+                                                    domainId={domain.id}
+                                                    hostname={domain.hostname}
+                                                    enabled={domain.cdn}
+                                                    onChanged={onChanged}
+                                                />
+                                            )}
+                                        <Switch
+                                            checked={domain.enabled}
+                                            onChange={(next) =>
                                                 startTransition(async () => {
-                                                    await deployActions.removeDomainAction(
-                                                        domain.id
+                                                    await deployActions.setDomainEnabledAction(
+                                                        domain.id,
+                                                        next
                                                     );
                                                     onChanged();
                                                 })
                                             }
-                                            className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                        >
-                                            <Trash2 className="size-3.5" />
-                                        </button>
-                                    </span>
-                                </li>
+                                            aria-label={
+                                                domain.enabled
+                                                    ? t("settings.disableDomain")
+                                                    : t("settings.enableDomain")
+                                            }
+                                        />
+                                        <span className="flex w-5 shrink-0 items-center justify-center">
+                                            <button
+                                                type="button"
+                                                title={t("settings.removeDomain")}
+                                                onClick={() =>
+                                                    startTransition(async () => {
+                                                        await deployActions.removeDomainAction(
+                                                            domain.id
+                                                        );
+                                                        onChanged();
+                                                    })
+                                                }
+                                                className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                                            >
+                                                <Trash2 className="size-3.5" />
+                                            </button>
+                                        </span>
+                                    </li>
+                                    {domain.enabled && readings.has(domain.id) && (
+                                        <li className="empty:hidden">
+                                            <publicNet.DomainReadingView
+                                                reading={readings.get(domain.id)}
+                                            />
+                                        </li>
+                                    )}
+                                </Fragment>
                             );
                         })}
                         <NamedTunnelRow
@@ -3211,7 +3323,14 @@ function SettingsTab({
                             nonce={tunnelNonce}
                             onChanged={() => setTunnelNonce((nonce) => nonce + 1)}
                         />
+                        <publicNet.TcpProxyList
+                            applicationId={app.id}
+                            nonce={tcpNonce}
+                            canEdit={can("domains.manage")}
+                            onChanged={onChanged}
+                        />
                     </ul>
+                    <div ref={addForm} />
                     <MethodBlock
                         icon={<Globe className="size-4" />}
                         title={t("settings.addADomain")}
@@ -3346,7 +3465,9 @@ function SettingsTab({
                                                     : t("exposureHint.cfNamed")
                                                 : exposure === "cf-quick"
                                                   ? t("exposureHint.cfQuick")
-                                                  : t("exposureHint.ngrok")}
+                                                  : exposure === "tcp"
+                                                    ? t("exposureHint.tcp")
+                                                    : t("exposureHint.ngrok")}
                             </p>
                             {duckMissing && (
                                 <a
@@ -3356,34 +3477,12 @@ function SettingsTab({
                                     {t("settings.setUpDuckdns")} <ExternalLink className="size-3" />
                                 </a>
                             )}
-                            {isDomainExposure && (
-                                <div className="flex flex-col gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setAdvanced((value) => !value)}
-                                        className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                                    >
-                                        {advanced ? (
-                                            <ChevronDown className="size-3.5" />
-                                        ) : (
-                                            <ChevronRight className="size-3.5" />
-                                        )}{" "}
-                                        {t("settings.advanced")}
-                                    </button>
-                                    {advanced && (
-                                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                            {t("settings.targetPort")}
-                                            <Input
-                                                value={port}
-                                                onChange={(event) => setPort(event.target.value)}
-                                                placeholder={String(app.port ?? t("settings.auto"))}
-                                                inputMode="numeric"
-                                                className="w-40"
-                                            />
-                                            <span>{t("settings.targetPortHint")}</span>
-                                        </label>
-                                    )}
-                                </div>
+                            {(isDomainExposure || exposure === "tcp") && (
+                                <publicNet.TargetPortField
+                                    ports={ports}
+                                    value={port}
+                                    onChange={setPort}
+                                />
                             )}
                             {dnsNote && (
                                 <p className="text-xs text-muted-foreground">{dnsNote.text}</p>
@@ -3412,6 +3511,7 @@ function SettingsTab({
                             </div>
                         </div>
                     </MethodBlock>
+                    <publicNet.PrivateNetworkingLink />
                 </section>
             )}
 

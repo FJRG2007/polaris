@@ -100,6 +100,13 @@ export interface ProviderDriver {
     deploy(token: string, externalId: string, ref: ProviderRef): Promise<void>;
 
     /**
+     * The hostnames it serves production on, custom ones first. Optional: a
+     * provider that has no such notion (ECS behind somebody's own load balancer)
+     * leaves it out, and the card shows the release URL instead.
+     */
+    productionDomains?(token: string, externalId: string, ref: ProviderRef): Promise<string[]>;
+
+    /**
      * The repository the provider builds, for a service being brought home.
      *
      * Null where the provider will not say - which is a real answer and not a

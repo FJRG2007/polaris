@@ -230,5 +230,18 @@
     "behaviour": {
         "loadFailed": "Could not read how this service deploys",
         "saveFailed": "Could not save how this service deploys"
+    },
+    "publicNet": {
+        "notFound": "That service or domain is not there any more.",
+        "badPort": "Use a port between 1 and 65535.",
+        "notRenameable": "Only a name Polaris generated in one of its zones can be renamed. Add a new domain instead.",
+        "badName": "Use letters, digits and dashes for the subdomain.",
+        "zoneUnavailable": "That zone cannot take a new name right now. Check it under Domains.",
+        "taken": "{hostname} is already taken.",
+        "renameFailed": "Could not rename the domain.",
+        "proxyLimit": "A service can hold {count} TCP proxies.",
+        "rangeFull": "Every public port in the TCP proxy range is taken on this server.",
+        "portFixed": "This domain is reached on the service's own port. Change the service's port instead.",
+        "failed": "That did not go through. Try again in a moment."
     }
 }

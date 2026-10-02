@@ -17,6 +17,7 @@ import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { projectGlanceAction } from "./glance-actions";
 import { isInFlightStatus } from "@/lib/deploy/status";
+import { deployOutcome } from "@/lib/deploy/run-state";
 import { RelativeTime } from "@/components/relative-time";
 import { FAILED_DEPLOY_STATUSES } from "@/lib/deploy/attention";
 import { ArrowUpRight, ChevronDown, CircleAlert, Globe } from "lucide-react";
@@ -43,7 +44,9 @@ export function useProjectGlance(
     const [glance, setGlance] = useState(initial);
     useEffect(() => setGlance(initial), [initial]);
 
-    const moving = Object.values(glance).some((entry) => isInFlightStatus(entry.lastDeploy?.status));
+    const moving = Object.values(glance).some((entry) =>
+        isInFlightStatus(entry.lastDeploy?.status)
+    );
     useEffect(() => {
         let active = true;
         function refresh(): void {
@@ -73,6 +76,18 @@ function deployVariant(status: string): "success" | "warning" | "danger" | "neut
     return "neutral";
 }
 
+/** The words for a deploy's outcome. A finished release reads as succeeded, never
+ *  as "running": whether the service is up now is its own chip on the service. */
+const OUTCOME_LABEL = {
+    succeeded: "glance.outcome.succeeded",
+    failed: "glance.outcome.failed",
+    cancelled: "glance.outcome.cancelled",
+    queued: "glance.outcome.queued",
+    deploying: "glance.outcome.deploying",
+    stopped: "glance.outcome.stopped",
+    removed: "glance.outcome.removed"
+} as const;
+
 const HEALTH_DOT: Record<string, string> = {
     up: "bg-success-solid",
     down: "bg-danger-solid"
@@ -84,8 +99,17 @@ function HealthDot({ address }: { address: GlanceAddress }) {
     return (
         <span
             role="img"
-            aria-label={status === "up" ? t("glance.up") : status === "down" ? t("glance.down") : t("glance.unchecked")}
-            className={cn("size-1.5 shrink-0 rounded-full", HEALTH_DOT[status] ?? "bg-foreground-subtle")}
+            aria-label={
+                status === "up"
+                    ? t("glance.up")
+                    : status === "down"
+                      ? t("glance.down")
+                      : t("glance.unchecked")
+            }
+            className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                HEALTH_DOT[status] ?? "bg-foreground-subtle"
+            )}
         />
     );
 }
@@ -148,7 +172,9 @@ export function ProjectGlanceBar({
                             rel="noreferrer"
                             className="inline-flex min-w-0 items-center gap-1 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
                         >
-                            <span className="truncate" title={shown.hostname}>{shown.hostname}</span>
+                            <span className="truncate" title={shown.hostname}>
+                                {shown.hostname}
+                            </span>
                             <ArrowUpRight className="size-3.5 text-muted-foreground" />
                         </a>
                         {/* i18n-ignore: the shared copy button says "Copy" in English around it */}
@@ -162,24 +188,41 @@ export function ProjectGlanceBar({
                                         aria-label={t("glance.switch")}
                                     >
                                         {shown.service}
-                                        <span className="tabular-nums text-foreground-subtle">+{addresses.length - 1}</span>
+                                        <span className="tabular-nums text-foreground-subtle">
+                                            +{addresses.length - 1}
+                                        </span>
                                         <ChevronDown className="size-3.5" />
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" className="max-h-72 max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain">
+                                <DropdownMenuContent
+                                    align="start"
+                                    className="max-h-72 max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain"
+                                >
                                     <DropdownMenuLabel>{t("glance.addresses")}</DropdownMenuLabel>
                                     {addresses.map((address) => (
-                                        <DropdownMenuItem key={address.id} onSelect={() => pick(address.hostname)}>
+                                        <DropdownMenuItem
+                                            key={address.id}
+                                            onSelect={() => pick(address.hostname)}
+                                        >
                                             <HealthDot address={address} />
-                                            <span className="min-w-0 flex-1 truncate" title={address.hostname}>{address.hostname}</span>
-                                            <span className="shrink-0 text-xs text-muted-foreground">{address.service}</span>
+                                            <span
+                                                className="min-w-0 flex-1 truncate"
+                                                title={address.hostname}
+                                            >
+                                                {address.hostname}
+                                            </span>
+                                            <span className="shrink-0 text-xs text-muted-foreground">
+                                                {address.service}
+                                            </span>
                                         </DropdownMenuItem>
                                     ))}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
                         {addresses.length === 1 && (
-                            <span className="shrink-0 text-xs text-muted-foreground">{shown.service}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                                {shown.service}
+                            </span>
                         )}
                     </>
                 ) : (
@@ -198,10 +241,22 @@ export function ProjectGlanceBar({
                     >
                         <span className="shrink-0">{t("glance.lastDeploy")}</span>
                         <Badge variant={deployVariant(last.status)} className="shrink-0 capitalize">
-                            {last.status.replace(/_/g, " ")}
+                            {deployOutcome(last.status) in OUTCOME_LABEL
+                                ? t(
+                                      OUTCOME_LABEL[
+                                          deployOutcome(last.status) as keyof typeof OUTCOME_LABEL
+                                      ]
+                                  )
+                                : last.status.replace(/_/g, " ")}
                         </Badge>
-                        <RelativeTime iso={last.createdAt} formatStyle="narrow" className="shrink-0 tabular-nums" />
-                        <span className="truncate" title={last.service}>{last.service}</span>
+                        <RelativeTime
+                            iso={last.createdAt}
+                            formatStyle="narrow"
+                            className="shrink-0 tabular-nums"
+                        />
+                        <span className="truncate" title={last.service}>
+                            {last.service}
+                        </span>
                     </Link>
                 ) : (
                     <span className="text-xs text-muted-foreground">{t("glance.notDeployed")}</span>
@@ -209,7 +264,9 @@ export function ProjectGlanceBar({
                 {firstAttention && (
                     <Link
                         href={serviceHref(firstAttention.applicationId)}
-                        title={attention.map((entry) => `${entry.service}: ${entry.reasons.join(", ")}`).join("\n")}
+                        title={attention
+                            .map((entry) => `${entry.service}: ${entry.reasons.join(", ")}`)
+                            .join("\n")}
                         className={cn(statusChipClass("danger"), "hover:bg-danger-soft")}
                     >
                         <CircleAlert className="size-3" />

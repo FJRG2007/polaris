@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { primaryDomain } from "./domain-rank";
+import { IntegrationLogo } from "@/components/logos";
 import { dbEngineLabel } from "@polaris/core";
 import { NewVolumeDialog } from "./volume-form";
 import { useStagedChanges } from "./staged-changes";
@@ -27,6 +28,7 @@ import {
     SERVICE_TYPES,
     ServiceIcon,
     dbTone,
+    runStateLabel,
     serviceKindOf,
     type ProjectApp,
     type ProjectSummary,
@@ -71,6 +73,9 @@ interface CanvasNode {
     volume?: string;
     /** Real attached volumes (applications), each an interactive strip below the card. */
     volumes?: VolumeChip[];
+    /** The same service on another provider, whose production domain is the
+     *  subtitle: which provider, and whether its release is live. */
+    elsewhere?: { provider: string; status: string };
 }
 
 /** Where a volume opens in Drive: a nas volume points at its NAS connection + folder;
@@ -106,11 +111,17 @@ function nodesFromEnvironment(
             id: app.id,
             name: app.name,
             kind: serviceKindOf(app.sourceType),
+            // The production copy's domain first when the service also runs on another
+            // provider - that is where it answers people - then its own best address.
             subtitle:
+                app.elsewhere.find((entry) => entry.domains.length > 0)?.domains[0] ??
                 primaryDomain(app.domains)?.hostname ??
                 (app.sourceType === "image" ? t("canvas.dockerImage") : t("canvas.gitRepository")),
-            tone: dbTone(app.deployStatus ?? ""),
-            statusLabel: app.deployStatus ?? t("view.notDeployed"),
+            elsewhere: app.elsewhere[0]
+                ? { provider: app.elsewhere[0].provider, status: app.elsewhere[0].status }
+                : undefined,
+            tone: runStateLabel(app, t).tone,
+            statusLabel: runStateLabel(app, t).label,
             volumes: app.volumes
         })
     );
@@ -266,7 +277,9 @@ export function DeployCanvas({
         hostedCount?: number;
     } | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
-    const [managing, setManaging] = useState<{ id: string; name: string; engine: string } | null>(null);
+    const [managing, setManaging] = useState<{ id: string; name: string; engine: string } | null>(
+        null
+    );
     const [acting, setActing] = useState(false);
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({
         open: false,
@@ -645,9 +658,7 @@ export function DeployCanvas({
                             </span>
                             <p className="text-sm font-medium">{t("canvas.empty")}</p>
                             <p className="max-w-xs text-xs text-muted-foreground">
-                                {canManage
-                                    ? t("canvas.emptyManage")
-                                    : t("canvas.emptyView")}
+                                {canManage ? t("canvas.emptyManage") : t("canvas.emptyView")}
                             </p>
                         </div>
                     </div>
@@ -725,7 +736,8 @@ export function DeployCanvas({
 
                             {nodes.map((node) => {
                                 const p = pos[node.id] ?? { x: 0, y: 0 };
-                                const label = node.tone === "success" ? t("canvas.online") : node.statusLabel;
+                                const label =
+                                    node.tone === "success" ? t("canvas.online") : node.statusLabel;
                                 const pulsing = node.tone === "warning";
                                 const app = environment.applications.find(
                                     (item) => item.id === node.id
@@ -774,8 +786,26 @@ export function DeployCanvas({
                                                     {node.name}
                                                 </span>
                                             </div>
-                                            <p className="mt-1 truncate text-sm text-muted-foreground">
-                                                {node.subtitle}
+                                            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                                                {node.elsewhere && (
+                                                    <>
+                                                        <IntegrationLogo
+                                                            slug={node.elsewhere.provider}
+                                                            className="size-3.5 w-4 shrink-0 object-contain"
+                                                        />
+                                                        <span
+                                                            className={`size-1.5 shrink-0 rounded-full ${
+                                                                node.elsewhere.status === "live"
+                                                                    ? "bg-success-solid"
+                                                                    : node.elsewhere.status ===
+                                                                        "failed"
+                                                                      ? "bg-danger-solid"
+                                                                      : "bg-foreground-subtle"
+                                                            }`}
+                                                        />
+                                                    </>
+                                                )}
+                                                <span className="truncate">{node.subtitle}</span>
                                             </p>
                                             <div className="mt-auto flex items-center gap-2 text-sm">
                                                 {removing ? (
@@ -847,7 +877,8 @@ export function DeployCanvas({
                                                                 })
                                                             }
                                                         >
-                                                            <Settings2 className="size-4" /> {t("view.manage")}
+                                                            <Settings2 className="size-4" />{" "}
+                                                            {t("view.manage")}
                                                         </ContextMenuItem>
                                                     )}
                                                     <ContextMenuSeparator />
@@ -864,7 +895,9 @@ export function DeployCanvas({
                                                         }
                                                     >
                                                         <Trash2 className="size-4" />
-                                                        {removing ? t("view.removalPending") : t("canvas.delete")}
+                                                        {removing
+                                                            ? t("view.removalPending")
+                                                            : t("canvas.delete")}
                                                     </ContextMenuItem>
                                                 </ContextMenuContent>
                                             </ContextMenu>
@@ -917,7 +950,8 @@ export function DeployCanvas({
                                                         </span>
                                                         <span className="ml-auto shrink-0 truncate text-[0.625rem] text-muted-foreground/70">
                                                             {vol.kind === "nas"
-                                                                ? (vol.connectionName ?? t("canvas.nas"))
+                                                                ? (vol.connectionName ??
+                                                                  t("canvas.nas"))
                                                                 : vol.kind === "bind"
                                                                   ? t("canvas.server")
                                                                   : t("canvas.volume")}
@@ -933,7 +967,8 @@ export function DeployCanvas({
                                                             })
                                                         }
                                                     >
-                                                        <Settings2 className="size-4" /> {t("canvas.volumeSettings")}
+                                                        <Settings2 className="size-4" />{" "}
+                                                        {t("canvas.volumeSettings")}
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
                                                         onSelect={() =>
@@ -943,7 +978,8 @@ export function DeployCanvas({
                                                             })
                                                         }
                                                     >
-                                                        <Files className="size-4" /> {t("canvas.browseFiles")}
+                                                        <Files className="size-4" />{" "}
+                                                        {t("canvas.browseFiles")}
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
                                                         onSelect={() =>
@@ -952,7 +988,8 @@ export function DeployCanvas({
                                                             )
                                                         }
                                                     >
-                                                        <HardDrive className="size-4" /> {t("canvas.viewInDrive")}
+                                                        <HardDrive className="size-4" />{" "}
+                                                        {t("canvas.viewInDrive")}
                                                     </ContextMenuItem>
                                                     {canManage && (
                                                         <ContextMenuItem
@@ -963,7 +1000,8 @@ export function DeployCanvas({
                                                                 })
                                                             }
                                                         >
-                                                            <ScrollText className="size-4" /> {t("canvas.editMount")}
+                                                            <ScrollText className="size-4" />{" "}
+                                                            {t("canvas.editMount")}
                                                         </ContextMenuItem>
                                                     )}
                                                 </ContextMenuContent>
@@ -981,9 +1019,7 @@ export function DeployCanvas({
                 </div>
             )}
             {canManage && (
-                <p className="mt-2 text-xs text-muted-foreground/70">
-                    {t("canvas.hint")}
-                </p>
+                <p className="mt-2 text-xs text-muted-foreground/70">{t("canvas.hint")}</p>
             )}
 
             <ConfirmDeleteDialog
@@ -996,7 +1032,11 @@ export function DeployCanvas({
                 }}
                 name={deleteTarget?.name ?? ""}
                 kind={deleteTarget?.kind ?? "service"}
-                title={deleteTarget?.kind === "database" ? t("view.deleteDatabase") : t("canvas.deleteServiceTitle")}
+                title={
+                    deleteTarget?.kind === "database"
+                        ? t("view.deleteDatabase")
+                        : t("canvas.deleteServiceTitle")
+                }
                 description={
                     deleteTarget?.kind === "database"
                         ? deleteTarget.hostedCount

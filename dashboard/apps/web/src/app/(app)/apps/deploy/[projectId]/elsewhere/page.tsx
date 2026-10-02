@@ -18,7 +18,12 @@ import { ElsewhereView } from "@/app/(app)/apps/deploy/elsewhere-view";
 import { getProjectFull } from "@/lib/deploy-service";
 import { listConnections } from "@/lib/connections/store";
 import { requireProjectAccess, accessCan } from "@/lib/deploy-project-access";
-import { isProvider, listExternalServices, refreshStale } from "@/lib/deploy/external-services";
+import {
+    isProvider,
+    listExternalServices,
+    refreshStale,
+    repoOfSource
+} from "@/lib/deploy/external-services";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +69,14 @@ export default async function ProjectElsewherePage({
             canAdd={accessCan(access, "service.create")}
             canDeploy={accessCan(access, "deploy.run")}
             canRemove={accessCan(access, "service.delete")}
+            canLink={accessCan(access, "service.configure")}
+            applications={project.environments.flatMap((environment) =>
+                environment.applications.map((app) => ({
+                    id: app.id,
+                    name: app.name,
+                    repo: repoOfSource(app.sourceConfig)
+                }))
+            )}
         />
     );
 }

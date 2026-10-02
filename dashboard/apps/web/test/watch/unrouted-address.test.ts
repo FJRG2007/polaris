@@ -89,7 +89,7 @@ describe("an address that is serving", () => {
         const health = await checkDomain(TARGET);
 
         expect(health.status).toBe("down");
-        expect(health.detail).toBe("HTTP 502");
+        expect(health.detail).toBe("Service not running");
         expect(health.notRouted).toBeUndefined();
     });
 

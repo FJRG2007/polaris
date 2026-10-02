@@ -28,7 +28,16 @@
         "lastDeploy": "Última versión",
         "notDeployed": "Sin desplegar aún",
         "needsLook": "{name} requiere atención",
-        "needLook": "{count} servicios requieren atención"
+        "needLook": "{count} servicios requieren atención",
+        "outcome": {
+            "succeeded": "Correcto",
+            "failed": "Fallido",
+            "cancelled": "Cancelado",
+            "queued": "En cola",
+            "deploying": "Desplegando",
+            "stopped": "Detenido",
+            "removed": "Retirado"
+        }
     },
     "sections": {
         "architecture": {
