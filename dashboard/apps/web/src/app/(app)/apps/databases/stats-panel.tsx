@@ -341,10 +341,12 @@ function InsightCard({
 /** Where the room is going. The question somebody opens this screen with when a
  *  disk is filling, and the one a rate cannot answer. */
 function BiggestPanel({ insights }: { insights: DatabaseInsights | null }) {
+    // Before the early return: hooks run in the same order on every render, and
+    // this one returns early only once the measurements arrive.
+    const t = useTranslations("databases");
     const rows = insights?.biggest ?? [];
     if (insights !== null && rows.length === 0) return null;
     const largest = rows[0]?.bytes ?? 0;
-    const t = useTranslations("databases");
     return (
         <InsightCard
             title={t("insights.biggest")}
@@ -387,11 +389,12 @@ function BiggestPanel({ insights }: { insights: DatabaseInsights | null }) {
  * them.
  */
 function FrequentPanel({ insights }: { insights: DatabaseInsights | null }) {
+    // Before the early return, for the same reason as BiggestPanel's.
+    const t = useTranslations("databases");
     const rows = insights?.frequent ?? [];
     const unavailable = insights?.frequentUnavailable ?? "";
     if (insights !== null && rows.length === 0 && !unavailable) return null;
     const most = rows[0]?.calls ?? 0;
-    const t = useTranslations("databases");
     return (
         <InsightCard
             title={t("insights.frequent")}
