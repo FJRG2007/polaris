@@ -15,9 +15,9 @@ import {
     rewardSchema,
     type EventPreset
 } from "./catalog";
-import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { stashSchema } from "./kinds/stash";
 import { bossStateSchema } from "./kinds/boss";
+import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { placeFromSchema, placeTrySchema, searchSummarySchema } from "./place-search";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
@@ -60,11 +60,6 @@ export type Arena = z.infer<typeof arenaSchema>;
 
 export const GAMEMODES = ["survival", "creative", "adventure", "spectator"] as const;
 
-/**
- * A player an event took somewhere, and everything needed to put them back:
- * where they stood, which way they faced, in which world, and the game mode
- * they played in. Written down before they are moved, and never again.
- */
 /** Somebody kept out of an arena or a stage rather than let in carrying their
  *  own things: why, and the items that could not be put away, by id. */
 export const keptOutSchema = z.object({
@@ -75,6 +70,11 @@ export const keptOutSchema = z.object({
 
 export type KeptOut = z.infer<typeof keptOutSchema>;
 
+/**
+ * A player an event took somewhere, and everything needed to put them back:
+ * where they stood, which way they faced, in which world, and the game mode
+ * they played in. Written down before they are moved, and never again.
+ */
 export const entrantSchema = z.object({
     name: z.string(),
     /** For finding what they dropped while they were away; null when unread. */
