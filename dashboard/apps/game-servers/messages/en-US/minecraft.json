@@ -1846,6 +1846,7 @@
         "forgetPrize": "Forget {name}'s prize",
         "participants": "{count} on",
         "disqualified": "left off by the anti-cheat: {names}",
+        "keptOut": "kept out to keep their things safe: {names}",
         "delivered": "Handed out - {list}",
         "deliveredDropped": "{count} fell at their feet: inventory full",
         "deliveredLevels": "{count} levels",

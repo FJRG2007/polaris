@@ -20,8 +20,12 @@
  * before a restart - nothing is ever given twice. A player who is not on gets it
  * all when they are.
  *
- * A stack a command cannot carry - one whose data is too long for a command, or
- * whose reply was too long to read whole - is never taken: it stays where it is.
+ * A stack too long for one command - a shulker box of enchanted gear, a piece
+ * of armor with a long lore - is read and written in as many commands as it
+ * takes, through command storage (`stack-storage`). Nothing a player brings is
+ * left on them: a stack that cannot be taken at all - one string in it longer
+ * than any command, a slot no command reaches - keeps them out of the event
+ * instead, with everything of theirs where it was.
  *
  * Before this, the stacks were copied into two barrels under the event's floor,
  * cased in barrier. `barrels` and `casing` are kept for a stash written that
@@ -33,8 +37,10 @@
  */
 
 import { z } from "zod";
+import * as storage from "../../stack-storage";
 import type { InventoryItem } from "../../inventory";
 import { itemArgument, replaceSlot } from "../../item-argument";
+import { readInt, splitTopLevel, topLevelColon, unquote } from "../../snbt";
 import { COMMAND_BYTES_MAX, commandBytes } from "../../command-size";
 
 const pointSchema = z.object({ x: z.number().int(), y: z.number().int(), z: z.number().int() });
@@ -92,20 +98,79 @@ export const SLOTS: readonly number[] = [
     -106
 ];
 
+/** The event's own kit: the event's, cleared at the end - never kept, and never
+ *  in the way of anybody coming in. */
+export function isKit(item: InventoryItem): boolean {
+    if (!item.data) return false;
+    const root = fieldsOf(item.data.snbt);
+    const marked =
+        item.data.era === "components"
+            ? fieldsOf(root.get("minecraft:custom_data") ?? root.get("custom_data") ?? "")
+            : root;
+    return readInt(marked.get("polaris_event")) === 1;
+}
+
+/** A compound's own members by key, its nested ones left whole. */
+function fieldsOf(snbt: string): Map<string, string> {
+    const fields = new Map<string, string>();
+    const text = snbt.trim();
+    if (!text.startsWith("{") || !text.endsWith("}")) return fields;
+    for (const field of splitTopLevel(text.slice(1, -1))) {
+        const colon = topLevelColon(field);
+        if (colon === -1) continue;
+        fields.set(unquote(field.slice(0, colon)), field.slice(colon + 1).trim());
+    }
+    return fields;
+}
+
+/** A stack as the game holds an item - `{id, count, components}` - for building
+ *  it in storage. Only for the component era: its holder hands an item over by
+ *  its `contents` slot, which a tag-era server is not known to have. */
+export function stackValue(item: InventoryItem): string | null {
+    if (item.data?.era !== "components") return null;
+    return `{id:${JSON.stringify(item.id)},count:${item.count},components:${item.data.snbt}}`;
+}
+
+/** The lines that build a stack too long for one command in storage under
+ *  `key`; null when no number of commands can. */
+export function longLines(key: string, item: InventoryItem): string[] | null {
+    const value = stackValue(item);
+    return value ? storage.storeLines(key, value) : null;
+}
+
+/** Written back with one command: `item replace ... with` carries it whole. */
+export function fitsOneLine(item: InventoryItem): boolean {
+    return itemArgument(item).ok;
+}
+
 /**
- * The stacks that are kept: those in the 41 slots every version has, that a
- * command can write back whole. A modded slot - a backpack, a ring - is none of
- * this and is left where it is, and so is a stack too big for a command.
+ * Whether a stack can be taken and given back whole: it sits in one of the 41
+ * slots every version has, and a command - or several, through storage - writes
+ * it back exactly. A modded slot, or a stack with one piece longer than any
+ * command, cannot; the player who carries one is kept out instead.
  */
-export function keepable(items: readonly InventoryItem[]): InventoryItem[] {
-    return items.filter(
-        (item) =>
-            SLOTS.includes(item.slot) &&
-            replaceSlot(item.slot) !== null &&
-            itemArgument(item).ok &&
-            // The event's own kit is the event's, cleared at the end - never kept.
-            !(item.data?.snbt.includes("polaris_event") ?? false)
+export function takeable(item: InventoryItem): boolean {
+    return (
+        SLOTS.includes(item.slot) &&
+        replaceSlot(item.slot) !== null &&
+        (fitsOneLine(item) || longLines(longKey("00000000", item.slot), item) !== null)
     );
+}
+
+/**
+ * Where a stack taken is written down to go back to: its own slot, or - when a
+ * stack taken before it already went from there, one picked up into a slot
+ * just emptied - the first slot nobody is owed, the bag before the hotbar
+ * before what is worn. Null when every slot is owed already.
+ */
+export function slotFor(slot: number, owed: ReadonlySet<number>): number | null {
+    if (!owed.has(slot)) return slot;
+    const order = [
+        ...SLOTS.filter((one) => one >= 9 && one <= 35),
+        ...SLOTS.filter((one) => one >= 0 && one <= 8),
+        ...SLOTS.filter((one) => one >= 100 || one < 0)
+    ];
+    return order.find((one) => !owed.has(one)) ?? null;
 }
 
 /** Two stacks the same: id, count and data. `digest` turns a stack's data into
@@ -121,19 +186,6 @@ export function sameStack(
         item.count === kept.count &&
         digest(item) === kept.data
     );
-}
-
-/** What to keep, from what a player carries. */
-export function keepFrom(
-    items: readonly InventoryItem[],
-    digest: (item: InventoryItem) => string | null
-): Kept[] {
-    return keepable(items).map((item) => ({
-        slot: item.slot,
-        id: item.id,
-        count: item.count,
-        data: digest(item)
-    }));
 }
 
 /** A slot emptied, once its copy is written. */
@@ -211,6 +263,40 @@ export function dropLines(
               ? [modern]
               : [legacy];
     return lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX) ? lines : null;
+}
+
+/** The storage key, and the tag of the item display, a stack too long for one
+ *  command is handed over through: one per stash and slot. */
+export function longKey(record: string | null, slot: number): string {
+    return dropTag(record, slot).replace("pe_gb", "gb");
+}
+
+export function holdTag(record: string | null, slot: number): string {
+    return dropTag(record, slot).replace("pe_gb", "pe_hd");
+}
+
+/**
+ * A kept stack too long for one command, dropped at the player's feet as
+ * theirs: built in storage, an item summoned there unless the one dropped
+ * before is still lying there, and filled from storage. Null when no number
+ * of commands can write it.
+ */
+export function longDropLines(
+    name: string,
+    item: InventoryItem,
+    record: string | null
+): string[] | null {
+    const key = longKey(record, item.slot);
+    const build = longLines(key, item);
+    if (!build) return null;
+    const tag = dropTag(record, item.slot);
+    const it = `@e[type=minecraft:item,tag=${tag}]`;
+    return [
+        ...build,
+        `execute unless entity ${it} at ${name} run summon minecraft:item ~ ~ ~ {Item:{id:"minecraft:stone",count:1},Tags:["${tag}"],PickupDelay:32767,Age:-32768}`,
+        storage.fillItemLine(`@e[type=minecraft:item,tag=${tag},limit=1]`, key),
+        storage.forgetLine(key)
+    ];
 }
 
 /** The dropped stack, read back to check it holds the copy. */

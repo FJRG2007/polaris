@@ -10,20 +10,20 @@
  * event appears here without a reload.
  */
 
-import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
-import type { GameKey } from "../../../messages";
 import * as ui from "@polaris/ui";
-import { type GameText, useGameText, useSchemaText } from "../game-text";
 import * as actions from "./events-actions";
 import { EventEditor } from "./event-editor";
+import type { GameKey } from "../../../messages";
 import { hostUi } from "@polaris/app-host/client";
 import { CATCH_LABELS } from "./event-options-rare-catch";
 import { MATERIAL_LABELS } from "./event-options-gathering";
 import { worldBossFacts } from "./event-options-world-boss";
 import * as catalog from "../../lib/minecraft/events/catalog";
+import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
+import { type GameText, useGameText, useSchemaText } from "../game-text";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
-import type { SearchSummary } from "../../lib/minecraft/events/place-search";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
+import type { SearchSummary } from "../../lib/minecraft/events/place-search";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     Copy,
@@ -1590,6 +1590,16 @@ export function MinecraftEvents({
                                             : entry.note}
                                         {entry.disqualified.length > 0 &&
                                             ` - ${t("events.disqualified", { names: entry.disqualified.join(", ") })}`}
+                                        {(entry.keptOut ?? []).length > 0 &&
+                                            ` - ${t("events.keptOut", {
+                                                names: (entry.keptOut ?? [])
+                                                    .map((one) =>
+                                                        one.items.length > 0
+                                                            ? `${one.name} (${one.items.map(catalog.itemName).join(", ")})`
+                                                            : one.name
+                                                    )
+                                                    .join(", ")
+                                            })}`}
                                     </p>
                                     {entry.search && (
                                         <p className="text-xs text-muted-foreground">

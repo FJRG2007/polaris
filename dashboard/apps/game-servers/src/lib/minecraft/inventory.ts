@@ -11,7 +11,14 @@
 
 import type { Translator } from "@polaris/core";
 import { gameCatalogs, type GameKey } from "../../../messages";
-import { dataReplyValue, readFirstAccepted, readInt, splitTopLevel, topLevelColon, unquote } from "./snbt";
+import {
+    dataReplyValue,
+    readFirstAccepted,
+    readInt,
+    splitTopLevel,
+    topLevelColon,
+    unquote
+} from "./snbt";
 
 /**
  * What a stack carries besides its id: enchantments, a name somebody typed, the
@@ -53,7 +60,11 @@ export const ARMOUR_SLOTS: readonly number[] = [103, 102, 101, 100];
 export const HOTBAR_SLOTS: readonly number[] = range(0, 9);
 
 /** The bag above it, as the three rows of nine the game draws. */
-export const MAIN_SLOT_ROWS: readonly (readonly number[])[] = [range(9, 9), range(18, 9), range(27, 9)];
+export const MAIN_SLOT_ROWS: readonly (readonly number[])[] = [
+    range(9, 9),
+    range(18, 9),
+    range(27, 9)
+];
 
 /** Where a slot number puts the item, in the words the game uses for it. */
 export function slotLabel(slot: number): string {
@@ -86,7 +97,12 @@ const ARMOUR_KEYS: readonly GameKey<"minecraft">[] = [
  * empty. These get a row of their own rather than being dropped.
  */
 export function extraSlots(items: readonly InventoryItem[]): InventoryItem[] {
-    const drawn = new Set([...ARMOUR_SLOTS, OFFHAND_SLOT, ...HOTBAR_SLOTS, ...MAIN_SLOT_ROWS.flat()]);
+    const drawn = new Set([
+        ...ARMOUR_SLOTS,
+        OFFHAND_SLOT,
+        ...HOTBAR_SLOTS,
+        ...MAIN_SLOT_ROWS.flat()
+    ]);
     return items.filter((item) => !drawn.has(item.slot));
 }
 
@@ -110,12 +126,46 @@ function range(start: number, length: number): number[] {
 export function parseInventory(output: string): InventoryItem[] {
     return (
         readFirstAccepted(dataReplyValue(output), "[", (list) => {
-            const items = splitTopLevel(list.slice(1, -1)).flatMap((entry) => readItem(entry) ?? []);
+            const items = splitTopLevel(list.slice(1, -1)).flatMap(
+                (entry) => readItem(entry) ?? []
+            );
             // A list with nothing in it is not this list: an inventory reply that
             // parses to no items is either genuinely empty - in which case an empty
             // answer is right anyway - or it was never the inventory, and the next
             // bracket along still might be.
             return items.length > 0 ? items.sort((left, right) => left.slot - right.slot) : null;
+        }) ?? []
+    );
+}
+
+/**
+ * Where 1.21.5 and later keep what a player wears and holds in the offhand,
+ * apart from `Inventory`: each member of `equipment`, and the slot it is
+ * everywhere else.
+ */
+export const EQUIPMENT_SLOTS: Readonly<Record<string, number>> = {
+    head: 103,
+    chest: 102,
+    legs: 101,
+    feet: 100,
+    offhand: -106
+};
+
+/** The stacks in a `data get entity ... equipment` reply, each in the slot it is
+ *  everywhere else. Empty for anything that is not that reply. */
+export function parseEquipment(output: string): InventoryItem[] {
+    return (
+        readFirstAccepted(dataReplyValue(output), "{", (compound) => {
+            const items: InventoryItem[] = [];
+            for (const field of splitTopLevel(compound.slice(1, -1))) {
+                const colon = topLevelColon(field);
+                if (colon === -1) continue;
+                const slot = EQUIPMENT_SLOTS[unquote(field.slice(0, colon))];
+                if (slot === undefined) continue;
+                const item = readItem(field.slice(colon + 1).trim());
+                if (item) items.push({ ...item, slot });
+            }
+            return items;
         }) ?? []
     );
 }

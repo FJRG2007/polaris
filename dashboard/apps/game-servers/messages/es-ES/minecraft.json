@@ -1846,6 +1846,7 @@
         "forgetPrize": "Olvidar el premio de {name}",
         "participants": "{count} dentro",
         "disqualified": "excluidos por el anti-trampas: {names}",
+        "keptOut": "sin entrar para no arriesgar sus cosas: {names}",
         "delivered": "Entregado - {list}",
         "deliveredDropped": "{count} cayeron al suelo: inventario lleno",
         "deliveredLevels": "{count} niveles",

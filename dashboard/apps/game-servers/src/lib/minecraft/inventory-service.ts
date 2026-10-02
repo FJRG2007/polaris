@@ -18,8 +18,15 @@
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
 import { isDataReply, replyIsWhole } from "./snbt";
+import { readWhole } from "./stack-storage-service";
 import { withServerContainer, type ServerContainer } from "./service";
-import { parseInventory, parseStack, type InventoryItem } from "./inventory";
+import {
+    EQUIPMENT_SLOTS,
+    parseEquipment,
+    parseInventory,
+    parseStack,
+    type InventoryItem
+} from "./inventory";
 
 /** How often a bag is worth re-reading. Ten minutes is short enough to be useful
  *  after somebody logs off mid-session and long enough that a busy server is not
@@ -130,8 +137,57 @@ export interface LiveReading {
  */
 export async function readLiveInventory(asker: Ask | Asker, player: string): Promise<LiveReading> {
     const how = typeof asker === "function" ? { ask: asker } : asker;
-    const whole = await how.ask(["data", "get", "entity", player, "Inventory"]);
-    return fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole);
+    const bag = ["data", "get", "entity", player, "Inventory"];
+    const worn = ["data", "get", "entity", player, "equipment"];
+    // Where the server takes several questions in one trip, what is worn rides
+    // along with the bag rather than costing a trip of its own.
+    const [whole, wearing] = how.askEach
+        ? await eachAnswered(how, [bag, worn])
+        : [await how.ask(bag), null];
+    const reading = await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole!);
+    return withEquipment(how, player, reading, wearing);
+}
+
+/**
+ * A bag read from `Inventory`, with what is worn and in the offhand added from
+ * `equipment` - where 1.21.5 and later keep it, and `Inventory` no longer
+ * does. A server before it has no such field, and its reading is left as it
+ * was. A piece too long for one answer is read whole through storage.
+ */
+async function withEquipment(
+    asker: Asker,
+    player: string,
+    reading: LiveReading,
+    answer?: string | null
+): Promise<LiveReading> {
+    if (!reading.answered) return reading;
+    const reply = stripFormatting(
+        answer ?? (await asker.ask(["data", "get", "entity", player, "equipment"]))
+    );
+    if (!isDataReply(reply)) return reading;
+    let worn = parseEquipment(reply);
+    let unreadable = 0;
+    if (!replyIsWhole(reply, "{")) {
+        worn = [];
+        for (const [key, slot] of Object.entries(EQUIPMENT_SLOTS)) {
+            const value = await readWhole(
+                (line) => asker.ask([line]),
+                `entity ${player} equipment.${key}`
+            );
+            if (value === null) continue;
+            const stack = parseStack(value);
+            if (stack) worn.push({ ...stack, slot });
+            else unreadable += 1;
+        }
+    }
+    const slots = new Set(worn.map((one) => one.slot));
+    return {
+        ...reading,
+        items: [...reading.items.filter((one) => !slots.has(one.slot)), ...worn].sort(
+            (left, right) => left.slot - right.slot
+        ),
+        unreadable: reading.unreadable + unreadable
+    };
 }
 
 /**
@@ -148,13 +204,18 @@ export async function readLiveInventories(
 ): Promise<(LiveReading | null)[]> {
     const how = typeof asker === "function" ? { ask: asker } : asker;
     const wholes: (string | null)[] = [];
+    const worn: (string | null)[] = [];
     for (let start = 0; start < players.length; start += BAGS_PER_TRIP) {
         const some = players.slice(start, start + BAGS_PER_TRIP);
-        const commands = some.map((player) => ["data", "get", "entity", player, "Inventory"]);
+        // Each bag with what is worn beside it, in the same trip.
+        const commands = some.flatMap((player) => [
+            ["data", "get", "entity", player, "Inventory"],
+            ["data", "get", "entity", player, "equipment"]
+        ]);
         const answers = await eachAnswered(how, commands, (argv) =>
             how.ask(argv).catch(() => null)
         ).catch(() => commands.map(() => null));
-        wholes.push(...answers);
+        answers.forEach((answer, index) => (index % 2 === 0 ? wholes : worn).push(answer));
     }
     const readings: (LiveReading | null)[] = [];
     for (const [index, player] of players.entries()) {
@@ -162,9 +223,9 @@ export async function readLiveInventories(
         readings.push(
             whole == null
                 ? null
-                : await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole).catch(
-                      () => null
-                  )
+                : await fromWhole(how, ["entity", player], "Inventory", MOST_ENTRIES, whole)
+                      .then((reading) => withEquipment(how, player, reading, worn[index]))
+                      .catch(() => null)
         );
     }
     return readings;
@@ -233,7 +294,15 @@ async function fromWhole(
                 ended = true;
                 break;
             }
-            const stack = parseStack(reply);
+            // One stack bigger than an answer - a shulker box of enchanted gear -
+            // arrives cut off, and half a stack read as a stack is a different
+            // item: read it whole through storage instead.
+            const stack = replyIsWhole(reply, "{")
+                ? parseStack(reply)
+                : await readWhole(
+                      (line) => asker.ask([line]),
+                      `${target.join(" ")} ${path}[${index}]`
+                  ).then((value) => (value === null ? null : parseStack(value)));
             if (stack) found.push(stack);
             else unreadable += 1;
         }

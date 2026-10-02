@@ -15,9 +15,9 @@ import {
     rewardSchema,
     type EventPreset
 } from "./catalog";
-import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { stashSchema } from "./kinds/stash";
 import { bossStateSchema } from "./kinds/boss";
+import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { placeFromSchema, placeTrySchema, searchSummarySchema } from "./place-search";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
@@ -59,6 +59,16 @@ export const arenaSchema = z.object({ box: boxSchema, blocks: z.array(z.string()
 export type Arena = z.infer<typeof arenaSchema>;
 
 export const GAMEMODES = ["survival", "creative", "adventure", "spectator"] as const;
+
+/** Somebody kept out of an arena or a stage rather than let in carrying their
+ *  own things: why, and the items that could not be put away, by id. */
+export const keptOutSchema = z.object({
+    name: z.string(),
+    why: z.enum(["unread", "untakeable", "unsaved", "unsettled"]),
+    items: z.array(z.string()).default([])
+});
+
+export type KeptOut = z.infer<typeof keptOutSchema>;
 
 /**
  * A player an event took somewhere, and everything needed to put them back:
@@ -143,6 +153,9 @@ export const runSchema = z.object({
     timeBefore: z.number().nullable().default(null),
     /** Everybody seen in creative or spectator while it ran. */
     offMode: z.array(z.string()).default([]),
+    /** Everybody kept out because what they carried could not all be put away
+     *  safely, and why (`stash-service`). */
+    keptOut: z.array(keptOutSchema).default([]),
     /** Its results are being handed out; never played again from here. */
     finishing: z.boolean().default(false),
     /** Treasure hunt: every chest it put down, and who opened each. Kept so the
@@ -196,6 +209,9 @@ export const runSchema = z.object({
     arena: arenaSchema.nullable().default(null),
     /** Who it moved, and where each came from. */
     entrants: z.array(entrantSchema).default([]),
+    /** Taken from and then kept out (`keptOut`), and not yet put back or given
+     *  back their things: never played, only sent home at the end. */
+    sentOut: z.array(entrantSchema).default([]),
     /** How the kit it handed out is marked, and which items it was. */
     marker: z.enum(MARKERS).nullable().default(null),
     kit: z.array(z.string()).default([]),
@@ -262,7 +278,9 @@ const historySchema = z.object({
      *  want of room: what `give` answers cannot tell. */
     delivered: z.array(deliveredSchema).default([]),
     /** Where it looked for its place and what stopped it, when nowhere would do. */
-    search: searchSummarySchema.nullable().default(null)
+    search: searchSummarySchema.nullable().default(null),
+    /** Who was kept out to keep their things safe, and why. */
+    keptOut: z.array(keptOutSchema).default([])
 });
 
 export type EventHistoryEntry = z.infer<typeof historySchema>;

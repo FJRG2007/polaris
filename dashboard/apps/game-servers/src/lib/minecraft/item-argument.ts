@@ -18,7 +18,13 @@
  */
 
 import { splitTopLevel, topLevelColon, unquote } from "./snbt";
-import { ARMOUR_SLOTS, HOTBAR_SLOTS, MAIN_SLOT_ROWS, OFFHAND_SLOT, type InventoryItem } from "./inventory";
+import {
+    ARMOUR_SLOTS,
+    HOTBAR_SLOTS,
+    MAIN_SLOT_ROWS,
+    OFFHAND_SLOT,
+    type InventoryItem
+} from "./inventory";
 
 /**
  * The per-argument ceiling the transport enforces (see `assertSafeArgument` in
@@ -41,7 +47,9 @@ export type ItemArgumentRefusal = "unreadable" | "too-long";
  * `components: {"minecraft:x": v}` and takes `id[minecraft:x=v]`; an older one
  * wrote `tag: {...}` and takes `id{...}` verbatim.
  */
-export function itemArgument(item: InventoryItem): { ok: true; value: string } | { ok: false; why: ItemArgumentRefusal } {
+export function itemArgument(
+    item: InventoryItem
+): { ok: true; value: string } | { ok: false; why: ItemArgumentRefusal } {
     const built = build(item);
     if (built === null) return { ok: false, why: "unreadable" };
     if (built.length > MAX_ARGUMENT_LENGTH) return { ok: false, why: "too-long" };
@@ -89,6 +97,14 @@ function componentList(snbt: string): string | null {
         const key = unquote(field.slice(0, colon));
         const value = field.slice(colon + 1).trim();
         if (!key || !value) return null;
+        // A component taken off the item's own defaults is read back as
+        // `"!minecraft:food": {}` and written as the bare `!minecraft:food`:
+        // the argument refuses a value after one.
+        if (key.startsWith("!")) {
+            if (value !== "{}") return null;
+            parts.push(key);
+            continue;
+        }
         parts.push(`${key}=${value}`);
     }
     return parts.join(",");

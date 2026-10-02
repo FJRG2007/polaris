@@ -42,6 +42,8 @@ function server(bags: Record<string, string[]>) {
         const [, , , player, path] = argv;
         const bag = bags[player!];
         if (!bag) return "No entity was found";
+        // A server before 1.21.5: what is worn is in the bag, not in `equipment`.
+        if (path === "equipment") return "Found no elements matching equipment";
         const entry = /^Inventory\[(\d+)\]$/.exec(path!);
         const text = entry
             ? bag[Number(entry[1])]
@@ -79,9 +81,9 @@ describe("reading bags", () => {
         expect(old.items).toHaveLength(41);
         expect(now.items).toEqual(old.items);
         expect(now.unreadable).toBe(0);
-        // 1 whole-bag question + 41 stacks, one trip each.
-        expect(before.trips()).toBe(42);
-        // 1 whole-bag question + 5 trips of up to ten stacks.
+        // 1 whole-bag question + 41 stacks, one trip each, + what is worn.
+        expect(before.trips()).toBe(43);
+        // 1 trip for the whole bag and what is worn + 5 trips of up to ten stacks.
         expect(after.trips()).toBe(6);
     });
 
@@ -97,8 +99,9 @@ describe("reading bags", () => {
         );
 
         expect(now.map((reading) => reading?.items)).toEqual(old.map((reading) => reading.items));
-        expect(before.trips()).toBe(42 + 42 + 1);
-        // 1 trip for all three whole bags, then 5 for each of the two full ones.
+        expect(before.trips()).toBe(43 + 43 + 2);
+        // 1 trip for all three whole bags and what each wears, then 5 for each
+        // of the two full ones.
         expect(after.trips()).toBe(11);
     });
 
@@ -145,16 +148,17 @@ describe("reading bags", () => {
             }
         };
         await expect(readLiveInventory(stuck, "Alice")).rejects.toThrow("No answer in time");
-        expect(alone).toBe(1);
+        expect(alone).toBe(0);
         expect(await readLiveInventories(stuck, ["Alice"])).toEqual([null]);
-        expect(alone).toBe(1);
+        expect(alone).toBe(0);
     });
 
     it("keeps reading one question at a time where the server cannot take several", async () => {
         const plain = server({ Alice: [stack(0)] });
         const reading = await readLiveInventory({ ask: plain.say }, "Alice");
         expect(reading.items).toHaveLength(1);
-        expect(plain.trips()).toBe(1);
+        // The bag, and what is worn.
+        expect(plain.trips()).toBe(2);
     });
 });
 

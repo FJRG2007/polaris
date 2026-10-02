@@ -1387,3 +1387,8 @@ export function needsPvp(preset: EventPreset): boolean {
     // Pushing is punching: with PvP off, nobody on the hill could move anybody.
     return preset.kind === "team-duel" || hillFistsOnly(preset);
 }
+
+/** An item id as a player reads it: `minecraft:shulker_box` is "shulker box". */
+export function itemName(id: string): string {
+    return (id.split(":").pop() ?? id).replace(/_/g, " ");
+}

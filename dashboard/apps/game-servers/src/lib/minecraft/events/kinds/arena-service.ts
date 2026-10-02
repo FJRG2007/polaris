@@ -89,6 +89,7 @@ export class EventStopped extends Error {}
 export class TooFew extends EventStopped {}
 
 const NO_PLACE = "No dry ground was found for it near the players";
+const ONE_SIDED = "Everybody left in it was on the same team";
 /** Why it was called off, as the history keeps it (and `messages.cancelReason`
  *  says it to players). */
 const tooFew = (joined: number, needed: number) => `Only ${joined} joined; it needs ${needed}`;
@@ -366,7 +367,11 @@ async function bringIn(ctx: KindContext): Promise<void> {
         : hillside
           ? []
           : build.KIT_IDS;
-    const moved = new Set(run.entrants.map((one) => lower(one.name)));
+    const moved = new Set(
+        [...run.entrants, ...(run.sentOut ?? []), ...(run.keptOut ?? [])].map((one) =>
+            lower(one.name)
+        )
+    );
     const waiting = run.joined.filter((name) => !moved.has(lower(name)));
     if (waiting.length > 0) {
         const say = (line: string) => ctx.server.say([line]);
@@ -409,49 +414,76 @@ async function bringIn(ctx: KindContext): Promise<void> {
         ctx.run = { ...ctx.run, entrants: [...run.entrants, ...fresh], marker, kit };
         await ctx.persist();
     }
-    await stashAll(ctx);
-    const out: string[] = [];
-    const entrants = ctx.run.entrants;
-    if (duelling) {
-        const options = run.preset.options as catalog.EventOptions<"team-duel">;
-        const counts = [0, 0];
-        for (const one of entrants) {
+    // Each player's lines in, once what they carry is put away.
+    const options = run.preset.options;
+    const theme =
+        duelling || hillside
+            ? null
+            : build.themeFor(options as catalog.EventOptions<"build-battle">, run.id, language);
+    if (theme !== null)
+        // Kept in the server's own language; shown in each reader's.
+        ctx.run = {
+            ...ctx.run,
+            theme:
+                ctx.run.theme ??
+                build.themeFor(options as catalog.EventOptions<"build-battle">, run.id, ctx.home)
+        };
+    const overGround = hillside ? await ctx.atLeast([1, 19, 4]) : false;
+    const counts = [0, 0];
+    const linesIn = (one: stored.Entrant): string[] => {
+        if (duelling) {
             const slot = counts[one.side] ?? 0;
             counts[one.side] = slot + 1;
-            const spot = duel.sideSpot(box, one.side, slot);
-            out.push(
-                ...arena.enter(one.name, spot),
+            return [
+                ...arena.enter(one.name, duel.sideSpot(box, one.side, slot)),
                 duel.joinTeam(one.name, one.side),
                 ...kit.map((id) => arena.giveMarked(one.name, id, 1, marker)),
                 ...arena.titleTo(
                     one.name,
                     messages.duelEnterTitle(one.side, language),
-                    messages.duelEnterSubtitle(options.downHearts, language)
+                    messages.duelEnterSubtitle(
+                        (options as catalog.EventOptions<"team-duel">).downHearts,
+                        language
+                    )
                 )
-            );
+            ];
         }
-    } else if (hillside) {
-        const overGround = await ctx.atLeast([1, 19, 4]);
-        for (const one of entrants) {
-            out.push(...hillService.enterLines(ctx.run, one.name, one.side, overGround, language));
-        }
-    } else {
-        const options = run.preset.options as catalog.EventOptions<"build-battle">;
-        // Kept in the server's own language; shown in each reader's.
-        ctx.run = { ...ctx.run, theme: ctx.run.theme ?? build.themeFor(options, run.id, ctx.home) };
-        const theme = build.themeFor(options, run.id, language);
-        for (const one of entrants) {
-            out.push(
-                ...arena.enter(
-                    one.name,
-                    build.plotSpot(box, one.side, options.plotSize, run.joined.length)
-                ),
-                ...build.kitCommands(one.name, marker),
-                ...arena.titleTo(one.name, messages.themeTitle(language), `&f${theme}`)
-            );
-        }
-        out.push(commands.say(messages.tag(language) + messages.themeLine(theme, language)));
+        if (hillside)
+            return hillService.enterLines(ctx.run, one.name, one.side, overGround, language);
+        return [
+            ...arena.enter(
+                one.name,
+                build.plotSpot(
+                    box,
+                    one.side,
+                    (options as catalog.EventOptions<"build-battle">).plotSize,
+                    run.joined.length
+                )
+            ),
+            ...build.kitCommands(one.name, marker),
+            ...arena.titleTo(one.name, messages.themeTitle(language), `&f${theme ?? ""}`)
+        ];
+    };
+    // One at a time: what they carry put away, and straight in - nobody left
+    // standing about empty-handed at home, free to put their armor back on,
+    // while everybody else's is put away.
+    for (const one of [...ctx.run.entrants]) {
+        if (!(await stashOne(ctx, one))) continue;
+        await ctx.server.sayAll(linesIn(one));
     }
+    // And once in, a last look: whatever turned up on them on the way is put
+    // away with the rest; anybody it cannot be taken from is sent back out.
+    for (const one of [...ctx.run.entrants]) await stashOne(ctx, one, true);
+    // Too few left once those kept out are: called off, and everybody brought
+    // in sent back with their things.
+    const needed = catalog.joinersNeeded(run.preset);
+    if (ctx.run.entrants.length < needed) throw new TooFew(tooFew(ctx.run.entrants.length, needed));
+    // Everybody left on the one team: nobody to play against.
+    if (duelling && [0, 1].some((side) => !ctx.run.entrants.some((one) => one.side === side)))
+        throw new TooFew(ONE_SIDED);
+    const out: string[] = [];
+    if (theme !== null)
+        out.push(commands.say(messages.tag(language) + messages.themeLine(theme, language)));
     out.push(commands.sound(commands.SOUNDS.start));
     await ctx.server.sayAll(out);
     const seconds =
@@ -469,24 +501,86 @@ async function bringIn(ctx: KindContext): Promise<void> {
 }
 
 /**
- * Everybody's own things kept before they are brought in and handed the kit
- * (`stash`), each written into the run as it is kept. From 1.17, which has
- * `item`; before it, the kit goes beside what they carry, as it always has.
+ * One player's own things put away before they are brought in and handed the
+ * kit (`stash`), written into the run as it is kept - or, `inside`, what turned
+ * up on them on the way in put away with the rest. From 1.17, which has `item`;
+ * before it, the kit goes beside what they carry, as it always has. Answers
+ * whether they are in: somebody whose things cannot all be put away is kept
+ * out - told why, sent back where they were if they had been brought in, and
+ * handed back whatever was taken.
  */
-export async function stashAll(ctx: KindContext): Promise<void> {
-    if (!(await ctx.atLeast([1, 17]))) return;
-    for (const one of ctx.run.entrants) {
-        if (one.stash || !one.away) continue;
-        await stashService.stashIn(ctx.server, ctx.stashOwner, one.name, async (kept) => {
-            ctx.run = {
-                ...ctx.run,
-                entrants: ctx.run.entrants.map((each) =>
-                    each.name === one.name ? { ...each, stash: kept } : each
-                )
-            };
-            await ctx.persist();
-        });
+async function stashOne(ctx: KindContext, one: stored.Entrant, inside = false): Promise<boolean> {
+    if (!one.away || (!inside && one.stash)) return true;
+    if (!(await ctx.atLeast([1, 17]))) return true;
+    // Written into the run as it is kept, and as it is given back.
+    const keep = async (kept: stored.Entrant["stash"]) => {
+        ctx.run = {
+            ...ctx.run,
+            entrants: ctx.run.entrants.map((each) =>
+                each.name === one.name ? { ...each, stash: kept } : each
+            )
+        };
+        await ctx.persist();
+    };
+    const result = await stashService.stashIn(
+        ctx.server,
+        ctx.stashOwner,
+        one.name,
+        keep,
+        inside ? one.stash : null
+    );
+    if (!result.refused) return true;
+    let entrant = ctx.run.entrants.find((each) => each.name === one.name) ?? one;
+    ctx.run = {
+        ...ctx.run,
+        keptOut: await stashService.keepOut(
+            ctx.server,
+            ctx.run.keptOut,
+            one.name,
+            result.refused,
+            ctx.language
+        )
+    };
+    const drop = async () => {
+        ctx.run = {
+            ...ctx.run,
+            entrants: ctx.run.entrants.filter((each) => each.name !== one.name)
+        };
+        await ctx.persist();
+        return false;
+    };
+    // Never brought in: still where they stand, handed back whatever was taken.
+    if (!inside) {
+        if (!entrant.stash) return drop();
+        const how = await stashService.giveBack(ctx.server, one.name, entrant.stash, keep);
+        if (how === "done" || how === "failed") return drop();
     }
+    // Back where they were, with whatever was taken given back: the way an end
+    // sends anybody home, for this one player.
+    entrant = ctx.run.entrants.find((each) => each.name === one.name) ?? entrant;
+    const leftover = leftoverOf(ctx.run);
+    const left = leftover
+        ? await closeArena(
+              ctx.server,
+              { ...leftover, arena: null, site: null, entrants: [entrant], gamerules: {} },
+              ctx.language
+          )
+        : null;
+    // Not on to be sent back: still owed the trip, at the end with everybody -
+    // never played, and never brought back in by a tick.
+    if (left) {
+        ctx.run = {
+            ...ctx.run,
+            entrants: ctx.run.entrants.filter((each) => each.name !== one.name),
+            sentOut: [
+                ...(ctx.run.sentOut ?? []).filter((each) => each.name !== one.name),
+                ...left.entrants
+            ]
+        };
+        await ctx.persist();
+        return false;
+    }
+    return drop();
 }
 
 // ------------------------------------------------------------------ team duel
@@ -854,7 +948,7 @@ export function leftoverOf(
     run: stored.EventRun,
     gamerules: Readonly<Record<string, string>> = {}
 ): stored.ArenaLeftover | null {
-    const entrants = run.entrants.filter((one) => one.away);
+    const entrants = [...run.entrants, ...(run.sentOut ?? [])].filter((one) => one.away);
     if (!run.arena && !run.site && entrants.length === 0) return null;
     return {
         id: run.id,

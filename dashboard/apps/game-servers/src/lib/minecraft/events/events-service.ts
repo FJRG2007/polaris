@@ -640,6 +640,7 @@ export async function startEvent(input: {
         gamerules: {},
         timeBefore: null,
         offMode: [],
+        keptOut: [],
         chests: [],
         held: [],
         hidden: false,
@@ -659,6 +660,7 @@ export async function startEvent(input: {
         site: null,
         arena: null,
         entrants: [],
+        sentOut: [],
         marker: null,
         kit: [],
         readyAt: null,
@@ -3396,7 +3398,8 @@ async function finish(
         search:
             outcome === "failed" && !run.place && run.placeLog.length > 0
                 ? search.summarize(run.placeFrom, run.placeLog, run.overSea)
-                : null
+                : null,
+        keptOut: run.keptOut ?? []
     };
     await updateEventState(installedAppId, (state) => ({
         ...stored.withHistory(

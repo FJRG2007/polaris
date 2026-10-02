@@ -7,12 +7,19 @@
  */
 
 import * as stash from "./stash";
+import * as speech from "../../speech";
+import * as written from "../messages";
+import * as commands from "../commands";
+import type { KeptOut } from "../state";
 import { prisma } from "@polaris/db";
 import { createHash } from "node:crypto";
 import { stripFormatting } from "../../parse";
-import { itemArgument } from "../../item-argument";
+import * as storage from "../../stack-storage";
+import { replaceSlot } from "../../item-argument";
 import type { ServerContainer } from "../../service";
 import * as transfer from "../../inventory-transfer";
+import { isDataReply, replyIsWhole } from "../../snbt";
+import { readWhole } from "../../stack-storage-service";
 import { applyPlanNow } from "../../inventory-transfer-service";
 import { parseStack, type InventoryItem } from "../../inventory";
 import { askerOf, readLiveContainer, readLiveInventory } from "../../inventory-service";
@@ -26,20 +33,28 @@ export interface StashOwner {
     readonly event: string;
 }
 
-/** A stack's own data, short: enough to tell two stacks of one id apart. */
+/** A stack's own data, short: enough to tell two stacks of one id apart. Taken
+ *  of the data with its keys in one order (`canonicalSnbt`): the server prints
+ *  the same stack in another order once it has taken another road. */
 export function digest(item: InventoryItem): string | null {
+    if (!item.data) return null;
+    return createHash("sha256")
+        .update(storage.canonicalSnbt(item.data.snbt))
+        .digest("hex")
+        .slice(0, 16);
+}
+
+/** The same, as a stash written before this took it: of the data as printed. */
+function printedDigest(item: InventoryItem): string | null {
     if (!item.data) return null;
     return createHash("sha256").update(item.data.snbt).digest("hex").slice(0, 16);
 }
 
-/** The same stack exactly: id, count and every byte of its data. */
+/** The same stack exactly: id, count and every member of its data. */
 function whole(left: InventoryItem | undefined, right: InventoryItem): boolean {
-    return (
-        left !== undefined &&
-        left.id === right.id &&
-        left.count === right.count &&
-        (left.data?.snbt ?? null) === (right.data?.snbt ?? null)
-    );
+    if (left === undefined || left.id !== right.id || left.count !== right.count) return false;
+    if (left.data === null || right.data === null) return left.data === right.data;
+    return storage.canonicalSnbt(left.data.snbt) === storage.canonicalSnbt(right.data.snbt);
 }
 
 const passed = (reply: string) => /test passed/i.test(stripFormatting(reply));
@@ -58,95 +73,214 @@ async function experienceOf(
     return levels === null || points === null ? null : { levels, points };
 }
 
+/** Why somebody was kept out of an event rather than let in carrying their own
+ *  things (`events.refusedWhy.*`). */
+export type StashRefusal =
+    /** What they carry could not be read whole. */
+    | "unread"
+    /** Something they carry no command can write back: named in `items`. */
+    | "untakeable"
+    /** The copy could not be written to the database. */
+    | "unsaved"
+    /** What they carry kept changing while it was being put away. */
+    | "unsettled";
+
+export interface StashResult {
+    /** What is kept for them now; null for nothing. */
+    readonly stash: stash.Stash | null;
+    /** Why they must not be let in; null when everything of theirs is put away. */
+    readonly refused: { readonly why: StashRefusal; readonly items: string[] } | null;
+}
+
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
+
 /**
- * Take what `name` carries: every stack a command can carry written whole to
- * the database with their experience, the stash saved in the run - and only
- * then are the slots emptied and the experience taken. Answers the stash, or
- * null when nothing was taken: empty-handed with no experience, a bag that could
- * not be read, or a copy that could not be written - in which case the player
- * keeps everything on them.
+ * Somebody kept out for `refused`: told why, and written into the run's list of
+ * who was kept out - once, for whatever kept them out last. Answers the list.
+ */
+export async function keepOut(
+    server: ServerContainer,
+    keptOut: readonly KeptOut[] | undefined,
+    name: string,
+    refused: NonNullable<StashResult["refused"]>,
+    language: speech.Speech
+): Promise<KeptOut[]> {
+    await server.say([
+        `tellraw ${name} ${commands.text(
+            messages.tag(language) + messages.keptOut(refused.why, refused.items, language)
+        )}`
+    ]);
+    return [
+        ...(keptOut ?? []).filter((each) => each.name.toLowerCase() !== name.toLowerCase()),
+        { name, why: refused.why, items: [...refused.items] }
+    ];
+}
+
+/** How many times what somebody carries is read and put away before it is
+ *  called unsettled: once, and again for whatever turned up meanwhile. */
+const ROUNDS = 4;
+
+/**
+ * Put away everything `name` carries that is theirs - every stack, however
+ * long, written whole to the database with their experience, and only then
+ * emptied from its slot - until nothing of theirs is left on them. Answers what
+ * is kept, and whether they must be kept out instead: a bag that cannot be read
+ * whole, a stack no command can write back, a copy that cannot be written, or
+ * a bag that will not stop changing. A refusal for something seen before it is
+ * taken takes nothing; one after leaves what was taken in the stash, for the
+ * caller to give back.
+ *
+ * `existing` carries on a stash already made - the look after they are in, for
+ * anything picked up on the way - into the same database copy.
  */
 export async function stashIn(
     server: ServerContainer,
     owner: StashOwner,
     name: string,
-    save: (kept: stash.Stash) => Promise<void>
-): Promise<stash.Stash | null> {
-    const reading = await readLiveInventory(askerOf(server), name);
-    if (!reading.answered) return null;
-    const items = stash.keepable(reading.items);
-    const kept = stash.keepFrom(items, digest);
-    const experience = await experienceOf(server, name);
+    save: (kept: stash.Stash) => Promise<void>,
+    existing: stash.Stash | null = null
+): Promise<StashResult> {
+    let current: stash.Stash | null = existing;
+    const read = () => readLiveInventory(askerOf(server), name);
+    const refuse = (why: StashRefusal, items: readonly InventoryItem[] = []): StashResult => ({
+        stash: current,
+        refused: { why, items: [...new Set(items.map((item) => item.id))] }
+    });
+    let reading = await read();
+    if (!reading.answered || reading.unreadable > 0) return refuse("unread");
+    let theirs = reading.items.filter((item) => !stash.isKit(item));
+    const untakeable = theirs.filter((item) => !stash.takeable(item));
+    if (untakeable.length > 0) return refuse("untakeable", untakeable);
+    const experience = existing ? null : await experienceOf(server, name);
     const hasExperience = experience !== null && (experience.levels > 0 || experience.points > 0);
-    if (kept.length === 0 && !hasExperience) return null;
+    if (theirs.length === 0 && !hasExperience) return { stash: existing, refused: null };
 
-    let record: string;
-    try {
-        record = (
-            await prisma.eventInventoryStash.create({
-                data: {
-                    installedAppId: owner.installedAppId,
-                    runId: owner.runId,
-                    player: name,
-                    event: owner.event,
-                    inventory: reading.said,
-                    items: JSON.stringify(items),
-                    experience: hasExperience ? JSON.stringify(experience) : null,
-                    barrels: "[]",
-                    casing: "[]",
-                    status: "stashed"
-                },
-                select: { id: true }
-            })
-        ).id;
-    } catch (error) {
-        console.warn(
-            "polaris: keeping a copy of a bag failed",
-            owner.installedAppId,
-            String(error)
-        );
-        return null;
+    // The database copy: every stack written down whole, under the slot it is
+    // to go back to.
+    let record = existing?.record ?? null;
+    let copies: InventoryItem[] = [];
+    if (existing && record) {
+        const copy = await copyOf(record);
+        if (copy === "unread") return refuse("unsaved");
+        const owed = new Set(existing.kept.map((one) => one.slot));
+        copies = (copy?.items ?? []).filter((item) => owed.has(item.slot));
     }
-    const taking: stash.Stash = {
-        barrels: [],
-        casing: [],
-        kept,
-        experience: hasExperience ? experience : null,
-        state: "taking",
-        record
+    const writeCopy = async (state: stash.Stash["state"]): Promise<void> => {
+        if (record) {
+            await prisma.eventInventoryStash.update({
+                where: { id: record },
+                data: { items: JSON.stringify(copies) }
+            });
+        } else {
+            record = (
+                await prisma.eventInventoryStash.create({
+                    data: {
+                        installedAppId: owner.installedAppId,
+                        runId: owner.runId,
+                        player: name,
+                        event: owner.event,
+                        inventory: reading.said,
+                        items: JSON.stringify(copies),
+                        experience: hasExperience ? JSON.stringify(experience) : null,
+                        barrels: "[]",
+                        casing: "[]",
+                        status: "stashed"
+                    },
+                    select: { id: true }
+                })
+            ).id;
+        }
+        current = {
+            barrels: existing?.barrels ?? [],
+            casing: existing?.casing ?? [],
+            kept: copies.map((item) => ({
+                slot: item.slot,
+                id: item.id,
+                count: item.count,
+                data: digest(item)
+            })),
+            experience: existing ? existing.experience : hasExperience ? experience : null,
+            state,
+            record
+        };
+        await save(current);
     };
-    try {
-        await save(taking);
-    } catch (error) {
-        await prisma.eventInventoryStash.delete({ where: { id: record } }).catch(() => undefined);
-        throw error;
-    }
-    // Written down: now, and only now, the slots are emptied - each only while
-    // it still holds the stack that was written down.
-    const again = await readLiveInventory(askerOf(server), name);
-    const still = kept.filter((one) =>
-        stash.sameStack(
-            one,
-            again.items.find((item) => item.slot === one.slot),
-            digest
-        )
-    );
-    await server.sayAll([
-        ...still.flatMap((one) => stash.emptySlot(name, one.slot) ?? []),
-        ...(hasExperience ? stash.setExperience(name, { levels: 0, points: 0 }) : [])
-    ]);
-    // What is still in its slot was never taken, and stays theirs where it is.
-    const after = await readLiveInventory(askerOf(server), name);
-    // Unread - they left that moment: everything written down stays owed, and a
-    // stack found still in its slot at the give-back is simply left there.
-    const taken = after.answered
-        ? still.filter((one) => !after.items.some((item) => item.slot === one.slot))
-        : still;
-    const stashed: stash.Stash = { ...taking, kept: taken, state: "stashed" };
-    await save(stashed);
-    return stashed;
-}
 
+    for (let round = 0; round < ROUNDS && (theirs.length > 0 || round === 0); round += 1) {
+        // Written down first, each under a slot of its own.
+        const owed = new Set(copies.map((item) => item.slot));
+        const taking: { from: number; copy: InventoryItem }[] = [];
+        for (const item of theirs) {
+            const slot = stash.slotFor(item.slot, owed);
+            if (slot === null) return refuse("unsettled", theirs);
+            owed.add(slot);
+            taking.push({ from: item.slot, copy: { ...item, slot } });
+        }
+        const before = copies;
+        copies = [...copies, ...taking.map((one) => one.copy)];
+        try {
+            await writeCopy("taking");
+        } catch (error) {
+            console.warn(
+                "polaris: keeping a copy of a bag failed",
+                owner.installedAppId,
+                String(error)
+            );
+            copies = before;
+            if (current) await writeCopy("stashed").catch(() => undefined);
+            return refuse("unsaved");
+        }
+        // Then emptied - each slot only while it still holds the stack written
+        // down. One that changed meanwhile is not taken: it is read again next
+        // round, as it is now.
+        const again = await read();
+        const emptying = taking.filter((one) =>
+            whole(
+                again.items.find((item) => item.slot === one.from),
+                one.copy
+            )
+        );
+        await server.sayAll([
+            ...emptying.flatMap((one) => stash.emptySlot(name, one.from) ?? []),
+            ...(round === 0 && hasExperience
+                ? stash.setExperience(name, { levels: 0, points: 0 })
+                : [])
+        ]);
+        reading = await read();
+        // Unread - they left that moment: everything written down stays owed,
+        // and a stack found still in its slot at the give-back is left there.
+        if (!reading.answered || reading.unreadable > 0) {
+            await writeCopy("stashed").catch(() => undefined);
+            return refuse("unread");
+        }
+        const after = reading.items;
+        const stayed = taking.filter(
+            (one) =>
+                !emptying.includes(one) ||
+                whole(
+                    after.find((item) => item.slot === one.from),
+                    one.copy
+                )
+        );
+        if (stayed.length > 0)
+            copies = copies.filter((item) => !stayed.some((one) => one.copy === item));
+        try {
+            await writeCopy("stashed");
+        } catch (error) {
+            console.warn(
+                "polaris: keeping a copy of a bag failed",
+                owner.installedAppId,
+                String(error)
+            );
+        }
+        theirs = after.filter((item) => !stash.isKit(item));
+        const late = theirs.filter((item) => !stash.takeable(item));
+        if (late.length > 0) return refuse("untakeable", late);
+    }
+    if (theirs.length > 0) return refuse("unsettled", theirs);
+    return { stash: current, refused: null };
+}
 /** How long somebody sent home is waited for to be on the ground, a second a look. */
 const SETTLE_LOOKS = 15;
 
@@ -284,7 +418,11 @@ export async function giveBack(
         );
     }
     const stackOf = (one: stash.Kept) =>
-        copy.items.find((item) => item.slot === one.slot && stash.sameStack(one, item, digest));
+        copy.items.find(
+            (item) =>
+                item.slot === one.slot &&
+                (stash.sameStack(one, item, digest) || stash.sameStack(one, item, printedDigest))
+        );
     const at = (items: readonly InventoryItem[], slot: number) =>
         items.find((item) => item.slot === slot);
 
@@ -293,14 +431,19 @@ export async function giveBack(
     const toDrop: { one: stash.Kept; item: InventoryItem }[] = [];
     for (const one of kept.kept) {
         const item = stackOf(one);
-        if (item && !itemArgument(item).ok && at(current.items, one.slot) === undefined) {
+        if (
+            item &&
+            kept.barrels.length > 0 &&
+            !stash.fitsOneLine(item) &&
+            at(current.items, one.slot) === undefined
+        ) {
             // Too big for a command, from a stash kept in barrels: copied from its
             // barrel into its own empty slot, as it was put in.
             if (await fromBarrel(server, name, kept, one, item)) given.push(one);
             continue;
         }
         // Not in the copy, or no command can carry it: owed, and on the panel.
-        if (!item || !itemArgument(item).ok) continue;
+        if (!item || !stash.takeable(item)) continue;
         const there = at(current.items, one.slot);
         // Never taken - stopped between writing it down and emptying the slot -
         // or given back already by a give-back that stopped before it said so.
@@ -325,6 +468,14 @@ export async function giveBack(
                 data: { writing: JSON.stringify(toWrite.map((each) => each.one.slot)) }
             });
         await applyPlanNow(server, server.installedAppId, name, plan).catch(() => undefined);
+        // Too long for one command: built in storage and handed over, each
+        // into its slot only while that is still empty.
+        for (const each of toWrite) {
+            if (stash.fitsOneLine(each.item)) continue;
+            await writeLong(server, name, kept.record, each.item).catch((error: unknown) =>
+                console.warn("polaris: giving back a long stack failed", name, String(error))
+            );
+        }
         const after = await readLiveInventory(askerOf(server), name);
         if (!after.answered) {
             await save({ ...kept, kept: kept.kept.filter((one) => !given.includes(one)) });
@@ -358,10 +509,12 @@ export async function giveBack(
     // At their feet, as theirs: only they can pick it up once it is checked.
     for (const { one, item } of toDrop) {
         const tag = stash.dropTag(kept.record, one.slot);
-        const lines = stash.dropLines(name, item, kept.record);
+        const lines =
+            stash.dropLines(name, item, kept.record) ??
+            stash.longDropLines(name, item, kept.record);
         if (!lines) continue;
         await server.sayAll(lines);
-        const lying = parseStack(stripFormatting(await server.say([stash.readDrop(tag)])));
+        const lying = await readDropped(server, tag);
         if (lying && whole({ ...lying, slot: item.slot }, item)) {
             // Written down as given before it is let go: never dropped twice.
             given.push(one);
@@ -396,6 +549,45 @@ export async function giveBack(
     await removeBarrels(server, kept);
     await save(null);
     return "done";
+}
+
+/**
+ * A stack too long for one command into `name`'s own slot: built in storage,
+ * held by an item display beside them, and copied from it - only while the slot
+ * is still empty. The display and the storage copy are taken away after.
+ */
+async function writeLong(
+    server: ServerContainer,
+    name: string,
+    record: string | null,
+    item: InventoryItem
+): Promise<void> {
+    const slot = replaceSlot(item.slot);
+    const key = stash.longKey(record, item.slot);
+    const tag = stash.holdTag(record, item.slot);
+    const build = stash.longLines(key, item);
+    if (!slot || !build) return;
+    try {
+        await server.sayAll([
+            ...build,
+            ...storage.holdLines(name, key, tag),
+            storage.fromHolderLine(name, slot, tag)
+        ]);
+    } finally {
+        await server.sayAll([storage.releaseLine(tag), storage.forgetLine(key)]);
+    }
+}
+
+/** The stack lying at somebody's feet under `tag`, read whole however long it is. */
+async function readDropped(server: ServerContainer, tag: string): Promise<InventoryItem | null> {
+    const reply = stripFormatting(await server.say([stash.readDrop(tag)]));
+    if (!isDataReply(reply)) return null;
+    if (replyIsWhole(reply, "{")) return parseStack(reply);
+    const value = await readWhole(
+        (line) => server.say([line]),
+        `entity @e[type=minecraft:item,tag=${tag},limit=1] Item`
+    );
+    return value === null ? null : parseStack(value);
 }
 
 /** Give back `experience` to `name`: set when they have none - or the stash may

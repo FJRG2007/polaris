@@ -20,6 +20,7 @@ function server(answers: Record<string, string>) {
 }
 
 const WHOLE_BAG = "data get entity Alice Inventory";
+const WORN = "data get entity Alice equipment";
 
 describe("readLiveInventory", () => {
     it("takes the whole bag in one question when the reply arrives whole", async () => {
@@ -32,8 +33,11 @@ describe("readLiveInventory", () => {
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.answered).toBe(true);
         expect(reading.chunked).toBe(false);
-        expect(reading.items.map((item) => item.id)).toEqual(["minecraft:stone", "minecraft:torch"]);
-        expect(asked).toEqual([WHOLE_BAG]);
+        expect(reading.items.map((item) => item.id)).toEqual([
+            "minecraft:stone",
+            "minecraft:torch"
+        ]);
+        expect(asked).toEqual([WHOLE_BAG, WORN]);
     });
 
     it("reports an empty bag as empty, without asking forty more questions", async () => {
@@ -42,7 +46,7 @@ describe("readLiveInventory", () => {
         const { ask, asked } = server({ [WHOLE_BAG]: said("Alice", "[]") });
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading).toMatchObject({ answered: true, chunked: false, unreadable: 0, items: [] });
-        expect(asked).toEqual([WHOLE_BAG]);
+        expect(asked).toEqual([WHOLE_BAG, WORN]);
     });
 
     it("reads the bag a stack at a time when the whole-bag reply was cut off", async () => {
@@ -50,9 +54,18 @@ describe("readLiveInventory", () => {
         // reassemble the rest, so a big bag ends mid-compound. Parsed as it stands
         // that is no stacks at all - a full inventory drawn as an empty one.
         const { ask, asked } = server({
-            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:netherite_helmet", Count: 1b, components: {"min'),
-            "data get entity Alice Inventory[0]": said("Alice", '{Slot: 103b, id: "minecraft:netherite_helmet", Count: 1b}'),
-            "data get entity Alice Inventory[1]": said("Alice", '{Slot: 0b, id: "minecraft:diamond", Count: 12b}')
+            [WHOLE_BAG]: said(
+                "Alice",
+                '[{Slot: 0b, id: "minecraft:netherite_helmet", Count: 1b, components: {"min'
+            ),
+            "data get entity Alice Inventory[0]": said(
+                "Alice",
+                '{Slot: 103b, id: "minecraft:netherite_helmet", Count: 1b}'
+            ),
+            "data get entity Alice Inventory[1]": said(
+                "Alice",
+                '{Slot: 0b, id: "minecraft:diamond", Count: 12b}'
+            )
         });
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.answered).toBe(true);
@@ -64,19 +77,48 @@ describe("readLiveInventory", () => {
             WHOLE_BAG,
             "data get entity Alice Inventory[0]",
             "data get entity Alice Inventory[1]",
-            "data get entity Alice Inventory[2]"
+            "data get entity Alice Inventory[2]",
+            WORN
         ]);
     });
 
     it("counts a stack it could not read even alone rather than dropping it", async () => {
         const { ask } = server({
-            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:shulker_box", Count: 1b, components: {"min'),
-            "data get entity Alice Inventory[0]": said("Alice", '{Slot: 0b, id: "minecraft:shulker_box", components: {"min'),
-            "data get entity Alice Inventory[1]": said("Alice", '{Slot: 1b, id: "minecraft:bread", Count: 5b}')
+            [WHOLE_BAG]: said(
+                "Alice",
+                '[{Slot: 0b, id: "minecraft:shulker_box", Count: 1b, components: {"min'
+            ),
+            "data get entity Alice Inventory[0]": said(
+                "Alice",
+                '{Slot: 0b, id: "minecraft:shulker_box", components: {"min'
+            ),
+            "data get entity Alice Inventory[1]": said(
+                "Alice",
+                '{Slot: 1b, id: "minecraft:bread", Count: 5b}'
+            )
         });
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.unreadable).toBe(1);
         expect(reading.items.map((item) => item.id)).toEqual(["minecraft:bread"]);
+    });
+
+    it("reads what is worn and in the offhand from equipment on 1.21.5 and later", async () => {
+        const { ask } = server({
+            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:stone", count: 64}]'),
+            [WORN]: said(
+                "Alice",
+                '{chest: {id: "minecraft:diamond_chestplate", count: 1, components: {"minecraft:damage": 3}}, offhand: {id: "minecraft:shield", count: 1}, body: {id: "minecraft:saddle", count: 1}}'
+            )
+        });
+        const reading = await readLiveInventory(ask, "Alice");
+        expect(reading.items.map((item) => [item.slot, item.id])).toEqual([
+            [-106, "minecraft:shield"],
+            [0, "minecraft:stone"],
+            [102, "minecraft:diamond_chestplate"]
+        ]);
+        expect(reading.items.find((item) => item.slot === 102)?.data?.snbt).toBe(
+            '{"minecraft:damage": 3}'
+        );
     });
 
     it("does not claim an answer when the server refused", async () => {
@@ -92,7 +134,10 @@ describe("readLiveInventory", () => {
         // A server that answered every index forever must not become an endless
         // loop of round trips.
         const answers: Record<string, string> = {
-            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:stone", Count: 1b, components: {"min')
+            [WHOLE_BAG]: said(
+                "Alice",
+                '[{Slot: 0b, id: "minecraft:stone", Count: 1b, components: {"min'
+            )
         };
         for (let index = 0; index < 200; index += 1) {
             answers[`data get entity Alice Inventory[${index}]`] = said(
@@ -103,7 +148,7 @@ describe("readLiveInventory", () => {
         const { ask, asked } = server(answers);
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.items).toHaveLength(41);
-        expect(asked).toHaveLength(42);
+        expect(asked).toHaveLength(43);
     });
 });
 

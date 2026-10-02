@@ -18,7 +18,7 @@ import { stripFormatting } from "./parse";
 import { planStackMove } from "./stack-move";
 import { maxStackFor, normalizeItemId, stacksFor } from "./items";
 import { askerOf, readLiveInventory } from "./inventory-service";
-import { parseStack, type InventoryItem } from "./inventory";
+import { EQUIPMENT_SLOTS, parseStack, type InventoryItem } from "./inventory";
 import { withServerContainer, type ServerContainer } from "./service";
 import { recentlyGivenItems as recentlyGiven } from "../recent-items";
 import { AIR, itemArgument, replaceSlot, type ItemArgumentRefusal } from "./item-argument";
@@ -78,7 +78,14 @@ export async function readSlot(
     slot: number
 ): Promise<InventoryItem | null> {
     const reply = await server.say(["data", "get", "entity", player, `Inventory[{Slot:${slot}b}]`]);
-    return parseStack(stripFormatting(reply));
+    const stack = parseStack(stripFormatting(reply));
+    // Worn, or in the offhand, on 1.21.5 and later: kept in `equipment` instead.
+    const key = Object.entries(EQUIPMENT_SLOTS).find(([, each]) => each === slot)?.[0];
+    if (stack || !key) return stack;
+    const worn = parseStack(
+        stripFormatting(await server.say(["data", "get", "entity", player, `equipment.${key}`]))
+    );
+    return worn ? { ...worn, slot } : null;
 }
 
 /** Whether two stacks are the same one, for a write that is about to overwrite
