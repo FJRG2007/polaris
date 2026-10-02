@@ -21,7 +21,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { PrivateNetworkPanel } from "./private-network-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
-import { KeyRound, Link2, Loader2, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { KeyRound, Link2, Loader2, Maximize2, Minimize2, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { DatabaseWorkspace } from "./database-workspace";
 import {
     Badge,
     Button,
@@ -37,11 +38,12 @@ import {
     SegmentedControl,
     Select,
     Skeleton,
-    Switch
+    Switch,
+    cn
 } from "@polaris/ui";
 
 type Overview = NonNullable<Awaited<ReturnType<typeof actions.databaseOverviewAction>>["overview"]>;
-type Tab = "versions" | "settings" | "network" | "pitr" | "copy" | "buckets" | "activity";
+type Tab = "database" | "versions" | "settings" | "network" | "pitr" | "copy" | "buckets" | "activity";
 
 /** A pending confirmation: what it says, and what it runs once agreed to. */
 interface Confirmation {
@@ -66,7 +68,8 @@ export function DatabaseManageDialog({
     const manage = can("databases.manage");
     const [overview, setOverview] = useState<Overview | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [tab, setTab] = useState<Tab>("versions");
+    const [tab, setTab] = useState<Tab>("database");
+    const [full, setFull] = useState(false);
     const [confirm, setConfirm] = useState<Confirmation | null>(null);
     const [confirmError, setConfirmError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -99,6 +102,11 @@ export function DatabaseManageDialog({
 
     const tabs: { value: Tab; label: string }[] = overview
         ? [
+              // The data itself first, as the Database tab is on Railway: the
+              // rest of this panel is about the instance around it.
+              ...(!overview.storage && core.isDbEngine(overview.engine)
+                  ? [{ value: "database" as const, label: t("database.tabs.database") }]
+                  : []),
               ...(overview.upgrade
                   ? [{ value: "versions" as const, label: t("database.tabs.version") }]
                   : []),
@@ -147,8 +155,22 @@ export function DatabaseManageDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="w-full max-w-2xl">
-                <DialogHeader className="pr-8">
+            <DialogContent
+                className={cn(
+                    "right-0 left-auto top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-4 overflow-y-auto overscroll-contain rounded-none rounded-l-xl border-y-0 border-r-0 data-[state=open]:slide-in-from-right-4",
+                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[920px] sm:max-w-[calc(100vw-2rem)]"
+                )}
+            >
+                <button
+                    type="button"
+                    onClick={() => setFull((value) => !value)}
+                    title={full ? t("database.exitFullScreen") : t("database.fullScreen")}
+                    aria-label={full ? t("database.exitFullScreen") : t("database.fullScreen")}
+                    className="absolute right-12 top-4 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                </button>
+                <DialogHeader className="pr-20">
                     <DialogTitle className="flex items-center gap-2">
                         <DbEngineIcon engine={database.engine} className="size-6" />
                         <span className="truncate" title={database.name}>
@@ -205,7 +227,14 @@ export function DatabaseManageDialog({
                                 />
                             </ScrollRow>
                         ) : null}
-                        {!overview.deployed && current !== "activity" ? (
+                        {current === "database" ? (
+                            <DatabaseWorkspace
+                                database={database}
+                                deployed={overview.deployed}
+                                manage={manage}
+                                hosted={overview.hosted}
+                            />
+                        ) : !overview.deployed && current !== "activity" ? (
                             <p className="text-sm text-muted-foreground">
                                 {t("database.provisionFirst")}
                             </p>
