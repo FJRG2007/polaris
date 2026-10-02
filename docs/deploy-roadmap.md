@@ -1,7 +1,7 @@
 # Deploy - feature roadmap (parity with Railway / Coolify / Dokploy / openship)
 
 Backlog of what the reference PaaS tools offer that Polaris Deploy should have.
-Statuses were checked against the code on 2026-09-10; keep them updated as items
+Statuses were checked against the code on 2026-10-02; keep them updated as items
 land.
 
 **Status:** done - a user can do it from the dashboard (or the CLI/API row from
@@ -65,7 +65,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Custom domain + Let's Encrypt            | done    | P0   | or a certificate you supply                                                     |
 | Wildcard certificates                    | done    | P1   | owner domains                                                                   |
 | DNS records managed                      | done    | P1   | Cloudflare zone editor                                                          |
-| Private networking between services      | done    | P0   | per-environment network, reached by service name                                |
+| Private networking between services      | done    | P0   | Railway-style: each service answers to `<name>.polaris.internal` and its bare name on a network of its own (dual stack where the engine gives it one), port-less via a port-80 forwarder; editable endpoint name with an availability check and a 7-day grace period for the old one, extra aliases; `POLARIS_PRIVATE_DOMAIN` and service variable references follow renames; opt-in links let one service of another project on the same server call it by name |
 | Multiple domains per service             | done    | P1   | added one at a time                                                             |
 | Redirects / rewrites                     | done    | P2   | Service > Settings                                                              |
 | Load balancing (copies, sticky, health)  | done    | P1   |                                                                                 |

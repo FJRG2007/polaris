@@ -55,7 +55,7 @@ All paths are prefixed `/v1`.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/health` | `{ version, capabilities: { hostFilesystem, nativeMounts, docker, kubernetes, systemd, autoUpdate } }`. Capabilities are probed from the host on each call. |
+| `GET` | `/v1/health` | `{ version, capabilities: { hostFilesystem, nativeMounts, docker, deploy, privateNetworks, privateNames, kubernetes, systemd, autoUpdate } }`. Capabilities are probed from the host on each call. |
 | `GET` | `/v1/fs/<path>` | Stream a file. Honours `Range: bytes=start-end` -> `206 Partial Content`. |
 | `PUT` | `/v1/fs/<path>` | Write the request body to the file (parent dirs created). Body is streamed to disk. |
 | `DELETE` | `/v1/fs/<path>` | Remove the file. |
