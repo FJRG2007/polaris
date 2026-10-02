@@ -1218,8 +1218,8 @@ function QueryPanel({
                     )}
                     {t("bench.run")}
                 </Button>
-                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>
                 {/* i18n-ignore a key chord */}
+                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>
             </div>
 
             {error && (
