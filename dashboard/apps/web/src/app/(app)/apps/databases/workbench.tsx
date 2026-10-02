@@ -29,12 +29,13 @@
 import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
-import { dataText } from "@/lib/data/words";
 import { StatsPanel } from "./stats-panel";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { dataText } from "@/lib/data/words";
+import { spreadsheetSafe } from "@/lib/data/spreadsheet";
 import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
     DataColumn,
@@ -448,8 +449,10 @@ function rowsAsText(
     columns: readonly DataColumn[]
 ): string {
     if (rows.length === 0) return "";
-    const header = columns.map((column) => column.name).join("\t");
-    const body = rows.map((row) => columns.map((column) => cellText(row[column.name])).join("\t"));
+    const header = columns.map((column) => spreadsheetSafe(column.name)).join("\t");
+    const body = rows.map((row) =>
+        columns.map((column) => spreadsheetSafe(cellText(row[column.name]))).join("\t")
+    );
     return [header, ...body].join("\n");
 }
 
