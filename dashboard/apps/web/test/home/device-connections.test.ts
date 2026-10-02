@@ -119,6 +119,20 @@ describe("a connection made by pairing", () => {
         expect(registry.fieldIssue(email, "")).toBeNull();
         expect(registry.fieldsComplete(philips!, { email: "owner@example" })).toBe(false);
         expect(registry.fieldsComplete(philips!, { email: " owner@example.com " })).toBe(true);
+        // A comma or space left over from a paste is another address to Philips.
+        for (const slip of [
+            "owner@example.com,",
+            "owner@example.com;",
+            "owner @example.com",
+            "owner@example..com"
+        ]) {
+            expect(registry.fieldIssue(email, slip)).not.toBeNull();
+            expect(registry.fieldsComplete(philips!, { email: slip })).toBe(false);
+        }
+        expect(registry.normalizeFields(philips!, { email: " Owner@Example.COM " }).email).toBe(
+            "owner@example.com"
+        );
+        expect(registry.normalizeField(email, " Owner@Example.COM ")).toBe("owner@example.com");
     });
 
     it("keeps the typed Tuya project as a second way in", () => {

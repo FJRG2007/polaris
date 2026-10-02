@@ -298,6 +298,21 @@ describe("signing in with an emailed code", () => {
         ).rejects.toThrow(/did not send a code/);
     });
 
+    it("keeps Philips' own title and code, never its details", async () => {
+        route(at("/accounts.auth.otp.email.sendCode"), () =>
+            jsonReply({
+                errorCode: 400006,
+                errorMessage: "Invalid parameter value",
+                errorDetails: "Invalid argument: email owner@example.com\napiKey 4_secret"
+            })
+        );
+        await expect(
+            driver.philipsCloudDriver.pair!.start({ email: "owner@example.com" })
+        ).rejects.toThrow(
+            "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with. Philips said: Invalid parameter value (400006)."
+        );
+    });
+
     it("trades the code for tokens through prompt=none and PKCE, and lists the devices", async () => {
         philips({ airplusDevices: [PURIFIER] });
         const answer = await driver.philipsCloudDriver.pair!.poll(
@@ -379,6 +394,9 @@ describe("signing in with an emailed code", () => {
         );
         await expect(wrong).rejects.toBeInstanceOf(DriverError);
         await expect(wrong).rejects.toMatchObject({ kind: "unauthorized" });
+        await expect(wrong).rejects.toThrow(
+            "Philips did not accept the code. Check it, or ask for a new one. Philips said: Invalid code (403042)."
+        );
         await expect(
             driver.philipsCloudDriver.pair!.poll({ email: "owner@example.com" }, { vToken: "vt-1" })
         ).rejects.toThrow("Enter the code from the email");

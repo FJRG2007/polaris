@@ -162,12 +162,29 @@ function form(values: Readonly<Record<string, string>>): RequestInit {
 const gigyaSchema = z
     .object({
         errorCode: z.number().optional(),
+        errorMessage: z.string().max(500).optional(),
         vToken: z.string().max(4000).optional(),
         sessionInfo: z.object({ cookieValue: z.string().max(4000).optional() }).optional(),
         gmidTicket: z.string().max(4000).optional(),
         UID: z.string().max(200).optional()
     })
     .passthrough();
+
+/**
+ * A refusal with what Philips itself said after it, so a refusal for any reason
+ * is never reported as a wrong code. Only Gigya's short error title and code are
+ * kept: its details can echo back what was sent.
+ */
+function philipsSaid(sentence: string, answer: { errorCode?: number; errorMessage?: string }) {
+    const words = (answer.errorMessage ?? "")
+        .replace(/[^\x20-\x7e]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+    const code = answer.errorCode === undefined ? "" : String(answer.errorCode);
+    const said = words && code ? `${words} (${code})` : words || code;
+    return said ? `${sentence} Philips said: ${said}.` : sentence;
+}
 
 async function gigya(endpoint: string, values: Readonly<Record<string, string>>) {
     const response = await call(`${GIGYA}/${endpoint}`, form(values));
@@ -186,7 +203,10 @@ export async function requestPhilipsCode(email: string): Promise<string> {
     });
     if (answer.errorCode !== 0 || !answer.vToken) {
         throw new DriverError(
-            "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with.",
+            philipsSaid(
+                "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with.",
+                answer
+            ),
             "refused"
         );
     }
@@ -217,7 +237,7 @@ async function sessionFor(
     const session = answer.sessionInfo?.cookieValue;
     if (answer.errorCode !== 0 || !session) {
         throw new DriverError(
-            "That code is not right or has expired. Ask for a new one.",
+            philipsSaid("Philips did not accept the code. Check it, or ask for a new one.", answer),
             "unauthorized"
         );
     }
