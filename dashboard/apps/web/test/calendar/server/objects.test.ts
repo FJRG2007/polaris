@@ -13,11 +13,11 @@ vi.mock("@polaris/app-host", async () => (await import("../fixtures/fake-host"))
 vi.mock("@polaris/auth", () => ({ userHasPermission: async () => false }));
 
 import { db } from "../fixtures/fake-db";
+import * as world from "../fixtures/world";
 import { addUser, fake } from "../fixtures/fake-host";
 import * as engine from "@polaris-app/calendar/src/engine";
 import * as objects from "@polaris-app/calendar/src/lib/objects";
 import { occurrencesIn } from "@polaris-app/calendar/src/lib/occurrences";
-import * as world from "../fixtures/world";
 
 const ZONE = "Europe/Madrid";
 
@@ -285,6 +285,138 @@ describe("calendar objects", () => {
         expect(
             db.rows("calendarInvitation").filter((invitation) => invitation.objectId === copy)
         ).toEqual([]);
+    });
+
+    it("pastes one occurrence of a series as a single new event at another time, inviting nobody", async () => {
+        const id = await createSeries();
+        const shared = world.addCalendar(bob.id, { name: "Bob's" });
+        world.addShare(calendar, { userId: bob.id }, "read");
+        fake.mails.length = 0;
+        const keys = await keysOf(id);
+        // Bob reads Alice's calendar and pastes her second meeting into his own.
+        const pasted = await objects.pasteEvent(bob, {
+            objectId: id,
+            recurrenceKey: keys[1]!,
+            calendarId: shared,
+            start: world.at("2026-10-20T15:00:00"),
+            end: world.at("2026-10-20T16:00:00"),
+            floatingZone: ZONE
+        });
+        const row = db.byId("calendarObject", pasted)!;
+        const event = world.eventIn(row);
+        expect(row.calendarId).toBe(shared);
+        expect(row.uid).not.toBe(db.byId("calendarObject", id)!.uid);
+        expect(event.summary).toBe("Planning");
+        expect(event.rule).toBeNull();
+        expect(event.recurrenceId).toBeNull();
+        expect(event.start).toEqual(world.at("2026-10-20T15:00:00"));
+        expect(fake.mails).toEqual([]);
+    });
+
+    it("refuses pasting into a calendar the reader cannot write", async () => {
+        const id = await createSeries();
+        const readOnly = world.addCalendar(bob.id, { name: "Bob's" });
+        world.addShare(readOnly, { userId: alice.id }, "read");
+        await expect(
+            objects.pasteEvent(alice, {
+                objectId: id,
+                recurrenceKey: null,
+                calendarId: readOnly,
+                start: world.at("2026-10-20T15:00:00"),
+                end: world.at("2026-10-20T16:00:00"),
+                floatingZone: ZONE
+            })
+        ).rejects.toThrow();
+        expect(world.objectsIn(readOnly)).toHaveLength(0);
+    });
+
+    it("refuses pasting a private event from a calendar the reader only reads", async () => {
+        const own = world.addCalendar(bob.id, { name: "Bob's" });
+        world.addShare(calendar, { userId: bob.id }, "read");
+        const paste = (objectId: string) =>
+            objects.pasteEvent(bob, {
+                objectId,
+                recurrenceKey: null,
+                calendarId: own,
+                start: world.at("2026-10-20T15:00:00"),
+                end: world.at("2026-10-20T16:00:00"),
+                floatingZone: ZONE
+            });
+        for (const classification of ["PRIVATE", "CONFIDENTIAL"] as const) {
+            const row = world.storeEvent(calendar, {
+                summary: "Doctor",
+                description: "Private notes",
+                classification,
+                start: world.at("2026-10-09T10:00:00"),
+                end: world.at("2026-10-09T11:00:00")
+            });
+            await expect(paste(String(row.id))).rejects.toThrow(
+                "Only the busy time of this event is shared with you"
+            );
+        }
+        expect(world.objectsIn(own)).toHaveLength(0);
+
+        world.addShare(own, { userId: alice.id }, "write");
+        const mine = world.storeEvent(calendar, {
+            summary: "Doctor",
+            classification: "PRIVATE",
+            start: world.at("2026-10-09T10:00:00"),
+            end: world.at("2026-10-09T11:00:00")
+        });
+        const pasted = await objects.pasteEvent(alice, {
+            objectId: String(mine.id),
+            recurrenceKey: null,
+            calendarId: own,
+            start: world.at("2026-10-20T15:00:00"),
+            end: world.at("2026-10-20T16:00:00"),
+            floatingZone: ZONE
+        });
+        expect(world.eventIn(db.byId("calendarObject", pasted)).summary).toBe("Doctor");
+    });
+
+    it("moves a whole event to another calendar from the menu, keeping its id and UID", async () => {
+        const id = await createSeries();
+        const uid = db.byId("calendarObject", id)!.uid;
+        const other = world.addCalendar(alice.id, { name: "Home" });
+        expect(
+            await objects.moveEvent(alice, { objectId: id, calendarId: other, floatingZone: ZONE })
+        ).toBe(id);
+        await world.settle();
+        expect(db.byId("calendarObject", id)?.calendarId).toBe(other);
+        expect(db.byId("calendarObject", id)?.uid).toBe(uid);
+        expect(await keysOf(id)).toHaveLength(4);
+    });
+
+    it("colours a whole event and gives it back the calendar's colour", async () => {
+        const id = await createSeries();
+        const keys = await keysOf(id);
+        // One occurrence moved on its own, so the series has an override.
+        await objects.shiftEvent(alice, {
+            objectId: id,
+            recurrenceKey: keys[1]!,
+            startDeltaMs: 3_600_000,
+            endDeltaMs: 3_600_000,
+            scope: "this",
+            version: null,
+            floatingZone: ZONE
+        });
+        await objects.setEventColor(alice, { objectId: id, color: "#d62728", floatingZone: ZONE });
+        const colored = world.itemIn(db.byId("calendarObject", id));
+        expect(colored.component === "VEVENT" && colored.master?.color).toBe("#d62728");
+        expect(
+            colored.component === "VEVENT" && colored.overrides.map((event) => event.color)
+        ).toEqual(["#d62728"]);
+        await objects.setEventColor(alice, { objectId: id, color: null, floatingZone: ZONE });
+        expect(world.eventIn(db.byId("calendarObject", id)).color).toBeNull();
+    });
+
+    it("refuses colouring an event on a calendar shared read-only", async () => {
+        const id = await createSeries();
+        world.addShare(calendar, { userId: bob.id }, "read");
+        await expect(
+            objects.setEventColor(bob, { objectId: id, color: "#d62728", floatingZone: ZONE })
+        ).rejects.toThrow();
+        expect(world.eventIn(db.byId("calendarObject", id)).color).toBeNull();
     });
 
     it("sets the reader's own answer, on a calendar they only read", async () => {

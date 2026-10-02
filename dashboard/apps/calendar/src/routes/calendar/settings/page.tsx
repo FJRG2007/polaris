@@ -9,6 +9,7 @@ import { Button, PageHeader } from "@polaris/ui";
 import { calendarT } from "../../../lib/i18n";
 import { requireCalendarUser } from "../../../lib/access";
 import { SettingsView } from "../../../screens/settings-view";
+import { AccountsSection } from "../../../screens/accounts/accounts-section";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,10 @@ export default async function CalendarSettingsPage() {
                     </Button>
                 }
             />
-            <SettingsView />
+            <div className="flex flex-col gap-4">
+                <AccountsSection />
+                <SettingsView />
+            </div>
         </div>
     );
 }

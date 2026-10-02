@@ -87,6 +87,16 @@ function blankState() {
             listName: string;
         }[],
         scheduled: [] as { taskId: string; due: unknown }[],
+        /** Lists a task can be created in; null when Tasks is not theirs. */
+        taskLists: [] as { id: string; name: string; spaceName: string }[] | null,
+        createdTasks: [] as {
+            actorId: string;
+            listId: string;
+            name: string;
+            due: { at: string; timed: boolean };
+        }[],
+        /** Whether each provider's sign-in application is set up. */
+        linkReady: { google: true, microsoft: true },
         /** The dashboard's key-value settings. */
         settings: new Map<string, string>()
     };
@@ -255,6 +265,20 @@ export const host = {
         listCalendarLinks: async () => [...fake.links],
         calendarLinkUrl: async (provider: string) =>
             `/account/connections/new?provider=${provider}&scope=calendar`,
+        calendarLinkAvailable: async (provider: "google" | "microsoft") => fake.linkReady[provider],
+        taskListsFor: async () => (fake.taskLists ? [...fake.taskLists] : null),
+        createDueTask: async (
+            actor: { id: string },
+            input: { listId: string; name: string; due: { at: string; timed: boolean } }
+        ) => {
+            if (!fake.taskLists?.some((list) => list.id === input.listId))
+                return { refused: "That list no longer exists." };
+            fake.createdTasks.push({ actorId: actor.id, ...input });
+            return {
+                id: `task-${fake.createdTasks.length}`,
+                reference: `T-${fake.createdTasks.length}`
+            };
+        },
         assignedTasks: async () => [...fake.tasks],
         scheduleTask: async (_actor: unknown, taskId: string, due: unknown) => {
             fake.scheduled.push({ taskId, due });

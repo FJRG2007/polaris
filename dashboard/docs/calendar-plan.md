@@ -246,7 +246,10 @@ week, `3`/`m` month, `4`/`y` year, `5`/`l`/`a` list, `6`/`x` custom days, `c`
 create, `e` open selected, `Backspace`/`Delete` delete selected, `z` undo, `/`
 search, `r` refresh, `s` settings, `+` add calendar, `?` overview, `Esc` close,
 `Ctrl/Cmd+Enter` and `Ctrl/Cmd+S` save, `Ctrl/Cmd+Delete` delete, `Ctrl/Cmd+D`
-duplicate.
+duplicate. On the grid: arrow keys move focus between day cells, `Enter`
+creates on the focused day, the menu key or `Shift+F10` opens its context menu,
+`Ctrl/Cmd+C` copies the focused event and `Ctrl/Cmd+V` pastes at the focused
+cell.
 
 ## Work-unit ledger
 
@@ -334,4 +337,6 @@ and es-ES.
 - [x] U61 tsc - done (C)
 - [x] U62 bundler + contract tests - done (B)
 - [x] U63 Browser pass - done (W)
+- [x] U67 Linking is findable - done (T: screens/accounts-entry; W): Accounts is the first section of Calendar settings; the sidebar's "Add a calendar" lists Google, Microsoft, CalDAV, subscribe by URL, holidays, import and create; a first-use tip until linked or closed (`dismissedHints`); a provider whose OAuth client is not set up says so - administrators are linked to `/admin/integrations?configure=<provider>`, which opens that setup, everybody else is told to ask one
+- [x] U68 Grid context menu - done (T: screens/grid-menu, server/objects; W): right-click, long press, the menu key or Shift+F10 on a time, a day, the all-day row or an event; new event / all-day / task due here / paste / go to day; open, edit, duplicate, copy (Ctrl/Cmd+C), move to calendar, color, respond, download, delete; a range selected first is the range it creates over; arrows step between day cells, Enter creates on the focused day, Ctrl/Cmd+V pastes there
 - [ ] U64 CalDAV server for phones and desktop clients - deferred(phase 2, the one item the brief allowed: a WebDAV/CalDAV server with per-user app passwords is a project of its own)

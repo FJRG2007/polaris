@@ -1,4 +1,16 @@
 {
+    "addMenu": {
+        "askAdmin": "Not set up yet. Ask your administrator.",
+        "caldav": "CalDAV server",
+        "caldavHint": "iCloud, Fastmail, Nextcloud, Yahoo",
+        "google": "From a Google account",
+        "holidays": "Holiday calendars",
+        "import": "Import a file (.ics)",
+        "microsoft": "From Microsoft",
+        "setUpFirst": "Not set up yet. Set up {provider} first.",
+        "subscribe": "Subscribe by URL (.ics)",
+        "unreadable": "Could not check. Try again."
+    },
     "attendeeEditor": {
         "add": "Invite people",
         "addButton": "Invite",
@@ -202,6 +214,36 @@
         "unreadable": "{count, plural, one {# event could not be read and is not shown.} other {# events could not be read and are not shown.}}",
         "week": "Wk"
     },
+    "gridMenu": {
+        "answers": {
+            "ACCEPTED": "Accept",
+            "DECLINED": "Decline",
+            "TENTATIVE": "Maybe"
+        },
+        "color": "Change color",
+        "colorOption": "Color {color}",
+        "copied": "Event copied. Right-click a day or a time to paste it.",
+        "copy": "Copy",
+        "delete": "Delete",
+        "download": "Download .ics",
+        "duplicate": "Duplicate",
+        "edit": "Edit",
+        "goToDay": "Go to this day",
+        "label": "Actions on the calendar",
+        "move": "Move to calendar",
+        "movedTo": "Moved to {name}",
+        "newAllDay": "New all-day event",
+        "newEvent": "New event here",
+        "newInRange": "New event in this range",
+        "newTask": "New task due here",
+        "open": "Open",
+        "openTask": "Open task",
+        "paste": "Paste {title}",
+        "pasteFailed": "The event was not pasted",
+        "pasted": "Event pasted",
+        "respond": "Respond",
+        "wholeSeries": "Every event in the series"
+    },
     "header": {
         "calendars": "Calendars",
         "goTo": "{label}. Go to a date",
@@ -232,6 +274,24 @@
         "sample": "Event",
         "task": "Task with a due date",
         "tentative": "Tentative, or you said maybe"
+    },
+    "linkHint": {
+        "dismiss": "Hide this tip",
+        "text": "Bring in your other calendars: Google, Microsoft, iCloud, or any CalDAV server or .ics link."
+    },
+    "newTask": {
+        "create": "Create task",
+        "created": "{reference} created",
+        "due": "Due {when}",
+        "list": "List",
+        "listsFailed": "Your Tasks lists could not be loaded.",
+        "loading": "Loading your lists",
+        "name": "Name",
+        "namePlaceholder": "What needs doing",
+        "noLists": "You have no list to add tasks to yet. <tasks>Open Tasks</tasks> to make one.",
+        "noTasks": "Your account cannot create tasks.",
+        "open": "Open",
+        "title": "New task"
     },
     "popover": {
         "chooseCalendar": "Choose a calendar first",
@@ -377,6 +437,11 @@
         "searching": "Searching all events"
     },
     "settingsPage": {
+        "accounts": "Accounts",
+        "accountsLead": "The Google, Microsoft and CalDAV accounts and the subscriptions your calendars come from.",
+        "accountsManage": "Manage",
+        "accountsMore": "{count, plural, one {# more} other {# more}}",
+        "accountsNone": "No account is linked yet.",
         "addClock": "Add a clock",
         "addRange": "Add hours",
         "all": "All",
@@ -451,7 +516,9 @@
         "labels": {
             "addCalendar": "Create a calendar",
             "close": "Close",
+            "copy": "Copy the selected event",
             "create": "New event",
+            "createHere": "New event on the focused day",
             "day": "Day view",
             "days": "Custom view",
             "delete": "Delete selected event",
@@ -460,9 +527,12 @@
             "goTo": "Go to a date",
             "help": "This list",
             "list": "List view",
+            "menu": "Open the menu",
             "month": "Month view",
+            "moveFocus": "Move between days",
             "next": "Go to the next period",
             "open": "Open selected event",
+            "paste": "Paste on the focused day",
             "previous": "Go to the previous period",
             "refresh": "Refresh",
             "save": "Save, in the editor",
@@ -503,6 +573,7 @@
         "left": "{name} removed from your list",
         "linked": "{account}",
         "loadFailed": "The calendars could not be loaded.",
+        "manageAccount": "Manage account",
         "menu": "Options for {name}",
         "mine": "My calendars",
         "moveDown": "Move down",
@@ -527,6 +598,7 @@
         "show": "Show {name}",
         "subscriptions": "Subscriptions",
         "syncProblem": "The last sync failed",
+        "syncProblemFix": "The last sync failed. Open the accounts to fix it.",
         "tasksFailed": "The tasks could not be loaded.",
         "toggleFailed": "The calendar was not shown or hidden",
         "unmute": "Unmute reminders",

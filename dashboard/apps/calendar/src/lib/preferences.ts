@@ -74,7 +74,9 @@ const fields = {
     /** Where invitations from other Polaris people land. */
     invitationCalendarId: z.string().uuid().nullable(),
     /** Sidebar sections folded away. */
-    collapsed: z.array(z.string().max(40)).max(20)
+    collapsed: z.array(z.string().max(40)).max(20),
+    /** First-use hints somebody closed, so they stay closed. */
+    dismissedHints: z.array(z.enum(["link-accounts"])).max(10)
 };
 
 type Fields = typeof fields;
@@ -105,7 +107,8 @@ export const DEFAULT_PREFERENCES: CalendarPreferences = {
     workingHours: { "1": WORKDAY, "2": WORKDAY, "3": WORKDAY, "4": WORKDAY, "5": WORKDAY },
     defaultCalendarId: null,
     invitationCalendarId: null,
-    collapsed: []
+    collapsed: [],
+    dismissedHints: []
 };
 
 /** A change from the settings screen: any subset of the fields, each strict,

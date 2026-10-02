@@ -12,6 +12,7 @@ import { host } from "@polaris/app-host";
 import { isKnownZone, uuidSchema } from "../lib/schemas";
 import type { TaskItemView } from "../lib/wire";
 import { requireCalendarUser } from "../lib/access";
+import { CalendarRefusal } from "../lib/errors";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { itemOf, writableObject, writeItem } from "../lib/objects";
 
@@ -55,6 +56,47 @@ export async function scheduleTaskAction(input: unknown): Promise<Outcome<object
             parsed.data.due
         );
         return {};
+    });
+}
+
+/** A Tasks list a new task can go into. */
+export interface TaskListOption {
+    readonly id: string;
+    readonly name: string;
+    readonly spaceName: string;
+}
+
+/** The Tasks lists the reader may add work to, or null when they cannot create
+ *  tasks at all - the calendar then offers no way to. */
+export async function taskListsAction(): Promise<Outcome<{ lists: TaskListOption[] | null }>> {
+    return outcome(async () => {
+        const user = await requireCalendarUser();
+        return {
+            lists: await host.calendarHost.taskListsFor({ id: user.id, isAdmin: user.isAdmin })
+        };
+    });
+}
+
+const createTaskInput = z.object({
+    listId: uuidSchema,
+    name: z.string().trim().min(1).max(500),
+    due: z.object({ at: z.string().datetime({ offset: true }), timed: z.boolean() })
+});
+
+/** A Tasks task due at a moment chosen on the calendar, assigned to the reader. */
+export async function createDueTaskAction(
+    input: unknown
+): Promise<Outcome<{ taskId: string; reference: string }>> {
+    const parsed = createTaskInput.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    return outcome(async () => {
+        const user = await requireCalendarUser();
+        const created = await host.calendarHost.createDueTask(
+            { id: user.id, isAdmin: user.isAdmin },
+            parsed.data
+        );
+        if ("refused" in created) throw new CalendarRefusal(created.refused);
+        return { taskId: created.id, reference: created.reference };
     });
 }
 

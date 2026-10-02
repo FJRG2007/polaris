@@ -82,6 +82,11 @@
         "neverSynced": "Sin sincronizar",
         "newAddress": "Nueva URL",
         "newPassword": "Nueva contraseña de {name}",
+        "notSetUp": {
+            "admin": "El acceso con {provider} aún no está configurado en este Polaris.",
+            "member": "{provider} aún no está configurado en este Polaris. Pide a tu administrador que lo configure.",
+            "setUp": "Configurar {provider}"
+        },
         "outcome": {
             "cancelled": "Se canceló el enlace. No ha cambiado nada.",
             "dismiss": "Cerrar",

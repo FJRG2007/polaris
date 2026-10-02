@@ -15,7 +15,7 @@ import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { CalendarRefusal } from "./errors";
 import { afterObjectChange } from "./effects";
-import { requireCalendar, requireWritableCalendar, type SessionUser } from "./access";
+import { reaches, requireCalendar, requireWritableCalendar, type SessionUser } from "./access";
 
 /** The row a write starts from. */
 export interface StoredObject {
@@ -428,6 +428,106 @@ export async function duplicateEvent(
     const copy = engine.duplicateItem(await itemOf(row));
     // Stored the way a file is: nobody listed in it is sent an invitation.
     return writeItem(row.calendarId, null, copy, { actor: user, floatingZone, fromImport: true });
+}
+
+/**
+ * Paste a copied occurrence: one new event (never a series) with everything the
+ * occurrence had, at the start and end given, in a calendar the reader writes
+ * to. Copying needs only to read the original - an event from a calendar shared
+ * read-only can be pasted into one's own. Stored the way a duplicate is, so
+ * nobody listed on it is sent an invitation.
+ */
+export async function pasteEvent(
+    user: SessionUser,
+    input: {
+        objectId: string;
+        recurrenceKey: string | null;
+        calendarId: string;
+        start: engine.DateValue;
+        end: engine.DateValue;
+        floatingZone: string;
+    }
+): Promise<string> {
+    const t = await calendarT();
+    const row = await prisma.calendarObject.findUnique({
+        where: { id: input.objectId },
+        select: STORED
+    });
+    if (!row || row.deletedAt) throw new CalendarRefusal(t("errors.eventNotFound"));
+    const source = await requireCalendar(user.id, row.calendarId, "read");
+    const target = await requireWritableCalendar(user.id, input.calendarId);
+    const item = await itemOf(row);
+    if (item.component !== "VEVENT") throw new CalendarRefusal(t("errors.notAnEvent"));
+    const base =
+        (input.recurrenceKey
+            ? item.overrides.find((override) => overrideKeyMatches(override, input.recurrenceKey!))
+            : null) ??
+        item.master ??
+        item.overrides[0];
+    if (!base) throw new CalendarRefusal(t("errors.notAnEvent"));
+    if (!reaches(source.reach, "write") && base.classification !== "PUBLIC")
+        throw new CalendarRefusal(t("errors.busyOnly"));
+    const {
+        uid: _uid,
+        recurrenceId: _recurrenceId,
+        thisAndFuture: _thisAndFuture,
+        rule: _rule,
+        exdates: _exdates,
+        rdates: _rdates,
+        sequence: _sequence,
+        created: _created,
+        lastModified: _lastModified,
+        ...kept
+    } = base;
+    const copy = engine.newEvent({ ...kept, start: input.start, end: input.end });
+    return writeItem(target.id, null, engine.eventItem(copy, item.timezones), {
+        actor: user,
+        floatingZone: input.floatingZone,
+        fromImport: true
+    });
+}
+
+/**
+ * Move a whole event - every occurrence - to another calendar the reader writes
+ * to, the way the editor's calendar picker does on a save of the series.
+ */
+export async function moveEvent(
+    user: SessionUser,
+    input: { objectId: string; calendarId: string; floatingZone: string }
+): Promise<string> {
+    const { row } = await writableObject(user, input.objectId);
+    const target = await requireWritableCalendar(user.id, input.calendarId);
+    if (row.calendarId === target.id) return row.id;
+    const item = await itemOf(row);
+    return moveObject(user, row, target.id, item, {
+        actor: user,
+        floatingZone: input.floatingZone
+    });
+}
+
+/**
+ * Colour a whole event (RFC 7986 COLOR on the series and every override), or
+ * give it back the calendar's colour with null.
+ */
+export async function setEventColor(
+    user: SessionUser,
+    input: { objectId: string; color: string | null; floatingZone: string }
+): Promise<void> {
+    const { row } = await writableObject(user, input.objectId);
+    const item = await itemOf(row);
+    if (item.component !== "VEVENT")
+        throw new CalendarRefusal((await calendarT())("errors.notAnEvent"));
+    const color = input.color;
+    await writeItem(
+        row.calendarId,
+        row,
+        {
+            ...item,
+            master: item.master ? { ...item.master, color } : null,
+            overrides: item.overrides.map((override) => ({ ...override, color }))
+        },
+        { actor: user, floatingZone: input.floatingZone }
+    );
 }
 
 /**

@@ -7,10 +7,16 @@
  * dates and the header are the screen's; this only draws the window it is told
  * to and reports what was pressed, dragged or selected - with the instants it
  * means, never the grid's own dates.
+ *
+ * The selection is the screen's too: a range stays highlighted for as long as
+ * `selection` names it (while its new-event card or its menu is open), and goes
+ * when that is cleared. Every event carries `data-event-id` and every day cell
+ * and day column is a keyboard stop, which is what the grid's menu reads.
  */
 
 import * as time from "./time";
 import { GRID_CSS } from "./grid-css";
+import { KEYBOARD_CELLS } from "./grid-target";
 import listPlugin from "@fullcalendar/list";
 import type { GridItem } from "./grid-events";
 import FullCalendar from "@fullcalendar/react";
@@ -47,6 +53,12 @@ export interface GridMoment {
     readonly allDay: boolean;
 }
 
+/** A range of the grid, as the screen holds it while it is highlighted. */
+export interface GridRange {
+    readonly start: GridMoment;
+    readonly end: GridMoment;
+}
+
 export interface GridChange {
     readonly item: GridItem;
     readonly startDeltaMs: number;
@@ -72,17 +84,20 @@ export interface GridViewProps {
     readonly businessHours: { daysOfWeek: number[]; startTime: string; endTime: string }[];
     readonly events: EventInput[];
     readonly selectedId: string | null;
+    /** The range to keep highlighted; null clears it. */
+    readonly selection: GridRange | null;
     readonly words: {
         readonly allDay: string;
         readonly noEvents: string;
         readonly week: string;
         readonly more: (count: number) => string;
         readonly secondaryZone: string;
+        /** A day cell's name for the keyboard, e.g. "Friday, 2 October 2026". */
+        readonly day: (day: string) => string;
     };
-    readonly onSelectRange: (
-        range: { start: GridMoment; end: GridMoment },
-        anchor: DOMRect | null
-    ) => void;
+    /** A range was selected. False: it was not taken (the long press that
+     *  opened the menu ends in one), and the highlight goes back to `selection`. */
+    readonly onSelectRange: (range: GridRange, anchor: DOMRect | null) => boolean;
     readonly onItemClick: (item: GridItem, id: string, anchor: DOMRect) => void;
     readonly onItemFocus: (id: string) => void;
     readonly onChange: (change: GridChange) => void;
@@ -107,11 +122,75 @@ function itemOf(event: EventApi): GridItem {
     return (event.extendedProps as { item: GridItem }).item;
 }
 
+/**
+ * Make the day cells reachable by keyboard: each is focusable and named, and
+ * one of them - the anchor's, else the first - is the grid's single tab stop.
+ * Moving between them with the arrows is the menu wrapper's (`grid-menu.tsx`).
+ */
+function markCells(root: HTMLElement | null, anchor: string, name: (day: string) => string): void {
+    if (!root) return;
+    const cells = [...root.querySelectorAll<HTMLElement>(KEYBOARD_CELLS)];
+    if (cells.length === 0) return;
+    for (const cell of cells) {
+        const day = cell.getAttribute("data-date") ?? "";
+        cell.tabIndex = -1;
+        if (!cell.hasAttribute("aria-label")) cell.setAttribute("aria-label", name(day));
+    }
+    const stop = cells.find((cell) => cell.getAttribute("data-date") === anchor) ?? cells[0]!;
+    stop.tabIndex = 0;
+}
+
+/** Whether two ranges are the same, so a highlight is not drawn twice. */
+function sameRange(a: GridRange | null, b: GridRange | null): boolean {
+    if (!a || !b) return a === b;
+    return (
+        a.start.allDay === b.start.allDay &&
+        a.start.at.getTime() === b.start.at.getTime() &&
+        a.end.at.getTime() === b.end.at.getTime()
+    );
+}
+
 export default function GridView(props: GridViewProps) {
     const calendar = useRef<FullCalendar>(null);
+    const root = useRef<HTMLDivElement>(null);
     const fcView = FC_VIEWS[props.view];
     const propsRef = useRef(props);
     propsRef.current = props;
+    /** What the grid itself has highlighted, so the screen's range is drawn once. */
+    const drawn = useRef<GridRange | null>(null);
+    /** Set while the range is drawn from here, so FullCalendar's own report of
+     *  that selection is not taken for somebody selecting. */
+    const drawing = useRef(false);
+
+    /** Draw a range as the selection, without it counting as one being made. */
+    const redraw = (range: GridRange | null) => {
+        const api = calendar.current?.getApi();
+        if (!api || sameRange(drawn.current, range)) return;
+        drawn.current = range;
+        if (!range) {
+            api.unselect();
+            return;
+        }
+        const zone = propsRef.current.zone;
+        const toGrid = (moment: GridMoment) =>
+            moment.allDay ? moment.day : new Date(`${time.wallOf(moment.at, zone).slice(0, 19)}Z`);
+        drawing.current = true;
+        try {
+            api.select({
+                start: toGrid(range.start),
+                end: toGrid(range.end),
+                allDay: range.start.allDay
+            });
+        } finally {
+            drawing.current = false;
+        }
+    };
+
+    // The highlight follows the screen's range.
+    useEffect(() => {
+        redraw(props.selection);
+        // `redraw` reads everything else through refs.
+    }, [props.selection]);
 
     useEffect(() => {
         const api = calendar.current?.getApi();
@@ -154,7 +233,7 @@ export default function GridView(props: GridViewProps) {
     );
 
     return (
-        <div className="pc-grid h-full min-h-0">
+        <div ref={root} className="pc-grid h-full min-h-0">
             <style>{GRID_CSS}</style>
             <FullCalendar
                 ref={calendar}
@@ -236,11 +315,22 @@ export default function GridView(props: GridViewProps) {
                 selectLongPressDelay={350}
                 eventLongPressDelay={350}
                 droppable
+                unselectAuto={false}
+                datesSet={() =>
+                    requestAnimationFrame(() =>
+                        markCells(root.current, propsRef.current.anchor, propsRef.current.words.day)
+                    )
+                }
                 eventAllow={(drop, dragged) => (dragged ? drop.allDay === dragged.allDay : true)}
                 events={events}
                 eventDidMount={(arg) => {
                     const label = (arg.event.extendedProps as { label?: string }).label;
-                    if (label) arg.el.setAttribute("aria-label", label);
+                    arg.el.setAttribute("data-event-id", arg.event.id);
+                    if (label) {
+                        arg.el.setAttribute("aria-label", label);
+                        // A title cut short by its box is still readable on hover.
+                        arg.el.setAttribute("title", label);
+                    }
                     arg.el.addEventListener("focus", () =>
                         propsRef.current.onItemFocus(arg.event.id)
                     );
@@ -254,19 +344,24 @@ export default function GridView(props: GridViewProps) {
                     );
                 }}
                 select={(arg: DateSelectArg) => {
+                    if (drawing.current) return;
                     const zone = propsRef.current.zone;
                     const target =
                         arg.jsEvent?.target instanceof Element
                             ? arg.jsEvent.target.getBoundingClientRect()
                             : null;
-                    propsRef.current.onSelectRange(
-                        {
-                            start: moment(arg.start, arg.allDay, zone),
-                            end: moment(arg.end, arg.allDay, zone)
-                        },
-                        target
-                    );
+                    const range = {
+                        start: moment(arg.start, arg.allDay, zone),
+                        end: moment(arg.end, arg.allDay, zone)
+                    };
+                    // Highlighted until the screen says otherwise: it holds the
+                    // range while its card is open, and clears it after.
+                    drawn.current = range;
+                    if (propsRef.current.onSelectRange(range, target)) return;
+                    const held = propsRef.current.selection;
+                    drawn.current = null;
                     calendar.current?.getApi().unselect();
+                    if (held) requestAnimationFrame(() => redraw(held));
                 }}
                 eventDrop={(arg: EventDropArg) => {
                     const zone = propsRef.current.zone;

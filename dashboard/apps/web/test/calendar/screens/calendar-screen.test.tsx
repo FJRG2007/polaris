@@ -275,4 +275,25 @@ describe("the calendar screen", () => {
         expect(grid().getAttribute("data-view")).toBe("week");
         expect(grid().getAttribute("data-anchor")).toBe("2026-10-07");
     });
+
+    it("points a first-time reader at linking their other calendars, until they close the tip", async () => {
+        render(<CalendarScreen path={["week", "2026-10-07"]} />, { wrapper: MessagesWrapper });
+        await settle();
+        await screen.findByTestId("grid");
+        const tip = await screen.findByRole("note");
+        expect(tip.textContent).toContain("Bring in your other calendars");
+        expect(screen.getAllByRole("button", { name: "Add a calendar" }).length).toBeGreaterThan(0);
+        fireEvent.click(screen.getByRole("button", { name: "Hide this tip" }));
+        await settle();
+        expect(savedPreferences).toHaveBeenCalledWith({ dismissedHints: ["link-accounts"] });
+        expect(screen.queryByRole("note")).toBeNull();
+    });
+
+    it("says nothing about linking once the tip was closed", async () => {
+        preferences = { ...preferences, dismissedHints: ["link-accounts"] };
+        render(<CalendarScreen path={["week", "2026-10-07"]} />, { wrapper: MessagesWrapper });
+        await settle();
+        await screen.findByTestId("grid");
+        expect(screen.queryByRole("note")).toBeNull();
+    });
 });

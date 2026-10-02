@@ -1,4 +1,16 @@
 {
+    "addMenu": {
+        "askAdmin": "Aún sin configurar. Pídeselo a tu administrador.",
+        "caldav": "Servidor CalDAV",
+        "caldavHint": "iCloud, Fastmail, Nextcloud, Yahoo",
+        "google": "De una cuenta de Google",
+        "holidays": "Calendarios festivos",
+        "import": "Importar archivo (.ics)",
+        "microsoft": "De Microsoft",
+        "setUpFirst": "Aún sin configurar. Configura {provider} primero.",
+        "subscribe": "Suscribirse por URL (.ics)",
+        "unreadable": "No se pudo comprobar. Inténtalo de nuevo."
+    },
     "attendeeEditor": {
         "add": "Invitar a gente",
         "addButton": "Invitar",
@@ -202,6 +214,36 @@
         "unreadable": "{count, plural, one {# evento no se ha podido leer y no se muestra.} other {# eventos no se han podido leer y no se muestran.}}",
         "week": "Sem"
     },
+    "gridMenu": {
+        "answers": {
+            "ACCEPTED": "Aceptar",
+            "DECLINED": "Rechazar",
+            "TENTATIVE": "Quizás"
+        },
+        "color": "Cambiar color",
+        "colorOption": "Color {color}",
+        "copied": "Evento copiado. Haz clic derecho en un día o una hora para pegarlo.",
+        "copy": "Copiar",
+        "delete": "Borrar",
+        "download": "Bajar .ics",
+        "duplicate": "Duplicar",
+        "edit": "Editar",
+        "goToDay": "Ir a este día",
+        "label": "Acciones del calendario",
+        "move": "Mover a calendario",
+        "movedTo": "Movido a {name}",
+        "newAllDay": "Evento de todo el día",
+        "newEvent": "Nuevo evento aquí",
+        "newInRange": "Nuevo evento en el rango",
+        "newTask": "Nueva tarea aquí",
+        "open": "Abrir",
+        "openTask": "Abrir tarea",
+        "paste": "Pegar {title}",
+        "pasteFailed": "El evento no se pegó",
+        "pasted": "Evento pegado",
+        "respond": "Responder",
+        "wholeSeries": "Todos los de la serie"
+    },
     "header": {
         "calendars": "Calendarios",
         "goTo": "{label}. Ir a una fecha",
@@ -232,6 +274,24 @@
         "sample": "Evento",
         "task": "Tarea con fecha",
         "tentative": "Provisional, o dijiste quizá"
+    },
+    "linkHint": {
+        "dismiss": "Ocultar consejo",
+        "text": "Trae tus otros calendarios: Google, Microsoft, iCloud o cualquier servidor CalDAV o enlace .ics."
+    },
+    "newTask": {
+        "create": "Crear tarea",
+        "created": "{reference} creada",
+        "due": "Vence {when}",
+        "list": "Lista",
+        "listsFailed": "No se pudieron cargar tus listas de Tareas.",
+        "loading": "Cargando tus listas",
+        "name": "Nombre",
+        "namePlaceholder": "Qué hay que hacer",
+        "noLists": "Aún no tienes ninguna lista donde añadir tareas. <tasks>Abre Tareas</tasks> para crear una.",
+        "noTasks": "Tu cuenta no puede crear tareas.",
+        "open": "Abrir",
+        "title": "Nueva tarea"
     },
     "popover": {
         "chooseCalendar": "Elige antes un calendario",
@@ -377,6 +437,11 @@
         "searching": "Buscando en todo"
     },
     "settingsPage": {
+        "accounts": "Cuentas",
+        "accountsLead": "Las cuentas de Google, Microsoft y CalDAV y las suscripciones de las que vienen tus calendarios.",
+        "accountsManage": "Gestionar",
+        "accountsMore": "{count, plural, one {# más} other {# más}}",
+        "accountsNone": "Aún no hay ninguna cuenta vinculada.",
         "addClock": "Añadir reloj",
         "addRange": "Añadir horas",
         "all": "Todos",
@@ -451,7 +516,9 @@
         "labels": {
             "addCalendar": "Crear calendario",
             "close": "Cerrar",
+            "copy": "Copiar el evento elegido",
             "create": "Nuevo evento",
+            "createHere": "Nuevo evento en el día activo",
             "day": "Ver día",
             "days": "Ver a medida",
             "delete": "Borrar evento elegido",
@@ -460,9 +527,12 @@
             "goTo": "Ir a una fecha",
             "help": "Esta lista",
             "list": "Ver lista",
+            "menu": "Abrir el menú",
             "month": "Ver mes",
+            "moveFocus": "Moverse entre días",
             "next": "Periodo siguiente",
             "open": "Abrir evento elegido",
+            "paste": "Pegar en el día activo",
             "previous": "Periodo anterior",
             "refresh": "Actualizar",
             "save": "Guardar, en el editor",
@@ -503,6 +573,7 @@
         "left": "{name} ya no está en tu lista",
         "linked": "{account}",
         "loadFailed": "No se han podido cargar los calendarios.",
+        "manageAccount": "Gestionar cuenta",
         "menu": "Opciones de {name}",
         "mine": "Mis calendarios",
         "moveDown": "Bajar",
@@ -527,6 +598,7 @@
         "show": "Mostrar {name}",
         "subscriptions": "Suscripciones",
         "syncProblem": "Error al sincronizar",
+        "syncProblemFix": "La última sincronización falló. Abre las cuentas para arreglarlo.",
         "tasksFailed": "No se han podido cargar las tareas.",
         "toggleFailed": "No se ha mostrado ni ocultado el calendario",
         "unmute": "Activar avisos",
