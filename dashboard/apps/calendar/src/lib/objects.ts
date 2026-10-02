@@ -15,7 +15,7 @@ import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { CalendarRefusal } from "./errors";
 import { afterObjectChange } from "./effects";
-import { requireCalendar, requireWritableCalendar, type SessionUser } from "./access";
+import { reaches, requireCalendar, requireWritableCalendar, type SessionUser } from "./access";
 
 /** The row a write starts from. */
 export interface StoredObject {
@@ -454,7 +454,7 @@ export async function pasteEvent(
         select: STORED
     });
     if (!row || row.deletedAt) throw new CalendarRefusal(t("errors.eventNotFound"));
-    await requireCalendar(user.id, row.calendarId, "read");
+    const source = await requireCalendar(user.id, row.calendarId, "read");
     const target = await requireWritableCalendar(user.id, input.calendarId);
     const item = await itemOf(row);
     if (item.component !== "VEVENT") throw new CalendarRefusal(t("errors.notAnEvent"));
@@ -465,6 +465,8 @@ export async function pasteEvent(
         item.master ??
         item.overrides[0];
     if (!base) throw new CalendarRefusal(t("errors.notAnEvent"));
+    if (!reaches(source.reach, "write") && base.classification !== "PUBLIC")
+        throw new CalendarRefusal(t("errors.busyOnly"));
     const {
         uid: _uid,
         recurrenceId: _recurrenceId,

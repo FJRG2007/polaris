@@ -872,7 +872,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
     /** A whole day, as a range of the grid. */
     const dayRange = (day: string): GridRange => ({
         start: { at: time.dayStart(day, zone), day, allDay: true },
-        end: { at: time.dayStart(time.addDays(day, 1), zone), day: time.addDays(day, 1), allDay: true }
+        end: {
+            at: time.dayStart(time.addDays(day, 1), zone),
+            day: time.addDays(day, 1),
+            allDay: true
+        }
     });
 
     /** What a range reads as at the top of the menu. */
@@ -880,15 +884,19 @@ export function CalendarScreen({ path }: { path: string[] }) {
         if (range.start.allDay) {
             const last = time.addDays(range.end.day, -1);
             return last > range.start.day
-                ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).formatRange(
-                      time.dayDate(range.start.day),
-                      time.dayDate(last)
-                  )
+                ? new Intl.DateTimeFormat(locale, {
+                      dateStyle: "medium",
+                      timeZone: "UTC"
+                  }).formatRange(time.dayDate(range.start.day), time.dayDate(last))
                 : time.formatDay(range.start.day, locale, { dateStyle: "full" });
         }
-        const slot = range.end.at.getTime() - range.start.at.getTime() <= preferences.slotMinutes * 60_000;
+        const slot =
+            range.end.at.getTime() - range.start.at.getTime() <= preferences.slotMinutes * 60_000;
         return slot
-            ? time.formatInstant(range.start.at, locale, zone, { dateStyle: "full", timeStyle: "short" })
+            ? time.formatInstant(range.start.at, locale, zone, {
+                  dateStyle: "full",
+                  timeStyle: "short"
+              })
             : new Intl.DateTimeFormat(locale, {
                   dateStyle: "medium",
                   timeStyle: "short",
@@ -917,7 +925,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
             : (() => {
                   const start = target.time
                       ? {
-                            at: time.gridInstant(new Date(`${target.day}T${target.time}:00Z`), zone),
+                            at: time.gridInstant(
+                                new Date(`${target.day}T${target.time}:00Z`),
+                                zone
+                            ),
                             day: target.day,
                             allDay: false
                         }
@@ -957,7 +968,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
         if (source.allDay && source.startDate) {
             const days = Math.max(
                 1,
-                time.daysBetween(source.startDate, source.endDate ?? time.addDays(source.startDate, 1))
+                time.daysBetween(
+                    source.startDate,
+                    source.endDate ?? time.addDays(source.startDate, 1)
+                )
             );
             start = { date: at.day };
             end = { date: time.addDays(at.day, days) };
@@ -970,7 +984,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
             const length = new Date(source.end).getTime() - new Date(source.start).getTime();
             start = { dateTime: time.wallOf(startAt, zone).slice(0, 19), tzid: zone };
             end = {
-                dateTime: time.wallOf(new Date(startAt.getTime() + Math.max(length, 60_000)), zone).slice(0, 19),
+                dateTime: time
+                    .wallOf(new Date(startAt.getTime() + Math.max(length, 60_000)), zone)
+                    .slice(0, 19),
                 tzid: zone
             };
         }
@@ -1065,8 +1081,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
         const moved = await changeShown(
             occurrence.objectId,
             (entry) => ({ ...entry, calendarId }),
-            () =>
-                eventActions.moveEventAction({ objectId: occurrence.objectId, calendarId, zone }),
+            () => eventActions.moveEventAction({ objectId: occurrence.objectId, calendarId, zone }),
             t("grid.moveFailed")
         );
         if (!moved) return;
@@ -1141,21 +1156,25 @@ export function CalendarScreen({ path }: { path: string[] }) {
     };
 
     // Ctrl/Cmd+C on the selected event, when no text is selected to copy instead.
+    const copyRef = useRef({ selected, copyOccurrence });
+    copyRef.current = { selected, copyOccurrence };
     useEffect(() => {
         const listener = (event: KeyboardEvent) => {
             if (!(event.ctrlKey || event.metaKey) || event.altKey || event.defaultPrevented) return;
             if (event.key.toLowerCase() !== "c") return;
+            const { selected, copyOccurrence } = copyRef.current;
             const item = selected?.item;
             if (item?.kind !== "event" || item.occurrence.busyOnly) return;
             const target = event.target as HTMLElement | null;
-            if (target?.closest?.("input, textarea, [contenteditable='true'], [role='dialog']")) return;
+            if (target?.closest?.("input, textarea, [contenteditable='true'], [role='dialog']"))
+                return;
             if (window.getSelection()?.toString()) return;
             event.preventDefault();
             copyOccurrence(item.occurrence);
         };
         document.addEventListener("keydown", listener);
         return () => document.removeEventListener("keydown", listener);
-    });
+    }, []);
 
     const openSearchResult = (result: SearchResult) => {
         if (result.day && (result.day < span.start || result.day >= span.end))
@@ -1485,7 +1504,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                 title={t("linkHint.dismiss")}
                                 onClick={() =>
                                     void savePreferences({
-                                        dismissedHints: [...preferences.dismissedHints, "link-accounts"]
+                                        dismissedHints: [
+                                            ...preferences.dismissedHints,
+                                            "link-accounts"
+                                        ]
                                     })
                                 }
                             >
@@ -1543,65 +1565,66 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                 showsOnlyDay={(day) => view === "day" && anchor === day}
                                 actions={menuActions}
                             >
-                            <Suspense fallback={<GridSkeleton />}>
-                                <GridView
-                                    view={view}
-                                    anchor={anchor}
-                                    customDays={preferences.customDays}
-                                    zone={zone}
-                                    secondaryZone={preferences.secondaryTimezone}
-                                    locale={locale}
-                                    hour12={hour12}
-                                    firstDay={firstDay}
-                                    showWeekends={preferences.showWeekends}
-                                    showWeekNumbers={preferences.showWeekNumbers}
-                                    slotMinutes={preferences.slotMinutes}
-                                    dayStart={preferences.dayStart}
-                                    eventLimit={preferences.eventLimit}
-                                    businessHours={businessHours}
-                                    events={events}
-                                    selectedId={selected?.id ?? null}
-                                    selection={selection}
-                                    words={{
-                                        allDay: t("grid.allDay"),
-                                        noEvents: t("grid.noEvents"),
-                                        week: t("grid.week"),
-                                        more: (count) => t("grid.more", { count }),
-                                        secondaryZone: t("grid.secondaryZone", {
-                                            zone: preferences.secondaryTimezone ?? ""
-                                        }),
-                                        day: (day) =>
-                                            time.formatDay(day, locale, { dateStyle: "full" })
-                                    }}
-                                    onSelectRange={(range, anchorRect) => {
-                                        if (
-                                            menuOpen ||
-                                            Date.now() - menuOpenedAt.current < MENU_SETTLE_MS
-                                        )
-                                            return false;
-                                        startCreate(range.start, range.end, anchorRect);
-                                        return true;
-                                    }}
-                                    onItemClick={(item, id, anchorRect) =>
-                                        openItem(item, id, anchorRect)
-                                    }
-                                    onItemFocus={(id) => {
-                                        const found = events.find((event) => event.id === id);
-                                        if (found)
-                                            setSelected({
-                                                id,
-                                                item: (found.extendedProps as { item: GridItem })
-                                                    .item
-                                            });
-                                    }}
-                                    onChange={(change) => void applyChange(change)}
-                                    onTaskDrop={(taskId, at) => void scheduleTask(taskId, at)}
-                                    onOpenDay={(day, next) => {
-                                        setAnchor(day);
-                                        chooseView(next);
-                                    }}
-                                />
-                            </Suspense>
+                                <Suspense fallback={<GridSkeleton />}>
+                                    <GridView
+                                        view={view}
+                                        anchor={anchor}
+                                        customDays={preferences.customDays}
+                                        zone={zone}
+                                        secondaryZone={preferences.secondaryTimezone}
+                                        locale={locale}
+                                        hour12={hour12}
+                                        firstDay={firstDay}
+                                        showWeekends={preferences.showWeekends}
+                                        showWeekNumbers={preferences.showWeekNumbers}
+                                        slotMinutes={preferences.slotMinutes}
+                                        dayStart={preferences.dayStart}
+                                        eventLimit={preferences.eventLimit}
+                                        businessHours={businessHours}
+                                        events={events}
+                                        selectedId={selected?.id ?? null}
+                                        selection={selection}
+                                        words={{
+                                            allDay: t("grid.allDay"),
+                                            noEvents: t("grid.noEvents"),
+                                            week: t("grid.week"),
+                                            more: (count) => t("grid.more", { count }),
+                                            secondaryZone: t("grid.secondaryZone", {
+                                                zone: preferences.secondaryTimezone ?? ""
+                                            }),
+                                            day: (day) =>
+                                                time.formatDay(day, locale, { dateStyle: "full" })
+                                        }}
+                                        onSelectRange={(range, anchorRect) => {
+                                            if (
+                                                menuOpen ||
+                                                Date.now() - menuOpenedAt.current < MENU_SETTLE_MS
+                                            )
+                                                return false;
+                                            startCreate(range.start, range.end, anchorRect);
+                                            return true;
+                                        }}
+                                        onItemClick={(item, id, anchorRect) =>
+                                            openItem(item, id, anchorRect)
+                                        }
+                                        onItemFocus={(id) => {
+                                            const found = events.find((event) => event.id === id);
+                                            if (found)
+                                                setSelected({
+                                                    id,
+                                                    item: (
+                                                        found.extendedProps as { item: GridItem }
+                                                    ).item
+                                                });
+                                        }}
+                                        onChange={(change) => void applyChange(change)}
+                                        onTaskDrop={(taskId, at) => void scheduleTask(taskId, at)}
+                                        onOpenDay={(day, next) => {
+                                            setAnchor(day);
+                                            chooseView(next);
+                                        }}
+                                    />
+                                </Suspense>
                             </GridMenu>
                         </div>
                     )}

@@ -64,7 +64,7 @@ export const SHORTCUT_ROWS = [
     { keys: ["k", "p"], label: "previous" },
     { keys: ["j", "n"], label: "next" },
     { keys: ["t"], label: "today" },
-    { keys: ["g"], label: "goTo" },
+    { keys: ["g"], label: "goTo" }, // i18n-ignore: a catalog key
     { keys: ["1", "d"], label: "day" },
     { keys: ["2", "w"], label: "week" },
     { keys: ["3", "m"], label: "month" },
@@ -78,15 +78,15 @@ export const SHORTCUT_ROWS = [
     { keys: ["/"], label: "search" },
     { keys: ["r"], label: "refresh" },
     { keys: ["s"], label: "settings" },
-    { keys: ["+"], label: "addCalendar" },
+    { keys: ["+"], label: "addCalendar" }, // i18n-ignore: a catalog key
     { keys: ["?"], label: "help" },
     { keys: ["Esc"], label: "close" }
 ] as const;
 
 /** The grid's own, on a focused day or event (`grid-menu.tsx`). */
 export const GRID_SHORTCUT_ROWS = [
-    { keys: ["Left", "Right", "Up", "Down"], label: "moveFocus" },
-    { keys: ["Enter"], label: "createHere" },
+    { keys: ["Left", "Right", "Up", "Down"], label: "moveFocus" }, // i18n-ignore: a catalog key
+    { keys: ["Enter"], label: "createHere" }, // i18n-ignore: a catalog key
     { keys: ["Shift+F10"], label: "menu" }
 ] as const;
 
@@ -100,7 +100,7 @@ export const CLIPBOARD_SHORTCUT_ROWS = [
 export const EDITOR_SHORTCUT_ROWS = [
     { keys: ["Enter"], label: "save" },
     { keys: ["S"], label: "save" },
-    { keys: ["Delete"], label: "deleteEvent" },
+    { keys: ["Delete"], label: "deleteEvent" }, // i18n-ignore: a catalog key
     { keys: ["D"], label: "duplicate" }
 ] as const;
 

@@ -157,7 +157,7 @@ export async function pasteEventAction(input: unknown): Promise<Outcome<{ object
               ? engine.valueToInstant(end, parsed.data.zone).getTime() >
                 engine.valueToInstant(start, parsed.data.zone).getTime()
               : false;
-    if (!ordered) return invalid([{ message: "endBeforeStart" }]);
+    if (!ordered) return invalid([{ message: engine.SCHEMA_MESSAGES.endBeforeStart }]);
     return outcome(async () => ({
         objectId: await objects.pasteEvent(await requireCalendarUser(), {
             objectId: parsed.data.objectId,

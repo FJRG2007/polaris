@@ -4,6 +4,7 @@
     },
     "errors": {
         "alreadyThere": "That calendar already has this event.",
+        "busyOnly": "Only the busy time of this event is shared with you, so it cannot be copied.",
         "calendarNotFound": "That calendar is not available.",
         "changedMeanwhile": "This event changed since you opened it. Reopen it to see the latest.",
         "checkInput": "Check what you entered and try again.",
