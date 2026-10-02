@@ -17,10 +17,11 @@
  * so they run on the server; this sends the bytes it already fetched and is
  * handed the pages back.
  *
- * The drawing is GenOffice's own (Apache-2.0, see NOTICE) - the same component
- * its slides editor uses for thumbnails, which is why a page here and a page
- * there are identical. It draws to a canvas and needs no bridge of any kind, so
- * it is eighty kilobytes rather than the three megabytes of the whole editor.
+ * The drawing is GenOffice's own (github.com/genspark-ai/genoffice,
+ * Apache-2.0) - the same component its slides editor uses for thumbnails,
+ * which is why a page here and a page there are identical. It draws to a canvas
+ * and needs no bridge of any kind, so it is eighty kilobytes rather than the
+ * three megabytes of the whole editor.
  *
  * Read-only. Writing a .pptx back is a separate piece of work and this claims
  * none of it.

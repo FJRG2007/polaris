@@ -8,10 +8,11 @@
 /**
  * The shape of a pivot table, as a workbook stores one.
  *
- * Ported from GenSpark's GenOffice (Apache-2.0) - see NOTICE. Only the shape,
- * not the reader that fills it in: `PivotDefinition` is what the recompute
- * engine consumes, and the OOXML parser that produces one from a `.xlsx` is a
- * separate concern that arrives with the import work.
+ * Ported from GenSpark's GenOffice (github.com/genspark-ai/genoffice,
+ * Apache-2.0). Only the shape, not the reader that fills it in:
+ * `PivotDefinition` is what the recompute engine consumes, and the OOXML parser
+ * that produces one from a `.xlsx` is a separate concern that arrives with the
+ * import work.
  *
  * Everything here is a type. The engine beside it is where the behaviour is.
  */

@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Page, slide and PDF geometry: pagination, snapping, text lines and columns. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "description": "Page, slide and PDF geometry: pagination, snapping, text lines and columns. Ported from GenOffice (Apache-2.0) - github.com/genspark-ai/genoffice.",
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",

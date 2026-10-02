@@ -4,10 +4,11 @@
  * The full Markdown editor, over a file in Drive.
  *
  * The editor itself is GenOffice's (`@polaris/genoffice-markdown`, Apache-2.0,
- * see NOTICE) - slash commands, tables, maths, a table of contents, the things a
- * plain textarea does not have. It was written for Electron and reads and writes
- * through `window.markdownApi`, an object a preload script injects; this is that
- * object, implemented for a browser and answered by Drive.
+ * github.com/genspark-ai/genoffice) - slash commands, tables, maths, a table of
+ * contents, the things a plain textarea does not have. It was written for
+ * Electron and reads and writes through `window.markdownApi`, an object a
+ * preload script injects; this is that object, implemented for a browser and
+ * answered by Drive.
  *
  * **It is an alternative, not a replacement.** The Pretty and Raw views and the
  * plain editor beside it are unchanged and are what most people want for a

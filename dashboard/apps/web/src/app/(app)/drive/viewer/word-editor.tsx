@@ -3,11 +3,12 @@
 /**
  * Editing a Word document in Drive.
  *
- * The editor is GenOffice's (`@polaris/genoffice-docs`, Apache-2.0, see NOTICE)
- * and the writer under it is `@polaris/docx`, which patches paragraphs into the
- * original package rather than rebuilding one - so a document saved from here
- * keeps the styles, the numbering, the headers and everything else it arrived
- * with, including the parts nothing in this repository understands.
+ * The editor is GenOffice's (`@polaris/genoffice-docs`, Apache-2.0,
+ * github.com/genspark-ai/genoffice) and the writer under it is `@polaris/docx`,
+ * which patches paragraphs into the original package rather than rebuilding
+ * one - so a document saved from here keeps the styles, the numbering, the
+ * headers and everything else it arrived with, including the parts nothing in
+ * this repository understands.
  *
  * That is what makes this possible at all, and it is why the read-only note on
  * `doc-view` was true when it was written and is not any more: "no open-source

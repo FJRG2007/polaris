@@ -2,12 +2,12 @@
  * The spreadsheet engine's other half: everything a workbook can do that the
  * grid itself does not.
  *
- * **Ported from GenOffice** (github.com/genspark-ai/genoffice, Apache-2.0 - see
- * `NOTICE` at the root of this repository). Polaris' spreadsheet is built on
- * Univer, whose open edition ships the grid, the formulas and the formatting and
- * deliberately does not ship pivot tables, charts, flash fill or range sorting -
- * those are what its makers sell. GenOffice had written exactly those, as pure
- * TypeScript with no framework in it, under a licence that lets them be used.
+ * **Ported from GenOffice** (github.com/genspark-ai/genoffice, Apache-2.0).
+ * Polaris' spreadsheet is built on Univer, whose open edition ships the grid,
+ * the formulas and the formatting and deliberately does not ship pivot tables,
+ * charts, flash fill or range sorting - those are what its makers sell.
+ * GenOffice had written exactly those, as pure TypeScript with no framework in
+ * it, under a licence that lets them be used.
  *
  * So they are here rather than reimplemented, and rather than bought:
  *

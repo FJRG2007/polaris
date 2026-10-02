@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "GenOffice's docs editor, its renderer half. Ported from GenOffice (Apache-2.0) - see NOTICE. Not wired to a route: the bridge it talks to is an Electron channel, and Polaris' equivalent is server actions.",
+    "description": "GenOffice's docs editor, its renderer half. Ported from GenOffice (Apache-2.0) - github.com/genspark-ai/genoffice. Not wired to a route: the bridge it talks to is an Electron channel, and Polaris' equivalent is server actions.",
     "exports": {
         ".": {
             "types": "./dist/App.d.ts",

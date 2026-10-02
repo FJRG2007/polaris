@@ -1,10 +1,11 @@
 /**
  * A document or a deck, as the real Office package.
  *
- * `@polaris/docx` and `@polaris/pptx` are ported from GenOffice (Apache-2.0, see
- * NOTICE) and are the OOXML engines proper: a blank package they build has the
- * styles, the numbering, the sections, the master, the layout and the theme that
- * a reader other than the one it was tested against will go looking for.
+ * `@polaris/docx` and `@polaris/pptx` are ported from GenOffice (Apache-2.0,
+ * github.com/genspark-ai/genoffice) and are the OOXML engines proper: a blank
+ * package they build has the styles, the numbering, the sections, the master,
+ * the layout and the theme that a reader other than the one it was tested
+ * against will go looking for.
  *
  * What was here before was a zip with the four parts that make a file open. It
  * opened, and it was a document with no styles in it - every heading the same
