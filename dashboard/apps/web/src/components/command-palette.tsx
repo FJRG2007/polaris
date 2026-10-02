@@ -35,8 +35,18 @@ import {
     type SearchScopeDefinition
 } from "@/lib/search/scopes";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import { CommandRow, EntryRow, HitRow, HitSkeleton, RecentRow } from "@/components/search-rows";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import {
+    ClockRow,
+    clockCommandText,
+    CommandRow,
+    EntryRow,
+    HitRow,
+    HitSkeleton,
+    RecentRow
+} from "@/components/search-rows";
+import { useToast } from "@polaris/ui";
+import { useDisplayFormat } from "@/components/display-format";
 import {
     COMMAND_ENTRY_FIELDS,
     navigationEntries,
@@ -95,6 +105,7 @@ function rememberLookup(key: string, hits: SearchHit[]): void {
 /** One line of the panel. Everything the arrow keys move through is one of these. */
 type Row =
     | { kind: "command"; id: string; group: string; scope: SearchScopeDefinition }
+    | { kind: "clock"; id: string; group: string; command: core.ClockCommand }
     | { kind: "entry"; id: string; group: string; entry: CommandEntry }
     | { kind: "hit"; id: string; group: string; hit: SearchHit }
     | { kind: "recent"; id: string; group: string; entry: core.RecentSearch };
@@ -143,6 +154,9 @@ export function CommandPalette({
     const router = useRouter();
     const pathname = usePathname();
     const t = useTranslations("components");
+    const locale = useLocale();
+    const toast = useToast();
+    const display = useDisplayFormat();
     const navLabel = useNavLabel();
     const [open, setOpen] = useState(false);
     /** The scope the panel is to open on, when whatever opened it asked for one. */
@@ -384,6 +398,13 @@ export function CommandPalette({
 
     const suggestions = useMemo(() => (scope ? [] : commandSuggestions(query)), [scope, query]);
 
+    // "timer 10m", "alarm 7:30", "stopwatch": Calendar's Time area, for whoever
+    // has Calendar. Read here to offer the row; the route reads it again.
+    const clockCommand = useMemo(
+        () => (scope || !fromKey(appKey).includes("calendar") ? null : core.parseClockCommand(query)),
+        [scope, query, appKey]
+    );
+
     /** Earlier searches, narrowed to the command in hand and to what is typed. */
     const recentRows = useMemo(() => {
         const matching = recent.filter((entry) => {
@@ -454,8 +475,12 @@ export function CommandPalette({
                 entry
             }));
 
-        return [...remembered, ...commands, ...found];
-    }, [recentRows, suggestions, scope, hits, trimmed, query, pool, navigation, t, navLabel]);
+        const clock: Row[] = clockCommand
+            ? [{ kind: "clock", id: `clock:${clockCommand.kind}`, group: t("search.actions"), command: clockCommand }]
+            : [];
+
+        return [...clock, ...remembered, ...commands, ...found];
+    }, [recentRows, suggestions, scope, hits, trimmed, query, pool, navigation, t, navLabel, clockCommand]);
 
     const groups = useMemo(() => groupRows(rows), [rows]);
     /** Rows that are an answer rather than a memory or a command. */
@@ -475,8 +500,53 @@ export function CommandPalette({
             ?.scrollIntoView({ block: "nearest" });
     }, [active, rows]);
 
+    /** Start what a typed clock command says, and say so - or why it could not. */
+    function runClock(command: core.ClockCommand): void {
+        openedRef.current = true;
+        setOpen(false);
+        // The zone this person reads times in: their choice, else this device's.
+        const chosen = display.preferences.timeZone;
+        const zone =
+            chosen && chosen !== core.AUTOMATIC_TIME_ZONE
+                ? chosen
+                : Intl.DateTimeFormat().resolvedOptions().timeZone;
+        void fetch("/api/calendar/time/quick", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ command: trimmed, zone })
+        })
+            .then(async (response) => {
+                const body = (await response.json().catch(() => ({}))) as { error?: string };
+                if (!response.ok) throw new Error(body.error || t("search.clock.failed"));
+                // The header's indicator and any open Time screen read again.
+                window.dispatchEvent(new CustomEvent("polaris:clock-changed"));
+                if (typeof BroadcastChannel !== "undefined") {
+                    const channel = new BroadcastChannel("polaris-clock");
+                    channel.postMessage("changed");
+                    channel.close();
+                }
+                const href = `/calendar/time?tab=${command.kind === "alarm" ? "alarms" : command.kind === "timer" ? "timers" : "stopwatch"}`;
+                toast.show({
+                    key: "search-clock",
+                    title: t("search.clock.done"),
+                    body: clockCommandText(command, t, locale),
+                    onPress: () => router.push(href)
+                });
+            })
+            .catch((caught: unknown) =>
+                toast.show({
+                    key: "search-clock",
+                    title: caught instanceof Error && caught.message ? caught.message : t("search.clock.failed")
+                })
+            );
+    }
+
     function go(row: Row | undefined): void {
         if (!row) return;
+        if (row.kind === "clock") {
+            runClock(row.command);
+            return;
+        }
         if (row.kind === "command") {
             setScope(row.scope);
             setQuery("");
@@ -735,6 +805,19 @@ export function CommandPalette({
                                             const selected = position === active;
                                             const select = () => go(row);
                                             const hover = () => setActive(position);
+                                            if (row.kind === "clock") {
+                                                return (
+                                                    <ClockRow
+                                                        key={row.id}
+                                                        id={rowElementId(row)}
+                                                        command={row.command}
+                                                        text={clockCommandText(row.command, t, locale)}
+                                                        selected={selected}
+                                                        onSelect={select}
+                                                        onHover={hover}
+                                                    />
+                                                );
+                                            }
                                             if (row.kind === "command") {
                                                 return (
                                                     <CommandRow

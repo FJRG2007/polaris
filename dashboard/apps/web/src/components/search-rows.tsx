@@ -15,8 +15,8 @@
 import { Badge, cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
-import type { RecentSearch } from "@polaris/core";
-import { Clock, CornerDownLeft, X } from "lucide-react";
+import type { ClockCommand, RecentSearch } from "@polaris/core";
+import { AlarmClock, Clock, CornerDownLeft, Timer, Watch, X } from "lucide-react";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -108,6 +108,50 @@ export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDef
             <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none text-muted-foreground">
                 {scope.sigil ?? `/${scope.keywords[0]}`}
             </kbd>
+        </Row>
+    );
+}
+
+/** What a typed clock command will do, in words: "Start a 10 min timer: tea". */
+export function clockCommandText(
+    command: ClockCommand,
+    t: ReturnType<typeof useTranslations>,
+    locale: string
+): string {
+    if (command.kind === "stopwatch") return t("search.clock.stopwatch");
+    if (command.kind === "alarm") {
+        const time = new Intl.DateTimeFormat(locale, {
+            hour: "numeric",
+            minute: "2-digit",
+            timeZone: "UTC"
+        }).format(new Date(Date.UTC(2024, 0, 1, command.hour, command.minute)));
+        const said = t("search.clock.alarm", { time });
+        return command.label ? t("search.clock.labelled", { action: said, label: command.label }) : said;
+    }
+    const seconds = Math.round(command.durationMs / 1000);
+    const length = [
+        Math.floor(seconds / 3600) ? t("search.clock.hours", { count: Math.floor(seconds / 3600) }) : "",
+        Math.floor((seconds % 3600) / 60) ? t("search.clock.minutes", { count: Math.floor((seconds % 3600) / 60) }) : "",
+        seconds % 60 ? t("search.clock.seconds", { count: seconds % 60 }) : ""
+    ]
+        .filter(Boolean)
+        .join(" ");
+    const said = t("search.clock.timer", { length });
+    return command.label ? t("search.clock.labelled", { action: said, label: command.label }) : said;
+}
+
+/** A typed "timer 10m", "alarm 7:30" or "stopwatch", ready to run. */
+export function ClockRow({ text, command, ...row }: RowProps & { text: string; command: ClockCommand }) {
+    const Icon = command.kind === "alarm" ? AlarmClock : command.kind === "timer" ? Timer : Watch;
+    return (
+        <Row {...row} label={text}>
+            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm" title={text}>
+                    {text}
+                </span>
+            </span>
+            <CornerDownLeft className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Row>
     );
 }
