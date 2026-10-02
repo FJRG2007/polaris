@@ -1089,6 +1089,16 @@ export function ListScreen({
             {viewType === "calendar" && <CalendarView {...viewProps} />}
             {viewType === "gantt" && <GanttView {...viewProps} />}
 
+            {/* List and Table say so in their own rows; the board, the calendar
+                and the timeline keep drawing their columns and days, so a
+                search nothing carries would otherwise read as an empty board. */}
+            {needle && rows.length > 0 && visible.length === 0 && viewType !== "list" && viewType !== "table" && (
+                <EmptyState
+                    title={t("search.noMatch", { query: needle })}
+                    description={t("search.noMatchDescription")}
+                />
+            )}
+
             {rows.length === 0 && (
                 <EmptyState
                     title={t("empty.title")}

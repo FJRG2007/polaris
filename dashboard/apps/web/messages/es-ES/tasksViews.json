@@ -80,6 +80,10 @@
         "noMatch": "Ninguna tarea coincide con esta vista.",
         "noMatchDescription": "Cambia los filtros o añade la primera."
     },
+    "search": {
+        "noMatch": "Ninguna tarea contiene “{query}”.",
+        "noMatchDescription": "Cada palabra que escribas debe estar en el nombre, la referencia, la descripción o las etiquetas."
+    },
     "table": {
         "task": "Tarea",
         "status": "Estado",
