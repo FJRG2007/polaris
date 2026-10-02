@@ -69,12 +69,13 @@ const BASE_VIEW: PrivateNetworkView = {
             domain: "api.acme.polaris.internal",
             sameServer: true
         }
-    ]
+    ],
+    crossLinksOffered: true
 };
 
-async function mountReady(overrides: Partial<PrivateNetworkView> = {}) {
+async function mountReady(overrides: Partial<PrivateNetworkView> = {}, id = "service-1") {
     privateNetworkAction.mockResolvedValue({ view: { ...BASE_VIEW, ...overrides }, canEdit: true });
-    render(<PrivateNetworkPanel kind="application" id="service-1" />, { wrapper: MessagesWrapper });
+    render(<PrivateNetworkPanel kind="application" id={id} />, { wrapper: MessagesWrapper });
     await screen.findByText("api.polaris.internal");
 }
 
@@ -90,7 +91,7 @@ describe("the private networking panel", () => {
         expect(screen.getByText("api.polaris.internal")).toBeTruthy();
         expect(screen.getByText("Ready to talk privately")).toBeTruthy();
         expect(screen.getByText("IPv4 & IPv6")).toBeTruthy();
-        expect(screen.getByText(/simply call me/).textContent).toContain("api");
+        expect(screen.getByText(/Also reachable as/).textContent).toContain("api");
         expect(screen.getByText(/reaches port 3000/)).toBeTruthy();
         expect(screen.getByText(/Still answers to/).textContent).toContain("backend");
         expect(screen.getByText("worker")).toBeTruthy();
@@ -208,5 +209,28 @@ describe("the private networking panel", () => {
         await waitFor(() =>
             expect(addCrossLinkAction).toHaveBeenCalledWith("application", "service-1", "svc-2")
         );
+    });
+
+    it("asks before closing a link, and closes it only once agreed to", async () => {
+        const user = userEvent.setup();
+        await mountReady();
+
+        await user.click(screen.getByRole("button", { name: "Close the link with billing" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog.textContent).toContain("loses its connections to this service now");
+        expect(removeCrossLinkAction).not.toHaveBeenCalled();
+
+        removeCrossLinkAction.mockResolvedValueOnce({});
+        await user.click(screen.getByRole("button", { name: "Close link" }));
+        await waitFor(() =>
+            expect(removeCrossLinkAction).toHaveBeenCalledWith("application", "service-1", "link-1")
+        );
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("offers no new link on a server that does not carry them", async () => {
+        await mountReady({ crossLinksOffered: false }, "service-swarm");
+        expect(screen.queryByRole("button", { name: "Allow a service" })).toBeNull();
+        expect(screen.getByText(/not available on Swarm servers/)).toBeTruthy();
     });
 });

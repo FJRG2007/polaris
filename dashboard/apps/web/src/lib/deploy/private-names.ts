@@ -164,6 +164,15 @@ export function namesOn(target: TargetFacts): boolean {
     return target.kind === "local" || !target.hostId ? getCapabilities().privateNames : true;
 }
 
+/**
+ * Whether a target carries links between projects: plain compose only. A swarm
+ * service keeps a link's network in its spec, so a task rescheduled after the
+ * link is closed would join it again, and closing one could not take effect.
+ */
+export function crossLinksOn(target: TargetFacts & { readonly runtime: string }): boolean {
+    return namesOn(target) && target.runtime !== "swarm";
+}
+
 /** The port an application listens on inside its container: the one set on it,
  *  else its first domain's, else its source's default. */
 export function containerPortOf(application: {
@@ -218,7 +227,7 @@ export async function prepareDeployNames(input: {
     readonly privateNetwork: string;
     readonly environment: { readonly id: string; readonly networkMode: string };
     readonly projectSlug: string;
-    readonly target: TargetFacts;
+    readonly target: TargetFacts & { readonly runtime: string };
     readonly kept?: boolean;
 }): Promise<DeployNames> {
     if (!namesOn(input.target))
@@ -229,12 +238,14 @@ export async function prepareDeployNames(input: {
         environmentId: input.environment.id,
         serviceId: input.id
     });
-    const links = await prisma.privateLink.findMany({
-        where: linksOf(input.kind, input.id),
-        select: { id: true, targetKind: true, targetId: true, sourceId: true },
-        orderBy: { createdAt: "asc" },
-        take: CROSS_LINKS_MAX
-    });
+    const links = crossLinksOn(input.target)
+        ? await prisma.privateLink.findMany({
+              where: linksOf(input.kind, input.id),
+              select: { id: true, targetKind: true, targetId: true, sourceId: true },
+              orderBy: { createdAt: "asc" },
+              take: CROSS_LINKS_MAX
+          })
+        : [];
     const networkAliases: Record<string, string[]> =
         labels.length > 0 ? { [own]: namesFor(labels[0]!, labels.slice(1)) } : {};
     for (const link of links) {
@@ -288,7 +299,11 @@ function withLive(
  * panel does not say "Ready" for a release that may still fail or never be
  * promoted. `promoteStagedNames` moves them over once it is the one serving.
  */
-export async function stageNames(applicationId: string, names: readonly string[], deploymentId: string): Promise<void> {
+export async function stageNames(
+    applicationId: string,
+    names: readonly string[],
+    deploymentId: string
+): Promise<void> {
     await changeStored("application", applicationId, (stored) => ({
         ...stored,
         pending: { deploymentId, names: [...names] }
@@ -317,7 +332,10 @@ export async function carryLiveNames(
  * become live. Anything staged for another deployment - one superseded, or a
  * redeploy still on its way - is left as it is.
  */
-export async function promoteStagedNames(applicationId: string, deploymentId: string): Promise<void> {
+export async function promoteStagedNames(
+    applicationId: string,
+    deploymentId: string
+): Promise<void> {
     await changeStored("application", applicationId, (stored) => {
         if (stored.pending?.deploymentId !== deploymentId) return null;
         const { pending, ...rest } = stored;
@@ -412,8 +430,14 @@ async function changeStored(
     for (let attempt = 0; attempt < STORE_ATTEMPTS; attempt++) {
         const row =
             kind === "application"
-                ? await prisma.application.findUnique({ where: { id }, select: { privateNetwork: true } })
-                : await prisma.managedDatabase.findUnique({ where: { id }, select: { privateNetwork: true } });
+                ? await prisma.application.findUnique({
+                      where: { id },
+                      select: { privateNetwork: true }
+                  })
+                : await prisma.managedDatabase.findUnique({
+                      where: { id },
+                      select: { privateNetwork: true }
+                  });
         if (!row) return;
         const next = change(parsePrivateNetwork(row.privateNetwork));
         if (!next) return;
@@ -733,6 +757,8 @@ export interface PrivateNetworkView {
     /** Services of its environment on other servers, which cannot. */
     readonly unreachable: PrivateNetworkPeer[];
     readonly crossLinks: CrossLinkView[];
+    /** Whether its server carries links between projects at all. */
+    readonly crossLinksOffered: boolean;
 }
 
 const STARTING = new Set(["queued", "provisioning", "building", "deploying", "pending"]);
@@ -899,7 +925,8 @@ export async function privateNetworkView(
         crossLinks: links.map(({ serverId, ...link }) => ({
             ...link,
             sameServer: serverId === service.target.id
-        }))
+        })),
+        crossLinksOffered: crossLinksOn(service.target)
     };
 }
 
@@ -1055,7 +1082,11 @@ export async function addCrossLink(
     sourceId: string,
     userId: string
 ): Promise<void> {
-    const select = { targetId: true, environment: { select: { projectId: true } } } as const;
+    const select = {
+        targetId: true,
+        target: { select: { kind: true, hostId: true, runtime: true } },
+        environment: { select: { projectId: true } }
+    } as const;
     const [target, source] = await Promise.all([
         kind === "application"
             ? prisma.application.findUnique({ where: { id }, select })
@@ -1066,13 +1097,15 @@ export async function addCrossLink(
     if (target.environment.projectId === source.environment.projectId)
         throw new PrivateLinkRefusal("sameProject");
     if (target.targetId !== source.targetId) throw new PrivateLinkRefusal("otherServer");
+    if (!crossLinksOn(target.target)) throw new PrivateLinkRefusal("unsupported");
     const key = { targetKind: kind, targetId: id, sourceId };
     if (!(await prisma.privateLink.findUnique({ where: { targetKind_targetId_sourceId: key } }))) {
         const counts = await Promise.all([
             prisma.privateLink.count({ where: linksOf(kind, id) }),
             prisma.privateLink.count({ where: linksOf("application", sourceId) })
         ]);
-        if (counts.some((count) => count >= CROSS_LINKS_MAX)) throw new PrivateLinkRefusal("tooMany");
+        if (counts.some((count) => count >= CROSS_LINKS_MAX))
+            throw new PrivateLinkRefusal("tooMany");
     }
     await prisma.privateLink.upsert({
         where: { targetKind_targetId_sourceId: { targetKind: kind, targetId: id, sourceId } },
@@ -1101,7 +1134,9 @@ export async function revokeCrossLink(link: {
     readonly targetId: string;
 }): Promise<void> {
     const select = {
-        target: { select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true } },
+        target: {
+            select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true }
+        },
         environment: { select: { project: { select: { ownerId: true } } } }
     } as const;
     const service =
@@ -1109,7 +1144,7 @@ export async function revokeCrossLink(link: {
             ? await prisma.managedDatabase.findUnique({ where: { id: link.targetId }, select })
             : await prisma.application.findUnique({ where: { id: link.targetId }, select });
     // A target that is gone has no container left on the link to take off.
-    if (service && namesOn(service.target)) {
+    if (service && crossLinksOn(service.target)) {
         const { getPorts } = await import("./runtime");
         const ports = await getPorts(service.target, service.environment.project.ownerId);
         try {
@@ -1126,7 +1161,15 @@ export async function revokeCrossLink(link: {
 
 /** Why a link was refused, for the action to word. */
 export class PrivateLinkRefusal extends Error {
-    constructor(readonly reason: "missing" | "sameProject" | "otherServer" | "unreachable" | "tooMany") {
+    constructor(
+        readonly reason:
+            | "missing"
+            | "sameProject"
+            | "otherServer"
+            | "unreachable"
+            | "tooMany"
+            | "unsupported"
+    ) {
         super(reason);
     }
 }

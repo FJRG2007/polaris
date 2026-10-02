@@ -130,8 +130,8 @@ function daemon(privateNames: boolean): void {
     });
 }
 
-const LOCAL = { kind: "local", hostId: null };
-const REMOTE = { kind: "host", hostId: "host-1" };
+const LOCAL = { kind: "local", hostId: null, runtime: "compose" };
+const REMOTE = { kind: "host", hostId: "host-1", runtime: "compose" };
 
 beforeEach(() => {
     applications = [
@@ -296,6 +296,22 @@ describe("a deploy's names", () => {
             "api.polaris.internal",
             "api"
         ]);
+    });
+
+    it("leave a swarm service off every link's network, which its spec would keep", async () => {
+        links = [{ id: "l1", targetKind: "application", targetId: "a1", sourceId: "other" }];
+        const given = await names.prepareDeployNames({
+            kind: "application",
+            id: "a1",
+            slug: "api",
+            privateNetwork: "{}",
+            environment: { id: "env-1", networkMode: "environment" },
+            projectSlug: "shop",
+            target: { ...REMOTE, runtime: "swarm" }
+        });
+        expect(given.enabled).toBe(true);
+        expect(given.crossLinks).toEqual([]);
+        expect(given.networkAliases[deploy.crossLinkNetwork("l1")]).toBeUndefined();
     });
 
     it("are off on a machine whose daemon predates them, and on for another server", async () => {
@@ -516,7 +532,10 @@ describe("a release's names", () => {
         // Deploying, or failed: nothing reads them as live.
         expect(names.parsePrivateNetwork(app().privateNetwork).live).toBeUndefined();
         expect(
-            names.referencedDomain({ ...app(), currentDeploymentId: "dep-2", target: LOCAL }, container)
+            names.referencedDomain(
+                { ...app(), currentDeploymentId: "dep-2", target: LOCAL },
+                container
+            )
         ).toBe(container);
 
         // A promotion of another deployment leaves them waiting.
@@ -526,9 +545,15 @@ describe("a release's names", () => {
         await names.promoteStagedNames("a1", "dep-2");
         const stored = names.parsePrivateNetwork(app().privateNetwork);
         expect(stored.pending).toBeUndefined();
-        expect(stored.live).toEqual({ deploymentId: "dep-2", names: ["api.polaris.internal", "api"] });
+        expect(stored.live).toEqual({
+            deploymentId: "dep-2",
+            names: ["api.polaris.internal", "api"]
+        });
         expect(
-            names.referencedDomain({ ...app(), currentDeploymentId: "dep-2", target: LOCAL }, container)
+            names.referencedDomain(
+                { ...app(), currentDeploymentId: "dep-2", target: LOCAL },
+                container
+            )
         ).toBe("api.polaris.internal");
     });
 
@@ -551,7 +576,10 @@ describe("a release's names", () => {
             names: ["api.polaris.internal", "api"]
         });
         expect(
-            names.referencedDomain({ ...app(), currentDeploymentId: "dep-2", target: LOCAL }, container)
+            names.referencedDomain(
+                { ...app(), currentDeploymentId: "dep-2", target: LOCAL },
+                container
+            )
         ).toBe("api.polaris.internal");
     });
 
@@ -574,7 +602,13 @@ describe("closing a link between projects", () => {
     beforeEach(() => {
         cut.length = 0;
         serverAnswers = true;
-        const target = { id: "t1", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "polaris-proxy" };
+        const target = {
+            id: "t1",
+            kind: "local",
+            hostId: null,
+            runtime: "compose",
+            proxyNetwork: "polaris-proxy"
+        };
         Object.assign(databases[0]!, { target, environment: { project: { ownerId: "owner" } } });
         Object.assign(applications[0]!, { target, environment: { project: { ownerId: "owner" } } });
         links = [{ id: "l1", targetKind: "database", targetId: "d1", sourceId: "x9" }];
@@ -588,8 +622,19 @@ describe("closing a link between projects", () => {
 
     it("keeps the link on record, and says so, when the server cannot be told", async () => {
         serverAnswers = false;
-        await expect(names.revokeCrossLink(links[0]!)).rejects.toMatchObject({ reason: "unreachable" });
+        await expect(names.revokeCrossLink(links[0]!)).rejects.toMatchObject({
+            reason: "unreachable"
+        });
         expect(links).toHaveLength(1);
+    });
+
+    it("drops the record on a swarm server, whose services never join a link's network", async () => {
+        serverAnswers = false;
+        const row = databases[0] as unknown as { target: Record<string, unknown> };
+        row.target = { ...row.target, runtime: "swarm" };
+        await names.revokeCrossLink(links[0]!);
+        expect(cut).toEqual([]);
+        expect(links).toEqual([]);
     });
 
     it("only drops the record where nothing could still be on it", async () => {

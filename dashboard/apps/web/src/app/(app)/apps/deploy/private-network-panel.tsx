@@ -17,7 +17,20 @@ import type { ReactNode } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Badge, Button, CopyButton, Input, Select, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    CopyButton,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 import type {
     NamesApplied,
     PrivateNetworkStatus,
@@ -657,6 +670,8 @@ function CrossProjectLinks({
     const [candidates, setCandidates] = useState<{ value: string; label: string }[] | null>(null);
     const [picked, setPicked] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [closing, setClosing] = useState<{ id: string; serviceName: string } | null>(null);
+    const [closeError, setCloseError] = useState<string | null>(null);
     const [pending, start] = useTransition();
 
     function open() {
@@ -696,14 +711,21 @@ function CrossProjectLinks({
         });
     }
 
-    function remove(linkId: string) {
-        setError(null);
+    function ask(link: { id: string; serviceName: string }) {
+        setCloseError(null);
+        setClosing(link);
+    }
+
+    function remove() {
+        if (!closing) return;
+        const linkId = closing.id;
         start(async () => {
             const result = await removeCrossLinkAction(kind, id, linkId);
             if (result.error) {
-                setError(result.error);
+                setCloseError(result.error);
                 return;
             }
+            setClosing(null);
             await onChanged(null);
         });
     }
@@ -713,6 +735,9 @@ function CrossProjectLinks({
         <div className="flex flex-col gap-1.5">
             <h4 className="text-xs font-medium">{t("projects")}</h4>
             <p className="text-xs text-muted-foreground">{t("projectsHint")}</p>
+            {!view.crossLinksOffered && view.status !== "unsupported" && (
+                <p className="text-xs text-muted-foreground">{t("linksSwarm")}</p>
+            )}
             {view.crossLinks.length > 0 && (
                 <ul className="flex flex-col gap-1">
                     {view.crossLinks.map((link) => (
@@ -740,7 +765,7 @@ function CrossProjectLinks({
                                     aria-label={t("removeLink", { service: link.serviceName })}
                                     title={t("removeLink", { service: link.serviceName })}
                                     disabled={pending}
-                                    onClick={() => remove(link.id)}
+                                    onClick={() => ask(link)}
                                 >
                                     <X />
                                 </Button>
@@ -749,7 +774,7 @@ function CrossProjectLinks({
                     ))}
                 </ul>
             )}
-            {canEdit && !choosing && (
+            {canEdit && !choosing && view.crossLinksOffered && (
                 <Button size="sm" variant="outline" className="w-fit" onClick={open}>
                     <Plus /> {t("allow")}
                 </Button>
@@ -792,6 +817,34 @@ function CrossProjectLinks({
                 </div>
             )}
             {error && <p className="text-xs text-danger-ink">{error}</p>}
+            {closing && (
+                <Dialog open onOpenChange={(value) => !value && !pending && setClosing(null)}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {t("closeLink.title", { service: closing.serviceName })}
+                            </DialogTitle>
+                            <DialogDescription>
+                                {t("closeLink.body", { service: closing.serviceName })}
+                            </DialogDescription>
+                        </DialogHeader>
+                        {closeError && <p className="text-sm text-danger-ink">{closeError}</p>}
+                        <DialogFooter>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setClosing(null)}
+                                disabled={pending}
+                            >
+                                {t("cancel")}
+                            </Button>
+                            <Button variant="danger" disabled={pending} onClick={remove}>
+                                {pending && <Loader2 className="animate-spin" />}{" "}
+                                {t("closeLink.confirm")}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
     );
 }
