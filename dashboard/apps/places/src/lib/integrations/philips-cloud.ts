@@ -32,6 +32,14 @@
  * The client that worked is stored, because a refresh token can only be renewed
  * by the client it was issued to.
  *
+ * Regions. The sign-in has none: Philips' Gigya key lives in one data centre,
+ * EU1 (`cdc.accounts.home.id` is its custom name), and Gigya's US1 and AU1 hosts
+ * answer that key with `301001 Invalid data center` pointing back there. The
+ * HomeID backend is one host for every country too: each of its 79 countries
+ * lists `deviceRegion: "WO"`, worldwide. Only the IoT registry and its broker
+ * are regional, and which region a country uses is asked of Versuni's own
+ * configuration service, the way the Air+ app asks it (`philipsRegionFor`).
+ *
  * Nothing here logs. A response body names tokens, signatures and - in the
  * device list - each unit's local keys, so none of it is ever written anywhere
  * but into the fields this file returns.
@@ -48,8 +56,147 @@ const GIGYA_API_KEY = "4_JGZWlP8eQHpEqkvQElolbA";
 const GIGYA = "https://cdc.accounts.home.id";
 const ISSUER = `${GIGYA}/oidc/op/v1.0/${GIGYA_API_KEY}`;
 
-/** The Versuni IoT API the app reads its devices and its MQTT signature from. */
-const IOT = "https://prod.eu-da.iot.versuni.com/api/da";
+/**
+ * One of Versuni's IoT regions: the API the app reads its devices and its MQTT
+ * signature from, and the broker its units talk to.
+ *
+ * Which one an account uses is Versuni's to say. The Air+ app asks its
+ * configuration service with the country picked at sign-up, and the service
+ * answers the region's AWS code and both hosts - `{"region":"eu-west-1",
+ * "api":"prod.eu-da.iot.versuni.com","iot":"ats.prod.eu-da.iot.versuni.com"}`.
+ * The request is in kwesolowski/node-red-contrib-philips-airplus
+ * (`docs/api-reverse-engineered.md`, "Configuration API", captured from the
+ * app), and the service is named in Ka3seBr0t/HA_Philips_Air_Plus
+ * (`notes/finding_fan_architecture.md`).
+ */
+export interface PhilipsRegion {
+    /** The AWS region code (`eu-west-1`): what the screen names, as an area. */
+    readonly region: string;
+    /** The REST API's host. */
+    readonly api: string;
+    /** The MQTT broker's host. */
+    readonly broker: string;
+}
+
+/**
+ * The only region known without asking, and what every connection made before
+ * there was a choice uses: EU, the hosts both community integrations hard-code
+ * (`const.py`) and the one the configuration service answered for each of the
+ * 280 country codes asked on 2026-10-02.
+ *
+ * Deliberately not here: `prod.us-da` and `prod.ap-da`, which ShorMeneses/
+ * philips-airplus-homeassistant tries as fallbacks (`FALLBACK_API_HOSTS`). Neither
+ * name resolves, no certificate has ever been logged for either (certificate
+ * transparency for `*.iot.versuni.com` shows only `eu-da` and `global-da`), and
+ * Ka3seBr0t's notes record trying them, `cn-da` too, and finding nothing.
+ */
+export const PHILIPS_EU: PhilipsRegion = {
+    region: "eu-west-1",
+    api: "prod.eu-da.iot.versuni.com",
+    broker: "ats.prod.eu-da.iot.versuni.com"
+};
+
+/** Versuni's configuration service. Public: it answers without a sign-in. */
+const CONFIGURATION = "https://prod.global-da.iot.versuni.com/configuration";
+
+/** A host a token may be sent to: one of Versuni's IoT names, and nothing
+ *  else, whatever the configuration answered. */
+const VERSUNI_IOT_HOST = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.iot\.versuni\.com$/;
+
+export function isVersuniIotHost(host: string): boolean {
+    return host.length <= 200 && VERSUNI_IOT_HOST.test(host);
+}
+
+/** How long one country's answer is kept: the service sends it with a day's
+ *  cache itself, and a region does not move under an account. */
+const REGION_TTL_MS = 6 * 60 * 60 * 1000;
+/** How long the configuration service is waited on before EU is assumed. */
+const REGION_TIMEOUT_MS = 5_000;
+
+const regionSchema = z.object({
+    region: z.string().regex(/^[a-z]{2}(-[a-z]+)+-\d$/),
+    api: z.string().refine(isVersuniIotHost),
+    iot: z.string().refine(isVersuniIotHost)
+});
+
+/** Each country's answer, by code. Bounded by the countries Philips serves. */
+const regions = new Map<string, { region: PhilipsRegion; at: number }>();
+
+/** For tests: forget every answer. */
+export function resetPhilipsRegions(): void {
+    regions.clear();
+}
+
+/**
+ * The region a country's accounts are in, as Versuni's configuration answers
+ * it, and whether it did answer. A service that is down, slow or answering
+ * something Polaris cannot vouch for is EU: where every account is today, and
+ * still a working answer rather than no sign-in at all.
+ */
+export async function philipsRegionFor(
+    country: string,
+    now: () => number = Date.now
+): Promise<{ region: PhilipsRegion; answered: boolean }> {
+    const code = country.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) return { region: PHILIPS_EU, answered: false };
+    const known = regions.get(code);
+    if (known && now() - known.at < REGION_TTL_MS) return { region: known.region, answered: true };
+    try {
+        const response = await fetch(`${CONFIGURATION}?countryCode=${code}`, {
+            headers: { accept: "application/json" },
+            signal: AbortSignal.timeout(REGION_TIMEOUT_MS)
+        });
+        if (!response.ok) return { region: PHILIPS_EU, answered: false };
+        const parsed = regionSchema.safeParse(JSON.parse(await response.text()) as unknown);
+        if (!parsed.success) return { region: PHILIPS_EU, answered: false };
+        const region = {
+            region: parsed.data.region,
+            api: parsed.data.api,
+            broker: parsed.data.iot
+        };
+        regions.set(code, { region, at: now() });
+        return { region, answered: true };
+    } catch {
+        return { region: PHILIPS_EU, answered: false };
+    }
+}
+
+/** How many other regions one sign-in asks, side by side, and how long each
+ *  is given: a region that holds the account answers in well under a second. */
+const FALLBACK_LIMIT = 4;
+const FALLBACK_TIMEOUT_MS = 8_000;
+
+/**
+ * The regions worth asking after `tried` came back empty: EU and every other
+ * region the configuration service has named for any country, at most
+ * `FALLBACK_LIMIT` of them. Never a host nobody has answered with.
+ */
+export function otherPhilipsRegions(tried: readonly PhilipsRegion[]): PhilipsRegion[] {
+    const others: PhilipsRegion[] = [];
+    for (const region of [PHILIPS_EU, ...[...regions.values()].map((entry) => entry.region)]) {
+        if (tried.some((seen) => seen.api === region.api)) continue;
+        if (others.some((seen) => seen.api === region.api)) continue;
+        others.push(region);
+    }
+    return others.slice(0, FALLBACK_LIMIT);
+}
+
+/** A region as stored on a connection, or EU for one made before there was a
+ *  choice - or one whose stored hosts are not Versuni's. */
+export function storedPhilipsRegion(stored: {
+    readonly iotRegion?: string;
+    readonly iotApi?: string;
+    readonly iotBroker?: string;
+}): PhilipsRegion {
+    const { iotRegion, iotApi, iotBroker } = stored;
+    if (!iotRegion || !iotApi || !iotBroker) return PHILIPS_EU;
+    if (!isVersuniIotHost(iotApi) || !isVersuniIotHost(iotBroker)) return PHILIPS_EU;
+    return { region: iotRegion, api: iotApi, broker: iotBroker };
+}
+
+function iotBase(region: PhilipsRegion): string {
+    return `https://${region.api}/api/da`;
+}
 
 /** The two public clients a sign-in can be minted for. Neither has a secret. */
 export const PHILIPS_CLIENTS = {
@@ -130,9 +277,13 @@ function signedOut(): DriverError {
     );
 }
 
-async function call(url: string, init: RequestInit = {}): Promise<Response> {
+async function call(
+    url: string,
+    init: RequestInit = {},
+    timeoutMs: number = TIMEOUT_MS
+): Promise<Response> {
     try {
-        return await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+        return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
     } catch {
         throw unreachable();
     }
@@ -394,8 +545,8 @@ export async function refreshPhilipsSession(session: PhilipsSession): Promise<Ph
 
 // --- the IoT API ----------------------------------------------------------------
 
-async function iot(path: string, accessToken: string): Promise<unknown> {
-    const response = await call(`${IOT}${path}`, {
+async function iot(path: string, accessToken: string, region: PhilipsRegion): Promise<unknown> {
+    const response = await call(`${iotBase(region)}${path}`, {
         headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
     });
     // A 403 is the API refusing the token, not an outage (`get_devices`).
@@ -523,34 +674,49 @@ function unique(devices: readonly (PhilipsCloudDevice | null)[]): PhilipsCloudDe
 /** What an IoT call answered: the body, or the HTTP status it failed with. */
 async function iotAnswer(
     path: string,
-    accessToken: string
+    accessToken: string,
+    region: PhilipsRegion,
+    timeoutMs: number = TIMEOUT_MS
 ): Promise<{ status: number; body: unknown }> {
-    const response = await call(`${IOT}${path}`, {
-        headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" }
-    });
+    const response = await call(
+        `${iotBase(region)}${path}`,
+        { headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" } },
+        timeoutMs
+    );
     if (!response.ok) return { status: response.status, body: null };
     return { status: response.status, body: await json(response) };
 }
 
-export async function listPhilipsDevices(accessToken: string): Promise<PhilipsCloudDevice[]> {
-    return unique(deviceItems(await iot("/user/self/device", accessToken)).map(philipsCloudDevice));
+export async function listPhilipsDevices(
+    accessToken: string,
+    region: PhilipsRegion = PHILIPS_EU
+): Promise<PhilipsCloudDevice[]> {
+    return unique(
+        deviceItems(await iot("/user/self/device", accessToken, region)).map(philipsCloudDevice)
+    );
 }
 
 /** The account's id in the IoT API, which every MQTT client id starts with. */
-export async function philipsUserId(accessToken: string): Promise<string> {
+export async function philipsUserId(
+    accessToken: string,
+    region: PhilipsRegion = PHILIPS_EU
+): Promise<string> {
     const parsed = z
         .object({ id: z.union([z.string().min(1).max(200), z.number()]) })
-        .safeParse(await iot("/user/self", accessToken));
+        .safeParse(await iot("/user/self", accessToken, region));
     if (!parsed.success) throw garbled();
     return String(parsed.data.id);
 }
 
 /** The AWS IoT custom-authorizer signature for one access token. It has to
  *  match the token presented with it, so a new token needs a new one. */
-export async function philipsSignature(accessToken: string): Promise<string> {
+export async function philipsSignature(
+    accessToken: string,
+    region: PhilipsRegion = PHILIPS_EU
+): Promise<string> {
     const parsed = z
         .object({ signature: z.string().min(1).max(8000) })
-        .safeParse(await iot("/user/self/signature", accessToken));
+        .safeParse(await iot("/user/self/signature", accessToken, region));
     if (!parsed.success) throw garbled();
     return parsed.data.signature;
 }
@@ -658,6 +824,10 @@ export interface PhilipsLookup {
         | "HomeID account"
         | "Air+ account"
         | "Philips Air";
+    /** The IoT region it was asked in (`eu-west-1`), for a list that lives in
+     *  one. The HomeID backend and the fan and heater cloud are one for the
+     *  whole world, and name none. */
+    readonly region?: string;
     /** How many appliances it listed, or null where it could not be read. */
     readonly count: number | null;
     /** Each appliance's model code or type, as Philips wrote it. */
@@ -667,16 +837,18 @@ export interface PhilipsLookup {
 }
 
 /** What a sign-in found, everywhere it looked, in words with nothing private in
- *  them: no token, no id, no address - counts and model codes only. */
+ *  them: no token, no id, no address - counts, model codes and the region each
+ *  list was asked in. */
 export function philipsLookupSummary(lookups: readonly PhilipsLookup[]): string {
     return lookups
         .map((lookup) => {
-            if (lookup.count === null) return `${lookup.where}: ${lookup.failure ?? "-"}`;
+            const where = lookup.region ? `${lookup.where} (${lookup.region})` : lookup.where;
+            if (lookup.count === null) return `${where}: ${lookup.failure ?? "-"}`;
             const models = lookup.models.slice(0, 8).join(", ");
             const more = lookup.models.length > 8 ? ", ..." : "";
             return lookup.count === 0
-                ? `${lookup.where}: 0`
-                : `${lookup.where}: ${lookup.count} (${models}${more})`;
+                ? `${where}: 0`
+                : `${where}: ${lookup.count} (${models}${more})`;
         })
         .join("; ");
 }
@@ -696,9 +868,15 @@ function airOf(devices: readonly PhilipsCloudDevice[]): PhilipsCloudDevice[] {
 /** One lookup that read a list, as the reader is told about it. */
 export function seenLookup(
     where: PhilipsLookup["where"],
-    models: readonly (string | null)[]
+    models: readonly (string | null)[],
+    region?: string
 ): PhilipsLookup {
-    return { where, count: models.length, models: models.map((model) => model ?? "?") };
+    return {
+        where,
+        ...(region ? { region } : {}),
+        count: models.length,
+        models: models.map((model) => model ?? "?")
+    };
 }
 
 /** What a sign-in found on Philips' Versuni side, and where. */
@@ -707,6 +885,8 @@ export interface PhilipsFound {
     readonly userId: string;
     readonly source: PhilipsSource;
     readonly devices: PhilipsCloudDevice[];
+    /** The IoT region the list was read in, which every sync and command uses. */
+    readonly region: PhilipsRegion;
 }
 
 /** A signed-in account and what was found on it. */
@@ -716,17 +896,76 @@ export interface PhilipsDiscovery {
     /** Whether that list holds an air device, rather than kitchen ones only. */
     readonly hasAir: boolean;
     readonly lookups: readonly PhilipsLookup[];
+    /** The region asked first: the one the account's country is in. */
+    readonly asked: PhilipsRegion;
+    /** Every region asked, the first one included. */
+    readonly tried: readonly PhilipsRegion[];
+    /**
+     * Whether the HomeID backend failed with a server error. That is Philips
+     * failing to build the account's appliance list, almost always over a
+     * broken appliance record on its side; removing the device in the HomeID
+     * app and adding it again rebuilds it (renaudallard/
+     * homeassistant_philips_homeid, issues #32 and #36). Not a region.
+     */
+    readonly homeIdBroken: boolean;
+}
+
+/** One list read in one region: what the reader is told, and what it held. */
+async function registryLookup(
+    where: PhilipsLookup["where"],
+    session: PhilipsSession,
+    region: PhilipsRegion,
+    timeoutMs: number = TIMEOUT_MS
+): Promise<{ lookup: PhilipsLookup; devices: PhilipsCloudDevice[] }> {
+    try {
+        const answer = await iotAnswer("/user/self/device", session.accessToken, region, timeoutMs);
+        if (answer.body === null) {
+            return {
+                lookup: {
+                    where,
+                    region: region.region,
+                    count: null,
+                    models: [],
+                    failure: `HTTP ${answer.status}`
+                },
+                devices: []
+            };
+        }
+        const devices = unique(deviceItems(answer.body).map(philipsCloudDevice));
+        return {
+            lookup: seenLookup(
+                where,
+                devices.map((device) => device.model),
+                region.region
+            ),
+            devices
+        };
+    } catch (caught) {
+        return {
+            lookup: {
+                where,
+                region: region.region,
+                count: null,
+                models: [],
+                failure: failureOf(caught)
+            },
+            devices: []
+        };
+    }
 }
 
 /**
  * Everywhere a device on this account can be listed on Philips' Versuni side,
  * in order, until one lists an air device:
  *
- * 1. the IoT registry with the Air+ app's token - a purifier paired in the Air+
- *    app is only shown to that client (both integrations);
- * 2. the IoT registry with the HomeID app's token, for one paired there;
+ * 1. the IoT registry of the account's own region with the Air+ app's token -
+ *    a purifier paired in the Air+ app is only shown to that client (both
+ *    integrations);
+ * 2. the same registry with the HomeID app's token, for one paired there;
  * 3. the HomeID backend's own appliance list with that token (`email_auth.py`'s
- *    last resort, `get_appliances_via_homeid`).
+ *    last resort, `get_appliances_via_homeid`) - one for the whole world;
+ * 4. the registries of every other region known, side by side and briefly,
+ *    for an account whose country was picked wrong.
  *
  * A failure in one is noted and the next is tried: what one list refuses
  * another may hold. Where none holds an air device, the first list holding
@@ -736,71 +975,67 @@ export interface PhilipsDiscovery {
  */
 export async function discoverPhilipsDevices(
     gigyaSession: string,
-    airplus: PhilipsSession
+    airplus: PhilipsSession,
+    asked: PhilipsRegion = PHILIPS_EU
 ): Promise<PhilipsDiscovery> {
     const lookups: PhilipsLookup[] = [];
-    /** Sessions the IoT API would not name the account for: asked once. */
-    const refused = new Set<PhilipsSession>();
+    const tried: PhilipsRegion[] = [asked];
+    /** Sessions the IoT API of a region would not name the account for:
+     *  asked once each. */
+    const refused = new Set<string>();
+    const refusal = (session: PhilipsSession, region: PhilipsRegion) =>
+        `${session.client} ${region.api}`;
     const candidates: {
         session: PhilipsSession;
         source: PhilipsSource;
         devices: PhilipsCloudDevice[];
+        region: PhilipsRegion;
     }[] = [];
 
+    const answer = (found: PhilipsFound | null, hasAir: boolean): PhilipsDiscovery => ({
+        found,
+        hasAir,
+        lookups,
+        asked,
+        tried,
+        homeIdBroken: lookups.some(
+            (lookup) => lookup.where === "HomeID app" && /^HTTP 5\d\d$/.test(lookup.failure ?? "")
+        )
+    });
+    const air = async (
+        session: PhilipsSession,
+        source: PhilipsSource,
+        devices: PhilipsCloudDevice[],
+        region: PhilipsRegion
+    ) => {
+        const userId = await philipsUserId(session.accessToken, region);
+        return answer({ session, userId, source, devices, region }, true);
+    };
     const registry = async (
         where: PhilipsLookup["where"],
-        session: PhilipsSession
-    ): Promise<PhilipsCloudDevice[]> => {
-        try {
-            const answer = await iotAnswer("/user/self/device", session.accessToken);
-            if (answer.body === null) {
-                lookups.push({ where, count: null, models: [], failure: `HTTP ${answer.status}` });
-                return [];
-            }
-            const devices = unique(deviceItems(answer.body).map(philipsCloudDevice));
-            lookups.push(
-                seenLookup(
-                    where,
-                    devices.map((device) => device.model)
-                )
-            );
-            return devices;
-        } catch (caught) {
-            lookups.push({ where, count: null, models: [], failure: failureOf(caught) });
-            return [];
-        }
+        session: PhilipsSession,
+        region: PhilipsRegion
+    ) => {
+        const read = await registryLookup(where, session, region);
+        lookups.push(read.lookup);
+        candidates.push({ session, source: "iot", devices: read.devices, region });
+        return read.devices;
     };
 
-    const fromAirplus = await registry("Air+", airplus);
-    candidates.push({ session: airplus, source: "iot", devices: fromAirplus });
-    if (airOf(fromAirplus).length > 0) {
-        const userId = await philipsUserId(airplus.accessToken);
-        return {
-            found: { session: airplus, userId, source: "iot", devices: fromAirplus },
-            hasAir: true,
-            lookups
-        };
-    }
+    const fromAirplus = await registry("Air+", airplus, asked);
+    if (airOf(fromAirplus).length > 0) return air(airplus, "iot", fromAirplus, asked);
 
     let homeid: PhilipsSession | null = null;
     try {
         homeid = await tokensFor(gigyaSession, "homeid");
     } catch (caught) {
         const failure = failureOf(caught);
-        lookups.push({ where: "HomeID", count: null, models: [], failure });
+        lookups.push({ where: "HomeID", region: asked.region, count: null, models: [], failure });
         lookups.push({ where: "HomeID app", count: null, models: [], failure });
     }
     if (homeid) {
-        const fromHomeId = await registry("HomeID", homeid);
-        candidates.push({ session: homeid, source: "iot", devices: fromHomeId });
-        if (airOf(fromHomeId).length > 0) {
-            const userId = await philipsUserId(homeid.accessToken);
-            return {
-                found: { session: homeid, userId, source: "iot", devices: fromHomeId },
-                hasAir: true,
-                lookups
-            };
-        }
+        const fromHomeId = await registry("HomeID", homeid, asked);
+        if (airOf(fromHomeId).length > 0) return air(homeid, "iot", fromHomeId, asked);
         let fromApp: PhilipsCloudDevice[] = [];
         try {
             fromApp = unique(
@@ -820,19 +1055,15 @@ export async function discoverPhilipsDevices(
                 failure: failureOf(caught)
             });
         }
-        candidates.push({ session: homeid, source: "homeid-app", devices: fromApp });
+        candidates.push({ session: homeid, source: "homeid-app", devices: fromApp, region: asked });
         if (airOf(fromApp).length > 0) {
             try {
-                const userId = await philipsUserId(homeid.accessToken);
-                return {
-                    found: { session: homeid, userId, source: "homeid-app", devices: fromApp },
-                    hasAir: true,
-                    lookups
-                };
+                return await air(homeid, "homeid-app", fromApp, asked);
             } catch (caught) {
-                refused.add(homeid);
+                refused.add(refusal(homeid, asked));
                 lookups.push({
                     where: "HomeID account",
+                    region: asked.region,
                     count: null,
                     models: [],
                     failure: failureOf(caught)
@@ -841,37 +1072,72 @@ export async function discoverPhilipsDevices(
         }
     }
 
-    // No air device anywhere it could be driven from: keep the first list that
-    // holds anything at all - a kitchen appliance - which goes over the same
-    // link.
-    for (const candidate of candidates) {
-        if (candidate.devices.length === 0 || refused.has(candidate.session)) continue;
+    // Nothing in the account's own region: every other region known, all at
+    // once and briefly, read back in a fixed order so the first that holds an
+    // air device wins the same way every time.
+    const others = otherPhilipsRegions([asked]);
+    tried.push(...others);
+    const sessions: [PhilipsLookup["where"], PhilipsSession][] = [["Air+", airplus]];
+    if (homeid) sessions.push(["HomeID", homeid]);
+    const elsewhere = await Promise.all(
+        others.flatMap((region) =>
+            sessions.map(async ([where, session]) => ({
+                region,
+                session,
+                read: await registryLookup(where, session, region, FALLBACK_TIMEOUT_MS)
+            }))
+        )
+    );
+    for (const { region, session, read } of elsewhere) {
+        lookups.push(read.lookup);
+        candidates.push({ session, source: "iot", devices: read.devices, region });
+    }
+    for (const { region, session, read } of elsewhere) {
+        if (airOf(read.devices).length === 0) continue;
         try {
-            const userId = await philipsUserId(candidate.session.accessToken);
-            return {
-                found: { ...candidate, userId },
-                hasAir: airOf(candidate.devices).length > 0,
-                lookups
-            };
+            return await air(session, "iot", read.devices, region);
         } catch (caught) {
-            refused.add(candidate.session);
+            refused.add(refusal(session, region));
             lookups.push({
-                where: candidate.session === airplus ? "Air+ account" : "HomeID account",
+                where: session === airplus ? "Air+ account" : "HomeID account",
+                region: region.region,
                 count: null,
                 models: [],
                 failure: failureOf(caught)
             });
         }
     }
-    return { found: null, hasAir: false, lookups };
+
+    // No air device anywhere it could be driven from: keep the first list that
+    // holds anything at all - a kitchen appliance - which goes over the same
+    // link.
+    for (const candidate of candidates) {
+        const key = refusal(candidate.session, candidate.region);
+        if (candidate.devices.length === 0 || refused.has(key)) continue;
+        try {
+            const userId = await philipsUserId(candidate.session.accessToken, candidate.region);
+            return answer({ ...candidate, userId }, airOf(candidate.devices).length > 0);
+        } catch (caught) {
+            refused.add(key);
+            lookups.push({
+                where: candidate.session === airplus ? "Air+ account" : "HomeID account",
+                region: candidate.region.region,
+                count: null,
+                models: [],
+                failure: failureOf(caught)
+            });
+        }
+    }
+    return answer(null, false);
 }
 
 /** The devices of a connection, from where it found them when it was made. */
 export async function listPhilipsSource(
     accessToken: string,
-    source: PhilipsSource
+    source: PhilipsSource,
+    region: PhilipsRegion = PHILIPS_EU
 ): Promise<PhilipsCloudDevice[]> {
-    if (source === "iot") return listPhilipsDevices(accessToken);
+    if (source === "iot") return listPhilipsDevices(accessToken, region);
     try {
         return unique((await listHomeIdAppliances(accessToken)).map(philipsHomeIdAppliance));
     } catch (caught) {

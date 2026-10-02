@@ -14,16 +14,26 @@ import "@/components/app-host/client";
 import { withMessages } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    philipsCountryGuess,
+    philipsCountryName
+} from "@polaris-app/places/src/lib/integrations/philips-regions";
 
 const started: unknown[] = [];
 const polled: { state: Record<string, string> }[] = [];
 let pollAnswer: {
     error?: string;
     waiting?: boolean;
-    next?: { state: Record<string, string>; summary: string; skippable: boolean };
+    next?: {
+        state: Record<string, string>;
+        summary: string;
+        skippable: boolean;
+        asked?: { country: string; region: string; homeIdBroken: boolean };
+    };
     devices?: unknown[];
     accounts?: unknown[];
     unsupported?: string[];
+    foundIn?: { country: string; asked: string; found: string };
 } = {};
 
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
@@ -247,5 +257,80 @@ describe("the Philips Air+ app step", () => {
         fireEvent.click(screen.getByRole("button", { name: "Connect without it" }));
         await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
         expect(polled.at(-1)!.state).toEqual({ ticket: "handle-1", skip: "1" });
+    });
+});
+describe("the Philips account's country", () => {
+    it("is asked first, and starts on where the reader probably is", async () => {
+        drawn();
+        const picker = screen.getByRole("combobox", { name: "Country or region" });
+        expect(screen.getByText(/Philips keeps each country's devices in one region/)).toBeTruthy();
+        const expected = philipsCountryGuess({
+            timeZones: [null, Intl.DateTimeFormat().resolvedOptions().timeZone],
+            locales: [...navigator.languages, "en-US"]
+        });
+        expect(expected).not.toBe("");
+        expect(picker.textContent).toBe(philipsCountryName(expected, "en-US"));
+        fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
+            target: { value: "owner@example.com" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect(started[0]).toMatchObject({
+            fields: { country: expected, email: "owner@example.com" }
+        });
+    });
+
+    it("says, before the app file, which region was asked and that every other one was too", async () => {
+        drawn();
+        fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
+            target: { value: "owner@example.com" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+        const box = await screen.findByRole("textbox", { name: "Code from the email" });
+        pollAnswer = {
+            waiting: true,
+            next: {
+                state: { ticket: "handle-1" },
+                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: HTTP 500",
+                skippable: false,
+                asked: { country: "ES", region: "eu-west-1", homeIdBroken: true }
+            }
+        };
+        fireEvent.change(box, { target: { value: "123456" } });
+        fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+        await screen.findByText("Upload the Philips Air+ app file (.apk)");
+        expect(
+            screen.getByText(
+                /^Polaris asked Philips' servers for Spain \(Europe\) and every other region it knows, and no Air\+ or HomeID list holds an air device \(Air\+ \(eu-west-1\): 0; HomeID \(eu-west-1\): 0; HomeID app: HTTP 500\)\./
+            )
+        ).toBeTruthy();
+        expect(
+            screen.getByText(
+                "Philips' HomeID service failed on this account. If the device is in the HomeID app, removing it there and adding it again usually fixes that."
+            )
+        ).toBeTruthy();
+    });
+
+    it("says where the devices were found when it was another region, before it closes", async () => {
+        const onConnected = drawn();
+        fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
+            target: { value: "owner@example.com" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+        const box = await screen.findByRole("textbox", { name: "Code from the email" });
+        pollAnswer = {
+            devices: [{ id: "d1" }],
+            accounts: [],
+            foundIn: { country: "US", asked: "us-east-1", found: "eu-west-1" }
+        };
+        fireEvent.change(box, { target: { value: "123456" } });
+        fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+        const notice = await screen.findByRole("status");
+        expect(notice.textContent).toBe(
+            "Found on Philips' servers in Europe, not in United States, where accounts from United States usually are. Polaris will keep using Europe."
+        );
+        expect(onConnected).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "Done" }));
+        expect(onConnected).toHaveBeenCalledWith({ devices: [{ id: "d1" }], accounts: [] });
     });
 });

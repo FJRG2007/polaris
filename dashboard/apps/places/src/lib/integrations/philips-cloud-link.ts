@@ -8,8 +8,8 @@
  * decompiled app does that the first does not - power through the AWS IoT
  * shadow, one port read at a time, and a busy unit asked again.
  *
- * - AWS IoT over a WebSocket on 443 (`ats.prod.eu-da.iot.versuni.com/mqtt`),
- *   let in by a custom authorizer: the access token and the signature the IoT
+ * - AWS IoT over a WebSocket on 443 (`ats.prod.eu-da.iot.versuni.com/mqtt`, or
+ *   the broker of the account's own region), let in by a custom authorizer: the access token and the signature the IoT
  *   API issued for it ride on the upgrade request as headers. A new token needs
  *   a new signature, or the broker refuses the connection.
  * - The unit is spoken to on `da_ctrl/<thing>/to_ncp` and answers on
@@ -46,6 +46,12 @@ import { PHILIPS_REFUSED } from "./philips-sentences";
 
 export const PHILIPS_MQTT_URL = "wss://ats.prod.eu-da.iot.versuni.com:443/mqtt";
 
+/** The broker's address for a region's broker host, or EU's for none. The host
+ *  was checked to be one of Versuni's before it was stored. */
+export function philipsMqttUrl(broker: string | undefined): string {
+    return broker ? `wss://${broker}:443/mqtt` : PHILIPS_MQTT_URL;
+}
+
 /** One value a port holds. */
 export type CloudValue = string | number | boolean;
 
@@ -54,6 +60,8 @@ export interface CloudAuth {
     readonly accessToken: string;
     readonly signature: string;
     readonly clientId: string;
+    /** The region's broker host; EU's where none is given. */
+    readonly broker?: string;
 }
 
 /** What has been heard from a unit, merged across its ports. */
@@ -312,7 +320,7 @@ export class CloudLink {
     private connect(): Promise<void> {
         const auth = this.auth;
         if (!auth) return Promise.reject(refusedLink());
-        const client = mqtt.connect(PHILIPS_MQTT_URL, {
+        const client = mqtt.connect(philipsMqttUrl(auth.broker), {
             clientId: auth.clientId,
             protocolVersion: 4,
             clean: true,

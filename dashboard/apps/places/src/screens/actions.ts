@@ -64,7 +64,12 @@ import { host } from "@polaris/app-host";
 import type { MessageParams } from "@polaris/core";
 import { placesT } from "../lib/i18n";
 import type { PlacesKey } from "../../messages";
-import type { DiscoveredUnit, PairingNext } from "../lib/drivers/contract";
+import type {
+    DiscoveredUnit,
+    PairingAsked,
+    PairingFoundIn,
+    PairingNext
+} from "../lib/drivers/contract";
 import { placesRefusalText } from "../lib/refusal-text";
 import { guard } from "../lib/action-guard";
 import { connectionWords } from "../lib/device-connections";
@@ -1481,9 +1486,17 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
     waiting?: boolean;
     /** A step to draw before asking again: a file to upload, with the state
      *  to send back once it is, and what the attempt saw so far. */
-    next?: { state: Record<string, string>; summary: string; skippable: boolean };
+    next?: {
+        state: Record<string, string>;
+        summary: string;
+        skippable: boolean;
+        asked?: PairingAsked;
+    };
     /** Model codes connected that cannot be fully operated yet. */
     unsupported?: string[];
+    /** Where the devices were found, when it was not where they were first
+     *  looked for. */
+    foundIn?: PairingFoundIn;
     devices?: DeviceView[];
     accounts?: deviceAccounts.DeviceAccountView[];
     error?: string;
@@ -1517,14 +1530,23 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
         return {
             list: await devices.listDevices(install.id, current.id),
             connected: await deviceAccounts.listAccounts(install.id),
-            unsupported: [...(answer.unsupported ?? [])]
+            unsupported: [...(answer.unsupported ?? [])],
+            foundIn: answer.foundIn
         };
     });
     if (result.error) return { error: result.error };
     if (!result.value) return { waiting: true };
     if ("next" in result.value && result.value.next) {
-        const { state, summary, skippable } = result.value.next;
-        return { waiting: true, next: { state: { ...state }, summary, skippable } };
+        const { state, summary, skippable, asked } = result.value.next;
+        return {
+            waiting: true,
+            next: {
+                state: { ...state },
+                summary,
+                skippable,
+                ...(asked ? { asked: { ...asked } } : {})
+            }
+        };
     }
     await recordAudit({
         actorId: user.id,
@@ -1538,7 +1560,8 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
     return {
         devices: result.value.list,
         accounts: result.value.connected,
-        ...(result.value.unsupported.length > 0 ? { unsupported: result.value.unsupported } : {})
+        ...(result.value.unsupported.length > 0 ? { unsupported: result.value.unsupported } : {}),
+        ...(result.value.foundIn ? { foundIn: { ...result.value.foundIn } } : {})
     };
 }
 

@@ -116,6 +116,24 @@ export interface PairingNext {
     readonly state: Readonly<Record<string, string>>;
     readonly summary: string;
     readonly skippable: boolean;
+    /** Where the attempt looked, for a cloud with regions: the country picked
+     *  (a code, or "" for none), the AWS code of the region asked first, and
+     *  whether one of the maker's own services failed on the account. */
+    readonly asked?: PairingAsked;
+}
+
+export interface PairingAsked {
+    readonly country: string;
+    readonly region: string;
+    readonly homeIdBroken: boolean;
+}
+
+/** Devices found in another region than the one the country's accounts are
+ *  in: the country, the region asked (AWS code) and the one they were in. */
+export interface PairingFoundIn {
+    readonly country: string;
+    readonly asked: string;
+    readonly found: string;
 }
 
 /** Whether the other side has said yes yet. Not yet is the normal answer, asked
@@ -129,6 +147,9 @@ export type PairingPoll =
           /** Model codes found that are listed but cannot be fully operated
            *  yet, for the dialog to name rather than leave to be discovered. */
           readonly unsupported?: readonly string[];
+          /** Where the devices were found, when it was not where they were
+           *  first looked for - for the dialog to say. */
+          readonly foundIn?: PairingFoundIn;
       };
 
 /**

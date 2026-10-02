@@ -16,6 +16,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { placesCatalogs } from "@polaris-app/places/messages";
 import { placesRefusalText } from "@polaris-app/places/src/lib/refusal-text";
 import { outageHeadline, outageLength } from "@polaris-app/places/src/lib/reachability";
+import { nothingFoundSentence } from "@polaris-app/places/src/lib/drivers/philips-cloud";
 
 const LIB = fileURLToPath(new URL("../../../places/src/lib/", import.meta.url));
 
@@ -77,10 +78,34 @@ describe("a refusal from Places", () => {
         expect(
             placesRefusalText(
                 es,
-                "Polaris found no device on this Philips account. What it saw: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10); Philips Air: 0. Check that the device is in a Philips app under this same email."
+                "Polaris found no device on this Philips account. It asked Philips' servers for Spain (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): HTTP 403; HomeID app: 1 (AC0651/10); Philips Air: 0. Check that the device is in a Philips app under this same email."
             )
         ).toBe(
-            "Polaris no ha encontrado ningún dispositivo en esta cuenta Philips. Lo que vio: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10); Philips Air: 0. Comprueba que está en una app de Philips con este mismo email."
+            "Polaris no ha encontrado ningún dispositivo en esta cuenta Philips. Preguntó a los servidores de Philips de España (Europa) y de las demás regiones que conoce. Lo que vio: Air+ (eu-west-1): 0; HomeID (eu-west-1): HTTP 403; HomeID app: 1 (AC0651/10); Philips Air: 0. Comprueba que está en una app de Philips con este mismo email."
+        );
+    });
+
+    it("names the region asked, and what fixes a HomeID backend that failed", () => {
+        const english = nothingFoundSentence("Air+ (eu-west-1): 0; HomeID app: HTTP 500", {
+            country: "US",
+            region: "eu-west-1",
+            homeIdBroken: true
+        });
+        expect(english).toBe(
+            "Polaris found no device on this Philips account. It asked Philips' servers for United States (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID app: HTTP 500. Check that the device is in a Philips app under this same email. Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again."
+        );
+        expect(placesRefusalText(en, english)).toBe(english);
+        expect(placesRefusalText(es, english)).toBe(
+            "Polaris no ha encontrado ningún dispositivo en esta cuenta Philips. Preguntó a los servidores de Philips de Estados Unidos (Europa) y de las demás regiones que conoce. Lo que vio: Air+ (eu-west-1): 0; HomeID app: HTTP 500. Comprueba que está en una app de Philips con este mismo email. El servicio HomeID de Philips falló en esta cuenta; si el aparato está en la app HomeID, quítalo y vuelve a añadirlo."
+        );
+        const unpicked = nothingFoundSentence("Air+ (eu-west-1): 0", {
+            country: "",
+            region: "eu-west-1",
+            homeIdBroken: false
+        });
+        expect(unpicked).toContain("Philips' servers for your country (Europe)");
+        expect(placesRefusalText(es, unpicked)).toContain(
+            "servidores de Philips de tu país (Europa)"
         );
     });
 
