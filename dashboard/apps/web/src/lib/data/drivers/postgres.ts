@@ -22,6 +22,7 @@ import { Client, Query, type QueryArrayConfig } from "pg";
 import * as data from "../driver";
 import { tlsConnectOptions } from "../tls";
 import { prepareCellEdit } from "../cell-edit";
+import * as rowEdit from "../row-edit";
 import {
     quoteQualified,
     quoteSqlIdent,
@@ -267,6 +268,26 @@ export class PostgresDriver implements data.DataDriver {
     }
 
     /**
+     * One statement Polaris wrote, with its values bound. Never a statement
+     * somebody typed - that is `run` - so it is not judged for writes here; a
+     * read-only session is still refused any by the engine itself.
+     */
+    async query(statement: string, params: readonly unknown[]): Promise<data.QueryResult[]> {
+        const client = await this.open();
+        const started = Date.now();
+        const result = await client.query({ text: statement, values: [...params], rowMode: "array" });
+        return [
+            {
+                statement,
+                columns: result.fields?.map((field) => field.name) ?? [],
+                rows: (result.rows as unknown[][]) ?? [],
+                affected: null,
+                ms: Date.now() - started
+            }
+        ];
+    }
+
+    /**
      * Change one cell, aimed by primary key.
      *
      * Refused outright on a read-only connection - the session is already set
@@ -285,6 +306,54 @@ export class PostgresDriver implements data.DataDriver {
         const client = await this.open();
         const result = await client.query(prepared.text, prepared.params);
         return { changed: result.rowCount ?? 0 };
+    }
+
+    /** Add one row; a column left out takes its default. See `row-edit.ts`. */
+    async insertRow(insert: rowEdit.RowInsert): Promise<rowEdit.RowWriteResult> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("adding a row");
+        const columns = await this.columns(insert.namespace, insert.relation);
+        const prepared = rowEdit.prepareInsert(insert, columns, this.dialect(insert.namespace, insert.relation), "postgres");
+        const client = await this.open();
+        const result = await client.query(prepared.text, prepared.params);
+        return { changed: result.rowCount ?? 0 };
+    }
+
+    /**
+     * Remove rows by their whole primary key, in one transaction: either every
+     * row named goes, or - when the engine refuses one, a foreign key pointing at
+     * it - none of them do.
+     */
+    async deleteRows(removal: rowEdit.RowDelete): Promise<rowEdit.RowWriteResult> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("removing rows");
+        const columns = await this.columns(removal.namespace, removal.relation);
+        const prepared = rowEdit.prepareDelete(removal, columns, this.dialect(removal.namespace, removal.relation));
+        const client = await this.open();
+        await client.query("BEGIN");
+        try {
+            const result = await client.query(prepared.text, prepared.params);
+            await client.query("COMMIT");
+            return { changed: result.rowCount ?? 0 };
+        } catch (error) {
+            await client.query("ROLLBACK").catch(() => undefined);
+            throw error;
+        }
+    }
+
+    async createTable(draft: rowEdit.TableDraft): Promise<void> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("creating a table");
+        const text = rowEdit.prepareCreateTable(draft, "postgres", quoteSqlIdent, (namespace, name) =>
+            quoteQualified([namespace ?? "public", name], quoteSqlIdent)
+        );
+        const client = await this.open();
+        await client.query(text);
+    }
+
+    private dialect(namespace: string | null, relation: string) {
+        return {
+            quote: quoteSqlIdent,
+            placeholder: (index: number) => `$${index}`,
+            target: quoteQualified([namespace ?? "public", relation], quoteSqlIdent)
+        };
     }
 
     async close(): Promise<void> {

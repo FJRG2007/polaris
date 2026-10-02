@@ -126,6 +126,41 @@ const EXACT: Readonly<Record<string, Key>> = {
         "insights.noPgStatStatements",
     "This server does not have the performance schema turned on, so it is not recording which statements run.":
         "insights.noPerformanceSchema",
+    // New tables, new rows and removals (row-edit.ts, row-edit-schema.ts).
+    "A table name starts with a letter or an underscore and holds only letters, digits and underscores.":
+        "refusals.tableName",
+    "A column name starts with a letter or an underscore and holds only letters, digits and underscores.":
+        "refusals.columnNameRule",
+    "That default is not one Polaris offers.": "refusals.unknownDefault",
+    "A default can be at most 200 characters.": "refusals.defaultTooLong",
+    "A default cannot hold a backslash or a line break.": "refusals.defaultBackslash",
+    "That default has to be a number.": "refusals.defaultNumber",
+    "A yes/no column takes true or false as its default.": "refusals.defaultBoolean",
+    "This table has no primary key, so there is no way to remove one row of it without risking the others. Use the statement box.":
+        "refusals.noPrimaryKeyDelete",
+    "Pick the rows to remove.": "refusals.pickRows",
+    "Remove at most 200 rows at a time from here.": "refusals.tooManyRows",
+    "A table made here can have at most 100 columns.": "refusals.tooManyColumns",
+    "Give the table at least one column.": "refusals.noColumnsGiven",
+    "Rows in this kind of database are not added or removed from the grid.": "refusals.noRowWrites",
+    "Tables in this kind of database are not created from here.": "refusals.noCreateTable",
+    // A Deploy database's Stats and Config (maintenance.ts, database-ops/admin.ts).
+    "Database not found": "refusals.databaseNotFound",
+    "This server does not ship that extension.": "refusals.notShipped",
+    "That extension is not installed here.": "refusals.notInstalled",
+    "That extension is part of the database and stays.": "refusals.keptExtension",
+    "Query statistics are recorded by PostgreSQL only.": "refusals.statsPostgresOnly",
+    "This database lives inside another instance; turn statistics on for that instance.": "refusals.statsHosted",
+    "Deploy this database first - it has no container yet.": "refusals.deployFirst",
+    "An object store's keys are managed from its Buckets panel.": "refusals.objectStoreKeys",
+    "This instance runs as several containers, and their passwords are changed together by redeploying it, not from here.":
+        "refusals.severalContainers",
+    "This database lives inside another instance; publish that instance instead.": "refusals.publishHosted",
+    "Pick a port between 1024 and 65535.": "refusals.portRange",
+    "Ports 20000 to 39999 are kept for services. Pick another.": "refusals.portServices",
+    "Another database on this server already uses that port.": "refusals.portTaken",
+    "Vacuum is a PostgreSQL command.": "refusals.vacuumPostgres",
+    "Extensions are a PostgreSQL feature.": "refusals.extensionsPostgres",
     // What the list says about a connection.
     "Read-only. Polaris itself runs on this one.": "notes.polaris",
     "The server this connection tunnels through was removed from Servers. Edit it to pick another.":
@@ -137,7 +172,10 @@ const EXACT: Readonly<Record<string, Key>> = {
 /** What a read-only connection refused, by what the driver said it was. */
 const READ_ONLY_WHAT: Readonly<Record<string, Key>> = {
     "one of those statements": "refusals.readOnlyWhat.statements",
-    "changing a value": "refusals.readOnlyWhat.value"
+    "changing a value": "refusals.readOnlyWhat.value",
+    "adding a row": "refusals.readOnlyWhat.row",
+    "removing rows": "refusals.readOnlyWhat.rows",
+    "creating a table": "refusals.readOnlyWhat.table"
 };
 
 const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
@@ -213,7 +251,20 @@ const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
     ],
     [/^Polaris could not find (\S+)\. Check the name\.$/, "refusals.egressUnresolved", ["host"]],
     [/^Showing the first (\d+) rows\.$/, "bench.truncated", ["count"]],
-    [/^(.+) cannot be empty\.$/, "refusals.cannotBeEmpty", ["column"]]
+    [/^(.+) cannot be empty\.$/, "refusals.cannotBeEmpty", ["column"]],
+    [
+        /^"(.+)" cannot be a column name: letters, digits and underscores, starting with a letter\.$/,
+        "refusals.columnName",
+        ["column"]
+    ],
+    [/^There are two columns called (.+)\.$/, "refusals.duplicateColumn", ["column"]],
+    [/^Pick a type for (.+)\.$/, "refusals.pickType", ["column"]],
+    [/^(.+) is numbered automatically, so it has to be the primary key\.$/, "refusals.autoKey", ["column"]],
+    [/^(.+) is numbered automatically and takes no default\.$/, "refusals.autoDefault", ["column"]],
+    [/^That default does not fit the type of (.+)\.$/, "refusals.defaultType", ["column"]],
+    [/^There is no column called (.+)\.$/, "refusals.unknownColumn", ["column"]],
+    [/^The instance did not start that way, so it was put back: (.+)$/, "refusals.putBack", ["reason"]],
+    [/^The database did not start that way, so it was put back: (.+)$/, "refusals.publicPutBack", ["reason"]]
 ];
 
 const READ_ONLY =

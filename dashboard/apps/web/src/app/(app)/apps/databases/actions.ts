@@ -15,20 +15,24 @@
  * address or the credential - those stay on this side.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
+import { dataText } from "@/lib/data/words";
+import { withDriver } from "@/lib/data/open";
 import * as browser from "@/lib/data/browser";
 import { listHosts } from "@/lib/host-service";
 import { requirePermission } from "@/lib/session";
-import * as connections from "@/lib/data/connections";
-import { engineStats, type DatabaseStats } from "@/lib/data/stats";
-import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
-import { DataRequestError, ReadOnlyError } from "@/lib/data/driver";
+import { guardData } from "@/lib/data/action-guard";
+import { DataRequestError } from "@/lib/data/driver";
 import { getTranslations } from "@/lib/i18n/request";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { withDriver } from "@/lib/data/open";
+import * as connections from "@/lib/data/connections";
+import type { TableDraft } from "@/lib/data/row-edit";
 import { readPrivateKey, SshKeyError } from "@/lib/data/ssh-key";
-import { dataText } from "@/lib/data/words";
+import { engineStats, type DatabaseStats } from "@/lib/data/stats";
+import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
+import { rowDeleteSchema, rowInsertSchema, tableDraftSchema } from "@/lib/data/row-edit-schema";
 import type {
     DataColumn,
     DataNamespace,
@@ -45,27 +49,16 @@ async function actor(): Promise<{ id: string }> {
     return { id: user.id };
 }
 
-/**
- * Turn a refusal into a sentence, and a fault into a line in the log.
- *
- * Only the refusals this app writes for a reader are shown. Anything else is a
- * fault, and a fault talking to a database describes that database out loud -
- * table names, drivers, connection strings - to whoever happens to be looking.
- * The real one goes to the log, whole, where it is of use.
- */
-async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
-    try {
-        return { value: await run() };
-    } catch (caught) {
-        const spoken =
-            caught instanceof connections.DataConnectionError ||
-            caught instanceof ReadOnlyError ||
-            caught instanceof DataRequestError;
-        const t = await getTranslations("databases");
-        if (spoken) return { error: dataText(t, (caught as Error).message) };
-        console.error("databases: an action failed", caught);
-        return { error: t("refusals.generic") };
+/** Every failure answered the one way (`guardData`). */
+const guard = guardData;
+
+/** A body in the shape a form sends, or a refusal in the schema's own words. */
+function parsed<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown): T {
+    const result = schema.safeParse(value);
+    if (!result.success) {
+        throw new DataRequestError(result.error.issues[0]?.message ?? "That did not work. Nothing was changed.");
     }
+    return result.data;
 }
 
 /** Everything this account can open: what it saved, what Polaris runs for it,
@@ -313,6 +306,35 @@ export async function updateCellAction(
         })
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
+}
+
+/**
+ * Add one row, remove picked rows, create a table.
+ *
+ * The same gates `updateCellAction` leans on, all of them on the other side of
+ * the call: the read-only flag, the relation having to be one the connection
+ * holds, a removal naming whole primary keys, and a new table's names and types
+ * coming from `row-edit.ts`. The shape is checked here against the schema the
+ * forms validate with.
+ */
+export async function insertRowAction(id: string, insert: unknown): Promise<{ changed?: number; error?: string }> {
+    const me = await actor();
+    const result = await guard(async () => browser.insertRow(me.id, String(id), parsed(rowInsertSchema, insert)));
+    return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
+}
+
+export async function deleteRowsAction(id: string, removal: unknown): Promise<{ changed?: number; error?: string }> {
+    const me = await actor();
+    const result = await guard(async () => browser.deleteRows(me.id, String(id), parsed(rowDeleteSchema, removal)));
+    return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
+}
+
+export async function createTableAction(id: string, draft: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(async () =>
+        browser.createTable(me.id, String(id), parsed(tableDraftSchema, draft) as TableDraft)
+    );
+    return result.error ? { error: result.error } : {};
 }
 
 /** What one Redis key holds. Its own action because it is the one read that is

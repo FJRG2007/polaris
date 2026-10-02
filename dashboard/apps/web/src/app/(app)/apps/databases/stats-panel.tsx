@@ -33,7 +33,7 @@
  * nobody is watching change would make this panel the load it is measuring.
  */
 
-import * as actions from "./actions";
+import { useDataSource } from "./data-source";
 import { formatBytes } from "@polaris/core";
 import { Loader2, RefreshCw } from "lucide-react";
 import { dataText, statText } from "@/lib/data/words";
@@ -84,8 +84,9 @@ const RATES: Record<string, { keys: string[]; hitRate?: [string, string] }> = {
     mongo: { keys: ["query", "insert", "update", "delete", "getmore"] }
 };
 
-export function StatsPanel({ connectionId }: { connectionId: string }) {
+export function StatsPanel() {
     const t = useTranslations("databases");
+    const source = useDataSource();
     const [readings, setReadings] = useState<Reading[]>([]);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -104,7 +105,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
         if (running.current) return;
         running.current = true;
         setBusy(true);
-        const result = await actions.statsAction(connectionId);
+        const result = await source.stats();
         running.current = false;
         setBusy(false);
         if (result.error) {
@@ -116,7 +117,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
         setError("");
         setEngine(stats.engine);
         setReadings((current) => [...current, toReading(stats)].slice(-KEPT));
-    }, [connectionId]);
+    }, [source]);
 
     useEffect(() => {
         setReadings([]);
@@ -136,7 +137,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
     useEffect(() => {
         let alive = true;
         setInsights(null);
-        void actions.insightsAction(connectionId).then((result) => {
+        void source.insights().then((result) => {
             if (!alive) return;
             // A failure here is not the panel's failure. The rates above are
             // still worth watching, and an engine that will not answer this is
@@ -146,7 +147,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
         return () => {
             alive = false;
         };
-    }, [connectionId]);
+    }, [source]);
 
     const latest = readings[readings.length - 1];
     const rates = RATES[engine] ?? { keys: [] };

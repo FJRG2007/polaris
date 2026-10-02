@@ -16,6 +16,7 @@ import * as data from "./driver";
 import { withDriver } from "./open";
 import { addressOf } from "./connections";
 import type { RedisValue } from "./drivers/redis";
+import type { RowDelete, RowInsert, RowWriteResult, TableDraft } from "./row-edit";
 
 /** What a page of rows may ask for. Everything is bounded here rather than
  *  trusted: it arrives from a browser. */
@@ -34,7 +35,10 @@ export type KeyValueView = RedisValue;
 /** The engine's own version string. The connection test, and what the header
  *  says once it is open. */
 export async function version(userId: string, connectionId: string): Promise<string> {
-    const address = await addressOf(userId, connectionId);
+    return versionAt(await addressOf(userId, connectionId));
+}
+
+export async function versionAt(address: data.DataAddress): Promise<string> {
     return withDriver(address, (driver) => driver.version());
 }
 
@@ -63,7 +67,19 @@ export async function browse(
      */
     namespace: string | null;
 }> {
-    const address = await addressOf(userId, connectionId);
+    return browseAt(await addressOf(userId, connectionId), namespace);
+}
+
+/** `browse`, for an address already resolved and authorized by the caller. */
+export async function browseAt(
+    address: data.DataAddress,
+    namespace: string | null
+): Promise<{
+    shape: data.DataShape;
+    namespaces: data.DataNamespace[];
+    relations: data.DataRelation[];
+    namespace: string | null;
+}> {
     return withDriver(address, async (driver) => {
         const namespaces = await driver.namespaces();
         // The one it was asked for, or the one a database is worth opening on -
@@ -83,7 +99,15 @@ export async function rows(
     relation: string,
     request: RowRequest
 ): Promise<data.DataPage> {
-    const address = await addressOf(userId, connectionId);
+    return rowsAt(await addressOf(userId, connectionId), namespace, relation, request);
+}
+
+export async function rowsAt(
+    address: data.DataAddress,
+    namespace: string | null,
+    relation: string,
+    request: RowRequest
+): Promise<data.DataPage> {
     return withDriver(address, async (driver) => {
         // The relation has to be one this connection actually holds. The name
         // goes into a statement in a position no parameter can occupy, so being
@@ -123,7 +147,10 @@ export async function updateCell(
     connectionId: string,
     edit: data.CellEdit
 ): Promise<data.CellEditResult> {
-    const address = await addressOf(userId, connectionId);
+    return updateCellAt(await addressOf(userId, connectionId), edit);
+}
+
+export async function updateCellAt(address: data.DataAddress, edit: data.CellEdit): Promise<data.CellEditResult> {
     return withDriver(address, async (driver) => {
         if (!driver.updateCell) {
             throw new data.DataRequestError("Values in this kind of database are not edited from the grid.");
@@ -142,7 +169,10 @@ export async function run(
     connectionId: string,
     statement: string
 ): Promise<data.QueryResult[]> {
-    const address = await addressOf(userId, connectionId);
+    return runAt(await addressOf(userId, connectionId), statement);
+}
+
+export async function runAt(address: data.DataAddress, statement: string): Promise<data.QueryResult[]> {
     return withDriver(address, (driver) => driver.run(statement));
 }
 
@@ -153,7 +183,14 @@ export async function keyValue(
     namespace: string | null,
     key: string
 ): Promise<KeyValueView> {
-    const address = await addressOf(userId, connectionId);
+    return keyValueAt(await addressOf(userId, connectionId), namespace, key);
+}
+
+export async function keyValueAt(
+    address: data.DataAddress,
+    namespace: string | null,
+    key: string
+): Promise<KeyValueView> {
     if (address.engine !== "redis") {
         throw new data.DataRequestError("Only a Redis key has a value to open.");
     }
@@ -163,5 +200,63 @@ export async function keyValue(
             throw new data.DataRequestError("Only a Redis key has a value to open.");
         }
         return driver.value(namespace, key);
+    });
+}
+
+/**
+ * The relation has to be one this connection holds before anything is written to
+ * it - its name goes where no parameter can - and the engine has to be one with
+ * rows to add and remove.
+ */
+async function knownRelation(driver: data.DataDriver, namespace: string | null, relation: string): Promise<void> {
+    const known = await driver.relations(namespace);
+    if (!known.some((entry) => entry.name === relation && entry.kind === "table")) {
+        throw new data.DataRequestError("There is nothing here by that name.");
+    }
+}
+
+const NO_ROW_WRITES = "Rows in this kind of database are not added or removed from the grid.";
+
+/** Add one row. */
+export async function insertRow(userId: string, connectionId: string, insert: RowInsert): Promise<RowWriteResult> {
+    return insertRowAt(await addressOf(userId, connectionId), insert);
+}
+
+export async function insertRowAt(address: data.DataAddress, insert: RowInsert): Promise<RowWriteResult> {
+    return withDriver(address, async (driver) => {
+        if (!driver.insertRow) throw new data.DataRequestError(NO_ROW_WRITES);
+        await knownRelation(driver, insert.namespace, insert.relation);
+        return driver.insertRow(insert);
+    });
+}
+
+/** Remove rows, each named by its primary key. */
+export async function deleteRows(userId: string, connectionId: string, removal: RowDelete): Promise<RowWriteResult> {
+    return deleteRowsAt(await addressOf(userId, connectionId), removal);
+}
+
+export async function deleteRowsAt(address: data.DataAddress, removal: RowDelete): Promise<RowWriteResult> {
+    return withDriver(address, async (driver) => {
+        if (!driver.deleteRows) throw new data.DataRequestError(NO_ROW_WRITES);
+        await knownRelation(driver, removal.namespace, removal.relation);
+        return driver.deleteRows(removal);
+    });
+}
+
+/** Create a table in a schema the connection holds. */
+export async function createTable(userId: string, connectionId: string, draft: TableDraft): Promise<void> {
+    return createTableAt(await addressOf(userId, connectionId), draft);
+}
+
+export async function createTableAt(address: data.DataAddress, draft: TableDraft): Promise<void> {
+    return withDriver(address, async (driver) => {
+        if (!driver.createTable) {
+            throw new data.DataRequestError("Tables in this kind of database are not created from here.");
+        }
+        const namespaces = await driver.namespaces();
+        if (draft.namespace !== null && !namespaces.some((entry) => entry.name === draft.namespace)) {
+            throw new data.DataRequestError("There is nothing here by that name.");
+        }
+        await driver.createTable(draft);
     });
 }
