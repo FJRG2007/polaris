@@ -9,6 +9,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { utils as sshUtils } from "ssh2";
+
+/** A real key, since a typed key is now parsed before it is stored. */
+const KEY = sshUtils.generateKeyPairSync("ed25519").private;
 
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "99999999-9999-4999-8999-999999999999";
@@ -23,6 +27,7 @@ let written: Record<string, unknown> | null = null;
 const captured: { target: Record<string, unknown>; jump: Record<string, unknown> | null }[] = [];
 let captureFails = false;
 let captureRefuses = "";
+let admin = false;
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -49,7 +54,22 @@ vi.mock("@polaris/config", () => ({
         POLARIS_MASTER_KEY: "0".repeat(64)
     })
 }));
-vi.mock("@polaris/auth", () => ({ userHasPermission: async () => false }));
+vi.mock("@polaris/auth", () => ({ userHasPermission: async () => admin }));
+// Names resolve to documentation addresses, so the judging of an address runs
+// for real without anything leaving this machine.
+vi.mock("node:dns/promises", () => ({
+    lookup: async (host: string) => {
+        const table: Record<string, string> = {
+            "ssh.example.com": "198.51.100.22",
+            "old.example.com": "198.51.100.23",
+            "db.example.com": "203.0.113.10",
+            "intranet.example.com": "10.0.0.40"
+        };
+        const address = table[host];
+        if (!address) throw Object.assign(new Error("ENOTFOUND"), { code: "ENOTFOUND" });
+        return [{ address, family: 4 }];
+    }
+}));
 vi.mock("@polaris/storage", () => ({
     encryptCredentials: (secret: unknown) => ({
         ciphertext: Buffer.from(JSON.stringify(secret)),
@@ -70,7 +90,11 @@ vi.mock("@/lib/host-service", () => {
             this.name = "HostCredentialsError";
         }
     }
-    return { HostCredentialsError, getHostConnection };
+    return {
+        HostCredentialsError,
+        getHostConnection,
+        getHostConnectionUnscoped: getHostConnection
+    };
 
     async function getHostConnection(hostId: string, ownerId: string) {
         if (ownerId !== ALICE) throw new Error("Host not found");
@@ -182,6 +206,7 @@ beforeEach(() => {
     captured.length = 0;
     captureFails = false;
     captureRefuses = "";
+    admin = false;
 });
 
 describe("saving a tunnel through a registered server", () => {
@@ -229,8 +254,9 @@ describe("saving a tunnel through a login typed in the form", () => {
     it("signs in once to pin the server's key, and keeps the secret encrypted", async () => {
         await saveConnection(ALICE, { ...base, ssh: manual });
 
+        // The address that was judged is the one dialled, not the name again.
         expect(captured[0]?.target).toMatchObject({
-            host: "ssh.example.com",
+            host: "198.51.100.22",
             port: 2222,
             username: "root"
         });
@@ -389,13 +415,14 @@ describe("saving a tunnel through a login typed in the form", () => {
         await saveConnection(ALICE, {
             ...base,
             id: CONNECTION,
-            ssh: { ...manual, authMethod: "key", password: null, privateKey: "PRIVATE" }
+            ssh: { ...manual, authMethod: "key", password: null, privateKey: KEY }
         });
 
         expect(captured[0]?.target).toMatchObject({
             pinnedHostKey: ["SSHKEY"],
-            auth: { method: "key", privateKey: "PRIVATE" }
+            auth: { method: "key", privateKey: KEY.trim() }
         });
+        expect(written?.sshKeySummary).toMatch(/^ssh-ed25519 SHA256:/);
     });
 
     it("says the key changed rather than blaming the password, and stores nothing", async () => {
@@ -426,6 +453,40 @@ describe("saving a tunnel through a login typed in the form", () => {
         expect(written).toBeNull();
     });
 
+    it("refuses a public key pasted where the private one goes", async () => {
+        const pair = sshUtils.generateKeyPairSync("ed25519");
+        await expect(
+            saveConnection(ALICE, {
+                ...base,
+                ssh: { ...manual, authMethod: "key", password: null, privateKey: pair.public }
+            })
+        ).rejects.toThrow(/That is a public key/);
+        expect(captured).toHaveLength(0);
+    });
+
+    it("does not send a saved SSH secret to a server it was not saved for", async () => {
+        saved = [
+            row({
+                sshMode: "manual",
+                sshHost: "old.example.com",
+                sshPort: 2222,
+                sshUsername: "root",
+                sshAuthMethod: "password",
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "password", password: "hunter2" })
+                ),
+                sshCredentialNonce: Buffer.from("nonce"),
+                sshCredentialKeyId: "k1",
+                sshHostKey: "OLDKEY"
+            })
+        ];
+
+        await expect(
+            saveConnection(ALICE, { ...base, id: CONNECTION, ssh: { ...manual, password: null } })
+        ).rejects.toThrow(/Enter the SSH password or key again/);
+        expect(captured).toHaveLength(0);
+    });
+
     it("signs in with nothing pinned when the address moved", async () => {
         saved = [
             row({
@@ -446,7 +507,7 @@ describe("saving a tunnel through a login typed in the form", () => {
         await saveConnection(ALICE, {
             ...base,
             id: CONNECTION,
-            ssh: { ...manual, password: null }
+            ssh: { ...manual, password: "typed-again" }
         });
 
         expect(captured).toHaveLength(1);
@@ -496,7 +557,7 @@ describe("opening one", () => {
 
         expect(address.tunnel).toMatchObject({
             target: {
-                host: "ssh.example.com",
+                host: "198.51.100.22",
                 port: 2222,
                 auth: { method: "key", privateKey: "PRIVATE" },
                 pinnedHostKey: ["SSHKEY"]
@@ -541,13 +602,47 @@ describe("opening one", () => {
         await expect(addressOf(ALICE, CONNECTION)).rejects.toThrow(/incomplete/);
     });
 
-    it("opens a connection with no tunnel exactly as before", async () => {
-        saved = [row()];
+    it("opens a connection with no tunnel at the address it judged", async () => {
+        saved = [row({ host: "db.example.com" })];
 
         const address = await addressOf(ALICE, CONNECTION);
 
         expect(address.tunnel).toBeNull();
-        expect(address).toMatchObject({ host: "127.0.0.1", port: 5432, password: "app-secret" });
+        expect(address).toMatchObject({ host: "203.0.113.10", port: 5432, password: "app-secret" });
+        expect(address.tls).toMatchObject({ mode: "disable" });
+    });
+
+    it("refuses Polaris' own loopback to an account that does not run the instance", async () => {
+        saved = [row({ host: "127.0.0.1" })];
+        await expect(addressOf(ALICE, CONNECTION)).rejects.toThrow(/private network/);
+        admin = true;
+        await expect(addressOf(ALICE, CONNECTION)).resolves.toMatchObject({ host: "127.0.0.1" });
+    });
+
+    it("refuses a name that resolves into a private network, on open as on save", async () => {
+        saved = [row({ host: "intranet.example.com" })];
+        await expect(addressOf(ALICE, CONNECTION)).rejects.toThrow(/private network/);
+        // A refused open is not a use: nothing was written for it.
+        expect(written).toBeNull();
+        await expect(
+            saveConnection(ALICE, { ...base, host: "intranet.example.com" })
+        ).rejects.toThrow(/private network/);
+        expect(written).toBeNull();
+    });
+
+    it("refuses the metadata address even to an administrator", async () => {
+        admin = true;
+        await expect(saveConnection(ALICE, { ...base, host: "169.254.169.254" })).rejects.toThrow(
+            /link-local or metadata/
+        );
+    });
+
+    it("reads a row saved with the old encryption switch as encrypted, unverified", async () => {
+        saved = [row({ host: "db.example.com", tls: true })];
+        const address = await addressOf(ALICE, CONNECTION);
+        expect(address.tls).toMatchObject({ mode: "require" });
+        const [listed] = await listConnections(ALICE);
+        expect(listed?.tls).toMatchObject({ mode: "require", legacy: true });
     });
 });
 
@@ -563,5 +658,78 @@ describe("the list", () => {
             hostId: SERVER,
             hostName: "lirio-0"
         });
+    });
+});
+
+describe("a saved password", () => {
+    it("is kept by an edit that still points at the same database", async () => {
+        saved = [row({ host: "db.example.com" })];
+        await saveConnection(ALICE, {
+            ...base,
+            id: CONNECTION,
+            host: "db.example.com",
+            password: null,
+            name: "Renamed"
+        });
+        const sealed = JSON.parse((written?.encryptedCredential as Buffer).toString("utf8"));
+        expect(sealed).toEqual({ password: "app-secret" });
+    });
+
+    it("is not sent to a new address: the edit asks for it again", async () => {
+        saved = [row({ host: "db.example.com" })];
+        await expect(
+            saveConnection(ALICE, {
+                ...base,
+                id: CONNECTION,
+                host: "ssh.example.com",
+                password: null
+            })
+        ).rejects.toThrow(/Enter the password again/);
+        expect(written).toBeNull();
+    });
+
+    it("nor to another engine on the same address", async () => {
+        saved = [row({ host: "db.example.com" })];
+        await expect(
+            saveConnection(ALICE, {
+                ...base,
+                id: CONNECTION,
+                host: "db.example.com",
+                engine: "mysql",
+                port: 5432,
+                password: null
+            })
+        ).rejects.toThrow(/Enter the password again/);
+    });
+
+    it("never reaches the list", async () => {
+        saved = [
+            row({
+                host: "db.example.com",
+                sshMode: "manual",
+                sshHost: "ssh.example.com",
+                sshPort: 22,
+                sshUsername: "root",
+                sshAuthMethod: "key",
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "key", privateKey: KEY })
+                ),
+                sshCredentialNonce: Buffer.from("nonce"),
+                sshCredentialKeyId: "k1",
+                sshHostKey: Buffer.from("hostkey").toString("base64"),
+                sshKeySummary: "ssh-ed25519 SHA256:abc"
+            })
+        ];
+        const listed = await listConnections(ALICE);
+        const said = JSON.stringify(listed);
+        expect(said).not.toContain("app-secret");
+        expect(said).not.toContain("PRIVATE KEY");
+        expect(listed[0]).toMatchObject({
+            hasPassword: true,
+            tunnel: { keyType: "ssh-ed25519", keyFingerprint: "SHA256:abc" }
+        });
+        expect((listed[0]?.tunnel as { hostKeyFingerprint: string }).hostKeyFingerprint).toMatch(
+            /^SHA256:/
+        );
     });
 });

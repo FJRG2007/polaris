@@ -29,6 +29,8 @@
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
+import { dataText } from "@/lib/data/words";
+import { spreadsheetSafe } from "@/lib/data/spreadsheet";
 import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
@@ -445,8 +447,10 @@ function rowsAsText(
     columns: readonly DataColumn[]
 ): string {
     if (rows.length === 0) return "";
-    const header = columns.map((column) => column.name).join("\t");
-    const body = rows.map((row) => columns.map((column) => cellText(row[column.name])).join("\t"));
+    const header = columns.map((column) => spreadsheetSafe(column.name)).join("\t");
+    const body = rows.map((row) =>
+        columns.map((column) => spreadsheetSafe(cellText(row[column.name]))).join("\t")
+    );
     return [header, ...body].join("\n");
 }
 
@@ -1253,6 +1257,11 @@ function QueryPanel({
                                       })}
                             </span>
                         </div>
+                        {result.note && (
+                            <p className="border-b border-border px-3 py-1 text-xs text-warning">
+                                {dataText(t, result.note)}
+                            </p>
+                        )}
                         {result.rows.length > 0 && (
                             <div className="max-h-72 overflow-auto overscroll-contain">
                                 <table className="w-full text-xs">

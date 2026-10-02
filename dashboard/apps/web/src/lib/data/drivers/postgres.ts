@@ -8,13 +8,19 @@
  * gates: it has to be a relation this connection just listed, and it is quoted
  * on the way in anyway.
  *
- * Read-only is a real read-only transaction rather than a promise. Postgres
- * refuses the write itself, which covers the statements no keyword check could
- * catch - a function that writes, a trigger behind a SELECT.
+ * Read-only is a real read-only transaction rather than a promise. Every typed
+ * statement runs inside `BEGIN READ ONLY`, after a first query has fixed the
+ * transaction's mode, and is rolled back after - so Postgres refuses the write
+ * itself, which covers what no keyword check could catch: a function that
+ * writes, a trigger behind a SELECT, a statement that tries to switch the
+ * transaction or the session back to read-write. Each one is sent on its own,
+ * through the extended protocol, which takes exactly one statement: a second one
+ * hidden where the splitter did not see it is an error, not a write.
  */
 
-import { Client } from "pg";
+import { Client, Query, type QueryArrayConfig } from "pg";
 import * as data from "../driver";
+import { tlsConnectOptions } from "../tls";
 import { prepareCellEdit } from "../cell-edit";
 import {
     quoteQualified,
@@ -60,17 +66,16 @@ export class PostgresDriver implements data.DataDriver {
             database: this.address.database ?? undefined,
             user: this.address.username ?? undefined,
             password: this.address.password ?? undefined,
-            // The certificate is not verified: a database Polaris runs answers
-            // on a self-signed one, and refusing it would mean the tool works
-            // everywhere except on the databases it provisioned. The channel is
-            // still encrypted, which is what the switch is for.
-            ssl: this.address.tls ? { rejectUnauthorized: false } : undefined,
+            // Whatever the connection's mode says, checked the way `tls.ts`
+            // checks it for every engine.
+            ssl: tlsConnectOptions(this.address.tls) ?? undefined,
             connectionTimeoutMillis: 8000,
-            statement_timeout: 30_000,
+            statement_timeout: data.STATEMENT_TIMEOUT_MS,
             application_name: "polaris-data-browser"
         });
         await client.connect();
-        if (this.address.readOnly) await client.query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY");
+        if (this.address.readOnly)
+            await client.query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY");
         this.client = client;
         return client;
     }
@@ -149,10 +154,15 @@ export class PostgresDriver implements data.DataDriver {
         }));
     }
 
-    async rows(namespace: string | null, relation: string, query: data.RowQuery): Promise<data.DataPage> {
+    async rows(
+        namespace: string | null,
+        relation: string,
+        query: data.RowQuery
+    ): Promise<data.DataPage> {
         const client = await this.open();
         const columns = await this.columns(namespace, relation);
-        if (columns.length === 0) throw new data.DataRequestError("That table has no columns to read.");
+        if (columns.length === 0)
+            throw new data.DataRequestError("That table has no columns to read.");
         const target = quoteQualified([namespace ?? "public", relation], quoteSqlIdent);
 
         // Only a column this table actually has can be ordered by, and the name
@@ -194,7 +204,11 @@ export class PostgresDriver implements data.DataDriver {
         };
     }
 
-    async count(namespace: string | null, relation: string, filter: string | null): Promise<number> {
+    async count(
+        namespace: string | null,
+        relation: string,
+        filter: string | null
+    ): Promise<number> {
         const client = await this.open();
         const target = quoteQualified([namespace ?? "public", relation], quoteSqlIdent);
         const params: unknown[] = [];
@@ -211,24 +225,45 @@ export class PostgresDriver implements data.DataDriver {
     }
 
     async run(sql: string): Promise<data.QueryResult[]> {
-        if (this.address.readOnly && anyStatementWrites(sql)) {
+        const readOnly = this.address.readOnly;
+        if (readOnly && anyStatementWrites(sql, "postgres")) {
             throw new data.ReadOnlyError("one of those statements");
         }
         const client = await this.open();
         const results: data.QueryResult[] = [];
-        for (const statement of splitStatements(sql)) {
+        for (const statement of splitStatements(sql, "postgres")) {
             const started = Date.now();
-            const result = await client.query({ text: statement, rowMode: "array" });
-            const fields = result.fields?.map((field) => field.name) ?? [];
+            const result = readOnly
+                ? await this.readOnlyStatement(client, statement)
+                : await capped(client, statement, false);
             results.push({
                 statement,
-                columns: fields,
-                rows: (result.rows as unknown[][]) ?? [],
-                affected: statementWrites(statement) ? (result.rowCount ?? 0) : null,
-                ms: Date.now() - started
+                columns: result.columns,
+                rows: result.rows,
+                affected: statementWrites(statement, "postgres") ? (result.rowCount ?? 0) : null,
+                ms: Date.now() - started,
+                ...(result.truncated ? { note: data.TRUNCATED_NOTE } : {})
             });
         }
         return results;
+    }
+
+    /**
+     * One statement in a transaction that cannot write.
+     *
+     * `SELECT 1` first, because Postgres lets a transaction be switched back to
+     * read-write only until its first query: after that, `SET TRANSACTION READ
+     * WRITE` is refused by the engine. The rollback undoes anything the statement
+     * managed to change about the session, a `SET` included.
+     */
+    private async readOnlyStatement(client: Client, statement: string): Promise<CappedResult> {
+        await client.query("BEGIN TRANSACTION READ ONLY");
+        try {
+            await client.query("SELECT 1");
+            return await capped(client, statement, true);
+        } finally {
+            await client.query("ROLLBACK").catch(() => undefined);
+        }
     }
 
     /**
@@ -257,4 +292,52 @@ export class PostgresDriver implements data.DataDriver {
         this.client = null;
         if (client) await client.end().catch(() => undefined);
     }
+}
+
+interface CappedResult {
+    readonly columns: string[];
+    readonly rows: unknown[][];
+    readonly rowCount: number | null;
+    readonly truncated: boolean;
+}
+
+/**
+ * Run one statement and keep at most `MAX_STATEMENT_ROWS` of what it returns.
+ *
+ * Rows arrive one at a time on the `row` event and are not collected by the
+ * driver once something listens for them, so the ones past the limit are read
+ * and dropped rather than held. `extended` sends it through the extended
+ * protocol, which takes exactly one statement.
+ */
+function capped(client: Client, text: string, extended: boolean): Promise<CappedResult> {
+    return new Promise((resolve, reject) => {
+        const rows: unknown[][] = [];
+        let truncated = false;
+        // `queryMode` is pg's and missing from its declarations.
+        const config: QueryArrayConfig & { queryMode?: "extended" } = {
+            text,
+            rowMode: "array",
+            ...(extended ? { queryMode: "extended" as const } : {})
+        };
+        const query = new Query(config);
+        query.on("row", (row: unknown[]) => {
+            if (rows.length < data.MAX_STATEMENT_ROWS) rows.push(row);
+            else truncated = true;
+        });
+        query.on("error", reject);
+        query.on("end", (ended: unknown) => {
+            // A statement the splitter left whole can still be several to the
+            // simple protocol; its last answer is the one that is drawn.
+            const last = (Array.isArray(ended) ? ended[ended.length - 1] : ended) as
+                | { fields?: { name: string }[]; rowCount?: number | null }
+                | undefined;
+            resolve({
+                columns: last?.fields?.map((field) => field.name) ?? [],
+                rows,
+                rowCount: last?.rowCount ?? null,
+                truncated
+            });
+        });
+        client.query(query);
+    });
 }
