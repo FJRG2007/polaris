@@ -16,7 +16,7 @@ import { Button, Input } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { LocalPath } from "@/lib/server-local-path";
-import { findLocalPathAction, renameServerAction, useLocalPathAction } from "./actions";
+import { findLocalPathAction, renameServerAction, adoptLocalPathAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
 import type { ServerRow, ServerStatus } from "./types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -148,7 +148,7 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
     const move = async (address: string) => {
         setBusy(true);
         setError("");
-        const result = await runAction(() => useLocalPathAction({ hostId, address }), setError);
+        const result = await runAction(() => adoptLocalPathAction({ hostId, address }), setError);
         setBusy(false);
         if (!result || result.error) {
             if (result?.error) setError(result.error);

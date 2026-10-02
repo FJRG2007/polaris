@@ -73,11 +73,11 @@ export async function withDriver<T>(
 
 async function withOpenDriver<T>(
     address: data.DataAddress,
-    use: (driver: data.DataDriver) => Promise<T>
+    work: (driver: data.DataDriver) => Promise<T>
 ): Promise<T> {
     const driver = await openDriver(address);
     try {
-        return await use(driver);
+        return await work(driver);
     } catch (error) {
         // A certificate that did not check out is the reader's to act on, and
         // is said as itself rather than as whatever the driver wrapped it in.

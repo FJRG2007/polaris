@@ -196,7 +196,7 @@ async function sweepForMachine(
  * involve a terminal - which is the one outcome this whole feature exists to
  * avoid.
  */
-export async function useLocalPath(
+export async function adoptLocalPath(
     hostId: string,
     ownerId: string,
     address: string

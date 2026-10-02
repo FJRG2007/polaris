@@ -45,7 +45,7 @@ import {
 import * as serverEdge from "@/lib/deploy/server-edge";
 import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { isSharedHost, setSharedHost } from "@/lib/deploy/server-space";
-import { findLocalPath, useLocalPath, type LocalPath } from "@/lib/server-local-path";
+import { findLocalPath, adoptLocalPath, type LocalPath } from "@/lib/server-local-path";
 import {
     createEnrollmentSchema,
     createHostSchema,
@@ -283,7 +283,7 @@ export async function recoverServerAddressAction(
     if (path.kind !== "found" || !path.moved) return { path };
 
     // Verified a second time inside, against the same pinned key.
-    const result = await useLocalPath(parsed.data, user.id, path.address);
+    const result = await adoptLocalPath(parsed.data, user.id, path.address);
     if (result.error) return { error: result.error, path };
     await recordAudit({
         actorId: user.id,
@@ -297,14 +297,14 @@ export async function recoverServerAddressAction(
     return { found: path.address, path };
 }
 
-export async function useLocalPathAction(input: unknown): Promise<{ error?: string }> {
+export async function adoptLocalPathAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = z
         .object({ hostId: z.string().uuid(), address: z.string().trim().min(1).max(253) })
         .safeParse(input);
     if (!parsed.success) return { error: await say("errors.notFound") };
 
-    const result = await useLocalPath(parsed.data.hostId, user.id, parsed.data.address);
+    const result = await adoptLocalPath(parsed.data.hostId, user.id, parsed.data.address);
     if (result.error) return result;
     await recordAudit({
         actorId: user.id,

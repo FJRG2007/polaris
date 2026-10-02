@@ -83,7 +83,7 @@ vi.mock("@polaris/ssh", () => ({
     }
 }));
 
-const { findLocalPath, useLocalPath } = await import("../../src/lib/server-local-path");
+const { findLocalPath, adoptLocalPath } = await import("../../src/lib/server-local-path");
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -198,7 +198,7 @@ describe("moving a server onto the address it was found at", () => {
         // that has disappeared with no way back that does not involve a terminal.
         realAddress = "192.168.1.142";
 
-        expect(await useLocalPath(HOST, ADA, "192.168.1.142")).toEqual({});
+        expect(await adoptLocalPath(HOST, ADA, "192.168.1.142")).toEqual({});
         expect(updated).toHaveBeenCalledWith(
             expect.objectContaining({ data: { address: "192.168.1.142" } })
         );
@@ -207,7 +207,7 @@ describe("moving a server onto the address it was found at", () => {
     it("refuses an address that does not answer as this server", async () => {
         realAddress = "192.168.1.142";
 
-        const result = await useLocalPath(HOST, ADA, "192.168.1.200");
+        const result = await adoptLocalPath(HOST, ADA, "192.168.1.200");
 
         expect(result.error).toBeTruthy();
         expect(updated).not.toHaveBeenCalled();
