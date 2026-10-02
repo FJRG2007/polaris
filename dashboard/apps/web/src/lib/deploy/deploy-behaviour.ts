@@ -23,7 +23,10 @@ export interface DeployBehaviourView {
     readonly defaultAlias: string;
 }
 
-export async function deployBehaviour(applicationId: string, ownerId: string): Promise<DeployBehaviourView> {
+export async function deployBehaviour(
+    applicationId: string,
+    ownerId: string
+): Promise<DeployBehaviourView> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: {
@@ -56,7 +59,9 @@ export async function deployBehaviour(applicationId: string, ownerId: string): P
     const notYetMade = strategy.mode === "overlap" ? await volumesNotYetMade(app) : [];
     return {
         strategy:
-            notYetMade.length > 0 ? { mode: "restart", reasons: [{ code: "newVolumes", names: notYetMade }] } : strategy,
+            notYetMade.length > 0
+                ? { mode: "restart", reasons: [{ code: "newVolumes", names: notYetMade }] }
+                : strategy,
         hasVolumes: app.volumes.length > 0,
         overlapChoice: app.volumes.length > 0 && app.target.runtime === "compose",
         overlapVolumes: app.overlapVolumes,
@@ -67,13 +72,20 @@ export async function deployBehaviour(applicationId: string, ownerId: string): P
 
 /** Let a service with volumes change over beside its running version, or not.
  *  The next deploy does it. False when nothing changed. */
-export async function setOverlapVolumes(applicationId: string, ownerId: string, value: boolean): Promise<boolean> {
+export async function setOverlapVolumes(
+    applicationId: string,
+    ownerId: string,
+    value: boolean
+): Promise<boolean> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { overlapVolumes: true }
     });
     if (!app) throw new Error("Application not found");
     if (app.overlapVolumes === value) return false;
-    await prisma.application.update({ where: { id: applicationId }, data: { overlapVolumes: value } });
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { overlapVolumes: value }
+    });
     return true;
 }

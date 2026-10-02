@@ -58,7 +58,12 @@ export async function redeployInstalledAppAction(id: string): Promise<{ error?: 
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.redeploy") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("installed"))("errors.redeploy")
+        };
     }
 }
 
@@ -75,7 +80,12 @@ export async function setInstalledAppRunningAction(
         revalidatePath(`/apps/installed/${id}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.update") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("installed"))("errors.update")
+        };
     }
 }
 
@@ -97,6 +107,11 @@ export async function uninstallInstalledAppAction(id: string): Promise<{ error?:
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("installed"))("errors.uninstall") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("installed"))("errors.uninstall")
+        };
     }
 }

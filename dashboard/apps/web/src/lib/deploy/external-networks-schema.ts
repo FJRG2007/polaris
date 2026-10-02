@@ -41,6 +41,8 @@ export const externalNetworksSchema = z
     .refine((list) => new Set(list.map((entry) => entry.name)).size === list.length, {
         message: "issues.networkTwice"
     })
-    .transform((list) => list.map((entry) => ({ name: entry.name, aliases: [...new Set(entry.aliases)] })));
+    .transform((list) =>
+        list.map((entry) => ({ name: entry.name, aliases: [...new Set(entry.aliases)] }))
+    );
 
 export type ExternalNetwork = z.infer<typeof externalNetworkSchema>;

@@ -8,7 +8,13 @@
 import { SshPorts } from "./ports-ssh";
 import { HostdPorts } from "./ports-hostd";
 import { getHostConnection } from "../host-service";
-import { ComposeRuntime, SwarmRuntime, type DeployTargetInfo, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
+import {
+    ComposeRuntime,
+    SwarmRuntime,
+    type DeployTargetInfo,
+    type RuntimeDriver,
+    type RuntimePorts
+} from "@polaris/deploy";
 
 /** The subset of a DeployTarget row the runtime needs. */
 export interface TargetRow {
@@ -27,7 +33,11 @@ export interface TargetRow {
  * Both backends carry it the same way: the work runs on the other side of a
  * connection, and that side ends the command when the connection does.
  */
-export async function getPorts(target: TargetRow, ownerId: string, signal?: AbortSignal): Promise<RuntimePorts> {
+export async function getPorts(
+    target: TargetRow,
+    ownerId: string,
+    signal?: AbortSignal
+): Promise<RuntimePorts> {
     if (target.kind === "local" || !target.hostId) return new HostdPorts(signal);
     const connection = await getHostConnection(target.hostId, ownerId);
     return new SshPorts(

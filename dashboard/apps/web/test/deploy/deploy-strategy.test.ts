@@ -11,7 +11,9 @@ vi.mock("@polaris/db", () => ({ prisma: {} }));
 
 const releases = await import("@/lib/deploy/releases");
 const { externalNetworksSchema } = await import("@/lib/deploy/external-networks-schema");
-const { externalNetworkPlan, storedExternalNetworks } = await import("@/lib/deploy/external-networks");
+const { externalNetworkPlan, storedExternalNetworks } = await import(
+    "@/lib/deploy/external-networks"
+);
 
 const plain = {
     id: "app-1",
@@ -41,7 +43,10 @@ describe("how a deploy replaces what runs", () => {
             ...plain,
             sourceType: "image",
             publishPort: true,
-            sourceConfig: JSON.stringify({ hostPort: 25565, extraPorts: [{ host: 19132, container: 19132, protocol: "udp" }] })
+            sourceConfig: JSON.stringify({
+                hostPort: 25565,
+                extraPorts: [{ host: 19132, container: 19132, protocol: "udp" }]
+            })
         };
         expect(releases.deployStrategy(game, routed, hostPort)).toEqual({
             mode: "restart",
@@ -58,7 +63,9 @@ describe("how a deploy replaces what runs", () => {
             mode: "restart",
             reasons: [{ code: "volumes", names: ["uploads"] }]
         });
-        expect(releases.deployStrategy({ ...withData, overlapVolumes: true }, routed)).toEqual({ mode: "overlap" });
+        expect(releases.deployStrategy({ ...withData, overlapVolumes: true }, routed)).toEqual({
+            mode: "overlap"
+        });
         expect(releases.runsCutover({ ...withData, overlapVolumes: true }, routed)).toBe(true);
         expect(releases.runsCutover(withData, routed)).toBe(false);
     });
@@ -66,7 +73,12 @@ describe("how a deploy replaces what runs", () => {
     it("never lets two swarm tasks share a volume, whatever the setting", () => {
         const swarm = { ...plain, target: { kind: "local", runtime: "swarm" } };
         expect(releases.deployStrategy(swarm, routed)).toEqual({ mode: "swarm" });
-        expect(releases.deployStrategy({ ...swarm, volumes: [{ name: "data" }], overlapVolumes: true }, routed)).toEqual({
+        expect(
+            releases.deployStrategy(
+                { ...swarm, volumes: [{ name: "data" }], overlapVolumes: true },
+                routed
+            )
+        ).toEqual({
             mode: "restart",
             reasons: [{ code: "volumes", names: ["data"] }]
         });
@@ -85,9 +97,14 @@ describe("how a deploy replaces what runs", () => {
     });
 
     it("runs kept releases side by side on this host, and says why not elsewhere", () => {
-        expect(releases.deployStrategy({ ...plain, keepReleases: true }, routed)).toEqual({ mode: "kept" });
+        expect(releases.deployStrategy({ ...plain, keepReleases: true }, routed)).toEqual({
+            mode: "kept"
+        });
         expect(
-            releases.deployStrategy({ ...plain, keepReleases: true, target: { kind: "host", runtime: "compose" } }, routed)
+            releases.deployStrategy(
+                { ...plain, keepReleases: true, target: { kind: "host", runtime: "compose" } },
+                routed
+            )
         ).toEqual({ mode: "restart", reasons: [{ code: "history" }] });
     });
 });
@@ -109,7 +126,9 @@ describe("the container the edge dials", () => {
 
 describe("networks of the operator's own", () => {
     it("takes several names on one network - the one the service is called and the one a client insists on", () => {
-        const parsed = externalNetworksSchema.parse([{ name: "app_network", aliases: ["dymo-api", " DymoAPI ", "dymo-api"] }]);
+        const parsed = externalNetworksSchema.parse([
+            { name: "app_network", aliases: ["dymo-api", " DymoAPI ", "dymo-api"] }
+        ]);
         expect(parsed).toEqual([{ name: "app_network", aliases: ["dymo-api", "dymoapi"] }]);
         expect(externalNetworkPlan(parsed)).toEqual({
             networks: ["app_network"],
@@ -118,11 +137,21 @@ describe("networks of the operator's own", () => {
     });
 
     it("refuses Docker's own networks and Polaris's, and names that are not one DNS label", () => {
-        for (const name of ["host", "bridge", "polaris_default", "polaris-proxy", "-bad", "has space"]) {
+        for (const name of [
+            "host",
+            "bridge",
+            "polaris_default",
+            "polaris-proxy",
+            "-bad",
+            "has space"
+        ]) {
             expect(externalNetworksSchema.safeParse([{ name, aliases: [] }]).success).toBe(false);
         }
         for (const alias of ["dymo_api", "-api", "api-", "a.b"]) {
-            expect(externalNetworksSchema.safeParse([{ name: "app_network", aliases: [alias] }]).success).toBe(false);
+            expect(
+                externalNetworksSchema.safeParse([{ name: "app_network", aliases: [alias] }])
+                    .success
+            ).toBe(false);
         }
         expect(
             externalNetworksSchema.safeParse([

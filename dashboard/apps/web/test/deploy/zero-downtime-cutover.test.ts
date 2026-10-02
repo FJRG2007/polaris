@@ -23,7 +23,10 @@ const dataDir = await mkdtemp(join(tmpdir(), "polaris-cutover-test-"));
 type Row = Record<string, unknown> & { id: string };
 
 const { db, ops, routerSync } = vi.hoisted(() => ({
-    db: { deployments: new Map<string, Record<string, unknown> & { id: string }>(), app: {} as Record<string, unknown> },
+    db: {
+        deployments: new Map<string, Record<string, unknown> & { id: string }>(),
+        app: {} as Record<string, unknown>
+    },
     ops: [] as string[],
     routerSync: { fail: false }
 }));
@@ -49,31 +52,56 @@ vi.mock("@polaris/db", () => {
     return {
         prisma: {
             deployment: {
-                findUnique: vi.fn(async (args: { where: { id: string } }) => db.deployments.get(args.where.id) ?? null),
-                findFirst: vi.fn(async (args: { where: Record<string, unknown> }) => deployments().find((row) => matches(row, args.where)) ?? null),
-                findMany: vi.fn(async (args: { where?: Record<string, unknown> }) => deployments().filter((row) => matches(row, args.where))),
-                count: vi.fn(async (args: { where?: Record<string, unknown> }) => deployments().filter((row) => matches(row, args.where)).length),
-                update: vi.fn(async (args: { where: { id: string }; data: Record<string, unknown> }) => {
-                    const row = db.deployments.get(args.where.id);
-                    if (row) Object.assign(row, args.data);
-                    return row;
-                }),
-                updateMany: vi.fn(async (args: { where?: Record<string, unknown>; data: Record<string, unknown> }) => {
-                    const hit = deployments().filter((row) => matches(row, args.where));
-                    for (const row of hit) Object.assign(row, args.data);
-                    return { count: hit.length };
-                })
+                findUnique: vi.fn(
+                    async (args: { where: { id: string } }) =>
+                        db.deployments.get(args.where.id) ?? null
+                ),
+                findFirst: vi.fn(
+                    async (args: { where: Record<string, unknown> }) =>
+                        deployments().find((row) => matches(row, args.where)) ?? null
+                ),
+                findMany: vi.fn(async (args: { where?: Record<string, unknown> }) =>
+                    deployments().filter((row) => matches(row, args.where))
+                ),
+                count: vi.fn(
+                    async (args: { where?: Record<string, unknown> }) =>
+                        deployments().filter((row) => matches(row, args.where)).length
+                ),
+                update: vi.fn(
+                    async (args: { where: { id: string }; data: Record<string, unknown> }) => {
+                        const row = db.deployments.get(args.where.id);
+                        if (row) Object.assign(row, args.data);
+                        return row;
+                    }
+                ),
+                updateMany: vi.fn(
+                    async (args: {
+                        where?: Record<string, unknown>;
+                        data: Record<string, unknown>;
+                    }) => {
+                        const hit = deployments().filter((row) => matches(row, args.where));
+                        for (const row of hit) Object.assign(row, args.data);
+                        return { count: hit.length };
+                    }
+                )
             },
             application: {
                 findUnique: vi.fn(async () => db.app),
                 findFirst: vi.fn(async () => db.app),
                 findMany: vi.fn(async () => [db.app]),
-                update: vi.fn(async (args: { data: Record<string, unknown> }) => Object.assign(db.app, args.data)),
-                updateMany: vi.fn(async (args: { where?: Record<string, unknown>; data: Record<string, unknown> }) => {
-                    if (!matches(db.app as never, args.where)) return { count: 0 };
-                    Object.assign(db.app, args.data);
-                    return { count: 1 };
-                })
+                update: vi.fn(async (args: { data: Record<string, unknown> }) =>
+                    Object.assign(db.app, args.data)
+                ),
+                updateMany: vi.fn(
+                    async (args: {
+                        where?: Record<string, unknown>;
+                        data: Record<string, unknown>;
+                    }) => {
+                        if (!matches(db.app as never, args.where)) return { count: 0 };
+                        Object.assign(db.app, args.data);
+                        return { count: 1 };
+                    }
+                )
             },
             domain: {
                 findMany: vi.fn(async () => [
@@ -95,7 +123,9 @@ vi.mock("@polaris/db", () => {
         }
     };
 });
-vi.mock("@/lib/notifications/deploy-events", () => ({ notifyDeployFinished: vi.fn(async () => undefined) }));
+vi.mock("@/lib/notifications/deploy-events", () => ({
+    notifyDeployFinished: vi.fn(async () => undefined)
+}));
 vi.mock("@/lib/deploy/github-deployment", () => ({
     announceDeployFinished: vi.fn(async () => undefined),
     announceDeployQueued: vi.fn(async () => undefined),
@@ -116,7 +146,10 @@ vi.mock("@/lib/domain-zones", () => ({
     deployZoneHosts: vi.fn(async () => []),
     isBaseZoneKey: vi.fn()
 }));
-vi.mock("@/lib/waf-service", () => ({ resolveWaf: vi.fn(), resolveWafBatch: vi.fn(async () => new Map()) }));
+vi.mock("@/lib/waf-service", () => ({
+    resolveWaf: vi.fn(),
+    resolveWafBatch: vi.fn(async () => new Map())
+}));
 vi.mock("@/lib/domain-service", () => ({
     appBaseUrl: vi.fn(async () => "https://polaris.example.test"),
     getPublicIp: vi.fn(async () => "10.0.0.5")
@@ -137,12 +170,23 @@ vi.mock("@/lib/deploy/runtime", () => ({
         dispose: vi.fn(async () => undefined)
     })),
     getDriver: vi.fn(() => ({})),
-    toTargetInfo: vi.fn(() => ({ id: "target-1", kind: "local", engine: "compose", proxyNetwork: "polaris-proxy" }))
+    toTargetInfo: vi.fn(() => ({
+        id: "target-1",
+        kind: "local",
+        engine: "compose",
+        proxyNetwork: "polaris-proxy"
+    }))
 }));
 
 const service = await import("@/lib/deploy-service");
 
-const TARGET = { id: "target-1", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "polaris-proxy" };
+const TARGET = {
+    id: "target-1",
+    kind: "local",
+    hostId: null,
+    runtime: "compose",
+    proxyNetwork: "polaris-proxy"
+};
 const base = serviceRef("acme", "shop", "app-1");
 const nameOf = (id: string) => releaseRef(base, releaseMarker({ id })).name;
 const projectOf = (id: string) => releaseRef(base, releaseMarker({ id })).project;
@@ -191,7 +235,9 @@ function release(ok: boolean) {
     return async () => {
         ops.push(`up ${projectOf("dep-new")}`);
         ops.push(ok ? "serving" : "did not come up");
-        return ok ? { ok: true, imageTag: "polaris-release/shop:abc" } : { ok: false, error: "it did not" };
+        return ok
+            ? { ok: true, imageTag: "polaris-release/shop:abc" }
+            : { ok: false, error: "it did not" };
     };
 }
 
@@ -214,7 +260,11 @@ describe("a change-over redeploy of a routed service", () => {
     it("leaves the old release serving and the route untouched when the new one does not come up", async () => {
         await service.executeDeployment("dep-new", TARGET as never, "owner-1", release(false));
 
-        expect(ops).toEqual([`up ${projectOf("dep-new")}`, "did not come up", `down ${projectOf("dep-new")}`]);
+        expect(ops).toEqual([
+            `up ${projectOf("dep-new")}`,
+            "did not come up",
+            `down ${projectOf("dep-new")}`
+        ]);
         expect(db.app.currentDeploymentId).toBe("dep-old");
         expect(db.deployments.get("dep-old")?.status).toBe("running");
         expect(db.deployments.get("dep-new")?.status).toBe("failed");
@@ -281,7 +331,9 @@ describe("an in-place deploy after a change-over release that shares its volumes
         Object.assign(db.deployments.get("dep-new")!, { isolated: false, cutover: false });
         db.app.volumes = [{ kind: "volume" }];
         const ports = {
-            composeUp: vi.fn(async (spec: { project: string }) => void ops.push(`up ${spec.project}`)),
+            composeUp: vi.fn(
+                async (spec: { project: string }) => void ops.push(`up ${spec.project}`)
+            ),
             composeDown: vi.fn(async (project: string) => void ops.push(`down ${project}`)),
             pull: vi.fn(async () => undefined)
         };
@@ -290,19 +342,31 @@ describe("an in-place deploy after a change-over release that shares its volumes
 
     it("stops the change-over release right before the in-place one starts on the same volumes", async () => {
         const ctx = inPlace();
-        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+        const wrapped = await service.sharedVolumesFreedBeforeUp(
+            "dep-new",
+            { ref: base } as never,
+            ctx as never
+        );
 
         await wrapped.ports.pull("img");
         expect(ops).toEqual([]);
         await wrapped.ports.composeUp({ project: base.project } as never);
         await wrapped.ports.composeUp({ project: base.project } as never);
 
-        expect(ops).toEqual([`down ${projectOf("dep-old")}`, `up ${base.project}`, `up ${base.project}`]);
+        expect(ops).toEqual([
+            `down ${projectOf("dep-old")}`,
+            `up ${base.project}`,
+            `up ${base.project}`
+        ]);
     });
 
     it("no longer records the release it stopped as running or serving", async () => {
         const ctx = inPlace();
-        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+        const wrapped = await service.sharedVolumesFreedBeforeUp(
+            "dep-new",
+            { ref: base } as never,
+            ctx as never
+        );
 
         await wrapped.ports.composeUp({ project: base.project } as never);
 
@@ -313,7 +377,11 @@ describe("an in-place deploy after a change-over release that shares its volumes
     it("leaves the running release alone when the service has no named volume", async () => {
         const ctx = inPlace();
         db.app.volumes = [{ kind: "bind" }];
-        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+        const wrapped = await service.sharedVolumesFreedBeforeUp(
+            "dep-new",
+            { ref: base } as never,
+            ctx as never
+        );
 
         expect(wrapped).toBe(ctx);
     });
@@ -321,7 +389,11 @@ describe("an in-place deploy after a change-over release that shares its volumes
     it("leaves it alone for a deploy that changes over itself", async () => {
         const ctx = inPlace();
         Object.assign(db.deployments.get("dep-new")!, { isolated: true, cutover: true });
-        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+        const wrapped = await service.sharedVolumesFreedBeforeUp(
+            "dep-new",
+            { ref: base } as never,
+            ctx as never
+        );
 
         expect(wrapped).toBe(ctx);
     });

@@ -1845,7 +1845,11 @@ export async function reconcileNasMounts(): Promise<void> {
             if (recreated) {
                 // A service with a NAS volume never runs its releases side by side, so
                 // its own container name is the one serving it.
-                const container = deployReleases.serviceRef(app.environment.project.slug, app.slug, app.id).name;
+                const container = deployReleases.serviceRef(
+                    app.environment.project.slug,
+                    app.slug,
+                    app.id
+                ).name;
                 await ports.container(container, "restart");
                 console.log(`polaris: re-established NAS mount for ${app.slug} and restarted it`);
             }
@@ -2362,7 +2366,10 @@ async function buildAppPlan(
         release && kept
             ? deployReleases.releaseRef(base, deployReleases.markerOf(release))
             : release && cutover
-              ? deployReleases.releaseRef(base, deployReleases.markerOf({ id: release.id, cutover: true }))
+              ? deployReleases.releaseRef(
+                    base,
+                    deployReleases.markerOf({ id: release.id, cutover: true })
+                )
               : base;
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     const build = JSON.parse(app.buildConfig) as Record<string, unknown>;
@@ -2582,7 +2589,9 @@ async function buildAppPlan(
             const extra = [...(isLocalHub ? [HUB_NETWORK] : []), ...external.networks];
             return {
                 extraNetworks: extra.length > 0 ? extra : undefined,
-                ...(Object.keys(external.aliases).length > 0 ? { networkAliases: external.aliases } : {})
+                ...(Object.keys(external.aliases).length > 0
+                    ? { networkAliases: external.aliases }
+                    : {})
             };
         })(),
         // A release changing over beside the one serving, with volumes it is allowed
@@ -3982,7 +3991,9 @@ async function releaseCurrentOnly(applicationId: string, ownerId: string): Promi
     try {
         for (const release of superseded) {
             await ports
-                .composeDown(deployReleases.releaseRef(base, deployReleases.markerOf(release)).project)
+                .composeDown(
+                    deployReleases.releaseRef(base, deployReleases.markerOf(release)).project
+                )
                 .catch(() => undefined);
         }
     } finally {
@@ -4066,7 +4077,10 @@ export async function sharedVolumesFreedBeforeUp(
     if (!row || row.isolated) return ctx;
     const app = await prisma.application.findUnique({
         where: { id: row.deployableId },
-        include: { environment: { include: { project: true } }, volumes: { select: { kind: true } } }
+        include: {
+            environment: { include: { project: true } },
+            volumes: { select: { kind: true } }
+        }
     });
     if (!app?.volumes.some((volume) => volume.kind !== "bind" && volume.kind !== "nas")) return ctx;
     const current = app.currentDeploymentId
@@ -4084,7 +4098,9 @@ export async function sharedVolumesFreedBeforeUp(
     const composeUp: RuntimePorts["composeUp"] = async (spec, onOutput) => {
         if (!freed && spec.project === plan.ref.project) {
             freed = true;
-            ctx.log(Buffer.from("==> Stopping the running version: it shares this service's volumes\n"));
+            ctx.log(
+                Buffer.from("==> Stopping the running version: it shares this service's volumes\n")
+            );
             await ports.composeDown(serving, onOutput);
             await releaseTakenDown(app.id, currentId);
         }
@@ -4554,10 +4570,10 @@ async function settleCancelled(
     const settled = await settleDeployment(deploymentId, {
         status: "cancelled",
         error: timedOut
-            // i18n-ignore stored with the deployment, written once in the default language
-            ? `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing`
-            // i18n-ignore stored with the deployment, written once in the default language
-            : "Canceled",
+            ? // i18n-ignore stored with the deployment, written once in the default language
+              `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing`
+            : // i18n-ignore stored with the deployment, written once in the default language
+              "Canceled",
         finishedAt: new Date()
     });
     await abandonRelease(deploymentId).catch(() => undefined);
@@ -4674,7 +4690,14 @@ async function promoteRelease(
 async function retireHeldReleases(unreachedHosts: ReadonlySet<string>): Promise<void> {
     const running = await prisma.deployment.findMany({
         where: { deployableType: "application", status: "running" },
-        select: { id: true, deployableId: true, commitSha: true, isolated: true, cutover: true, createdAt: true }
+        select: {
+            id: true,
+            deployableId: true,
+            commitSha: true,
+            isolated: true,
+            cutover: true,
+            createdAt: true
+        }
     });
     const candidates = [...new Set(running.map((row) => row.deployableId))].filter(
         (applicationId) => !promoting.has(applicationId)
@@ -4682,7 +4705,12 @@ async function retireHeldReleases(unreachedHosts: ReadonlySet<string>): Promise<
     if (candidates.length === 0) return;
     const apps = await prisma.application.findMany({
         where: { id: { in: candidates }, currentDeploymentId: { not: null } },
-        select: { id: true, keepReleases: true, currentDeploymentId: true, target: { select: { hostId: true } } }
+        select: {
+            id: true,
+            keepReleases: true,
+            currentDeploymentId: true,
+            target: { select: { hostId: true } }
+        }
     });
     const held = new Map<string, typeof running>();
     for (const app of apps) {
@@ -4732,11 +4760,22 @@ function drain(): Promise<void> {
  *  replaced, or a kept one fallen out of the window. */
 async function anythingToRetire(
     applicationId: string,
-    replaced: readonly { id: string; commitSha: string | null; isolated: boolean; cutover: boolean }[]
+    replaced: readonly {
+        id: string;
+        commitSha: string | null;
+        isolated: boolean;
+        cutover: boolean;
+    }[]
 ): Promise<boolean> {
     if ((await stillServingProjects(applicationId, replaced)).length > 0) return true;
     const kept = await prisma.deployment.count({
-        where: { deployableType: "application", deployableId: applicationId, status: "running", isolated: true, cutover: false }
+        where: {
+            deployableType: "application",
+            deployableId: applicationId,
+            status: "running",
+            isolated: true,
+            cutover: false
+        }
     });
     return kept > deployReleases.KEPT_RELEASES;
 }
@@ -4765,7 +4804,12 @@ async function switchEdge(hostId: string | null): Promise<boolean> {
  */
 async function stillServingProjects(
     applicationId: string,
-    replaced: readonly { id: string; commitSha: string | null; isolated: boolean; cutover: boolean }[]
+    replaced: readonly {
+        id: string;
+        commitSha: string | null;
+        isolated: boolean;
+        cutover: boolean;
+    }[]
 ): Promise<string[]> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
@@ -4777,8 +4821,9 @@ async function stillServingProjects(
     return replaced
         .filter(
             (row) =>
-                (row.isolated ? deployReleases.releaseRef(base, deployReleases.markerOf(row)).project : base.project) !==
-                serving.project
+                (row.isolated
+                    ? deployReleases.releaseRef(base, deployReleases.markerOf(row)).project
+                    : base.project) !== serving.project
         )
         .map((row) => row.id);
 }
@@ -4818,7 +4863,11 @@ async function retireReplaced(
             // beside them goes.
             app.keepReleases && !row.cutover
                 ? []
-                : [row.isolated ? deployReleases.releaseRef(base, deployReleases.markerOf(row)).project : base.project]
+                : [
+                      row.isolated
+                          ? deployReleases.releaseRef(base, deployReleases.markerOf(row)).project
+                          : base.project
+                  ]
         )
     );
     // Whatever resolves to what is serving now stays - an ordinary redeploy in
@@ -4967,7 +5016,9 @@ async function retireOldReleases(applicationId: string): Promise<void> {
         await ports.composeDown(base.project).catch(() => undefined);
         for (const release of retiring) {
             await ports
-                .composeDown(deployReleases.releaseRef(base, deployReleases.markerOf(release)).project)
+                .composeDown(
+                    deployReleases.releaseRef(base, deployReleases.markerOf(release)).project
+                )
                 .catch(() => undefined);
             await prisma.domain.deleteMany({ where: { applicationId, deploymentId: release.id } });
             await prisma.deployment.update({
@@ -5001,7 +5052,9 @@ async function downAllReleases(
     });
     const projects = [
         base.project,
-        ...releases.map((release) => deployReleases.releaseRef(base, deployReleases.markerOf(release)).project)
+        ...releases.map(
+            (release) => deployReleases.releaseRef(base, deployReleases.markerOf(release)).project
+        )
     ];
     for (const project of [...new Set(projects)]) {
         if (swarm) await ports.stackDown(project).catch(() => undefined);

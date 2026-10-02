@@ -123,8 +123,15 @@ export function keepsReleases(app: {
  * Polaris is dialled on the host port that server publishes, which is the
  * published-port case already refused here.
  */
-export function runsCutover(app: CutoverSubject, edge: { readonly followsPushedRoutes: boolean }): boolean {
-    return !app.keepReleases && app.target.runtime === "compose" && restartReasons(app, edge).length === 0;
+export function runsCutover(
+    app: CutoverSubject,
+    edge: { readonly followsPushedRoutes: boolean }
+): boolean {
+    return (
+        !app.keepReleases &&
+        app.target.runtime === "compose" &&
+        restartReasons(app, edge).length === 0
+    );
 }
 
 /** What `runsCutover` and `deployStrategy` read about a service. */
@@ -191,15 +198,23 @@ export function restartReasons(
     if (Array.isArray(source.extraPorts)) {
         for (const entry of source.extraPorts as { host?: unknown; protocol?: unknown }[]) {
             if (typeof entry?.host !== "number") continue;
-            reasons.push({ code: "hostPort", port: entry.host, protocol: entry.protocol === "udp" ? "udp" : "tcp" });
+            reasons.push({
+                code: "hostPort",
+                port: entry.host,
+                protocol: entry.protocol === "udp" ? "udp" : "tcp"
+            });
         }
     }
     if (app.sourceType === "compose") reasons.push({ code: "compose" });
     // Swarm never lets two tasks share a volume (`forSwarm`), whatever the setting.
     if (app.volumes.length > 0 && (!app.overlapVolumes || app.target.runtime !== "compose")) {
-        reasons.push({ code: "volumes", names: app.volumes.map((volume) => volume.name ?? "").filter(Boolean) });
+        reasons.push({
+            code: "volumes",
+            names: app.volumes.map((volume) => volume.name ?? "").filter(Boolean)
+        });
     }
-    if (!edge.followsPushedRoutes && app.target.runtime === "compose") reasons.push({ code: "edge" });
+    if (!edge.followsPushedRoutes && app.target.runtime === "compose")
+        reasons.push({ code: "edge" });
     return reasons;
 }
 
@@ -212,11 +227,15 @@ export function deployStrategy(
     if (app.target.runtime === "swarm") {
         const volumes = app.volumes.length > 0;
         return volumes
-            ? { mode: "restart", reasons: restartReasons({ ...app, publishPort: false, sourceConfig: "{}" }, edge) }
+            ? {
+                  mode: "restart",
+                  reasons: restartReasons({ ...app, publishPort: false, sourceConfig: "{}" }, edge)
+              }
             : { mode: "swarm" };
     }
     if (app.keepReleases) {
-        if (keepsReleases({ ...app, target: { kind: app.target.kind ?? "local" } })) return { mode: "kept" };
+        if (keepsReleases({ ...app, target: { kind: app.target.kind ?? "local" } }))
+            return { mode: "kept" };
     }
     const reasons = restartReasons(app, edge, hostPortOf);
     if (reasons.length === 0 && !app.keepReleases) return { mode: "overlap" };
@@ -234,7 +253,11 @@ export function deployStrategy(
  */
 export async function volumesNotYetMade(app: {
     readonly currentDeploymentId: string | null;
-    readonly volumes: readonly { readonly name: string; readonly kind: string; readonly createdAt: Date }[];
+    readonly volumes: readonly {
+        readonly name: string;
+        readonly kind: string;
+        readonly createdAt: Date;
+    }[];
 }): Promise<string[]> {
     const named = app.volumes.filter((volume) => volume.kind !== "bind" && volume.kind !== "nas");
     if (named.length === 0) return [];
@@ -278,7 +301,9 @@ export function edgeDialName(
     base: ReleaseRef,
     current: { readonly id: string; readonly cutover: boolean } | null | undefined
 ): string {
-    return current?.cutover ? releaseRef(base, markerOf({ id: current.id, cutover: true })).name : base.name;
+    return current?.cutover
+        ? releaseRef(base, markerOf({ id: current.id, cutover: true })).name
+        : base.name;
 }
 
 /**

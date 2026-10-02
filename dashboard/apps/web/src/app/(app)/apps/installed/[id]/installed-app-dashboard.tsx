@@ -152,7 +152,12 @@ export function InstalledAppDashboard({
 
             <PageHeader
                 title={app.name}
-                description={[appName(words, app.catalogId, app.catalogName, navLabel), app.serverName].filter(Boolean).join(" - ")}
+                description={[
+                    appName(words, app.catalogId, app.catalogName, navLabel),
+                    app.serverName
+                ]
+                    .filter(Boolean)
+                    .join(" - ")}
                 actions={
                     <div className="flex items-center gap-2">
                         <Badge
@@ -165,7 +170,9 @@ export function InstalledAppDashboard({
                             {liveStatus ??
                                 (app.applicationStatus
                                     ? STATUSES.has(app.applicationStatus)
-                                        ? t(`status.${app.applicationStatus as "installing" | "running" | "stopped" | "failed"}`)
+                                        ? t(
+                                              `status.${app.applicationStatus as "installing" | "running" | "stopped" | "failed"}`
+                                          )
                                         : app.applicationStatus
                                     : "-")}
                         </Badge>
@@ -247,9 +254,7 @@ export function InstalledAppDashboard({
                             log={log}
                             name={app.name}
                             searchable
-                            emptyText={
-                                running ? t("waitingOutput") : t("notRunning")
-                            }
+                            emptyText={running ? t("waitingOutput") : t("notRunning")}
                             className="h-80"
                         />
                     )}

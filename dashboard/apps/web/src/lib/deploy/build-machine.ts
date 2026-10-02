@@ -39,7 +39,9 @@ const POLARIS_HOST = "the Polaris host";
 /** The stored choice, or "" when there is none or it no longer reads as one. */
 export function storedBuildOn(buildConfig: string | null | undefined): BuildOn {
     try {
-        const parsed = buildOnSchema.safeParse((JSON.parse(buildConfig || "{}") as { buildOn?: unknown }).buildOn ?? "");
+        const parsed = buildOnSchema.safeParse(
+            (JSON.parse(buildConfig || "{}") as { buildOn?: unknown }).buildOn ?? ""
+        );
         return parsed.success ? parsed.data : "";
     } catch {
         return "";
@@ -82,20 +84,34 @@ export async function resolveBuildMachine(
             select: { name: true, hostId: true, host: { select: { name: true } } }
         });
         if (!pool) {
-            throw new Error("The runner pool this service builds on no longer exists. Choose another under its settings.");
+            throw new Error(
+                "The runner pool this service builds on no longer exists. Choose another under its settings."
+            );
         }
         const name = `${pool.name} (${pool.host?.name ?? POLARIS_HOST})`;
         if (!pool.hostId) {
             if (local) return null;
             return {
-                target: { id: "build:local", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "" },
+                target: {
+                    id: "build:local",
+                    kind: "local",
+                    hostId: null,
+                    runtime: "compose",
+                    proxyNetwork: ""
+                },
                 name,
                 runsOn
             };
         }
         if (!local && app.target.hostId === pool.hostId) return null;
         return {
-            target: { id: `build:${pool.hostId}`, kind: "host", hostId: pool.hostId, runtime: "compose", proxyNetwork: "" },
+            target: {
+                id: `build:${pool.hostId}`,
+                kind: "host",
+                hostId: pool.hostId,
+                runtime: "compose",
+                proxyNetwork: ""
+            },
             name,
             runsOn
         };
@@ -103,18 +119,35 @@ export async function resolveBuildMachine(
     if (choice === "local") {
         if (local) return null;
         return {
-            target: { id: "build:local", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "" },
+            target: {
+                id: "build:local",
+                kind: "local",
+                hostId: null,
+                runtime: "compose",
+                proxyNetwork: ""
+            },
             name: POLARIS_HOST,
             runsOn
         };
     }
     if (!local && app.target.hostId === choice) return null;
-    const host = await prisma.host.findFirst({ where: { id: choice, ownerId }, select: { id: true, name: true } });
+    const host = await prisma.host.findFirst({
+        where: { id: choice, ownerId },
+        select: { id: true, name: true }
+    });
     if (!host) {
-        throw new Error("The server this service builds on is no longer connected. Choose another under its settings.");
+        throw new Error(
+            "The server this service builds on is no longer connected. Choose another under its settings."
+        );
     }
     return {
-        target: { id: `build:${host.id}`, kind: "host", hostId: host.id, runtime: "compose", proxyNetwork: "" },
+        target: {
+            id: `build:${host.id}`,
+            kind: "host",
+            hostId: host.id,
+            runtime: "compose",
+            proxyNetwork: ""
+        },
         name: host.name,
         runsOn
     };
@@ -128,7 +161,10 @@ export interface BuildMachineView {
 }
 
 /** What a service builds on now, and every machine it could build on. */
-export async function buildMachineOptions(applicationId: string, ownerId: string): Promise<BuildMachineView> {
+export async function buildMachineOptions(
+    applicationId: string,
+    ownerId: string
+): Promise<BuildMachineView> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: {
@@ -145,7 +181,9 @@ export async function buildMachineOptions(applicationId: string, ownerId: string
     });
     const local = runsLocally(app.target);
     const t = await readerWords("deployService");
-    const options: { value: BuildOn; label: string }[] = [{ value: "", label: t("buildMachine.itsServer") }];
+    const options: { value: BuildOn; label: string }[] = [
+        { value: "", label: t("buildMachine.itsServer") }
+    ];
     if (!local) options.push({ value: "local", label: t("buildMachine.polarisHost") });
     for (const host of hosts) {
         if (!local && host.id === app.target.hostId) continue;
@@ -159,7 +197,10 @@ export async function buildMachineOptions(applicationId: string, ownerId: string
     for (const pool of pools) {
         options.push({
             value: `pool:${pool.id}`,
-            label: t("buildMachine.pool", { name: pool.name, server: pool.host?.name ?? t("buildMachine.polarisHost") })
+            label: t("buildMachine.pool", {
+                name: pool.name,
+                server: pool.host?.name ?? t("buildMachine.polarisHost")
+            })
         });
     }
     const value = storedBuildOn(app.buildConfig);
@@ -171,7 +212,11 @@ export async function buildMachineOptions(applicationId: string, ownerId: string
 }
 
 /** Choose where a service builds. The next deploy uses it. */
-export async function setBuildMachine(applicationId: string, ownerId: string, value: BuildOn): Promise<void> {
+export async function setBuildMachine(
+    applicationId: string,
+    ownerId: string,
+    value: BuildOn
+): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { buildConfig: true }
@@ -179,10 +224,16 @@ export async function setBuildMachine(applicationId: string, ownerId: string, va
     if (!app) throw new Error("Application not found");
     const poolId = poolOf(value);
     if (poolId) {
-        const pool = await prisma.runnerPool.findFirst({ where: { id: poolId, ownerId }, select: { id: true } });
+        const pool = await prisma.runnerPool.findFirst({
+            where: { id: poolId, ownerId },
+            select: { id: true }
+        });
         if (!pool) throw new Error("That runner pool does not exist");
     } else if (value && value !== "local") {
-        const host = await prisma.host.findFirst({ where: { id: value, ownerId }, select: { id: true } });
+        const host = await prisma.host.findFirst({
+            where: { id: value, ownerId },
+            select: { id: true }
+        });
         if (!host) throw new Error("That server is not connected");
     }
     let build: Record<string, unknown> = {};

@@ -16,11 +16,18 @@ import { recordDeployAudit } from "@/lib/deploy-audit";
 import { setExternalNetworks } from "@/lib/deploy/external-networks";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { externalNetworksSchema } from "@/lib/deploy/external-networks-schema";
-import { deployBehaviour, setOverlapVolumes, type DeployBehaviourView } from "@/lib/deploy/deploy-behaviour";
+import {
+    deployBehaviour,
+    setOverlapVolumes,
+    type DeployBehaviourView
+} from "@/lib/deploy/deploy-behaviour";
 
 const DEPLOY_PATH = "/apps/deploy";
 
-async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
+async function failure(
+    caught: unknown,
+    fallback: NamespaceKey<"deployServer">
+): Promise<{ error: string }> {
     console.error("polaris: a deploy behaviour action failed:", caught);
     return { error: await reply(fallback) };
 }
@@ -37,7 +44,10 @@ export async function deployBehaviourAction(
     }
 }
 
-export async function setOverlapVolumesAction(applicationId: string, value: unknown): Promise<{ error?: string }> {
+export async function setOverlapVolumesAction(
+    applicationId: string,
+    value: unknown
+): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = z.boolean().safeParse(value);
     if (!parsed.success) return { error: await reply("behaviour.saveFailed") };
@@ -58,7 +68,10 @@ export async function setOverlapVolumesAction(applicationId: string, value: unkn
     }
 }
 
-export async function setExternalNetworksAction(applicationId: string, value: unknown): Promise<{ error?: string }> {
+export async function setExternalNetworksAction(
+    applicationId: string,
+    value: unknown
+): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = externalNetworksSchema.safeParse(value);
     if (!parsed.success) return { error: await firstIssue(parsed.error, "behaviour.saveFailed") };

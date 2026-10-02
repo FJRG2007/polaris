@@ -35,7 +35,9 @@ export function SharedHostPanel({ hostId }: { hostId: string }) {
         const before = shared;
         setError("");
         setShared(next);
-        const result = await setSharedHostAction(hostId, next).catch(() => ({ error: t("shared.saveFailed") }));
+        const result = await setSharedHostAction(hostId, next).catch(() => ({
+            error: t("shared.saveFailed")
+        }));
         if (result.error) {
             setShared(before);
             setError(result.error);
@@ -50,7 +52,10 @@ export function SharedHostPanel({ hostId }: { hostId: string }) {
                     <p className="text-xs text-muted-foreground">{t("shared.hint")}</p>
                 </div>
                 {shared === null && !error ? (
-                    <div className="h-5 w-9 shrink-0 animate-pulse rounded-full bg-muted" aria-busy="true" />
+                    <div
+                        className="h-5 w-9 shrink-0 animate-pulse rounded-full bg-muted"
+                        aria-busy="true"
+                    />
                 ) : (
                     <Switch
                         checked={shared === true}

@@ -15,7 +15,11 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DeployBehaviourView } from "@/lib/deploy/deploy-behaviour";
 import { externalNetworksSchema } from "@/lib/deploy/external-networks-schema";
-import { deployBehaviourAction, setExternalNetworksAction, setOverlapVolumesAction } from "./deploy-behaviour-actions";
+import {
+    deployBehaviourAction,
+    setExternalNetworksAction,
+    setOverlapVolumesAction
+} from "./deploy-behaviour-actions";
 
 /** One row of the networks form, as typed: the aliases as one comma-separated line. */
 interface NetworkRow {
@@ -24,7 +28,10 @@ interface NetworkRow {
 }
 
 function rowsOf(view: DeployBehaviourView): NetworkRow[] {
-    return view.externalNetworks.map((entry) => ({ name: entry.name, aliases: entry.aliases.join(", ") }));
+    return view.externalNetworks.map((entry) => ({
+        name: entry.name,
+        aliases: entry.aliases.join(", ")
+    }));
 }
 
 function listOf(rows: readonly NetworkRow[]) {
@@ -37,7 +44,13 @@ function listOf(rows: readonly NetworkRow[]) {
     }));
 }
 
-export function DeployBehaviourSection({ applicationId, canConfigure }: { applicationId: string; canConfigure: boolean }) {
+export function DeployBehaviourSection({
+    applicationId,
+    canConfigure
+}: {
+    applicationId: string;
+    canConfigure: boolean;
+}) {
     const t = useTranslations("deployService");
     const [view, setView] = useState<DeployBehaviourView | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -68,7 +81,10 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
         if (parsed.success) return found;
         for (const issue of parsed.error.issues) {
             const [index, field] = issue.path;
-            const key = typeof index === "number" ? `${filled[index]?.name.trim() ?? ""}:${String(field ?? "name")}` : "list";
+            const key =
+                typeof index === "number"
+                    ? `${filled[index]?.name.trim() ?? ""}:${String(field ?? "name")}`
+                    : "list";
             if (!found.has(key)) found.set(key, issue.message);
         }
         return found;
@@ -116,7 +132,10 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
         if (result.error) {
             setView(before);
             setError(result.error);
-        } else setRows(typed.map((entry) => ({ name: entry.name, aliases: entry.aliases.join(", ") })));
+        } else
+            setRows(
+                typed.map((entry) => ({ name: entry.name, aliases: entry.aliases.join(", ") }))
+            );
     }
 
     const strategy = view.strategy;
@@ -136,7 +155,9 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
                 ) : (
                     <div className="flex flex-col gap-1">
                         <p className="font-medium text-success">{t("behaviour.noGap")}</p>
-                        <p className="text-muted-foreground">{t(`behaviour.mode.${strategy.mode}`)}</p>
+                        <p className="text-muted-foreground">
+                            {t(`behaviour.mode.${strategy.mode}`)}
+                        </p>
                     </div>
                 )}
 
@@ -144,7 +165,9 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
                     <div className="flex items-start justify-between gap-3 border-t border-border pt-3">
                         <div className="flex min-w-0 flex-col gap-1">
                             <span className="font-medium">{t("behaviour.overlap")}</span>
-                            <span className="text-xs text-muted-foreground">{t("behaviour.overlapHint")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("behaviour.overlapHint")}
+                            </span>
                         </div>
                         <Switch
                             checked={view.overlapVolumes}
@@ -169,7 +192,13 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
                                     <Input
                                         value={row.name}
                                         onChange={(event) =>
-                                            setRows(rows.map((r, at) => (at === index ? { ...r, name: event.target.value } : r)))
+                                            setRows(
+                                                rows.map((r, at) =>
+                                                    at === index
+                                                        ? { ...r, name: event.target.value }
+                                                        : r
+                                                )
+                                            )
                                         }
                                         placeholder="app_network"
                                         className="h-8 w-40 shrink-0"
@@ -180,7 +209,13 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
                                     <Input
                                         value={row.aliases}
                                         onChange={(event) =>
-                                            setRows(rows.map((r, at) => (at === index ? { ...r, aliases: event.target.value } : r)))
+                                            setRows(
+                                                rows.map((r, at) =>
+                                                    at === index
+                                                        ? { ...r, aliases: event.target.value }
+                                                        : r
+                                                )
+                                            )
                                         }
                                         placeholder={view.defaultAlias}
                                         className="h-8 min-w-0 flex-1"
@@ -191,7 +226,9 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
                                     {canConfigure && (
                                         <button
                                             type="button"
-                                            onClick={() => setRows(rows.filter((_, at) => at !== index))}
+                                            onClick={() =>
+                                                setRows(rows.filter((_, at) => at !== index))
+                                            }
                                             className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                             aria-label={t("behaviour.removeNetwork")}
                                             title={t("behaviour.removeNetwork")}
@@ -201,12 +238,18 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
                                     )}
                                 </div>
                                 {(nameIssue || aliasIssue) && (
-                                    <p className="text-xs text-danger">{issueText(nameIssue ?? aliasIssue ?? "", t)}</p>
+                                    <p className="text-xs text-danger">
+                                        {issueText(nameIssue ?? aliasIssue ?? "", t)}
+                                    </p>
                                 )}
                             </div>
                         );
                     })}
-                    {issues.get("list") && <p className="text-xs text-danger">{issueText(issues.get("list") ?? "", t)}</p>}
+                    {issues.get("list") && (
+                        <p className="text-xs text-danger">
+                            {issueText(issues.get("list") ?? "", t)}
+                        </p>
+                    )}
                     {canConfigure && (
                         <div className="flex items-center justify-between gap-2">
                             <Button
@@ -240,7 +283,10 @@ type T = NamespaceTranslator<"deployService">;
 function reasonText(reason: RestartReason, t: T): string {
     switch (reason.code) {
         case "hostPort":
-            return t("behaviour.reason.hostPort", { port: reason.port, protocol: reason.protocol.toUpperCase() });
+            return t("behaviour.reason.hostPort", {
+                port: reason.port,
+                protocol: reason.protocol.toUpperCase()
+            });
         case "volumes":
             return t("behaviour.reason.volumes", { names: reason.names.join(", ") });
         case "newVolumes":

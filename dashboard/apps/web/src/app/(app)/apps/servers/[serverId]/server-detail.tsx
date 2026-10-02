@@ -290,15 +290,17 @@ export function ServerDetail({
                                 }
                             >
                                 <MapPin className="size-3.5" />
-                                {server.environment === "unknown" ? t("list.setLocation") : meta.label}
+                                {server.environment === "unknown"
+                                    ? t("list.setLocation")
+                                    : meta.label}
                             </Button>
                             {server.environment !== "unknown" && !server.confirmed ? (
-                                <span className="text-xs text-muted-foreground">{t("list.detected")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("list.detected")}
+                                </span>
                             ) : null}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            {t("detail.locationHint")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("detail.locationHint")}</p>
                     </section>
 
                     <section className="flex flex-col gap-2">
@@ -313,7 +315,9 @@ export function ServerDetail({
                     {server.hostId ? (
                         <section className="flex flex-col gap-2">
                             <h2 className="text-sm font-medium">
-                                {server.kind === "local" ? t("list.giveUpLogin") : t("detail.removeTitle")}
+                                {server.kind === "local"
+                                    ? t("list.giveUpLogin")
+                                    : t("detail.removeTitle")}
                             </h2>
                             <p className="text-xs text-muted-foreground">
                                 {server.kind === "local"
@@ -329,7 +333,9 @@ export function ServerDetail({
                                     }
                                 >
                                     <Trash2 className="size-3.5" />
-                                    {server.kind === "local" ? t("list.giveUpLogin") : t("list.remove")}
+                                    {server.kind === "local"
+                                        ? t("list.giveUpLogin")
+                                        : t("list.remove")}
                                 </Button>
                             </div>
                         </section>
@@ -361,7 +367,9 @@ export function ServerDetail({
                                 variant="ghost"
                                 onClick={() => setAsRoot((current) => !current)}
                             >
-                                {asRoot ? t("shell.backTo", { login: server.detail }) : t("shell.openAsRoot")}
+                                {asRoot
+                                    ? t("shell.backTo", { login: server.detail })
+                                    : t("shell.openAsRoot")}
                             </Button>
                         </DialogFooter>
                     ) : null}

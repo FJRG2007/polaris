@@ -45,11 +45,15 @@ function view(overrides: Partial<DeployBehaviourView> = {}): DeployBehaviourView
 describe("the Deploys section of a service page", () => {
     it("tells the operator a deploy has no gap, in the overlap release's own words", async () => {
         behaviourAction.mockResolvedValue({ view: view() });
-        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, { wrapper: MessagesWrapper });
+        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {
+            wrapper: MessagesWrapper
+        });
 
         expect(await screen.findByText("Zero downtime")).toBeDefined();
         expect(
-            screen.getByText(/The new version starts beside the running one\. The edge moves to it once it answers on its port/)
+            screen.getByText(
+                /The new version starts beside the running one\. The edge moves to it once it answers on its port/
+            )
         ).toBeDefined();
     });
 
@@ -65,7 +69,9 @@ describe("the Deploys section of a service page", () => {
                 }
             })
         });
-        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, { wrapper: MessagesWrapper });
+        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {
+            wrapper: MessagesWrapper
+        });
 
         expect(await screen.findByText("Restarts on deploy")).toBeDefined();
         expect(screen.getByText(/It binds port 25565\/UDP on the server/)).toBeDefined();
@@ -74,9 +80,13 @@ describe("the Deploys section of a service page", () => {
 
     it("shows the operator's own networks with the name a container there calls this service by", async () => {
         behaviourAction.mockResolvedValue({
-            view: view({ externalNetworks: [{ name: "app_network", aliases: ["dymo-api", "dymoapi"] }] })
+            view: view({
+                externalNetworks: [{ name: "app_network", aliases: ["dymo-api", "dymoapi"] }]
+            })
         });
-        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, { wrapper: MessagesWrapper });
+        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {
+            wrapper: MessagesWrapper
+        });
 
         expect(await screen.findByDisplayValue("app_network")).toBeDefined();
         expect(screen.getByDisplayValue("dymo-api, dymoapi")).toBeDefined();
@@ -84,7 +94,9 @@ describe("the Deploys section of a service page", () => {
 
     it("reports the load failure in words instead of leaving the section blank", async () => {
         behaviourAction.mockResolvedValue({ error: "Could not read how this service deploys" });
-        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, { wrapper: MessagesWrapper });
+        render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {
+            wrapper: MessagesWrapper
+        });
 
         expect(await screen.findByText("Could not read how this service deploys")).toBeDefined();
     });

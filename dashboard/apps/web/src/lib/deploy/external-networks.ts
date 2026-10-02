@@ -37,7 +37,9 @@ export function externalNetworkPlan(list: readonly ExternalNetwork[]): {
     return {
         networks: list.map((entry) => entry.name),
         aliases: Object.fromEntries(
-            list.filter((entry) => entry.aliases.length > 0).map((entry) => [entry.name, [...entry.aliases]])
+            list
+                .filter((entry) => entry.aliases.length > 0)
+                .map((entry) => [entry.name, [...entry.aliases]])
         )
     };
 }
@@ -55,6 +57,9 @@ export async function setExternalNetworks(
     if (!app) throw new Error("Application not found");
     const next = JSON.stringify(list);
     if (JSON.stringify(storedExternalNetworks(app.externalNetworks)) === next) return false;
-    await prisma.application.update({ where: { id: applicationId }, data: { externalNetworks: next } });
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { externalNetworks: next }
+    });
     return true;
 }

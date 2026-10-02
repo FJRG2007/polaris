@@ -23,26 +23,36 @@ vi.mock("@polaris/db", () => ({
         host: {
             findUnique: vi.fn(async () => host),
             findFirst: vi.fn(async () => host),
-            update: vi.fn(async (args: { data: { sharedHost: boolean } }) => Object.assign(host, args.data))
+            update: vi.fn(async (args: { data: { sharedHost: boolean } }) =>
+                Object.assign(host, args.data)
+            )
         }
     }
 }));
 vi.mock("@/lib/host-service", () => ({
-    getHostConnectionUnscoped: vi.fn(async () => ({ id: "host-1", address: "203.0.113.7", port: 22, username: "ops", auth: {} }))
+    getHostConnectionUnscoped: vi.fn(async () => ({
+        id: "host-1",
+        address: "203.0.113.7",
+        port: 22,
+        username: "ops",
+        auth: {}
+    }))
 }));
 vi.mock("@/lib/connection-pool", () => ({
     borrowSsh: vi.fn(async () => ({ client: {}, release: () => undefined }))
 }));
 vi.mock("@polaris/ssh", () => ({
-    execCommand: vi.fn(async (_client: unknown, command: string, sinks: { onStdout: (chunk: Buffer) => void }) => {
-        ran.push(command);
-        if (command.includes("docker ps -a")) {
-            if (said.listing === null) throw new Error("connection refused");
-            sinks.onStdout(Buffer.from(said.listing));
-            if (said.finished) sinks.onStdout(Buffer.from("polaris-listed|\n"));
+    execCommand: vi.fn(
+        async (_client: unknown, command: string, sinks: { onStdout: (chunk: Buffer) => void }) => {
+            ran.push(command);
+            if (command.includes("docker ps -a")) {
+                if (said.listing === null) throw new Error("connection refused");
+                sinks.onStdout(Buffer.from(said.listing));
+                if (said.finished) sinks.onStdout(Buffer.from("polaris-listed|\n"));
+            }
+            return { code: 0 };
         }
-        return { code: 0 };
-    })
+    )
 }));
 
 const space = await import("@/lib/deploy/server-space");
@@ -59,7 +69,13 @@ describe("the careful sweep", () => {
         const sweep = space.pruneCommandFor(true);
         expect(sweep).toContain("docker image prune -af --filter 'label!=polaris.release'");
         expect(sweep).toContain("docker builder prune -af");
-        for (const forbidden of ["system prune", "network prune", "container prune", "volume prune", "nerdctl system"]) {
+        for (const forbidden of [
+            "system prune",
+            "network prune",
+            "container prune",
+            "volume prune",
+            "nerdctl system"
+        ]) {
             expect(sweep).not.toContain(forbidden);
         }
     });
@@ -130,6 +146,8 @@ describe("a reclaim on a shared server", () => {
     it("runs the ordinary sweep on a server only Polaris uses", async () => {
         host.sharedHost = false;
         await space.reclaimServerSpace("host-1");
-        expect(ran.filter((command) => command.includes("prune"))).toEqual([space.PRUNE_EVERY_ENGINE]);
+        expect(ran.filter((command) => command.includes("prune"))).toEqual([
+            space.PRUNE_EVERY_ENGINE
+        ]);
     });
 });

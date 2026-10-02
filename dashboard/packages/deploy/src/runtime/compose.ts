@@ -55,8 +55,10 @@ function timer(ctx: RuntimeContext): (label: string) => (note?: string) => void 
  * It is still returned as well: that is what the deployment record stores.
  */
 function fail(ctx: RuntimeContext, error: string): DeployResult {
-    ctx.log(Buffer.from(`==> Failed: ${error}
-`));
+    ctx.log(
+        Buffer.from(`==> Failed: ${error}
+`)
+    );
     return { ok: false, error };
 }
 
@@ -197,7 +199,10 @@ export class ComposeRuntime implements RuntimeDriver {
         return undefined;
     }
 
-    public async deployApplication(plan: AppDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
+    public async deployApplication(
+        plan: AppDeployPlan,
+        ctx: RuntimeContext
+    ): Promise<DeployResult> {
         // The pipeline's own steps are timed and announced. Without this the log is
         // whatever docker happened to print, so a deploy that spends a minute
         // fetching the source and a second building it reads as a slow build - and
@@ -266,7 +271,9 @@ export class ComposeRuntime implements RuntimeDriver {
         plan: AppDeployPlan,
         ctx: RuntimeContext,
         step: (label: string) => (note?: string) => void
-    ): Promise<DeployResult | { imageTag: string; effectivePlan: AppDeployPlan; spec: ComposeSpec }> {
+    ): Promise<
+        DeployResult | { imageTag: string; effectivePlan: AppDeployPlan; spec: ComposeSpec }
+    > {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         let imageTag: string;
         let kept: string | null;
@@ -290,18 +297,26 @@ export class ComposeRuntime implements RuntimeDriver {
                 // like a corrupt image and sends people to the registry.
                 return fail(
                     ctx,
-                    deployFailureReason(reasonOf(error, ""), `could not pull ${plan.build.imageRef}`)
+                    deployFailureReason(
+                        reasonOf(error, ""),
+                        `could not pull ${plan.build.imageRef}`
+                    )
                 );
             }
             done();
-        } else if ((plan.build.method === "dockerfile" || plan.build.method === "nixpacks") && ctx.buildContext) {
+        } else if (
+            (plan.build.method === "dockerfile" || plan.build.method === "nixpacks") &&
+            ctx.buildContext
+        ) {
             // Build from the cloned repo: a Dockerfile, or Nixpacks auto-detecting the
             // framework (no Dockerfile needed). Then run the built image.
             imageTag = toImageTag(plan.build.name, plan.build.commitSha);
             const fetched = step("Fetching the source");
             const context = await ctx.buildContext();
             fetched();
-            const built = step(ctx.builder ? `Building the image on ${ctx.builder.name}` : "Building the image");
+            const built = step(
+                ctx.builder ? `Building the image on ${ctx.builder.name}` : "Building the image"
+            );
             try {
                 await buildPorts(ctx).build(
                     {
@@ -325,12 +340,18 @@ export class ComposeRuntime implements RuntimeDriver {
             } catch (error) {
                 // A build fills the same disk a pull does, and reports it the
                 // same unhelpful way.
-                return fail(ctx, deployFailureReason(reasonOf(error, ""), "the image would not build"));
+                return fail(
+                    ctx,
+                    deployFailureReason(reasonOf(error, ""), "the image would not build")
+                );
             }
             built();
         } else {
             // buildpacks/static need a builder toolchain on the target; not yet wired.
-            return fail(ctx, `build method "${plan.build.method}" is not yet supported on the compose runtime`);
+            return fail(
+                ctx,
+                `build method "${plan.build.method}" is not yet supported on the compose runtime`
+            );
         }
 
         // Kept under the release's own name before it runs, so the container is
@@ -342,7 +363,10 @@ export class ComposeRuntime implements RuntimeDriver {
             try {
                 imageTag = await shipRelease(imageTag, plan, ctx);
             } catch (error) {
-                return fail(ctx, deployFailureReason(reasonOf(error, ""), "the image could not be copied"));
+                return fail(
+                    ctx,
+                    deployFailureReason(reasonOf(error, ""), "the image could not be copied")
+                );
             }
         } else if (!kept) {
             imageTag = await pinRelease(imageTag, plan, ctx);
@@ -434,7 +458,11 @@ export class ComposeRuntime implements RuntimeDriver {
         }
         const detected = exposed[0];
         if (detected === undefined || detected === plan.expose.container) return plan;
-        ctx.log(Buffer.from(`Detected container port ${detected} from the image (was ${plan.expose.container}).\n`));
+        ctx.log(
+            Buffer.from(
+                `Detected container port ${detected} from the image (was ${plan.expose.container}).\n`
+            )
+        );
         return { ...plan, expose: { ...plan.expose, container: detected } };
     }
 
@@ -446,7 +474,8 @@ export class ComposeRuntime implements RuntimeDriver {
     private async bringUpDatabase(plan: DbDeployPlan, ctx: RuntimeContext): Promise<DeployResult> {
         const sink = (chunk: Buffer): void => ctx.log(chunk);
         for (const image of dbPlanImages(plan)) {
-            if (plan.keepImages && (await ctx.ports.hasImage?.(image).catch(() => true)) !== false) continue;
+            if (plan.keepImages && (await ctx.ports.hasImage?.(image).catch(() => true)) !== false)
+                continue;
             await ctx.ports.pull(image, sink);
         }
         const spec = dbComposeSpec(plan, ctx.target.proxyNetwork);
@@ -455,7 +484,9 @@ export class ComposeRuntime implements RuntimeDriver {
                 ctx,
                 spec,
                 sink,
-                plan.keepImages ? null : { image: plan.image, again: () => ctx.ports.pull(plan.image, sink) }
+                plan.keepImages
+                    ? null
+                    : { image: plan.image, again: () => ctx.ports.pull(plan.image, sink) }
             );
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "database deploy failed"));

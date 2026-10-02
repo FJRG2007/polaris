@@ -249,19 +249,31 @@ export function foreignContainers(said: string): string[] {
  * that cannot be asked, or whose listing did not finish, counts as shared.
  */
 export async function isSharedHost(hostId: string): Promise<boolean> {
-    const host = await prisma.host.findUnique({ where: { id: hostId }, select: { sharedHost: true } });
+    const host = await prisma.host.findUnique({
+        where: { id: hostId },
+        select: { sharedHost: true }
+    });
     if (!host) return true;
     if (host.sharedHost !== null) return host.sharedHost;
     const said = await onServer(hostId, LIST_CONTAINERS);
     if (said === null || !said.split("\n").some((line) => line.trim() === LISTED)) return true;
     if (foreignContainers(said).length === 0) return false;
-    await prisma.host.update({ where: { id: hostId }, data: { sharedHost: true } }).catch(() => undefined);
+    await prisma.host
+        .update({ where: { id: hostId }, data: { sharedHost: true } })
+        .catch(() => undefined);
     return true;
 }
 
 /** Set, by the operator, whether a server is shared. False when it was already so. */
-export async function setSharedHost(hostId: string, ownerId: string, shared: boolean): Promise<boolean> {
-    const host = await prisma.host.findFirst({ where: { id: hostId, ownerId }, select: { sharedHost: true } });
+export async function setSharedHost(
+    hostId: string,
+    ownerId: string,
+    shared: boolean
+): Promise<boolean> {
+    const host = await prisma.host.findFirst({
+        where: { id: hostId, ownerId },
+        select: { sharedHost: true }
+    });
     if (!host) throw new Error("Server not found");
     if (host.sharedHost === shared) return false;
     await prisma.host.update({ where: { id: hostId }, data: { sharedHost: shared } });

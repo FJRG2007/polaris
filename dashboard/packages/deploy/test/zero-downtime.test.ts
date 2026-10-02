@@ -16,7 +16,8 @@ import { appComposeSpec, renderComposeYaml } from "../src/compose-spec.js";
 import type { AppDeployPlan, RuntimeContext } from "../src/runtime/driver.js";
 import { portStateFrom, waitUntilListening } from "../src/runtime/readiness.js";
 
-const HEADER = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode";
+const HEADER =
+    "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode";
 const HEADER6 =
     "  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode";
 /** One socket row: port 3000 is 0BB8. */
@@ -33,17 +34,29 @@ function fakeClock(start = 0) {
 describe("reading a container's sockets", () => {
     it("finds a socket listening on every address", () => {
         expect(portStateFrom([HEADER, v4("00000000", "0BB8")].join("\n"), 3000)).toBe("listening");
-        expect(portStateFrom([HEADER6, v6("00000000000000000000000000000000", "0BB8")].join("\n"), 3000)).toBe("listening");
+        expect(
+            portStateFrom(
+                [HEADER6, v6("00000000000000000000000000000000", "0BB8")].join("\n"),
+                3000
+            )
+        ).toBe("listening");
     });
 
     it("tells a socket bound to localhost only apart from one nothing listens on", () => {
         expect(portStateFrom([HEADER, v4("0100007F", "0BB8")].join("\n"), 3000)).toBe("loopback");
-        expect(portStateFrom([HEADER6, v6("00000000000000000000000001000000", "0BB8")].join("\n"), 3000)).toBe("loopback");
+        expect(
+            portStateFrom(
+                [HEADER6, v6("00000000000000000000000001000000", "0BB8")].join("\n"),
+                3000
+            )
+        ).toBe("loopback");
         expect(portStateFrom([HEADER, v4("00000000", "1F90")].join("\n"), 3000)).toBe("closed");
     });
 
     it("counts only a listening socket, not a connection on that port", () => {
-        expect(portStateFrom([HEADER, v4("00000000", "0BB8", "01")].join("\n"), 3000)).toBe("closed");
+        expect(portStateFrom([HEADER, v4("00000000", "0BB8", "01")].join("\n"), 3000)).toBe(
+            "closed"
+        );
     });
 });
 
@@ -51,7 +64,12 @@ describe("waiting for a release's port", () => {
     function ctx(reads: string[]) {
         let call = 0;
         return {
-            ports: { runIn: vi.fn(async () => ({ code: 0, output: reads[Math.min(call++, reads.length - 1)] })) },
+            ports: {
+                runIn: vi.fn(async () => ({
+                    code: 0,
+                    output: reads[Math.min(call++, reads.length - 1)]
+                }))
+            },
             log: () => undefined
         } as unknown as RuntimeContext;
     }
@@ -67,13 +85,21 @@ describe("waiting for a release's port", () => {
     });
 
     it("fails a release bound to localhost, saying so", async () => {
-        const result = await waitUntilListening(ctx([[HEADER, v4("0100007F", "0BB8")].join("\n")]), "web", 3000, fakeClock());
+        const result = await waitUntilListening(
+            ctx([[HEADER, v4("0100007F", "0BB8")].join("\n")]),
+            "web",
+            3000,
+            fakeClock()
+        );
         expect(result).toEqual({ ok: false, reason: expect.stringContaining("localhost only") });
     });
 
     it("fails one that never opens the port within the deadline", async () => {
         const result = await waitUntilListening(ctx([HEADER]), "web", 3000, fakeClock(), 10_000);
-        expect(result).toEqual({ ok: false, reason: expect.stringContaining("did not start listening on port 3000") });
+        expect(result).toEqual({
+            ok: false,
+            reason: expect.stringContaining("did not start listening on port 3000")
+        });
     });
 
     it("does not hold up an image it cannot look into", async () => {
@@ -91,7 +117,8 @@ describe("waiting for a release's port", () => {
         const runIn = vi.fn(async () => {
             call += 1;
             if (call === 1) throw new Error("container is restarting");
-            if (call === 2) return { code: 1, output: "Error response from daemon: connection reset" };
+            if (call === 2)
+                return { code: 1, output: "Error response from daemon: connection reset" };
             return { code: 0, output: [HEADER, v4("00000000", "0BB8")].join("\n") };
         });
         const context = { ports: { runIn }, log: () => undefined } as unknown as RuntimeContext;
@@ -129,17 +156,26 @@ describe("the order a release is brought up in", () => {
         let reads = 0;
         const ports = {
             pull: vi.fn(async (image: string) => void ops.push(`pull ${image}`)),
-            composeUp: vi.fn(async (spec: { project: string }) => void ops.push(`up ${spec.project}`)),
+            composeUp: vi.fn(
+                async (spec: { project: string }) => void ops.push(`up ${spec.project}`)
+            ),
             inspectImage: vi.fn(async () => [] as number[]),
             logs: vi.fn(async () => undefined),
             inspect: vi.fn(async (name: string) => {
                 ops.push(`inspect ${name}`);
-                return { RestartCount: 0, State: { Status: "running", Health: { Status: "healthy" } } };
+                return {
+                    RestartCount: 0,
+                    State: { Status: "running", Health: { Status: "healthy" } }
+                };
             }),
             runIn: vi.fn(async (name: string) => {
                 reads += 1;
                 ops.push(`sockets ${name}`);
-                return { code: 0, output: reads > opensAfter ? [HEADER, v4("00000000", "0BB8")].join("\n") : HEADER };
+                return {
+                    code: 0,
+                    output:
+                        reads > opensAfter ? [HEADER, v4("00000000", "0BB8")].join("\n") : HEADER
+                };
             })
         };
         const context = {
@@ -178,7 +214,10 @@ describe("the order a release is brought up in", () => {
             const pending = new ComposeRuntime().deployApplication(plan, context);
             await vi.advanceTimersByTimeAsync(4 * 60_000);
             const result = await pending;
-            expect(result).toEqual({ ok: false, error: expect.stringContaining("did not start listening on port 3000") });
+            expect(result).toEqual({
+                ok: false,
+                error: expect.stringContaining("did not start listening on port 3000")
+            });
         } finally {
             vi.useRealTimers();
         }
@@ -186,7 +225,10 @@ describe("the order a release is brought up in", () => {
 
     it("does not wait on a port for a worker nothing is routed to", async () => {
         const { ops, context } = machine(Number.POSITIVE_INFINITY);
-        const result = await new ComposeRuntime().deployApplication({ ...plan, awaitPort: false }, context);
+        const result = await new ComposeRuntime().deployApplication(
+            { ...plan, awaitPort: false },
+            context
+        );
         expect(result.ok).toBe(true);
         expect(ops.some((op) => op.startsWith("sockets"))).toBe(false);
     });
@@ -208,7 +250,11 @@ describe("what a release is started with", () => {
     } as unknown as AppDeployPlan;
 
     it("mounts the service's own named volumes by their exact names when it shares them", () => {
-        const spec = appComposeSpec({ ...plan, sharedVolumesFrom: "polaris-1a2b3c4d" }, "nginx:1", "polaris-proxy");
+        const spec = appComposeSpec(
+            { ...plan, sharedVolumesFrom: "polaris-1a2b3c4d" },
+            "nginx:1",
+            "polaris-proxy"
+        );
         expect(spec.volumes).toEqual([]);
         expect(spec.externalVolumes).toEqual(["polaris-1a2b3c4d_uploads"]);
         expect(spec.services[0]?.volumes).toEqual([
@@ -227,7 +273,12 @@ describe("what a release is started with", () => {
 
     it("answers to every name it was given on the operator's network, and to none of them on the proxy network", () => {
         const spec = appComposeSpec(
-            { ...plan, volumes: [], extraNetworks: ["app_network"], networkAliases: { app_network: ["dymo-api", "dymoapi"] } },
+            {
+                ...plan,
+                volumes: [],
+                extraNetworks: ["app_network"],
+                networkAliases: { app_network: ["dymo-api", "dymoapi"] }
+            },
             "nginx:1",
             "polaris-proxy"
         );
@@ -241,7 +292,11 @@ describe("what a release is started with", () => {
     });
 
     it("drops names for a network it does not join", () => {
-        const spec = appComposeSpec({ ...plan, volumes: [], networkAliases: { app_network: ["dymoapi"] } }, "nginx:1", "polaris-proxy");
+        const spec = appComposeSpec(
+            { ...plan, volumes: [], networkAliases: { app_network: ["dymoapi"] } },
+            "nginx:1",
+            "polaris-proxy"
+        );
         expect(spec.services[0]?.networkAliases).toBeUndefined();
     });
 });

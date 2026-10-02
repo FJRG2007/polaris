@@ -183,7 +183,8 @@ export async function setServerFollowAction(input: {
 export async function createHostAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createHostSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidHost") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidHost") };
     try {
         const created = await createHost(user.id, parsed.data);
         await recordAudit({
@@ -327,11 +328,13 @@ export async function useLocalPathAction(input: unknown): Promise<{ error?: stri
 export async function renameServerAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = renameServerSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidName") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidName") };
     const { hostId, name } = parsed.data;
     if (hostId) {
         if (!name) return { error: await say("errors.nameIt") };
-        if (!(await renameHost(user.id, hostId, name))) return { error: await say("errors.notFound") };
+        if (!(await renameHost(user.id, hostId, name)))
+            return { error: await say("errors.notFound") };
     } else {
         await setLocalServerName(name);
     }
@@ -362,7 +365,8 @@ const serverWildcardSchema = z.object({
 export async function setServerWildcardAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = serverWildcardSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidDomain") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidDomain") };
     try {
         if (
             !(await setHostWildcardDomain(user.id, parsed.data.hostId, parsed.data.wildcardDomain))
@@ -392,7 +396,10 @@ export async function openEnrollmentAction(
 ): Promise<{ enrollment?: OpenedEnrollment; error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createEnrollmentSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidEnrollment") };
+    if (!parsed.success)
+        return {
+            error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidEnrollment")
+        };
     try {
         return { enrollment: await openEnrollment(user.id, parsed.data) };
     } catch (caught) {
@@ -409,7 +416,10 @@ export async function enrollmentStatusAction(id: string): Promise<EnrollmentStat
     // A finished enrollment added a row the list does not know about yet.
     if (status?.state === "claimed") revalidatePath(SERVERS_PATH);
     if (!status?.error) return status;
-    return { ...status, error: enrollmentRefusalText(await getTranslations("servers"), status.error) };
+    return {
+        ...status,
+        error: enrollmentRefusalText(await getTranslations("servers"), status.error)
+    };
 }
 
 /** Kill a command that was generated and should not be used after all. */
@@ -451,7 +461,8 @@ export async function removeServerAction(
 ): Promise<RemoveServerResult> {
     const user = await requirePermission("system.manage");
     const parsed = removeServerSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidRemoval") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidRemoval") };
 
     const result = await removeServer(user.id, hostId, user.id, parsed.data);
     if (result.error) return result;
@@ -501,7 +512,8 @@ export async function renameHostGroupAction(
     name: string
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    if (!z.string().uuid().safeParse(groupId).success) return { error: await say("errors.groupNotFound") };
+    if (!z.string().uuid().safeParse(groupId).success)
+        return { error: await say("errors.groupNotFound") };
     try {
         await renameHostGroup(user.id, groupId, name);
         revalidatePath(SERVERS_PATH);
@@ -514,7 +526,8 @@ export async function renameHostGroupAction(
 /** Delete a group. Its firewall rules go with it - see deleteHostGroup. */
 export async function deleteHostGroupAction(groupId: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    if (!z.string().uuid().safeParse(groupId).success) return { error: await say("errors.groupNotFound") };
+    if (!z.string().uuid().safeParse(groupId).success)
+        return { error: await say("errors.groupNotFound") };
     try {
         await deleteHostGroup(user.id, groupId);
         await recordAudit({
@@ -535,7 +548,8 @@ export async function setHostGroupMembersAction(
     hostIds: string[]
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
-    if (!z.string().uuid().safeParse(groupId).success) return { error: await say("errors.groupNotFound") };
+    if (!z.string().uuid().safeParse(groupId).success)
+        return { error: await say("errors.groupNotFound") };
     const members = z.array(z.string().uuid()).max(1000).safeParse(hostIds);
     if (!members.success) return { error: await say("errors.pickServers") };
     try {
@@ -682,7 +696,9 @@ export async function setLeftoverAutoRemoveAction(on: boolean): Promise<{ error?
  * its clean-up to images and build cache. Found out from what runs there until it
  * is found shared or the operator decides.
  */
-export async function sharedHostAction(hostId: string): Promise<{ shared?: boolean; error?: string }> {
+export async function sharedHostAction(
+    hostId: string
+): Promise<{ shared?: boolean; error?: string }> {
     const user = await requirePermission("system.manage");
     const host = (await listHosts(user.id)).find((entry) => entry.id === hostId);
     if (!host) return { error: await say("errors.notYours") };
@@ -690,7 +706,10 @@ export async function sharedHostAction(hostId: string): Promise<{ shared?: boole
 }
 
 /** Switch it. Audited: it decides what a clean-up may remove on that machine. */
-export async function setSharedHostAction(hostId: string, shared: unknown): Promise<{ error?: string }> {
+export async function setSharedHostAction(
+    hostId: string,
+    shared: unknown
+): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     if (typeof shared !== "boolean") return { error: await say("errors.notASetting") };
     const host = (await listHosts(user.id)).find((entry) => entry.id === hostId);
