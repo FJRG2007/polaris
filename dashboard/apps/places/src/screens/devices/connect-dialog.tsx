@@ -214,8 +214,9 @@ function Field({
     // A MAC half typed is unfinished while the box has the caret, and its
     // digits are counted in it; it is only called short once it is left.
     const shownIssue = asMac && typing && issue === t("connections.macShort") ? null : issue;
+    const Wrapper = field.address === true ? "div" : "label";
     return (
-        <div className="flex flex-col gap-1.5">
+        <Wrapper className="flex flex-col gap-1.5">
             <span className="text-xs text-muted-foreground">
                 {words.label}
                 {field.optional === true ? (
@@ -273,7 +274,7 @@ function Field({
                 words.hint && <span className="text-xs text-foreground-subtle">{words.hint}</span>
             )}
             {shownIssue && <span className="text-xs text-danger">{shownIssue}</span>}
-        </div>
+        </Wrapper>
     );
 }
 

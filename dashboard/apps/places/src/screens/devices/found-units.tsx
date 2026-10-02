@@ -167,7 +167,10 @@ export function FoundUnits({
                                     </span>
                                 </button>
                                 {unit.mac && (
-                                    <CopyButton value={unit.mac} label={`MAC ${unit.mac}`} />
+                                    <CopyButton
+                                        value={unit.mac}
+                                        label={t("connect.found.copyMac", { mac: unit.mac })}
+                                    />
                                 )}
                             </li>
                         );

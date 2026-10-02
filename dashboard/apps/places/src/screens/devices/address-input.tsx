@@ -141,7 +141,7 @@ export function AddressInput({
                     autoComplete="off"
                     autoCapitalize={mode === "mac" ? "characters" : "off"}
                     inputMode={mode === "mac" ? "text" : "url"}
-                    placeholder={mode === "mac" ? "AA:BB:CC:DD:EE:FF" : placeholder}
+                    placeholder={mode === "mac" ? t("connect.address.macPlaceholder") : placeholder}
                     maxLength={mode === "mac" ? 17 : undefined}
                     className={mode === "mac" ? "pr-24 font-mono uppercase" : undefined}
                     aria-label={label}
@@ -156,10 +156,14 @@ export function AddressInput({
                         }
                         const input = event.target;
                         apply(
-                            formatMacInput(input.value, input.selectionStart ?? input.value.length, {
-                                value,
-                                caret: Math.max(0, (input.selectionStart ?? 1) - 1)
-                            })
+                            formatMacInput(
+                                input.value,
+                                input.selectionStart ?? input.value.length,
+                                {
+                                    value,
+                                    caret: Math.max(0, (input.selectionStart ?? 1) - 1)
+                                }
+                            )
                         );
                     }}
                 />

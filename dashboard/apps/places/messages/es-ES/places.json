@@ -1558,6 +1558,7 @@
             "mode": "Dar la dirección como",
             "byIp": "IP o nombre",
             "byMac": "MAC",
+            "macPlaceholder": "AA:BB:CC:DD:EE:FF",
             "macHint": "Polaris busca la IP por su cuenta y la sigue si el router la cambia.",
             "digits": "{count} de 12 dígitos"
         },
@@ -1568,7 +1569,8 @@
             "failed": "La búsqueda no terminó. Busca otra vez o escribe la dirección abajo.",
             "again": "Buscar otra vez",
             "use": "Usar {name}",
-            "noMac": "Sin MAC"
+            "noMac": "Sin MAC",
+            "copyMac": "Copiar MAC {mac}"
         }
     },
     "discover": {
