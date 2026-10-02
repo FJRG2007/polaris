@@ -17,14 +17,14 @@ import { saveFile, sendFile } from "@/components/transfers/move-file";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TransfersView } from "@/components/transfers/transfers-view";
-import Fuse from "fuse.js";
 import { formatBytes } from "@polaris/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import type { DriveEntry } from "@/app/(app)/drive/types";
 import { filesToItems, gatherDropItems } from "@/lib/drop-items";
 import { iconColorClass, iconComponent } from "@/app/(app)/drive/item-icons";
-import { matchesStructured, parseSearch } from "@/app/(app)/drive/search-query";
+import { searchItems } from "@polaris/core/search-text";
+import { matchesStructured, NAME_SEARCH, parseSearch, PATH_SEARCH } from "@/app/(app)/drive/search-query";
 import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
 import {
     FILE_CATEGORIES,
@@ -345,12 +345,9 @@ export function ShareExplorer({
         const parsed = parseSearch(query);
         rows = rows.filter((entry) => matchesStructured(entry.name, entry.path, parsed));
         if (parsed.fuzzy) {
-            const fuse = new Fuse(rows, {
-                keys: [parsed.pathMode ? "path" : "name"],
-                threshold: 0.4,
-                ignoreLocation: true
-            });
-            rows = fuse.search(parsed.fuzzy).map((result) => result.item);
+            // In path mode the words are matched against the full relative path,
+            // so a query like "documentos/doc.pdf" finds a nested item.
+            rows = searchItems(rows, parsed.fuzzy, parsed.pathMode ? PATH_SEARCH : NAME_SEARCH);
         }
 
         const direction = sortDir === "asc" ? 1 : -1;

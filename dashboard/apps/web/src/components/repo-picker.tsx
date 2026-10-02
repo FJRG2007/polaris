@@ -17,7 +17,7 @@
  * the widest gate of the three.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { Button, Input } from "@polaris/ui";
 import { GitHubMark } from "@/components/brand-icons";
 import { externalGitUrl } from "@/lib/repo-reference";
@@ -31,6 +31,9 @@ export interface PickerRepo {
     defaultBranch: string;
     private: boolean;
 }
+
+/** A repository is found by its "owner/name". */
+const REPO_FIELDS: readonly SearchField<PickerRepo>[] = [{ text: (repo) => repo.fullName }];
 
 /** What the connected account can reach. */
 export interface RepoListResult {
@@ -129,11 +132,10 @@ export function RepoPicker({
     const trimmed = query.trim();
     const external = onPickUrl ? externalGitUrl(trimmed) : null;
 
-    const fuse = useMemo(
-        () => new Fuse(repos, { keys: ["fullName"], threshold: 0.4, ignoreLocation: true }),
-        [repos]
+    const mine = useMemo(
+        () => (trimmed ? searchItems(repos, trimmed, REPO_FIELDS, { limit: 20 }) : repos),
+        [repos, trimmed]
     );
-    const mine = trimmed ? fuse.search(trimmed, { limit: 20 }).map((match) => match.item) : repos;
 
     // Ask GitHub for whatever the loaded list does not already hold. A URL that is
     // not GitHub's is nothing to search for - it is the answer already.

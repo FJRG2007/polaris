@@ -27,7 +27,7 @@
  * on screen.
  */
 
-import Fuse from "fuse.js";
+import { searchItems } from "@polaris/core/search-text";
 import { RuleList } from "./rule-list";
 import { Section } from "./page-parts";
 import { ruleDescription } from "./rule-language";
@@ -479,18 +479,18 @@ export function WafEditor({
     /**
      * The search, over every row on the screen at once.
      *
-     * Fuzzy rather than a substring test: the rules are named in the operator's second
-     * language as often as their first, and "scaner"/"wordpres"/"tor exit" all have to
-     * find the row somebody meant. Rebuilt each render rather than memoised - it is a
-     * few dozen short strings, and a stale index would silently stop finding a rule
-     * that was just renamed.
+     * The rules are named in the operator's second language as often as their first,
+     * so "scaner"/"wordpres"/"tor exit" all have to find the row somebody meant - a
+     * typo in the name is forgiven when nothing matches as typed. Run each render
+     * rather than memoised - it is a few dozen short strings, and a stale result
+     * would silently stop finding a rule that was just renamed.
      */
     const needle = search.trim();
     const found =
         needle === ""
             ? null
             : new Set(
-                  new Fuse(
+                  searchItems(
                       [
                           ...saved.rules.map((rule, index) => ({
                               key: `custom:${index}`,
@@ -508,15 +508,9 @@ export function WafEditor({
                               description: row.description
                           }))
                       ],
-                      {
-                          keys: ["name", "description"],
-                          threshold: 0.35,
-                          ignoreLocation: true,
-                          minMatchCharLength: 2
-                      }
-                  )
-                      .search(needle)
-                      .map((hit) => hit.item.key)
+                      needle,
+                      [{ text: (row) => row.name }, { text: (row) => row.description }]
+                  ).map((row) => row.key)
               );
 
     /** Whether a row survives the search and the status filter. `enabled` is what is

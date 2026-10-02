@@ -26,7 +26,7 @@
  * is the kind of thing people stop bothering with.
  */
 
-import Fuse from "fuse.js";
+import { searchItems } from "@polaris/core/search-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { forwardAction } from "./actions";
@@ -111,24 +111,23 @@ export function ForwardDialog({
      * Ranked rather than filtered.
      *
      * Somebody forwarding a message is typing a room name from memory, into a
-     * box, in a hurry - which is exactly where a substring match fails: a
-     * transposed letter, a missing accent or two words the other way round and
-     * the conversation they meant is simply not in the list. Fuse is already
-     * carried for the task search, the data is already here, and the ranking is
-     * the point: the best match should be first, not wherever the array put it.
+     * box, in a hurry - so a missing accent, two words the other way round or a
+     * transposed letter in the name still find it, and the best match is first
+     * rather than wherever the array put it.
      *
      * It reads the flat list on purpose. Typing is how somebody reaches a
      * channel buried three servers down without opening three servers.
      */
-    const index = useMemo(
-        () => new Fuse(targets, { keys: ["name", "place"], threshold: 0.3, ignoreLocation: true }),
-        [targets]
-    );
-
     const searching = query.trim().length > 0;
     const found = useMemo(
-        () => (searching ? index.search(query.trim()).map((hit) => hit.item) : []),
-        [index, query, searching]
+        () =>
+            searching
+                ? searchItems(targets, query, [
+                      { text: (target) => target.name },
+                      { text: (target) => target.place }
+                  ])
+                : [],
+        [targets, query, searching]
     );
 
     /** What is on screen right now, which is one of three things. */

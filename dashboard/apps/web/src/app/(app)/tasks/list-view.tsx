@@ -14,7 +14,6 @@
  * screen showing something that did not happen.
  */
 
-import Fuse from "fuse.js";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { FilterBar } from "./filter-bar";
@@ -38,6 +37,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { Button, ConfirmDeleteDialog, EmptyState, Select, cn, useToast } from "@polaris/ui";
 import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
@@ -61,6 +61,18 @@ import type {
  * can skip rather than another render.
  */
 const DEFAULT_SORT: core.TaskSort = { field: "priority", direction: "asc" };
+
+/**
+ * What the search box reads of a task: its name first, which is the only place
+ * a typo is forgiven, then its reference, its description and its tags. Every
+ * word typed has to be in one of them - a word in no task finds no task.
+ */
+const TASK_SEARCH_FIELDS: readonly SearchField<TaskRow>[] = [
+    { text: (task) => task.name, weight: 3 },
+    { text: (task) => task.reference, weight: 2 },
+    { text: (task) => task.description, weight: 1 },
+    { text: (task) => task.tags.map((tag) => tag.name), weight: 1 }
+];
 
 const VIEW_ICONS: Record<core.TaskViewType, typeof LayoutList> = {
     list: LayoutList,
@@ -234,73 +246,28 @@ export function ListScreen({
 
     const needle = search.trim();
 
-    /**
-     * Some queries are not somebody half remembering.
-     *
-     * Pasting a URL, a path, an address or an identifier names one exact thing,
-     * and a fuzzy matcher handed a forty-character string scores almost every row
-     * as a partial match - so the answer was a list of everything with the one
-     * task that actually contains it somewhere in the middle. `isLiteralQuery`
-     * decides which kind of query this is; quoting forces it either way.
-     */
-    const literal = core.isLiteralQuery(needle);
-
-    /**
-     * Search is otherwise fuzzy, because the way people look for a task is by
-     * half remembering it. A substring match only finds "user agent" if that is
-     * what somebody typed, and misses it for "useragent", "UA blocked" or a
-     * transposed letter - which is exactly when they are searching in the first
-     * place. Reference and tags are searchable too, at lower weight.
-     *
-     * Built only while something is being searched for. The index is over every
-     * task on the screen and the rows change on every tick of a checkbox, so
-     * building it regardless would rebuild a few thousand entries on each edit
-     * to answer a question nobody asked.
-     */
-    const index = useMemo(
-        () =>
-            needle && !literal
-                ? new Fuse(rows, {
-                      keys: [
-                          { name: "name", weight: 3 },
-                          { name: "reference", weight: 2 },
-                          { name: "description", weight: 1 },
-                          { name: "tags.name", weight: 1 }
-                      ],
-                      threshold: 0.4,
-                      ignoreLocation: true,
-                      minMatchCharLength: 2
-                  })
-                : null,
-        [rows, needle, literal]
-    );
-
     const hidesClosed = core.hidesClosedWork(groupBy, showClosed);
 
     const sortedFacts = useMemo(() => {
         const now = new Date();
-        const matched = index
-            ? index.search(needle).map((hit) => hit.item)
-            : literal
-              ? rows.filter((task) =>
-                    core.matchesLiterally(needle, [
-                        task.name,
-                        task.reference,
-                        task.description,
-                        ...task.tags.map((tag) => tag.name)
-                    ])
-                )
-              : rows;
-        const working = matched
+        const working = rows
             .filter((task) => !hidesClosed || task.statusType !== "closed")
             .map(toFacts)
             .filter((facts) => core.matchesFilter(facts, filter, now, format.weekStartsOn));
-        // A search is already ranked by how well each row matched; re-sorting it
-        // by due date would throw that away.
-        // A fuzzy search is already ranked by how well each row matched; a literal
-        // one is not ranked at all, so it keeps the order the screen was in.
-        return index ? working : core.sortTasks(working, sort, statusOrder);
-    }, [rows, index, needle, literal, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
+        const sorted = core.sortTasks(working, sort, statusOrder);
+        if (!needle) return sorted;
+        // Searched in the screen's own order, so the tasks that matched equally
+        // well keep the sort somebody chose; the rows rather than the facts, so
+        // the text each one was read as is remembered between keystrokes.
+        const byId = new Map(sorted.map((facts) => [facts.id, facts]));
+        const candidates = sorted
+            .map((facts) => rowById.get(facts.id))
+            .filter((task): task is TaskRow => task !== undefined);
+        return searchItems(candidates, needle, TASK_SEARCH_FIELDS).flatMap((task) => {
+            const facts = byId.get(task.id);
+            return facts ? [facts] : [];
+        });
+    }, [rows, rowById, needle, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
 
     /**
      * What the reader asked to see, as opposed to what the data happens to be.

@@ -15,7 +15,7 @@
  * shows who is in the group and opens on the dialog that changes it.
  */
 
-import Fuse from "fuse.js";
+import { searchItems } from "@polaris/core/search-text";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import { Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
@@ -70,25 +70,20 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
     // showing the membership from before the change it just made.
     const open = groups.find((group) => group.id === openId) ?? null;
 
-    // Fuzzy rather than a substring: somebody looking for the operations group
-    // types "ops", and somebody looking for the group a person is in types their
-    // name half-remembered. Over the rows already on the page - a deployment's
-    // groups are a short list, and asking the server for a substring would be
-    // slower than reading it.
-    const fuse = useMemo(
+    // By the group's name, what it is for, or who is in it: somebody looking for
+    // the group a person is in types that person's name. Over the rows already on
+    // the page - a deployment's groups are a short list, and asking the server
+    // would be slower than reading it.
+    const shown = useMemo(
         () =>
-            new Fuse(groups, {
-                keys: ["name", "description", "members.name", "members.email"],
-                threshold: 0.3,
-                ignoreLocation: true
-            }),
-        [groups]
+            searchItems(groups, query, [
+                { text: (group) => group.name },
+                { text: (group) => group.description },
+                { text: (group) => group.members.map((member) => member.name) },
+                { text: (group) => group.members.map((member) => member.email) }
+            ]),
+        [groups, query]
     );
-    const shown = useMemo(() => {
-        const needle = query.trim();
-        if (!needle) return groups;
-        return fuse.search(needle).map((hit) => hit.item);
-    }, [fuse, groups, query]);
 
     function mutate(run: () => Promise<unknown>) {
         startTransition(async () => {

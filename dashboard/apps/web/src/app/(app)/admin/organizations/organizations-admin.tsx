@@ -23,7 +23,6 @@
  * to mean "no cap" rather than "none allowed", and it is labelled that way.
  */
 
-import Fuse from "fuse.js";
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -66,23 +65,17 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
     const router = useRouter();
     const [query, setQuery] = useState("");
 
-    // Fuzzy, over the rows already here: a handle is half-remembered more often
-    // than it is typed correctly, and an owner's name is worth finding by either
-    // half of it.
-    const fuse = useMemo(
+    // Over the rows already here, by name, handle or owner - an owner's name is
+    // worth finding by either half of it.
+    const shown = useMemo(
         () =>
-            new Fuse(orgs, {
-                keys: ["name", "slug", "ownerName"],
-                threshold: 0.3,
-                ignoreLocation: true
-            }),
-        [orgs]
+            core.searchItems(orgs, query, [
+                { text: (org) => org.name },
+                { text: (org) => org.slug },
+                { text: (org) => org.ownerName }
+            ]),
+        [orgs, query]
     );
-    const shown = useMemo(() => {
-        const needle = query.trim();
-        if (!needle) return orgs;
-        return fuse.search(needle).map((hit) => hit.item);
-    }, [fuse, orgs, query]);
 
     // An administrator is answered as the owner of every organization, so the
     // row opens the real thing rather than a read-only copy of half of it.

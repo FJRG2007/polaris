@@ -18,7 +18,7 @@
  * the reason they cannot use it.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { Button, Input } from "@polaris/ui";
 import { Check, Loader2, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -34,6 +34,13 @@ export interface PickerModel {
     reasoning: boolean;
     costInput: number | null;
 }
+
+/** A model is found by its name, its slug or who serves it. */
+const MODEL_FIELDS: readonly SearchField<PickerModel>[] = [
+    { text: (model) => model.name },
+    { text: (model) => model.slug },
+    { text: (model) => model.provider }
+];
 
 /** Loaded once per session: the catalogue changes daily at most, and a dialog
  *  reopened while deciding should not go back for it. */
@@ -112,21 +119,7 @@ export function ModelPicker({
         return () => document.removeEventListener("pointerdown", onPointerDown);
     }, [open]);
 
-    const fuse = useMemo(
-        () =>
-            new Fuse(models, {
-                keys: ["name", "slug", "provider"],
-                threshold: 0.35,
-                ignoreLocation: true
-            }),
-        [models]
-    );
-
-    const results = useMemo(() => {
-        const trimmed = query.trim();
-        if (!trimmed) return models;
-        return fuse.search(trimmed).map((hit) => hit.item);
-    }, [fuse, models, query]);
+    const results = useMemo(() => searchItems(models, query, MODEL_FIELDS), [models, query]);
 
     const chosen = useMemo(
         () => models.find((model) => model.slug === value) ?? null,

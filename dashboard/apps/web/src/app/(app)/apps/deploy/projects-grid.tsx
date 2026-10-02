@@ -6,7 +6,7 @@
  * shows an "N/M services online" status. Clicking a card opens the project.
  */
 
-import Fuse from "fuse.js";
+import { searchItems } from "@polaris/core/search-text";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
@@ -117,8 +117,10 @@ export function ProjectsGrid({
         () => projects.filter((project) => !removing.includes(project.id)),
         [projects, removing]
     );
-    const fuse = useMemo(() => new Fuse(visible, { keys: ["name"], threshold: 0.4 }), [visible]);
-    const filtered = search.trim() ? fuse.search(search.trim()).map((result) => result.item) : visible;
+    const filtered = useMemo(
+        () => searchItems(visible, search, [{ text: (project) => project.name }]),
+        [visible, search]
+    );
     const count = visible.length;
 
     return (

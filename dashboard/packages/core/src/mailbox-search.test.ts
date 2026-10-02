@@ -184,8 +184,8 @@ describe("what a search admits", () => {
     });
 
     it("leaves the loose words alone, because those are ranked rather than tested", () => {
-        // A word nobody in the message ever wrote still gets through here; Fuse
-        // is what decides whether it is close enough to anything.
+        // A word nobody in the message ever wrote still gets through here; the
+        // shared search over what comes back is what decides.
         expect(search.mailSearchAdmits(message(), search.parseMailSearch("cualquiercosa"))).toBe(true);
     });
 });

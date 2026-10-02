@@ -2,7 +2,8 @@
 
 /**
  * The file table for one location: breadcrumb, a search/sort/filter toolbar, and
- * a selectable list. Rows support fuzzy search (fuse.js), category/size/date
+ * a selectable list. Rows support search (every word typed, typos forgiven only
+ * when nothing matches as typed), category/size/date
  * filters, multi-select (ctrl toggles, shift extends a range), inline rename
  * (double-click the name text), a right-click context menu, and bulk
  * download/delete. Opening a file swaps the listing for its preview in place -
@@ -12,13 +13,13 @@
  * every keystroke.
  */
 
-import Fuse from "fuse.js";
 import Link from "next/link";
 import type { DriveEntry, ListingFailure } from "./types";
 import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
-import { formatBytes, isLiteralQuery, matchesLiterally } from "@polaris/core";
+import { formatBytes } from "@polaris/core";
+import { searchItems } from "@polaris/core/search-text";
 import type { DriveAbilities } from "@/lib/drive-authz";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
@@ -34,7 +35,7 @@ import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { matchesStructured, parseSearch } from "./search-query";
+import { matchesStructured, NAME_SEARCH, parseSearch, PATH_SEARCH } from "./search-query";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
@@ -929,20 +930,10 @@ export function FilesView({
 
         const parsed = parseSearch(query);
         rows = rows.filter((entry) => matchesStructured(entry.name, entry.path, parsed));
-        if (parsed.fuzzy && isLiteralQuery(parsed.fuzzy)) {
-            // A pasted address, path or identifier names one exact thing, and a
-            // fuzzy matcher handed one scores almost every row as a partial
-            // match - so it would answer with the whole folder.
-            rows = rows.filter((entry) => matchesLiterally(parsed.fuzzy, [entry.name, entry.path]));
-        } else if (parsed.fuzzy) {
-            // In path mode the fuzzy pass ranks against the full relative path so a
-            // query like "documentos/doc.pdf" matches a nested item.
-            const fuse = new Fuse(rows, {
-                keys: [parsed.pathMode ? "path" : "name"],
-                threshold: 0.4,
-                ignoreLocation: true
-            });
-            rows = fuse.search(parsed.fuzzy).map((result) => result.item);
+        if (parsed.fuzzy) {
+            // In path mode the words are matched against the full relative path,
+            // so a query like "documentos/doc.pdf" finds a nested item.
+            rows = searchItems(rows, parsed.fuzzy, parsed.pathMode ? PATH_SEARCH : NAME_SEARCH);
         }
 
         const direction = sortDir === "asc" ? 1 : -1;

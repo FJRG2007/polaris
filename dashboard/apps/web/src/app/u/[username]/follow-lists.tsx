@@ -28,7 +28,7 @@
  * letter still lands where it should.
  */
 
-import Fuse from "fuse.js";
+import { searchItems } from "@polaris/core/search-text";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
@@ -232,16 +232,10 @@ function PeopleDialog({
     const shown = useMemo(() => {
         const term = query.trim();
         if (!term || people.length === 0) return people;
-        const ranked = new Fuse(people, {
-            threshold: 0.35,
-            ignoreLocation: true,
-            keys: [
-                { name: "name", weight: 3 },
-                { name: "username", weight: 2 }
-            ]
-        })
-            .search(term)
-            .map((hit) => hit.item);
+        const ranked = searchItems(people, term, [
+            { text: (person) => person.name, weight: 3 },
+            { text: (person) => person.username, weight: 2 }
+        ]);
         const seen = new Set(ranked.map((person) => person.id));
         return [...ranked, ...people.filter((person) => !seen.has(person.id))];
     }, [people, query]);

@@ -26,7 +26,7 @@
  *   the one place not reading it.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppMark } from "@/components/app-mark";
@@ -154,27 +154,8 @@ export function MarketplaceView({
             });
     }
 
-    /**
-     * Everything on offer, indexed once.
-     *
-     * Over the name, the summary and the category, weighted in that order: people
-     * search a store for a name, occasionally for what a thing does, and the
-     * category is the tie-break rather than the answer. The description is
-     * deliberately left out - it is a paragraph, and matching inside one puts
-     * apps at the top for a word buried in their third sentence.
-     */
-    const index = useMemo(() => {
-        const all = groups.flatMap((group) => group.apps);
-        return new Fuse(all, {
-            threshold: 0.35,
-            ignoreLocation: true,
-            keys: [
-                { name: "name", weight: 3 },
-                { name: "summary", weight: 2 },
-                { name: "category", weight: 1 }
-            ]
-        });
-    }, [groups]);
+    /** Everything on offer, in one list for the search. */
+    const all = useMemo(() => groups.flatMap((group) => group.apps), [groups]);
 
     /**
      * What the grid draws: the categories, or one flat list of matches.
@@ -186,11 +167,11 @@ export function MarketplaceView({
     const shown = useMemo(() => {
         const term = query.trim();
         if (term) {
-            const hits = index.search(term).map((hit) => hit.item);
+            const hits = searchItems(all, term, APP_FIELDS);
             return hits.length === 0 ? [] : [{ category: t("view.results"), apps: sortOffered(hits) }];
         }
         return groups.map((group) => ({ category: group.category, apps: sortOffered(group.apps) }));
-    }, [groups, index, query, t]);
+    }, [groups, all, query, t]);
 
     const installedByCatalog = useMemo(() => {
         const map = new Map<string, number>();
@@ -282,6 +263,19 @@ function openHrefFor(app: AppManifest, singletonInstall: Map<string, string>): s
  * it meant the first row of a category could be three things nobody can have.
  * Order is otherwise left alone: the catalog's is deliberate.
  */
+/**
+ * What a store search reads of an app: the name, the summary and the category,
+ * weighted in that order - people search a store for a name, occasionally for
+ * what a thing does, and the category is the tie-break rather than the answer.
+ * The description is deliberately left out: it is a paragraph, and matching
+ * inside one puts apps at the top for a word buried in their third sentence.
+ */
+const APP_FIELDS: readonly SearchField<AppManifest>[] = [
+    { text: (app) => app.name, weight: 3 },
+    { text: (app) => app.summary, weight: 2 },
+    { text: (app) => app.category, weight: 1 }
+];
+
 function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
     return [...apps].sort(
         (left, right) => Number(left.comingSoon ?? false) - Number(right.comingSoon ?? false)

@@ -14,7 +14,7 @@
  * without either knowing about this file.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 
 export interface EmojiGroup {
     readonly name: string;
@@ -507,14 +507,14 @@ const ALL: readonly { char: string; words: string }[] = EMOJI_GROUPS.flatMap(
 );
 
 /**
- * The index behind the search box.
- *
- * Ranked rather than filtered, and built once at module scope because the list
- * never changes. A substring match would miss "thumbsup" for "thumbs up",
- * "smilie" for "smile" and every transposition somebody types at speed - and it
- * cannot rank, so the emoji you meant sits wherever the list happened to put it.
+ * What the search box reads of an emoji: its words, which are its name. Every
+ * word typed has to start or sit inside one of them; "thumbsup" still finds
+ * "thumbs up" and "smiel" still finds "smile", but only when nothing matched as
+ * typed.
  */
-const INDEX = new Fuse(ALL, { keys: ["words"], threshold: 0.3, ignoreLocation: true });
+const EMOJI_FIELDS: readonly SearchField<{ char: string; words: string }>[] = [
+    { text: (entry) => entry.words }
+];
 
 /** Every emoji that matches a typed term. Empty query gives nothing: the tabs
  *  are for browsing, and a search with no term is a browse. */
@@ -523,5 +523,5 @@ export function searchEmoji(query: string): { char: string; words: string }[] {
     if (!term) return [];
     // An exact emoji pasted in is itself, which no fuzzy match over words finds.
     const pasted = ALL.filter((entry) => entry.char === term);
-    return [...pasted, ...INDEX.search(term).map((hit) => hit.item)];
+    return [...pasted, ...searchItems(ALL, term, EMOJI_FIELDS)];
 }

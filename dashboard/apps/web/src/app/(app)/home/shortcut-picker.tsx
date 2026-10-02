@@ -13,13 +13,19 @@
  * can be pinned, and there is no list to keep in step.
  */
 
-import Fuse from "fuse.js";
 import { Check, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { OverviewShortcut } from "@polaris/core";
 import { Dialog, DialogContent, DialogTitle, Input, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { navigationEntries, resourceEntries, type CommandEntry, type SearchResource } from "@/lib/search/entries";
+import { searchItems } from "@polaris/core/search-text";
+import {
+    COMMAND_ENTRY_FIELDS,
+    navigationEntries,
+    resourceEntries,
+    type CommandEntry,
+    type SearchResource
+} from "@/lib/search/entries";
 
 /** Matches shown at once. Past this, narrowing the query is the way to find it. */
 const MAX_RESULTS = 30;
@@ -63,26 +69,11 @@ export function ShortcutPicker({
         [isAdmin, appKey, gate, resources]
     );
 
-    const fuse = useMemo(
-        () =>
-            new Fuse(pool, {
-                threshold: 0.4,
-                ignoreLocation: true,
-                keys: [
-                    { name: "label", weight: 3 },
-                    { name: "keywords", weight: 2 },
-                    { name: "context", weight: 1 },
-                    { name: "group", weight: 1 }
-                ]
-            }),
-        [pool]
-    );
-
     const trimmed = query.trim();
     const results = useMemo(() => {
-        const matches = trimmed ? fuse.search(trimmed, { limit: MAX_RESULTS }).map((match) => match.item) : pool;
+        const matches = trimmed ? searchItems(pool, trimmed, COMMAND_ENTRY_FIELDS, { limit: MAX_RESULTS }) : pool;
         return matches.slice(0, MAX_RESULTS);
-    }, [trimmed, fuse, pool]);
+    }, [trimmed, pool]);
 
     const alreadyPinned = new Set(pinned.map((shortcut) => shortcut.href));
 

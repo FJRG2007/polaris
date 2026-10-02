@@ -26,7 +26,7 @@
  * file browser uses, so what somebody has learnt in Drive works here.
  */
 
-import Fuse from "fuse.js";
+import { searchItems } from "@polaris/core/search-text";
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
@@ -208,19 +208,15 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
         void load(null);
     }, [load]);
 
-    // Fuzzy, over what is already here: a schema is a few hundred names at most,
-    // and the one somebody is looking for is usually half-remembered - "user_sess"
-    // has to find `user_sessions`, and a transposition has to find it too. Ranked,
-    // so the closest is at the top rather than wherever the catalogue put it.
-    const fuse = useMemo(
-        () => new Fuse(relations ?? [], { keys: ["name"], threshold: 0.3, ignoreLocation: true }),
-        [relations]
-    );
+    // Over what is already here: a schema is a few hundred names at most, and the
+    // one somebody is looking for is usually half-remembered - "user_sess" has to
+    // find `user_sessions`, and a transposition has to find it too. Ranked, so the
+    // closest is at the top rather than wherever the catalogue put it.
     const shown = useMemo(() => {
         const needle = find.trim();
         // A search is already ranked by how well each name matched; re-ordering
         // it by anything else throws that away.
-        if (needle) return fuse.search(needle).map((hit) => hit.item);
+        if (needle) return searchItems(relations ?? [], needle, [{ text: (relation) => relation.name }]);
         const list = [...(relations ?? [])];
         if (order === "rows") {
             // A table whose size the engine does not keep sinks rather than
@@ -234,7 +230,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
             list.sort((left, right) => left.name.localeCompare(right.name));
         }
         return list;
-    }, [fuse, relations, find, order]);
+    }, [relations, find, order]);
 
     return (
         <div className="flex min-h-0 flex-1 gap-4">

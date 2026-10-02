@@ -6,8 +6,8 @@
  *
  * Two halves, and the split is what keeps it cheap. Pages and the resource index
  * - deploy projects and services, servers, runner pools, installed apps - are
- * known up front and matched here with fuse.js, so a typo still lands and typing
- * costs nothing. Tasks, pages, notes and people are too many to hold and too
+ * known up front and matched here with the shared search, so a typo in a name
+ * still lands, a word nothing has finds nothing, and typing costs nothing. Tasks, pages, notes and people are too many to hold and too
  * live to cache, so they are searched in the database, one scope at a time, and
  * only behind a command: "/tasks", "/servers lirio-0", "@ana". Typing a name on
  * its own never starts four searches nobody asked for.
@@ -18,7 +18,6 @@
  * to another machine without the panel ever waiting for it.
  */
 
-import Fuse from "fuse.js";
 import * as core from "@polaris/core";
 import { usePathname, useRouter } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
@@ -33,6 +32,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { CommandRow, EntryRow, HitRow, HitSkeleton, RecentRow } from "@/components/search-rows";
 import {
+    COMMAND_ENTRY_FIELDS,
     navigationEntries,
     resourceEntries,
     type CommandEntry,
@@ -376,21 +376,6 @@ export function CommandPalette({
         );
     }, [scope, navigation, resources]);
 
-    const fuse = useMemo(
-        () =>
-            new Fuse(pool, {
-                threshold: 0.4,
-                ignoreLocation: true,
-                keys: [
-                    { name: "label", weight: 3 },
-                    { name: "keywords", weight: 2 },
-                    { name: "context", weight: 1 },
-                    { name: "group", weight: 1 }
-                ]
-            }),
-        [pool]
-    );
-
     const suggestions = useMemo(() => (scope ? [] : commandSuggestions(query)), [scope, query]);
 
     /** Earlier searches, narrowed to the command in hand and to what is typed. */
@@ -433,7 +418,7 @@ export function CommandPalette({
                 // dashboard rather than a ranking, so the pages are listed as
                 // their apps order them.
                 const matches = trimmed
-                    ? fuse.search(trimmed, { limit: MAX_RESULTS }).map((match) => match.item)
+                    ? core.searchItems(pool, trimmed, COMMAND_ENTRY_FIELDS, { limit: MAX_RESULTS })
                     : pool;
                 const shown = trimmed || scope ? matches : navigation;
                 for (const entry of shown.slice(0, MAX_RESULTS)) {
@@ -464,7 +449,7 @@ export function CommandPalette({
             }));
 
         return [...remembered, ...commands, ...found];
-    }, [recentRows, suggestions, scope, hits, trimmed, query, fuse, pool, navigation, t, navLabel]);
+    }, [recentRows, suggestions, scope, hits, trimmed, query, pool, navigation, t, navLabel]);
 
     const groups = useMemo(() => groupRows(rows), [rows]);
     /** Rows that are an answer rather than a memory or a command. */

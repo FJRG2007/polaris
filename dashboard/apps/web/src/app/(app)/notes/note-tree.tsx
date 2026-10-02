@@ -20,7 +20,7 @@
 
 import { saveFile } from "@/components/transfers/move-file";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import Fuse from "fuse.js";
+import { searchItems } from "@polaris/core/search-text";
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -264,24 +264,14 @@ export function NoteTree({
         () => shelves.flatMap((shelf) => shelf.notes.map((note) => ({ ...note, shelf }))),
         [shelves]
     );
-    const index = useMemo(
-        () =>
-            new Fuse(everything, {
-                keys: [
-                    { name: "title", weight: 3 },
-                    { name: "excerpt", weight: 1 }
-                ],
-                threshold: 0.3,
-                ignoreLocation: true
-            }),
-        [everything]
-    );
-
     if (term) {
         // Ranked rather than filtered: somebody looking for a note is typing a
-        // title from memory, and a substring match misses a transposition or two
-        // words the other way round.
-        const hits = index.search(term).map((hit) => hit.item);
+        // title from memory, so the title counts for more than the excerpt, and
+        // a typo in it is still forgiven when nothing matches as typed.
+        const hits = searchItems(everything, term, [
+            { text: (note) => note.title, weight: 3 },
+            { text: (note) => note.excerpt, weight: 1 }
+        ]);
         return (
             <aside className="flex w-full flex-col gap-2 md:w-72 md:shrink-0">
                 <TreeSearch query={query} onQuery={setQuery} onNew={() => void create({ spaceId: null, folderId: null })} />
