@@ -39,7 +39,12 @@ export interface SpfTerm {
 }
 
 export type SpfParse =
-    | { readonly ok: true; readonly terms: readonly SpfTerm[]; readonly redirect: string | null; readonly all: SpfQualifier | null }
+    | {
+          readonly ok: true;
+          readonly terms: readonly SpfTerm[];
+          readonly redirect: string | null;
+          readonly all: SpfQualifier | null;
+      }
     | { readonly ok: false; readonly bad: string };
 
 /** Whether a TXT string is an SPF record at all: the version, then a space or nothing. */
@@ -47,7 +52,8 @@ export function isSpf(text: string): boolean {
     return /^v=spf1(\s|$)/i.test(text.trim());
 }
 
-const MECHANISM = /^([+\-~?]?)(all|include|a|mx|ptr|ip4|ip6|exists)(?::([^/\s]+))?(\/\/?\d{1,3}(?:\/\/\d{1,3})?)?$/i;
+const MECHANISM =
+    /^([+\-~?]?)(all|include|a|mx|ptr|ip4|ip6|exists)(?::([^/\s]+))?(\/\/?\d{1,3}(?:\/\/\d{1,3})?)?$/i;
 const MODIFIER = /^([a-z][a-z0-9_.-]*)=(\S*)$/i;
 const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
 
@@ -69,7 +75,8 @@ export function parseSpf(record: string): SpfParse {
             const qualifier = (mechanism[1] || "+") as SpfQualifier;
             if (name === "all" && (value !== null || mechanism[4])) return { ok: false, bad: part };
             if (NEEDS_DOMAIN.has(name) && !value) return { ok: false, bad: part };
-            if (value && TAKES_DOMAIN.has(name) && !/^[a-z0-9%{}_.+-]+$/i.test(value)) return { ok: false, bad: part };
+            if (value && TAKES_DOMAIN.has(name) && !/^[a-z0-9%{}_.+-]+$/i.test(value))
+                return { ok: false, bad: part };
             if (name === "ip4" && !(value && IPV4.test(value))) return { ok: false, bad: part };
             if (name === "ip6" && !(value && value.includes(":"))) return { ok: false, bad: part };
             terms.push({ qualifier, mechanism: name, value });
@@ -123,7 +130,11 @@ const WALK_BUDGET = 20;
  * stops after `WALK_BUDGET` lookups, never visits a name twice (a loop is just
  * more lookups), and a resolver failure counts as nothing found.
  */
-export async function walkSpf(domain: string, spf: Extract<SpfParse, { ok: true }>, resolver: SpfResolver): Promise<SpfWalk> {
+export async function walkSpf(
+    domain: string,
+    spf: Extract<SpfParse, { ok: true }>,
+    resolver: SpfResolver
+): Promise<SpfWalk> {
     let lookups = 0;
     let voids = 0;
     const missing: string[] = [];
@@ -131,15 +142,24 @@ export async function walkSpf(domain: string, spf: Extract<SpfParse, { ok: true 
     const visited = new Set<string>([domain.toLowerCase()]);
 
     async function visit(name: string, record: Extract<SpfParse, { ok: true }>): Promise<void> {
-        const steps: { kind: "include" | "a" | "mx" | "exists" | "ptr" | "redirect"; target: string }[] = [];
+        const steps: {
+            kind: "include" | "a" | "mx" | "exists" | "ptr" | "redirect";
+            target: string;
+        }[] = [];
         for (const term of record.terms) {
-            if (term.mechanism === "include" || term.mechanism === "exists") steps.push({ kind: term.mechanism, target: term.value! });
-            else if (term.mechanism === "a" || term.mechanism === "mx" || term.mechanism === "ptr") {
+            if (term.mechanism === "include" || term.mechanism === "exists")
+                steps.push({ kind: term.mechanism, target: term.value! });
+            else if (
+                term.mechanism === "a" ||
+                term.mechanism === "mx" ||
+                term.mechanism === "ptr"
+            ) {
                 steps.push({ kind: term.mechanism, target: term.value ?? name });
             }
         }
         // A redirect is only read when there is no `all` (RFC 7208 6.1).
-        if (record.redirect && record.all === null) steps.push({ kind: "redirect", target: record.redirect });
+        if (record.redirect && record.all === null)
+            steps.push({ kind: "redirect", target: record.redirect });
 
         for (const step of steps) {
             if (lookups >= WALK_BUDGET) return;
@@ -150,7 +170,9 @@ export async function walkSpf(domain: string, spf: Extract<SpfParse, { ok: true 
             const target = step.target.toLowerCase().replace(/\.$/, "");
             if (step.kind === "ptr") continue;
             if (step.kind === "a" || step.kind === "mx" || step.kind === "exists") {
-                const found = await resolver.exists(target, step.kind === "mx" ? "mx" : "a").catch(() => false);
+                const found = await resolver
+                    .exists(target, step.kind === "mx" ? "mx" : "a")
+                    .catch(() => false);
                 if (!found) voids += 1;
                 continue;
             }
@@ -182,7 +204,11 @@ export async function walkSpf(domain: string, spf: Extract<SpfParse, { ok: true 
  * nothing is missing. What merging a second SPF into the first means: one record,
  * since two is a permanent error for every receiver.
  */
-export function mergeSpfRecords(existing: string, extra: string, fallbackAll: SpfQualifier = "~"): string {
+export function mergeSpfRecords(
+    existing: string,
+    extra: string,
+    fallbackAll: SpfQualifier = "~"
+): string {
     const keep = existing.trim().split(/\s+/).slice(1);
     const add = extra.trim().split(/\s+/).slice(1);
     const isAll = (part: string) => /^[+\-~?]?all$/i.test(part);
@@ -190,7 +216,8 @@ export function mergeSpfRecords(existing: string, extra: string, fallbackAll: Sp
     const terms: string[] = [];
     for (const part of [...keep, ...add]) {
         if (isAll(part)) continue;
-        if (!terms.some((present) => present.toLowerCase() === part.toLowerCase())) terms.push(part);
+        if (!terms.some((present) => present.toLowerCase() === part.toLowerCase()))
+            terms.push(part);
     }
     return ["v=spf1", ...terms, allPart].join(" ");
 }
@@ -214,7 +241,9 @@ export interface DmarcRecord {
     readonly ruf: readonly string[];
 }
 
-export type DmarcParse = { readonly ok: true; readonly record: DmarcRecord } | { readonly ok: false; readonly bad: string };
+export type DmarcParse =
+    | { readonly ok: true; readonly record: DmarcRecord }
+    | { readonly ok: false; readonly bad: string };
 
 export function isDmarc(text: string): boolean {
     return /^v\s*=\s*DMARC1\s*(;|$)/i.test(text.trim());
@@ -224,12 +253,14 @@ const POLICIES: readonly DmarcPolicy[] = ["none", "quarantine", "reject"];
 
 function uriList(value: string | undefined): string[] {
     if (!value) return [];
-    return value
-        .split(",")
-        .map((part) => part.trim())
-        .filter(Boolean)
-        // A size limit (`!10m`) is part of the URI on the wire, not the address.
-        .map((part) => part.replace(/!\d+[kmgt]?$/i, ""));
+    return (
+        value
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean)
+            // A size limit (`!10m`) is part of the URI on the wire, not the address.
+            .map((part) => part.replace(/!\d+[kmgt]?$/i, ""))
+    );
 }
 
 export function parseDmarc(text: string): DmarcParse {
@@ -239,9 +270,15 @@ export function parseDmarc(text: string): DmarcParse {
     const p = tags.get("p")?.toLowerCase();
     if (!p || !POLICIES.includes(p as DmarcPolicy)) return { ok: false, bad: `p=${p ?? ""}` };
     const spRaw = tags.get("sp")?.toLowerCase();
-    if (spRaw !== undefined && !POLICIES.includes(spRaw as DmarcPolicy)) return { ok: false, bad: `sp=${spRaw}` };
+    if (spRaw !== undefined && !POLICIES.includes(spRaw as DmarcPolicy))
+        return { ok: false, bad: `sp=${spRaw}` };
     const pctRaw = tags.get("pct");
-    const pct = pctRaw === undefined ? 100 : /^\d{1,3}$/.test(pctRaw) && Number(pctRaw) <= 100 ? Number(pctRaw) : NaN;
+    const pct =
+        pctRaw === undefined
+            ? 100
+            : /^\d{1,3}$/.test(pctRaw) && Number(pctRaw) <= 100
+              ? Number(pctRaw)
+              : NaN;
     if (Number.isNaN(pct)) return { ok: false, bad: `pct=${pctRaw}` };
     const alignment = (key: "adkim" | "aspf"): "r" | "s" | null => {
         const value = tags.get(key)?.toLowerCase() ?? "r";
@@ -253,11 +290,22 @@ export function parseDmarc(text: string): DmarcParse {
     if (!aspf) return { ok: false, bad: `aspf=${tags.get("aspf")}` };
     const rua = uriList(tags.get("rua"));
     const ruf = uriList(tags.get("ruf"));
-    const badUri = [...rua, ...ruf].find((uri) => !/^mailto:[^\s@]+@[^\s@]+$/i.test(uri) && !/^https?:\/\//i.test(uri));
+    const badUri = [...rua, ...ruf].find(
+        (uri) => !/^mailto:[^\s@]+@[^\s@]+$/i.test(uri) && !/^https?:\/\//i.test(uri)
+    );
     if (badUri) return { ok: false, bad: badUri };
     return {
         ok: true,
-        record: { p: p as DmarcPolicy, sp: (spRaw as DmarcPolicy | undefined) ?? (p as DmarcPolicy), spSet: spRaw !== undefined, pct, adkim, aspf, rua, ruf }
+        record: {
+            p: p as DmarcPolicy,
+            sp: (spRaw as DmarcPolicy | undefined) ?? (p as DmarcPolicy),
+            spSet: spRaw !== undefined,
+            pct,
+            adkim,
+            aspf,
+            rua,
+            ruf
+        }
     };
 }
 
@@ -313,7 +361,14 @@ export function withRua(text: string, address: string): string {
     const at = parts.findIndex((part) => /^rua\s*=/i.test(part));
     if (at === -1) return [...parts, `rua=${address}`].join("; ");
     const current = parts[at]!.replace(/^rua\s*=\s*/i, "");
-    if (current.toLowerCase().split(",").map((part) => part.trim()).includes(address.toLowerCase())) return parts.join("; ");
+    if (
+        current
+            .toLowerCase()
+            .split(",")
+            .map((part) => part.trim())
+            .includes(address.toLowerCase())
+    )
+        return parts.join("; ");
     parts[at] = `rua=${current},${address}`;
     return parts.join("; ");
 }
@@ -360,7 +415,12 @@ export function parseMtaStsPolicy(text: string): MtaStsPolicy | null {
         .filter(Boolean)
         .map((line) => {
             const at = line.indexOf(":");
-            return at > 0 ? ([line.slice(0, at).trim().toLowerCase(), line.slice(at + 1).trim()] as [string, string]) : (["", ""] as [string, string]);
+            return at > 0
+                ? ([line.slice(0, at).trim().toLowerCase(), line.slice(at + 1).trim()] as [
+                      string,
+                      string
+                  ])
+                : (["", ""] as [string, string]);
         });
     const one = (key: string) => fields.find(([name]) => name === key)?.[1];
     if (one("version") !== "STSv1") return null;
@@ -381,7 +441,11 @@ export function mxCovered(host: string, patterns: readonly string[]): boolean {
         const clean = pattern.replace(/\.$/, "");
         if (clean.startsWith("*.")) {
             const suffix = clean.slice(1);
-            return bare.endsWith(suffix) && !bare.slice(0, -suffix.length).includes(".") && bare.length > suffix.length;
+            return (
+                bare.endsWith(suffix) &&
+                !bare.slice(0, -suffix.length).includes(".") &&
+                bare.length > suffix.length
+            );
         }
         return bare === clean;
     });
@@ -392,7 +456,9 @@ export function mxCovered(host: string, patterns: readonly string[]): boolean {
 // ---------------------------------------------------------------------------
 
 /** The Contact and Expires of a security.txt, or null when it has no Contact. */
-export function parseSecurityTxt(text: string): { contacts: string[]; expires: string | null } | null {
+export function parseSecurityTxt(
+    text: string
+): { contacts: string[]; expires: string | null } | null {
     const contacts: string[] = [];
     let expires: string | null = null;
     for (const raw of text.split(/\r?\n/)) {
@@ -403,7 +469,8 @@ export function parseSecurityTxt(text: string): { contacts: string[]; expires: s
         const field = line.slice(0, at).trim().toLowerCase();
         const value = line.slice(at + 1).trim();
         if (field === "contact" && value) contacts.push(value);
-        if (field === "expires" && !expires && !Number.isNaN(Date.parse(value))) expires = new Date(value).toISOString();
+        if (field === "expires" && !expires && !Number.isNaN(Date.parse(value)))
+            expires = new Date(value).toISOString();
     }
     return contacts.length > 0 ? { contacts, expires } : null;
 }

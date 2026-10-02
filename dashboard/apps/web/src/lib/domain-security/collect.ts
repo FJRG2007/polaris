@@ -20,7 +20,9 @@ export interface DnsAsk {
     resolveMx(name: string): Promise<{ priority: number; exchange: string }[]>;
     resolveTxt(name: string): Promise<string[][]>;
     resolveNs(name: string): Promise<string[]>;
-    resolveCaa(name: string): Promise<{ critical: number; issue?: string; issuewild?: string; iodef?: string }[]>;
+    resolveCaa(
+        name: string
+    ): Promise<{ critical: number; issue?: string; issuewild?: string; iodef?: string }[]>;
     resolve4(name: string): Promise<string[]>;
     resolve6(name: string): Promise<string[]>;
     resolveCname(name: string): Promise<string[]>;
@@ -30,7 +32,10 @@ export interface Probes {
     readonly dns: DnsAsk;
     /** DNSSEC: whether a DS (or DNSKEY) exists, and whether a validating resolver
      *  vouched for the answer. null when the resolver did not answer. */
-    dnssec(name: string, type: "DS" | "DNSKEY"): Promise<{ present: boolean; validated: boolean } | null>;
+    dnssec(
+        name: string,
+        type: "DS" | "DNSKEY"
+    ): Promise<{ present: boolean; validated: boolean } | null>;
     /** Whether a name server hands out the zone. null when it could not be asked. */
     axfr(server: string, domain: string): Promise<boolean | null>;
     registration(domain: string): Promise<F.RegistrationFacts | null>;
@@ -85,7 +90,11 @@ async function txt(dns: DnsAsk, name: string): Promise<string[] | null> {
 }
 
 /** Run `work` over `items`, `width` at a time. */
-async function inBatches<T, R>(items: readonly T[], width: number, work: (item: T) => Promise<R>): Promise<R[]> {
+async function inBatches<T, R>(
+    items: readonly T[],
+    width: number,
+    work: (item: T) => Promise<R>
+): Promise<R[]> {
     const results: R[] = [];
     for (let start = 0; start < items.length; start += width) {
         results.push(...(await Promise.all(items.slice(start, start + width).map(work))));
@@ -93,7 +102,10 @@ async function inBatches<T, R>(items: readonly T[], width: number, work: (item: 
     return results;
 }
 
-async function collectDkim(input: CollectInput, probes: Probes): Promise<{ found: F.DkimFound[] | null; tried: string[] }> {
+async function collectDkim(
+    input: CollectInput,
+    probes: Probes
+): Promise<{ found: F.DkimFound[] | null; tried: string[] }> {
     const tried = [...new Set([...input.selectors, ...COMMON_DKIM_SELECTORS])];
     const answers = await inBatches(tried, DKIM_PARALLEL, async (selector) => ({
         selector,
@@ -108,11 +120,18 @@ async function collectDkim(input: CollectInput, probes: Probes): Promise<{ found
         if (!text) continue;
         const key = /(?:^|;)\s*p\s*=\s*([^;]*)/i.exec(text)?.[1]?.replace(/\s+/g, "") ?? "";
         const type = /(?:^|;)\s*k\s*=\s*([^;\s]*)/i.exec(text)?.[1]?.toLowerCase() ?? "rsa";
-        found.push({ selector: entry.selector, text, bits: key ? probes.keyBits(key, type) : null });
+        found.push({
+            selector: entry.selector,
+            text,
+            bits: key ? probes.keyBits(key, type) : null
+        });
     }
     // A wildcard key answers for a selector nobody uses: the lockdown's empty one.
     if (found.length === 0) {
-        const wildcard = await txt(probes.dns, `${probes.randomLabel()}._domainkey.${input.domain}`);
+        const wildcard = await txt(
+            probes.dns,
+            `${probes.randomLabel()}._domainkey.${input.domain}`
+        );
         const text = wildcard?.find((value) => /(^|;)\s*p\s*=/i.test(value));
         if (text) found.push({ selector: "*", text, bits: null });
     }
@@ -125,16 +144,23 @@ async function collectNs(domain: string, probes: Probes): Promise<F.NameServer[]
     return Promise.all(
         names.slice(0, 8).map(async (name) => ({
             name: name.toLowerCase(),
-            addresses: [...((await answer(() => probes.dns.resolve4(name))) ?? []), ...((await answer(() => probes.dns.resolve6(name))) ?? [])]
+            addresses: [
+                ...((await answer(() => probes.dns.resolve4(name))) ?? []),
+                ...((await answer(() => probes.dns.resolve6(name))) ?? [])
+            ]
         }))
     );
 }
 
 /** Aliases whose target no longer exists: the shape of a subdomain takeover. */
-async function collectDangling(input: CollectInput, probes: Probes): Promise<{ dangling: { name: string; target: string }[]; checked: number }> {
+async function collectDangling(
+    input: CollectInput,
+    probes: Probes
+): Promise<{ dangling: { name: string; target: string }[]; checked: number }> {
     const aliases = input.aliases.slice(0, MAX_ALIASES);
     const checked = await inBatches(aliases, DKIM_PARALLEL, async (alias) => {
-        const target = alias.target ?? (await answer(() => probes.dns.resolveCname(alias.name)))?.[0] ?? null;
+        const target =
+            alias.target ?? (await answer(() => probes.dns.resolveCname(alias.name)))?.[0] ?? null;
         if (!target) return null;
         const clean = target.toLowerCase().replace(/\.$/, "");
         try {
@@ -150,11 +176,22 @@ async function collectDangling(input: CollectInput, probes: Probes): Promise<{ d
             return { name: alias.name, target: clean, dangling: v6 !== null && v6.length === 0 };
         }
     });
-    const looked = checked.filter((entry): entry is { name: string; target: string; dangling: boolean } => entry !== null);
-    return { dangling: looked.filter((entry) => entry.dangling).map(({ name, target }) => ({ name, target })), checked: looked.length };
+    const looked = checked.filter(
+        (entry): entry is { name: string; target: string; dangling: boolean } => entry !== null
+    );
+    return {
+        dangling: looked
+            .filter((entry) => entry.dangling)
+            .map(({ name, target }) => ({ name, target })),
+        checked: looked.length
+    };
 }
 
-async function collectAuthorization(domain: string, dmarcTxt: readonly string[] | null, probes: Probes): Promise<Record<string, boolean | null>> {
+async function collectAuthorization(
+    domain: string,
+    dmarcTxt: readonly string[] | null,
+    probes: Probes
+): Promise<Record<string, boolean | null>> {
     const record = dmarcTxt?.filter(isDmarc);
     if (!record || record.length !== 1) return {};
     const hosts = externalReportHosts(domain, record[0]!).slice(0, 3);
@@ -174,7 +211,8 @@ async function collectSpf(domain: string, apexTxt: readonly string[] | null, pro
     const resolver: SpfResolver = {
         txt: async (name) => (await txt(probes.dns, name)) ?? [],
         exists: async (name, kind) => {
-            if (kind === "mx") return ((await answer(() => probes.dns.resolveMx(name))) ?? []).length > 0;
+            if (kind === "mx")
+                return ((await answer(() => probes.dns.resolveMx(name))) ?? []).length > 0;
             const v4 = (await answer(() => probes.dns.resolve4(name))) ?? [];
             if (v4.length > 0) return true;
             return ((await answer(() => probes.dns.resolve6(name))) ?? []).length > 0;
@@ -188,24 +226,41 @@ async function collectSpf(domain: string, apexTxt: readonly string[] | null, pro
 export async function collectFacts(input: CollectInput, probes: Probes): Promise<F.DomainFacts> {
     const { domain } = input;
     const dns = probes.dns;
-    const [mx, apexTxt, dmarcTxt, mtaStsTxt, tlsRptTxt, bimiTxt, caaRaw, ns, wildcard, ds, dnskey, registration, web, dkim, dangling] =
-        await Promise.all([
-            answer(() => dns.resolveMx(domain)),
-            txt(dns, domain),
-            txt(dns, `_dmarc.${domain}`),
-            txt(dns, `_mta-sts.${domain}`),
-            txt(dns, `_smtp._tls.${domain}`),
-            txt(dns, `default._bimi.${domain}`),
-            answer(() => dns.resolveCaa(domain)),
-            collectNs(domain, probes),
-            answer(() => dns.resolve4(`${probes.randomLabel()}.${domain}`)).then((found) => (found === null ? null : found.length > 0)),
-            probes.dnssec(domain, "DS").catch(() => null),
-            probes.dnssec(domain, "DNSKEY").catch(() => null),
-            probes.registration(domain).catch(() => null),
-            probes.web(domain, input.servedByPolaris).catch(() => null),
-            collectDkim(input, probes),
-            collectDangling(input, probes)
-        ]);
+    const [
+        mx,
+        apexTxt,
+        dmarcTxt,
+        mtaStsTxt,
+        tlsRptTxt,
+        bimiTxt,
+        caaRaw,
+        ns,
+        wildcard,
+        ds,
+        dnskey,
+        registration,
+        web,
+        dkim,
+        dangling
+    ] = await Promise.all([
+        answer(() => dns.resolveMx(domain)),
+        txt(dns, domain),
+        txt(dns, `_dmarc.${domain}`),
+        txt(dns, `_mta-sts.${domain}`),
+        txt(dns, `_smtp._tls.${domain}`),
+        txt(dns, `default._bimi.${domain}`),
+        answer(() => dns.resolveCaa(domain)),
+        collectNs(domain, probes),
+        answer(() => dns.resolve4(`${probes.randomLabel()}.${domain}`)).then((found) =>
+            found === null ? null : found.length > 0
+        ),
+        probes.dnssec(domain, "DS").catch(() => null),
+        probes.dnssec(domain, "DNSKEY").catch(() => null),
+        probes.registration(domain).catch(() => null),
+        probes.web(domain, input.servedByPolaris).catch(() => null),
+        collectDkim(input, probes),
+        collectDangling(input, probes)
+    ]);
 
     const [spfWalk, ruaAuthorization, mtaStsPolicy, axfr] = await Promise.all([
         collectSpf(domain, apexTxt, probes),
@@ -223,7 +278,11 @@ export async function collectFacts(input: CollectInput, probes: Probes): Promise
 
     return {
         domain,
-        mx: mx?.map((entry) => ({ priority: entry.priority, exchange: entry.exchange.replace(/\.$/, "").toLowerCase() })) ?? null,
+        mx:
+            mx?.map((entry) => ({
+                priority: entry.priority,
+                exchange: entry.exchange.replace(/\.$/, "").toLowerCase()
+            })) ?? null,
         apexTxt,
         spfWalk,
         dmarcTxt,
@@ -237,9 +296,12 @@ export async function collectFacts(input: CollectInput, probes: Probes): Promise
         // Validation is the zone's own keys vouched for through the chain - the
         // AD bit on its DNSKEY answer - which only means anything once a DS
         // anchors it in the parent.
-        dnssec: { ds: ds?.present ?? null, dnskey: dnskey?.present ?? null, validated: ds?.present ? (dnskey?.validated ?? null) : null },
-        caa:
-            caaRaw?.map((entry) => ({ flags: entry.critical, ...caaTagValue(entry) })) ?? null,
+        dnssec: {
+            ds: ds?.present ?? null,
+            dnskey: dnskey?.present ?? null,
+            validated: ds?.present ? (dnskey?.validated ?? null) : null
+        },
+        caa: caaRaw?.map((entry) => ({ flags: entry.critical, ...caaTagValue(entry) })) ?? null,
         ns,
         axfr,
         dangling: dangling.dangling,

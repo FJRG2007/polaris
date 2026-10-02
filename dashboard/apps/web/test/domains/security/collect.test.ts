@@ -45,7 +45,13 @@ function probes(table: Record<string, Record<string, unknown>>, asked: string[] 
 
 const INPUT = {
     domain: "example.com",
-    context: { polarisIssues: false, polarisZone: false, mailServerSpf: null, reportAddress: null, dsRecord: null },
+    context: {
+        polarisIssues: false,
+        polarisZone: false,
+        mailServerSpf: null,
+        reportAddress: null,
+        dsRecord: null
+    },
     selectors: [],
     aliases: [],
     servedByPolaris: false
@@ -53,7 +59,10 @@ const INPUT = {
 
 describe("collecting facts", () => {
     it("reads a resolver that did not answer as unknown, not as missing", async () => {
-        const facts = await collectFacts(INPUT, probes({ "example.com": { TXT: "TIMEOUT", MX: "TIMEOUT", NS: "TIMEOUT" } }));
+        const facts = await collectFacts(
+            INPUT,
+            probes({ "example.com": { TXT: "TIMEOUT", MX: "TIMEOUT", NS: "TIMEOUT" } })
+        );
         expect(facts.apexTxt).toBeNull();
         expect(facts.mx).toBeNull();
         expect(facts.ns).toBeNull();
@@ -82,13 +91,22 @@ describe("collecting facts", () => {
     });
 
     it("checks at most a bounded number of aliases", async () => {
-        const aliases = Array.from({ length: MAX_ALIASES + 10 }, (_, index) => ({ name: `a${index}.example.com`, target: "live.example.net" }));
-        const facts = await collectFacts({ ...INPUT, aliases }, probes({ "live.example.net": { A: ["192.0.2.10"] } }));
+        const aliases = Array.from({ length: MAX_ALIASES + 10 }, (_, index) => ({
+            name: `a${index}.example.com`,
+            target: "live.example.net"
+        }));
+        const facts = await collectFacts(
+            { ...INPUT, aliases },
+            probes({ "live.example.net": { A: ["192.0.2.10"] } })
+        );
         expect(facts.danglingChecked).toBe(MAX_ALIASES);
     });
 
     it("finds the empty wildcard DKIM key a locked-down domain publishes", async () => {
-        const facts = await collectFacts(INPUT, probes({ "polaris-random._domainkey.example.com": { TXT: [["v=DKIM1; p="]] } }));
+        const facts = await collectFacts(
+            INPUT,
+            probes({ "polaris-random._domainkey.example.com": { TXT: [["v=DKIM1; p="]] } })
+        );
         expect(facts.dkim).toEqual([{ selector: "*", text: "v=DKIM1; p=", bits: null }]);
     });
 
@@ -96,18 +114,31 @@ describe("collecting facts", () => {
         const asked: string[] = [];
         const facts = await collectFacts(
             { ...INPUT, selectors: ["polaris"] },
-            probes({ "polaris._domainkey.example.com": { TXT: [["v=DKIM1; k=rsa; p=MIIB"]] } }, asked)
+            probes(
+                { "polaris._domainkey.example.com": { TXT: [["v=DKIM1; k=rsa; p=MIIB"]] } },
+                asked
+            )
         );
-        expect(facts.dkim).toEqual([{ selector: "polaris", text: "v=DKIM1; k=rsa; p=MIIB", bits: 2048 }]);
+        expect(facts.dkim).toEqual([
+            { selector: "polaris", text: "v=DKIM1; k=rsa; p=MIIB", bits: 2048 }
+        ]);
         expect(facts.dkimSelectorsTried[0]).toBe("polaris");
-        expect(asked.filter((entry) => entry.includes("._domainkey.")).length).toBe(facts.dkimSelectorsTried.length);
+        expect(asked.filter((entry) => entry.includes("._domainkey.")).length).toBe(
+            facts.dkimSelectorsTried.length
+        );
     });
 
     it("asks report hosts outside the domain whether they accept its reports", async () => {
         const facts = await collectFacts(
             INPUT,
             probes({
-                "_dmarc.example.com": { TXT: [["v=DMARC1; p=reject; rua=mailto:a@example.com,mailto:b@reports.example.net"]] },
+                "_dmarc.example.com": {
+                    TXT: [
+                        [
+                            "v=DMARC1; p=reject; rua=mailto:a@example.com,mailto:b@reports.example.net"
+                        ]
+                    ]
+                },
                 "example.com._report._dmarc.reports.example.net": { TXT: [["v=DMARC1"]] }
             })
         );

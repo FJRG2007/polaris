@@ -17,7 +17,11 @@ import { canAddOwnerDomain, instanceDomains, listOwnerDomains } from "@/lib/owne
 
 export const dynamic = "force-dynamic";
 
-export default async function OrganizationDomainsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function OrganizationDomainsPage({
+    params
+}: {
+    params: Promise<{ slug: string }>;
+}) {
     const { slug } = await params;
     const { org, user } = await requireOrgPage(slug, "domains.manage");
     const owner = { kind: "org", id: org.id } as const;
@@ -36,7 +40,9 @@ export default async function OrganizationDomainsPage({ params }: { params: Prom
         <div className="flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("domains.title")}</h2>
-                <p className="text-muted-foreground text-sm">{t("domains.intro", { org: org.name })}</p>
+                <p className="text-muted-foreground text-sm">
+                    {t("domains.intro", { org: org.name })}
+                </p>
             </div>
             <Messages namespaces={["dns", "domainSecurity"]}>
                 <OwnerDomainsView

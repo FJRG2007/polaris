@@ -27,5 +27,7 @@ export function publicResolver(): Resolver {
  */
 export function caaTagValue(entry: object): { tag: string; value: string } {
     const found = Object.entries(entry).find(([key]) => key !== "critical" && key !== "type");
-    return found ? { tag: found[0].toLowerCase(), value: String(found[1]) } : { tag: "", value: "" };
+    return found
+        ? { tag: found[0].toLowerCase(), value: String(found[1]) }
+        : { tag: "", value: "" };
 }

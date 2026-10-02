@@ -160,7 +160,12 @@ export function gradeOf(findings: readonly Finding[]): Grade {
 
 /** A finding's identity across two audits: the same check about the same thing. */
 export function findingKey(finding: Pick<Finding, "code" | "params">): string {
-    const subject = finding.params.selector ?? finding.params.name ?? finding.params.server ?? finding.params.target ?? "";
+    const subject =
+        finding.params.selector ??
+        finding.params.name ??
+        finding.params.server ??
+        finding.params.target ??
+        "";
     return `${finding.code}:${String(subject)}`;
 }
 
@@ -169,8 +174,13 @@ export function findingKey(finding: Pick<Finding, "code" | "params">): string {
  * were in `previous`. What a daily re-check tells somebody about: a regression,
  * never the same complaint twice.
  */
-export function regressions(previous: readonly Finding[] | null, current: readonly Finding[]): Finding[] {
-    const before = new Map((previous ?? []).map((finding) => [findingKey(finding), severityRank(finding.severity)]));
+export function regressions(
+    previous: readonly Finding[] | null,
+    current: readonly Finding[]
+): Finding[] {
+    const before = new Map(
+        (previous ?? []).map((finding) => [findingKey(finding), severityRank(finding.severity)])
+    );
     return current.filter((finding) => {
         const rank = severityRank(finding.severity);
         if (rank < severityRank("medium")) return false;

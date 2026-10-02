@@ -6,7 +6,14 @@
  */
 
 import { z } from "zod";
-import { FINDING_CODES, SECURITY_SECTIONS, SEVERITIES, gradeOf, type Finding, type SecurityReport } from "./types";
+import {
+    FINDING_CODES,
+    SECURITY_SECTIONS,
+    SEVERITIES,
+    gradeOf,
+    type Finding,
+    type SecurityReport
+} from "./types";
 
 const findingSchema = z.object({
     code: z.string(),

@@ -34,7 +34,14 @@ import { sendingSources, type SendingSource } from "./dmarc-sources";
 import { regressions, type Grade, type SecurityReport } from "./types";
 import { emptyDraft, type DnsRecordDraft } from "@/lib/dns/record-schema";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
-import { automaticChanges, fingerprint, planChanges, type EdgeTarget, type PlannedChange, type ZoneRecordLike } from "./plan";
+import {
+    automaticChanges,
+    fingerprint,
+    planChanges,
+    type EdgeTarget,
+    type PlannedChange,
+    type ZoneRecordLike
+} from "./plan";
 
 /** Somebody asking about a domain: who they are, and the shelf they asked from. */
 export interface DomainActor {
@@ -46,7 +53,13 @@ export interface DomainActor {
 
 /** A refusal whose message is a key in the `domainSecurity` catalog. */
 export class DomainSecurityError extends Error {
-    constructor(readonly key: "errors.notFound" | "errors.cannotFix" | "errors.planChanged" | "errors.tooSoon") {
+    constructor(
+        readonly key:
+            | "errors.notFound"
+            | "errors.cannotFix"
+            | "errors.planChanged"
+            | "errors.tooSoon"
+    ) {
         super(key);
         this.name = "DomainSecurityError";
     }
@@ -81,10 +94,16 @@ const NO_SCOPE: Pick<Access, "scope" | "signing"> = { scope: null, signing: null
 
 /** How Polaris writes a known domain's zone with one token, never the other in
  *  its place when that one cannot be used. */
-async function scopeWith(known: KnownDomain, kind: ScopeKind): Promise<Pick<Access, "scope" | "signing">> {
+async function scopeWith(
+    known: KnownDomain,
+    kind: ScopeKind
+): Promise<Pick<Access, "scope" | "signing">> {
     if (kind === "owner") {
         if (!known.ownerDomain?.hasToken) return NO_SCOPE;
-        const row = await prisma.ownerDomain.findUnique({ where: { id: known.ownerDomain.id }, select: { dnsToken: true } });
+        const row = await prisma.ownerDomain.findUnique({
+            where: { id: known.ownerDomain.id },
+            select: { dnsToken: true }
+        });
         const token = openText(row?.dnsToken ?? null);
         if (!token) return NO_SCOPE;
         const owner: DomainOwner = known.ownerDomain.orgId
@@ -125,7 +144,8 @@ async function accessFor(actor: DomainActor, domain: string): Promise<Access> {
     const known = await knownDomain(domain);
     if (!known) throw new DomainSecurityError("errors.notFound");
     if (actor.owner) {
-        if (!known.ownerDomain || !ownsRow(actor.owner, known.ownerDomain)) throw new DomainSecurityError("errors.notFound");
+        if (!known.ownerDomain || !ownsRow(actor.owner, known.ownerDomain))
+            throw new DomainSecurityError("errors.notFound");
         // The owner's page writes with the owner's token, never the instance's.
         return { known, ...(await scopeWith(known, "owner")) };
     }
@@ -134,35 +154,59 @@ async function accessFor(actor: DomainActor, domain: string): Promise<Access> {
     return { known, ...(await scopeWith(known, "instance")) };
 }
 
-async function zoneRecordsFor(scope: zones.DnsScope | null, domain: string): Promise<ZoneRecordLike[] | null> {
+async function zoneRecordsFor(
+    scope: zones.DnsScope | null,
+    domain: string
+): Promise<ZoneRecordLike[] | null> {
     if (!scope) return null;
     try {
         const zone = await zones.zoneRecords(scope);
         return zone.records
             .filter((record) => record.name === domain || record.name.endsWith(`.${domain}`))
-            .map((record) => ({ id: record.id, type: record.type, name: record.name, content: record.content, priority: record.priority }));
+            .map((record) => ({
+                id: record.id,
+                type: record.type,
+                name: record.name,
+                content: record.content,
+                priority: record.priority
+            }));
     } catch {
         return null;
     }
 }
 
 function reportAddressFor(known: KnownDomain): string | null {
-    return known.mailServers.some((server) => server.reports) ? `${core.MAIL_REPORTS_NAME}@${known.domain}` : null;
+    return known.mailServers.some((server) => server.reports)
+        ? `${core.MAIL_REPORTS_NAME}@${known.domain}`
+        : null;
 }
 
 /** Audit one domain now, store it, and answer it with the one it replaced. */
-async function audit(known: KnownDomain, access: Pick<Access, "scope" | "signing">, probes?: Probes): Promise<{ report: SecurityReport; previous: SecurityReport | null }> {
+async function audit(
+    known: KnownDomain,
+    access: Pick<Access, "scope" | "signing">,
+    probes?: Probes
+): Promise<{ report: SecurityReport; previous: SecurityReport | null }> {
     const records = await zoneRecordsFor(access.scope, known.domain);
-    const dnssec = access.signing ? await cf.getZoneDnssec(access.signing.token, access.signing.zoneId).catch(() => null) : null;
+    const dnssec = access.signing
+        ? await cf.getZoneDnssec(access.signing.token, access.signing.zoneId).catch(() => null)
+        : null;
     const aliases = records
-        ? records.filter((record) => record.type === "CNAME").map((record) => ({ name: record.name, target: record.content }))
-        : [...new Set([`www.${known.domain}`, ...known.hostnames.map((entry) => entry.hostname)])].map((name) => ({ name }));
+        ? records
+              .filter((record) => record.type === "CNAME")
+              .map((record) => ({ name: record.name, target: record.content }))
+        : [
+              ...new Set([`www.${known.domain}`, ...known.hostnames.map((entry) => entry.hostname)])
+          ].map((name) => ({ name }));
     const servers = known.mailServers;
     const facts = await collectFacts(
         {
             domain: known.domain,
             context: {
-                polarisIssues: known.sources.includes("owner") || known.sources.includes("instance") || known.hostnames.some((entry) => entry.le),
+                polarisIssues:
+                    known.sources.includes("owner") ||
+                    known.sources.includes("instance") ||
+                    known.hostnames.some((entry) => entry.le),
                 polarisZone: known.sources.includes("owner") || known.sources.includes("instance"),
                 mailServerSpf: servers.find((server) => server.spf)?.spf ?? null,
                 reportAddress: reportAddressFor(known),
@@ -175,12 +219,24 @@ async function audit(known: KnownDomain, access: Pick<Access, "scope" | "signing
         probes ?? (await import("./probes")).liveProbes()
     );
     const report = evaluate(facts);
-    const row = await prisma.domainSecurityAudit.findUnique({ where: { domain: known.domain }, select: { report: true } });
+    const row = await prisma.domainSecurityAudit.findUnique({
+        where: { domain: known.domain },
+        select: { report: true }
+    });
     const previous = row ? readReport(row.report) : null;
     await prisma.domainSecurityAudit.upsert({
         where: { domain: known.domain },
-        create: { domain: known.domain, grade: report.grade, report: report as unknown as object, checkedAt: new Date(report.checkedAt) },
-        update: { grade: report.grade, report: report as unknown as object, checkedAt: new Date(report.checkedAt) }
+        create: {
+            domain: known.domain,
+            grade: report.grade,
+            report: report as unknown as object,
+            checkedAt: new Date(report.checkedAt)
+        },
+        update: {
+            grade: report.grade,
+            report: report as unknown as object,
+            checkedAt: new Date(report.checkedAt)
+        }
     });
     return { report, previous };
 }
@@ -222,7 +278,12 @@ const reverseCache = new Map<string, { at: number; name: string | null }>();
 async function reverseName(ip: string): Promise<string | null> {
     const cached = reverseCache.get(ip);
     if (cached && Date.now() - cached.at < REVERSE_TTL_MS) return cached.name;
-    const name = (await publicResolver().reverse(ip).catch(() => [] as string[]))[0] ?? null;
+    const name =
+        (
+            await publicResolver()
+                .reverse(ip)
+                .catch(() => [] as string[])
+        )[0] ?? null;
     if (reverseCache.size > 5000) reverseCache.clear();
     reverseCache.set(ip, { at: Date.now(), name });
     return name;
@@ -233,7 +294,14 @@ async function reverseName(ip: string): Promise<string | null> {
 async function namedSources(sources: SendingSource[]): Promise<SendingSource[]> {
     const named: SendingSource[] = [];
     for (let start = 0; start < sources.length; start += 8) {
-        named.push(...(await Promise.all(sources.slice(start, start + 8).map(async (source) => ({ ...source, hostname: await reverseName(source.sourceIp) })))));
+        named.push(
+            ...(await Promise.all(
+                sources.slice(start, start + 8).map(async (source) => ({
+                    ...source,
+                    hostname: await reverseName(source.sourceIp)
+                }))
+            ))
+        );
     }
     return named;
 }
@@ -264,15 +332,25 @@ async function viewOf(access: Access): Promise<DomainSecurityView> {
     };
 }
 
-export async function domainSecurityView(actor: DomainActor, domain: string): Promise<DomainSecurityView> {
+export async function domainSecurityView(
+    actor: DomainActor,
+    domain: string
+): Promise<DomainSecurityView> {
     return viewOf(await accessFor(actor, domain));
 }
 
 /** Audit again now, unless the last audit was a moment ago. */
-export async function recheckDomain(actor: DomainActor, domain: string): Promise<DomainSecurityView> {
+export async function recheckDomain(
+    actor: DomainActor,
+    domain: string
+): Promise<DomainSecurityView> {
     const access = await accessFor(actor, domain);
-    const row = await prisma.domainSecurityAudit.findUnique({ where: { domain: access.known.domain }, select: { checkedAt: true } });
-    if (row?.checkedAt && Date.now() - row.checkedAt.getTime() < RECHECK_GAP_MS) return viewOf(access);
+    const row = await prisma.domainSecurityAudit.findUnique({
+        where: { domain: access.known.domain },
+        select: { checkedAt: true }
+    });
+    if (row?.checkedAt && Date.now() - row.checkedAt.getTime() < RECHECK_GAP_MS)
+        return viewOf(access);
     await audit(access.known, access);
     return viewOf(access);
 }
@@ -298,7 +376,9 @@ export async function gradesFor(domains: readonly string[]): Promise<Record<stri
         out[row.domain] = {
             grade: report.grade,
             checkedAt: row.checkedAt?.toISOString() ?? null,
-            problems: report.findings.filter((finding) => !["pass", "info"].includes(finding.severity)).length
+            problems: report.findings.filter(
+                (finding) => !["pass", "info"].includes(finding.severity)
+            ).length
         };
     }
     return out;
@@ -315,7 +395,11 @@ export async function securityInventory(actor: DomainActor): Promise<InventoryEn
     if (!actor.isAdmin) return [];
     const known = await knownDomains();
     const grades = await gradesFor(known.map((entry) => entry.domain));
-    return known.map((entry) => ({ domain: entry.domain, sources: entry.sources, grade: grades[entry.domain] ?? null }));
+    return known.map((entry) => ({
+        domain: entry.domain,
+        sources: entry.sources,
+        grade: grades[entry.domain] ?? null
+    }));
 }
 
 // ---------------------------------------------------------------------------
@@ -333,11 +417,21 @@ async function edgeTargets(known: KnownDomain): Promise<EdgeTarget[]> {
     return hosts.flatMap((host) => {
         const app = apps.find((entry) => entry.id === host.applicationId);
         if (!app) return [];
-        return [{ applicationId: app.id, hostname: host.hostname, preset: core.parseAppEdgeConfig(app.edgeConfig).headers.preset }];
+        return [
+            {
+                applicationId: app.id,
+                hostname: host.hostname,
+                preset: core.parseAppEdgeConfig(app.edgeConfig).headers.preset
+            }
+        ];
     });
 }
 
-async function planWith(access: Access, report: SecurityReport, dmarcPolicy: "quarantine" | "reject" | null): Promise<PlannedChange[]> {
+async function planWith(
+    access: Access,
+    report: SecurityReport,
+    dmarcPolicy: "quarantine" | "reject" | null
+): Promise<PlannedChange[]> {
     return planChanges({
         report,
         records: await zoneRecordsFor(access.scope, access.known.domain),
@@ -349,9 +443,16 @@ async function planWith(access: Access, report: SecurityReport, dmarcPolicy: "qu
 }
 
 /** What Polaris would change for this person, from the audit they are looking at. */
-export async function planFor(actor: DomainActor, domain: string, dmarcPolicy: "quarantine" | "reject" | null): Promise<PlannedChange[]> {
+export async function planFor(
+    actor: DomainActor,
+    domain: string,
+    dmarcPolicy: "quarantine" | "reject" | null
+): Promise<PlannedChange[]> {
     const access = await accessFor(actor, domain);
-    const row = await prisma.domainSecurityAudit.findUnique({ where: { domain: access.known.domain }, select: { report: true } });
+    const row = await prisma.domainSecurityAudit.findUnique({
+        where: { domain: access.known.domain },
+        select: { report: true }
+    });
     const report = row ? readReport(row.report) : null;
     if (!report) return [];
     return planWith(access, report, dmarcPolicy);
@@ -363,9 +464,16 @@ function draftFor(change: PlannedChange): DnsRecordDraft {
     const draft = emptyDraft(change.type ?? "TXT");
     if (change.type === "CAA") {
         const match = /^(\d+)\s+(\S+)\s+"?([^"]*)"?$/.exec(change.after ?? "");
-        return { ...draft, name: change.name, flags: match?.[1] ?? "0", tag: match?.[2] ?? "issue", value: match?.[3] ?? "" };
+        return {
+            ...draft,
+            name: change.name,
+            flags: match?.[1] ?? "0",
+            tag: match?.[2] ?? "issue",
+            value: match?.[3] ?? ""
+        };
     }
-    if (change.type === "MX") return { ...draft, name: change.name, content: change.after ?? ".", priority: "0" };
+    if (change.type === "MX")
+        return { ...draft, name: change.name, content: change.after ?? ".", priority: "0" };
     return { ...draft, name: change.name, content: change.after ?? "" };
 }
 
@@ -376,17 +484,29 @@ export interface ChangeResult {
     readonly detail: string | null;
 }
 
-async function carryOut(access: Access, change: PlannedChange, actorId: string | null): Promise<ChangeResult> {
+async function carryOut(
+    access: Access,
+    change: PlannedChange,
+    actorId: string | null
+): Promise<ChangeResult> {
     try {
         if (change.kind === "dnssec") {
             if (!access.signing) throw new DomainSecurityError("errors.cannotFix");
             await cf.enableZoneDnssec(access.signing.token, access.signing.zoneId);
         } else if (change.kind === "edge") {
-            if (!actorId || !change.applicationId) throw new DomainSecurityError("errors.cannotFix");
+            if (!actorId || !change.applicationId)
+                throw new DomainSecurityError("errors.cannotFix");
             const { requireApplicationAccess } = await import("@/lib/deploy-project-access");
             const deploy = await import("@/lib/deploy-service");
-            const granted = await requireApplicationAccess(change.applicationId, actorId, "domains.manage");
-            const app = await prisma.application.findUnique({ where: { id: change.applicationId }, select: { edgeConfig: true } });
+            const granted = await requireApplicationAccess(
+                change.applicationId,
+                actorId,
+                "domains.manage"
+            );
+            const app = await prisma.application.findUnique({
+                where: { id: change.applicationId },
+                select: { edgeConfig: true }
+            });
             const config = core.parseAppEdgeConfig(app?.edgeConfig ?? null);
             await deploy.setApplicationEdgeConfig(change.applicationId, granted.ownerId, {
                 ...config,
@@ -394,8 +514,14 @@ async function carryOut(access: Access, change: PlannedChange, actorId: string |
             });
         } else {
             if (!access.scope) throw new DomainSecurityError("errors.cannotFix");
-            if (change.action === "delete" && change.recordId) await zones.deleteZoneRecord(access.scope, change.recordId);
-            else await zones.saveZoneRecord(access.scope, change.action === "update" ? change.recordId : null, draftFor(change));
+            if (change.action === "delete" && change.recordId)
+                await zones.deleteZoneRecord(access.scope, change.recordId);
+            else
+                await zones.saveZoneRecord(
+                    access.scope,
+                    change.action === "update" ? change.recordId : null,
+                    draftFor(change)
+                );
         }
         return { id: change.id, ok: true, detail: null };
     } catch (error) {
@@ -422,7 +548,10 @@ export async function applyFor(
     dmarcPolicy: "quarantine" | "reject" | null
 ): Promise<{ results: ChangeResult[]; view: DomainSecurityView }> {
     const access = await accessFor(actor, domain);
-    const row = await prisma.domainSecurityAudit.findUnique({ where: { domain: access.known.domain }, select: { report: true } });
+    const row = await prisma.domainSecurityAudit.findUnique({
+        where: { domain: access.known.domain },
+        select: { report: true }
+    });
     const report = row ? readReport(row.report) : null;
     if (!report) throw new DomainSecurityError("errors.planChanged");
     const wanted = new Set(approved);
@@ -437,10 +566,17 @@ export async function applyFor(
 
 /** Hand a domain's safe fixes to Polaris, or take them back. Only somebody who
  *  can fix it may. */
-export async function setDedicated(actor: DomainActor, domain: string, dedicated: boolean): Promise<DomainSecurityView> {
+export async function setDedicated(
+    actor: DomainActor,
+    domain: string,
+    dedicated: boolean
+): Promise<DomainSecurityView> {
     const access = await accessFor(actor, domain);
     if (!access.scope) throw new DomainSecurityError("errors.cannotFix");
-    const by = { dedicatedBy: dedicated ? actor.userId : null, dedicatedScope: dedicated ? access.scope.kind : null };
+    const by = {
+        dedicatedBy: dedicated ? actor.userId : null,
+        dedicatedScope: dedicated ? access.scope.kind : null
+    };
     await prisma.domainSecurityAudit.upsert({
         where: { domain: access.known.domain },
         create: { domain: access.known.domain, dedicated, ...by },
@@ -458,14 +594,21 @@ export async function setDedicated(actor: DomainActor, domain: string, dedicated
 async function recipientsFor(known: KnownDomain): Promise<{ userId: string; href: string }[]> {
     const out = new Map<string, string>();
     if (known.ownerDomain?.orgId) {
-        const org = await prisma.organization.findUnique({ where: { id: known.ownerDomain.orgId }, select: { slug: true } });
+        const org = await prisma.organization.findUnique({
+            where: { id: known.ownerDomain.orgId },
+            select: { slug: true }
+        });
         const href = org ? `/account/organizations/${org.slug}/domains` : "/account/domains";
-        for (const userId of await orgPeopleHolding(known.ownerDomain.orgId, "domains.manage")) out.set(userId, href);
+        for (const userId of await orgPeopleHolding(known.ownerDomain.orgId, "domains.manage"))
+            out.set(userId, href);
     } else if (known.ownerDomain?.userId) {
         out.set(known.ownerDomain.userId, "/account/domains");
     }
     if (known.sources.some((source) => source !== "owner")) {
-        const admins = await prisma.user.findMany({ where: { isAdmin: true, bannedAt: null, disabledAt: null }, select: { id: true } });
+        const admins = await prisma.user.findMany({
+            where: { isAdmin: true, bannedAt: null, disabledAt: null },
+            select: { id: true }
+        });
         for (const admin of admins) if (!out.has(admin.id)) out.set(admin.id, "/admin/domains");
     }
     return [...out.entries()].map(([userId, href]) => ({ userId, href }));
@@ -477,7 +620,10 @@ async function tell(known: KnownDomain, worse: number, fixed: number): Promise<v
         await notify({
             userId: recipient.userId,
             event: "domain.security",
-            title: worse > 0 ? t("notice.worse", { domain: known.domain, count: worse }) : t("notice.fixed", { domain: known.domain, count: fixed }),
+            title:
+                worse > 0
+                    ? t("notice.worse", { domain: known.domain, count: worse })
+                    : t("notice.fixed", { domain: known.domain, count: fixed }),
             body: worse > 0 ? t("notice.worseBody", { fixed }) : t("notice.fixedBody"),
             href: recipient.href,
             level: worse > 0 ? "warning" : "success",
@@ -488,7 +634,11 @@ async function tell(known: KnownDomain, worse: number, fixed: number): Promise<v
 
 /** The safe fixes for a domain handed to Polaris, made with nobody asking and
  *  only with the token of whoever handed it over. */
-async function autoFix(known: KnownDomain, report: SecurityReport, dedicated: { by: string | null; scope: ScopeKind | null }): Promise<AutoFixSummary | null> {
+async function autoFix(
+    known: KnownDomain,
+    report: SecurityReport,
+    dedicated: { by: string | null; scope: ScopeKind | null }
+): Promise<AutoFixSummary | null> {
     if (!dedicated.scope) return null;
     const system = await scopeWith(known, dedicated.scope);
     if (!system.scope) return null;
@@ -497,8 +647,15 @@ async function autoFix(known: KnownDomain, report: SecurityReport, dedicated: { 
     if (changes.length === 0) return null;
     const results: ChangeResult[] = [];
     for (const change of changes) results.push(await carryOut(access, change, dedicated.by));
-    const summary = { at: new Date().toISOString(), applied: results.filter((result) => result.ok).length, failed: results.filter((result) => !result.ok).length };
-    await prisma.domainSecurityAudit.update({ where: { domain: known.domain }, data: { lastAutoFix: summary as unknown as object } });
+    const summary = {
+        at: new Date().toISOString(),
+        applied: results.filter((result) => result.ok).length,
+        failed: results.filter((result) => !result.ok).length
+    };
+    await prisma.domainSecurityAudit.update({
+        where: { domain: known.domain },
+        data: { lastAutoFix: summary as unknown as object }
+    });
     return summary;
 }
 
@@ -506,12 +663,20 @@ async function autoFix(known: KnownDomain, report: SecurityReport, dedicated: { 
  * One run of the daily pass: the stalest few domains audited, regressions told,
  * dedicated domains fixed. Never throws for one domain - the next still runs.
  */
-export async function runDomainSecuritySweep(probes?: Probes): Promise<{ audited: number; told: number; fixed: number }> {
+export async function runDomainSecuritySweep(
+    probes?: Probes
+): Promise<{ audited: number; told: number; fixed: number }> {
     const known = await knownDomains({ resolveParents: true });
     if (known.length === 0) return { audited: 0, told: 0, fixed: 0 };
     const rows = await prisma.domainSecurityAudit.findMany({
         where: { domain: { in: known.map((entry) => entry.domain) } },
-        select: { domain: true, checkedAt: true, dedicated: true, dedicatedBy: true, dedicatedScope: true }
+        select: {
+            domain: true,
+            checkedAt: true,
+            dedicated: true,
+            dedicatedBy: true,
+            dedicatedScope: true
+        }
     });
     const byDomain = new Map(rows.map((row) => [row.domain, row]));
     const due = known
@@ -519,7 +684,11 @@ export async function runDomainSecuritySweep(probes?: Probes): Promise<{ audited
             const checked = byDomain.get(entry.domain)?.checkedAt;
             return !checked || Date.now() - checked.getTime() > STALE_MS;
         })
-        .sort((a, b) => (byDomain.get(a.domain)?.checkedAt?.getTime() ?? 0) - (byDomain.get(b.domain)?.checkedAt?.getTime() ?? 0))
+        .sort(
+            (a, b) =>
+                (byDomain.get(a.domain)?.checkedAt?.getTime() ?? 0) -
+                (byDomain.get(b.domain)?.checkedAt?.getTime() ?? 0)
+        )
         .slice(0, PER_RUN);
     let told = 0;
     let fixed = 0;
@@ -532,7 +701,10 @@ export async function runDomainSecuritySweep(probes?: Probes): Promise<{ audited
             const row = byDomain.get(entry.domain);
             let applied = 0;
             if (row?.dedicated) {
-                const summary = await autoFix(entry, report, { by: row.dedicatedBy, scope: scopeKindOf(row.dedicatedScope) });
+                const summary = await autoFix(entry, report, {
+                    by: row.dedicatedBy,
+                    scope: scopeKindOf(row.dedicatedScope)
+                });
                 if (summary && summary.applied > 0) {
                     applied = summary.applied;
                     fixed += applied;

@@ -72,7 +72,10 @@ export interface WebFacts {
     readonly httpRedirects: boolean | null;
     /** The response headers of the HTTPS front page, names lower case. */
     readonly headers: Readonly<Record<string, string>> | null;
-    readonly securityTxt: { readonly status: "ok"; readonly text: string } | { readonly status: "missing" } | null;
+    readonly securityTxt:
+        | { readonly status: "ok"; readonly text: string }
+        | { readonly status: "missing" }
+        | null;
     /** Whether Polaris's own edge serves this name, so headers are Polaris's to set. */
     readonly servedByPolaris: boolean;
 }
@@ -106,7 +109,11 @@ export interface DomainFacts {
     readonly mtaStsPolicy: MtaStsFetch | null;
     readonly tlsRptTxt: readonly string[] | null;
     readonly bimiTxt: readonly string[] | null;
-    readonly dnssec: { readonly ds: boolean | null; readonly dnskey: boolean | null; readonly validated: boolean | null };
+    readonly dnssec: {
+        readonly ds: boolean | null;
+        readonly dnskey: boolean | null;
+        readonly validated: boolean | null;
+    };
     readonly caa: readonly CaaEntry[] | null;
     readonly ns: readonly NameServer[] | null;
     /** Each name server asked for a zone transfer: true when it gave one. */

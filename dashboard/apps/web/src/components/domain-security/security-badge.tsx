@@ -21,9 +21,17 @@ const GRADE_VARIANT: Record<Grade, "success" | "neutral" | "warning" | "danger">
 
 export function SecurityBadge({ grade, problems }: { grade: Grade; problems?: number }) {
     const t = useTranslations("domainSecurity");
-    const Icon = grade === "unknown" ? ShieldQuestion : grade === "protected" || grade === "fair" ? ShieldCheck : ShieldAlert;
+    const Icon =
+        grade === "unknown"
+            ? ShieldQuestion
+            : grade === "protected" || grade === "fair"
+              ? ShieldCheck
+              : ShieldAlert;
     return (
-        <Badge variant={GRADE_VARIANT[grade]} title={problems === undefined ? undefined : t("admin.problems", { count: problems })}>
+        <Badge
+            variant={GRADE_VARIANT[grade]}
+            title={problems === undefined ? undefined : t("admin.problems", { count: problems })}
+        >
             <Icon className="size-3 shrink-0" aria-hidden />
             {t(`grade.${grade}`)}
         </Badge>

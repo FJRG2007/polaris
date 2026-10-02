@@ -68,7 +68,14 @@ class Findings {
         params: FindingParams = {},
         fix: { records?: readonly FixRecord[]; where?: FixWhere | null } = {}
     ): void {
-        this.list.push({ section, code, severity, params, records: fix.records ?? [], where: fix.where ?? null });
+        this.list.push({
+            section,
+            code,
+            severity,
+            params,
+            records: fix.records ?? [],
+            where: fix.where ?? null
+        });
     }
 }
 
@@ -82,41 +89,80 @@ export function lockdownRecords(domain: string, reportAddress: string | null): F
         txt(domain, "v=spf1 -all"),
         txt(
             `_dmarc.${domain}`,
-            rec.formatDmarc({ p: "reject", sp: "reject", adkim: "s", aspf: "s", rua: reportAddress ? [`mailto:${reportAddress}`] : [] })
+            rec.formatDmarc({
+                p: "reject",
+                sp: "reject",
+                adkim: "s",
+                aspf: "s",
+                rua: reportAddress ? [`mailto:${reportAddress}`] : []
+            })
         ),
         { type: "MX", name: domain, value: ".", priority: 0 },
         txt(`*._domainkey.${domain}`, "v=DKIM1; p=")
     ];
 }
 
-function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; receives: boolean; rua: string[] } {
+function emailFindings(
+    facts: DomainFacts,
+    out: Findings
+): { sends: boolean; receives: boolean; rua: string[] } {
     const domain = facts.domain;
     const mx = facts.mx;
-    const nullMx = mx !== null && mx.length === 1 && (mx[0]!.exchange === "" || mx[0]!.exchange === ".");
+    const nullMx =
+        mx !== null && mx.length === 1 && (mx[0]!.exchange === "" || mx[0]!.exchange === ".");
     const receives = mx !== null && mx.length > 0 && !nullMx;
 
     const spfTexts = facts.apexTxt?.filter(rec.isSpf) ?? null;
     const spf = spfTexts && spfTexts.length === 1 ? rec.parseSpf(spfTexts[0]!) : null;
     const dkim = facts.dkim ?? [];
     const liveDkim = dkim.filter((entry) => (rec.parseDkim(entry.text)?.publicKey ?? "") !== "");
-    const sends = (spf?.ok === true && rec.spfAuthorizesSenders(spf)) || liveDkim.length > 0 || facts.context.mailServerSpf !== null;
+    const sends =
+        (spf?.ok === true && rec.spfAuthorizesSenders(spf)) ||
+        liveDkim.length > 0 ||
+        facts.context.mailServerSpf !== null;
     const parked = !sends && !receives;
     const report = facts.context.reportAddress;
 
     // --- MX ---
     if (mx !== null) {
         if (nullMx) out.add("email", "mxNull", "pass");
-        else if (receives) out.add("email", "mxOk", "pass", { count: mx.length, hosts: mx.map((host) => host.exchange).join(", ") });
-        else if (sends) out.add("email", "mxMissing", "low", {}, { records: [{ type: "MX", name: domain, value: ".", priority: 0 }], where: "dns" });
-        else out.add("email", "parkedNullMx", "low", {}, { records: [{ type: "MX", name: domain, value: ".", priority: 0 }], where: "dns" });
+        else if (receives)
+            out.add("email", "mxOk", "pass", {
+                count: mx.length,
+                hosts: mx.map((host) => host.exchange).join(", ")
+            });
+        else if (sends)
+            out.add(
+                "email",
+                "mxMissing",
+                "low",
+                {},
+                { records: [{ type: "MX", name: domain, value: ".", priority: 0 }], where: "dns" }
+            );
+        else
+            out.add(
+                "email",
+                "parkedNullMx",
+                "low",
+                {},
+                { records: [{ type: "MX", name: domain, value: ".", priority: 0 }], where: "dns" }
+            );
     }
 
     // --- SPF ---
     if (spfTexts === null) {
         out.add("email", "spfUnchecked", "info");
     } else if (spfTexts.length === 0) {
-        const value = parked ? "v=spf1 -all" : facts.context.mailServerSpf ?? (receives ? "v=spf1 mx ~all" : "v=spf1 -all");
-        out.add("email", "spfMissing", "high", { parked: parked ? "yes" : "no" }, { records: [txt(domain, value)], where: "dns" });
+        const value = parked
+            ? "v=spf1 -all"
+            : (facts.context.mailServerSpf ?? (receives ? "v=spf1 mx ~all" : "v=spf1 -all"));
+        out.add(
+            "email",
+            "spfMissing",
+            "high",
+            { parked: parked ? "yes" : "no" },
+            { records: [txt(domain, value)], where: "dns" }
+        );
     } else if (spfTexts.length > 1) {
         out.add("email", "spfMultiple", "critical", { count: spfTexts.length }, { where: "dns" });
     } else if (spf && !spf.ok) {
@@ -140,7 +186,13 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
         if (walk) {
             if (walk.lookups > 10) {
                 clean = false;
-                out.add("email", "spfLookups", "critical", { count: walk.lookups }, { where: "dns" });
+                out.add(
+                    "email",
+                    "spfLookups",
+                    "critical",
+                    { count: walk.lookups },
+                    { where: "dns" }
+                );
             }
             if (walk.voids > 2) {
                 clean = false;
@@ -151,8 +203,13 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
                 out.add("email", "spfIncludeMissing", "high", { target }, { where: "dns" });
             }
         }
-        if (spf.terms.some((term) => term.mechanism === "ptr")) out.add("email", "spfPtr", "low", {}, { where: "dns" });
-        if (clean) out.add("email", "spfOk", "pass", { all: all ? `${all}all` : "redirect", lookups: walk?.lookups ?? 0 });
+        if (spf.terms.some((term) => term.mechanism === "ptr"))
+            out.add("email", "spfPtr", "low", {}, { where: "dns" });
+        if (clean)
+            out.add("email", "spfOk", "pass", {
+                all: all ? `${all}all` : "redirect",
+                lookups: walk?.lookups ?? 0
+            });
     }
 
     // --- DKIM ---
@@ -161,18 +218,51 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
             const key = rec.parseDkim(entry.text);
             if (!key || key.publicKey === "") continue;
             if (key.keyType === "rsa" && entry.bits !== null && entry.bits < 1024) {
-                out.add("email", "dkimWeak", "high", { selector: entry.selector, bits: entry.bits }, { where: "site" });
+                out.add(
+                    "email",
+                    "dkimWeak",
+                    "high",
+                    { selector: entry.selector, bits: entry.bits },
+                    { where: "site" }
+                );
             } else if (key.keyType === "rsa" && entry.bits !== null && entry.bits < 2048) {
-                out.add("email", "dkimShort", "low", { selector: entry.selector, bits: entry.bits }, { where: "site" });
+                out.add(
+                    "email",
+                    "dkimShort",
+                    "low",
+                    { selector: entry.selector, bits: entry.bits },
+                    { where: "site" }
+                );
             }
-            if (key.testing) out.add("email", "dkimTesting", "low", { selector: entry.selector }, { where: "site" });
+            if (key.testing)
+                out.add(
+                    "email",
+                    "dkimTesting",
+                    "low",
+                    { selector: entry.selector },
+                    { where: "site" }
+                );
         }
         if (liveDkim.length > 0) {
-            out.add("email", "dkimOk", "pass", { selectors: liveDkim.map((entry) => entry.selector).join(", ") });
+            out.add("email", "dkimOk", "pass", {
+                selectors: liveDkim.map((entry) => entry.selector).join(", ")
+            });
         } else if (sends) {
-            out.add("email", "dkimNone", "low", { selectors: facts.dkimSelectorsTried.slice(0, 8).join(", ") }, { where: "site" });
+            out.add(
+                "email",
+                "dkimNone",
+                "low",
+                { selectors: facts.dkimSelectorsTried.slice(0, 8).join(", ") },
+                { where: "site" }
+            );
         } else if (parked && !dkim.some((entry) => entry.selector === "*")) {
-            out.add("email", "parkedDkim", "info", {}, { records: [txt(`*._domainkey.${domain}`, "v=DKIM1; p=")], where: "dns" });
+            out.add(
+                "email",
+                "parkedDkim",
+                "info",
+                {},
+                { records: [txt(`*._domainkey.${domain}`, "v=DKIM1; p=")], where: "dns" }
+            );
         }
     }
 
@@ -183,15 +273,39 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
     if (dmarcTexts !== null) {
         if (dmarcTexts.length === 0) {
             const value = parked
-                ? rec.formatDmarc({ p: "reject", sp: "reject", adkim: "s", aspf: "s", rua: report ? [`mailto:${report}`] : [] })
+                ? rec.formatDmarc({
+                      p: "reject",
+                      sp: "reject",
+                      adkim: "s",
+                      aspf: "s",
+                      rua: report ? [`mailto:${report}`] : []
+                  })
                 : rec.formatDmarc({ p: "none", rua: report ? [`mailto:${report}`] : [] });
-            out.add("email", "dmarcMissing", "high", { parked: parked ? "yes" : "no" }, { records: [txt(`_dmarc.${domain}`, value)], where: "dns" });
+            out.add(
+                "email",
+                "dmarcMissing",
+                "high",
+                { parked: parked ? "yes" : "no" },
+                { records: [txt(`_dmarc.${domain}`, value)], where: "dns" }
+            );
         } else if (dmarcTexts.length > 1) {
-            out.add("email", "dmarcMultiple", "critical", { count: dmarcTexts.length }, { where: "dns" });
+            out.add(
+                "email",
+                "dmarcMultiple",
+                "critical",
+                { count: dmarcTexts.length },
+                { where: "dns" }
+            );
         } else {
             const parsed = rec.parseDmarc(dmarcTexts[0]!);
             if (!parsed.ok) {
-                out.add("email", "dmarcSyntax", "high", { term: parsed.bad.slice(0, 80) }, { where: "dns" });
+                out.add(
+                    "email",
+                    "dmarcSyntax",
+                    "high",
+                    { term: parsed.bad.slice(0, 80) },
+                    { where: "dns" }
+                );
             } else {
                 const record = parsed.record;
                 rua.push(...record.rua);
@@ -199,9 +313,27 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
                 let clean = true;
                 if (record.p === "none") {
                     clean = false;
-                    out.add("email", "dmarcNone", "medium", {}, { records: [txt(dmarcName, rec.withPolicy(dmarcTexts[0]!, "quarantine"))], where: "dns" });
+                    out.add(
+                        "email",
+                        "dmarcNone",
+                        "medium",
+                        {},
+                        {
+                            records: [txt(dmarcName, rec.withPolicy(dmarcTexts[0]!, "quarantine"))],
+                            where: "dns"
+                        }
+                    );
                 } else if (record.p === "quarantine") {
-                    out.add("email", "dmarcQuarantine", "low", {}, { records: [txt(dmarcName, rec.withPolicy(dmarcTexts[0]!, "reject"))], where: "dns" });
+                    out.add(
+                        "email",
+                        "dmarcQuarantine",
+                        "low",
+                        {},
+                        {
+                            records: [txt(dmarcName, rec.withPolicy(dmarcTexts[0]!, "reject"))],
+                            where: "dns"
+                        }
+                    );
                 }
                 if (record.p !== "none" && record.pct < 100) {
                     clean = false;
@@ -210,13 +342,20 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
                 const order = ["none", "quarantine", "reject"];
                 if (record.spSet && order.indexOf(record.sp) < order.indexOf(record.p)) {
                     clean = false;
-                    out.add("email", "dmarcSubdomainWeaker", "medium", { sp: record.sp, p: record.p }, { where: "dns" });
+                    out.add(
+                        "email",
+                        "dmarcSubdomainWeaker",
+                        "medium",
+                        { sp: record.sp, p: record.p },
+                        { where: "dns" }
+                    );
                 }
                 if (record.rua.length === 0) {
                     out.add("email", "dmarcRuaMissing", "low", {}, { where: "dns" });
                 }
                 for (const [host, authorized] of Object.entries(facts.ruaAuthorization)) {
-                    if (authorized === false) out.add("email", "dmarcRuaUnauthorized", "low", { host }, { where: "dns" });
+                    if (authorized === false)
+                        out.add("email", "dmarcRuaUnauthorized", "low", { host }, { where: "dns" });
                 }
                 enforcing = record.p !== "none" && record.pct === 100;
                 if (clean) out.add("email", "dmarcOk", "pass", { policy: record.p, sp: record.sp });
@@ -224,25 +363,48 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
         }
     }
 
-    if (parked && spf?.ok === true && spf.all === "-" && enforcing && nullMx) out.add("email", "parkedOk", "pass");
+    if (parked && spf?.ok === true && spf.all === "-" && enforcing && nullMx)
+        out.add("email", "parkedOk", "pass");
 
     // --- MTA-STS and TLS-RPT: only for a domain that takes mail ---
     if (receives) {
-        const stsTexts = facts.mtaStsTxt?.filter((text) => /^v=STSv1\s*;/i.test(text.trim())) ?? null;
+        const stsTexts =
+            facts.mtaStsTxt?.filter((text) => /^v=STSv1\s*;/i.test(text.trim())) ?? null;
         if (stsTexts !== null) {
             if (stsTexts.length === 0) {
                 out.add("email", "mtaStsMissing", "low", {}, { where: "site" });
             } else {
                 const fetched = facts.mtaStsPolicy;
-                const policy = fetched?.status === "ok" ? rec.parseMtaStsPolicy(fetched.text) : null;
+                const policy =
+                    fetched?.status === "ok" ? rec.parseMtaStsPolicy(fetched.text) : null;
                 if (fetched && fetched.status !== "unreachable" && !policy) {
-                    out.add("email", "mtaStsPolicy", "medium", { host: `mta-sts.${domain}` }, { where: "site" });
+                    out.add(
+                        "email",
+                        "mtaStsPolicy",
+                        "medium",
+                        { host: `mta-sts.${domain}` },
+                        { where: "site" }
+                    );
                 } else if (policy) {
-                    const uncovered = (mx ?? []).filter((host) => !rec.mxCovered(host.exchange, policy.mx));
+                    const uncovered = (mx ?? []).filter(
+                        (host) => !rec.mxCovered(host.exchange, policy.mx)
+                    );
                     if (policy.mode === "enforce" && uncovered.length > 0) {
-                        out.add("email", "mtaStsMxMismatch", "high", { hosts: uncovered.map((host) => host.exchange).join(", ") }, { where: "site" });
+                        out.add(
+                            "email",
+                            "mtaStsMxMismatch",
+                            "high",
+                            { hosts: uncovered.map((host) => host.exchange).join(", ") },
+                            { where: "site" }
+                        );
                     } else if (policy.mode !== "enforce") {
-                        out.add("email", "mtaStsTesting", "low", { mode: policy.mode }, { where: "site" });
+                        out.add(
+                            "email",
+                            "mtaStsTesting",
+                            "low",
+                            { mode: policy.mode },
+                            { where: "site" }
+                        );
                     } else {
                         out.add("email", "mtaStsOk", "pass");
                     }
@@ -257,7 +419,12 @@ function emailFindings(facts: DomainFacts, out: Findings): { sends: boolean; rec
                     "tlsRptMissing",
                     "low",
                     {},
-                    { records: report ? [txt(`_smtp._tls.${domain}`, `v=TLSRPTv1; rua=mailto:${report}`)] : [], where: "dns" }
+                    {
+                        records: report
+                            ? [txt(`_smtp._tls.${domain}`, `v=TLSRPTv1; rua=mailto:${report}`)]
+                            : [],
+                        where: "dns"
+                    }
                 );
             } else {
                 out.add("email", "tlsRptOk", "pass");
@@ -282,7 +449,9 @@ function dnsFindings(facts: DomainFacts, out: Findings): void {
     } else if (ds === true) {
         out.add("dns", "dnssecOk", "pass");
     } else if (ds === false && dnskey === true) {
-        const records: FixRecord[] = facts.context.dsRecord ? [{ type: "DS", name: domain, value: facts.context.dsRecord }] : [];
+        const records: FixRecord[] = facts.context.dsRecord
+            ? [{ type: "DS", name: domain, value: facts.context.dsRecord }]
+            : [];
         out.add("dns", "dnssecNoDs", "medium", {}, { records, where: "registrar" });
     } else if (ds === false) {
         out.add("dns", "dnssecOff", "low", {}, { where: "dnssec" });
@@ -294,9 +463,25 @@ function dnsFindings(facts: DomainFacts, out: Findings): void {
             .map((entry) => entry.value.split(";")[0]!.trim().toLowerCase());
         const record: FixRecord = { type: "CAA", name: domain, value: `0 issue "${POLARIS_CA}"` };
         if (facts.caa.length === 0) {
-            out.add("dns", "caaMissing", "low", {}, { records: facts.context.polarisIssues ? [record] : [], where: "dns" });
-        } else if (facts.context.polarisIssues && issuers.length > 0 && !issuers.includes(POLARIS_CA)) {
-            out.add("dns", "caaBlocksPolaris", "high", { issuers: [...new Set(issuers)].join(", ") || ";" }, { records: [record], where: "dns" });
+            out.add(
+                "dns",
+                "caaMissing",
+                "low",
+                {},
+                { records: facts.context.polarisIssues ? [record] : [], where: "dns" }
+            );
+        } else if (
+            facts.context.polarisIssues &&
+            issuers.length > 0 &&
+            !issuers.includes(POLARIS_CA)
+        ) {
+            out.add(
+                "dns",
+                "caaBlocksPolaris",
+                "high",
+                { issuers: [...new Set(issuers)].join(", ") || ";" },
+                { records: [record], where: "dns" }
+            );
         } else {
             out.add("dns", "caaOk", "pass", { issuers: [...new Set(issuers)].join(", ") });
         }
@@ -305,23 +490,51 @@ function dnsFindings(facts: DomainFacts, out: Findings): void {
     if (facts.ns !== null) {
         const servers = facts.ns;
         const blocks = new Set(
-            servers.flatMap((server) => server.addresses.filter((address) => !address.includes(":")).map((address) => address.split(".").slice(0, 3).join(".")))
+            servers.flatMap((server) =>
+                server.addresses
+                    .filter((address) => !address.includes(":"))
+                    .map((address) => address.split(".").slice(0, 3).join("."))
+            )
         );
-        if (servers.length < 2) out.add("dns", "nsSingle", "medium", { count: servers.length }, { where: "registrar" });
-        else if (blocks.size === 1) out.add("dns", "nsSameNetwork", "low", { block: `${[...blocks][0]}.0/24` }, { where: "registrar" });
+        if (servers.length < 2)
+            out.add("dns", "nsSingle", "medium", { count: servers.length }, { where: "registrar" });
+        else if (blocks.size === 1)
+            out.add(
+                "dns",
+                "nsSameNetwork",
+                "low",
+                { block: `${[...blocks][0]}.0/24` },
+                { where: "registrar" }
+            );
         else out.add("dns", "nsOk", "pass", { count: servers.length });
     }
 
     const open = facts.axfr.filter((entry) => entry.open === true);
-    for (const entry of open) out.add("dns", "axfrOpen", "high", { server: entry.server }, { where: "site" });
-    if (open.length === 0 && facts.axfr.length > 0 && facts.axfr.every((entry) => entry.open === false)) {
+    for (const entry of open)
+        out.add("dns", "axfrOpen", "high", { server: entry.server }, { where: "site" });
+    if (
+        open.length === 0 &&
+        facts.axfr.length > 0 &&
+        facts.axfr.every((entry) => entry.open === false)
+    ) {
         out.add("dns", "axfrRefused", "pass", { count: facts.axfr.length });
     }
 
-    for (const entry of facts.dangling) out.add("dns", "danglingCname", "high", { name: entry.name, target: entry.target }, { where: "dns" });
-    if (facts.dangling.length === 0 && facts.danglingChecked > 0) out.add("dns", "danglingOk", "pass", { count: facts.danglingChecked });
+    for (const entry of facts.dangling)
+        out.add(
+            "dns",
+            "danglingCname",
+            "high",
+            { name: entry.name, target: entry.target },
+            { where: "dns" }
+        );
+    if (facts.dangling.length === 0 && facts.danglingChecked > 0)
+        out.add("dns", "danglingOk", "pass", { count: facts.danglingChecked });
 
-    if (facts.wildcard === true) out.add("dns", "wildcard", facts.context.polarisZone ? "info" : "low", { name: `*.${domain}` });
+    if (facts.wildcard === true)
+        out.add("dns", "wildcard", facts.context.polarisZone ? "info" : "low", {
+            name: `*.${domain}`
+        });
 }
 
 function registrationFindings(facts: DomainFacts, now: Date, out: Findings): void {
@@ -334,18 +547,32 @@ function registrationFindings(facts: DomainFacts, now: Date, out: Findings): voi
     if (registration.expiresAt) {
         const days = Math.floor((Date.parse(registration.expiresAt) - now.getTime()) / DAY);
         const params = { date: registration.expiresAt.slice(0, 10), days, registrar };
-        if (days < 14) out.add("registration", "expirySoon", "critical", params, { where: "registrar" });
-        else if (days < 30) out.add("registration", "expirySoon", "high", params, { where: "registrar" });
-        else if (days < 60) out.add("registration", "expirySoon", "medium", params, { where: "registrar" });
+        if (days < 14)
+            out.add("registration", "expirySoon", "critical", params, { where: "registrar" });
+        else if (days < 30)
+            out.add("registration", "expirySoon", "high", params, { where: "registrar" });
+        else if (days < 60)
+            out.add("registration", "expirySoon", "medium", params, { where: "registrar" });
         else out.add("registration", "expiryOk", "pass", params);
     }
     if (registration.statuses.length > 0) {
-        const locked = registration.statuses.some((status) => /(client|server) ?transfer ?prohibited/i.test(status));
+        const locked = registration.statuses.some((status) =>
+            /(client|server) ?transfer ?prohibited/i.test(status)
+        );
         if (locked) out.add("registration", "transferLocked", "pass");
-        else out.add("registration", "transferUnlocked", "medium", { registrar }, { where: "registrar" });
+        else
+            out.add(
+                "registration",
+                "transferUnlocked",
+                "medium",
+                { registrar },
+                { where: "registrar" }
+            );
     }
-    if (registration.registrantRedacted === true) out.add("registration", "registrantPrivate", "pass");
-    else if (registration.registrantRedacted === false) out.add("registration", "registrantPublic", "low", { registrar }, { where: "registrar" });
+    if (registration.registrantRedacted === true)
+        out.add("registration", "registrantPrivate", "pass");
+    else if (registration.registrantRedacted === false)
+        out.add("registration", "registrantPublic", "low", { registrar }, { where: "registrar" });
 }
 
 /** A header's value, by its lower-case name. */
@@ -361,22 +588,50 @@ function webFindings(facts: DomainFacts, now: Date, out: Findings): void {
     }
     const where: FixWhere = web.servedByPolaris ? "edge" : "site";
     if (!web.certificate) {
-        out.add("web", "httpsUnreachable", "medium", { error: (web.httpsError ?? "").slice(0, 120) }, { where: "site" });
+        out.add(
+            "web",
+            "httpsUnreachable",
+            "medium",
+            { error: (web.httpsError ?? "").slice(0, 120) },
+            { where: "site" }
+        );
         return;
     }
     const certificate = web.certificate;
     const daysLeft = Math.floor((Date.parse(certificate.validTo) - now.getTime()) / DAY);
     if (!certificate.trusted) {
-        out.add("web", "certInvalid", "high", { reason: (certificate.error ?? "").slice(0, 120), issuer: certificate.issuer }, { where: web.servedByPolaris ? "edge" : "site" });
+        out.add(
+            "web",
+            "certInvalid",
+            "high",
+            { reason: (certificate.error ?? "").slice(0, 120), issuer: certificate.issuer },
+            { where: web.servedByPolaris ? "edge" : "site" }
+        );
     } else if (daysLeft < 14) {
-        out.add("web", "certExpiring", "high", { days: daysLeft, date: certificate.validTo.slice(0, 10) }, { where: "site" });
+        out.add(
+            "web",
+            "certExpiring",
+            "high",
+            { days: daysLeft, date: certificate.validTo.slice(0, 10) },
+            { where: "site" }
+        );
     } else if (daysLeft < 30) {
-        out.add("web", "certExpiring", "medium", { days: daysLeft, date: certificate.validTo.slice(0, 10) }, { where: "site" });
+        out.add(
+            "web",
+            "certExpiring",
+            "medium",
+            { days: daysLeft, date: certificate.validTo.slice(0, 10) },
+            { where: "site" }
+        );
     } else {
-        out.add("web", "certOk", "pass", { issuer: certificate.issuer, date: certificate.validTo.slice(0, 10) });
+        out.add("web", "certOk", "pass", {
+            issuer: certificate.issuer,
+            date: certificate.validTo.slice(0, 10)
+        });
     }
 
-    if (web.legacyProtocol) out.add("web", "tlsLegacy", "medium", { version: web.legacyProtocol }, { where: "site" });
+    if (web.legacyProtocol)
+        out.add("web", "tlsLegacy", "medium", { version: web.legacyProtocol }, { where: "site" });
     else if (web.protocol) out.add("web", "tlsOk", "pass", { version: web.protocol });
 
     if (web.httpRedirects === false) out.add("web", "httpRedirectMissing", "medium", {}, { where });
@@ -388,7 +643,8 @@ function webFindings(facts: DomainFacts, now: Date, out: Findings): void {
         if (!hsts || maxAge === 0) out.add("web", "hstsMissing", "medium", {}, { where });
         else if (maxAge < HSTS_MIN) out.add("web", "hstsShort", "low", { maxAge }, { where });
         else {
-            const preload = /includesubdomains/i.test(hsts) && /preload/i.test(hsts) && maxAge >= 31_536_000;
+            const preload =
+                /includesubdomains/i.test(hsts) && /preload/i.test(hsts) && maxAge >= 31_536_000;
             out.add("web", "hstsOk", "pass", { maxAge, preload: preload ? "yes" : "no" });
         }
         const csp = header(headers, "content-security-policy") ?? "";
@@ -414,12 +670,31 @@ function webFindings(facts: DomainFacts, now: Date, out: Findings): void {
     }
 
     if (web.securityTxt?.status === "missing") {
-        out.add("web", "securityTxtMissing", "low", { url: `https://${facts.domain}/.well-known/security.txt` }, { where: "site" });
+        out.add(
+            "web",
+            "securityTxtMissing",
+            "low",
+            { url: `https://${facts.domain}/.well-known/security.txt` },
+            { where: "site" }
+        );
     } else if (web.securityTxt?.status === "ok") {
         const parsed = rec.parseSecurityTxt(web.securityTxt.text);
-        if (!parsed) out.add("web", "securityTxtMissing", "low", { url: `https://${facts.domain}/.well-known/security.txt` }, { where: "site" });
+        if (!parsed)
+            out.add(
+                "web",
+                "securityTxtMissing",
+                "low",
+                { url: `https://${facts.domain}/.well-known/security.txt` },
+                { where: "site" }
+            );
         else if (parsed.expires && Date.parse(parsed.expires) < now.getTime()) {
-            out.add("web", "securityTxtExpired", "low", { date: parsed.expires.slice(0, 10) }, { where: "site" });
+            out.add(
+                "web",
+                "securityTxtExpired",
+                "low",
+                { date: parsed.expires.slice(0, 10) },
+                { where: "site" }
+            );
         } else out.add("web", "securityTxtOk", "pass");
     }
 }
@@ -452,5 +727,11 @@ export function externalReportHosts(domain: string, dmarcText: string): string[]
         .map((part) => rec.reportHost(part.trim().replace(/!\d+[kmgt]?$/i, "")))
         .filter((host): host is string => host !== null);
     const base = domain.toLowerCase();
-    return [...new Set(hosts.filter((host) => host !== base && !host.endsWith(`.${base}`) && !base.endsWith(`.${host}`)))];
+    return [
+        ...new Set(
+            hosts.filter(
+                (host) => host !== base && !host.endsWith(`.${base}`) && !base.endsWith(`.${host}`)
+            )
+        )
+    ];
 }

@@ -15,7 +15,19 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { SecurityReport } from "@/lib/domain-security/types";
 import type { DomainSecurityView } from "@/lib/domain-security/service";
-import { Badge, Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Select, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Checkbox,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 import {
     applyDomainSecurityAction,
     planDomainSecurityAction,
@@ -27,7 +39,15 @@ type Policy = "keep" | "quarantine" | "reject";
 
 const ACTION_VARIANT = { create: "success", update: "warning", delete: "danger" } as const;
 
-function ChangeRow({ change, checked, onToggle }: { change: PreviewChange; checked: boolean; onToggle: (next: boolean) => void }) {
+function ChangeRow({
+    change,
+    checked,
+    onToggle
+}: {
+    change: PreviewChange;
+    checked: boolean;
+    onToggle: (next: boolean) => void;
+}) {
     const t = useTranslations("domainSecurity");
     const label =
         change.kind === "dnssec"
@@ -48,20 +68,40 @@ function ChangeRow({ change, checked, onToggle }: { change: PreviewChange; check
                     <Badge variant={ACTION_VARIANT[change.action]} className="shrink-0">
                         {t(`fix.action.${change.action}`)}
                     </Badge>
-                    <span className="min-w-0 break-all font-mono text-xs font-semibold">{label}</span>
+                    <span className="min-w-0 break-all font-mono text-xs font-semibold">
+                        {label}
+                    </span>
                 </div>
-                <p className="text-muted-foreground text-xs">{t(`findings.${change.code}.title` as NamespaceKey<"domainSecurity">)}</p>
-                {change.kind === "dnssec" && <p className="text-muted-foreground text-xs">{t("fix.dnssecHint")}</p>}
-                {change.kind === "edge" && <p className="text-muted-foreground text-xs">{t("fix.edgeHint", { hostname: change.name })}</p>}
+                <p className="text-muted-foreground text-xs">
+                    {t(`findings.${change.code}.title` as NamespaceKey<"domainSecurity">)}
+                </p>
+                {change.kind === "dnssec" && (
+                    <p className="text-muted-foreground text-xs">{t("fix.dnssecHint")}</p>
+                )}
+                {change.kind === "edge" && (
+                    <p className="text-muted-foreground text-xs">
+                        {t("fix.edgeHint", { hostname: change.name })}
+                    </p>
+                )}
                 {change.kind === "record" && (
                     <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
                         <dt className="text-muted-foreground">{t("fix.now")}</dt>
                         <dd className="min-w-0 break-all font-mono">
-                            {change.before.length > 0 ? change.before.join("\n") : <span className="text-muted-foreground font-sans">{t("fix.nothing")}</span>}
+                            {change.before.length > 0 ? (
+                                change.before.join("\n")
+                            ) : (
+                                <span className="text-muted-foreground font-sans">
+                                    {t("fix.nothing")}
+                                </span>
+                            )}
                         </dd>
                         <dt className="text-muted-foreground">{t("fix.after")}</dt>
                         <dd className="min-w-0 break-all font-mono">
-                            {change.after ?? <span className="text-muted-foreground font-sans">{t("fix.nothing")}</span>}
+                            {change.after ?? (
+                                <span className="text-muted-foreground font-sans">
+                                    {t("fix.nothing")}
+                                </span>
+                            )}
                         </dd>
                     </dl>
                 )}
@@ -101,7 +141,11 @@ export function FixDialog({
         let cancelled = false;
         setChanges(null);
         void (async () => {
-            const result = await planDomainSecurityAction(scope, domain, policy === "keep" ? null : policy).catch(() => null);
+            const result = await planDomainSecurityAction(
+                scope,
+                domain,
+                policy === "keep" ? null : policy
+            ).catch(() => null);
             if (cancelled) return;
             if (result?.changes) setChanges(result.changes);
             else setError(result?.error ?? t("errors.failed"));
@@ -119,7 +163,13 @@ export function FixDialog({
         setApplying(true);
         setError("");
         const result = await runAction(
-            () => applyDomainSecurityAction(scope, domain, chosen.map((change) => change.fingerprint), policy === "keep" ? null : policy),
+            () =>
+                applyDomainSecurityAction(
+                    scope,
+                    domain,
+                    chosen.map((change) => change.fingerprint),
+                    policy === "keep" ? null : policy
+                ),
             setError
         );
         setApplying(false);
@@ -136,10 +186,20 @@ export function FixDialog({
             return;
         }
         setOutcome(
-            `${t("fix.applied", { ok })}. ${t("fix.someFailed", { failed: failed.length, detail: failed.map((entry) => entry.detail ?? "").filter(Boolean).join("; ") })}`
+            `${t("fix.applied", { ok })}. ${t("fix.someFailed", {
+                failed: failed.length,
+                detail: failed
+                    .map((entry) => entry.detail ?? "")
+                    .filter(Boolean)
+                    .join("; ")
+            })}`
         );
         setChanges(null);
-        const again = await planDomainSecurityAction(scope, domain, policy === "keep" ? null : policy).catch(() => null);
+        const again = await planDomainSecurityAction(
+            scope,
+            domain,
+            policy === "keep" ? null : policy
+        ).catch(() => null);
         if (again?.changes) setChanges(again.changes);
     }
 
@@ -159,7 +219,10 @@ export function FixDialog({
 
                 {current && (
                     <div className="flex flex-col gap-1.5">
-                        <label className="flex flex-wrap items-center gap-2 text-sm" htmlFor={`dmarc-policy-${domain}`}>
+                        <label
+                            className="flex flex-wrap items-center gap-2 text-sm"
+                            htmlFor={`dmarc-policy-${domain}`}
+                        >
                             {t("fix.policy.label")}
                             <Select
                                 id={`dmarc-policy-${domain}`}
@@ -169,23 +232,35 @@ export function FixDialog({
                                 className="w-44"
                             />
                         </label>
-                        <p className="text-muted-foreground text-xs">{t("fix.policy.hint", { domain })}</p>
+                        <p className="text-muted-foreground text-xs">
+                            {t("fix.policy.hint", { domain })}
+                        </p>
                     </div>
                 )}
 
                 {error && (
-                    <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                    <p
+                        role="alert"
+                        className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                    >
                         {error}
                     </p>
                 )}
                 {outcome && (
-                    <p role="status" className="bg-warning-soft text-warning-ink rounded-md px-3 py-2 text-sm">
+                    <p
+                        role="status"
+                        className="bg-warning-soft text-warning-ink rounded-md px-3 py-2 text-sm"
+                    >
                         {outcome}
                     </p>
                 )}
 
                 {changes === null ? (
-                    <div className="flex flex-col gap-2" aria-busy="true" aria-label={t("fix.loading")}>
+                    <div
+                        className="flex flex-col gap-2"
+                        aria-busy="true"
+                        aria-label={t("fix.loading")}
+                    >
                         <Skeleton className="h-12 w-full" />
                         <Skeleton className="h-12 w-full" />
                     </div>
@@ -215,7 +290,11 @@ export function FixDialog({
                     <Button variant="ghost" disabled={applying} onClick={onClose}>
                         {tc("actions.cancel")}
                     </Button>
-                    <Button aria-disabled={applying || chosen.length === 0} disabled={applying || chosen.length === 0} onClick={() => void apply()}>
+                    <Button
+                        aria-disabled={applying || chosen.length === 0}
+                        disabled={applying || chosen.length === 0}
+                        onClick={() => void apply()}
+                    >
                         {applying ? t("fix.applying") : t("fix.apply", { count: chosen.length })}
                     </Button>
                 </DialogFooter>

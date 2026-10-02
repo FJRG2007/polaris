@@ -42,11 +42,26 @@ export interface KnownDomain {
         readonly selectors: readonly string[];
     }[];
     /** Hostnames under it that a service answers on. */
-    readonly hostnames: readonly { readonly hostname: string; readonly applicationId: string; readonly le: boolean }[];
+    readonly hostnames: readonly {
+        readonly hostname: string;
+        readonly applicationId: string;
+        readonly le: boolean;
+    }[];
 }
 
 /** Names that are somebody else's shared domain, never one to audit as ours. */
-const SHARED_SUFFIXES = ["sslip.io", "nip.io", "traefik.me", "duckdns.org", "trycloudflare.com", "cfargotunnel.com", "ngrok.io", "ngrok-free.app", "ngrok.app", "local"];
+const SHARED_SUFFIXES = [
+    "sslip.io",
+    "nip.io",
+    "traefik.me",
+    "duckdns.org",
+    "trycloudflare.com",
+    "cfargotunnel.com",
+    "ngrok.io",
+    "ngrok-free.app",
+    "ngrok.app",
+    "local"
+];
 
 function shared(name: string): boolean {
     return SHARED_SUFFIXES.some((suffix) => name === suffix || name.endsWith(`.${suffix}`));
@@ -106,10 +121,14 @@ export async function zoneApexOf(hostname: string): Promise<string | null> {
 }
 
 /** DKIM selectors and the SPF a mail server's stored DNS scan names for a domain. */
-function mailRecords(server: Parameters<typeof storedDns>[0], domain: string): { spf: string | null; selectors: string[] } {
+function mailRecords(
+    server: Parameters<typeof storedDns>[0],
+    domain: string
+): { spf: string | null; selectors: string[] } {
     const report = storedDns(server)?.reports.find((entry) => entry.domain === domain);
     if (!report) return { spf: null, selectors: [] };
-    const spf = report.records.find((entry) => entry.record.purpose === "spf")?.record.value ?? null;
+    const spf =
+        report.records.find((entry) => entry.record.purpose === "spf")?.record.value ?? null;
     const selectors = report.records
         .filter((entry) => entry.record.purpose === "dkim")
         .map((entry) => entry.record.name.split("._domainkey.")[0] ?? "")
@@ -131,7 +150,9 @@ interface Draft {
  * domain's entry depends on, since a hostname is filed under the deepest known
  * domain above it.
  */
-export async function knownDomains(options: { resolveParents?: boolean; within?: string } = {}): Promise<KnownDomain[]> {
+export async function knownDomains(
+    options: { resolveParents?: boolean; within?: string } = {}
+): Promise<KnownDomain[]> {
     const within = options.within ? clean(options.within) : null;
     const near = within
         ? [
@@ -144,7 +165,13 @@ export async function knownDomains(options: { resolveParents?: boolean; within?:
         const name = clean(domain);
         let entry = drafts.get(name);
         if (!entry) {
-            entry = { sources: new Set(), ownerDomain: null, zone: null, mailServers: [], hostnames: [] };
+            entry = {
+                sources: new Set(),
+                ownerDomain: null,
+                zone: null,
+                mailServers: [],
+                hostnames: []
+            };
             drafts.set(name, entry);
         }
         return entry;
@@ -153,19 +180,27 @@ export async function knownDomains(options: { resolveParents?: boolean; within?:
     const [config, owned, servers, zones, hostnames] = await Promise.all([
         getDomainZones(),
         prisma.ownerDomain.findMany({
-            where: { verifiedAt: { not: null }, ...(near ? { OR: near.map((domain) => ({ domain })) } : {}) },
+            where: {
+                verifiedAt: { not: null },
+                ...(near ? { OR: near.map((domain) => ({ domain })) } : {})
+            },
             select: { id: true, domain: true, userId: true, orgId: true, dnsToken: true }
         }),
         prisma.mailServer.findMany({ where: { status: { in: ["ready", "down"] } } }),
         cloudflareZones(),
         prisma.domain.findMany({
-            where: { enabled: true, kind: { in: ["custom", "base", "random"] }, ...(near ? { OR: near.map((hostname) => ({ hostname })) } : {}) },
+            where: {
+                enabled: true,
+                kind: { in: ["custom", "base", "random"] },
+                ...(near ? { OR: near.map((hostname) => ({ hostname })) } : {})
+            },
             select: { hostname: true, applicationId: true, certResolver: true },
             take: 500
         })
     ]);
 
-    if (config.baseDomain && !shared(config.baseDomain)) draft(config.baseDomain).sources.add("instance");
+    if (config.baseDomain && !shared(config.baseDomain))
+        draft(config.baseDomain).sources.add("instance");
     for (const zone of zones) {
         const entry = draft(zone.name);
         entry.sources.add("cloudflare");
@@ -174,10 +209,18 @@ export async function knownDomains(options: { resolveParents?: boolean; within?:
     for (const row of owned) {
         const entry = draft(row.domain);
         entry.sources.add("owner");
-        entry.ownerDomain = { id: row.id, userId: row.userId, orgId: row.orgId, hasToken: Boolean(row.dnsToken) };
+        entry.ownerDomain = {
+            id: row.id,
+            userId: row.userId,
+            orgId: row.orgId,
+            hasToken: Boolean(row.dnsToken)
+        };
     }
     for (const server of servers) {
-        const names = new Set([server.primaryDomain, ...(storedDns(server)?.reports.map((report) => report.domain) ?? [])]);
+        const names = new Set([
+            server.primaryDomain,
+            ...(storedDns(server)?.reports.map((report) => report.domain) ?? [])
+        ]);
         for (const name of names) {
             if (!name || shared(clean(name))) continue;
             const entry = draft(name);
@@ -197,7 +240,9 @@ export async function knownDomains(options: { resolveParents?: boolean; within?:
     // A zone on the account holds every domain under it; the deepest known
     // domain is the one a hostname is filed under.
     const parentOf = (hostname: string): string | null =>
-        [...drafts.keys()].filter((domain) => under(hostname, domain)).sort((a, b) => b.length - a.length)[0] ?? null;
+        [...drafts.keys()]
+            .filter((domain) => under(hostname, domain))
+            .sort((a, b) => b.length - a.length)[0] ?? null;
     for (const row of hostnames) {
         const hostname = clean(row.hostname);
         if (shared(hostname)) continue;
@@ -206,19 +251,30 @@ export async function knownDomains(options: { resolveParents?: boolean; within?:
         if (!parent) continue;
         const entry = draft(parent);
         entry.sources.add("deploy");
-        entry.hostnames.push({ hostname, applicationId: row.applicationId, le: row.certResolver === "le" });
+        entry.hostnames.push({
+            hostname,
+            applicationId: row.applicationId,
+            le: row.certResolver === "le"
+        });
     }
     // Zones whose domain is under another known one keep their own entry: a
     // delegated subdomain is its own zone with its own records.
     for (const [domain, entry] of drafts) {
         if (!entry.zone) {
-            const zone = zones.filter((candidate) => under(domain, candidate.name)).sort((a, b) => b.name.length - a.name.length)[0];
+            const zone = zones
+                .filter((candidate) => under(domain, candidate.name))
+                .sort((a, b) => b.name.length - a.name.length)[0];
             if (zone) entry.zone = { id: zone.id, name: zone.name };
         }
     }
 
     return [...drafts.entries()]
-        .filter(([domain]) => domain.includes(".") && !core.isIpAddress(domain) && (!within || under(domain, within)))
+        .filter(
+            ([domain]) =>
+                domain.includes(".") &&
+                !core.isIpAddress(domain) &&
+                (!within || under(domain, within))
+        )
         .map(([domain, entry]) => ({
             domain,
             sources: [...entry.sources],

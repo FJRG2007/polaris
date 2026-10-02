@@ -56,17 +56,27 @@ async function failure(caught: unknown): Promise<{ error: string }> {
     return { error: t("errors.failed") };
 }
 
-export async function readDomainSecurityAction(ref: SecurityRef, domain: string): Promise<{ view?: security.DomainSecurityView; error?: string }> {
+export async function readDomainSecurityAction(
+    ref: SecurityRef,
+    domain: string
+): Promise<{ view?: security.DomainSecurityView; error?: string }> {
     try {
-        return { view: await security.domainSecurityView(await actorFor(ref), domainSchema.parse(domain)) };
+        return {
+            view: await security.domainSecurityView(await actorFor(ref), domainSchema.parse(domain))
+        };
     } catch (caught) {
         return failure(caught);
     }
 }
 
-export async function recheckDomainSecurityAction(ref: SecurityRef, domain: string): Promise<{ view?: security.DomainSecurityView; error?: string }> {
+export async function recheckDomainSecurityAction(
+    ref: SecurityRef,
+    domain: string
+): Promise<{ view?: security.DomainSecurityView; error?: string }> {
     try {
-        return { view: await security.recheckDomain(await actorFor(ref), domainSchema.parse(domain)) };
+        return {
+            view: await security.recheckDomain(await actorFor(ref), domainSchema.parse(domain))
+        };
     } catch (caught) {
         return failure(caught);
     }
@@ -80,8 +90,14 @@ export async function planDomainSecurityAction(
     policy: "quarantine" | "reject" | null
 ): Promise<{ changes?: PreviewChange[]; error?: string }> {
     try {
-        const changes = await security.planFor(await actorFor(ref), domainSchema.parse(domain), policySchema.parse(policy));
-        return { changes: changes.map((change) => ({ ...change, fingerprint: fingerprint(change) })) };
+        const changes = await security.planFor(
+            await actorFor(ref),
+            domainSchema.parse(domain),
+            policySchema.parse(policy)
+        );
+        return {
+            changes: changes.map((change) => ({ ...change, fingerprint: fingerprint(change) }))
+        };
     } catch (caught) {
         return failure(caught);
     }
@@ -92,7 +108,11 @@ export async function applyDomainSecurityAction(
     domain: string,
     approved: string[],
     policy: "quarantine" | "reject" | null
-): Promise<{ results?: security.ChangeResult[]; view?: security.DomainSecurityView; error?: string }> {
+): Promise<{
+    results?: security.ChangeResult[];
+    view?: security.DomainSecurityView;
+    error?: string;
+}> {
     try {
         const actor = await actorFor(ref);
         const name = domainSchema.parse(domain);
@@ -104,7 +124,11 @@ export async function applyDomainSecurityAction(
             action: "domain.security.fix",
             targetType: "domain",
             targetId: name,
-            metadata: { applied: outcome.results.filter((result) => result.ok).length, failed: outcome.results.filter((result) => !result.ok).length, policy }
+            metadata: {
+                applied: outcome.results.filter((result) => result.ok).length,
+                failed: outcome.results.filter((result) => !result.ok).length,
+                policy
+            }
         });
         return outcome;
     } catch (caught) {
@@ -134,7 +158,10 @@ export async function setDomainDedicatedAction(
     }
 }
 
-export async function securityInventoryAction(): Promise<{ domains?: security.InventoryEntry[]; error?: string }> {
+export async function securityInventoryAction(): Promise<{
+    domains?: security.InventoryEntry[];
+    error?: string;
+}> {
     try {
         const actor = await actorFor({ kind: "admin" });
         return { domains: await security.securityInventory(actor) };

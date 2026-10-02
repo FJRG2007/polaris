@@ -22,8 +22,11 @@ export function rdapBaseFor(bootstrap: unknown, domain: string): string | null {
             if (!Array.isArray(service) || service.length < 2) continue;
             const [tlds, urls] = service as [unknown, unknown];
             if (!Array.isArray(tlds) || !Array.isArray(urls)) continue;
-            if (!tlds.some((tld) => typeof tld === "string" && tld.toLowerCase() === suffix)) continue;
-            const https = urls.find((url): url is string => typeof url === "string" && url.startsWith("https://"));
+            if (!tlds.some((tld) => typeof tld === "string" && tld.toLowerCase() === suffix))
+                continue;
+            const https = urls.find(
+                (url): url is string => typeof url === "string" && url.startsWith("https://")
+            );
             if (https) return https.endsWith("/") ? https : `${https}/`;
         }
     }
@@ -38,7 +41,9 @@ interface RdapEntity {
 }
 
 function entities(value: unknown): RdapEntity[] {
-    return Array.isArray(value) ? (value.filter((entry) => entry && typeof entry === "object") as RdapEntity[]) : [];
+    return Array.isArray(value)
+        ? (value.filter((entry) => entry && typeof entry === "object") as RdapEntity[])
+        : [];
 }
 
 function hasRole(entity: RdapEntity, role: string): boolean {
@@ -50,12 +55,14 @@ function vcardValue(entity: RdapEntity, property: string): string | null {
     const card = entity.vcardArray;
     if (!Array.isArray(card) || !Array.isArray(card[1])) return null;
     for (const entry of card[1] as unknown[]) {
-        if (Array.isArray(entry) && entry[0] === property && typeof entry[3] === "string") return entry[3];
+        if (Array.isArray(entry) && entry[0] === property && typeof entry[3] === "string")
+            return entry[3];
     }
     return null;
 }
 
-const REDACTED = /redact|privacy|private|withheld|not disclosed|data protected|gdpr|statutory masking|contact privacy|proxy/i;
+const REDACTED =
+    /redact|privacy|private|withheld|not disclosed|data protected|gdpr|statutory masking|contact privacy|proxy/i;
 
 /** Whether a registrant entity withholds who it is: no name at all, or a name or
  *  remark that says it is masked. */
@@ -73,7 +80,12 @@ export function relatedRdapLink(answer: unknown): string | null {
     if (!Array.isArray(links)) return null;
     for (const link of links) {
         const entry = link as { rel?: unknown; href?: unknown; type?: unknown };
-        if (entry?.rel === "related" && typeof entry.href === "string" && entry.href.startsWith("https://") && /rdap/i.test(String(entry.type ?? entry.href))) {
+        if (
+            entry?.rel === "related" &&
+            typeof entry.href === "string" &&
+            entry.href.startsWith("https://") &&
+            /rdap/i.test(String(entry.type ?? entry.href))
+        ) {
             return entry.href;
         }
     }
@@ -83,26 +95,50 @@ export function relatedRdapLink(answer: unknown): string | null {
 /** What an RDAP domain answer says about expiry, locks, registrar and privacy. */
 export function parseRdapDomain(answer: unknown): RegistrationFacts | null {
     if (!answer || typeof answer !== "object") return null;
-    const body = answer as { objectClassName?: unknown; events?: unknown; status?: unknown; entities?: unknown; redacted?: unknown };
+    const body = answer as {
+        objectClassName?: unknown;
+        events?: unknown;
+        status?: unknown;
+        entities?: unknown;
+        redacted?: unknown;
+    };
     if (body.objectClassName !== undefined && body.objectClassName !== "domain") return null;
     const events = Array.isArray(body.events) ? body.events : [];
-    const expiry = events.find((event) => (event as { eventAction?: unknown })?.eventAction === "expiration") as { eventDate?: unknown } | undefined;
-    const expiresAt = typeof expiry?.eventDate === "string" && !Number.isNaN(Date.parse(expiry.eventDate)) ? new Date(expiry.eventDate).toISOString() : null;
-    const statuses = Array.isArray(body.status) ? body.status.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.toLowerCase()) : [];
+    const expiry = events.find(
+        (event) => (event as { eventAction?: unknown })?.eventAction === "expiration"
+    ) as { eventDate?: unknown } | undefined;
+    const expiresAt =
+        typeof expiry?.eventDate === "string" && !Number.isNaN(Date.parse(expiry.eventDate))
+            ? new Date(expiry.eventDate).toISOString()
+            : null;
+    const statuses = Array.isArray(body.status)
+        ? body.status
+              .filter((entry): entry is string => typeof entry === "string")
+              .map((entry) => entry.toLowerCase())
+        : [];
     const all = entities(body.entities);
     const registrarEntity = all.find((entity) => hasRole(entity, "registrar"));
-    const registrar = registrarEntity ? vcardValue(registrarEntity, "fn") ?? vcardValue(registrarEntity, "org") : null;
+    const registrar = registrarEntity
+        ? (vcardValue(registrarEntity, "fn") ?? vcardValue(registrarEntity, "org"))
+        : null;
     const registrant = all.find((entity) => hasRole(entity, "registrant"));
     // RFC 9537 lists the fields a server withheld; a registrant name among them
     // is an answer on its own.
     const redactedList = Array.isArray(body.redacted) ? JSON.stringify(body.redacted) : "";
-    const registrantRedacted = registrant ? redacted(registrant) : /registrant/i.test(redactedList) ? true : null;
+    const registrantRedacted = registrant
+        ? redacted(registrant)
+        : /registrant/i.test(redactedList)
+          ? true
+          : null;
     return { expiresAt, statuses, registrar, registrantRedacted };
 }
 
 /** A thin registry's answer completed by the registrar's: the registry knows the
  *  dates and locks, the registrar knows the registrant. */
-export function mergeRegistration(registry: RegistrationFacts, registrar: RegistrationFacts | null): RegistrationFacts {
+export function mergeRegistration(
+    registry: RegistrationFacts,
+    registrar: RegistrationFacts | null
+): RegistrationFacts {
     if (!registrar) return registry;
     return {
         expiresAt: registry.expiresAt ?? registrar.expiresAt,

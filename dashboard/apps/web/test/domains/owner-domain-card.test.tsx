@@ -37,23 +37,30 @@ function domain(overrides: Partial<OwnerDomainView>): OwnerDomainView {
 }
 
 function render(domains: OwnerDomainView[]): string {
-    return renderToStaticMarkup(withMessages(
-        <OwnerDomainsView
-            owner={{ kind: "user" }}
-            domains={domains}
-            canAdd={false}
-            blockedReason=""
-            publicIp="203.0.113.10"
-            instanceDomains={[]}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <OwnerDomainsView
+                owner={{ kind: "user" }}
+                domains={domains}
+                canAdd={false}
+                blockedReason=""
+                publicIp="203.0.113.10"
+                instanceDomains={[]}
+            />
+        )
+    );
 }
 
 describe("a domain of one's own", () => {
     it("says what its wildcard certificate covers once it is issued", () => {
         const markup = render([
             domain({
-                certificate: { status: "issued", expiresAt: "2026-12-01T00:00:00.000Z", nextAttemptAt: null, detail: null }
+                certificate: {
+                    status: "issued",
+                    expiresAt: "2026-12-01T00:00:00.000Z",
+                    nextAttemptAt: null,
+                    detail: null
+                }
             })
         ]);
         expect(markup).toContain("Wildcard certificate");

@@ -12,7 +12,11 @@ import { sendingSources } from "@/lib/domain-security/dmarc-sources";
 import { axfrGranted, axfrQuery, keyBits } from "@/lib/domain-security/probes";
 import { gradeOf, regressions, type Finding } from "@/lib/domain-security/types";
 
-function finding(code: Finding["code"], severity: Finding["severity"], params: Finding["params"] = {}): Finding {
+function finding(
+    code: Finding["code"],
+    severity: Finding["severity"],
+    params: Finding["params"] = {}
+): Finding {
     return { code, severity, params, section: "email", records: [], where: null };
 }
 
@@ -27,8 +31,16 @@ describe("grades and regressions", () => {
 
     it("tells only what is new or worse, and at least medium", () => {
         const before = [finding("dmarcNone", "medium"), finding("expirySoon", "medium")];
-        const after = [finding("dmarcNone", "medium"), finding("expirySoon", "high"), finding("spfAllSoft", "low"), finding("dkimWeak", "high", { selector: "s1" })];
-        expect(regressions(before, after).map((entry) => entry.code)).toEqual(["expirySoon", "dkimWeak"]);
+        const after = [
+            finding("dmarcNone", "medium"),
+            finding("expirySoon", "high"),
+            finding("spfAllSoft", "low"),
+            finding("dkimWeak", "high", { selector: "s1" })
+        ];
+        expect(regressions(before, after).map((entry) => entry.code)).toEqual([
+            "expirySoon",
+            "dkimWeak"
+        ]);
         // The first audit tells about everything that matters.
         expect(regressions(null, before)).toHaveLength(2);
     });
@@ -43,7 +55,10 @@ describe("a stored report", () => {
             receives: true,
             rua: [],
             grade: "exposed",
-            findings: [finding("spfOk", "pass"), { ...finding("spfOk", "pass"), code: "retiredCheck", severity: "critical" }]
+            findings: [
+                finding("spfOk", "pass"),
+                { ...finding("spfOk", "pass"), code: "retiredCheck", severity: "critical" }
+            ]
         });
         expect(report?.findings.map((entry) => entry.code)).toEqual(["spfOk"]);
         expect(report?.grade).toBe("protected");
@@ -52,7 +67,12 @@ describe("a stored report", () => {
 });
 
 describe("who sends as a domain", () => {
-    const row = (sourceIp: string, count: number, verdict: "pass" | "fail", signedBy: string | null) => ({
+    const row = (
+        sourceIp: string,
+        count: number,
+        verdict: "pass" | "fail",
+        signedBy: string | null
+    ) => ({
         sourceIp,
         count,
         disposition: "none" as const,
@@ -73,7 +93,11 @@ describe("who sends as a domain", () => {
                 end: new Date(0),
                 domain: "example.com",
                 policy: { p: "reject", sp: "reject", pct: 100 },
-                rows: [row("192.0.2.1", 40, "pass", "example.com"), row("198.51.100.7", 5, "fail", null), row("203.0.113.9", 3, "fail", "esp.example.net")]
+                rows: [
+                    row("192.0.2.1", 40, "pass", "example.com"),
+                    row("198.51.100.7", 5, "fail", null),
+                    row("203.0.113.9", 3, "fail", "esp.example.net")
+                ]
             }
         ]);
         expect(sources.map((source) => [source.sourceIp, source.verdict])).toEqual([
@@ -81,7 +105,11 @@ describe("who sends as a domain", () => {
             ["203.0.113.9", "misconfigured"],
             ["192.0.2.1", "authorized"]
         ]);
-        expect(sources[2]).toMatchObject({ messages: 40, passed: 40, dkimDomains: ["example.com"] });
+        expect(sources[2]).toMatchObject({
+            messages: 40,
+            passed: 40,
+            dkimDomains: ["example.com"]
+        });
     });
 });
 

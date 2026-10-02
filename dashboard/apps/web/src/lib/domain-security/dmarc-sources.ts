@@ -32,14 +32,32 @@ export interface SendingSource {
 export const MAX_SOURCES = 50;
 
 export function sendingSources(reports: readonly core.DmarcReport[]): SendingSource[] {
-    const bySource = new Map<string, { messages: number; passed: number; dkim: Set<string>; spf: Set<string>; reporters: Set<string> }>();
+    const bySource = new Map<
+        string,
+        {
+            messages: number;
+            passed: number;
+            dkim: Set<string>;
+            spf: Set<string>;
+            reporters: Set<string>;
+        }
+    >();
     for (const report of reports) {
         for (const row of report.rows) {
-            const entry = bySource.get(row.sourceIp) ?? { messages: 0, passed: 0, dkim: new Set(), spf: new Set(), reporters: new Set() };
+            const entry = bySource.get(row.sourceIp) ?? {
+                messages: 0,
+                passed: 0,
+                dkim: new Set(),
+                spf: new Set(),
+                reporters: new Set()
+            };
             entry.messages += row.count;
             if (row.dkim === "pass" || row.spf === "pass") entry.passed += row.count;
-            for (const auth of row.authDkim) if (auth.result === "pass" && auth.domain) entry.dkim.add(auth.domain.toLowerCase());
-            for (const auth of row.authSpf) if (auth.result === "pass" && auth.domain) entry.spf.add(auth.domain.toLowerCase());
+            for (const auth of row.authDkim)
+                if (auth.result === "pass" && auth.domain)
+                    entry.dkim.add(auth.domain.toLowerCase());
+            for (const auth of row.authSpf)
+                if (auth.result === "pass" && auth.domain) entry.spf.add(auth.domain.toLowerCase());
             entry.reporters.add(report.orgName);
             bySource.set(row.sourceIp, entry);
         }
@@ -49,7 +67,11 @@ export function sendingSources(reports: readonly core.DmarcReport[]): SendingSou
         .map(([sourceIp, entry]): SendingSource => {
             const failed = entry.messages - entry.passed;
             const verdict: SendingSource["verdict"] =
-                failed === 0 ? "authorized" : entry.passed === 0 && entry.dkim.size === 0 && entry.spf.size === 0 ? "spoofing" : "misconfigured";
+                failed === 0
+                    ? "authorized"
+                    : entry.passed === 0 && entry.dkim.size === 0 && entry.spf.size === 0
+                      ? "spoofing"
+                      : "misconfigured";
             return {
                 sourceIp,
                 messages: entry.messages,
@@ -62,6 +84,9 @@ export function sendingSources(reports: readonly core.DmarcReport[]): SendingSou
                 verdict
             };
         })
-        .sort((left, right) => rank[left.verdict] - rank[right.verdict] || right.messages - left.messages)
+        .sort(
+            (left, right) =>
+                rank[left.verdict] - rank[right.verdict] || right.messages - left.messages
+        )
         .slice(0, MAX_SOURCES);
 }

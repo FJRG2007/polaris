@@ -10,16 +10,34 @@ import * as rec from "@/lib/domain-security/records";
 
 describe("SPF", () => {
     it("reads the mechanisms, the all qualifier and a redirect", () => {
-        const spf = rec.parseSpf("v=spf1 include:_spf.example.net ip4:192.0.2.0/24 ip6:2001:db8::/32 mx -all");
+        const spf = rec.parseSpf(
+            "v=spf1 include:_spf.example.net ip4:192.0.2.0/24 ip6:2001:db8::/32 mx -all"
+        );
         expect(spf).toMatchObject({ ok: true, all: "-", redirect: null });
-        expect(spf.ok && spf.terms.map((term) => term.mechanism)).toEqual(["include", "ip4", "ip6", "mx", "all"]);
-        expect(rec.parseSpf("v=spf1 redirect=_spf.example.net")).toMatchObject({ ok: true, all: null, redirect: "_spf.example.net" });
+        expect(spf.ok && spf.terms.map((term) => term.mechanism)).toEqual([
+            "include",
+            "ip4",
+            "ip6",
+            "mx",
+            "all"
+        ]);
+        expect(rec.parseSpf("v=spf1 redirect=_spf.example.net")).toMatchObject({
+            ok: true,
+            all: null,
+            redirect: "_spf.example.net"
+        });
     });
 
     it("names the term that does not parse", () => {
         expect(rec.parseSpf("v=spf1 include: -all")).toEqual({ ok: false, bad: "include:" });
-        expect(rec.parseSpf("v=spf1 ip4:300.1.1.1 -all")).toEqual({ ok: false, bad: "ip4:300.1.1.1" });
-        expect(rec.parseSpf("v=spf1 a:example.com bogus -all")).toEqual({ ok: false, bad: "bogus" });
+        expect(rec.parseSpf("v=spf1 ip4:300.1.1.1 -all")).toEqual({
+            ok: false,
+            bad: "ip4:300.1.1.1"
+        });
+        expect(rec.parseSpf("v=spf1 a:example.com bogus -all")).toEqual({
+            ok: false,
+            bad: "bogus"
+        });
         expect(rec.parseSpf("v=spf2 -all")).toEqual({ ok: false, bad: "v=spf2" });
     });
 
@@ -31,10 +49,15 @@ describe("SPF", () => {
     });
 
     it("merges two records into one, keeping the first record's all", () => {
-        expect(rec.mergeSpfRecords("v=spf1 include:a.example -all", "v=spf1 include:b.example include:a.example ~all")).toBe(
-            "v=spf1 include:a.example include:b.example -all"
+        expect(
+            rec.mergeSpfRecords(
+                "v=spf1 include:a.example -all",
+                "v=spf1 include:b.example include:a.example ~all"
+            )
+        ).toBe("v=spf1 include:a.example include:b.example -all");
+        expect(rec.mergeSpfRecords("v=spf1 mx", "v=spf1 ip4:192.0.2.1")).toBe(
+            "v=spf1 mx ip4:192.0.2.1 ~all"
         );
-        expect(rec.mergeSpfRecords("v=spf1 mx", "v=spf1 ip4:192.0.2.1")).toBe("v=spf1 mx ip4:192.0.2.1 ~all");
     });
 });
 
@@ -72,7 +95,9 @@ describe("the SPF lookup walk", () => {
     });
 
     it("stops asking once the budget is spent", async () => {
-        const includes = Array.from({ length: 30 }, (_, index) => `include:i${index}.example`).join(" ");
+        const includes = Array.from({ length: 30 }, (_, index) => `include:i${index}.example`).join(
+            " "
+        );
         const spf = rec.parseSpf(`v=spf1 ${includes} -all`);
         if (!spf.ok) throw new Error("unreadable");
         const asked: string[] = [];
@@ -92,7 +117,16 @@ describe("DMARC", () => {
     it("reads the policy and fills in the defaults", () => {
         expect(rec.parseDmarc("v=DMARC1; p=reject; rua=mailto:dmarc@example.com!10m")).toEqual({
             ok: true,
-            record: { p: "reject", sp: "reject", spSet: false, pct: 100, adkim: "r", aspf: "r", rua: ["mailto:dmarc@example.com"], ruf: [] }
+            record: {
+                p: "reject",
+                sp: "reject",
+                spSet: false,
+                pct: 100,
+                adkim: "r",
+                aspf: "r",
+                rua: ["mailto:dmarc@example.com"],
+                ruf: []
+            }
         });
         expect(rec.parseDmarc("v=DMARC1; p=quarantine; sp=none; pct=25; adkim=s")).toMatchObject({
             ok: true,
@@ -108,29 +142,57 @@ describe("DMARC", () => {
 
     it("changes the policy or adds a report address and keeps every other tag", () => {
         const text = "v=DMARC1; p=none; rua=mailto:a@example.com; fo=1";
-        expect(rec.withPolicy(text, "quarantine")).toBe("v=DMARC1; p=quarantine; rua=mailto:a@example.com; fo=1");
-        expect(rec.withRua(text, "mailto:b@example.com")).toBe("v=DMARC1; p=none; rua=mailto:a@example.com,mailto:b@example.com; fo=1");
-        expect(rec.withRua("v=DMARC1; p=none", "mailto:b@example.com")).toBe("v=DMARC1; p=none; rua=mailto:b@example.com");
+        expect(rec.withPolicy(text, "quarantine")).toBe(
+            "v=DMARC1; p=quarantine; rua=mailto:a@example.com; fo=1"
+        );
+        expect(rec.withRua(text, "mailto:b@example.com")).toBe(
+            "v=DMARC1; p=none; rua=mailto:a@example.com,mailto:b@example.com; fo=1"
+        );
+        expect(rec.withRua("v=DMARC1; p=none", "mailto:b@example.com")).toBe(
+            "v=DMARC1; p=none; rua=mailto:b@example.com"
+        );
         expect(rec.withRua(text, "mailto:A@example.com")).toBe(text);
     });
 
     it("writes a record the reader reads back", () => {
-        const text = rec.formatDmarc({ p: "reject", sp: "reject", adkim: "s", aspf: "s", rua: ["mailto:r@example.com"] });
-        expect(text).toBe("v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s; rua=mailto:r@example.com");
+        const text = rec.formatDmarc({
+            p: "reject",
+            sp: "reject",
+            adkim: "s",
+            aspf: "s",
+            rua: ["mailto:r@example.com"]
+        });
+        expect(text).toBe(
+            "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s; rua=mailto:r@example.com"
+        );
         expect(rec.parseDmarc(text).ok).toBe(true);
     });
 });
 
 describe("DKIM, MTA-STS and security.txt", () => {
     it("reads a key, a revoked key and test mode", () => {
-        expect(rec.parseDkim("v=DKIM1; k=rsa; t=y; p=MIIB AQAB")).toEqual({ keyType: "rsa", publicKey: "MIIBAQAB", testing: true });
-        expect(rec.parseDkim("v=DKIM1; p=")).toEqual({ keyType: "rsa", publicKey: "", testing: false });
+        expect(rec.parseDkim("v=DKIM1; k=rsa; t=y; p=MIIB AQAB")).toEqual({
+            keyType: "rsa",
+            publicKey: "MIIBAQAB",
+            testing: true
+        });
+        expect(rec.parseDkim("v=DKIM1; p=")).toEqual({
+            keyType: "rsa",
+            publicKey: "",
+            testing: false
+        });
         expect(rec.parseDkim("not a key")).toBeNull();
     });
 
     it("reads an MTA-STS policy and matches MX hosts against it", () => {
-        const policy = rec.parseMtaStsPolicy("version: STSv1\nmode: enforce\nmx: mail.example.com\nmx: *.backup.example.net\nmax_age: 604800\n");
-        expect(policy).toEqual({ mode: "enforce", mx: ["mail.example.com", "*.backup.example.net"], maxAge: 604800 });
+        const policy = rec.parseMtaStsPolicy(
+            "version: STSv1\nmode: enforce\nmx: mail.example.com\nmx: *.backup.example.net\nmax_age: 604800\n"
+        );
+        expect(policy).toEqual({
+            mode: "enforce",
+            mx: ["mail.example.com", "*.backup.example.net"],
+            maxAge: 604800
+        });
         expect(rec.mxCovered("mx1.backup.example.net", policy!.mx)).toBe(true);
         expect(rec.mxCovered("a.b.backup.example.net", policy!.mx)).toBe(false);
         expect(rec.mxCovered("other.example.com", policy!.mx)).toBe(false);
@@ -138,7 +200,11 @@ describe("DKIM, MTA-STS and security.txt", () => {
     });
 
     it("reads a security.txt's contact and expiry", () => {
-        expect(rec.parseSecurityTxt("# hi\nContact: mailto:security@example.com\nExpires: 2027-01-01T00:00:00Z\n")).toEqual({
+        expect(
+            rec.parseSecurityTxt(
+                "# hi\nContact: mailto:security@example.com\nExpires: 2027-01-01T00:00:00Z\n"
+            )
+        ).toEqual({
             contacts: ["mailto:security@example.com"],
             expires: "2027-01-01T00:00:00.000Z"
         });

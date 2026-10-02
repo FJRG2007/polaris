@@ -21,7 +21,15 @@
 import { POLARIS_CA } from "./evaluate";
 import { txtText } from "@/lib/dns/record-schema";
 import type { FindingCode, SecurityReport } from "./types";
-import { isDmarc, isSpf, mergeSpfRecords, parseDmarc, withPolicy, withRua, type DmarcPolicy } from "./records";
+import {
+    isDmarc,
+    isSpf,
+    mergeSpfRecords,
+    parseDmarc,
+    withPolicy,
+    withRua,
+    type DmarcPolicy
+} from "./records";
 
 export type ChangeAction = "create" | "update" | "delete";
 
@@ -87,31 +95,97 @@ export function planChanges(input: PlanInput): PlannedChange[] {
     const codes = new Set(report.findings.map((finding) => finding.code));
     const changes: PlannedChange[] = [];
     const push = (change: Omit<PlannedChange, "id">, extra = "") =>
-        changes.push({ ...change, id: idOf(change.kind, change.action, change.type, change.name, extra) });
+        changes.push({
+            ...change,
+            id: idOf(change.kind, change.action, change.type, change.name, extra)
+        });
 
     if (records) {
-        const at = (type: string, name: string) => records.filter((record) => record.type === type && same(record.name, name));
-        const apexTxt = at("TXT", domain).map((record) => ({ ...record, text: txtText(record.content) }));
+        const at = (type: string, name: string) =>
+            records.filter((record) => record.type === type && same(record.name, name));
+        const apexTxt = at("TXT", domain).map((record) => ({
+            ...record,
+            text: txtText(record.content)
+        }));
         const spfs = apexTxt.filter((record) => isSpf(record.text));
         const parked = !report.sends && !report.receives;
 
         // --- SPF ---
         const spfFinding = report.findings.find((finding) => finding.code === "spfMissing");
         if (spfs.length === 0 && spfFinding) {
-            const value = spfFinding.records[0]?.value ?? (parked ? "v=spf1 -all" : "v=spf1 mx ~all");
-            push({ kind: "record", action: "create", type: "TXT", name: domain, before: [], after: value, recordId: null, code: "spfMissing", applicationId: null });
+            const value =
+                spfFinding.records[0]?.value ?? (parked ? "v=spf1 -all" : "v=spf1 mx ~all");
+            push({
+                kind: "record",
+                action: "create",
+                type: "TXT",
+                name: domain,
+                before: [],
+                after: value,
+                recordId: null,
+                code: "spfMissing",
+                applicationId: null
+            });
         } else if (spfs.length > 1) {
-            const merged = spfs.slice(1).reduce((value, record) => mergeSpfRecords(value, record.text), spfs[0]!.text);
-            push({ kind: "record", action: "update", type: "TXT", name: domain, before: [spfs[0]!.text], after: merged, recordId: spfs[0]!.id, code: "spfMultiple", applicationId: null });
+            const merged = spfs
+                .slice(1)
+                .reduce((value, record) => mergeSpfRecords(value, record.text), spfs[0]!.text);
+            push({
+                kind: "record",
+                action: "update",
+                type: "TXT",
+                name: domain,
+                before: [spfs[0]!.text],
+                after: merged,
+                recordId: spfs[0]!.id,
+                code: "spfMultiple",
+                applicationId: null
+            });
             for (const extra of spfs.slice(1)) {
-                push({ kind: "record", action: "delete", type: "TXT", name: domain, before: [extra.text], after: null, recordId: extra.id, code: "spfMultiple", applicationId: null }, extra.id);
+                push(
+                    {
+                        kind: "record",
+                        action: "delete",
+                        type: "TXT",
+                        name: domain,
+                        before: [extra.text],
+                        after: null,
+                        recordId: extra.id,
+                        code: "spfMultiple",
+                        applicationId: null
+                    },
+                    extra.id
+                );
             }
-        } else if (spfs.length === 1 && (codes.has("spfAllPass") || codes.has("spfAllNeutral") || codes.has("spfAllMissing"))) {
+        } else if (
+            spfs.length === 1 &&
+            (codes.has("spfAllPass") || codes.has("spfAllNeutral") || codes.has("spfAllMissing"))
+        ) {
             const current = spfs[0]!.text;
             const ending = parked ? "-all" : "~all";
-            const next = [...current.trim().split(/\s+/).filter((part) => !/^[+\-~?]?all$/i.test(part)), ending].join(" ");
-            const code: FindingCode = codes.has("spfAllPass") ? "spfAllPass" : codes.has("spfAllNeutral") ? "spfAllNeutral" : "spfAllMissing";
-            push({ kind: "record", action: "update", type: "TXT", name: domain, before: [current], after: next, recordId: spfs[0]!.id, code, applicationId: null });
+            const next = [
+                ...current
+                    .trim()
+                    .split(/\s+/)
+                    .filter((part) => !/^[+\-~?]?all$/i.test(part)),
+                ending
+            ].join(" ");
+            const code: FindingCode = codes.has("spfAllPass")
+                ? "spfAllPass"
+                : codes.has("spfAllNeutral")
+                  ? "spfAllNeutral"
+                  : "spfAllMissing";
+            push({
+                kind: "record",
+                action: "update",
+                type: "TXT",
+                name: domain,
+                before: [current],
+                after: next,
+                recordId: spfs[0]!.id,
+                code,
+                applicationId: null
+            });
         }
 
         // --- DMARC ---
@@ -121,7 +195,17 @@ export function planChanges(input: PlanInput): PlannedChange[] {
             .filter((record) => isDmarc(record.text));
         const dmarcFinding = report.findings.find((finding) => finding.code === "dmarcMissing");
         if (dmarcs.length === 0 && dmarcFinding?.records[0]) {
-            push({ kind: "record", action: "create", type: "TXT", name: dmarcName, before: [], after: dmarcFinding.records[0].value, recordId: null, code: "dmarcMissing", applicationId: null });
+            push({
+                kind: "record",
+                action: "create",
+                type: "TXT",
+                name: dmarcName,
+                before: [],
+                after: dmarcFinding.records[0].value,
+                recordId: null,
+                code: "dmarcMissing",
+                applicationId: null
+            });
         } else if (dmarcs.length === 1) {
             const current = dmarcs[0]!.text;
             const parsed = parseDmarc(current);
@@ -139,48 +223,136 @@ export function planChanges(input: PlanInput): PlannedChange[] {
                 code ??= "dmarcRuaMissing";
             }
             if (code && next !== current) {
-                push({ kind: "record", action: "update", type: "TXT", name: dmarcName, before: [current], after: next, recordId: dmarcs[0]!.id, code, applicationId: null });
+                push({
+                    kind: "record",
+                    action: "update",
+                    type: "TXT",
+                    name: dmarcName,
+                    before: [current],
+                    after: next,
+                    recordId: dmarcs[0]!.id,
+                    code,
+                    applicationId: null
+                });
             }
         }
 
         // --- A domain that takes no mail says so ---
-        if ((codes.has("parkedNullMx") || codes.has("mxMissing")) && at("MX", domain).length === 0) {
-            push({ kind: "record", action: "create", type: "MX", name: domain, before: [], after: ".", recordId: null, code: codes.has("parkedNullMx") ? "parkedNullMx" : "mxMissing", applicationId: null });
+        if (
+            (codes.has("parkedNullMx") || codes.has("mxMissing")) &&
+            at("MX", domain).length === 0
+        ) {
+            push({
+                kind: "record",
+                action: "create",
+                type: "MX",
+                name: domain,
+                before: [],
+                after: ".",
+                recordId: null,
+                code: codes.has("parkedNullMx") ? "parkedNullMx" : "mxMissing",
+                applicationId: null
+            });
         }
         const dkimName = `*._domainkey.${domain}`;
         if (codes.has("parkedDkim") && at("TXT", dkimName).length === 0) {
-            push({ kind: "record", action: "create", type: "TXT", name: dkimName, before: [], after: "v=DKIM1; p=", recordId: null, code: "parkedDkim", applicationId: null });
+            push({
+                kind: "record",
+                action: "create",
+                type: "TXT",
+                name: dkimName,
+                before: [],
+                after: "v=DKIM1; p=",
+                recordId: null,
+                code: "parkedDkim",
+                applicationId: null
+            });
         }
 
         // --- TLS reports ---
         const rpt = report.findings.find((finding) => finding.code === "tlsRptMissing")?.records[0];
         const rptName = `_smtp._tls.${domain}`;
         if (rpt && at("TXT", rptName).length === 0) {
-            push({ kind: "record", action: "create", type: "TXT", name: rptName, before: [], after: rpt.value, recordId: null, code: "tlsRptMissing", applicationId: null });
+            push({
+                kind: "record",
+                action: "create",
+                type: "TXT",
+                name: rptName,
+                before: [],
+                after: rpt.value,
+                recordId: null,
+                code: "tlsRptMissing",
+                applicationId: null
+            });
         }
 
         // --- CAA: allow Polaris's CA ---
-        const caaCode: FindingCode | null = codes.has("caaBlocksPolaris") ? "caaBlocksPolaris" : codes.has("caaMissing") && report.findings.some((finding) => finding.code === "caaMissing" && finding.records.length > 0) ? "caaMissing" : null;
+        const caaCode: FindingCode | null = codes.has("caaBlocksPolaris")
+            ? "caaBlocksPolaris"
+            : codes.has("caaMissing") &&
+                report.findings.some(
+                    (finding) => finding.code === "caaMissing" && finding.records.length > 0
+                )
+              ? "caaMissing"
+              : null;
         if (caaCode) {
             const current = at("CAA", domain).map((record) => record.content);
             if (!current.some((value) => value.toLowerCase().includes(POLARIS_CA))) {
-                push({ kind: "record", action: "create", type: "CAA", name: domain, before: current, after: `0 issue "${POLARIS_CA}"`, recordId: null, code: caaCode, applicationId: null });
+                push({
+                    kind: "record",
+                    action: "create",
+                    type: "CAA",
+                    name: domain,
+                    before: current,
+                    after: `0 issue "${POLARIS_CA}"`,
+                    recordId: null,
+                    code: caaCode,
+                    applicationId: null
+                });
             }
         }
     }
 
     // --- DNSSEC, switched on at the DNS host ---
     if (input.canSign && codes.has("dnssecOff")) {
-        push({ kind: "dnssec", action: "create", type: null, name: domain, before: [], after: null, recordId: null, code: "dnssecOff", applicationId: null });
+        push({
+            kind: "dnssec",
+            action: "create",
+            type: null,
+            name: domain,
+            before: [],
+            after: null,
+            recordId: null,
+            code: "dnssecOff",
+            applicationId: null
+        });
     }
 
     // --- Security headers on a site Polaris serves ---
-    const headerCodes: FindingCode[] = ["hstsMissing", "hstsShort", "headerFramingMissing", "headerNosniffMissing", "headerReferrerMissing"];
-    const headerCode = headerCodes.find((code) => report.findings.some((finding) => finding.code === code && finding.where === "edge"));
+    const headerCodes: FindingCode[] = [
+        "hstsMissing",
+        "hstsShort",
+        "headerFramingMissing",
+        "headerNosniffMissing",
+        "headerReferrerMissing"
+    ];
+    const headerCode = headerCodes.find((code) =>
+        report.findings.some((finding) => finding.code === code && finding.where === "edge")
+    );
     if (headerCode) {
         for (const target of input.edge.filter((entry) => entry.preset === "off")) {
             push(
-                { kind: "edge", action: "update", type: null, name: target.hostname, before: ["off"], after: "recommended", recordId: null, code: headerCode, applicationId: target.applicationId },
+                {
+                    kind: "edge",
+                    action: "update",
+                    type: null,
+                    name: target.hostname,
+                    before: ["off"],
+                    after: "recommended",
+                    recordId: null,
+                    code: headerCode,
+                    applicationId: target.applicationId
+                },
                 target.applicationId
             );
         }

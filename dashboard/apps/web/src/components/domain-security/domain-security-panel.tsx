@@ -27,7 +27,12 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import type { DomainSecurityView } from "@/lib/domain-security/service";
 import { Button, DnsRecordTable, SegmentedControl, Skeleton, Switch } from "@polaris/ui";
-import { SECURITY_SECTIONS, severityRank, type Finding, type SecuritySection } from "@/lib/domain-security/types";
+import {
+    SECURITY_SECTIONS,
+    severityRank,
+    type Finding,
+    type SecuritySection
+} from "@/lib/domain-security/types";
 import {
     readDomainSecurityAction,
     recheckDomainSecurityAction,
@@ -61,7 +66,10 @@ function counts(finding: Finding): boolean {
 
 /** What a finding says, with its parameters filled in. */
 function words(t: Words, finding: Finding, part: "title" | "risk" | "fix"): string {
-    return t(key(`findings.${finding.code}.${part}`), finding.params as Record<string, string | number>);
+    return t(
+        key(`findings.${finding.code}.${part}`),
+        finding.params as Record<string, string | number>
+    );
 }
 
 function whereText(t: Words, finding: Finding, canFix: boolean): string | null {
@@ -86,14 +94,22 @@ function FindingRow({ finding, canFix }: { finding: Finding; canFix: boolean }) 
     const fixable = open(finding);
     const where = fixable ? whereText(t, finding, canFix) : null;
     // A passed check has no fix; its words are only a title and what it means.
-    const hasFix = fixable && finding.code !== "spfUnchecked" && finding.code !== "rdapUnavailable" && finding.code !== "webNone";
+    const hasFix =
+        fixable &&
+        finding.code !== "spfUnchecked" &&
+        finding.code !== "rdapUnavailable" &&
+        finding.code !== "webNone";
     return (
         <li className="flex min-w-0 flex-col gap-1.5 border-t border-border py-3 first:border-t-0 first:pt-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <SeverityBadge severity={finding.severity} />
-                <span className="min-w-0 break-words text-sm font-medium">{words(t, finding, "title")}</span>
+                <span className="min-w-0 break-words text-sm font-medium">
+                    {words(t, finding, "title")}
+                </span>
             </div>
-            <p className="text-muted-foreground break-words text-[0.8125rem]">{words(t, finding, "risk")}</p>
+            <p className="text-muted-foreground break-words text-[0.8125rem]">
+                {words(t, finding, "risk")}
+            </p>
             {hasFix && (
                 <p className="break-words text-[0.8125rem]">
                     {words(t, finding, "fix")}
@@ -105,7 +121,10 @@ function FindingRow({ finding, canFix }: { finding: Finding; canFix: boolean }) 
                     records={finding.records.map((record) => ({
                         type: record.type,
                         name: record.name,
-                        value: record.type === "MX" ? `${record.priority ?? 0} ${record.value}` : record.value
+                        value:
+                            record.type === "MX"
+                                ? `${record.priority ?? 0} ${record.value}`
+                                : record.value
                     }))}
                 />
             )}
@@ -116,7 +135,9 @@ function FindingRow({ finding, canFix }: { finding: Finding; canFix: boolean }) 
 export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; domain: string }) {
     const t = useTranslations("domainSecurity");
     const cacheKey = `domain-security:${scopeKey(scope)}:${domain}`;
-    const [view, setView] = useState<DomainSecurityView | null>(() => readSnapshot<DomainSecurityView>(cacheKey, SNAPSHOT_MS)?.value ?? null);
+    const [view, setView] = useState<DomainSecurityView | null>(
+        () => readSnapshot<DomainSecurityView>(cacheKey, SNAPSHOT_MS)?.value ?? null
+    );
     const [error, setError] = useState("");
     const [checking, setChecking] = useState(false);
     const [section, setSection] = useState<SecuritySection>("email");
@@ -164,15 +185,26 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
     const findings = useMemo(() => report?.findings ?? [], [report]);
     const problems = findings.filter(counts);
     const inSection = findings.filter((finding) => finding.section === section);
-    const sectionProblems = inSection.filter(open).sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
+    const sectionProblems = inSection
+        .filter(open)
+        .sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
     const sectionPassed = inSection.filter((finding) => !open(finding));
-    const fixable = findings.filter((finding) => open(finding) && (finding.where === "dns" || finding.where === "dnssec" || finding.where === "edge"));
-    const needsZone = findings.some((finding) => open(finding) && finding.where === "dns" && finding.records.length > 0);
+    const fixable = findings.filter(
+        (finding) =>
+            open(finding) &&
+            (finding.where === "dns" || finding.where === "dnssec" || finding.where === "edge")
+    );
+    const needsZone = findings.some(
+        (finding) => open(finding) && finding.where === "dns" && finding.records.length > 0
+    );
 
     async function toggleDedicated(next: boolean) {
         setSavingDedicated(true);
         setError("");
-        const result = await runAction(() => setDomainDedicatedAction(scope, domain, next), setError);
+        const result = await runAction(
+            () => setDomainDedicatedAction(scope, domain, next),
+            setError
+        );
         setSavingDedicated(false);
         if (result?.view) accept(result.view);
         else if (result?.error) setError(result.error);
@@ -182,10 +214,20 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
         <div className="flex min-w-0 flex-col gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <h3 className="text-sm font-medium">{t("title")}</h3>
-                {report ? <SecurityBadge grade={report.grade} problems={problems.length} /> : view && <SecurityBadge grade="unknown" />}
+                {report ? (
+                    <SecurityBadge grade={report.grade} problems={problems.length} />
+                ) : (
+                    view && <SecurityBadge grade="unknown" />
+                )}
                 {report && (
                     <span className="text-muted-foreground text-xs" aria-live="polite">
-                        {checking ? t("checking") : <>{t("checked")} <RelativeTime iso={report.checkedAt} /></>}
+                        {checking ? (
+                            t("checking")
+                        ) : (
+                            <>
+                                {t("checked")} <RelativeTime iso={report.checkedAt} />
+                            </>
+                        )}
                     </span>
                 )}
                 <Button
@@ -197,12 +239,18 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                     title={t("recheck")}
                     onClick={() => void recheck()}
                 >
-                    <RefreshCw className={checking ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"} aria-hidden />
+                    <RefreshCw
+                        className={checking ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"}
+                        aria-hidden
+                    />
                 </Button>
             </div>
 
             {error && (
-                <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -216,7 +264,12 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
             ) : !report ? (
                 <div className="flex flex-wrap items-center gap-2">
                     <p className="text-muted-foreground text-sm">{t("notChecked")}</p>
-                    <Button size="sm" variant="secondary" disabled={checking} onClick={() => void recheck()}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={checking}
+                        onClick={() => void recheck()}
+                    >
                         {t("checkNow")}
                     </Button>
                 </div>
@@ -225,13 +278,20 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <p className="text-sm">{t("summary", { count: problems.length })}</p>
                         {view.canFix && fixable.length > 0 && (
-                            <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setFixing(true)}>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="ml-auto"
+                                onClick={() => setFixing(true)}
+                            >
                                 <Wrench className="size-4 shrink-0" aria-hidden /> {t("fix.review")}
                             </Button>
                         )}
                     </div>
                     {!view.canFix && needsZone && (
-                        <p className="text-muted-foreground text-xs">{t(scope.kind === "admin" ? "fix.cannotAdmin" : "fix.cannotOwner")}</p>
+                        <p className="text-muted-foreground text-xs">
+                            {t(scope.kind === "admin" ? "fix.cannotAdmin" : "fix.cannotOwner")}
+                        </p>
                     )}
 
                     <SegmentedControl
@@ -243,8 +303,16 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                             setShowPassed(false);
                         }}
                         options={SECURITY_SECTIONS.map((value) => {
-                            const count = findings.filter((finding) => finding.section === value && counts(finding)).length;
-                            return { value, label: count > 0 ? `${t(`sections.${value}`)} (${count})` : t(`sections.${value}`) };
+                            const count = findings.filter(
+                                (finding) => finding.section === value && counts(finding)
+                            ).length;
+                            return {
+                                value,
+                                label:
+                                    count > 0
+                                        ? `${t(`sections.${value}`)} (${count})`
+                                        : t(`sections.${value}`)
+                            };
                         })}
                     />
 
@@ -253,7 +321,11 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                     ) : (
                         <ul className="flex min-w-0 flex-col">
                             {sectionProblems.map((finding, index) => (
-                                <FindingRow key={`${finding.code}-${index}`} finding={finding} canFix={view.canFix} />
+                                <FindingRow
+                                    key={`${finding.code}-${index}`}
+                                    finding={finding}
+                                    canFix={view.canFix}
+                                />
                             ))}
                         </ul>
                     )}
@@ -271,7 +343,11 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                             {showPassed && (
                                 <ul className="flex min-w-0 flex-col">
                                     {sectionPassed.map((finding, index) => (
-                                        <FindingRow key={`${finding.code}-${index}`} finding={finding} canFix={view.canFix} />
+                                        <FindingRow
+                                            key={`${finding.code}-${index}`}
+                                            finding={finding}
+                                            canFix={view.canFix}
+                                        />
                                     ))}
                                 </ul>
                             )}
@@ -289,12 +365,16 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                             />
                             <div className="min-w-0">
                                 <p className="text-sm">{t("dedicated.label")}</p>
-                                <p id={`dedicated-${domain}`} className="text-muted-foreground text-xs">
+                                <p
+                                    id={`dedicated-${domain}`}
+                                    className="text-muted-foreground text-xs"
+                                >
                                     {t("dedicated.hint")}
                                 </p>
                                 {view.lastAutoFix && (
                                     <p className="text-muted-foreground mt-1 text-xs">
-                                        {t("dedicated.last", { applied: view.lastAutoFix.applied })} <RelativeTime iso={view.lastAutoFix.at} />
+                                        {t("dedicated.last", { applied: view.lastAutoFix.applied })}{" "}
+                                        <RelativeTime iso={view.lastAutoFix.at} />
                                     </p>
                                 )}
                             </div>

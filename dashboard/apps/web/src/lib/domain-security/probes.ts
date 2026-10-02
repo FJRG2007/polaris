@@ -20,7 +20,13 @@ import type { Probes } from "./collect";
 import { publicResolver } from "@/lib/dns/public-resolver";
 import { createPublicKey, randomBytes } from "node:crypto";
 import { configuredRequest, follow, readCapped, resolveName } from "@/lib/safe-fetch";
-import { RDAP_BOOTSTRAP_URL, mergeRegistration, parseRdapDomain, rdapBaseFor, relatedRdapLink } from "./rdap";
+import {
+    RDAP_BOOTSTRAP_URL,
+    mergeRegistration,
+    parseRdapDomain,
+    rdapBaseFor,
+    relatedRdapLink
+} from "./rdap";
 
 const TIMEOUT_MS = 5_000;
 /** The most any one answer read here is allowed to be. */
@@ -62,7 +68,10 @@ async function textOf(response: Response, max: number): Promise<string | null> {
     return Buffer.concat(chunks).toString("utf8");
 }
 
-async function dnssec(name: string, type: "DS" | "DNSKEY"): Promise<{ present: boolean; validated: boolean } | null> {
+async function dnssec(
+    name: string,
+    type: "DS" | "DNSKEY"
+): Promise<{ present: boolean; validated: boolean } | null> {
     const response = await fetch(`${DOH_JSON}?name=${encodeURIComponent(name)}&type=${type}&do=1`, {
         headers: { accept: "application/dns-json" },
         signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -71,12 +80,19 @@ async function dnssec(name: string, type: "DS" | "DNSKEY"): Promise<{ present: b
     if (!response.ok) return null;
     const text = await textOf(response, MAX_TEXT_BYTES);
     if (!text) return null;
-    const body = JSON.parse(text) as { Status?: number; AD?: boolean; Answer?: { type?: number }[] };
+    const body = JSON.parse(text) as {
+        Status?: number;
+        AD?: boolean;
+        Answer?: { type?: number }[];
+    };
     // SERVFAIL from a validating resolver is what a broken chain looks like.
     if (body.Status === 2) return { present: true, validated: false };
     if (body.Status !== 0 && body.Status !== 3) return null;
     const code = type === "DS" ? 43 : 48;
-    return { present: (body.Answer ?? []).some((entry) => entry.type === code), validated: body.AD === true };
+    return {
+        present: (body.Answer ?? []).some((entry) => entry.type === code),
+        validated: body.AD === true
+    };
 }
 
 /** An AXFR question for `domain`, in DNS's TCP framing (two length bytes first). */
@@ -178,7 +194,11 @@ interface Handshake {
     readonly certificate: F.CertificateFacts | null;
 }
 
-function handshake(host: string, address: string, legacy: boolean): Promise<Handshake | { error: string }> {
+function handshake(
+    host: string,
+    address: string,
+    legacy: boolean
+): Promise<Handshake | { error: string }> {
     return new Promise((resolve) => {
         const socket = tls.connect({
             host: address,
@@ -186,7 +206,13 @@ function handshake(host: string, address: string, legacy: boolean): Promise<Hand
             servername: host,
             timeout: TIMEOUT_MS,
             rejectUnauthorized: false,
-            ...(legacy ? { minVersion: "TLSv1" as const, maxVersion: "TLSv1.1" as const, ciphers: "DEFAULT:@SECLEVEL=0" } : {})
+            ...(legacy
+                ? {
+                      minVersion: "TLSv1" as const,
+                      maxVersion: "TLSv1.1" as const,
+                      ciphers: "DEFAULT:@SECLEVEL=0"
+                  }
+                : {})
         });
         let settled = false;
         const finish = (value: Handshake | { error: string }) => {
@@ -205,13 +231,17 @@ function handshake(host: string, address: string, legacy: boolean): Promise<Hand
                           issuer,
                           validTo: new Date(peer.valid_to).toISOString(),
                           trusted: socket.authorized,
-                          error: socket.authorizationError ? String(socket.authorizationError) : null
+                          error: socket.authorizationError
+                              ? String(socket.authorizationError)
+                              : null
                       }
                     : null
             });
         });
         socket.on("timeout", () => finish({ error: "timed out" }));
-        socket.on("error", (error: NodeJS.ErrnoException) => finish({ error: error.code ?? error.message }));
+        socket.on("error", (error: NodeJS.ErrnoException) =>
+            finish({ error: error.code ?? error.message })
+        );
     });
 }
 
@@ -219,7 +249,11 @@ function handshake(host: string, address: string, legacy: boolean): Promise<Hand
 async function frontPage(domain: string): Promise<Response | null> {
     let url = `https://${domain}/`;
     for (let hop = 0; hop < 4; hop += 1) {
-        const response = await configuredRequest(url, { method: "GET", timeoutMs: TIMEOUT_MS }, { allowPrivate: false }).catch(() => null);
+        const response = await configuredRequest(
+            url,
+            { method: "GET", timeoutMs: TIMEOUT_MS },
+            { allowPrivate: false }
+        ).catch(() => null);
         if (!response) return null;
         const location = response.headers.get("location");
         if (response.status >= 300 && response.status < 400 && location) {
@@ -235,11 +269,19 @@ async function frontPage(domain: string): Promise<Response | null> {
 }
 
 async function httpRedirects(domain: string): Promise<boolean | null> {
-    const response = await configuredRequest(`http://${domain}/`, { method: "GET", timeoutMs: TIMEOUT_MS }, { allowPrivate: false }).catch(() => null);
+    const response = await configuredRequest(
+        `http://${domain}/`,
+        { method: "GET", timeoutMs: TIMEOUT_MS },
+        { allowPrivate: false }
+    ).catch(() => null);
     if (!response) return null;
     await response.body?.cancel().catch(() => undefined);
     const location = response.headers.get("location") ?? "";
-    return response.status >= 300 && response.status < 400 && /^https:\/\//i.test(new URL(location, `http://${domain}/`).href);
+    return (
+        response.status >= 300 &&
+        response.status < 400 &&
+        /^https:\/\//i.test(new URL(location, `http://${domain}/`).href)
+    );
 }
 
 async function securityTxt(domain: string): Promise<F.WebFacts["securityTxt"]> {
@@ -253,7 +295,9 @@ async function securityTxt(domain: string): Promise<F.WebFacts["securityTxt"]> {
     // A site that answers every path with its own page has no security.txt.
     if (response.status !== 200 || !/text\/plain/i.test(type)) {
         await response.body?.cancel().catch(() => undefined);
-        return response.status === 200 || response.status === 404 || response.status === 410 ? { status: "missing" } : null;
+        return response.status === 200 || response.status === 404 || response.status === 410
+            ? { status: "missing" }
+            : null;
     }
     const text = await textOf(response, MAX_TEXT_BYTES);
     return text === null ? null : { status: "ok", text };
@@ -287,7 +331,12 @@ async function web(domain: string, servedByPolaris: boolean): Promise<F.WebFacts
     });
     await page?.body?.cancel().catch(() => undefined);
     // This build of TLS not offering 1.0 at all is not the server refusing it.
-    const legacyProtocol = "error" in legacy ? (/NO_PROTOCOLS|UNSUPPORTED_PROTOCOL/i.test(legacy.error) ? undefined : null) : legacy.protocol;
+    const legacyProtocol =
+        "error" in legacy
+            ? /NO_PROTOCOLS|UNSUPPORTED_PROTOCOL/i.test(legacy.error)
+                ? undefined
+                : null
+            : legacy.protocol;
     return {
         certificate: modern.certificate,
         httpsError: null,
