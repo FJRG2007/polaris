@@ -592,6 +592,35 @@ describe("the driver, for a connection on this cloud alone", () => {
         );
     });
 
+    it("keeps the listed fan, as last heard, through an outage of this cloud", async () => {
+        await driverModule.philipsCloudDriver.list(credentials);
+        replies.unshift((url) =>
+            url.pathname === "/enduser/deviceList/" ? envelope(500, null, 500) : null
+        );
+        const [snapshot, ...rest] = await driverModule.philipsCloudDriver.list(credentials);
+        expect(rest).toEqual([]);
+        expect(snapshot).toMatchObject({ externalId: "am:d1", kind: "air", state: "on" });
+    });
+
+    it("fails a sync through an outage before anything was listed", async () => {
+        replies.unshift((url) =>
+            url.pathname === "/enduser/deviceList/" ? envelope(500, null, 500) : null
+        );
+        await expect(driverModule.philipsCloudDriver.list(credentials)).rejects.toMatchObject({
+            kind: "unreachable"
+        });
+    });
+
+    it("fails a sync whose sign-in is refused, whatever was listed before", async () => {
+        await driverModule.philipsCloudDriver.list(credentials);
+        replies.unshift((url) =>
+            url.pathname === "/enduser/deviceList/" ? envelope(401, null, 401) : null
+        );
+        await expect(driverModule.philipsCloudDriver.list(credentials)).rejects.toMatchObject({
+            kind: "unauthorized"
+        });
+    });
+
     it("sets a speed through the shadow", async () => {
         await driverModule.philipsCloudDriver.list(credentials);
         await driverModule.philipsCloudDriver.act(

@@ -350,10 +350,26 @@ async function versuniSnapshot(
         if (caught instanceof DriverError && caught.kind === "unauthorized") throw caught;
         // One unit that did not answer is drawn as not answering, with what
         // was last heard; the rest of the account is not.
-        return appliance
-            ? kitchenSnapshot(device, link.state, false)
-            : philipsCloudSnapshot(device, link.state, false);
+        return versuniUnheard(account, device);
     }
+}
+
+/** A Versuni device as last heard, drawn as not answering. */
+function versuniUnheard(account: string, device: cloud.PhilipsCloudDevice): DeviceSnapshot {
+    const heard = cloudLink(account, device.thing).state;
+    return isKitchen(device.model)
+        ? kitchenSnapshot(device, heard, false)
+        : philipsCloudSnapshot(device, heard, false);
+}
+
+/** Every Versuni row of a sync, listed afresh. */
+async function versuniSnapshots(
+    credentials: Credentials,
+    account: string
+): Promise<DeviceSnapshot[]> {
+    const devices = await versuniDevicesOf(credentials);
+    listed.set(account, devices);
+    return Promise.all(devices.map((device) => versuniSnapshot(credentials, account, device)));
 }
 
 /** A kitchen appliance as a row: what it is doing, never a purifier's controls. */
@@ -451,13 +467,44 @@ async function airSnapshots(credentials: Credentials): Promise<DeviceSnapshot[]>
                 );
             } catch (caught) {
                 if (caught instanceof DriverError && caught.kind === "unauthorized") throw caught;
-                return airMatters.airMattersSnapshot(device, {
-                    reported: link.reported,
-                    answered: false
-                });
+                return airUnheard(account, device);
             }
         })
     );
+}
+
+/** A fan and heater cloud device as last heard, drawn as not answering. */
+function airUnheard(account: string, device: air.AirMattersDevice): DeviceSnapshot {
+    return airMatters.airMattersSnapshot(device, {
+        reported: shadowLink(account, device.id).reported,
+        answered: false
+    });
+}
+
+/**
+ * The rows of a sync across both clouds. One cloud that is down keeps what it
+ * last listed, drawn as not answering, so the other's devices still update; a
+ * refused sign-in on either, both down, or a cloud down before it was ever
+ * listed fails the sync as a whole.
+ */
+function acrossClouds(
+    results: readonly PromiseSettledResult<DeviceSnapshot[]>[],
+    unheard: readonly (() => DeviceSnapshot[] | undefined)[]
+): DeviceSnapshot[] {
+    const failed = results.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected"
+    );
+    const refused = failed.find(
+        (result) => result.reason instanceof DriverError && result.reason.kind === "unauthorized"
+    );
+    if (refused) throw refused.reason;
+    if (failed.length === results.length && failed.length > 0) throw failed[0]!.reason;
+    return results.flatMap((result, index) => {
+        if (result.status === "fulfilled") return result.value;
+        const kept = unheard[index]!();
+        if (!kept) throw result.reason;
+        return kept;
+    });
 }
 
 async function actOnAir(
@@ -499,7 +546,7 @@ const STEP_MS = 30 * 60 * 1000;
  *  the server (`pairing-vault.ts`), or a choice to go on without the app. None
  *  of it signs anything in on its own. */
 const pairingStateSchema = z.object({
-    vToken: z.string().min(1).max(4000),
+    vToken: z.string().min(1).max(4000).optional(),
     code: z
         .string()
         .transform((value) => value.replace(/\s+/g, ""))
@@ -528,10 +575,10 @@ function nothingFound(summary: string): never {
 
 /** The step after the code: the sign-in held on the server, the found Versuni devices and
  *  what was seen, waiting for the app to be uploaded. */
-async function afterCode(email: string, state: PairingState) {
+async function afterCode(email: string, state: PairingState & { code: string; vToken: string }) {
     const { gigyaSession, session, uid } = await cloud.signInWithCode(
         email,
-        state.code!,
+        state.code,
         state.vToken
     );
     const found = await cloud.discoverPhilipsDevices(gigyaSession, session);
@@ -630,9 +677,11 @@ export const philipsCloudDriver: DeviceDriver = {
             const parsed = pairingStateSchema.safeParse(state);
             if (!parsed.success) throw new HomeError("That connection is missing its sign-in");
             const email = philipsEmail(fields);
-            if (parsed.data.ticket) return afterFile(email, parsed.data);
-            if (!parsed.data.code) throw new HomeError("Enter the code from the email");
-            return afterCode(email, parsed.data);
+            const { ticket, code, vToken } = parsed.data;
+            if (ticket) return afterFile(email, parsed.data);
+            if (!vToken) throw new HomeError("That connection is missing its sign-in");
+            if (!code) throw new HomeError("Enter the code from the email");
+            return afterCode(email, { ...parsed.data, code, vToken });
         },
 
         /** The app uploaded at the file step: the signing value read out of it,
@@ -676,15 +725,14 @@ export const philipsCloudDriver: DeviceDriver = {
 
     async list(credentials) {
         const account = accountOf(credentials);
-        const [devices, fromAir] = await Promise.all([
-            versuniDevicesOf(credentials),
+        const sides = await Promise.allSettled([
+            versuniSnapshots(credentials, account),
             airSnapshots(credentials)
         ]);
-        listed.set(account, devices);
-        const fromVersuni = await Promise.all(
-            devices.map((device) => versuniSnapshot(credentials, account, device))
-        );
-        return [...fromVersuni, ...fromAir];
+        return acrossClouds(sides, [
+            () => listed.get(account)?.map((device) => versuniUnheard(account, device)),
+            () => airListed.get(account)?.map((device) => airUnheard(account, device))
+        ]);
     },
 
     async act(credentials, device, action, command) {

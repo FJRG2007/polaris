@@ -152,7 +152,7 @@ describe("the Philips Air+ app step", () => {
         pollAnswer = {
             waiting: true,
             next: {
-                state: { vToken: "vt-1", ticket: "handle-1" },
+                state: { ticket: "handle-1" },
                 summary: "Air+: 0; HomeID: 0; HomeID app: HTTP 500",
                 skippable
             }
@@ -207,11 +207,7 @@ describe("the Philips Air+ app step", () => {
         await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
         expect(uploads[0]!.url).toBe("/api/home/pairing/file?connection=philips-cloud");
         expect(uploads[0]!.init.body).toBe(file);
-        expect(polled.at(-1)!.state).toEqual({
-            vToken: "vt-1",
-            ticket: "handle-1",
-            appSecret: "handle-2"
-        });
+        expect(polled.at(-1)!.state).toEqual({ ticket: "handle-1", appSecret: "handle-2" });
     });
 
     it("shows the server's refusal and stays on the step", async () => {
@@ -238,6 +234,6 @@ describe("the Philips Air+ app step", () => {
         pollAnswer = { devices: [{ id: "ext-3" }], accounts: [] };
         fireEvent.click(screen.getByRole("button", { name: "Connect without it" }));
         await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
-        expect(polled.at(-1)!.state).toEqual({ vToken: "vt-1", ticket: "handle-1", skip: "1" });
+        expect(polled.at(-1)!.state).toEqual({ ticket: "handle-1", skip: "1" });
     });
 });

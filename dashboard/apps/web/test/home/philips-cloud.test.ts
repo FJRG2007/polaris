@@ -477,7 +477,7 @@ describe("going on to Philips' fan and heater cloud", () => {
         expect(JSON.stringify(read)).not.toContain(SECRET);
         const answer = await driver.philipsCloudDriver.pair!.poll(
             { email: "owner@example.com" },
-            { vToken: "vt-1", ...next.state, ...read }
+            { ...next.state, ...read }
         );
         expect(answer).toMatchObject({
             done: true,
@@ -495,7 +495,7 @@ describe("going on to Philips' fan and heater cloud", () => {
         await expect(
             driver.philipsCloudDriver.pair!.poll(
                 { email: "owner@example.com" },
-                { vToken: "vt-1", ...next.state, ...read }
+                { ...next.state, ...read }
             )
         ).rejects.toThrow("That step took too long and has run out. Start connecting again.");
         expect(logged).toEqual([]);
@@ -509,7 +509,7 @@ describe("going on to Philips' fan and heater cloud", () => {
         const poll = () =>
             driver.philipsCloudDriver.pair!.poll(
                 { email: "owner@example.com" },
-                { vToken: "vt-1", ...next.state, ...read }
+                { ...next.state, ...read }
             );
         await expect(poll()).rejects.toThrow(
             "Philips' fan and heater cloud refused the sign-in. Upload the Philips Air+ app again."
@@ -525,7 +525,7 @@ describe("going on to Philips' fan and heater cloud", () => {
         await expect(
             driver.philipsCloudDriver.pair!.poll(
                 { email: "owner@example.com" },
-                { vToken: "vt-1", ...next.state, ...read }
+                { ...next.state, ...read }
             )
         ).rejects.toThrow(
             "What it saw: Air+: 0; HomeID: 0; HomeID app: 0; Philips Air: 0. Check that the device is in a Philips app under this same email."
@@ -538,13 +538,13 @@ describe("going on to Philips' fan and heater cloud", () => {
         await expect(
             driver.philipsCloudDriver.pair!.poll(
                 { email: "owner@example.com" },
-                { vToken: "vt-1", ticket: "made-up", appSecret: "made-up" }
+                { ticket: "made-up", appSecret: "made-up" }
             )
         ).rejects.toThrow(/has run out/);
         await expect(
             driver.philipsCloudDriver.pair!.poll(
                 { email: "someone-else@example.com" },
-                { vToken: "vt-1", ...next.state, skip: "1" }
+                { ...next.state, skip: "1" }
             )
         ).rejects.toThrow(/has run out/);
     });
@@ -555,7 +555,7 @@ describe("going on to Philips' fan and heater cloud", () => {
         await expect(
             driver.philipsCloudDriver.pair!.poll(
                 { email: "owner@example.com" },
-                { vToken: "vt-1", ...next.state, skip: "1" }
+                { ...next.state, skip: "1" }
             )
         ).rejects.toThrow("Upload the Philips Air+ app file to go on");
     });
@@ -777,7 +777,7 @@ describe("finding the purifiers on an account", () => {
         if (answer.done || !answer.next) throw new Error("no file step");
         const skipped = await driver.philipsCloudDriver.pair!.poll(
             { email: "owner@example.com" },
-            { vToken: "vt-1", ...answer.next.state, skip: "1" }
+            { ...answer.next.state, skip: "1" }
         );
         expect(skipped).toMatchObject({
             done: true,
