@@ -162,12 +162,23 @@ function form(values: Readonly<Record<string, string>>): RequestInit {
 const gigyaSchema = z
     .object({
         errorCode: z.number().optional(),
+        errorMessage: z.string().max(500).optional(),
+        errorDetails: z.string().max(500).optional(),
         vToken: z.string().max(4000).optional(),
         sessionInfo: z.object({ cookieValue: z.string().max(4000).optional() }).optional(),
         gmidTicket: z.string().max(4000).optional(),
         UID: z.string().max(200).optional()
     })
     .passthrough();
+
+/**
+ * What Philips itself said when it refused, as one short line: its own message
+ * and code, so a refusal for any reason is never reported as a wrong code.
+ */
+function philipsSaid(answer: { errorCode?: number; errorMessage?: string; errorDetails?: string }) {
+    const words = (answer.errorDetails || answer.errorMessage || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    return words ? `${words} (${answer.errorCode ?? "?"})` : `error ${answer.errorCode ?? "?"}`;
+}
 
 async function gigya(endpoint: string, values: Readonly<Record<string, string>>) {
     const response = await call(`${GIGYA}/${endpoint}`, form(values));
@@ -186,7 +197,7 @@ export async function requestPhilipsCode(email: string): Promise<string> {
     });
     if (answer.errorCode !== 0 || !answer.vToken) {
         throw new DriverError(
-            "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with.",
+            `Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with. Philips said: ${philipsSaid(answer)}`,
             "refused"
         );
     }
@@ -217,7 +228,7 @@ async function sessionFor(
     const session = answer.sessionInfo?.cookieValue;
     if (answer.errorCode !== 0 || !session) {
         throw new DriverError(
-            "That code is not right or has expired. Ask for a new one.",
+            `Philips did not accept the code. Philips said: ${philipsSaid(answer)}`,
             "unauthorized"
         );
     }

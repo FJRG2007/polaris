@@ -57,6 +57,7 @@
  * and the build failed with a webpack error naming neither file.
  */
 
+import { emailField } from "@polaris/core";
 import type { PlacesTranslator } from "./i18n";
 import type { DeviceKind } from "./device-kinds";
 import { TUYA_REGIONS } from "./integrations/tuya-regions";
@@ -978,9 +979,6 @@ export function shownFields(connection: DeviceConnection): readonly ConnectionFi
     return connection.fields.filter((field) => field.secret !== true);
 }
 
-/** An address with something on each side of one @ and a dot in its domain:
- *  enough to catch a slip, not a claim that the mailbox exists. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * What is wrong with one field, or nothing.
@@ -1007,7 +1005,11 @@ export function fieldIssue(
     if (field.choices && !field.choices.some((choice) => choice.value === trimmed)) {
         return t("connections.pickListed");
     }
-    if (field.format === "email" && !EMAIL.test(trimmed)) return t("connections.notEmail");
+    // The same check every other email box in Polaris uses: a stray comma or a
+    // space left over from a paste is a different address to a sign-in service.
+    if (field.format === "email" && !emailField.safeParse(trimmed).success) {
+        return t("connections.notEmail");
+    }
     return null;
 }
 
@@ -1040,7 +1042,9 @@ export function normalizeFields(
     const clean: Record<string, string> = {};
     for (const field of connection.fields) {
         const raw = fields[field.key];
-        const value = (typeof raw === "string" ? raw : "").trim() || field.defaultValue || "";
+        const typed = (typeof raw === "string" ? raw : "").trim();
+        // One stored form for an address, whatever case it was typed in.
+        const value = (field.format === "email" ? typed.toLowerCase() : typed) || field.defaultValue || "";
         if (value) clean[field.key] = value;
     }
     return clean;
