@@ -63,6 +63,10 @@ fn capabilities(config: &Config) -> serde_json::Value {
         // newer than this daemon keeps its services on the shared network rather
         // than naming one this daemon would not create.
         "privateNetworks": config.docker_socket.exists(),
+        // Gives each service its private names (`<name>.polaris.internal`) on a
+        // network of their own, and runs the forwarder that answers port 80 for
+        // it. A dashboard newer than this daemon leaves both out until it updates.
+        "privateNames": config.docker_socket.exists(),
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
@@ -437,7 +441,11 @@ fn deploy_networks_reconcile<R: Read>(state: &AppState, req: &Request, body: &mu
     Response::json(
         200,
         "OK",
-        &serde_json::json!({ "kept": report.kept, "removed": report.removed }),
+        &serde_json::json!({
+            "kept": report.kept,
+            "removed": report.removed,
+            "ipv6": report.ipv6,
+        }),
     )
 }
 
@@ -1892,5 +1900,6 @@ mod tests {
         assert!(caps["docker"].is_boolean());
         assert!(caps["systemd"].is_boolean());
         assert!(caps["privateNetworks"].is_boolean());
+        assert!(caps["privateNames"].is_boolean());
     }
 }
