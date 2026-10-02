@@ -4,8 +4,10 @@
  *
  * What is asserted: Game servers is its own entry, gated on its install like
  * Places and Tools, and no longer a screen in the Apps rail; its path resolves to
- * it although Apps owns everything under /apps; the top row is pins, then recent
- * apps, then suggested ones, only ever apps the account can open; a stored list
+ * it although Apps owns everything under /apps; the menu is favorites, then a
+ * row of recent apps, then a shelf per category, each app once and only apps the
+ * account can open - for thirty-two apps as for nine; the Overview rail is the
+ * favorites; arranging keeps favorites the account cannot open today; a stored list
  * that is not a list of real apps is read as nothing pinned; and the switcher
  * draws each app once, as an icon and a name with no description.
  */
@@ -15,12 +17,17 @@ import { describe, expect, it } from "vitest";
 import { reachableApps } from "@/lib/app-access";
 import { Gamepad2, HardDrive } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { APP_SECTIONS, POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
+import { APP_CATEGORIES, APP_SECTIONS, POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
 import {
     LAUNCHER_ROW_SIZE,
+    RECENT_APPS,
+    arrangeFavorites,
     favoriteAppsSchema,
     launcherLayout,
-    parseFavoriteApps
+    moveFavorite,
+    parseFavoriteApps,
+    railApps,
+    sameOrder
 } from "@/lib/app-launcher";
 
 describe("Game servers in the switcher", () => {
@@ -54,7 +61,7 @@ describe("Game servers in the switcher", () => {
     });
 });
 
-describe("the launcher's top row", () => {
+describe("the launcher's layout", () => {
     const available = [
         "overview",
         "drive",
@@ -67,49 +74,110 @@ describe("the launcher's top row", () => {
         "notes"
     ];
 
-    it("suggests the first apps somebody can open when there is nothing else", () => {
-        const layout = launcherLayout({ available, favorites: [], recent: [] });
-        expect(layout.featured).toEqual(available.slice(0, LAUNCHER_ROW_SIZE));
-        expect(layout.pinned).toBe(false);
-        expect(layout.rest).toEqual(available.slice(LAUNCHER_ROW_SIZE));
-    });
-
-    it("puts pins first, then recent apps, then suggestions, each once", () => {
+    it("puts favorites first in their order, then recent apps, each once", () => {
         const layout = launcherLayout({
             available,
             favorites: ["mail", "games"],
-            recent: ["chat", "mail", "chat", "notes"]
+            recent: ["chat", "mail", "chat", "notes", "drive", "vault"]
         });
-        expect(layout.featured).toEqual(["mail", "games", "chat", "notes", "overview", "drive"]);
-        expect(layout.pinned).toBe(true);
-        expect([...layout.featured, ...layout.rest].sort()).toEqual([...available].sort());
+        expect(layout.favorites).toEqual(["mail", "games"]);
+        expect(layout.recent).toEqual(["chat", "notes", "drive"]);
+        expect(layout.recent).toHaveLength(RECENT_APPS);
     });
 
-    it("keeps every pin, however many there are", () => {
+    it("files every other app on its category's shelf, in the order the shelves are declared", () => {
+        const layout = launcherLayout({ available, favorites: ["mail"], recent: ["drive"] });
+        expect(layout.shelves).toEqual([
+            { category: "work", ids: ["overview", "tasks", "notes"] },
+            { category: "communication", ids: ["chat"] },
+            { category: "infrastructure", ids: ["apps"] },
+            { category: "games", ids: ["games"] },
+            { category: "tools", ids: ["vault"] }
+        ]);
+    });
+
+    it("keeps every favorite, however many there are", () => {
         const favorites = available.slice(0, 8).reverse();
-        expect(launcherLayout({ available, favorites, recent: [] }).featured).toEqual(favorites);
+        expect(launcherLayout({ available, favorites, recent: [] }).favorites).toEqual(favorites);
     });
 
     it("never draws an app the account cannot open", () => {
         const layout = launcherLayout({
             available: ["drive", "chat"],
             favorites: ["admin"],
-            recent: ["places"]
+            recent: ["home"]
         });
         expect(layout).toEqual({
-            featured: ["drive", "chat"],
-            pinned: false,
-            visited: false,
-            rest: []
+            favorites: [],
+            recent: [],
+            shelves: [
+                { category: "work", ids: ["drive"] },
+                { category: "communication", ids: ["chat"] }
+            ]
         });
     });
 
-    it("calls the row recent only when a recent app actually made it in", () => {
-        expect(launcherLayout({ available, favorites: [], recent: ["chat", "chat"] }).visited).toBe(
-            true
-        );
-        expect(launcherLayout({ available, favorites: [], recent: ["admin"] }).visited).toBe(false);
-        expect(launcherLayout({ available, favorites: [], recent: [] }).visited).toBe(false);
+    it("draws thirty-two apps once each, on six shelves", () => {
+        const categories = APP_CATEGORIES.map((category) => category.id);
+        const ids = Array.from({ length: 32 }, (_, at) => `fixture-${at + 1}`);
+        const categoryOf = (id: string) => categories[Number(id.split("-")[1]) % categories.length];
+        const layout = launcherLayout({
+            available: ids,
+            favorites: ["fixture-7", "fixture-2"],
+            recent: ["fixture-30", "fixture-7", "fixture-11"],
+            categoryOf
+        });
+        const drawn = [
+            ...layout.favorites,
+            ...layout.recent,
+            ...layout.shelves.flatMap((shelf) => shelf.ids)
+        ];
+        expect(drawn.sort()).toEqual([...ids].sort());
+        expect(layout.shelves.map((shelf) => shelf.category)).toEqual(categories);
+        expect(layout.recent).toEqual(["fixture-30", "fixture-11"]);
+    });
+
+    it("gives every app in the catalogue a shelf that exists", () => {
+        const shelves = new Set<string>(APP_CATEGORIES.map((category) => category.id));
+        for (const app of POLARIS_APPS) expect(shelves.has(app.category)).toBe(true);
+    });
+});
+
+describe("the Overview rail", () => {
+    it("lists only the favorites, in their order, never the Overview itself", () => {
+        expect(
+            railApps({ available: ["overview", "drive", "chat", "mail"], favorites: ["mail", "overview", "drive"] })
+        ).toEqual(["mail", "drive"]);
+    });
+
+    it("falls back to the first apps for somebody with no favorites they can open", () => {
+        const available = ["overview", "drive", "vault", "apps", "tasks", "chat", "mail", "notes"];
+        expect(railApps({ available, favorites: ["admin"] })).toEqual(available.slice(1, 1 + LAUNCHER_ROW_SIZE));
+    });
+});
+
+describe("arranging favorites", () => {
+    it("moves one app and clamps at the ends", () => {
+        expect(moveFavorite(["a", "b", "c"], "c", -1)).toEqual(["a", "c", "b"]);
+        expect(moveFavorite(["a", "b", "c"], "a", 3)).toEqual(["b", "c", "a"]);
+        const same = ["a", "b", "c"];
+        expect(moveFavorite(same, "a", -1)).toBe(same);
+    });
+
+    it("keeps favorites this account cannot open in their slots", () => {
+        // "admin" is a favorite from a role somebody held last week.
+        expect(arrangeFavorites(["mail", "admin", "drive", "chat"], ["chat", "mail", "drive"])).toEqual([
+            "chat",
+            "admin",
+            "mail",
+            "drive"
+        ]);
+    });
+
+    it("tells an unchanged order from a changed one", () => {
+        expect(sameOrder(["a", "b"], ["a", "b"])).toBe(true);
+        expect(sameOrder(["a", "b"], ["b", "a"])).toBe(false);
+        expect(sameOrder(["a"], ["a", "b"])).toBe(false);
     });
 });
 
@@ -157,7 +225,7 @@ describe("the switcher", () => {
             <AppSwitcher
                 apps={apps}
                 currentAppId="games"
-                featured={["games"]}
+                sections={[{ key: "favorites", label: "Favorites", ids: ["games"] }]}
                 pinned={["games"]}
                 onTogglePin={() => undefined}
             />

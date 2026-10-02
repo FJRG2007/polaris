@@ -1,29 +1,37 @@
 /**
- * What the app switcher puts in its top row, and how the pins behind it are
+ * What the app menu draws, in what order, and how the favorites behind it are
  * stored.
  *
- * The row is the apps somebody reaches for, the way Google's launcher opens on
- * the ones you use: first the apps they pinned, in their order; then, while there
- * is room, the ones they opened most recently; and for somebody who has neither -
- * a new account, a new browser - the first apps they can open, in the order the
- * registry lists them. Everything else sits below it, each app once.
+ * Built for the account with thirty apps as much as for the one with three. The
+ * menu opens on the apps somebody reaches for - their favorites, in the order
+ * they arranged them, then the few they opened most recently - and files every
+ * other app on a shelf by what it is for (`APP_CATEGORIES`), so a long list reads
+ * as six short ones. Each app is drawn once. Typing narrows all of it to what
+ * matches instead (see the switcher).
  *
- * Pure and safe in the browser: the switcher computes the row where the recent
- * history lives, and the server validates a save against the same schema.
+ * Pure and safe in the browser: the switcher computes the layout where the
+ * recent history lives, and the server validates a save against the same schema.
  */
 
 import { z } from "zod";
-import { POLARIS_APPS } from "@/lib/apps";
+import { APP_CATEGORIES, OVERVIEW_APP_ID, POLARIS_APPS, type AppCategory } from "@/lib/apps";
 
-/** Two rows of three: enough to hold what somebody uses daily, short enough that
- *  the rest of the list is still in view. */
+/** How many apps the Overview rail lists for somebody with no favorites yet:
+ *  enough to hold what most people use daily, short enough to stay a rail. */
 export const LAUNCHER_ROW_SIZE = 6;
 
-/** How many apps can be pinned. Every app there is, and not one more. */
+/** How many recently opened apps get a row of their own: one row of the grid. */
+export const RECENT_APPS = 3;
+
+/** How many apps can be favorites. Every app there is, and not one more. */
 export const MAX_FAVORITE_APPS = POLARIS_APPS.length;
 
-/** The ids an app can be pinned by: every app the switcher can list. */
+/** The ids an app can be a favorite by: every app the switcher can list. */
 const PINNABLE = new Set(POLARIS_APPS.filter((app) => !app.hidden).map((app) => app.id));
+
+const REGISTRY_CATEGORY = new Map<string, AppCategory>(
+    POLARIS_APPS.map((app) => [app.id, app.category])
+);
 
 export const favoriteAppsSchema = z
     .array(
@@ -52,55 +60,110 @@ export function parseFavoriteApps(raw: string | null | undefined): string[] {
     }
 }
 
+export interface LauncherShelf {
+    readonly category: AppCategory;
+    readonly ids: readonly string[];
+}
+
 export interface LauncherLayout {
-    /** The top row, in order. */
-    featured: string[];
-    /** Whether anything in it was pinned, which is what the row is called by. */
-    pinned: boolean;
-    /** Whether, pins aside, any of it came from somewhere recently visited. */
-    visited: boolean;
-    /** Every other app this account can open, in registry order. */
-    rest: string[];
+    /** The favorites this account can open, in the order they were arranged. */
+    readonly favorites: readonly string[];
+    /** Opened lately and not already a favorite, most recent first. */
+    readonly recent: readonly string[];
+    /** Everything else, on its shelf, shelves in `APP_CATEGORIES` order and each
+     *  shelf in registry order. Empty shelves are left out. */
+    readonly shelves: readonly LauncherShelf[];
 }
 
 /**
- * Split the apps somebody can open into the top row and the rest.
+ * Split the apps somebody can open into favorites, recent and the shelves.
  *
  * `available` is what they may open, in registry order, and is applied to
- * everything else: a pin kept from when the account held a permission, or a
- * recent visit from before an app was uninstalled, is not a door to draw. Pins
- * are never cut to the row size - somebody who pinned eight apps asked for eight.
+ * everything else: a favorite kept from when the account held a permission, or a
+ * recent visit from before an app was uninstalled, is not a door to draw.
+ * Favorites are never cut short - somebody who chose twelve asked for twelve.
  */
 export function launcherLayout({
     available,
     favorites,
-    recent
+    recent,
+    categoryOf = (id) => REGISTRY_CATEGORY.get(id)
 }: {
     available: readonly string[];
     favorites: readonly string[];
     /** App ids, most recent first. Repeats are fine. */
     recent: readonly string[];
+    /** Which shelf an id goes on. The registry's answer unless a caller lists
+     *  apps the registry does not hold. Unknown ids go on the last shelf. */
+    categoryOf?: (id: string) => AppCategory | undefined;
 }): LauncherLayout {
     const open = new Set(available);
-    const featured: string[] = [];
-    const add = (id: string) => {
-        if (open.has(id) && !featured.includes(id)) featured.push(id);
+    const placed = new Set<string>();
+    const take = (ids: readonly string[], limit = Infinity) => {
+        const out: string[] = [];
+        for (const id of ids) {
+            if (out.length >= limit) break;
+            if (!open.has(id) || placed.has(id)) continue;
+            placed.add(id);
+            out.push(id);
+        }
+        return out;
     };
-    favorites.forEach(add);
-    const pins = featured.length;
-    for (const id of recent) {
-        if (featured.length >= LAUNCHER_ROW_SIZE) break;
-        add(id);
-    }
-    const visited = featured.length > pins;
-    for (const id of available) {
-        if (featured.length >= LAUNCHER_ROW_SIZE) break;
-        add(id);
-    }
-    return {
-        featured,
-        pinned: pins > 0,
-        visited,
-        rest: available.filter((id) => !featured.includes(id))
-    };
+    const pinned = take(favorites);
+    const lately = take(recent, RECENT_APPS);
+    const fallback = APP_CATEGORIES[APP_CATEGORIES.length - 1]!.id;
+    const shelves = APP_CATEGORIES.map((category) => ({
+        category: category.id,
+        ids: available.filter(
+            (id) => !placed.has(id) && (categoryOf(id) ?? fallback) === category.id
+        )
+    })).filter((shelf) => shelf.ids.length > 0);
+    return { favorites: pinned, recent: lately, shelves };
+}
+
+/**
+ * The apps the Overview's rail lists: the favorites, or for somebody who has
+ * none yet the first few they can open. The Overview itself is left out - it is
+ * the screen the rail is drawn on.
+ */
+export function railApps({
+    available,
+    favorites
+}: {
+    available: readonly string[];
+    favorites: readonly string[];
+}): string[] {
+    const open = available.filter((id) => id !== OVERVIEW_APP_ID);
+    const chosen = favorites.filter((id, at) => open.includes(id) && favorites.indexOf(id) === at);
+    return chosen.length > 0 ? chosen : open.slice(0, LAUNCHER_ROW_SIZE);
+}
+
+/** `ids` with `id` moved `by` places, clamped to the ends. The same list when
+ *  it would not move, so a caller can tell a no-op by identity. */
+export function moveFavorite(ids: readonly string[], id: string, by: number): readonly string[] {
+    const from = ids.indexOf(id);
+    if (from < 0) return ids;
+    const to = Math.max(0, Math.min(ids.length - 1, from + by));
+    if (to === from) return ids;
+    const next = ids.filter((other) => other !== id);
+    next.splice(to, 0, id);
+    return next;
+}
+
+/**
+ * The stored favorites rearranged to the order somebody sees.
+ *
+ * What is on screen is only the favorites this account can open today; the
+ * stored list can hold more (an app taken away for a week stays a favorite for
+ * when it comes back). So the visible ones are put in their new order in the
+ * slots they already occupied, and every other entry keeps its place.
+ */
+export function arrangeFavorites(stored: readonly string[], visible: readonly string[]): string[] {
+    const shown = new Set(visible);
+    let next = 0;
+    return stored.map((id) => (shown.has(id) ? (visible[next++] ?? id) : id));
+}
+
+export function sameOrder(left: readonly string[], right: readonly string[]): boolean {
+    return left.length === right.length && left.every((id, at) => id === right[at]);
 }

@@ -18,38 +18,53 @@
  *  An app that remembered where it was left leads back there rather than to its
  *  front door - see `last-place`. Read after mount rather than during render:
  *  the server has no idea what one browser remembers, and a link that differed
- *  between the two would fail hydration. The recent apps that fill the top row
- *  are read the same way, from the history the Overview's "Recently visited"
- *  card keeps (`recent-places`); the pins come from the account. */
+ *  between the two would fail hydration. The recent apps are read the same way,
+ *  from the history the Overview's "Recently visited" card keeps
+ *  (`recent-places`); the favorites come from the account, through the store the
+ *  Overview's rail shares (`favorite-apps`).
+ *
+ *  Every app is also found by its English name and by its shelf, so somebody
+ *  reading in Spanish who types "settings" or "games" still finds it. */
 
 import Link from "next/link";
 import * as nav from "@/lib/apps";
 import { useEffect, useState } from "react";
 import { readPlace } from "@/lib/last-place";
 import { usePathname } from "next/navigation";
-import { AppSwitcher, useToast } from "@polaris/ui";
+import { ArrowUpDown, Store } from "lucide-react";
 import { launcherLayout } from "@/lib/app-launcher";
 import { badgeLabel } from "@/lib/notification-badge";
+import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { readRecentPlaces } from "@/lib/overview/recent-places";
 import { useInstalledNav } from "@/components/use-installed-nav";
 import { anythingWaiting, useAppUnread } from "@/components/app-unread";
-import { saveFavoriteAppsAction } from "@/app/(app)/app-launcher-actions";
+import {
+    AppSwitcher,
+    DropdownMenuItem,
+    type AppSwitcherSection,
+    type PolarisApp
+} from "@polaris/ui";
+import { ArrangeFavoritesDialog } from "@/components/arrange-favorites-dialog";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
+const CATEGORY_LABEL = new Map<string, string>(
+    nav.APP_CATEGORIES.map((category) => [category.id, category.label])
+);
+
 export function AppNav({
     appIds,
     guestAppIds = [],
-    favorites: savedFavorites = []
+    marketplace = false
 }: {
     appIds: string[];
     guestAppIds?: string[];
-    /** The apps this account pinned, in its order. */
-    favorites?: string[];
+    /** Whether this account can open the marketplace, for the way to more apps
+     *  at the foot of the menu - Google's "More from Google", Slack's directory. */
+    marketplace?: boolean;
 }) {
     const pathname = usePathname();
-    const toast = useToast();
     const t = useTranslations("nav");
     const label = useNavLabel();
     // The description an app is listed with, by its id. Every app in the
@@ -64,7 +79,6 @@ export function AppNav({
     const waiting = useAppUnread();
     const [places, setPlaces] = useState<Record<string, string>>({});
     const [recent, setRecent] = useState<string[]>([]);
-    const [favorites, setFavorites] = useState<string[]>(savedFavorites);
     // A game server's own screens live with the installed apps, and belong to
     // Game servers. The path only says "an installed app"; whether it is a game
     // server is the answer the rail already asks for (a server has screens).
@@ -84,92 +98,141 @@ export function AppNav({
     }, [pathname]);
 
     const apps = nav.POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
-        const entry =
-            asGuest.has(app.id) && app.guest
-                ? {
-                      ...app,
-                      label: label(app.guest.label),
-                      description: describe(app.id, "guestDescription", app.guest.description),
-                      href: app.guest.href
-                  }
-                : // A guest reaches the app through a subject rather than through
-                  // the app, so their entry leads to that subject and never to a
-                  // remembered screen behind it.
-                  {
-                      ...app,
-                      label: label(app.label),
-                      description: describe(app.id, "description", app.description),
-                      href: places[app.id] ?? app.href
-                  };
+        const category = CATEGORY_LABEL.get(app.category) ?? "";
+        const guest = asGuest.has(app.id) && app.guest ? app.guest : null;
+        const english = guest ? guest.label : app.label;
+        const entry = {
+            ...app,
+            label: label(english),
+            description: guest
+                ? describe(app.id, "guestDescription", guest.description)
+                : describe(app.id, "description", app.description),
+            // A guest reaches the app through a subject rather than through the
+            // app, so their entry leads to that subject and never to a
+            // remembered screen behind it.
+            href: guest ? guest.href : (places[app.id] ?? app.href),
+            keywords: [english, label(category), category]
+        };
         // Whatever that app has waiting, whichever app it is. Naming them
         // here is what left Mail with a number and no dot beside it.
         const badge = badgeLabel(waiting[app.id] ?? 0);
         return badge ? { ...entry, badge } : entry;
     });
-    const layout = launcherLayout({ available: apps.map((app) => app.id), favorites, recent });
     const isGameServer = installedId !== null && installed !== null && installed.tabs.length > 0;
     const active = isGameServer
         ? (nav.POLARIS_APPS.find((app) => app.id === "games") ?? nav.resolveActiveApp(pathname))
         : nav.resolveActiveApp(pathname);
     const current = { ...active, label: label(active.label) };
 
-    // Optimistic: the star fills at once and comes back off, with a note, if the
-    // save is refused. Sent whole, so two quick clicks cannot interleave into a
-    // list neither of them meant.
-    function togglePin(appId: string) {
-        const pinning = !favorites.includes(appId);
-        const next = pinning ? [...favorites, appId] : favorites.filter((id) => id !== appId);
-        setFavorites(next);
-        const undo = () =>
-            setFavorites((current) =>
-                current.includes(appId) !== pinning
-                    ? current
-                    : pinning
-                      ? current.filter((id) => id !== appId)
-                      : [...current, appId]
-            );
-        void saveFavoriteAppsAction(next)
-            .then((answer) => {
-                if (!answer.error) return;
-                undo();
-                toast.show({ title: answer.error });
-            })
-            .catch(() => {
-                undo();
-                toast.show({ title: t("switcher.saveFailed") });
-            });
-    }
-
     return (
-        <AppSwitcher
+        <AppLauncher
             apps={apps}
             currentAppId={current.id}
             currentApp={current.hidden ? current : undefined}
-            featured={layout.featured}
-            featuredLabel={
-                layout.pinned
-                    ? t("switcher.favorites")
-                    : layout.visited
-                      ? t("switcher.recent")
-                      : t("switcher.suggested")
-            }
-            strings={{
-                moreApps: t("switcher.moreApps"),
-                allApps: t("switcher.allApps"),
-                pin: (app) => t("switcher.pin", { app }),
-                unpin: (app) => t("switcher.unpin", { app })
-            }}
-            pinned={favorites}
-            onTogglePin={togglePin}
-            // Moving between apps keeps the page. An anchor here reloaded the
-            // whole dashboard, which among other things hung up on whoever was
-            // on the other end of a call.
-            linkAs={Link}
-            // The dot on the switcher itself, which is all somebody sees
-            // while the list is closed. Derived from what is actually waiting
-            // rather than from a list of apps, so the next app to start counting
-            // raises it without anybody remembering to.
+            recent={recent}
+            marketplace={marketplace}
+            // The dot on the switcher itself, which is all somebody sees while
+            // the list is closed. Derived from what is actually waiting rather
+            // than from a list of apps, so the next app to start counting raises
+            // it without anybody remembering to.
             alert={anythingWaiting(waiting)}
         />
+    );
+}
+
+/** An app as the menu lists it: drawn, and filed on a shelf. */
+export type LauncherApp = PolarisApp & { readonly category: nav.AppCategory };
+
+/**
+ * The menu itself, from a list of apps already resolved for this reader - the
+ * favorites, recent apps and shelves, the search, the arranging. Apart from
+ * `AppNav` so it can be drawn from any list of apps, which is how it is
+ * exercised with more apps than the catalogue holds.
+ */
+export function AppLauncher({
+    apps,
+    currentAppId,
+    currentApp,
+    recent,
+    marketplace = false,
+    alert = false
+}: {
+    apps: readonly LauncherApp[];
+    currentAppId: string;
+    currentApp?: PolarisApp;
+    /** App ids, most recent first. */
+    recent: readonly string[];
+    marketplace?: boolean;
+    alert?: boolean;
+}) {
+    const t = useTranslations("nav");
+    const label = useNavLabel();
+    const { favorites, toggle, arrange, launcherOpen, setLauncherOpen } = useFavoriteApps();
+    const [arranging, setArranging] = useState(false);
+    const categoryOf = new Map(apps.map((app) => [app.id, app.category]));
+    const layout = launcherLayout({
+        available: apps.map((app) => app.id),
+        favorites,
+        recent,
+        categoryOf: (id) => categoryOf.get(id)
+    });
+    const sections: AppSwitcherSection[] = [
+        {
+            key: "favorites",
+            label: t("switcher.favorites"),
+            ids: layout.favorites,
+            arrangeable: true
+        },
+        { key: "recent", label: t("switcher.recent"), ids: layout.recent },
+        ...layout.shelves.map((shelf) => ({
+            key: shelf.category,
+            label: label(CATEGORY_LABEL.get(shelf.category) ?? shelf.category),
+            ids: shelf.ids
+        }))
+    ];
+
+    return (
+        <>
+            <AppSwitcher
+                apps={apps}
+                currentAppId={currentAppId}
+                currentApp={currentApp}
+                sections={sections}
+                open={launcherOpen}
+                onOpenChange={setLauncherOpen}
+                strings={{
+                    search: t("switcher.search"),
+                    noMatch: (query) => t("switcher.noMatch", { query }),
+                    pin: (app) => t("switcher.pin", { app }),
+                    unpin: (app) => t("switcher.unpin", { app }),
+                    moved: (app, position, total) => t("switcher.moved", { app, position, total })
+                }}
+                pinned={favorites}
+                onTogglePin={toggle}
+                onArrange={arrange}
+                footer={
+                    <>
+                        <DropdownMenuItem onSelect={() => setArranging(true)}>
+                            <ArrowUpDown className="text-muted-foreground" aria-hidden="true" />
+                            {t("switcher.arrange")}
+                        </DropdownMenuItem>
+                        {marketplace ? (
+                            <DropdownMenuItem asChild>
+                                <Link href="/apps/marketplace">
+                                    <Store className="text-muted-foreground" aria-hidden="true" />
+                                    {t("switcher.marketplace")}
+                                </Link>
+                            </DropdownMenuItem>
+                        ) : null}
+                    </>
+                }
+                // Moving between apps keeps the page. An anchor here reloaded the
+                // whole dashboard, which among other things hung up on whoever was
+                // on the other end of a call.
+                linkAs={Link}
+                alert={alert}
+            />
+            <ArrangeFavoritesDialog open={arranging} onOpenChange={setArranging} apps={apps} />
+        </>
     );
 }

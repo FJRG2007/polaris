@@ -17,6 +17,7 @@ export function navLabels(): Set<string> {
             if (section.group) labels.add(section.group);
         }
     };
+    for (const category of nav.APP_CATEGORIES) labels.add(category.label);
     for (const app of nav.POLARIS_APPS) {
         labels.add(app.label);
         if (app.guest) labels.add(app.guest.label);

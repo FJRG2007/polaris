@@ -61,6 +61,7 @@ export function MenuSearch({
     onChange,
     placeholder,
     onSubmit,
+    focusOnOpen = true,
     className
 }: {
     value: string;
@@ -69,11 +70,18 @@ export function MenuSearch({
     /** What enter does where typing a name is itself a way of picking one.
      *  Without it, enter takes the first option the field has left on screen. */
     onSubmit?: () => void;
+    /**
+     * Whether the field takes the keyboard as the menu opens. Off for a menu
+     * opened by a finger: focusing a field there raises the on-screen keyboard
+     * over half of the list somebody opened the menu to look at. The field is
+     * still a tap away, and the menu walks its options as any other menu does.
+     */
+    focusOnOpen?: boolean;
     className?: string;
 }) {
     // Selected as well as focused, so a submenu reopened with an old search in
     // it is typed over rather than typed onto.
-    const ref = useDeferredFocus<HTMLInputElement>(useMenuSurface().open);
+    const ref = useDeferredFocus<HTMLInputElement>(useMenuSurface().open && focusOnOpen);
 
     const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
         const options = () => optionsAround(event.currentTarget);
@@ -122,12 +130,18 @@ export function MenuSearch({
                 ref={ref}
                 // What the menu around this looks for on the way open, so it can
                 // hand over the focus instead of taking it.
-                {...{ [MENU_SEARCH_ATTRIBUTE]: "" }}
+                {...(focusOnOpen ? { [MENU_SEARCH_ATTRIBUTE]: "" } : {})}
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder={placeholder}
                 aria-label={placeholder}
+                // A name being recalled, not prose: no capital forced onto the
+                // first letter and no correction rewriting it mid-word.
+                enterKeyHint="search"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
         </div>

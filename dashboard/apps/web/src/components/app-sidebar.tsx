@@ -27,7 +27,9 @@
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import * as nav from "@/lib/apps";
-import { ChevronLeft } from "lucide-react";
+import { railApps } from "@/lib/app-launcher";
+import { ChevronLeft, LayoutGrid } from "lucide-react";
+import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
 import { railCount } from "@/lib/waiting-counts";
@@ -62,7 +64,9 @@ export function AppSidebar({
 }) {
     const pathname = usePathname();
     const label = useNavLabel();
+    const t = useTranslations("nav");
     const app = nav.resolveActiveApp(pathname);
+    const { favorites, openLauncher } = useFavoriteApps();
     // Null everywhere except inside an organization, where it says what this
     // reader may open. Absent until it arrives, which draws the baseline rail.
     const org = useOrgNav(nav.orgSlugForPath(pathname));
@@ -81,11 +85,17 @@ export function AppSidebar({
     // The Overview is the exception: it belongs to no app's list of screens
     // because it is a window onto all of them, which left the rail empty on the
     // one screen where somebody has not yet decided where they are going. Its
-    // rail is the apps themselves.
+    // rail is the apps themselves - only the favorites, in the order they were
+    // arranged, and a way to the rest. Thirty apps in a rail is a list to read;
+    // the app menu is where the whole set is searched and shelved.
+    const onOverview = !subapp && app.id === nav.OVERVIEW_APP_ID;
+    const railIds = onOverview ? railApps({ available: appIds, favorites }) : [];
+    const moreApps =
+        onOverview && appIds.filter((id) => id !== nav.OVERVIEW_APP_ID).length > railIds.length;
     const sections = subapp
         ? subapp.sections
-        : app.id === nav.OVERVIEW_APP_ID
-          ? appRail(appIds)
+        : onOverview
+          ? appRail(railIds)
           : (nav.APP_SECTIONS[app.id] ?? []);
     const items = sections.filter((section) => {
         if (section.hidden) return false;
@@ -118,7 +128,9 @@ export function AppSidebar({
     // the name it was given - data, drawn as it is.
     const heading = subapp
         ? (org?.name ?? (nav.APP_SUBAPPS.includes(subapp) ? label(subapp.label) : subapp.label))
-        : label(app.id === nav.OVERVIEW_APP_ID ? "Apps" : app.label);
+        : onOverview && favorites.some((id) => railIds.includes(id))
+          ? t("switcher.favorites")
+          : label(app.id === nav.OVERVIEW_APP_ID ? "Apps" : app.label);
     const groups: { label: string; items: nav.AppSection[] }[] = [];
     for (const item of items) {
         const title = item.group ? label(item.group) : heading;
@@ -163,20 +175,33 @@ export function AppSidebar({
                     ))}
                 </div>
             ))}
+            {moreApps ? (
+                // A button rather than a link: it opens the app menu in the top
+                // bar, which is where every app is. Marked so the phone drawer
+                // this rail is also drawn in closes first.
+                <button
+                    type="button"
+                    data-closes-nav=""
+                    onClick={openLauncher}
+                    className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                >
+                    <LayoutGrid
+                        className="size-4 shrink-0 text-foreground-subtle"
+                        aria-hidden="true"
+                    />
+                    <span className="truncate">{t("switcher.moreApps")}</span>
+                </button>
+            ) : null}
         </nav>
     );
 }
 
-/** The apps this account can open, as rail entries. The Overview itself is left
- *  out: it is the screen the rail is being drawn on. */
+/** These apps, in this order, as rail entries (see `railApps` for which). */
 function appRail(appIds: readonly string[]): nav.AppSection[] {
-    return nav.POLARIS_APPS.filter(
-        (app) => app.id !== nav.OVERVIEW_APP_ID && appIds.includes(app.id)
-    ).map((app) => ({
-        label: app.label,
-        href: app.href,
-        icon: app.icon
-    }));
+    return appIds.flatMap((id) => {
+        const app = nav.POLARIS_APPS.find((candidate) => candidate.id === id);
+        return app ? [{ label: app.label, href: app.href, icon: app.icon }] : [];
+    });
 }
 
 /** The Chat entry, by the one thing a rail entry is keyed on. Read off the

@@ -5,12 +5,20 @@
     "switcher": {
         "favorites": "Favoritos",
         "recent": "Recientes",
-        "suggested": "Sugeridas",
         "moreApps": "Más apps",
-        "allApps": "Apps de Polaris",
         "pin": "Añadir {app} a favoritos",
         "unpin": "Quitar {app} de favoritos",
-        "saveFailed": "No se han podido guardar tus favoritos. Inténtalo de nuevo en un momento."
+        "saveFailed": "No se han podido guardar tus favoritos. Inténtalo de nuevo en un momento.",
+        "search": "Buscar apps",
+        "noMatch": "Ninguna app coincide con {query}",
+        "moved": "{app} pasa a la posición {position} de {total}",
+        "arrange": "Ordenar favoritos",
+        "arrangeHint": "Los favoritos salen primero en el menú de apps y son las apps que lista el Resumen.",
+        "noFavorites": "Aún no hay favoritos. Añade uno abajo.",
+        "otherApps": "Otras apps",
+        "moveEarlier": "Subir {app}",
+        "moveLater": "Bajar {app}",
+        "marketplace": "Buscar más apps"
     },
     "waiting": {
         "unread": "{count, plural, one {# mensaje sin leer} other {# mensajes sin leer}}",
@@ -280,7 +288,11 @@
         "Who gets in": "Quién entra",
         "World": "Mundo",
         "Developers": "Desarrollo",
-        "Connectivity": "Conexión"
+        "Connectivity": "Conexión",
+        "Work": "Trabajo",
+        "Home": "Hogar",
+        "Infrastructure": "Infraestructura",
+        "Games": "Juegos"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",
