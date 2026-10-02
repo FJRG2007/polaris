@@ -157,26 +157,28 @@ export function useMailList(
     // the render above this one, so memoising on it would produce a new key every
     // render and a fetch behind every one of them. The string is the identity.
     const params = mailPageParams(page).toString();
+    const keptId = `${shelf}.${params}`;
+    const mailbox = page.accountId ?? "";
     const load = useCallback(
         // `revision` is named in the dependencies and not in the body on
         // purpose: it is not part of the request, it is the thing that says the
         // last answer is out of date. A new identity here is what sends this
         // again, and it is the only thing that does.
-        (signal: AbortSignal) => readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal),
-        [params, revision, shelf]
+        //
+        // Every answer this visit got is the copy the next visit starts from,
+        // written under the key it was asked for. The tab's own kept copy is
+        // not written back: it is older than what the device may already hold.
+        async (signal: AbortSignal) => {
+            const answer = await readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal);
+            mailCache.write("list", keptId, answer, mailbox);
+            return answer;
+        },
+        [params, revision, shelf, keptId, mailbox]
     );
 
     const read = useLiveRead<MailListAnswer>({ load, cacheKey: `mail.list.${shelf}.${params}` });
     // The device's copy, for a tab that has none of its own yet.
-    const keptId = `${shelf}.${params}`;
     const kept = useKept<MailListAnswer>("list", keptId, read.data === null);
-    // Every answer this visit got is the copy the next visit starts from. The
-    // tab's own kept copy is not written back: it is older than what the device
-    // may already hold.
-    const mailbox = page.accountId ?? "";
-    useEffect(() => {
-        if (read.data && !read.kept) mailCache.write("list", keptId, read.data, mailbox);
-    }, [read.data, read.kept, keptId, mailbox]);
     const answer = read.data ?? kept ?? NOTHING;
     return {
         threads: answer.threads,

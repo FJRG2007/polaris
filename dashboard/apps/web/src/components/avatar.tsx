@@ -18,7 +18,7 @@
 import { initials, tintFor } from "@polaris/core";
 import { cn } from "@polaris/ui";
 import { createPortal } from "react-dom";
-import { useState, type CSSProperties } from "react";
+import { useState, useCallback, type CSSProperties } from "react";
 import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
@@ -272,6 +272,20 @@ export function Avatar({
     const opens = photoOpens({ openable, hasPhoto: real, allowed: mayOpen, source });
     const shape = square ? "rounded-md" : "rounded-full";
     const pictured = real && !failed;
+    const arrived = useCallback(
+        (image: HTMLImageElement): void => {
+            setReal(image.naturalWidth > 1);
+            if (image.naturalWidth > 1) onPicture?.(image);
+        },
+        [onPicture]
+    );
+    const attach = useCallback(
+        (image: HTMLImageElement | null): void => {
+            if (image?.complete && image.naturalWidth > 0) arrived(image);
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- a new source is a new picture to ask about
+        [arrived, source]
+    );
 
     // The dot sits outside the picture, so it is not clipped by the circle the
     // face is cut into - which is why the face has a wrapper at all when there
@@ -316,11 +330,8 @@ export function Avatar({
                     // The blank pixel is one pixel across, so this is the whole
                     // test for "is there a photo behind this face" and it costs
                     // no request of its own.
-                    onLoad={(event) => {
-                        const image = event.currentTarget;
-                        setReal(image.naturalWidth > 1);
-                        if (image.naturalWidth > 1) onPicture?.(image);
-                    }}
+                    ref={attach}
+                    onLoad={(event) => arrived(event.currentTarget)}
                     // A face is part of whatever row it sits in. An image is
                     // draggable by default, which made the face its own drag
                     // instead of the row's.

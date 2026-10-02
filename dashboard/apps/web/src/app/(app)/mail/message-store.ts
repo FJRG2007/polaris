@@ -63,10 +63,9 @@ async function fetchMessage(messageId: string): Promise<OpenedMessage> {
     // Cleaned here, once, so the copy this tab holds and the copy the device
     // keeps are both the cleaned one. The pane cleans it again on the way into
     // its frame, which changes nothing and costs nothing - see `sanitize`.
-    const opened: OpenedMessage = {
-        ...answer,
-        readable: { ...answer.readable, html: await sanitizeMail(answer.readable.html) }
-    };
+    const html = await sanitizeMail(answer.readable.html).catch(() => null);
+    if (html === null) return answer;
+    const opened: OpenedMessage = { ...answer, readable: { ...answer.readable, html } };
     mailCache.write("message", messageId, opened, opened.envelope.accountId);
     return opened;
 }
