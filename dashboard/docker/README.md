@@ -63,8 +63,9 @@ these names over plain HTTP (a `.local` name cannot get a public certificate),
 and both are already trusted origins for authentication.
 
 Being on the host network also makes `mdns` the one place Polaris can read the
-host's ARP table, which is how a network storage that changed address is found
-again - see [`../mdns/README.md`](../mdns/README.md#the-hosts-neighbour-table).
+host's ARP table, which is how a network storage that changed address, or a
+Places device given by its hardware (MAC) address, is found again - see
+[`../mdns/README.md`](../mdns/README.md#the-hosts-neighbour-table).
 
 ## Configuration
 

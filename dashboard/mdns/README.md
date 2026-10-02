@@ -22,7 +22,11 @@ daemon sees that: both sit on Docker bridges, whose own neighbour tables list
 only the bridge gateway. So when a storage on the network (an SMB share, a NAS)
 needs to be found again after its address changed, the host daemon execs a
 read-only `awk` in this container to read it
-(`lib/storage-whereabouts/neighbours.ts` in the web app). An install with no
-`mdns` container running - the limited edition, or host networking unavailable -
-simply has no neighbour table to read, and that storage is then identified by
-its SMB answer alone.
+(`lib/storage-whereabouts/neighbours.ts` in the web app). The same table is how
+Places follows a device given by its hardware (MAC) address to the IP it
+answers on now (`apps/places/src/lib/integrations/mac-locate.ts`), reached
+through `host.hostNetwork.readNeighbourTable()` rather than reading it twice. An
+install with no `mdns` container running - the limited edition, or host
+networking unavailable - simply has no neighbour table to read, and a storage
+is then identified by its SMB answer alone, and a device by MAC only where its
+own driver can scan for it.
