@@ -85,6 +85,29 @@ describe("waiting for a release's port", () => {
         );
         expect(result).toEqual({ ok: true, unchecked: true });
     });
+
+    it("asks again after a read that failed for any other reason", async () => {
+        let call = 0;
+        const runIn = vi.fn(async () => {
+            call += 1;
+            if (call === 1) throw new Error("container is restarting");
+            if (call === 2) return { code: 1, output: "Error response from daemon: connection reset" };
+            return { code: 0, output: [HEADER, v4("00000000", "0BB8")].join("\n") };
+        });
+        const context = { ports: { runIn }, log: () => undefined } as unknown as RuntimeContext;
+        const result = await waitUntilListening(context, "web", 3000, fakeClock());
+        expect(result).toEqual({ ok: true });
+        expect(runIn).toHaveBeenCalledTimes(3);
+    });
+
+    it("fails, rather than passes, a container whose sockets never could be read", async () => {
+        const runIn = vi.fn(async () => {
+            throw new Error("ssh: connection lost");
+        });
+        const context = { ports: { runIn }, log: () => undefined } as unknown as RuntimeContext;
+        const result = await waitUntilListening(context, "web", 3000, fakeClock(), 10_000);
+        expect(result).toEqual({ ok: false, reason: expect.stringContaining("could not be read") });
+    });
 });
 
 describe("the order a release is brought up in", () => {

@@ -68,7 +68,12 @@ vi.mock("@polaris/db", () => {
                 findUnique: vi.fn(async () => db.app),
                 findFirst: vi.fn(async () => db.app),
                 findMany: vi.fn(async () => [db.app]),
-                update: vi.fn(async (args: { data: Record<string, unknown> }) => Object.assign(db.app, args.data))
+                update: vi.fn(async (args: { data: Record<string, unknown> }) => Object.assign(db.app, args.data)),
+                updateMany: vi.fn(async (args: { where?: Record<string, unknown>; data: Record<string, unknown> }) => {
+                    if (!matches(db.app as never, args.where)) return { count: 0 };
+                    Object.assign(db.app, args.data);
+                    return { count: 1 };
+                })
             },
             domain: {
                 findMany: vi.fn(async () => [
@@ -293,6 +298,16 @@ describe("an in-place deploy after a change-over release that shares its volumes
         await wrapped.ports.composeUp({ project: base.project } as never);
 
         expect(ops).toEqual([`down ${projectOf("dep-old")}`, `up ${base.project}`, `up ${base.project}`]);
+    });
+
+    it("no longer records the release it stopped as running or serving", async () => {
+        const ctx = inPlace();
+        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+
+        await wrapped.ports.composeUp({ project: base.project } as never);
+
+        expect(db.deployments.get("dep-old")?.status).toBe("removed");
+        expect(db.app.currentDeploymentId).toBeNull();
     });
 
     it("leaves the running release alone when the service has no named volume", async () => {

@@ -26,8 +26,8 @@ import { prisma } from "@polaris/db";
 import { execCommand } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
-import { sshMachine, withImagePrune } from "@/lib/deploy/image-store-lock";
 import { RELEASE_LABEL, parseReclaimedBytes } from "@polaris/deploy";
+import { sshMachine, withImagePrune } from "@/lib/deploy/image-store-lock";
 
 /** How much of a command's output is kept. A prune prints a line per layer it
  *  removes, and only the total at the end is read. */
@@ -213,9 +213,13 @@ export function pruneCommandFor(shared: boolean): string {
     return shared ? PRUNE_SHARED_HOST : PRUNE_EVERY_ENGINE;
 }
 
+/** The last line of a `LIST_CONTAINERS` that worked. Without it the listing is a
+ *  failed one, which prints nothing and proves nothing. */
+export const LISTED = "polaris-listed|";
+
 /** Every container on a server, stopped ones too, with the compose project it
  *  belongs to - what is read to tell whether anybody else runs things there. */
-export const LIST_CONTAINERS = `docker ps -a --format '{{.Names}}|{{.Label "com.docker.compose.project"}}' 2>/dev/null`;
+export const LIST_CONTAINERS = `docker ps -a --format '{{.Names}}|{{.Label "com.docker.compose.project"}}' 2>/dev/null && echo '${LISTED}'`;
 
 /**
  * The containers in a `LIST_CONTAINERS` listing that Polaris did not start. Polaris
@@ -237,20 +241,22 @@ export function foreignContainers(said: string): string[] {
 /**
  * Whether a server is shared with containers Polaris did not start, so its
  * clean-up must stay to images and build cache. The stored answer when there is
- * one - the operator's, or the one found before. Otherwise it is found out once,
- * from what runs there, and kept: a machine somebody already ran services on is
- * shared, which is every server adopted rather than set up fresh. A machine that
- * cannot be asked is treated as shared for this sweep and asked again next time.
+ * one - the operator's, or a shared one found before. Otherwise it is found out
+ * from what runs there: a machine somebody already ran services on is shared,
+ * which is every server adopted rather than set up fresh, and that is kept. Not
+ * shared is only ever kept when the operator says so - somebody may start a
+ * service there tomorrow - so until then it is asked again every time. A machine
+ * that cannot be asked, or whose listing did not finish, counts as shared.
  */
 export async function isSharedHost(hostId: string): Promise<boolean> {
     const host = await prisma.host.findUnique({ where: { id: hostId }, select: { sharedHost: true } });
     if (!host) return true;
     if (host.sharedHost !== null) return host.sharedHost;
     const said = await onServer(hostId, LIST_CONTAINERS);
-    if (said === null) return true;
-    const shared = foreignContainers(said).length > 0;
-    await prisma.host.update({ where: { id: hostId }, data: { sharedHost: shared } }).catch(() => undefined);
-    return shared;
+    if (said === null || !said.split("\n").some((line) => line.trim() === LISTED)) return true;
+    if (foreignContainers(said).length === 0) return false;
+    await prisma.host.update({ where: { id: hostId }, data: { sharedHost: true } }).catch(() => undefined);
+    return true;
 }
 
 /** Set, by the operator, whether a server is shared. False when it was already so. */

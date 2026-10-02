@@ -168,28 +168,41 @@ export async function waitUntilListening(
 ): Promise<PortReadiness> {
     if (typeof ctx.ports.runIn !== "function") return { ok: true, unchecked: true };
     const deadline = clock.now() + deadlineMs;
-    let last: PortState = "closed";
+    let last: PortState | "unread" = "unread";
     for (;;) {
         const read = await Promise.resolve()
             .then(() => ctx.ports.runIn(container, ["cat", "/proc/net/tcp", "/proc/net/tcp6"]))
             .catch(() => null);
         // `cat` exits 1 when one of the two tables is missing (no IPv6) but still
-        // prints the other, so the output is what decides, not the code.
-        if (!read || !/\blocal_address\b/.test(read.output)) {
+        // prints the other, so the output is what decides, not the code. Only an
+        // image with no `cat` to run goes unchecked; any other failed read is a
+        // container between restarts or a connection that dropped, asked again.
+        if (read && /\blocal_address\b/.test(read.output)) {
+            last = portStateFrom(read.output, port);
+            if (last === "listening") return { ok: true };
+        } else if (read && hasNoCat(read)) {
             return { ok: true, unchecked: true };
         }
-        last = portStateFrom(read.output, port);
-        if (last === "listening") return { ok: true };
         if (clock.now() >= deadline) break;
         await clock.sleep(POLL_MS);
     }
+    const seconds = Math.round(deadlineMs / 1000);
     return {
         ok: false,
         reason:
             last === "loopback"
                 ? `the new version listens on port ${port} on localhost only, so nothing outside its container can reach it - have it listen on 0.0.0.0`
-                : `the new version did not start listening on port ${port} within ${Math.round(deadlineMs / 1000)} seconds - check the port it serves on`
+                : last === "unread"
+                  ? `the new version's sockets could not be read within ${seconds} seconds, so it was never seen listening on port ${port}`
+                  : `the new version did not start listening on port ${port} within ${seconds} seconds - check the port it serves on`
     };
+}
+
+/** Whether a read failed because the image has no `cat` at all (distroless,
+ *  scratch): exit 126/127, or the engine saying it found no such executable. */
+function hasNoCat(read: { code: number; output: string }): boolean {
+    if (read.code === 126 || read.code === 127) return true;
+    return /executable file not found|"cat": stat|cat: not found/i.test(read.output);
 }
 
 /** The last lines a container printed, into the deploy log, so a release that

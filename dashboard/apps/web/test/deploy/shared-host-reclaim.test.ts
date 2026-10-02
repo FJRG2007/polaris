@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { host, said, ran } = vi.hoisted(() => ({
     host: { sharedHost: null as boolean | null },
-    said: { listing: "" as string | null },
+    said: { listing: "" as string | null, finished: true },
     ran: [] as string[]
 }));
 
@@ -39,6 +39,7 @@ vi.mock("@polaris/ssh", () => ({
         if (command.includes("docker ps -a")) {
             if (said.listing === null) throw new Error("connection refused");
             sinks.onStdout(Buffer.from(said.listing));
+            if (said.finished) sinks.onStdout(Buffer.from("polaris-listed|\n"));
         }
         return { code: 0 };
     })
@@ -49,6 +50,7 @@ const space = await import("@/lib/deploy/server-space");
 beforeEach(() => {
     host.sharedHost = null;
     said.listing = "";
+    said.finished = true;
     ran.length = 0;
 });
 
@@ -88,10 +90,19 @@ describe("telling whether a server is shared", () => {
         expect(ran.filter((command) => command.includes("docker ps -a"))).toHaveLength(1);
     });
 
-    it("takes a server only Polaris uses as not shared", async () => {
+    it("takes a server only Polaris uses as not shared, and looks again next time", async () => {
         said.listing = "polaris-1a2b-shop|polaris-1a2b3c4d\n";
         expect(await space.isSharedHost("host-1")).toBe(false);
-        expect(host.sharedHost).toBe(false);
+        expect(host.sharedHost).toBeNull();
+        said.listing = "polaris-1a2b-shop|polaris-1a2b3c4d\nthe-operators-db|\n";
+        expect(await space.isSharedHost("host-1")).toBe(true);
+        expect(host.sharedHost).toBe(true);
+    });
+
+    it("never reads a listing that did not finish as a server nobody else uses", async () => {
+        said.finished = false;
+        expect(await space.isSharedHost("host-1")).toBe(true);
+        expect(host.sharedHost).toBeNull();
     });
 
     it("is careful with a server it cannot ask, and asks again next time", async () => {

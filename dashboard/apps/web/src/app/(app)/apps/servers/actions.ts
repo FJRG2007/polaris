@@ -9,26 +9,26 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { getTranslations } from "@/lib/i18n/request";
-import type { NamespaceKey } from "@/lib/i18n/types";
-import { enrollmentRefusalText } from "./enrollment-refusal-text";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as notes from "@/lib/server-notes-service";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import type { ServerMetrics } from "@/lib/server-probe";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
-import type { ServerMetrics } from "@/lib/server-probe";
 import { setLocalEnvironment } from "@/lib/network-service";
 import { getServerMetrics } from "@/lib/server-metrics-service";
+import { enrollmentRefusalText } from "./enrollment-refusal-text";
 import {
     hostSpace,
     reclaimBuildCache,
     reclaimHostSpace,
     type HostSpace
 } from "@/lib/deploy/host-space";
-import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
-import { autoRemoveOn, setAutoRemove } from "@/lib/deploy/leftover-volumes";
 import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
+import { autoRemoveOn, setAutoRemove } from "@/lib/deploy/leftover-volumes";
+import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
 import {
     removeStrayContainer,
     strayContainers,
@@ -42,8 +42,8 @@ import {
     setHostEnvironment,
     setHostWildcardDomain
 } from "@/lib/host-service";
-import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import * as serverEdge from "@/lib/deploy/server-edge";
+import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { isSharedHost, setSharedHost } from "@/lib/deploy/server-space";
 import { findLocalPath, useLocalPath, type LocalPath } from "@/lib/server-local-path";
 import {
@@ -679,7 +679,8 @@ export async function setLeftoverAutoRemoveAction(on: boolean): Promise<{ error?
 
 /**
  * Whether this server is shared with containers Polaris did not start, which keeps
- * its clean-up to images and build cache. Found out the first time it is asked.
+ * its clean-up to images and build cache. Found out from what runs there until it
+ * is found shared or the operator decides.
  */
 export async function sharedHostAction(hostId: string): Promise<{ shared?: boolean; error?: string }> {
     const user = await requirePermission("system.manage");

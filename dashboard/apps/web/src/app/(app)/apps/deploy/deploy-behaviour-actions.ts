@@ -21,7 +21,8 @@ import { deployBehaviour, setOverlapVolumes, type DeployBehaviourView } from "@/
 const DEPLOY_PATH = "/apps/deploy";
 
 async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
-    return { error: caught instanceof Error ? caught.message : await reply(fallback) };
+    console.error("polaris: a deploy behaviour action failed:", caught);
+    return { error: await reply(fallback) };
 }
 
 export async function deployBehaviourAction(

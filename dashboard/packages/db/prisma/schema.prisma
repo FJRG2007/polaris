@@ -1901,7 +1901,8 @@ model Host {
     // Whether the server is shared with containers Polaris did not start, so a
     // clean-up only removes images and build cache - never a stopped container or
     // a network nothing is attached to, which may be the operator's own. Null until
-    // it is decided: found out the first time Polaris looks at what runs there.
+    // the operator decides or Polaris finds a container it did not start there;
+    // while null, what runs there is looked at again on every clean-up.
     sharedHost          Boolean?
     // Server public key (base64) pinned on the trust-on-add test connect.
     hostKey             String?
