@@ -1719,6 +1719,7 @@ function LinkArea({ message }: { message: ChatMessageView }) {
                 preview={{
                     id: "",
                     url: message.link,
+                    target: null,
                     title: "",
                     author: "",
                     accent: null,

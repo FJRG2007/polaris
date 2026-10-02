@@ -9,7 +9,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { embedFor, oembedFor, playerAddress } from "../../src/lib/chat/embeds";
+import {
+    embedFor,
+    isShareLink,
+    landingOf,
+    oembedFor,
+    playerAddress
+} from "../../src/lib/chat/embeds";
 
 /** Every address in a list frames the same player. */
 function allFrame(addresses: string[], url: string): void {
@@ -180,19 +186,24 @@ describe("TikTok", () => {
                 "https://www.tiktok.com/embed/v2/7232918429372394779",
                 "https://www.tiktok.com/embed/7232918429372394779",
                 "https://www.tiktok.com/player/v1/7232918429372394779",
-                "https://tiktok.com/@someone/video/7232918429372394779"
+                "https://tiktok.com/@someone/video/7232918429372394779",
+                // Where a vm./vt. share link lands: the account is left out.
+                "https://www.tiktok.com/@/video/7232918429372394779?_r=1&u_code=abc"
             ],
             player
         );
     });
 
-    it("gives a short link and a photo post the card", () => {
-        // A share-button link names nothing until it is followed.
+    it("gives a short link, a photo post, a live and a profile the card", () => {
+        // A share-button link names nothing until the server has followed it.
         noneFrame([
             "https://vm.tiktok.com/ZMabcdef/",
             "https://vt.tiktok.com/ZSabcdef/",
+            "https://www.tiktok.com/t/ZTabcdef/",
             "https://www.tiktok.com/@someone/photo/7232918429372394779",
+            "https://www.tiktok.com/@someone/live",
             "https://www.tiktok.com/@someone",
+            "https://m.tiktok.com/h5/share/usr/6868799137997210630.html",
             "https://www.tiktok.com/@someone/video/123",
             "https://www.tiktok.com/@someone/video/7232918429372394779abc"
         ]);
@@ -409,6 +420,75 @@ describe("Streamable and Dailymotion", () => {
             "https://www.dailymotion.com/embed/video/x8abc12"
         );
         noneFrame(["https://www.dailymotion.com/someone", "https://dai.ly/y8abc12"]);
+    });
+});
+
+describe("Kick", () => {
+    it("plays a channel live", () => {
+        const embed = embedFor("https://kick.com/SomeStreamer");
+        expect(embed?.provider).toBe("Kick");
+        expect(embed?.url).toBe("https://player.kick.com/somestreamer");
+        expect(embed?.shape).toBe("video");
+        allFrame(
+            ["https://www.kick.com/somestreamer", "https://kick.com/somestreamer?ref=x"],
+            "https://player.kick.com/somestreamer"
+        );
+    });
+
+    it("gives Kick's own pages, a past broadcast and a clip the card", () => {
+        // Kick documents a player for a live channel only.
+        noneFrame([
+            "https://kick.com/",
+            "https://kick.com/browse",
+            "https://kick.com/categories",
+            "https://kick.com/somestreamer/videos/0b2b5a8e-0000-4000-8000-000000000000",
+            "https://kick.com/somestreamer/clips/clip_01ABCDEF",
+            "https://kick.com/a",
+            "https://kick.com.evil.example/somestreamer"
+        ]);
+    });
+});
+
+describe("share-button short links", () => {
+    it("recognises the shape each site hands out", () => {
+        for (const address of [
+            "https://vm.tiktok.com/ZMJxrLUGr/",
+            "https://vt.tiktok.com/ZSmhQWGRu/",
+            "https://www.tiktok.com/t/ZTRabc123/",
+            "https://on.soundcloud.com/AbCdEf123",
+            "https://spotify.link/AbCdEf123",
+            "https://redd.it/1abc2de",
+            "https://www.reddit.com/r/videos/s/AbCdEf123"
+        ]) {
+            expect(isShareLink(address), address).toBe(true);
+        }
+    });
+
+    it("follows nothing else, not even another path on the same host", () => {
+        for (const address of [
+            "https://vm.tiktok.com/",
+            "https://vm.tiktok.com/a/b/c",
+            "https://vm.tiktok.com/ZM<script>/",
+            "https://www.tiktok.com/@someone/video/7232918429372394779",
+            "https://www.tiktok.com/t/",
+            "https://www.reddit.com/r/videos/comments/1abc2de/",
+            "https://www.reddit.com/r/videos/s/",
+            "https://vm.tiktok.com.evil.example/ZMabcdef/",
+            "https://example.com/ZMabcdef",
+            "ftp://vm.tiktok.com/ZMabcdef/",
+            "not a url"
+        ]) {
+            expect(isShareLink(address), address).toBe(false);
+        }
+    });
+
+    it("keeps where one led without the sharer's query", () => {
+        expect(
+            landingOf(
+                "https://www.tiktok.com/@/video/7606895926577319189?_r=1&_d=secCgY&u_code=f1dd&share_item_id=7606895926577319189#x"
+            )
+        ).toBe("https://www.tiktok.com/@/video/7606895926577319189");
+        expect(landingOf("javascript:alert(1)")).toBeNull();
     });
 });
 

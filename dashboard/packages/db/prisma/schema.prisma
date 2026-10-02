@@ -8960,6 +8960,10 @@ model LinkPreview {
     // Capped by the caller at what a unique index can hold; longer than that is
     // a payload rather than a link.
     url         String   @unique
+    // Where a share-button short link led (`vm.tiktok.com/<code>` to the video's
+    // page), without the sharer's query. Null for a link that is not one, or one
+    // that could not be followed yet.
+    target      String?
     title       String   @default("")
     description String   @default("")
     // Who made the thing, when the site says so: the channel behind a video, the

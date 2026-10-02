@@ -59,8 +59,10 @@ vi.mock("node:dns/promises", () => ({
 
 interface Stored {
     url: string;
+    target: string | null;
     ok: boolean;
     title: string;
+    siteName: string;
     author: string;
     accent: string | null;
     imageUrl: string | null;
@@ -68,10 +70,26 @@ interface Stored {
 
 const stored: Stored[] = [];
 
+/** A row already there, for the cases about what is looked at again. */
+const rows = vi.hoisted(() => ({
+    existing: null as null | {
+        ok?: boolean;
+        url?: string;
+        target?: string | null;
+        fetchedAt?: Date;
+        imageUrl?: string | null;
+    },
+    updates: [] as Array<{ where: unknown; data: { fetchedAt: Date } }>
+}));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         linkPreview: {
-            findUnique: async () => null,
+            findUnique: async () => rows.existing,
+            updateMany: async (args: { where: unknown; data: { fetchedAt: Date } }) => {
+                rows.updates.push(args);
+                return { count: 1 };
+            },
             findMany: async () => [],
             upsert: async ({
                 where,
@@ -87,7 +105,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { unfurl } = await import("@/lib/chat/link-preview");
+const { previewImage, unfurl } = await import("@/lib/chat/link-preview");
 const { firstLink } = await import("@polaris/core");
 
 function page(title: string): { status: number; headers: Record<string, string>; body: string } {
@@ -108,6 +126,8 @@ beforeEach(() => {
     fetched.length = 0;
     responses.clear();
     stored.length = 0;
+    rows.existing = null;
+    rows.updates.length = 0;
 });
 
 describe("where it will not go", () => {
@@ -248,7 +268,11 @@ describe("a site that will not describe its own page", () => {
         // Who made it. YouTube's own markup describes the video and not the
         // channel, and the channel is the second line of the card - so both are
         // asked and the page wins wherever they overlap.
-        responses.set("https://www.youtube.com/watch?v=abc", page("The page said it"));
+        responses.set("https://www.youtube.com/watch?v=abc", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: '<html><head><meta property="og:title" content="The page said it"></head></html>'
+        });
         responses.set(
             "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc&format=json",
             oembed({ title: "The site said it", author_name: "A channel" })
@@ -256,6 +280,19 @@ describe("a site that will not describe its own page", () => {
         await unfurl("https://www.youtube.com/watch?v=abc");
         expect(stored[0]?.title).toBe("The page said it");
         expect(stored[0]?.author).toBe("A channel");
+    });
+
+    it("prefers what the site says over a page that only has a title tag", async () => {
+        // TikTok's video pages, to anything but a browser: "TikTok - Make Your
+        // Day" and no og: tags, for every video there is.
+        responses.set("https://www.youtube.com/watch?v=abc", page("Generic site title"));
+        responses.set(
+            "https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc&format=json",
+            oembed({ title: "The video", author_name: "A channel", provider_name: "YouTube" })
+        );
+        await unfurl("https://www.youtube.com/watch?v=abc");
+        expect(stored[0]?.title).toBe("The video");
+        expect(stored[0]?.siteName).toBe("YouTube");
     });
 
     it("is not asked for a page whose site has no such endpoint", async () => {
@@ -287,6 +324,176 @@ describe("a site that will not describe its own page", () => {
         );
         await unfurl("https://www.youtube.com/watch?v=abc");
         expect(stored[0]?.ok).toBe(false);
+    });
+});
+
+describe("a share-button short link", () => {
+    // What the TikTok app's Share > Copy link hands out, and what it answers -
+    // measured against vt.tiktok.com: a redirect to the video's page with the
+    // account left out and the sharer's identifiers in the query.
+    const share = "https://vt.tiktok.com/ZSmhQWGRu/";
+    const landed =
+        "https://www.tiktok.com/@/video/7574301384833617172?_r=1&_d=secCgY&u_code=eck6a4k288d7c4&share_item_id=7574301384833617172";
+    const video = "https://www.tiktok.com/@/video/7574301384833617172";
+    const askTikTok = `https://www.tiktok.com/oembed?url=${encodeURIComponent(video)}&format=json`;
+    const oembed = (body: unknown) => ({
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+    });
+
+    beforeEach(() => {
+        dns.set("vt.tiktok.com", ["23.0.0.10"]);
+        dns.set("vm.tiktok.com", ["23.0.0.10"]);
+        dns.set("www.tiktok.com", ["23.0.0.11"]);
+        responses.set(share, { status: 302, headers: { location: landed }, body: "" });
+        responses.set(video, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html><head><title>TikTok - Make Your Day</title></head></html>"
+        });
+        responses.set(
+            askTikTok,
+            oembed({
+                title: "A caption",
+                author_name: "Somebody",
+                provider_name: "TikTok",
+                thumbnail_url: "https://p16-sign.tiktokcdn-eu.com/cover.image"
+            })
+        );
+    });
+
+    it("is followed to the video, and that address is kept without the query", async () => {
+        await unfurl(share);
+        expect(stored[0]?.url).toBe(share);
+        expect(stored[0]?.target).toBe(video);
+        expect(stored[0]?.ok).toBe(true);
+        expect(stored[0]?.title).toBe("A caption");
+        expect(stored[0]?.siteName).toBe("TikTok");
+        expect(stored[0]?.author).toBe("Somebody");
+    });
+
+    it("asks TikTok about the video rather than the short link", async () => {
+        await unfurl(share);
+        // The hop that named the video is fetched once; the address it named is
+        // never fetched with the sharer's query on it.
+        expect(fetched[0]).toBe(share);
+        expect(fetched).toContain(askTikTok);
+        expect(fetched).not.toContain(landed);
+        expect(fetched.filter((address) => address === share)).toHaveLength(1);
+    });
+
+    it("refuses a short link that leads somewhere private", async () => {
+        responses.set(share, {
+            status: 302,
+            headers: { location: "http://evil.test/admin" },
+            body: ""
+        });
+        await unfurl(share);
+        expect(fetched).not.toContain("http://evil.test/admin");
+        expect(stored[0]?.target).toBeNull();
+    });
+
+    it("gives up on one that only leads to more short links", async () => {
+        // Bounded: a chain of redirects is not walked for ever.
+        responses.set(share, {
+            status: 302,
+            headers: { location: "https://vm.tiktok.com/ZMaaaa1/" },
+            body: ""
+        });
+        for (let hop = 1; hop <= 5; hop += 1) {
+            responses.set(`https://vm.tiktok.com/ZMaaaa${hop}/`, {
+                status: 302,
+                headers: { location: `https://vm.tiktok.com/ZMaaaa${hop + 1}/` },
+                body: ""
+            });
+        }
+        await unfurl(share);
+        expect(stored[0]?.target).toBeNull();
+        expect(fetched.filter((address) => address.includes("tiktok.com/ZM")).length).toBeLessThan(
+            5
+        );
+    });
+
+    it("draws a video with no caption, from who posted it", async () => {
+        responses.set(video, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html></html>"
+        });
+        responses.set(askTikTok, oembed({ title: "", author_name: "Somebody" }));
+        await unfurl(share);
+        expect(stored[0]?.ok).toBe(true);
+        expect(stored[0]?.author).toBe("Somebody");
+    });
+
+    it("is followed again within the hour when an older look never followed it", async () => {
+        rows.existing = {
+            ok: true,
+            url: share,
+            target: null,
+            fetchedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+        };
+        await unfurl(share);
+        expect(stored[0]?.target).toBe(video);
+    });
+
+    it("is not followed again once it has been", async () => {
+        rows.existing = {
+            ok: true,
+            url: share,
+            target: video,
+            fetchedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+        };
+        await unfurl(share);
+        expect(fetched).toEqual([]);
+    });
+
+    it("is not how an ordinary link is treated", async () => {
+        responses.set("http://example.com/", page("A page"));
+        await unfurl("http://example.com/");
+        expect(stored[0]?.target).toBeNull();
+    });
+});
+
+describe("a card's picture", () => {
+    beforeEach(() => {
+        dns.set("p16-sign.tiktokcdn-eu.com", ["23.0.0.12"]);
+    });
+
+    it("is handed back while it answers, and nothing is marked", async () => {
+        rows.existing = { imageUrl: "https://p16-sign.tiktokcdn-eu.com/cover.image?x-expires=1" };
+        responses.set("https://p16-sign.tiktokcdn-eu.com/cover.image?x-expires=1", {
+            status: 200,
+            headers: { "content-type": "image/jpeg" },
+            body: "jpeg"
+        });
+        expect((await previewImage("p1"))?.contentType).toBe("image/jpeg");
+        expect(rows.updates).toEqual([]);
+    });
+
+    it("that stopped answering marks the card to be looked at again, at most hourly", async () => {
+        // TikTok signs its covers with an expiry two days out; the card is
+        // trusted for a week.
+        rows.existing = { imageUrl: "https://p16-sign.tiktokcdn-eu.com/cover.image?x-expires=1" };
+        responses.set("https://p16-sign.tiktokcdn-eu.com/cover.image?x-expires=1", {
+            status: 403,
+            headers: { "content-type": "text/plain" },
+            body: "expired"
+        });
+        expect(await previewImage("p1")).toBeNull();
+        expect(rows.updates).toHaveLength(1);
+        const update = rows.updates[0]!;
+        // Only a row not already looked at within the hour.
+        const where = update.where as { id: string; fetchedAt: { lt: Date } };
+        expect(where.id).toBe("p1");
+        expect(Date.now() - where.fetchedAt.lt.getTime()).toBeGreaterThanOrEqual(
+            60 * 60 * 1000 - 1000
+        );
+        // Old enough that the next read asks again.
+        expect(Date.now() - update.data.fetchedAt.getTime()).toBeGreaterThan(
+            7 * 24 * 60 * 60 * 1000
+        );
     });
 });
 

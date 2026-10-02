@@ -19,10 +19,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 
 afterEach(cleanup);
 
-function preview(url: string, title = "A title") {
+function preview(url: string, title = "A title", target: string | null = null) {
     return {
         id: "p1",
         url,
+        target,
         title,
         author: "Someone",
         accent: null,
@@ -92,6 +93,33 @@ describe("a link Polaris can play", () => {
     });
 });
 
+describe("a share-button short link", () => {
+    it("plays where the server found it led, and still opens what was posted", async () => {
+        const { container } = render(
+            <LinkCard
+                preview={preview(
+                    "https://vm.tiktok.com/ZMabcdef/",
+                    "A title",
+                    "https://www.tiktok.com/@/video/7232918429372394779"
+                )}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.getByRole("link").getAttribute("href")).toBe(
+            "https://vm.tiktok.com/ZMabcdef/"
+        );
+        const play = screen.getByRole("button", { name: "Play this on TikTok, here" });
+        expect(play.className).toContain("aspect-[9/16]");
+        // Nothing from TikTok until it is asked for.
+        expect(container.querySelector("iframe")).toBeNull();
+
+        await userEvent.click(play);
+        expect(container.querySelector("iframe")?.getAttribute("src")).toBe(
+            "https://www.tiktok.com/player/v1/7232918429372394779?autoplay=1"
+        );
+    });
+});
+
 describe("a link Polaris cannot play", () => {
     it("is the ordinary card, with its description", () => {
         const { container } = render(<LinkCard preview={preview("https://example.com/article")} />, { wrapper: MessagesWrapper });
@@ -101,12 +129,26 @@ describe("a link Polaris cannot play", () => {
         expect(screen.getByText("What it is about")).toBeTruthy();
     });
 
-    it("includes a share-button short link, which names nothing on its own", () => {
+    it("includes a share-button short link the server has not followed yet", () => {
         render(<LinkCard preview={preview("https://vm.tiktok.com/ZMabcdef/")} />, { wrapper: MessagesWrapper });
         expect(screen.queryByRole("button")).toBeNull();
         expect(screen.getByRole("link").getAttribute("href")).toBe(
             "https://vm.tiktok.com/ZMabcdef/"
         );
+    });
+
+    it("includes a share link that led somewhere with no player - a profile", () => {
+        render(
+            <LinkCard
+                preview={preview(
+                    "https://vm.tiktok.com/ZMabcdef/",
+                    "Someone",
+                    "https://m.tiktok.com/h5/share/usr/6868799137997210630.html"
+                )}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.queryByRole("button")).toBeNull();
     });
 
     it("includes Twitch on a page Twitch will not play in, but nothing else", () => {

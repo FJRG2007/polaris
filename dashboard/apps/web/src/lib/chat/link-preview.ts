@@ -14,9 +14,9 @@
  */
 
 import { prisma } from "@polaris/db";
-import { oembedFor } from "./embeds";
+import { embedFor, isShareLink, landingOf, oembedFor } from "./embeds";
 import * as core from "@polaris/core";
-import { follow, readAtMost, readCapped, safeUrl } from "@/lib/safe-fetch";
+import { follow, readAtMost, readCapped, safeUrl, whereLeads } from "@/lib/safe-fetch";
 
 /**
  * How much of a page is read before deciding.
@@ -54,6 +54,11 @@ const RETRY_MS = 60 * 60 * 1000;
 export interface LinkPreviewView {
     readonly id: string;
     readonly url: string;
+    /** Where a share-button short link led (`vm.tiktok.com/...` to the video's
+     *  own page), without the sharer's query, or null for a link that was not one
+     *  or could not be followed. The player is built from this when it is set;
+     *  the card still opens the address that was posted. */
+    readonly target: string | null;
     readonly title: string;
     readonly description: string;
     /** Who made the thing, when the site says: the channel behind a video, the
@@ -102,6 +107,7 @@ export async function knownPreviews(
             id: true,
             ok: true,
             url: true,
+            target: true,
             title: true,
             author: true,
             accent: true,
@@ -117,11 +123,12 @@ export async function knownPreviews(
             row.url,
             {
                 ok: row.ok,
-                askAgain: now - row.fetchedAt.getTime() > (row.ok ? FRESH_MS : RETRY_MS),
+                askAgain: now - row.fetchedAt.getTime() > trustedFor(row),
                 view: row.ok
                     ? {
                           id: row.id,
                           url: row.url,
+                          target: row.target,
                           title: row.title,
                           author: row.author,
                           accent: row.accent,
@@ -149,13 +156,21 @@ export async function unfurl(address: string): Promise<void> {
 
     const existing = await prisma.linkPreview.findUnique({
         where: { url: url.href },
-        select: { ok: true, fetchedAt: true }
+        select: { ok: true, url: true, target: true, fetchedAt: true }
     });
     const age = existing ? Date.now() - existing.fetchedAt.getTime() : Infinity;
-    if (existing && age < (existing.ok ? FRESH_MS : RETRY_MS)) return;
+    if (existing && age < trustedFor(existing)) return;
 
-    const found = await describe(url);
+    // A share link is followed first, and everything after is about where it
+    // led: the site's own description of a TikTok is only to be had for the
+    // video's address, never for `vm.tiktok.com/<code>`. One that could not be
+    // followed is not walked a second time to describe it - it is a failure,
+    // asked about again in an hour like any other.
+    const share = isShareLink(url.href);
+    const target = share ? await landing(url) : null;
+    const found = share && !target ? null : await describe(target ? new URL(target) : url);
     const data = {
+        target,
         title: found?.title ?? "",
         author: found?.author ?? "",
         accent: found?.accent ?? null,
@@ -163,8 +178,10 @@ export async function unfurl(address: string): Promise<void> {
         imageUrl: found?.imageUrl ?? null,
         description: found?.description ?? "",
         // A page with no title and no description is a page there is nothing to
-        // say about, and a card saying nothing is worse than no card.
-        ok: Boolean(found && (found.title || found.description)),
+        // say about, and a card saying nothing is worse than no card. A video
+        // whose site names only who posted it - a TikTok with no caption - is
+        // still a video somebody posted, and its card says whose it is.
+        ok: Boolean(found && (found.title || found.description || found.author)),
         fetchedAt: new Date()
     };
 
@@ -193,18 +210,67 @@ export async function previewImage(
     if (!url) return null;
 
     const response = await follow(url, "image/*");
-    if (!response?.ok) return null;
+    const contentType = (response?.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    const bytes =
+        response?.ok && contentType.startsWith("image/")
+            ? await readCapped(response, MAX_IMAGE_BYTES)
+            : null;
+    if (!bytes) {
+        await lookAgainSoon(previewId);
+        return null;
+    }
+    return { bytes, contentType };
+}
 
-    const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim();
-    if (!contentType.startsWith("image/")) return null;
-
-    const bytes = await readCapped(response, MAX_IMAGE_BYTES);
-    return bytes ? { bytes, contentType } : null;
+/**
+ * Mark a card whose picture has stopped answering as worth looking at again.
+ *
+ * Some sites sign their picture addresses with an expiry - TikTok's covers stop
+ * answering about two days after they were handed out, well inside the week a
+ * card is trusted for. The next look gets a freshly signed address, so the card
+ * gets its picture back instead of a broken one until the week is up. At most
+ * once an hour per card: a row looked at within the hour is left alone, so a
+ * picture that is gone for good costs one look an hour, not one per render.
+ */
+async function lookAgainSoon(previewId: string): Promise<void> {
+    const now = Date.now();
+    await prisma.linkPreview
+        .updateMany({
+            where: { id: previewId, fetchedAt: { lt: new Date(now - RETRY_MS) } },
+            data: { fetchedAt: new Date(now - FRESH_MS - 1) }
+        })
+        .catch(() => undefined);
 }
 
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------
+
+/**
+ * How long one stored look is trusted for.
+ *
+ * A share link that was never followed - stored before Polaris followed them, or
+ * when following it failed - is trusted only as long as a failure, so a
+ * `vm.tiktok.com` link posted last week becomes a player within the hour instead
+ * of staying a card until its week is up. Bounded either way: one look an hour
+ * at most, never one per render.
+ */
+function trustedFor(row: { ok: boolean; url: string; target: string | null }): number {
+    if (!row.ok || (row.target === null && isShareLink(row.url))) return RETRY_MS;
+    return FRESH_MS;
+}
+
+/**
+ * Where a share link leads, through the same checked hops as every fetch here.
+ * The walk stops at the first address that is not itself a share link, before
+ * asking it anything, and what is kept is that address without its query.
+ */
+async function landing(url: URL): Promise<string | null> {
+    const reached = await whereLeads(url, (next) => !isShareLink(next.href));
+    if (!reached || isShareLink(reached.href)) return null;
+    const kept = landingOf(reached.href);
+    return kept && kept.length <= core.MAX_LINK_LENGTH ? kept : null;
+}
 
 interface Described {
     title: string;
@@ -213,6 +279,10 @@ interface Described {
     siteName: string;
     imageUrl: string | null;
     description: string;
+    /** Whether the title and the site name are only the page's fallbacks - the
+     *  `<title>` tag and the hostname - rather than what it declares about the
+     *  thing (`og:title`, `og:site_name`). */
+    guessed?: { title: boolean; siteName: boolean };
 }
 
 /**
@@ -224,16 +294,32 @@ interface Described {
  * behind a video is the second line of the card, and reading it off the HTML
  * would mean guessing at a different shape of markup per site.
  *
- * The page wins wherever both answer, since it is the thing that was linked.
+ * The page wins wherever both answer, since it is the thing that was linked -
+ * except where all the page has is a fallback. TikTok hands every video page to
+ * a fetch titled "TikTok - Make Your Day", with no `og:` tags, while its oEmbed
+ * names the video; the `<title>` tag and the hostname only stand in when the
+ * site says nothing.
  */
 async function describe(url: URL): Promise<Described | null> {
     const [fromPage, fromSite] = await Promise.all([describePage(url), describeByOembed(url)]);
     if (!fromPage && !fromSite) return null;
+    const declared = (value: string | undefined, guessed: boolean | undefined) =>
+        guessed ? "" : value || "";
     return {
-        title: fromPage?.title || fromSite?.title || "",
+        // A site that answered about a post with no caption has said the title
+        // is empty; the page's generic `<title>` is not the post's either.
+        title:
+            declared(fromPage?.title, fromPage?.guessed?.title) ||
+            fromSite?.title ||
+            (fromSite ? "" : fromPage?.title) ||
+            "",
         author: fromSite?.author || fromPage?.author || "",
         accent: fromPage?.accent ?? null,
-        siteName: fromPage?.siteName || fromSite?.siteName || "",
+        siteName:
+            declared(fromPage?.siteName, fromPage?.guessed?.siteName) ||
+            fromSite?.siteName ||
+            fromPage?.siteName ||
+            "",
         imageUrl: fromPage?.imageUrl ?? fromSite?.imageUrl ?? null,
         description: fromPage?.description || ""
     };
@@ -263,13 +349,17 @@ async function describeByOembed(url: URL): Promise<Described | null> {
 
     const text = (value: unknown): string => (typeof value === "string" ? value : "");
     const title = text(payload.title).slice(0, 200);
-    if (!title) return null;
+    const author = text(payload.author_name).slice(0, 100);
+    // An answer with no title is usually an answer about nothing. The exception
+    // is a playable link whose post simply has no caption: TikTok answers those
+    // with the account and the picture, which is the whole card Discord draws.
+    if (!title && !(author && embedFor(url.href))) return null;
 
     return {
         title,
         // The uploader, which is what a video card is actually asked: who made
         // this. There is no description in an oEmbed answer.
-        author: text(payload.author_name).slice(0, 100),
+        author,
         accent: null,
         siteName: (text(payload.provider_name) || url.hostname).slice(0, 100),
         imageUrl: absolute(text(payload.thumbnail_url), url),
@@ -313,11 +403,14 @@ async function describePage(url: URL): Promise<Described | null> {
     const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 
     const image = meta(html, "og:image") ?? meta(html, "twitter:image");
+    const ogTitle = meta(html, "og:title");
+    const ogSiteName = meta(html, "og:site_name");
     return {
-        title: (meta(html, "og:title") ?? titleTag(html) ?? "").slice(0, 200),
+        title: (ogTitle ?? titleTag(html) ?? "").slice(0, 200),
         author: (meta(html, "article:author") ?? meta(html, "author") ?? "").slice(0, 100),
         accent: await accentOf(html, url),
-        siteName: (meta(html, "og:site_name") ?? url.hostname).slice(0, 100),
+        siteName: (ogSiteName ?? url.hostname).slice(0, 100),
+        guessed: { title: ogTitle === null, siteName: ogSiteName === null },
         imageUrl: image ? absolute(image, url) : null,
         description: (
             meta(html, "og:description") ??
