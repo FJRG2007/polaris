@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Model providers and their request shapes, as GenOffice speaks them. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "description": "Model providers and their request shapes, as GenOffice speaks them. Ported from GenOffice (Apache-2.0) - github.com/genspark-ai/genoffice.",
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",

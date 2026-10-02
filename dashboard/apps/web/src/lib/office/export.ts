@@ -6,11 +6,11 @@
  * this is the half that knows what each editor keeps and how to pack a zip.
  *
  * **Word and PowerPoint go through the real engines.** `@polaris/docx` and
- * `@polaris/pptx` are ported from GenOffice (Apache-2.0, see NOTICE) and are the
- * OOXML packages proper - styles, numbering, sections, layouts, the parts a
- * reader other than Word will look for. This file used to write those two by
- * hand: a zip with the minimum set of parts, which opened, and which was a
- * document with no styles in it.
+ * `@polaris/pptx` are ported from GenOffice (github.com/genspark-ai/genoffice,
+ * Apache-2.0) and are the OOXML packages proper - styles, numbering, sections,
+ * layouts, the parts a reader other than Word will look for. This file used to
+ * write those two by hand: a zip with the minimum set of parts, which opened,
+ * and which was a document with no styles in it.
  *
  * The spreadsheet still goes through the library the Drive viewer already
  * carries, so there is one spreadsheet writer in this repository rather than

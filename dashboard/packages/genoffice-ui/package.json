@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "GenOffice's own components: its ribbon, colour picker, shape gallery and Markdown view. Ported from GenOffice (Apache-2.0) - see NOTICE. Kept apart from @polaris/ui, which is Polaris' own design system.",
+    "description": "GenOffice's own components: its ribbon, colour picker, shape gallery and Markdown view. Ported from GenOffice (Apache-2.0) - github.com/genspark-ai/genoffice. Kept apart from @polaris/ui, which is Polaris' own design system.",
     "exports": {
         ".": {
             "types": "./src/index.ts",

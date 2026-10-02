@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Turning a PDF into an editable Word document: text runs, columns, tables, images. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "description": "Turning a PDF into an editable Word document: text runs, columns, tables, images. Ported from GenOffice (Apache-2.0) - github.com/genspark-ai/genoffice.",
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",

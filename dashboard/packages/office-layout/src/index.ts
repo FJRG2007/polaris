@@ -1,10 +1,11 @@
 /**
  * How a page, a slide and a PDF are laid out.
  *
- * Ported from GenOffice's three editors (Apache-2.0, see NOTICE) - the parts of
- * them that are geometry rather than application: how a document breaks into
- * pages and where its lines fall, how a shape snaps and where its handles are,
- * how a PDF's text lines and columns are found and how its pages spread.
+ * Ported from GenOffice's three editors (github.com/genspark-ai/genoffice,
+ * Apache-2.0) - the parts of them that are geometry rather than application:
+ * how a document breaks into pages and where its lines fall, how a shape snaps
+ * and where its handles are, how a PDF's text lines and columns are found and
+ * how its pages spread.
  *
  * Nothing here reaches a canvas, a DOM, a database or Electron. That is what
  * made it portable out of an application Polaris cannot use, and it is what

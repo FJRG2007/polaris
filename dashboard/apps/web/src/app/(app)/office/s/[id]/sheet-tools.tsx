@@ -5,9 +5,9 @@
  *
  * Univer's open edition ships the grid, the formulas and the formatting, and
  * deliberately does not ship these - they are what its makers sell. The engine
- * behind them is ported from GenOffice (Apache-2.0, see NOTICE) and lives in
- * `@polaris/core/sheets`, pure and tested; this is the screen that points it at
- * a range.
+ * behind them is ported from GenOffice (github.com/genspark-ai/genoffice,
+ * Apache-2.0) and lives in `@polaris/core/sheets`, pure and tested; this is the
+ * screen that points it at a range.
  *
  * **Both write through the shared document rather than through the grid.** The
  * cells in Yjs are what two people typing at once agree about, and what a reload

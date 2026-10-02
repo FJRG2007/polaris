@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Font metrics without a font file: the tables a layout needs to measure text. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "description": "Font metrics without a font file: the tables a layout needs to measure text. Ported from GenOffice (Apache-2.0) - github.com/genspark-ai/genoffice.",
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",

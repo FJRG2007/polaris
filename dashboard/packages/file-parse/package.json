@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Reading text out of a document, whatever it is: Office, PDF, the old binary formats. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "description": "Reading text out of a document, whatever it is: Office, PDF, the old binary formats. Ported from GenOffice (Apache-2.0) - github.com/genspark-ai/genoffice.",
     "exports": {
         ".": {
             "types": "./src/index.ts",
