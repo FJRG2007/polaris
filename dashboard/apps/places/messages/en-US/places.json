@@ -531,7 +531,7 @@
         "greeRefused": "The air conditioner refused that.",
         "greeUnpaired": "Polaris is not paired with these air conditioners any more. Connect them again.",
         "greeNoneThere": "No Gree air conditioner answered at that address. Check it is switched on at the wall and on the same network as Polaris.",
-        "greeNoneFound": "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "greeNoneFound": "No Gree air conditioner answered on this network. Type the unit's IP or MAC address instead: the Gree+ app shows its MAC.",
         "greeNoPair": "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
         "airNoHumidity": "That device does not humidify",
         "airHumidity": "That humidity is not one this device accepts",
@@ -541,7 +541,7 @@
         "philipsRefused": "The air purifier refused that.",
         "philipsLost": "Polaris has lost track of these air purifiers. Connect them again.",
         "philipsNoneThere": "No Philips air purifier answered at that address. Check it is switched on and on the same network as Polaris.",
-        "philipsNoneFound": "No Philips air purifier answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "philipsNoneFound": "No Philips air purifier answered on this network. Type the unit's IP or MAC address instead: your router lists both among its connected devices.",
         "philipsNoRead": "The air purifiers on this network said who they are but would not answer a read. Switch them off and on again and try once more.",
         "philipsCloudUnreachable": "Philips' cloud could not be reached.",
         "philipsCloudGarbled": "Philips' cloud answered in a way Polaris could not read.",
@@ -564,7 +564,8 @@
         "pairingRanOut": "That step took too long and has run out. Start connecting again.",
         "uploadToGoOn": "Upload the Philips Air+ app file to go on",
         "fileTooLarge": "That file is larger than an app file can be.",
-        "fileEmpty": "Nothing arrived. Choose the file again."
+        "fileEmpty": "Nothing arrived. Choose the file again.",
+        "macNotFound": "Nothing on this network answers as {mac}. Check the device is switched on and on the same network as Polaris, or type its IP address instead."
     },
     "connections": {
         "nuki-web": {
@@ -862,12 +863,12 @@
             "note": "Polaris finds the units on your network and pairs with each one, the way Home Assistant does. They have to be set up in the Gree+ app first, and on the same network as Polaris.",
             "steps": {
                 "s0": "Set the air conditioner up in the Gree+ app, on the same Wi-Fi network as Polaris.",
-                "s1": "Select Connect. Leave the address empty to look for every unit, or type one to pair just that unit."
+                "s1": "Pick a unit from the list, type its IP or MAC, or leave the address empty to pair every unit."
             },
             "fields": {
                 "host": {
                     "label": "Unit address",
-                    "hint": "Optional. Empty looks for every unit on this network; your router lists each unit's address among its connected devices.",
+                    "hint": "Optional. Empty pairs every unit found. The Gree+ app shows each unit's MAC.",
                     "placeholder": "192.168.1.40"
                 }
             }
@@ -916,7 +917,9 @@
                 }
             }
         },
-        "notEmail": "Type a whole email address, like name@example.com."
+        "notEmail": "Type a whole email address, like name@example.com.",
+        "macShort": "A MAC address has 12 digits.",
+        "macReserved": "That is not a device's MAC address."
     },
     "actions": {
         "defaultStorage": "Wherever this Polaris keeps footage ({name})",
@@ -1550,7 +1553,25 @@
             "fileSend": "Upload"
         },
         "unsupported": "Connected. {count, plural, one {This model is} other {These models are}} not supported yet ({models}): listed with power and what {count, plural, one {it reports} other {they report}}, but modes cannot be set from Polaris yet.",
-        "done": "Done"
+        "done": "Done",
+        "address": {
+            "mode": "Give the address as",
+            "byIp": "IP or name",
+            "byMac": "MAC",
+            "macPlaceholder": "AA:BB:CC:DD:EE:FF",
+            "macHint": "Polaris finds the IP itself, and follows it if the router changes it.",
+            "digits": "{count} of 12 digits"
+        },
+        "found": {
+            "title": "Found on your network",
+            "scanning": "Looking on your network",
+            "none": "Nothing answered. Type its IP or MAC below.",
+            "failed": "The search did not finish. Look again, or type the address below.",
+            "again": "Search again",
+            "use": "Use {name}",
+            "noMac": "MAC unknown",
+            "copyMac": "Copy MAC {mac}"
+        }
     },
     "discover": {
         "intro": "Polaris asks the network first. Give it an address range as well if your cameras sit behind a repeater or an access point that blocks that.",

@@ -19,6 +19,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { HomeError } from "./home-error";
 import * as registry from "./device-connections";
+import { withAddresses } from "./driver-addresses";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { NUKI_WEB, nukiWebDriver } from "./drivers/nuki-web";
 import { NUKI_LOCAL, nukiLocalDriver } from "./drivers/nuki-local";
@@ -39,6 +40,7 @@ import {
     type Credentials,
     type DeviceDriver,
     type DevicePairing,
+    type DiscoveredUnit,
     type PairingPoll,
     type PairingStart
 } from "./drivers/contract";
@@ -49,7 +51,7 @@ import {
  * Adding a make is an entry here and an entry in the registry. Nothing else in
  * the app names one, which is the whole point of the shape.
  */
-const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
+const BUILT: Readonly<Record<string, DeviceDriver>> = {
     [NUKI_WEB]: nukiWebDriver,
     [NUKI_LOCAL]: nukiLocalDriver,
     [TUYA_APP]: tuyaAppDriver,
@@ -66,6 +68,12 @@ const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [PHILIPS_COAP]: philipsCoapDriver,
     [PHILIPS_CLOUD]: philipsCloudDriver
 };
+
+/** The drivers as everything here uses them: an address field may hold a MAC,
+ *  which each call is handed as the IP it answers on now (`driver-addresses.ts`). */
+const DRIVERS: Readonly<Record<string, DeviceDriver>> = Object.fromEntries(
+    Object.entries(BUILT).map(([connection, driver]) => [connection, withAddresses(driver)])
+);
 
 export function driverFor(connection: string): DeviceDriver {
     const driver = DRIVERS[connection];
@@ -408,6 +416,45 @@ export async function markSynced(id: string): Promise<void> {
         where: { id },
         data: { status: "ok", statusNote: null, lastSyncedAt: new Date() }
     });
+}
+
+// ---------------------------------------------------------------------------
+// Finding units
+// ---------------------------------------------------------------------------
+
+/** Scans in flight and what the last one found, per connection: a dialog opened
+ *  twice, or by two people, asks the network once. */
+const scans = new Map<string, { at: number; running: boolean; value: Promise<DiscoveredUnit[]> }>();
+/** A scan answers for this long before the network is asked again. */
+const SCAN_TTL_MS = 15_000;
+
+/** The units a connection finds on the network by itself, for the connect
+ *  dialog to offer. `fresh` is somebody pressing "look again"; a scan that is
+ *  still running is joined either way. */
+export async function discoverUnits(connection: string, fresh = false): Promise<DiscoveredUnit[]> {
+    const driver = isConnectable(connection) ? DRIVERS[connection] : undefined;
+    if (!driver?.discover || registry.deviceConnection(connection)?.discovery !== true) {
+        throw new HomeError("Polaris cannot connect that yet");
+    }
+    const held = scans.get(connection);
+    if (held && (held.running || (!fresh && Date.now() - held.at < SCAN_TTL_MS))) {
+        return held.value;
+    }
+    const entry = {
+        at: Date.now(),
+        running: true,
+        value: speaking(() => driver.discover!())
+    };
+    scans.set(connection, entry);
+    entry.value.then(
+        () => {
+            entry.running = false;
+        },
+        () => {
+            if (scans.get(connection) === entry) scans.delete(connection);
+        }
+    );
+    return entry.value;
 }
 
 // ---------------------------------------------------------------------------

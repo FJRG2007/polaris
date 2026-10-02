@@ -17,7 +17,7 @@
  */
 
 import { z } from "zod";
-import { isLocalAddress } from "@polaris/core";
+import { isLocalAddress, macHex } from "@polaris/core";
 
 /** What a device said about itself, or what the host's neighbour table said
  *  about it. Every field is optional because every source can be missing: the
@@ -65,10 +65,7 @@ export function readRemembered(value: unknown): RememberedIdentity | null {
 /** One normal spelling of a hardware address, or undefined for one that is not
  *  usable - including the all-zero address an incomplete neighbour entry shows. */
 export function normalizeMac(value: string | undefined | null): string | undefined {
-    if (!value) return undefined;
-    const hex = value.toLowerCase().replace(/[^0-9a-f]/g, "");
-    if (hex.length !== 12 || /^0+$/.test(hex) || /^f+$/.test(hex)) return undefined;
-    return hex.match(/../g)!.join(":");
+    return macHex(value)?.match(/../g)!.join(":");
 }
 
 /** Identity fields in their stored spelling, empty ones dropped. */

@@ -64,7 +64,7 @@ import { host } from "@polaris/app-host";
 import type { MessageParams } from "@polaris/core";
 import { placesT } from "../lib/i18n";
 import type { PlacesKey } from "../../messages";
-import type { PairingNext } from "../lib/drivers/contract";
+import type { DiscoveredUnit, PairingNext } from "../lib/drivers/contract";
 import { placesRefusalText } from "../lib/refusal-text";
 import { guard } from "../lib/action-guard";
 import { connectionWords } from "../lib/device-connections";
@@ -1450,6 +1450,26 @@ export async function startDevicePairingAction(input: unknown): Promise<{
     );
     if (result.error || !result.value) return { error: result.error };
     return { state: { ...result.value.state }, qr: result.value.qr };
+}
+
+/**
+ * The units a connection finds on the network by itself (a Gree scan, a Philips
+ * one), for the connect dialog to offer before anything is typed. Administrative,
+ * as connecting is: it is a look around somebody's network.
+ */
+export async function discoverDeviceUnitsAction(input: unknown): Promise<{
+    units?: DiscoveredUnit[];
+    error?: string;
+}> {
+    await requireHome("home.manage");
+    const parsed = schemas.discoverUnitsSchema.safeParse(input ?? {});
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
+    const result = await guard(() =>
+        deviceAccounts.discoverUnits(parsed.data.connection, parsed.data.fresh)
+    );
+    if (result.error || !result.value) return { error: result.error };
+    return { units: result.value };
 }
 
 /**

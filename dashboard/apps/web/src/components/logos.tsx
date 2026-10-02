@@ -90,6 +90,7 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     philipshue: brand.PhilipsHueMark,
     ikea: brand.IkeaMark,
     homeassistant: brand.HomeAssistantMark,
+    mqtt: brand.MqttMark,
     vercel: brand.VercelMark,
     railway: brand.RailwayMark,
     aws: brand.AwsMark
@@ -116,9 +117,11 @@ const SERVICE_IMAGES: Record<string, string> = {
     // SwitchBot's own wordmark, as their site serves it (switch-bot.com). Not in
     // any vector registry; their single brand red reads on both surfaces.
     switchbot: "/logos/switchbot.svg",
-    // Gree's emblem, cut from their own logo file (Wikimedia Commons, credited to
-    // gree.com) without the wordmark, which is unreadable at icon size. Their
-    // blue and orange, as published.
+    // Gree's emblem, cut from the logo Gree's own US company serves
+    // (greecomfort.com/assets/logo/gree-logo.svg) without the wordmark, which is
+    // unreadable at icon size. Paths and colours (#033ca6, #fb671a) untouched;
+    // only the view box is narrowed to the emblem. It replaced a third-party
+    // redraw whose shape and colours were off.
     gree: "/logos/gree.svg",
     // The Philips shield as Philips publish it in their 2019 annual report
     // (Wikimedia Commons, "Philips shield (2013).svg", public domain), editor

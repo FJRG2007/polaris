@@ -531,7 +531,7 @@
         "greeRefused": "El aire acondicionado lo rechazó.",
         "greeUnpaired": "Polaris ya no está emparejado con estos aires. Vuelve a conectarlos.",
         "greeNoneThere": "Ningún aire Gree respondió en esa dirección. Comprueba que tiene corriente y está en la misma red que Polaris.",
-        "greeNoneFound": "Ningún aire Gree respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
+        "greeNoneFound": "Ningún aire Gree respondió en esta red. Escribe la IP o la MAC del aparato: la app Gree+ muestra su MAC.",
         "greeNoPair": "El aire respondió pero no quiso emparejarse. Quítale la corriente un minuto y vuelve a intentarlo.",
         "airNoHumidity": "Ese dispositivo no humidifica",
         "airHumidity": "Este dispositivo no admite esa humedad",
@@ -541,7 +541,7 @@
         "philipsRefused": "El purificador lo rechazó.",
         "philipsLost": "Polaris ha perdido la pista de estos purificadores. Vuelve a conectarlos.",
         "philipsNoneThere": "Ningún purificador Philips respondió en esa dirección. Comprueba que está encendido y en la misma red que Polaris.",
-        "philipsNoneFound": "Ningún purificador Philips respondió en esta red. Escribe la dirección del aparato: tu router la muestra entre los dispositivos conectados.",
+        "philipsNoneFound": "Ningún purificador Philips respondió en esta red. Escribe la IP o la MAC del aparato: tu router muestra ambas entre sus dispositivos.",
         "philipsNoRead": "Los purificadores de esta red dijeron quiénes son pero no respondieron a una lectura. Apágalos y enciéndelos, y vuelve a intentarlo.",
         "philipsCloudUnreachable": "No se ha podido llegar a la nube de Philips.",
         "philipsCloudGarbled": "La nube de Philips ha respondido de una forma que Polaris no entiende.",
@@ -564,7 +564,8 @@
         "pairingRanOut": "Ese paso ha tardado demasiado y ha caducado. Vuelve a empezar la conexión.",
         "uploadToGoOn": "Sube el archivo de la app Philips Air+ para seguir",
         "fileTooLarge": "Ese archivo es más grande de lo que puede ser una app.",
-        "fileEmpty": "No ha llegado nada. Vuelve a elegir el archivo."
+        "fileEmpty": "No ha llegado nada. Vuelve a elegir el archivo.",
+        "macNotFound": "Nada en esta red responde como {mac}. Comprueba que el dispositivo está encendido y en la misma red que Polaris, o escribe su IP."
     },
     "connections": {
         "nuki-web": {
@@ -862,12 +863,12 @@
             "note": "Polaris busca los aparatos en tu red y se empareja con cada uno, como hace Home Assistant. Antes tienen que estar configurados en la app Gree+ y en la misma red que Polaris.",
             "steps": {
                 "s0": "Configura el aire en la app Gree+, en la misma red wifi que Polaris.",
-                "s1": "Pulsa Conectar. Deja la dirección vacía para buscar todos los aparatos, o escribe una para emparejar solo ese."
+                "s1": "Elige un aparato de la lista, escribe su IP o MAC, o deja la dirección vacía para emparejarlos todos."
             },
             "fields": {
                 "host": {
                     "label": "Dirección",
-                    "hint": "Opcional. Vacía busca todos los aparatos de esta red; tu router muestra la dirección de cada uno entre sus dispositivos conectados.",
+                    "hint": "Opcional. Vacía empareja todos los que encuentre. La app Gree+ muestra la MAC de cada uno.",
                     "placeholder": "192.168.1.40"
                 }
             }
@@ -916,7 +917,9 @@
                 }
             }
         },
-        "notEmail": "Escribe un email completo, como nombre@ejemplo.com."
+        "notEmail": "Escribe un email completo, como nombre@ejemplo.com.",
+        "macShort": "Una MAC tiene 12 dígitos.",
+        "macReserved": "Esa no es la MAC de un dispositivo."
     },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",
@@ -1550,7 +1553,25 @@
             "fileSend": "Subir"
         },
         "unsupported": "Conectado. {count, plural, one {Este modelo aún no es compatible} other {Estos modelos aún no son compatibles}} ({models}): se muestran con encendido y lo que {count, plural, one {informa} other {informan}}, pero sus modos aún no se pueden cambiar desde Polaris.",
-        "done": "Listo"
+        "done": "Listo",
+        "address": {
+            "mode": "Dar la dirección como",
+            "byIp": "IP o nombre",
+            "byMac": "MAC",
+            "macPlaceholder": "AA:BB:CC:DD:EE:FF",
+            "macHint": "Polaris busca la IP por su cuenta y la sigue si el router la cambia.",
+            "digits": "{count} de 12 dígitos"
+        },
+        "found": {
+            "title": "En tu red",
+            "scanning": "Buscando en tu red",
+            "none": "Nada respondió. Escribe su IP o MAC abajo.",
+            "failed": "La búsqueda no terminó. Busca otra vez o escribe la dirección abajo.",
+            "again": "Buscar otra vez",
+            "use": "Usar {name}",
+            "noMac": "Sin MAC",
+            "copyMac": "Copiar MAC {mac}"
+        }
     },
     "discover": {
         "intro": "Polaris pregunta primero a la red. Dale también un rango de direcciones si tus cámaras están tras un repetidor o un punto de acceso que lo bloquee.",

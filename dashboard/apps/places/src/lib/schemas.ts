@@ -369,6 +369,14 @@ export const deviceAccountSchema = z.object({
 
 export type DeviceAccountInput = z.infer<typeof deviceAccountSchema>;
 
+/** Asking a connection which units it finds on the network. `fresh` is the
+ *  "look again" button: anything else may be answered from a scan a few
+ *  seconds old. */
+export const discoverUnitsSchema = z.object({
+    connection: z.string().trim().min(1, "Pick how to connect it").max(64),
+    fresh: z.boolean().default(false)
+});
+
 /**
  * One step of pairing: the same connection, label and fields, plus what the
  * attempt was started with and, when this is a reconnect, the account it is for.

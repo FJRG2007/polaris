@@ -212,4 +212,24 @@ export interface DeviceDriver {
     /** Tell the other side this connection is gone, where it keeps a sign-in of
      *  its own. Best effort: the account is removed whether or not it answers. */
     forget?(credentials: Credentials): Promise<void>;
+    /**
+     * The units this connection can find on the network by itself, for the
+     * connect dialog to offer before anything is typed. Present only where the
+     * make answers a scan (`DeviceConnection.discovery` in the registry).
+     */
+    discover?(): Promise<DiscoveredUnit[]>;
+    /** Where one of its units is now, found by its hardware address in the
+     *  make's own way, or null. Used when an address field holds a MAC
+     *  (`driver-addresses.ts`). */
+    locate?(mac: string): Promise<string | null>;
+}
+
+/** A unit a scan found: what it calls itself and where it is. */
+export interface DiscoveredUnit {
+    readonly name: string;
+    readonly model: string;
+    /** `AA:BB:CC:DD:EE:FF`, or null when neither the unit nor the host's
+     *  neighbour table said. */
+    readonly mac: string | null;
+    readonly address: string;
 }
