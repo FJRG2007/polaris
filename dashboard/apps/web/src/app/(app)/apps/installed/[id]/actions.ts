@@ -11,6 +11,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
@@ -18,7 +19,9 @@ import { installRef } from "@/lib/apps/install-access";
 import { afterInstallStarts, beforeInstallStops } from "@/lib/app-extensions/registry";
 import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
-import { requirePermissionOn, type ResourceAccess } from "@/lib/resource-access";
+import type { DeployStrategy } from "@/lib/deploy/releases";
+import { deployBehaviour } from "@/lib/deploy/deploy-behaviour";
+import { requirePermissionOn, resourceAccess, type ResourceAccess } from "@/lib/resource-access";
 
 /** The backing application, resolved on the owner's behalf. */
 async function applicationFor(access: ResourceAccess, id: string): Promise<string> {
@@ -27,6 +30,21 @@ async function applicationFor(access: ResourceAccess, id: string): Promise<strin
     if (!app) throw new Error(t("errors.notFound"));
     if (!app.applicationId) throw new Error(t("errors.noDeployment"));
     return app.applicationId;
+}
+
+/** What a redeploy does to the running version, for whoever may redeploy this
+ *  install. Null rather than a refusal: it is a note, never a reason to leave. */
+export async function redeployStrategyAction(id: string): Promise<DeployStrategy | null> {
+    try {
+        const user = await requireUser();
+        const access = await resourceAccess(user, installRef(id), "deploy.manage");
+        if (!access) return null;
+        const app = await getInstalledApp(access.ownerId, id);
+        if (!app?.applicationId) return null;
+        return (await deployBehaviour(app.applicationId, access.ownerId)).strategy;
+    } catch {
+        return null;
+    }
 }
 
 export async function redeployInstalledAppAction(id: string): Promise<{ error?: string }> {

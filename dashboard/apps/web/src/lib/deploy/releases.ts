@@ -144,6 +144,7 @@ export interface CutoverSubject {
 export type RestartReason =
     | { readonly code: "hostPort"; readonly port: number; readonly protocol: "tcp" | "udp" }
     | { readonly code: "volumes"; readonly names: readonly string[] }
+    | { readonly code: "newVolumes"; readonly names: readonly string[] }
     | { readonly code: "compose" }
     | { readonly code: "edge" }
     | { readonly code: "history" }
@@ -222,6 +223,30 @@ export function deployStrategy(
     // A service set to keep its releases where it cannot (another server) is
     // replaced in place, and says that is why when nothing else does.
     return { mode: "restart", reasons: reasons.length > 0 ? reasons : [{ code: "history" }] };
+}
+
+/**
+ * The named volumes a change-over release would mount that do not exist yet. It
+ * mounts them by name as external, which Docker refuses for a volume nobody made
+ * yet - and the one that makes them is a deploy in the service's own project. So
+ * a service deploying for the first time, or with a volume added since its running
+ * release started, is deployed in place this once and changes over from then on.
+ */
+export async function volumesNotYetMade(app: {
+    readonly currentDeploymentId: string | null;
+    readonly volumes: readonly { readonly name: string; readonly kind: string; readonly createdAt: Date }[];
+}): Promise<string[]> {
+    const named = app.volumes.filter((volume) => volume.kind !== "bind" && volume.kind !== "nas");
+    if (named.length === 0) return [];
+    const current = app.currentDeploymentId
+        ? await prisma.deployment.findUnique({
+              where: { id: app.currentDeploymentId },
+              select: { status: true, startedAt: true, createdAt: true }
+          })
+        : null;
+    if (current?.status !== "running") return named.map((volume) => volume.name);
+    const since = current.startedAt ?? current.createdAt;
+    return named.filter((volume) => volume.createdAt > since).map((volume) => volume.name);
 }
 
 /**

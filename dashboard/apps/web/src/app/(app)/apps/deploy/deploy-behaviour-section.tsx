@@ -68,7 +68,7 @@ export function DeployBehaviourSection({ applicationId, canConfigure }: { applic
         if (parsed.success) return found;
         for (const issue of parsed.error.issues) {
             const [index, field] = issue.path;
-            const key = typeof index === "number" ? `${filled[index]?.name ?? ""}:${String(field ?? "name")}` : "list";
+            const key = typeof index === "number" ? `${filled[index]?.name.trim() ?? ""}:${String(field ?? "name")}` : "list";
             if (!found.has(key)) found.set(key, issue.message);
         }
         return found;
@@ -243,6 +243,8 @@ function reasonText(reason: RestartReason, t: T): string {
             return t("behaviour.reason.hostPort", { port: reason.port, protocol: reason.protocol.toUpperCase() });
         case "volumes":
             return t("behaviour.reason.volumes", { names: reason.names.join(", ") });
+        case "newVolumes":
+            return t("behaviour.reason.newVolumes", { names: reason.names.join(", ") });
         case "compose":
             return t("behaviour.reason.compose");
         case "edge":

@@ -7,7 +7,7 @@
 
 import { prisma } from "@polaris/db";
 import { hostPortForApp } from "./host-port";
-import { deployStrategy, type DeployStrategy } from "./releases";
+import { deployStrategy, volumesNotYetMade, type DeployStrategy } from "./releases";
 import { storedExternalNetworks, type ExternalNetwork } from "./external-networks";
 
 export interface DeployBehaviourView {
@@ -35,7 +35,8 @@ export async function deployBehaviour(applicationId: string, ownerId: string): P
             sourceConfig: true,
             overlapVolumes: true,
             externalNetworks: true,
-            volumes: { select: { name: true } },
+            currentDeploymentId: true,
+            volumes: { select: { name: true, kind: true, createdAt: true } },
             target: { select: { kind: true, hostId: true, runtime: true } }
         }
     });
@@ -49,8 +50,13 @@ export async function deployBehaviour(applicationId: string, ownerId: string): P
             .then((edge) => edge.pushable)
             .catch(() => false);
     }
+    const strategy = deployStrategy(app, { followsPushedRoutes }, hostPortForApp);
+    // The deploy itself runs in place once more while a volume it would share is
+    // not made yet, and the screen says so rather than promising no gap.
+    const notYetMade = strategy.mode === "overlap" ? await volumesNotYetMade(app) : [];
     return {
-        strategy: deployStrategy(app, { followsPushedRoutes }, hostPortForApp),
+        strategy:
+            notYetMade.length > 0 ? { mode: "restart", reasons: [{ code: "newVolumes", names: notYetMade }] } : strategy,
         hasVolumes: app.volumes.length > 0,
         overlapChoice: app.volumes.length > 0 && app.target.runtime === "compose",
         overlapVolumes: app.overlapVolumes,

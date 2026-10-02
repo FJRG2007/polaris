@@ -67,7 +67,7 @@ vi.mock("@polaris/db", () => {
             application: {
                 findUnique: vi.fn(async () => db.app),
                 findFirst: vi.fn(async () => db.app),
-                findMany: vi.fn(async () => []),
+                findMany: vi.fn(async () => [db.app]),
                 update: vi.fn(async (args: { data: Record<string, unknown> }) => Object.assign(db.app, args.data))
             },
             domain: {
@@ -174,6 +174,7 @@ beforeEach(() => {
         sourceConfig: '{"port":3000}',
         replicas: 1,
         asleepSince: null,
+        volumes: [],
         target: { kind: "local", hostId: null, runtime: "compose" },
         environment: { project: { slug: "acme", ownerId: "owner-1" } }
     });
@@ -239,5 +240,74 @@ describe("a change-over redeploy of a routed service", () => {
         expect(ops).toContain(`down ${projectOf("dep-old")}`);
         expect(ops).toContain(`down ${projectOf("dep-new")}`);
         expect(ops.indexOf("drain")).toBeLessThan(ops.indexOf(`down ${projectOf("dep-old")}`));
+    });
+
+    it("retires a release the edge could not be moved off once a later route sync reaches it", async () => {
+        routerSync.fail = true;
+        db.deployments.get("dep-new")!.createdAt = new Date("2026-10-01T11:00:00Z");
+        await service.executeDeployment("dep-new", TARGET as never, "owner-1", release(true));
+        routerSync.fail = false;
+        ops.length = 0;
+
+        await service.syncAppRoutes();
+
+        expect(ops).toEqual([
+            `route shop.example.test -> ${nameOf("dep-new")}`,
+            "drain",
+            `down ${projectOf("dep-old")}`
+        ]);
+        expect(db.deployments.get("dep-old")?.status).toBe("removed");
+        expect(db.deployments.get("dep-new")?.status).toBe("running");
+    });
+
+    it("never retires a release newer than the one serving", async () => {
+        db.deployments.get("dep-new")!.status = "running";
+        db.deployments.get("dep-new")!.createdAt = new Date("2026-10-01T11:00:00Z");
+
+        await service.syncAppRoutes();
+
+        expect(ops).toEqual([`route shop.example.test -> ${nameOf("dep-old")}`]);
+        expect(db.deployments.get("dep-new")?.status).toBe("running");
+    });
+});
+
+describe("an in-place deploy after a change-over release that shares its volumes", () => {
+    function inPlace() {
+        Object.assign(db.deployments.get("dep-new")!, { isolated: false, cutover: false });
+        db.app.volumes = [{ kind: "volume" }];
+        const ports = {
+            composeUp: vi.fn(async (spec: { project: string }) => void ops.push(`up ${spec.project}`)),
+            composeDown: vi.fn(async (project: string) => void ops.push(`down ${project}`)),
+            pull: vi.fn(async () => undefined)
+        };
+        return { ports, log: vi.fn() };
+    }
+
+    it("stops the change-over release right before the in-place one starts on the same volumes", async () => {
+        const ctx = inPlace();
+        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+
+        await wrapped.ports.pull("img");
+        expect(ops).toEqual([]);
+        await wrapped.ports.composeUp({ project: base.project } as never);
+        await wrapped.ports.composeUp({ project: base.project } as never);
+
+        expect(ops).toEqual([`down ${projectOf("dep-old")}`, `up ${base.project}`, `up ${base.project}`]);
+    });
+
+    it("leaves the running release alone when the service has no named volume", async () => {
+        const ctx = inPlace();
+        db.app.volumes = [{ kind: "bind" }];
+        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+
+        expect(wrapped).toBe(ctx);
+    });
+
+    it("leaves it alone for a deploy that changes over itself", async () => {
+        const ctx = inPlace();
+        Object.assign(db.deployments.get("dep-new")!, { isolated: true, cutover: true });
+        const wrapped = await service.sharedVolumesFreedBeforeUp("dep-new", { ref: base } as never, ctx as never);
+
+        expect(wrapped).toBe(ctx);
     });
 });

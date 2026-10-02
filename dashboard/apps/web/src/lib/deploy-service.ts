@@ -79,7 +79,8 @@ import {
     portSubject,
     releaseRef,
     runsCutover,
-    serviceRef
+    serviceRef,
+    volumesNotYetMade
 } from "./deploy/releases";
 import {
     appEdgeConfigSchema,
@@ -1202,8 +1203,19 @@ async function repointConnectors(applicationId: string, ownerId: string): Promis
  * be reached, so a change-over that depends on one taking the new route can keep
  * the old release serving instead of taking down the only one the edge still
  * dials. A failure to write this machine's own file throws.
+ *
+ * Once an edge has taken the routes, a release a change-over kept running only
+ * because its edge could not be told before is retired here (`retireHeldReleases`).
  */
 export async function syncAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
+    const result = await publishAppRoutes();
+    await retireHeldReleases(result.unreachedHosts).catch((error) => {
+        console.error("polaris: could not retire the releases an edge was moved off:", error);
+    });
+    return result;
+}
+
+async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
     const domains = await prisma.domain.findMany({
         where: { enabled: true },
         select: {
@@ -2744,41 +2756,18 @@ async function changesOver(
     app: Parameters<typeof runsCutover>[0] & {
         target: { kind: string; hostId: string | null };
         currentDeploymentId: string | null;
-        volumes: readonly { kind: string; createdAt: Date }[];
+        volumes: readonly { name: string; kind: string; createdAt: Date }[];
     },
     ownerId: string
 ): Promise<boolean> {
     const hostId = app.target.kind === "local" ? null : app.target.hostId;
     if (!runsCutover(app, { followsPushedRoutes: true })) return false;
-    if (!(await namedVolumesExist(app))) return false;
+    if ((await volumesNotYetMade(app)).length > 0) return false;
     if (!hostId) return true;
     const { readServerEdge } = await import("./deploy/server-edge");
     return runsCutover(app, {
         followsPushedRoutes: (await readServerEdge(hostId, ownerId)).pushable
     });
-}
-
-/**
- * Whether every named volume a change-over release would mount already exists. It
- * mounts them by name as external, which Docker refuses for a volume nobody made
- * yet - and the one that makes them is a deploy in the service's own project. So
- * a service deploying for the first time, or with a volume added since its running
- * release started, is deployed in place this once and changes over from then on.
- */
-async function namedVolumesExist(app: {
-    currentDeploymentId: string | null;
-    volumes: readonly { kind: string; createdAt: Date }[];
-}): Promise<boolean> {
-    const named = app.volumes.filter((volume) => volume.kind !== "bind" && volume.kind !== "nas");
-    if (named.length === 0) return true;
-    if (!app.currentDeploymentId) return false;
-    const current = await prisma.deployment.findUnique({
-        where: { id: app.currentDeploymentId },
-        select: { status: true, startedAt: true, createdAt: true }
-    });
-    if (current?.status !== "running") return false;
-    const since = current.startedAt ?? current.createdAt;
-    return named.every((volume) => volume.createdAt <= since);
 }
 
 /** A service's or database's stored ceilings as a plan carries them. */
@@ -4049,7 +4038,10 @@ function runDeployment(
                 ctx.log(Buffer.from(`==> Failed: ${refused}\n`));
                 return { ok: false, error: refused };
             }
-            const result = await driver.deployApplication(plan, ctx);
+            const result = await driver.deployApplication(
+                plan,
+                scaling ? ctx : await sharedVolumesFreedBeforeUp(deploymentId, plan, ctx)
+            );
             if (result.ok && result.detectedPort) {
                 await rememberDetectedPort(deploymentId, result.detectedPort);
             }
@@ -4065,6 +4057,59 @@ function runDeployment(
         if (plan.build.prebuilt)
             await rm(plan.build.prebuilt.archive, { force: true }).catch(() => undefined);
     });
+}
+
+/**
+ * A deploy in the service's own project, while a change-over release still runs
+ * beside it on that project's named volumes: the change-over release is taken
+ * down right before the new one starts, so the volumes never have two copies
+ * writing to them. A deploy that does not change over was promised a restart,
+ * and this is the restart - after the build, not before it.
+ */
+export async function sharedVolumesFreedBeforeUp(
+    deploymentId: string,
+    plan: AppDeployPlan,
+    ctx: RuntimeContext
+): Promise<RuntimeContext> {
+    const row = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: { isolated: true, deployableId: true }
+    });
+    if (!row || row.isolated) return ctx;
+    const app = await prisma.application.findUnique({
+        where: { id: row.deployableId },
+        include: { environment: { include: { project: true } }, volumes: { select: { kind: true } } }
+    });
+    if (!app?.volumes.some((volume) => volume.kind !== "bind" && volume.kind !== "nas")) return ctx;
+    const current = app.currentDeploymentId
+        ? await prisma.deployment.findUnique({
+              where: { id: app.currentDeploymentId },
+              select: { cutover: true, status: true }
+          })
+        : null;
+    if (!current?.cutover || current.status !== "running") return ctx;
+    const serving = (await currentReleaseRef(app)).project;
+    if (serving === plan.ref.project) return ctx;
+    const ports = ctx.ports;
+    let freed = false;
+    const composeUp: RuntimePorts["composeUp"] = async (spec, onOutput) => {
+        if (!freed && spec.project === plan.ref.project) {
+            freed = true;
+            ctx.log(Buffer.from("==> Stopping the running version: it shares this service's volumes\n"));
+            await ports.composeDown(serving, onOutput);
+        }
+        return ports.composeUp(spec, onOutput);
+    };
+    return {
+        ...ctx,
+        ports: new Proxy(ports, {
+            get: (target, key) => {
+                if (key === "composeUp") return composeUp;
+                const value: unknown = Reflect.get(target, key, target);
+                return typeof value === "function" ? value.bind(target) : value;
+            }
+        })
+    };
 }
 
 /**
@@ -4531,6 +4576,22 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
         select: { deployableType: true, deployableId: true }
     });
     if (dep?.deployableType !== "application") return;
+    promoting.add(dep.deployableId);
+    try {
+        await promoteRelease(deploymentId, dep);
+    } finally {
+        promoting.delete(dep.deployableId);
+    }
+}
+
+/** The services a promotion is under way for: what it replaced is its own to
+ *  drain and retire, never `retireHeldReleases`'. */
+const promoting = new Set<string>();
+
+async function promoteRelease(
+    deploymentId: string,
+    dep: { readonly deployableId: string }
+): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: dep.deployableId },
         select: { keepReleases: true, target: { select: { hostId: true } } }
@@ -4596,6 +4657,55 @@ async function promoteDeployment(deploymentId: string): Promise<void> {
     void import("./cdn").then(({ purgeAfterPromotion }) => purgeAfterPromotion(dep.deployableId));
 }
 
+/**
+ * Retire what a promotion had to keep running because the edge in front of it
+ * could not be told: once a later sync reached that edge, it dials the release now
+ * current and the replaced one is only holding its volumes. Drained first, the way
+ * a promotion does it. Never a release newer than the one serving - that is a
+ * deploy on its way to being promoted - and never one a promotion is handling now.
+ */
+async function retireHeldReleases(unreachedHosts: ReadonlySet<string>): Promise<void> {
+    const running = await prisma.deployment.findMany({
+        where: { deployableType: "application", status: "running" },
+        select: { id: true, deployableId: true, commitSha: true, isolated: true, cutover: true, createdAt: true }
+    });
+    const candidates = [...new Set(running.map((row) => row.deployableId))].filter(
+        (applicationId) => !promoting.has(applicationId)
+    );
+    if (candidates.length === 0) return;
+    const apps = await prisma.application.findMany({
+        where: { id: { in: candidates }, currentDeploymentId: { not: null } },
+        select: { id: true, keepReleases: true, currentDeploymentId: true, target: { select: { hostId: true } } }
+    });
+    const held = new Map<string, typeof running>();
+    for (const app of apps) {
+        if (app.target.hostId && unreachedHosts.has(app.target.hostId)) continue;
+        const current = running.find((row) => row.id === app.currentDeploymentId);
+        if (!current) continue;
+        const replaced = running.filter(
+            (row) =>
+                row.deployableId === app.id &&
+                row.id !== current.id &&
+                row.createdAt < current.createdAt &&
+                (!app.keepReleases || row.cutover)
+        );
+        if (replaced.length === 0) continue;
+        const serving = new Set(await stillServingProjects(app.id, replaced));
+        const retiring = replaced.filter((row) => serving.has(row.id));
+        if (retiring.length > 0) held.set(app.id, retiring);
+    }
+    if (held.size === 0) return;
+    await drain();
+    for (const [applicationId, rows] of held) {
+        if (promoting.has(applicationId)) continue;
+        await retireReplaced(applicationId, rows);
+        await prisma.deployment.updateMany({
+            where: { id: { in: rows.map((row) => row.id) }, status: "running" },
+            data: { status: "removed", finishedAt: new Date() }
+        });
+    }
+}
+
 /** How long a replaced release keeps answering after the change-over: the edge
  *  reads its routes from a watched file (Traefik batches what it sees for up to two
  *  seconds), and the requests already on their way to the old release get to
@@ -4633,7 +4743,7 @@ async function anythingToRetire(
  */
 async function switchEdge(hostId: string | null): Promise<boolean> {
     try {
-        const { unreachedHosts } = await syncAppRoutes();
+        const { unreachedHosts } = await publishAppRoutes();
         return !hostId || !unreachedHosts.has(hostId);
     } catch (error) {
         console.error("polaris: could not write the edge routes:", error);

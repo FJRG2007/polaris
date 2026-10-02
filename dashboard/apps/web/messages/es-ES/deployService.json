@@ -494,6 +494,7 @@
         "reason": {
             "hostPort": "Ocupa el puerto {port}/{protocol} del servidor, y dos versiones no pueden tener el mismo puerto. Desactiva el puerto abierto en Red si solo el dominio necesita llegar a él.",
             "volumes": "Guarda datos en {names}. Dos copias de un programa que bloquea o escribe un archivo ahí pueden fallar o corromperlo, así que la anterior se para primero.",
+            "newVolumes": "Este despliegue crea {names}, así que reinicia esta vez. Los siguientes no cortan el servicio.",
             "compose": "Usa tu propio archivo compose, cuyos nombres Polaris no cambia.",
             "edge": "El edge de este servidor aún no recibe rutas de Polaris. Prepáralo en la página del servidor.",
             "history": "Conserva sus versiones anteriores, que solo corren a la vez en el host de Polaris.",

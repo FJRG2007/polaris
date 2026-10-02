@@ -494,6 +494,7 @@
         "reason": {
             "hostPort": "It binds port {port}/{protocol} on the server, and two versions cannot hold one port. Turn off the open port under Networking if only the domain needs to reach it.",
             "volumes": "It keeps data on {names}. Two copies of a program that locks or writes one file there can fail or corrupt it, so the old one is stopped first.",
+            "newVolumes": "This deploy creates {names}, so it restarts this once. Deploys after it have no gap.",
             "compose": "It runs your own compose file, whose names Polaris does not change.",
             "edge": "This server's edge does not take routes from Polaris yet. Prepare it on the server's page.",
             "history": "It keeps its previous versions, which only run side by side on the Polaris host.",

@@ -210,7 +210,7 @@ export function InstalledAppDashboard({
                 }
             />
 
-            <RedeployNote applicationId={applicationId} />
+            {canManage && <RedeployNote installId={app.id} applicationId={applicationId} />}
 
             {error && <p className="text-sm text-danger">{error}</p>}
 

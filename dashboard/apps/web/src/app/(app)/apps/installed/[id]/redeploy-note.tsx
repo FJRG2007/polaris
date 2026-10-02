@@ -9,24 +9,24 @@
 import { useEffect, useState } from "react";
 import type { DeployStrategy } from "@/lib/deploy/releases";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { deployBehaviourAction } from "../../deploy/deploy-behaviour-actions";
+import { redeployStrategyAction } from "./actions";
 
-export function RedeployNote({ applicationId }: { applicationId: string | null }) {
+export function RedeployNote({ installId, applicationId }: { installId: string; applicationId: string | null }) {
     const t = useTranslations("installed");
     const [strategy, setStrategy] = useState<DeployStrategy | null>(null);
 
     useEffect(() => {
         if (!applicationId) return;
         let active = true;
-        void deployBehaviourAction(applicationId)
+        void redeployStrategyAction(installId)
             .then((result) => {
-                if (active && result.view) setStrategy(result.view.strategy);
+                if (active) setStrategy(result);
             })
             .catch(() => undefined);
         return () => {
             active = false;
         };
-    }, [applicationId]);
+    }, [installId, applicationId]);
 
     if (!strategy) return null;
     if (strategy.mode !== "restart") return <p className="text-xs text-muted-foreground">{t("deployGap.none")}</p>;
