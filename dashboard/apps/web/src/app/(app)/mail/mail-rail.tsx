@@ -121,6 +121,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     const pathname = usePathname();
     const search = useSearchParams();
     const router = useRouter();
+    const ahead = useFetchOnIntent();
     const toast = useToast();
     const t = useTranslations("mail");
     // Remembered for this browser rather than held for this mount - see
@@ -381,6 +382,8 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                             <li key={label.id}>
                                 <Link
                                     href={`/mail/label/${label.id}`}
+                                    // See `useFetchOnIntent`.
+                                    {...ahead(`/mail/label/${label.id}`)}
                                     onClick={onNavigate}
                                     className={cn(
                                         "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px]",
@@ -530,6 +533,28 @@ function RenameFolderDialog({ folder, onClose }: { folder: MailFolderView; onClo
 
 /** Whether a merged view is the one being looked at. The inbox is the only one
  *  whose href is a prefix of the others, so it is matched exactly. */
+/**
+ * Fetch the screen behind a rail entry while the pointer is on its way to it.
+ *
+ * A list route renders nothing but its frame - the rows are the browser's - yet
+ * pressing one still waited on the server for that frame before anything moved.
+ * Asked for on a hover or on focus, the press finds it already in the router and
+ * the list changes in the same frame, drawn from what this device kept of it
+ * while the request behind it runs. Only on intent: every entry in view asking
+ * at once would be a render of every folder on each visit to Mail. The router
+ * keeps one answer per address, so passing back and forth asks once.
+ */
+function useFetchOnIntent(): (href: string) => { onPointerEnter: () => void; onFocus: () => void } {
+    const router = useRouter();
+    return useCallback(
+        (href: string) => ({
+            onPointerEnter: () => router.prefetch(href),
+            onFocus: () => router.prefetch(href)
+        }),
+        [router]
+    );
+}
+
 function isActive(pathname: string, search: URLSearchParams, href: string): boolean {
     void search;
     return href === "/mail"
@@ -563,9 +588,11 @@ function RailLink({
     onDropMail?: (messageIds: string[]) => void;
 }) {
     const [over, setOver] = useState(false);
+    const ahead = useFetchOnIntent();
     return (
         <Link
             href={href}
+            {...ahead(href)}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             onDragOver={
@@ -641,16 +668,18 @@ function AccountLink({
     const pathname = usePathname();
     const inbox = `/mail/a/${account.id}`;
     const broken = account.state === "auth" || account.state === "unreachable";
+    const ahead = useFetchOnIntent();
+    const href =
+        account.state === "auth"
+            ? refusedMailboxHref(account.id)
+            : broken
+              ? "/mail/settings/accounts"
+              : inbox;
 
     return (
         <Link
-            href={
-                account.state === "auth"
-                    ? refusedMailboxHref(account.id)
-                    : broken
-                      ? "/mail/settings/accounts"
-                      : inbox
-            }
+            href={href}
+            {...ahead(href)}
             onClick={onNavigate}
             aria-current={pathname === inbox ? "page" : undefined}
             className={cn(

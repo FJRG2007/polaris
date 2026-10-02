@@ -7,10 +7,10 @@
  * been fetched free - and the composer asks for it on the server when it needs
  * the text to quote.
  *
- * What it does is deliberately small: read the body (from this database where it
- * is held, from the mail server where it is not), read what is needed to answer
- * the message, and hand both through `readableMessage`, which is where the
- * privacy work happens.
+ * What it does is deliberately small: read what is needed to answer the message
+ * and the body with it (from this database where it is held, from the mail
+ * server only where it is not), and hand both through `readableMessage`, which
+ * is where the privacy work happens.
  */
 
 import * as reading from "./reading";
@@ -39,19 +39,26 @@ export async function openMessage(
     userId: string,
     messageId: string
 ): Promise<OpenedMessage | null> {
-    const body = await messages.loadBody(userId, messageId);
+    // The row first, because it usually already holds the body: every message
+    // opened once, and every one the sync fetched whole, has it stored. Only a
+    // body nobody has read yet goes to the mail server - asking `loadBody` for
+    // a stored one was a second read of the same row on every open.
     const message = await messages.messageForReading(userId, messageId);
     if (!message) return null;
+    const stored = message.row.bodyHtml !== null || message.row.bodyText !== null;
+    const body = stored ? null : await messages.loadBody(userId, messageId);
     const readable = await reading.readableMessage(
         message.accountId,
         messageId,
         userId,
         message.policy,
-        {
-            ...message.row,
-            bodyHtml: body.html || message.row.bodyHtml,
-            bodyText: body.text || message.row.bodyText
-        }
+        body
+            ? {
+                  ...message.row,
+                  bodyHtml: body.html || message.row.bodyHtml,
+                  bodyText: body.text || message.row.bodyText
+              }
+            : message.row
     );
     return { readable, envelope: message.envelope };
 }

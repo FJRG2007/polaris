@@ -11,6 +11,7 @@
 
 import { createAuthClient } from "better-auth/react";
 import { dropAllSnapshots } from "@/lib/snapshot-cache";
+import { dropMailCache } from "@/lib/mailbox/mail-cache";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { magicLinkClient, twoFactorClient } from "better-auth/client/plugins";
 
@@ -38,5 +39,8 @@ export async function signOut(
         return await authClient.signOut(...args);
     } finally {
         dropAllSnapshots();
+        // And what this device kept of their mail between visits, which
+        // outlives the tab as well as the session.
+        await dropMailCache();
     }
 }

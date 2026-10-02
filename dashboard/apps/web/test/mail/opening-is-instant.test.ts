@@ -69,7 +69,7 @@ describe("fetching a body before it is asked for", () => {
         // Somebody arrowing down a list is deciding what to open exactly as
         // somebody hovering is, and the wait afterwards is the same wait.
         expect(list).toContain("onPointerEnter={(event) => {");
-        expect(list).toContain("if (onRow?.leadMessageId) warm(onRow.leadMessageId);");
+        expect(list).toContain("if (onRow?.leadMessageId) warm(onRow.leadMessageId, onRow.id);");
     });
 
     it("adds to the handlers the row was given rather than replacing them", () => {

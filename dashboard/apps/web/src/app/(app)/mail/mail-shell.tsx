@@ -32,6 +32,7 @@ import type { MailFolderView } from "@/lib/mailbox/views";
 import { Button, PAGE_BLEED, useToast } from "@polaris/ui";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { useNudgeMailUnread } from "@/components/mail-unread";
+import { mailCache } from "@/lib/mailbox/mail-cache";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
@@ -243,6 +244,7 @@ export function MailShell({
     identities,
     unread: sentUnread,
     viewerName,
+    viewerId,
     shelf,
     children
 }: {
@@ -252,9 +254,16 @@ export function MailShell({
     identities: Record<string, MailIdentityView[]>;
     unread: { total: number; byAccount: Record<string, number> };
     viewerName: string;
+    /** Whose mail this is, so what the device keeps of it is theirs alone -
+     *  see `mail-cache`. */
+    viewerId: string;
     shelf: string;
     children: ReactNode;
 }) {
+    // During render rather than in an effect, and on purpose: the screens inside
+    // read the device's copy from their own effects, and a child's effects run
+    // before its parent's. Idempotent, so a render twice is nothing twice.
+    mailCache.setOwner(viewerId);
     const router = useRouter();
     const toast = useToast();
     const t = useTranslations("mail");
@@ -283,6 +292,10 @@ export function MailShell({
     const accounts = rail.accounts;
     const folders = rail.folders;
     const unread = rail.unread;
+    // A mailbox that is no longer linked takes what the device kept of it.
+    useEffect(() => {
+        mailCache.setAccounts(accounts.map((account) => account.id));
+    }, [accounts]);
     const nudgeBadge = useNudgeMailUnread();
     const pathname = usePathname();
     const search = useSearchParams();

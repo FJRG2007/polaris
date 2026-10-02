@@ -41,7 +41,9 @@ vi.mock("@/app/(app)/mail/mail-shell", () => ({
 }));
 
 vi.mock("@/app/(app)/mail/message-store", () => ({
-    readMessage: async () => ({ readable: { html: "", text: "", remoteBlocked: 0 } })
+    readMessage: async () => ({ readable: { html: "", text: "", remoteBlocked: 0 } }),
+    peekMessage: () => null,
+    keptMessage: async () => null
 }));
 
 vi.mock("@/app/(app)/mail/actions", () => ({

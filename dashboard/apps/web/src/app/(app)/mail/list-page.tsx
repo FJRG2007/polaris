@@ -96,14 +96,16 @@ export async function MailListPage({
     searchParams: MailSearchParams;
 }) {
     const user = await requirePermission("mail.use");
-    const t = await getTranslations("mail");
-    // Together rather than one after the other. Both are single indexed reads,
-    // and both stand between a press on the rail and this screen rendering at
-    // all - which is the whole budget this route has left now that the
-    // conversations are fetched by the browser.
-    const [params, accounts, preferences] = await Promise.all([
+    // Together rather than one after the other. Each is a single indexed read,
+    // and all of them stand between a press on the rail and this screen
+    // rendering at all - which is the whole budget this route has left now that
+    // the conversations are fetched by the browser. The shelf and the mailboxes
+    // on it are the one pair that has to be in order, so they are chained inside
+    // the batch rather than awaited in front of it.
+    const [t, params, accounts, preferences] = await Promise.all([
+        getTranslations("mail"),
         searchParams,
-        ownedAccountIds(user.id, await mailShelfFor(user.id)),
+        mailShelfFor(user.id).then((shelf) => ownedAccountIds(user.id, shelf)),
         readMailPreferences(user.id)
     ]);
 

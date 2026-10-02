@@ -673,15 +673,19 @@ export async function readThreadView(
     userId: string,
     threadId: string
 ): Promise<{ thread: MailThreadView | null; messages: MailMessageView[] }> {
-    const messages = await readThread(userId, threadId);
-    if (messages.length === 0) return { thread: null, messages: [] };
     // Pinned and muted are the conversation's own and nothing on a message says
     // them, so they are read off its row - narrowed by the reader like the rest.
     // Hardcoded off, a pinned conversation opened from a link offered to pin it.
-    const state = await prisma.mailThread.findFirst({
-        where: { id: threadId, account: { userId } },
-        select: { pinned: true, muted: true }
-    });
+    // Asked beside the messages rather than after them: neither answer depends
+    // on the other, and this is the request standing between a press and the pane.
+    const [messages, state] = await Promise.all([
+        readThread(userId, threadId),
+        prisma.mailThread.findFirst({
+            where: { id: threadId, account: { userId } },
+            select: { pinned: true, muted: true }
+        })
+    ]);
+    if (messages.length === 0) return { thread: null, messages: [] };
 
     const first = messages[0]!;
     const newest = messages.at(-1)!;
