@@ -256,7 +256,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.greeNoneThere"
     ],
     [
-        "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "No Gree air conditioner answered on this network. Type the unit's IP or MAC address instead: the Gree+ app shows its MAC.",
         "refusals.greeNoneFound"
     ],
     [
@@ -273,7 +273,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.philipsNoneThere"
     ],
     [
-        "No Philips air purifier answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+        "No Philips air purifier answered on this network. Type the unit's IP or MAC address instead: your router lists both among its connected devices.",
         "refusals.philipsNoneFound"
     ],
     [
@@ -342,6 +342,13 @@ const SHAPED: readonly {
     readonly params: readonly string[];
 }[] = [
     { pattern: /^(.+) has to be connected again$/s, key: "refusals.reconnect", params: ["name"] },
+    {
+        // `macNotFound` in driver-addresses.ts.
+        pattern:
+            /^Nothing on this network answers as ([0-9A-F:]{17})\. Check the device is switched on and on the same network as Polaris, or type its IP address instead\.$/,
+        key: "refusals.macNotFound",
+        params: ["mac"]
+    },
     {
         pattern:
             /^Polaris found no device on this Philips account\. What it saw: (.+)\. Check that the device is in a Philips app under this same email\.$/s,

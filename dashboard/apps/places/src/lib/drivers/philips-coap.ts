@@ -41,6 +41,7 @@ import { HomeError } from "../home-error";
 import * as philips from "../integrations/philips-api";
 import { forbiddenAddress } from "../integrations/lan-address";
 import { subnetTargets, unitAddressOf } from "../integrations/lan-unit";
+import { macsAt } from "../integrations/mac-locate";
 import {
     PHILIPS_CHILD_LOCKS,
     PHILIPS_HUMIDIFIERS,
@@ -589,6 +590,21 @@ async function firstRead(
 export const philipsCoapDriver: DeviceDriver = {
     connection: PHILIPS_COAP,
 
+    /** The units on the network, as a scan finds them, for the dialog to offer.
+     *  Their MACs are the host's neighbour table's: the scan put them there. */
+    async discover() {
+        const found = (await philips.scanPhilips(await subnetTargets())).filter(
+            (unit) => !forbiddenAddress(unit.address)
+        );
+        const macs = await macsAt(found.map((unit) => unit.address));
+        return found.map((unit) => ({
+            name: unit.name.slice(0, 120),
+            model: unit.model.slice(0, 120),
+            mac: macs.get(unit.address) ?? null,
+            address: unit.address
+        }));
+    },
+
     /** Find the units - at the address typed, or on the network - and read each
      *  once. What is stored is where they are and what they are. */
     async verify(credentials) {
@@ -614,7 +630,7 @@ export const philipsCoapDriver: DeviceDriver = {
         );
         if (found.length === 0) {
             throw new DriverError(
-                "No Philips air purifier answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+                "No Philips air purifier answered on this network. Type the unit's IP or MAC address instead: your router lists both among its connected devices.",
                 "unreachable"
             );
         }

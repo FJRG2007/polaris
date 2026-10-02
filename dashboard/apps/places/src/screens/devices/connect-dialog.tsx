@@ -70,6 +70,9 @@ import {
 import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
 import { englishPlaces } from "../../../messages";
+import { FoundUnits } from "./found-units";
+import { AddressInput } from "./address-input";
+import type { DiscoveredUnit } from "../../lib/drivers/contract";
 import type { PlacesTranslator } from "../../lib/i18n";
 
 const { runAction } = hostUi.runAction;
@@ -192,18 +195,27 @@ function Field({
     connection,
     field,
     value,
-    onChange
+    onChange,
+    asMac,
+    onMacChange
 }: {
     connection: registry.DeviceConnection;
     field: registry.ConnectionField;
     value: string;
     onChange: (value: string) => void;
+    /** An address field being given a MAC. */
+    asMac: boolean;
+    onMacChange: (asMac: boolean) => void;
 }) {
     const t = usePlacesT();
     const words = registry.fieldWords(t, connection, field);
-    const issue = registry.fieldIssue(field, value, t, words.label);
+    const [typing, setTyping] = useState(false);
+    const issue = registry.fieldIssue(field, value, t, words.label, asMac);
+    // A MAC half typed is unfinished while the box has the caret, and its
+    // digits are counted in it; it is only called short once it is left.
+    const shownIssue = asMac && typing && issue === t("connections.macShort") ? null : issue;
     return (
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
             <span className="text-xs text-muted-foreground">
                 {words.label}
                 {field.optional === true ? (
@@ -212,7 +224,17 @@ function Field({
                     <span className="text-danger"> *</span>
                 )}
             </span>
-            {field.choices ? (
+            {field.address === true ? (
+                <AddressInput
+                    value={value}
+                    onChange={onChange}
+                    mode={asMac ? "mac" : "ip"}
+                    onModeChange={(mode) => onMacChange(mode === "mac")}
+                    label={words.label}
+                    placeholder={words.placeholder}
+                    onFocusChange={setTyping}
+                />
+            ) : field.choices ? (
                 <Select
                     value={value || field.defaultValue || ""}
                     onValueChange={onChange}
@@ -243,9 +265,15 @@ function Field({
                     aria-label={words.label}
                 />
             )}
-            {words.hint && <span className="text-xs text-foreground-subtle">{words.hint}</span>}
-            {issue && <span className="text-xs text-danger">{issue}</span>}
-        </label>
+            {asMac ? (
+                <span className="text-xs text-foreground-subtle">
+                    {t("connect.address.macHint")}
+                </span>
+            ) : (
+                words.hint && <span className="text-xs text-foreground-subtle">{words.hint}</span>
+            )}
+            {shownIssue && <span className="text-xs text-danger">{shownIssue}</span>}
+        </div>
     );
 }
 
@@ -274,6 +302,8 @@ export function ConnectDialog({
     const choosing = !reconnect && !picked;
     const [label, setLabel] = useState("");
     const [fields, setFields] = useState<Record<string, string>>({});
+    /** The address fields being given a MAC rather than an IP or a name. */
+    const [macKeys, setMacKeys] = useState<readonly string[]>([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     /** The attempt being waited on, for a connection made by pairing. */
@@ -294,7 +324,7 @@ export function ConnectDialog({
     const connectionId = reconnect ? reconnect.connection : chosen;
     const connection = registry.deviceConnection(connectionId);
     const ofBrand = useMemo(() => registry.connectionsOfBrand(brand), [brand]);
-    const complete = connection ? registry.fieldsComplete(connection, fields) : false;
+    const complete = connection ? registry.fieldsComplete(connection, fields, macKeys) : false;
     const said = connection ? registry.connectionWords(t, connection) : null;
 
     /** What a poll needs that may change between renders without the attempt
@@ -308,6 +338,14 @@ export function ConnectDialog({
     // registry calls shown ever arrives here; a credential never does.
     useEffect(() => {
         setFields(reconnect ? { ...reconnect.settings } : {});
+        const stored = reconnect ? registry.deviceConnection(reconnect.connection) : null;
+        setMacKeys(
+            stored && reconnect
+                ? stored.fields
+                      .filter((field) => registry.fieldMac(field, reconnect.settings[field.key]))
+                      .map((field) => field.key)
+                : []
+        );
     }, [reconnect]);
 
     // A closed dialog is waiting for nothing.
@@ -392,6 +430,7 @@ export function ConnectDialog({
         setBrand(next);
         setChosen(registry.recommendedConnection(next)?.id ?? "");
         setFields({});
+        setMacKeys([]);
         setError("");
         setPairing(null);
         setFileStep(null);
@@ -400,9 +439,30 @@ export function ConnectDialog({
     const pickConnection = (next: string) => {
         setChosen(next);
         setFields({});
+        setMacKeys([]);
         setError("");
         setPairing(null);
         setFileStep(null);
+    };
+
+    /** The address field a unit found on the network fills in. */
+    const addressField = connection?.fields.find((field) => field.address === true) ?? null;
+
+    /** A unit picked from those found: its MAC where it gave one, so it is
+     *  followed when the router moves it, else where it is now. */
+    const pickUnit = (unit: DiscoveredUnit) => {
+        if (!addressField) return;
+        const key = addressField.key;
+        setFields((current) => ({ ...current, [key]: unit.mac ?? unit.address }));
+        setMacKeys((current) =>
+            unit.mac
+                ? current.includes(key)
+                    ? current
+                    : [...current, key]
+                : current.filter((entry) => entry !== key)
+        );
+        if (!label.trim() && unit.name) setLabel(unit.name.slice(0, 60));
+        setError("");
     };
 
     /** Begin an attempt at pairing - or a fresh one, when the last ran out. */
@@ -954,11 +1014,20 @@ export function ConnectDialog({
                                     </div>
                                 )}
 
+                            {!pairing && connection?.discovery === true && addressField && (
+                                <FoundUnits
+                                    key={connection.id}
+                                    connection={connection.id}
+                                    picked={fields[addressField.key] ?? ""}
+                                    onPick={pickUnit}
+                                />
+                            )}
+
                             {!pairing &&
                                 connection &&
                                 connection.fields.map((field) => (
                                     <Field
-                                        key={field.key}
+                                        key={`${connection.id}:${field.key}`}
                                         connection={connection}
                                         field={field}
                                         value={fields[field.key] ?? ""}
@@ -967,6 +1036,13 @@ export function ConnectDialog({
                                                 ...current,
                                                 [field.key]: value
                                             }))
+                                        }
+                                        asMac={macKeys.includes(field.key)}
+                                        onMacChange={(asMac) =>
+                                            setMacKeys((current) => [
+                                                ...current.filter((key) => key !== field.key),
+                                                ...(asMac ? [field.key] : [])
+                                            ])
                                         }
                                     />
                                 ))}

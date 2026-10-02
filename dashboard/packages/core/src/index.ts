@@ -26,6 +26,7 @@ export * from "./size-units.js";
 export * from "./probe-timeout.js";
 export * from "./hostnames.js";
 export * from "./local-network.js";
+export * from "./mac-address.js";
 export * from "./names.js";
 export * from "./office-export.js";
 export * from "./office.js";

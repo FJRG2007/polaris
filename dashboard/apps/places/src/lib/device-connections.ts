@@ -60,6 +60,7 @@
 import { emailField } from "@polaris/core";
 import type { PlacesTranslator } from "./i18n";
 import type { DeviceKind } from "./device-kinds";
+import { macIssue, parseMac } from "@polaris/core";
 import { TUYA_REGIONS } from "./integrations/tuya-regions";
 import { englishPlaces as en, type PlacesKey } from "../../messages";
 
@@ -83,6 +84,17 @@ export interface ConnectionField {
     readonly optional?: boolean;
     /** A shape the value has to have, checked as it is typed. */
     readonly format?: "email";
+    /**
+     * Where the device is: an IP address or a name - or its hardware (MAC)
+     * address instead, for a device whose app shows only that.
+     *
+     * A MAC is stored as the MAC, never as the IP it resolved to, and is turned
+     * into the device's current IP every time the connection is used
+     * (`integrations/mac-locate.ts`), so a device the router lends a new address
+     * to is followed rather than lost. Declared here, on the field, so every make
+     * with an address gets it and no driver has to know.
+     */
+    readonly address?: true;
     readonly minLength?: number;
     readonly maxLength?: number;
     /** A fixed set to pick from, where there is one. */
@@ -166,6 +178,9 @@ export interface DeviceConnection {
     readonly pairing?: ConnectionPairing;
     /** What it can bring in, so a screen can say so before anything is typed. */
     readonly kinds: readonly DeviceKind[];
+    /** Its driver can list the units it finds on the network (`discover`), so
+     *  the dialog offers them to pick from before anything is typed. */
+    readonly discovery?: true;
     /** Other words somebody might search for - the product it is part of, the
      *  name on the box, the way it is written in a forum. */
     readonly search?: readonly string[];
@@ -230,6 +245,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.nuki-local.fields.host.label"),
                 hint: en("connections.nuki-local.fields.host.hint"),
                 placeholder: en("connections.nuki-local.fields.host.placeholder"),
@@ -270,7 +286,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "mqtt-discovery",
         brand: en("connections.brandMqtt"),
-        logo: "",
+        logo: "mqtt",
         label: en("connections.mqtt-discovery.label"),
         reach: "same-network",
         recommended: true,
@@ -284,6 +300,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.mqtt-discovery.fields.host.label"),
                 hint: en("connections.mqtt-discovery.fields.host.hint"),
                 placeholder: en("connections.mqtt-discovery.fields.host.placeholder"),
@@ -454,6 +471,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.tapo-local.fields.host.label"),
                 hint: en("connections.tapo-local.fields.host.hint"),
                 placeholder: en("connections.tapo-local.fields.host.placeholder"),
@@ -499,6 +517,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.kasa-local.fields.host.label"),
                 hint: en("connections.kasa-local.fields.host.hint"),
                 placeholder: en("connections.kasa-local.fields.host.placeholder"),
@@ -548,6 +567,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.shelly-local.fields.host.label"),
                 hint: en("connections.shelly-local.fields.host.hint"),
                 placeholder: en("connections.shelly-local.fields.host.placeholder"),
@@ -604,6 +624,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.gree-local.fields.host.label"),
                 hint: en("connections.gree-local.fields.host.hint"),
                 placeholder: en("connections.gree-local.fields.host.placeholder"),
@@ -612,6 +633,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["climate"],
+        discovery: true,
         search: [
             "gree",
             "gree+",
@@ -640,6 +662,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.philips-coap.fields.host.label"),
                 hint: en("connections.philips-coap.fields.host.hint"),
                 placeholder: en("connections.philips-coap.fields.host.placeholder"),
@@ -648,6 +671,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["air"],
+        discovery: true,
         search: [
             "philips",
             "air+",
@@ -744,6 +768,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.hue-bridge.fields.host.label"),
                 hint: en("connections.hue-bridge.fields.host.hint"),
                 placeholder: en("connections.hue-bridge.fields.host.placeholder"),
@@ -791,6 +816,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "host",
+                address: true,
                 label: en("connections.dirigera-hub.fields.host.label"),
                 hint: en("connections.dirigera-hub.fields.host.hint"),
                 placeholder: en("connections.dirigera-hub.fields.host.placeholder"),
@@ -829,6 +855,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         fields: [
             {
                 key: "url",
+                address: true,
                 label: en("connections.home-assistant.fields.url.label"),
                 hint: en("connections.home-assistant.fields.url.hint"),
                 placeholder: en("connections.home-assistant.fields.url.placeholder"),
@@ -991,10 +1018,18 @@ export function fieldIssue(
     field: ConnectionField,
     value: string,
     t: PlacesTranslator = en,
-    label: string = field.label
+    label: string = field.label,
+    /** The field is being given a MAC rather than an IP or a name. */
+    asMac = false
 ): string | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
+    if (field.address === true && asMac) {
+        const issue = macIssue(trimmed);
+        if (issue === "short") return t("connections.macShort");
+        if (issue === "reserved") return t("connections.macReserved");
+        return null;
+    }
     if (field.minLength !== undefined && trimmed.length < field.minLength) {
         return t("connections.tooShort", { field: label.toLowerCase() });
     }
@@ -1017,12 +1052,15 @@ export function fieldIssue(
  *  and on the server, where it decides whether anything is stored. */
 export function fieldsComplete(
     connection: DeviceConnection,
-    fields: Readonly<Record<string, string>>
+    fields: Readonly<Record<string, string>>,
+    /** The address fields being given a MAC, which only the form knows while
+     *  one is half typed. A whole MAC is recognised without it. */
+    macKeys: readonly string[] = []
 ): boolean {
     return connection.fields.every((field) => {
         const value = (fields[field.key] ?? field.defaultValue ?? "").trim();
         if (!value) return field.optional === true;
-        return fieldIssue(field, value) === null;
+        return fieldIssue(field, value, en, field.label, macKeys.includes(field.key)) === null;
     });
 }
 
@@ -1032,6 +1070,12 @@ export function fieldsComplete(
 export function normalizeField(field: ConnectionField, raw: unknown): string {
     const typed = (typeof raw === "string" ? raw : "").trim();
     return field.format === "email" ? typed.toLowerCase() : typed;
+}
+
+/** The MAC an address field holds, as `AA:BB:CC:DD:EE:FF`, or null when it holds
+ *  an IP address or a name (or is not an address field at all). */
+export function fieldMac(field: ConnectionField, value: string | undefined): string | null {
+    return field.address === true ? parseMac(value) : null;
 }
 
 /**
@@ -1049,7 +1093,8 @@ export function normalizeFields(
     const clean: Record<string, string> = {};
     for (const field of connection.fields) {
         const value = normalizeField(field, fields[field.key]) || field.defaultValue || "";
-        if (value) clean[field.key] = value;
+        // A MAC is kept in one spelling, whichever one it was typed in.
+        if (value) clean[field.key] = fieldMac(field, value) ?? value;
     }
     return clean;
 }

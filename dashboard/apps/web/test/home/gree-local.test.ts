@@ -545,3 +545,35 @@ describe("temperatures, as greeclimate's own tests have them", () => {
         }
     );
 });
+
+describe("finding units on the network", () => {
+    it("lists each unit with its name, its MAC in the usual spelling, and where it is", async () => {
+        units = [
+            fakeUnit(),
+            fakeUnit({ address: "192.168.1.41", mac: "aabbcc445566", name: "Lounge" })
+        ];
+        const found = await gree.greeLocalDriver.discover!();
+        expect(sent[0]).toMatchObject({ message: { t: "scan" } });
+        expect(sent[0]!.targets).toContain("255.255.255.255");
+        expect(found).toEqual([
+            { name: "Bedroom", model: "", mac: "AA:BB:CC:11:22:33", address: "192.168.1.40" },
+            { name: "Lounge", model: "", mac: "AA:BB:CC:44:55:66", address: "192.168.1.41" }
+        ]);
+        // A look, not a pairing: nothing was bound.
+        expect(sent.some((entry) => entry.message.i === 1)).toBe(false);
+    });
+
+    it("names a unit that gave no name by the end of its MAC, as the library does", async () => {
+        units = [fakeUnit({ name: "" })];
+        const [unit] = await gree.greeLocalDriver.discover!();
+        expect(unit!.name).toBe("Gree 2233");
+    });
+
+    it("finds a unit by its MAC, however the MAC is spelled", async () => {
+        units = [fakeUnit({ address: "192.168.1.77" })];
+        await expect(gree.greeLocalDriver.locate!("AA:BB:CC:11:22:33")).resolves.toBe(
+            "192.168.1.77"
+        );
+        await expect(gree.greeLocalDriver.locate!("aabbcc999999")).resolves.toBeNull();
+    });
+});

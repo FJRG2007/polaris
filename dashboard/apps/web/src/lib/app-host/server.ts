@@ -116,6 +116,7 @@ const load = {
     envVarService: once(() => import("@/lib/env-var-service")),
     footageStorage: once(() => import("@/lib/footage-storage")),
     hostService: once(() => import("@/lib/host-service")),
+    neighbours: once(() => import("@/lib/storage-whereabouts/neighbours")),
     i18nLocaleService: once(() => import("@/lib/i18n/locale-service")),
     i18nRequest: once(() => import("@/lib/i18n/request")),
     integrationService: once(() => import("@/lib/integration-service")),
@@ -330,6 +331,12 @@ export const serverHost = {
     hostService: {
         getHostConnection: later(load.hostService, "getHostConnection"),
         listHosts: later(load.hostService, "listHosts")
+    },
+    // The host's neighbour table (IP -> hardware address), for an app that is
+    // given a device by its MAC and has to find the address it was lent. Empty
+    // where it cannot be read (no host daemon, no host-network container).
+    hostNetwork: {
+        readNeighbourTable: later(load.neighbours, "readNeighbourTable")
     },
     // Which language to write in. An app ships its own catalogs and formats
     // them with `defineCatalogs` from @polaris/core; what it needs from here is

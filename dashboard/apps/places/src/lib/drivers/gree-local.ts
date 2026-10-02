@@ -285,8 +285,38 @@ async function unitOf(credentials: Credentials, mac: string): Promise<gree.GreeU
     return located(unit);
 }
 
+/** A unit's MAC as Gree spells it (`aabbcc112233`) in everybody else's way. */
+function macWords(mac: string): string {
+    return mac.toUpperCase().match(/../g)!.join(":");
+}
+
+/** The units a scan finds, with nothing bound and no key asked for. */
+async function scanned(): Promise<gree.GreeFound[]> {
+    return (await gree.scanGree(await scanTargets())).filter(
+        (unit) => !forbiddenAddress(unit.address)
+    );
+}
+
 export const greeLocalDriver: DeviceDriver = {
     connection: GREE_LOCAL,
+
+    /** The units on the network, as the scan Home Assistant's integration
+     *  sends finds them: each answers with its MAC and its name. */
+    async discover() {
+        return (await scanned()).map((unit) => ({
+            name: unit.name || `Gree ${unit.mac.slice(-4).toUpperCase()}`,
+            // Most units answer "gree" here, which says nothing the make does not.
+            model: unit.model.toLowerCase() === "gree" ? "" : unit.model,
+            mac: macWords(unit.mac),
+            address: unit.address
+        }));
+    },
+
+    /** Where a unit is, by its MAC: the scan answer says so. */
+    async locate(mac) {
+        const wanted = mac.toLowerCase().replace(/[^0-9a-f]/g, "");
+        return (await scanned()).find((unit) => unit.mac === wanted)?.address ?? null;
+    },
 
     /**
      * Find the units - at the address typed, or on the network - and bind to
@@ -302,7 +332,7 @@ export const greeLocalDriver: DeviceDriver = {
             throw new DriverError(
                 typed
                     ? "No Gree air conditioner answered at that address. Check it is switched on at the wall and on the same network as Polaris."
-                    : "No Gree air conditioner answered on this network. Type the unit's address instead: your router lists it among the connected devices.",
+                    : "No Gree air conditioner answered on this network. Type the unit's IP or MAC address instead: the Gree+ app shows its MAC.",
                 "unreachable"
             );
         }
