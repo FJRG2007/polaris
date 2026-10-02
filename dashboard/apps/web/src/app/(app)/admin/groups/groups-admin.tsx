@@ -15,7 +15,7 @@
  * shows who is in the group and opens on the dialog that changes it.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import { Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
@@ -56,6 +56,13 @@ export interface GroupRow {
     members: UserOption[];
 }
 
+const GROUP_FIELDS: readonly SearchField<GroupRow>[] = [
+    { text: (group) => group.name },
+    { text: (group) => group.description },
+    { text: (group) => group.members.map((member) => member.name) },
+    { text: (group) => group.members.map((member) => member.email) }
+];
+
 export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: UserOption[] }) {
     const t = useTranslations("admin");
     const router = useRouter();
@@ -70,25 +77,11 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
     // showing the membership from before the change it just made.
     const open = groups.find((group) => group.id === openId) ?? null;
 
-    // Fuzzy rather than a substring: somebody looking for the operations group
-    // types "ops", and somebody looking for the group a person is in types their
-    // name half-remembered. Over the rows already on the page - a deployment's
-    // groups are a short list, and asking the server for a substring would be
-    // slower than reading it.
-    const fuse = useMemo(
-        () =>
-            new Fuse(groups, {
-                keys: ["name", "description", "members.name", "members.email"],
-                threshold: 0.3,
-                ignoreLocation: true
-            }),
-        [groups]
-    );
-    const shown = useMemo(() => {
-        const needle = query.trim();
-        if (!needle) return groups;
-        return fuse.search(needle).map((hit) => hit.item);
-    }, [fuse, groups, query]);
+    // By the group's name, what it is for, or who is in it: somebody looking for
+    // the group a person is in types that person's name. Over the rows already on
+    // the page - a deployment's groups are a short list, and asking the server
+    // would be slower than reading it.
+    const shown = useMemo(() => searchItems(groups, query, GROUP_FIELDS), [groups, query]);
 
     function mutate(run: () => Promise<unknown>) {
         startTransition(async () => {
@@ -121,8 +114,12 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
                             <th className="px-3 py-2 font-medium">{t("groups.table.group")}</th>
-                            <th className="hidden px-3 py-2 font-medium sm:table-cell">{t("groups.table.members")}</th>
-                            <th className="hidden px-3 py-2 font-medium lg:table-cell">{t("groups.table.people")}</th>
+                            <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                                {t("groups.table.members")}
+                            </th>
+                            <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                {t("groups.table.people")}
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -161,7 +158,9 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                             <div className="min-w-0">
                                                 <p className="flex items-center gap-1.5 truncate font-medium">
                                                     {group.name}
-                                                    {group.isSystem ? <Badge>{t("groups.system")}</Badge> : null}
+                                                    {group.isSystem ? (
+                                                        <Badge>{t("groups.system")}</Badge>
+                                                    ) : null}
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
                                                     {group.description || t("groups.noDescription")}
@@ -327,7 +326,9 @@ function GroupDialog({
                     {/* Padded on the right so a long name does not run under the
                         dialog's own close button. */}
                     <DialogTitle className="flex items-center gap-2 pr-6">
-                        <span className="truncate" title={group.name}>{group.name}</span>
+                        <span className="truncate" title={group.name}>
+                            {group.name}
+                        </span>
                         {group.isSystem ? <Badge>{t("groups.system")}</Badge> : null}
                     </DialogTitle>
                     <DialogDescription>
@@ -337,7 +338,9 @@ function GroupDialog({
 
                 <div className="flex flex-col gap-1">
                     {group.members.length === 0 ? (
-                        <p className="py-2 text-sm text-muted-foreground">{t("groups.dialog.noMembers")}</p>
+                        <p className="py-2 text-sm text-muted-foreground">
+                            {t("groups.dialog.noMembers")}
+                        </p>
                     ) : (
                         group.members.map((member) => (
                             <PersonRow

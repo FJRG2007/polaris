@@ -14,7 +14,6 @@
  * screen showing something that did not happen.
  */
 
-import Fuse from "fuse.js";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { FilterBar } from "./filter-bar";
@@ -38,6 +37,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { Button, ConfirmDeleteDialog, EmptyState, Select, cn, useToast } from "@polaris/ui";
 import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
@@ -61,6 +61,18 @@ import type {
  * can skip rather than another render.
  */
 const DEFAULT_SORT: core.TaskSort = { field: "priority", direction: "asc" };
+
+/**
+ * What the search box reads of a task: its name first, which is the only place
+ * a typo is forgiven, then its reference, its description and its tags. Every
+ * word typed has to be in one of them - a word in no task finds no task.
+ */
+const TASK_SEARCH_FIELDS: readonly SearchField<TaskRow>[] = [
+    { text: (task) => task.name, weight: 3 },
+    { text: (task) => task.reference, weight: 2 },
+    { text: (task) => task.description, weight: 1 },
+    { text: (task) => task.tags.map((tag) => tag.name), weight: 1 }
+];
 
 const VIEW_ICONS: Record<core.TaskViewType, typeof LayoutList> = {
     list: LayoutList,
@@ -234,73 +246,33 @@ export function ListScreen({
 
     const needle = search.trim();
 
-    /**
-     * Some queries are not somebody half remembering.
-     *
-     * Pasting a URL, a path, an address or an identifier names one exact thing,
-     * and a fuzzy matcher handed a forty-character string scores almost every row
-     * as a partial match - so the answer was a list of everything with the one
-     * task that actually contains it somewhere in the middle. `isLiteralQuery`
-     * decides which kind of query this is; quoting forces it either way.
-     */
-    const literal = core.isLiteralQuery(needle);
-
-    /**
-     * Search is otherwise fuzzy, because the way people look for a task is by
-     * half remembering it. A substring match only finds "user agent" if that is
-     * what somebody typed, and misses it for "useragent", "UA blocked" or a
-     * transposed letter - which is exactly when they are searching in the first
-     * place. Reference and tags are searchable too, at lower weight.
-     *
-     * Built only while something is being searched for. The index is over every
-     * task on the screen and the rows change on every tick of a checkbox, so
-     * building it regardless would rebuild a few thousand entries on each edit
-     * to answer a question nobody asked.
-     */
-    const index = useMemo(
-        () =>
-            needle && !literal
-                ? new Fuse(rows, {
-                      keys: [
-                          { name: "name", weight: 3 },
-                          { name: "reference", weight: 2 },
-                          { name: "description", weight: 1 },
-                          { name: "tags.name", weight: 1 }
-                      ],
-                      threshold: 0.4,
-                      ignoreLocation: true,
-                      minMatchCharLength: 2
-                  })
-                : null,
-        [rows, needle, literal]
-    );
-
     const hidesClosed = core.hidesClosedWork(groupBy, showClosed);
 
     const sortedFacts = useMemo(() => {
         const now = new Date();
-        const matched = index
-            ? index.search(needle).map((hit) => hit.item)
-            : literal
-              ? rows.filter((task) =>
-                    core.matchesLiterally(needle, [
-                        task.name,
-                        task.reference,
-                        task.description,
-                        ...task.tags.map((tag) => tag.name)
-                    ])
-                )
-              : rows;
-        const working = matched
+        const working = rows
             .filter((task) => !hidesClosed || task.statusType !== "closed")
             .map(toFacts)
             .filter((facts) => core.matchesFilter(facts, filter, now, format.weekStartsOn));
-        // A search is already ranked by how well each row matched; re-sorting it
-        // by due date would throw that away.
-        // A fuzzy search is already ranked by how well each row matched; a literal
-        // one is not ranked at all, so it keeps the order the screen was in.
-        return index ? working : core.sortTasks(working, sort, statusOrder);
-    }, [rows, index, needle, literal, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
+        const sorted = core.sortTasks(working, sort, statusOrder);
+        if (!needle) return sorted;
+        // Searched in the screen's own order, so the tasks that matched equally
+        // well keep the sort somebody chose; the rows rather than the facts, so
+        // the text each one was read as is remembered between keystrokes.
+        const byId = new Map(sorted.map((facts) => [facts.id, facts]));
+        const candidates = sorted
+            .map((facts) => rowById.get(facts.id))
+            .filter((task): task is TaskRow => task !== undefined);
+        return searchItems(candidates, needle, TASK_SEARCH_FIELDS).flatMap((task) => {
+            const facts = byId.get(task.id);
+            return facts ? [facts] : [];
+        });
+    }, [rows, rowById, needle, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
+
+    const searchFindsAny = useMemo(
+        () => !needle || searchItems(rows, needle, TASK_SEARCH_FIELDS, { limit: 1 }).length > 0,
+        [rows, needle]
+    );
 
     /**
      * What the reader asked to see, as opposed to what the data happens to be.
@@ -520,7 +492,13 @@ export function ListScreen({
         // Before the write rather than after, because this is what the reader
         // sees the instant they let go, and the round trip is not something they
         // should be watching.
-        settle(core.arrangeAround(visibleFacts.map((facts) => facts.id), taskId, position));
+        settle(
+            core.arrangeAround(
+                visibleFacts.map((facts) => facts.id),
+                taskId,
+                position
+            )
+        );
         // The column of tasks with no status is keyed by an empty string. Sent
         // as-is it fails validation and the drop silently does nothing, so it
         // becomes an explicit null: "put this back to having no status".
@@ -719,7 +697,8 @@ export function ListScreen({
      */
     const copySelection = (targets: readonly TaskRow[]) => {
         if (targets.length === 0) return;
-        const label = targets.length === 1 ? targets[0]!.name : t("bulk.tasks", { count: targets.length });
+        const label =
+            targets.length === 1 ? targets[0]!.name : t("bulk.tasks", { count: targets.length });
         writeTaskClipboard({ taskIds: targets.map((task) => task.id), label });
         toast.show({ key: "tasks-copy", title: t("bulk.copied", { label }) });
     };
@@ -753,12 +732,16 @@ export function ListScreen({
         if (!report) return;
         const left: string[] = [];
         if (report.droppedStatuses > 0) left.push(t("paste.aStatus"));
-        if (report.droppedTags > 0) left.push(report.droppedTags === 1 ? t("paste.aTag") : t("paste.tags"));
+        if (report.droppedTags > 0)
+            left.push(report.droppedTags === 1 ? t("paste.aTag") : t("paste.tags"));
         if (report.droppedAssignees > 0) left.push(t("paste.people"));
         toast.show({
             key: "tasks-paste",
             title: t("paste.pasted", { count: report.created }),
-            body: left.length > 0 ? t("paste.leftOff", { items: left.join(t("paste.joiner")) }) : undefined
+            body:
+                left.length > 0
+                    ? t("paste.leftOff", { items: left.join(t("paste.joiner")) })
+                    : undefined
         });
         refresh();
     };
@@ -938,7 +921,10 @@ export function ListScreen({
         <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                    <h1 title={title} className="truncate text-[1.0625rem] font-semibold tracking-tight">
+                    <h1
+                        title={title}
+                        className="truncate text-[1.0625rem] font-semibold tracking-tight"
+                    >
                         {title}
                     </h1>
                     {subtitle && (
@@ -1064,7 +1050,10 @@ export function ListScreen({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -1122,6 +1111,28 @@ export function ListScreen({
             {viewType === "calendar" && <CalendarView {...viewProps} />}
             {viewType === "gantt" && <GanttView {...viewProps} />}
 
+            {/* List and Table say so in their own rows; the board, the calendar
+                and the timeline keep drawing their columns and days, so a
+                search nothing carries would otherwise read as an empty board. */}
+            {needle &&
+                rows.length > 0 &&
+                visible.length === 0 &&
+                viewType !== "list" &&
+                viewType !== "table" && (
+                    <EmptyState
+                        title={
+                            searchFindsAny
+                                ? t("list.noMatch")
+                                : t("search.noMatch", { query: needle })
+                        }
+                        description={
+                            searchFindsAny
+                                ? t("list.noMatchDescription")
+                                : t("search.noMatchDescription")
+                        }
+                    />
+                )}
+
             {rows.length === 0 && (
                 <EmptyState
                     title={t("empty.title")}
@@ -1145,9 +1156,7 @@ export function ListScreen({
                 />
             )}
 
-            <p className="text-[0.6875rem] text-muted-foreground">
-                {t("hint")}
-            </p>
+            <p className="text-[0.6875rem] text-muted-foreground">{t("hint")}</p>
 
             {createTarget && (
                 <TaskCreateDialog
@@ -1188,7 +1197,9 @@ export function ListScreen({
                 // One task is named; a selection is counted, since a dialog
                 // listing forty names says less than the number does.
                 name={
-                    deleting.length === 1 ? (deleting[0]?.name ?? "") : t("bulk.tasks", { count: deleting.length })
+                    deleting.length === 1
+                        ? (deleting[0]?.name ?? "")
+                        : t("bulk.tasks", { count: deleting.length })
                 }
                 kind={deleting.length === 1 ? "task" : "tasks"}
                 // One row of many is asked plainly, the way every other single
@@ -1199,7 +1210,11 @@ export function ListScreen({
                 title={t("bulk.deleteTitle", { count: deleting.length })}
                 question={t.rich("bulk.deleteQuestion", {
                     name: deleting[0]?.name ?? "",
-                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
                 })}
                 description={t("bulk.deleteDescription")}
                 confirmLabel={t("bulk.deleteConfirm", { count: deleting.length })}

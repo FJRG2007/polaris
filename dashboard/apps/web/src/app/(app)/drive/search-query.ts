@@ -5,20 +5,24 @@
  *   - explicit regex:      /invoice_\d+/          (optionally with flags)
  *   - extension filter:    ext:pptx,pdf,key
  *   - path search:         documentos/doc.pdf     c:/reports/*.xlsx
- *   - free text:           anything else -> fuzzy match (fuse.js)
- * Tokens combine with AND (all must match); free-text words are fuzzy-matched
- * against whatever survives the structured filters. When any token contains a
+ *   - free text:           anything else -> the shared search (every word must
+ *                          be in the name; a typo is forgiven only when nothing
+ *                          matches as typed)
+ * Tokens combine with AND (all must match); free-text words are searched for
+ * in whatever survives the structured filters. When any token contains a
  * path separator the whole query switches to "path mode": globs/regex/fuzzy are
  * matched against the item's full relative path instead of just its name, so a
  * user can search "documentos/doc.pdf". Pure and side-effect free.
  */
+
+import type { SearchField } from "@polaris/core/search-text";
 
 export interface ParsedQuery {
     /** Allowed extensions (dot-less, lowercase). Empty means no extension filter. */
     extensions: string[];
     /** Glob/regex patterns the target must ALL match. */
     patterns: RegExp[];
-    /** Remaining free text for a fuzzy pass. */
+    /** Remaining free text, for the search over names or paths. */
     fuzzy: string;
     /** True when the query targets full paths (a token contains a separator). */
     pathMode: boolean;
@@ -64,7 +68,9 @@ export function parseSearch(query: string): ParsedQuery {
     if (explicit) {
         result.pathMode = /[\\/]/.test(explicit[1]!);
         try {
-            result.patterns.push(new RegExp(explicit[1]!, (explicit[2] ?? "").replace(/g/g, "") || "i"));
+            result.patterns.push(
+                new RegExp(explicit[1]!, (explicit[2] ?? "").replace(/g/g, "") || "i")
+            );
         } catch {
             result.error = "Invalid regular expression";
         }
@@ -82,7 +88,8 @@ export function parseSearch(query: string): ParsedQuery {
         } else if (isPathToken(token)) {
             result.pathMode = true;
             const normalized = normalizePathTarget(token);
-            if (token.includes("*") || token.includes("?")) result.patterns.push(globToRegExp(normalized));
+            if (token.includes("*") || token.includes("?"))
+                result.patterns.push(globToRegExp(normalized));
             else fuzzyWords.push(normalized);
         } else if (token.includes("*") || token.includes("?")) {
             result.patterns.push(globToRegExp(token));
@@ -108,3 +115,13 @@ export function matchesStructured(name: string, path: string, parsed: ParsedQuer
     }
     return true;
 }
+
+/** What the free text is searched for in, outside path mode: the name. */
+export const NAME_SEARCH: readonly SearchField<{ readonly name: string }>[] = [
+    { text: (entry) => entry.name }
+];
+
+/** In path mode: the full relative path, in the form the query was put in. */
+export const PATH_SEARCH: readonly SearchField<{ readonly path: string }>[] = [
+    { text: (entry) => normalizePathTarget(entry.path) }
+];

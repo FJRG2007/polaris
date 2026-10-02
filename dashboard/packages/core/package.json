@@ -33,6 +33,10 @@
             "types": "./dist/extension-install.d.ts",
             "import": "./dist/extension-install.js"
         },
+        "./search-text": {
+            "types": "./dist/search-text.d.ts",
+            "import": "./dist/search-text.js"
+        },
         "./catalog-search": {
             "types": "./dist/catalog-search.d.ts",
             "import": "./dist/catalog-search.js"
@@ -45,12 +49,11 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/extension-install.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
-        "fuse.js": "7.0.0",
         "intl-messageformat": "12.1.2",
         "ipaddr.js": "2.2.0",
         "zod": "3.24.1"

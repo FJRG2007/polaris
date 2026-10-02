@@ -2,15 +2,11 @@
  * Finding a saved login by the little somebody remembers of its name.
  *
  * The box at the top of the popup, which is how anybody with more than a screenful
- * of logins reaches one. What is pinned here is the two halves of that: a query
- * long enough to be scored is matched loosely, so a letter left out or turned
- * around still finds what was meant, and a query too short to be scored falls
- * back to a plain filter rather than to nothing.
- *
- * That second half is the one worth a test. A fuzzy match needs a run of
- * characters to be confident about, so with a minimum run length a single letter
- * matches nothing at all - and the list went empty on the first keystroke, with
- * every login still on screen the moment before.
+ * of logins reaches one. What is pinned here: a single letter is every login
+ * carrying it rather than nothing (the list once went empty on the first
+ * keystroke), a letter left out or turned around still finds what was meant, and
+ * a name nothing in the vault carries answers nothing rather than whatever
+ * shares a few letters with it.
  */
 
 import { describe, expect, it } from "vitest";
@@ -59,6 +55,10 @@ describe("a query with a letter left out or turned around", () => {
 
     it("does not answer with something unrelated", () => {
         expect(names(searchLogins(VAULT, "githb"))).not.toContain("Bank");
+    });
+
+    it("answers nothing for a name the vault does not hold", () => {
+        expect(searchLogins(VAULT, "netflix")).toEqual([]);
     });
 });
 
