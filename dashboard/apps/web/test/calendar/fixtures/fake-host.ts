@@ -265,8 +265,7 @@ export const host = {
         listCalendarLinks: async () => [...fake.links],
         calendarLinkUrl: async (provider: string) =>
             `/account/connections/new?provider=${provider}&scope=calendar`,
-        calendarLinkAvailable: async (provider: "google" | "microsoft") =>
-            fake.linkReady[provider],
+        calendarLinkAvailable: async (provider: "google" | "microsoft") => fake.linkReady[provider],
         taskListsFor: async () => (fake.taskLists ? [...fake.taskLists] : null),
         createDueTask: async (
             actor: { id: string },
@@ -275,7 +274,10 @@ export const host = {
             if (!fake.taskLists?.some((list) => list.id === input.listId))
                 return { refused: "That list no longer exists." };
             fake.createdTasks.push({ actorId: actor.id, ...input });
-            return { id: `task-${fake.createdTasks.length}`, reference: `T-${fake.createdTasks.length}` };
+            return {
+                id: `task-${fake.createdTasks.length}`,
+                reference: `T-${fake.createdTasks.length}`
+            };
         },
         assignedTasks: async () => [...fake.tasks],
         scheduleTask: async (_actor: unknown, taskId: string, due: unknown) => {

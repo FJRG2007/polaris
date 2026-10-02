@@ -45,7 +45,9 @@ export interface AddCalendarMenuProps {
 function TwoLines({ label, hint }: { label: string; hint: string }) {
     return (
         <span className="flex min-w-0 flex-col">
-            <span className="truncate" title={label}>{label}</span>
+            <span className="truncate" title={label}>
+                {label}
+            </span>
             <span className="whitespace-normal text-xs text-foreground-subtle">{hint}</span>
         </span>
     );
@@ -72,11 +74,7 @@ function ProviderItem({
                 ) : (
                     <Loader2 className="animate-spin" aria-hidden />
                 )}
-                {accounts.error ? (
-                    <TwoLines label={label} hint={t("addMenu.unreadable")} />
-                ) : (
-                    label
-                )}
+                {accounts.error ? <TwoLines label={label} hint={t("addMenu.unreadable")} /> : label}
             </DropdownMenuItem>
         );
     }
@@ -104,10 +102,7 @@ function ProviderItem({
             <DropdownMenuItem asChild>
                 <Link href={setupHref(provider)}>
                     <Logo slug={provider} className="size-4" />
-                    <TwoLines
-                        label={label}
-                        hint={t("addMenu.setUpFirst", { provider: name })}
-                    />
+                    <TwoLines label={label} hint={t("addMenu.setUpFirst", { provider: name })} />
                 </Link>
             </DropdownMenuItem>
         );
@@ -122,7 +117,12 @@ function ProviderItem({
     );
 }
 
-export function AddCalendarMenu({ children, align = "start", onCreate, onAddFrom }: AddCalendarMenuProps) {
+export function AddCalendarMenu({
+    children,
+    align = "start",
+    onCreate,
+    onAddFrom
+}: AddCalendarMenuProps) {
     const t = useCalendarT();
     const [opened, setOpened] = useState(false);
     const accounts = useAccounts(opened);

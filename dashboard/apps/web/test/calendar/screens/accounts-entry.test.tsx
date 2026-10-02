@@ -204,9 +204,9 @@ describe("the Accounts section of the settings", () => {
         render(<AccountsSection />, { wrapper: MessagesWrapper });
         await settle();
         expect(screen.getByText("me@example.test")).toBeTruthy();
-        expect(screen.getByRole("link", { name: /Link another Google account/ }).getAttribute("href")).toBe(
-            "/api/connections/google/link?scope=calendar"
-        );
+        expect(
+            screen.getByRole("link", { name: /Link another Google account/ }).getAttribute("href")
+        ).toBe("/api/connections/google/link?scope=calendar");
         expect(screen.getByRole("link", { name: /Link a Microsoft account/ })).toBeTruthy();
     });
 

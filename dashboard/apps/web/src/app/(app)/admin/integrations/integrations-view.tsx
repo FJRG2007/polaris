@@ -29,10 +29,7 @@ import {
     type ComponentType
 } from "react";
 import type { ConnectionFailure } from "@/lib/connections/attention";
-import {
-    isTunnelToken,
-    type TunnelProviderSlug
-} from "@/lib/integrations/tunnel-token";
+import { isTunnelToken, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
 import {
     CheckCircle2,
     Circle,
@@ -521,10 +518,7 @@ function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: strin
                     {t("integrations.setupValue.download")}
                 </a>
             ) : (
-                <CopyButton
-                    value={value}
-                    label={t(`integrations.setupValue.copy.${kind}`)}
-                />
+                <CopyButton value={value} label={t(`integrations.setupValue.copy.${kind}`)} />
             )}
         </div>
     );
@@ -609,9 +603,7 @@ function AttentionNotice({ failure, name }: { failure: ConnectionFailure; name: 
                 <span className="text-muted-foreground">
                     {t("integrations.attention.reason", { name, reason: failure.reason })}
                 </span>
-                <span className="text-muted-foreground">
-                    {t("integrations.attention.clears")}
-                </span>
+                <span className="text-muted-foreground">{t("integrations.attention.clears")}</span>
             </div>
         </div>
     );
@@ -728,7 +720,9 @@ function EmailTrustSwitch({
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
                 <span>
-                    <span className="font-medium">{t("integrations.emailTrust.label", { name })}</span>
+                    <span className="font-medium">
+                        {t("integrations.emailTrust.label", { name })}
+                    </span>
                     <span className="block text-xs text-muted-foreground">
                         {t("integrations.emailTrust.hint", { name })}
                     </span>
@@ -904,7 +898,11 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -1019,7 +1017,11 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -1112,7 +1114,11 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -1225,7 +1231,11 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>{t("integrations.dialog.enabled")}</span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("integrations.dialog.enabled")} />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={t("integrations.dialog.enabled")}
+                        />
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
@@ -1361,7 +1371,11 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                                 {t("integrations.steam.enabledHint")}
                             </span>
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("integrations.dialog.enabled")} />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={t("integrations.dialog.enabled")}
+                        />
                     </div>
 
                     <label className="flex flex-col gap-1 text-sm">
@@ -1454,7 +1468,11 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>{t("integrations.dialog.enabled")}</span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("integrations.dialog.enabled")} />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={t("integrations.dialog.enabled")}
+                        />
                     </div>
                     <label className="flex flex-col gap-1 text-sm">
                         {card.apiKeyLabel ?? t("integrations.dialog.token")}
@@ -1470,7 +1488,9 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                             autoComplete="off"
                         />
                         {entered && !valid ? (
-                            <span className="text-xs text-danger">{t(`integrations.tunnelHint.${provider}`)}</span>
+                            <span className="text-xs text-danger">
+                                {t(`integrations.tunnelHint.${provider}`)}
+                            </span>
                         ) : card.apiKeyHelp ? (
                             <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
                         ) : null}
@@ -1594,7 +1614,9 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
     return (
         <div className="flex flex-col gap-3 border-t border-border pt-4">
             <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium">{t("integrations.cloudflare.apiAccess")}</span>
+                <span className="text-sm font-medium">
+                    {t("integrations.cloudflare.apiAccess")}
+                </span>
                 <span className="text-xs text-muted-foreground">
                     {t("integrations.cloudflare.apiAccessHint")}
                 </span>
@@ -1874,7 +1896,11 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -2023,7 +2049,9 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                                     )}
                                 >
                                     {rule.premium
-                                        ? t("integrations.dymo.premium", { label: dymoRule(t, rule) })
+                                        ? t("integrations.dymo.premium", {
+                                              label: dymoRule(t, rule)
+                                          })
                                         : dymoRule(t, rule)}
                                 </button>
                             ))}
@@ -2049,7 +2077,11 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -2335,7 +2367,9 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                     ) : method === "existing" ? (
                         <div className="flex flex-col gap-3 text-sm">
                             <label className="flex flex-col gap-1">
-                                <span className="font-medium">{t("integrations.github.appId")}</span>
+                                <span className="font-medium">
+                                    {t("integrations.github.appId")}
+                                </span>
                                 <Input
                                     value={appId}
                                     onChange={(event) => setAppId(event.target.value)}
@@ -2554,10 +2588,14 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                     </span>
                                     <span>
                                         <span className="font-medium">
-                                            {t(`integrations.virusTotal.actions.${action.value}.label`)}
+                                            {t(
+                                                `integrations.virusTotal.actions.${action.value}.label`
+                                            )}
                                         </span>
                                         <span className="block text-xs text-muted-foreground">
-                                            {t(`integrations.virusTotal.actions.${action.value}.help`)}
+                                            {t(
+                                                `integrations.virusTotal.actions.${action.value}.help`
+                                            )}
                                         </span>
                                     </span>
                                 </button>
@@ -2584,7 +2622,11 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                             {tc("actions.cancel")}
                         </Button>
                         <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : tc("actions.save")}
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
                         </Button>
                     </div>
                 </div>

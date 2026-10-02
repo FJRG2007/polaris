@@ -112,7 +112,11 @@ export interface GridMenuProps {
     readonly children: ReactNode;
     /** What a press stands for; null leaves the browser's own menu. `held` is the
      *  range that was highlighted when the press began. */
-    readonly resolve: (target: GridTarget, point: DOMRect, held: GridRange | null) => MenuTarget | null;
+    readonly resolve: (
+        target: GridTarget,
+        point: DOMRect,
+        held: GridRange | null
+    ) => MenuTarget | null;
     /** The range highlighted right now, read when a right press begins - before
      *  the press closes whatever card was holding it. */
     readonly heldRange: () => GridRange | null;
@@ -209,8 +213,7 @@ export function GridMenu(props: GridMenuProps) {
             const found = targetFromElements(elements);
             // A long press starts the same selection a drag does; the menu that
             // opens on it is what was asked for, not that selection.
-            const held =
-                heldAtPress.current ?? (keyboard ? null : propsRef.current.heldRange());
+            const held = heldAtPress.current ?? (keyboard ? null : propsRef.current.heldRange());
             heldAtPress.current = null;
             const resolved = found
                 ? propsRef.current.resolve(
@@ -238,7 +241,12 @@ export function GridMenu(props: GridMenuProps) {
         fromKeyboard.current = element;
         const { x, y } = pointOf(element);
         element.dispatchEvent(
-            new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y })
+            new MouseEvent("contextmenu", {
+                bubbles: true,
+                cancelable: true,
+                clientX: x,
+                clientY: y
+            })
         );
     };
 
@@ -386,7 +394,9 @@ function MenuBody({
             <>
                 <ContextMenuLabel title={task.title}>{task.title}</ContextMenuLabel>
                 <ContextMenuItem
-                    onSelect={() => actions.openItem({ kind: "task", task }, target.id, target.rect)}
+                    onSelect={() =>
+                        actions.openItem({ kind: "task", task }, target.id, target.rect)
+                    }
                 >
                     <SquareArrowOutUpRight className="size-4" />
                     {t("gridMenu.openTask")}
@@ -401,7 +411,9 @@ function MenuBody({
         );
     }
     const occurrence = target.occurrence;
-    const title = occurrence.busyOnly ? t("screen.busy") : occurrence.summary || t("screen.untitled");
+    const title = occurrence.busyOnly
+        ? t("screen.busy")
+        : occurrence.summary || t("screen.untitled");
     const others = calendars.filter(
         (calendar) =>
             calendar.writable &&

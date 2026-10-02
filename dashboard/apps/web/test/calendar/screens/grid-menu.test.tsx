@@ -98,7 +98,11 @@ function TimeGrid() {
             <table>
                 <tbody>
                     <tr className="fc-timegrid-all-day">
-                        <td className="fc-daygrid-day" data-date="2026-10-07" data-testid="allday-wed" />
+                        <td
+                            className="fc-daygrid-day"
+                            data-date="2026-10-07"
+                            data-testid="allday-wed"
+                        />
                         <td className="fc-daygrid-day" data-date="2026-10-08" />
                     </tr>
                 </tbody>
@@ -106,15 +110,29 @@ function TimeGrid() {
             <table className="fc-timegrid-slots">
                 <tbody>
                     <tr>
-                        <td className="fc-timegrid-slot fc-timegrid-slot-lane" data-time="09:30:00" data-testid="lane" />
+                        <td
+                            className="fc-timegrid-slot fc-timegrid-slot-lane"
+                            data-time="09:30:00"
+                            data-testid="lane"
+                        />
                     </tr>
                 </tbody>
             </table>
             <table>
                 <tbody>
                     <tr className="fc-timegrid-cols">
-                        <td className="fc-timegrid-col" data-date="2026-10-07" data-testid="col-wed" tabIndex={0} />
-                        <td className="fc-timegrid-col" data-date="2026-10-08" data-testid="col-thu" tabIndex={-1}>
+                        <td
+                            className="fc-timegrid-col"
+                            data-date="2026-10-07"
+                            data-testid="col-wed"
+                            tabIndex={0}
+                        />
+                        <td
+                            className="fc-timegrid-col"
+                            data-date="2026-10-08"
+                            data-testid="col-thu"
+                            tabIndex={-1}
+                        >
                             <a className="fc-event" data-event-id={EVENT_ID} tabIndex={0}>
                                 <span data-testid="event-title">Budget review</span>
                             </a>
@@ -144,7 +162,10 @@ function resolveLikeScreen(
     const start = target.allDay
         ? { at: at(target.day, "00:00"), day: target.day, allDay: true }
         : { at: at(target.day, target.time ?? "09:00"), day: target.day, allDay: false };
-    const end = { ...start, at: new Date(start.at.getTime() + (target.allDay ? 86_400_000 : 1_800_000)) };
+    const end = {
+        ...start,
+        at: new Date(start.at.getTime() + (target.allDay ? 86_400_000 : 1_800_000))
+    };
     const inside =
         held !== null &&
         held.start.allDay === start.allDay &&

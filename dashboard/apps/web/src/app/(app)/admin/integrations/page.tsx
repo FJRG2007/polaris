@@ -80,8 +80,7 @@ export default async function IntegrationsPage({
     // `?configure=<slug>` opens that service's setup straight away: what another
     // screen links to when it has just said the service is not set up yet.
     const asked = (await searchParams).configure;
-    const configure =
-        typeof asked === "string" && /^[a-z0-9-]{1,40}$/.test(asked) ? asked : null;
+    const configure = typeof asked === "string" && /^[a-z0-9-]{1,40}$/.test(asked) ? asked : null;
     const t = await getTranslations("admin");
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the

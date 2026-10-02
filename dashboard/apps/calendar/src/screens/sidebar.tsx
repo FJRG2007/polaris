@@ -198,7 +198,9 @@ export function Sidebar({
                 >
                     <Button size="sm" variant="outline" className="w-full justify-start">
                         <Plus />
-                        <span className="min-w-0 flex-1 truncate text-left">{t("sidebar.add")}</span>
+                        <span className="min-w-0 flex-1 truncate text-left">
+                            {t("sidebar.add")}
+                        </span>
                         <ChevronDown className="text-foreground-subtle" />
                     </Button>
                 </AddCalendarMenu>
