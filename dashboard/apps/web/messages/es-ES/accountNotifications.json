@@ -239,6 +239,10 @@
             "label": "Recordatorio",
             "description": "Un recordatorio puesto en un evento o una tarea de tus calendarios."
         },
+        "calendarClock": {
+            "label": "Alarma o temporizador",
+            "description": "Sonó una alarma o un temporizador del área Hora de Calendario."
+        },
         "calendarInvitation": {
             "label": "Invitación",
             "description": "Alguien te invitó a un evento, o cambió o canceló uno en el que estás."

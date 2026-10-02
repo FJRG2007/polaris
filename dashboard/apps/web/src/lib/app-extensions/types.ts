@@ -123,6 +123,14 @@ export interface AppExtension {
     /** What the firewall shows above the web rules for a service it runs. */
     readonly firewallSlot?: (ownerId: string, applicationId: string) => Promise<AppSlot | null>;
 
+    /**
+     * What it draws in the header of every screen, beside the bell - Calendar's
+     * running timers, say. Asked once per page frame, so it must not read
+     * anything: the component it names reads its own data in the browser, and
+     * draws nothing while there is nothing to show.
+     */
+    readonly headerSlot?: () => AppSlot | null;
+
     /** The panel an installed-app page draws for one of its installs. */
     readonly installedPanelSlot?: (install: ExtensionInstall) => Promise<AppSlot | null>;
 

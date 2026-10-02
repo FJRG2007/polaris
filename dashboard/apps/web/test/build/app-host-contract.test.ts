@@ -166,6 +166,9 @@ const EAGER_UI = [
     // The language a page is drawn in: a hook over a context the root layout
     // already provides.
     "i18nProvider.useLocale",
+    // How loud Polaris' sounds are: a number the frame's own chime and toasts
+    // already read, so its module is in the shell's chunk anyway.
+    "notificationSound.soundGain",
     // The kept-reading hooks and the merge under them: hooks cannot be drawn
     // later, and the shell's own screens load the module anyway.
     "liveRead.useKeptSnapshot",

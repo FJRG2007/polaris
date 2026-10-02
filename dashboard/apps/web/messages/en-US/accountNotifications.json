@@ -239,6 +239,10 @@
             "label": "Event reminder",
             "description": "A reminder set on an event or a task in your calendars."
         },
+        "calendarClock": {
+            "label": "Alarm or timer went off",
+            "description": "An alarm or a timer you set in Calendar's Time area went off."
+        },
         "calendarInvitation": {
             "label": "Invitation",
             "description": "Somebody invited you to an event, or changed or cancelled one you are in."

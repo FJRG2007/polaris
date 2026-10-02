@@ -47,6 +47,8 @@ import { UpdateIndicator } from "@/components/update-indicator";
 import { SessionScopeProvider } from "@/components/session-scope";
 import { ShelfScopeProvider } from "@/components/shelf-scope";
 import { NotificationBell } from "@/components/notification-bell";
+import { headerSlots } from "@/lib/app-extensions/registry";
+import { AppSlotView } from "@/components/app-extensions/installed-client";
 import { openShelfFor, resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
@@ -164,6 +166,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         adminCount
     ]);
     const build = buildStamp();
+    // What the apps this person reaches draw beside the bell - Calendar's
+    // running timers. Read from the extensions in memory: no query.
+    const appHeader = headerSlots(apps.ids);
 
     const frame = (
         <CapabilityProvider capabilities={capabilities}>
@@ -330,6 +335,12 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                         {user.isAdmin ? (
                                                                             <UpdateIndicator />
                                                                         ) : null}
+                                                                        {appHeader.map((slot) => (
+                                                                            <AppSlotView
+                                                                                key={`${slot.app}:${slot.kind}`}
+                                                                                slot={slot}
+                                                                            />
+                                                                        ))}
                                                                         <NotificationBell />
                                                                         <AccountMenu
                                                                             id={user.id}

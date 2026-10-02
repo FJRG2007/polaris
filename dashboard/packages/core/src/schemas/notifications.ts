@@ -244,6 +244,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "calendar.clock",
+        group: "calendar",
+        label: "Alarm or timer went off",
+        description: "An alarm or a timer you set in Calendar's Time area went off.",
+        level: "warning",
+        // Somebody set it to be interrupted at that moment. Mail arrives too
+        // late to be the ring, so it stays off unless they choose it.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "calendar.invitation",
         group: "calendar",
         label: "Invitation",
