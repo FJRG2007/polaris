@@ -19,7 +19,14 @@ interface Row {
 let applications: Row[] = [];
 let databases: Row[] = [];
 let links: { id: string; targetKind: string; targetId: string; sourceId: string }[] = [];
-let envVars: { id: string; scopeType: string; scopeId: string; key: string; value: string; isSecret: boolean }[] = [];
+let envVars: {
+    id: string;
+    scopeType: string;
+    scopeId: string;
+    key: string;
+    value: string;
+    isSecret: boolean;
+}[] = [];
 let environments: unknown[] = [];
 const updates: { table: string; id: string; privateNetwork: string }[] = [];
 
@@ -45,12 +52,14 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         application: {
             findMany: inEnvironment(() => applications),
-            findUnique: async ({ where }: { where: { id: string } }) => applications.find((row) => row.id === where.id) ?? null,
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                applications.find((row) => row.id === where.id) ?? null,
             update: updater("application", () => applications)
         },
         managedDatabase: {
             findMany: inEnvironment(() => databases),
-            findUnique: async ({ where }: { where: { id: string } }) => databases.find((row) => row.id === where.id) ?? null,
+            findUnique: async ({ where }: { where: { id: string } }) =>
+                databases.find((row) => row.id === where.id) ?? null,
             update: updater("database", () => databases)
         },
         privateLink: {
@@ -58,7 +67,9 @@ vi.mock("@polaris/db", () => ({
                 where?.OR
                     ? links.filter((link) =>
                           where.OR!.some((clause) =>
-                              Object.entries(clause).every(([key, value]) => link[key as keyof typeof link] === value)
+                              Object.entries(clause).every(
+                                  ([key, value]) => link[key as keyof typeof link] === value
+                              )
                           )
                       )
                     : links
@@ -78,7 +89,13 @@ const { wantedPrivateNetworks } = await import("@/lib/deploy/service-networks");
 const deploy = await import("@polaris/deploy");
 
 function daemon(privateNames: boolean): void {
-    setCapabilities({ ...LIMITED_CAPABILITIES, edition: "full", deploy: true, privateNetworks: true, privateNames });
+    setCapabilities({
+        ...LIMITED_CAPABILITIES,
+        edition: "full",
+        deploy: true,
+        privateNetworks: true,
+        privateNames
+    });
 }
 
 const LOCAL = { kind: "local", hostId: null };
@@ -87,10 +104,24 @@ const REMOTE = { kind: "host", hostId: "host-1" };
 beforeEach(() => {
     applications = [
         { id: "a1", slug: "api", name: "API", environmentId: "env-1", privateNetwork: "{}" },
-        { id: "a2", slug: "web", name: "Web", environmentId: "env-1", privateNetwork: JSON.stringify({ aliases: ["site"] }) },
+        {
+            id: "a2",
+            slug: "web",
+            name: "Web",
+            environmentId: "env-1",
+            privateNetwork: JSON.stringify({ aliases: ["site"] })
+        },
         { id: "a3", slug: "api", name: "API", environmentId: "env-2", privateNetwork: "{}" }
     ];
-    databases = [{ id: "d1", slug: "postgres", name: "Postgres", environmentId: "env-1", privateNetwork: "{}" }];
+    databases = [
+        {
+            id: "d1",
+            slug: "postgres",
+            name: "Postgres",
+            environmentId: "env-1",
+            privateNetwork: "{}"
+        }
+    ];
     links = [];
     envVars = [];
     environments = [];
@@ -106,7 +137,9 @@ describe("what is stored", () => {
             former: []
         });
         expect(names.privateNameOf({ slug: "api", privateNetwork: "{}" })).toBe("api");
-        expect(names.privateNameOf({ slug: "api", privateNetwork: '{"name":"backend"}' })).toBe("backend");
+        expect(names.privateNameOf({ slug: "api", privateNetwork: '{"name":"backend"}' })).toBe(
+            "backend"
+        );
     });
 
     it("keeps a former name answering only inside its grace period", () => {
@@ -118,7 +151,10 @@ describe("what is stored", () => {
                 { name: "old", until: "2026-09-01T00:00:00Z" }
             ]
         });
-        expect(names.labelsOf({ slug: "x", privateNetwork: stored }, now)).toEqual(["backend", "api"]);
+        expect(names.labelsOf({ slug: "x", privateNetwork: stored }, now)).toEqual([
+            "backend",
+            "api"
+        ]);
     });
 });
 
@@ -136,7 +172,9 @@ describe("a deploy's names", () => {
         const own = deploy.namesNetwork("env-1");
         expect(given.enabled).toBe(true);
         expect(given.domain).toBe("web.polaris.internal");
-        expect(given.networkAliases).toEqual({ [own]: ["web.polaris.internal", "web", "site.polaris.internal", "site"] });
+        expect(given.networkAliases).toEqual({
+            [own]: ["web.polaris.internal", "web", "site.polaris.internal", "site"]
+        });
         expect(given.live).toContain("web.polaris.internal");
         expect(updates).toHaveLength(0);
 
@@ -168,7 +206,13 @@ describe("a deploy's names", () => {
 
     it("leave out a name another service of the environment keeps", async () => {
         // An application created after the database, both called `postgres` by their slugs.
-        applications.push({ id: "z9", slug: "postgres", name: "Postgres app", environmentId: "env-1", privateNetwork: "{}" });
+        applications.push({
+            id: "z9",
+            slug: "postgres",
+            name: "Postgres app",
+            environmentId: "env-1",
+            privateNetwork: "{}"
+        });
         const app = await names.prepareDeployNames({
             kind: "application",
             id: "z9",
@@ -193,7 +237,12 @@ describe("a deploy's names", () => {
 
         // A name somebody chose wins over one a slug made, whoever came first.
         applications.at(-1)!.privateNetwork = JSON.stringify({ aliases: ["postgres"] });
-        expect(await names.answeringLabels({ kind: "database", id: "d1", slug: "postgres", privateNetwork: "{}" }, "env-1")).toEqual([]);
+        expect(
+            await names.answeringLabels(
+                { kind: "database", id: "d1", slug: "postgres", privateNetwork: "{}" },
+                "env-1"
+            )
+        ).toEqual([]);
     });
 
     it("give a linked service its project-qualified name on the link's network only", async () => {
@@ -208,8 +257,13 @@ describe("a deploy's names", () => {
             target: LOCAL
         });
         expect(given.crossLinks).toEqual([deploy.crossLinkNetwork("l1")]);
-        expect(given.networkAliases[deploy.crossLinkNetwork("l1")]).toEqual(["api.shop.polaris.internal"]);
-        expect(given.networkAliases[deploy.namesNetwork("env-1")]).toEqual(["api.polaris.internal", "api"]);
+        expect(given.networkAliases[deploy.crossLinkNetwork("l1")]).toEqual([
+            "api.shop.polaris.internal"
+        ]);
+        expect(given.networkAliases[deploy.namesNetwork("env-1")]).toEqual([
+            "api.polaris.internal",
+            "api"
+        ]);
     });
 
     it("are off on a machine whose daemon predates them, and on for another server", async () => {
@@ -230,33 +284,60 @@ describe("a deploy's names", () => {
 
 describe("a reference to a service", () => {
     const live = (deploymentId?: string) =>
-        JSON.stringify({ live: { ...(deploymentId ? { deploymentId } : {}), names: ["api.polaris.internal", "api"] } });
+        JSON.stringify({
+            live: {
+                ...(deploymentId ? { deploymentId } : {}),
+                names: ["api.polaris.internal", "api"]
+            }
+        });
 
     it("switches to the private name only once the release serving it answers to it", () => {
         const container = "shop-api-abcd";
-        expect(names.referencedDomain({ slug: "api", privateNetwork: "{}", currentDeploymentId: "d1" }, container)).toBe(
-            container
-        );
         expect(
-            names.referencedDomain({ slug: "api", privateNetwork: live("d2"), currentDeploymentId: "d1" }, container)
+            names.referencedDomain(
+                { slug: "api", privateNetwork: "{}", currentDeploymentId: "d1" },
+                container
+            )
         ).toBe(container);
         expect(
-            names.referencedDomain({ slug: "api", privateNetwork: live("d1"), currentDeploymentId: "d1" }, container)
+            names.referencedDomain(
+                { slug: "api", privateNetwork: live("d2"), currentDeploymentId: "d1" },
+                container
+            )
+        ).toBe(container);
+        expect(
+            names.referencedDomain(
+                { slug: "api", privateNetwork: live("d1"), currentDeploymentId: "d1" },
+                container
+            )
         ).toBe("api.polaris.internal");
         // An application's names recorded against no deployment are never taken as live.
         expect(
-            names.referencedDomain({ slug: "api", privateNetwork: live(), currentDeploymentId: "d1" }, container)
+            names.referencedDomain(
+                { slug: "api", privateNetwork: live(), currentDeploymentId: "d1" },
+                container
+            )
         ).toBe(container);
         // A renamed service is referenced by its new name once that is live.
-        const renamed = JSON.stringify({ name: "backend", live: { names: ["backend.polaris.internal"] } });
-        expect(names.referencedDomain({ slug: "api", privateNetwork: renamed }, container)).toBe("backend.polaris.internal");
+        const renamed = JSON.stringify({
+            name: "backend",
+            live: { names: ["backend.polaris.internal"] }
+        });
+        expect(names.referencedDomain({ slug: "api", privateNetwork: renamed }, container)).toBe(
+            "backend.polaris.internal"
+        );
     });
 
     it("stays on the container name where the target carries no names", () => {
         daemon(false);
         expect(
             names.referencedDomain(
-                { slug: "api", privateNetwork: live("d1"), currentDeploymentId: "d1", target: LOCAL },
+                {
+                    slug: "api",
+                    privateNetwork: live("d1"),
+                    currentDeploymentId: "d1",
+                    target: LOCAL
+                },
                 "shop-api-abcd"
             )
         ).toBe("shop-api-abcd");
@@ -265,13 +346,25 @@ describe("a reference to a service", () => {
 
 describe("choosing a name", () => {
     it("is refused when another service of the environment answers to it, in any form", async () => {
-        expect((await names.checkPrivateName("application", "a1", "env-1", "Web")).takenBy).toBe("Web");
-        expect((await names.checkPrivateName("application", "a1", "env-1", "site")).takenBy).toBe("Web");
-        expect((await names.checkPrivateName("application", "a1", "env-1", "postgres")).takenBy).toBe("Postgres");
+        expect((await names.checkPrivateName("application", "a1", "env-1", "Web")).takenBy).toBe(
+            "Web"
+        );
+        expect((await names.checkPrivateName("application", "a1", "env-1", "site")).takenBy).toBe(
+            "Web"
+        );
+        expect(
+            (await names.checkPrivateName("application", "a1", "env-1", "postgres")).takenBy
+        ).toBe("Postgres");
         // Its own name, and the same name in another environment, are free.
-        expect((await names.checkPrivateName("application", "a1", "env-1", "api")).takenBy).toBeNull();
-        expect((await names.checkPrivateName("application", "a3", "env-2", "web")).takenBy).toBeNull();
-        expect((await names.checkPrivateName("application", "a1", "env-1", "-x")).problem).toBe("edges");
+        expect(
+            (await names.checkPrivateName("application", "a1", "env-1", "api")).takenBy
+        ).toBeNull();
+        expect(
+            (await names.checkPrivateName("application", "a3", "env-2", "web")).takenBy
+        ).toBeNull();
+        expect((await names.checkPrivateName("application", "a1", "env-1", "-x")).problem).toBe(
+            "edges"
+        );
     });
 
     it("keeps the old name answering for the grace period after a rename", async () => {
@@ -282,16 +375,26 @@ describe("choosing a name", () => {
         expect(stored.former.map((entry) => entry.name)).toEqual(["api"]);
         const days = (Date.parse(stored.former[0]!.until) - Date.now()) / 86_400_000;
         expect(Math.round(days)).toBe(7);
-        await expect(names.renamePrivateName("application", "a1", "backend")).rejects.toMatchObject({
-            reason: "unchanged"
+        await expect(names.renamePrivateName("application", "a1", "backend")).rejects.toMatchObject(
+            {
+                reason: "unchanged"
+            }
+        );
+        await expect(names.renamePrivateName("application", "a1", "web")).rejects.toMatchObject({
+            reason: "taken"
         });
-        await expect(names.renamePrivateName("application", "a1", "web")).rejects.toMatchObject({ reason: "taken" });
     });
 
     it("checks extra names like names, and drops the service's own", async () => {
-        expect(await names.setPrivateAliases("application", "a1", ["DymoAPI", "api", "dymoapi"])).toEqual(["dymoapi"]);
-        await expect(names.setPrivateAliases("application", "a1", ["site"])).rejects.toMatchObject({ reason: "taken" });
-        await expect(names.setPrivateAliases("application", "a1", Array(9).fill("x"))).rejects.toMatchObject({
+        expect(
+            await names.setPrivateAliases("application", "a1", ["DymoAPI", "api", "dymoapi"])
+        ).toEqual(["dymoapi"]);
+        await expect(names.setPrivateAliases("application", "a1", ["site"])).rejects.toMatchObject({
+            reason: "taken"
+        });
+        await expect(
+            names.setPrivateAliases("application", "a1", Array(9).fill("x"))
+        ).rejects.toMatchObject({
             reason: "tooMany"
         });
     });
@@ -311,7 +414,9 @@ describe("the networks the reconcile keeps", () => {
         expect(wanted).not.toContain(deploy.namesNetwork("env-2"));
 
         daemon(false);
-        environments = [{ id: "env-2", networkMode: "links", applications: [{ id: "a3" }], databases: [] }];
+        environments = [
+            { id: "env-2", networkMode: "links", applications: [{ id: "a3" }], databases: [] }
+        ];
         expect((await wantedPrivateNetworks()).some(deploy.isNamesNetwork)).toBe(false);
     });
 });
@@ -319,11 +424,46 @@ describe("the networks the reconcile keeps", () => {
 describe("the canvas lines", () => {
     it("join a service to each service or database its variables reference, inside its environment", async () => {
         envVars = [
-            { id: "v1", scopeType: "application", scopeId: "a2", key: "API", value: "http://${{api.POLARIS_PRIVATE_DOMAIN}}", isSecret: false },
-            { id: "v2", scopeType: "application", scopeId: "a2", key: "DB", value: "${{postgres.DATABASE_URL}}", isSecret: false },
-            { id: "v3", scopeType: "application", scopeId: "a2", key: "AGAIN", value: "${{api.PORT}}", isSecret: false },
-            { id: "v4", scopeType: "application", scopeId: "a1", key: "SELF", value: "${{api.PORT}}", isSecret: false },
-            { id: "v5", scopeType: "application", scopeId: "a3", key: "X", value: "${{web.PORT}}", isSecret: false }
+            {
+                id: "v1",
+                scopeType: "application",
+                scopeId: "a2",
+                key: "API",
+                value: "http://${{api.POLARIS_PRIVATE_DOMAIN}}",
+                isSecret: false
+            },
+            {
+                id: "v2",
+                scopeType: "application",
+                scopeId: "a2",
+                key: "DB",
+                value: "${{postgres.DATABASE_URL}}",
+                isSecret: false
+            },
+            {
+                id: "v3",
+                scopeType: "application",
+                scopeId: "a2",
+                key: "AGAIN",
+                value: "${{api.PORT}}",
+                isSecret: false
+            },
+            {
+                id: "v4",
+                scopeType: "application",
+                scopeId: "a1",
+                key: "SELF",
+                value: "${{api.PORT}}",
+                isSecret: false
+            },
+            {
+                id: "v5",
+                scopeType: "application",
+                scopeId: "a3",
+                key: "X",
+                value: "${{web.PORT}}",
+                isSecret: false
+            }
         ];
         const edges = await names.referenceEdges(["env-1", "env-2"]);
         expect(edges.get("env-1")).toEqual([

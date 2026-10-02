@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { defaultPrivateName, normalizePrivateName, privateNameProblem, privateNameSchema } from "./private-name.js";
+import {
+    defaultPrivateName,
+    normalizePrivateName,
+    privateNameProblem,
+    privateNameSchema
+} from "./private-name.js";
 
 describe("a private name", () => {
     it("is normalized the one way DNS compares names", () => {

@@ -409,7 +409,10 @@ export class ComposeRuntime implements RuntimeDriver {
                 ? undefined
                 : (effectivePlan.expose?.container ?? effectivePlan.forwardPort);
         const spec = withPortForwarders(
-            expandReplicas(appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork), effectivePlan.aliasCopies),
+            expandReplicas(
+                appComposeSpec(effectivePlan, imageTag, ctx.target.proxyNetwork),
+                effectivePlan.aliasCopies
+            ),
             forwardTo
         );
         // Establish any NAS mounts the volumes bind onto, before the container comes

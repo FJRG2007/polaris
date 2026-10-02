@@ -182,7 +182,12 @@ export async function createProjectAction(input: {
             );
 
         // Closed to every other project from the start, like Railway's.
-        const project = await deployService.createProject(user.id, name, orgId, NEW_ENVIRONMENT_NETWORK_MODE);
+        const project = await deployService.createProject(
+            user.id,
+            name,
+            orgId,
+            NEW_ENVIRONMENT_NETWORK_MODE
+        );
         await recordDeployAudit({
             actorId: user.id,
             orgId: orgId ?? undefined,
@@ -193,7 +198,9 @@ export async function createProjectAction(input: {
         revalidatePath(DEPLOY_PATH);
         return { id: project.id };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("project.createFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("project.createFailed")
+        };
     }
 }
 
@@ -216,7 +223,9 @@ export async function deleteProjectAction(projectId: string): Promise<{ error?: 
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("project.deleteFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("project.deleteFailed")
+        };
     }
 }
 
@@ -280,7 +289,8 @@ export async function createEnvironmentAction(input: {
         return { id: environment.id };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : await reply("environment.createFailed")
+            error:
+                caught instanceof Error ? caught.message : await reply("environment.createFailed")
         };
     }
 }
@@ -303,7 +313,10 @@ export async function saveLayoutAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("environment.layoutFailed") };
+        return {
+            error:
+                caught instanceof Error ? caught.message : await reply("environment.layoutFailed")
+        };
     }
 }
 
@@ -330,7 +343,8 @@ export async function deleteEnvironmentAction(input: {
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : await reply("environment.deleteFailed")
+            error:
+                caught instanceof Error ? caught.message : await reply("environment.deleteFailed")
         };
     }
 }
@@ -610,7 +624,9 @@ export async function setAutoDeployAction(input: {
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("service.settingsFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("service.settingsFailed")
+        };
     }
 }
 
@@ -720,7 +736,9 @@ export async function rerunServiceSetupAction(applicationId: string): Promise<{ 
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("service.setupFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("service.setupFailed")
+        };
     }
 }
 
@@ -758,7 +776,9 @@ export async function setServiceFollowAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("service.changeFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("service.changeFailed")
+        };
     }
 }
 
@@ -784,8 +804,7 @@ export async function postServiceCommentAction(input: {
         subjectId: input.applicationId,
         body: input.body
     });
-    if (!parsed.success)
-        return { error: await firstIssue(parsed.error, "notes.invalid") };
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "notes.invalid") };
     try {
         const access = await requireApplicationAccess(
             parsed.data.subjectId,
@@ -800,7 +819,9 @@ export async function postServiceCommentAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("notes.postFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("notes.postFailed")
+        };
     }
 }
 
@@ -819,7 +840,9 @@ export async function deleteServiceCommentAction(input: {
         );
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("notes.deleteFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("notes.deleteFailed")
+        };
     }
 }
 
@@ -906,7 +929,8 @@ export async function rollbackDeploymentAction(
         return { deploymentId: started.deploymentId };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : await reply("deployment.rollbackFailed")
+            error:
+                caught instanceof Error ? caught.message : await reply("deployment.rollbackFailed")
         };
     }
 }
@@ -930,7 +954,8 @@ export async function pinDeploymentAction(
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : await reply("deployment.releaseFailed")
+            error:
+                caught instanceof Error ? caught.message : await reply("deployment.releaseFailed")
         };
     }
 }
@@ -983,7 +1008,9 @@ export async function setAppPortAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("service.portFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("service.portFailed")
+        };
     }
 }
 
@@ -1051,7 +1078,9 @@ export async function setAppServerAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("service.serverFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("service.serverFailed")
+        };
     }
 }
 
@@ -1065,7 +1094,8 @@ export async function restartApplicationAction(applicationId: string): Promise<{
         return {};
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : await reply("deployment.restartFailed")
+            error:
+                caught instanceof Error ? caught.message : await reply("deployment.restartFailed")
         };
     }
 }
@@ -1132,7 +1162,9 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("service.deleteFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("service.deleteFailed")
+        };
     }
 }
 
@@ -1205,7 +1237,9 @@ export async function addDomainAction(input: {
                 : undefined;
         return { hostname, dns };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("domains.addFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("domains.addFailed")
+        };
     }
 }
 
@@ -1342,7 +1376,12 @@ export async function zoneSubdomainAction(input: {
     const user = await requirePermission("deploy.manage");
     const parsed = zoneSubdomainSchema.safeParse(input);
     if (!parsed.success)
-        return { subdomain: "", hostname: "", available: false, error: await reply("common.invalidRequest") };
+        return {
+            subdomain: "",
+            hostname: "",
+            available: false,
+            error: await reply("common.invalidRequest")
+        };
     try {
         const access = await requireApplicationAccess(
             parsed.data.applicationId,
@@ -1397,7 +1436,8 @@ export async function setDomainCertificateAction(
         return result;
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : await reply("domains.certificateFailed")
+            error:
+                caught instanceof Error ? caught.message : await reply("domains.certificateFailed")
         };
     }
 }
@@ -1442,7 +1482,9 @@ export async function setDomainEnabledAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("domains.updateFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("domains.updateFailed")
+        };
     }
 }
 
@@ -1461,7 +1503,8 @@ export async function setServedByAction(
     servedBy: "server" | "polaris"
 ): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
-    if (servedBy !== "server" && servedBy !== "polaris") return { error: await reply("common.unknownChoice") };
+    if (servedBy !== "server" && servedBy !== "polaris")
+        return { error: await reply("common.unknownChoice") };
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
         await deployService.setApplicationServedBy(applicationId, access.ownerId, servedBy);
@@ -1475,7 +1518,9 @@ export async function setServedByAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("domains.updateFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("domains.updateFailed")
+        };
     }
 }
 
@@ -1566,7 +1611,9 @@ export async function setPublishPortAction(
         revalidatePath(DEPLOY_PATH);
         return { redeployed: outcome.redeployed };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("domains.portFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("domains.portFailed")
+        };
     }
 }
 
@@ -1597,7 +1644,9 @@ export async function startQuickTunnelAction(
         });
         return { url: status.url };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed")
+        };
     }
 }
 
@@ -1615,7 +1664,9 @@ export async function stopQuickTunnelAction(applicationId: string): Promise<{ er
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed")
+        };
     }
 }
 
@@ -1645,7 +1696,9 @@ export async function startNgrokTunnelAction(
         });
         return { url: status.url };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed")
+        };
     }
 }
 
@@ -1663,7 +1716,9 @@ export async function stopNgrokTunnelAction(applicationId: string): Promise<{ er
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed")
+        };
     }
 }
 
@@ -1699,7 +1754,9 @@ export async function setNamedTunnelEnabledAction(input: {
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.updateFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.updateFailed")
+        };
     }
 }
 
@@ -1744,7 +1801,9 @@ export async function provisionNamedTunnelAction(input: {
         });
         return { hostname: status.hostname };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.setupFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.setupFailed")
+        };
     }
 }
 
@@ -1773,7 +1832,9 @@ export async function startNamedTunnelAction(input: {
         });
         return { hostname: status.hostname };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.startFailed")
+        };
     }
 }
 
@@ -1791,7 +1852,9 @@ export async function stopNamedTunnelAction(applicationId: string): Promise<{ er
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("tunnels.stopFailed")
+        };
     }
 }
 
@@ -1876,7 +1939,8 @@ export async function deployDatabaseAction(
         return { deploymentId };
     } catch (caught) {
         return {
-            error: caught instanceof Error ? caught.message : await reply("databases.provisionFailed")
+            error:
+                caught instanceof Error ? caught.message : await reply("databases.provisionFailed")
         };
     }
 }
@@ -2009,7 +2073,9 @@ export async function createVolumeAction(input: DeployVolumeInput): Promise<{ er
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("volumes.addFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("volumes.addFailed")
+        };
     }
 }
 
@@ -2050,7 +2116,9 @@ export async function updateVolumeAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("volumes.updateFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("volumes.updateFailed")
+        };
     }
 }
 
@@ -2074,7 +2142,9 @@ export async function deleteVolumeAction(input: {
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("volumes.removeFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("volumes.removeFailed")
+        };
     }
 }
 

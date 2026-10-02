@@ -127,7 +127,13 @@ vi.mock("@/lib/deploy/private-names", () => ({
     privateNameOf: () => "",
     answeringLabels: async () => [],
     recordLiveNames: async () => undefined,
-    prepareDeployNames: async () => ({ enabled: false, live: [], crossLinks: [], networkAliases: {}, domain: null })
+    prepareDeployNames: async () => ({
+        enabled: false,
+        live: [],
+        crossLinks: [],
+        networkAliases: {},
+        domain: null
+    })
 }));
 vi.mock("@/lib/deploy/github-deployment", () => ({
     announceDeployQueued: vi.fn(async () => undefined),
@@ -137,9 +143,7 @@ vi.mock("@/lib/deploy/github-deployment", () => ({
 // Game servers installed, as its bundle would register it: the image a
 // Minecraft release runs is its call.
 vi.mock("@/lib/app-extensions/installed", async () => ({
-    installedExtensions: () => [
-        gameServersExtension
-    ]
+    installedExtensions: () => [gameServersExtension]
 }));
 const { gameServersExtension } = await import("@polaris-app/game-servers/src/lib/games-extension");
 

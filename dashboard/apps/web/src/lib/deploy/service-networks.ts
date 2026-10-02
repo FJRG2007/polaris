@@ -31,7 +31,9 @@ export const NEW_ENVIRONMENT_NETWORK_MODE: deploy.NetworkMode = "environment";
 
 /** The stored mode, or "shared" for anything that is not one of the three. */
 export function networkModeOf(stored: string | null | undefined): deploy.NetworkMode {
-    return (deploy.NETWORK_MODES as readonly string[]).includes(stored ?? "") ? (stored as deploy.NetworkMode) : "shared";
+    return (deploy.NETWORK_MODES as readonly string[]).includes(stored ?? "")
+        ? (stored as deploy.NetworkMode)
+        : "shared";
 }
 
 interface TargetFacts {
@@ -54,7 +56,11 @@ export function privateNetworksOn(target: Pick<TargetFacts, "kind" | "hostId">):
 }
 
 export interface ServiceNetworkFacts {
-    readonly environment: { readonly id: string; readonly networkMode: string; readonly layout: string };
+    readonly environment: {
+        readonly id: string;
+        readonly networkMode: string;
+        readonly layout: string;
+    };
     readonly serviceId: string;
     readonly target: TargetFacts;
     /** Whether the service publishes a port on the host. Always false for a
@@ -92,13 +98,19 @@ export async function hasTunnel(applicationId: string): Promise<boolean> {
 
 /** The networks one service joins on its next deploy. */
 export function networksForService(facts: ServiceNetworkFacts): string[] {
-    const mode = privateNetworksOn(facts.target) ? networkModeOf(facts.environment.networkMode) : "shared";
+    const mode = privateNetworksOn(facts.target)
+        ? networkModeOf(facts.environment.networkMode)
+        : "shared";
     return deploy.serviceNetworks({
         mode,
         proxyNetwork: facts.target.proxyNetwork,
         environmentId: facts.environment.id,
         serviceId: facts.serviceId,
-        joinsProxy: deploy.joinsProxy({ local: isLocal(facts.target), published: facts.published, routed: facts.routed }),
+        joinsProxy: deploy.joinsProxy({
+            local: isLocal(facts.target),
+            published: facts.published,
+            routed: facts.routed
+        }),
         links: deploy.linksOfLayout(facts.environment.layout),
         names: facts.names,
         crossLinks: facts.crossLinks
@@ -136,7 +148,10 @@ export async function privateNetworksOfApp(applicationId: string): Promise<strin
 /** The networks a tunnel's connector for this application joins: the proxy
  *  network it always had, and the application's private ones, so a service with
  *  its port closed is still reached by name once it has left the proxy network. */
-export async function connectorNetworks(applicationId: string, proxyNetwork: string): Promise<string[]> {
+export async function connectorNetworks(
+    applicationId: string,
+    proxyNetwork: string
+): Promise<string[]> {
     return [...new Set([proxyNetwork, ...(await privateNetworksOfApp(applicationId))])];
 }
 
@@ -194,11 +209,16 @@ const IPV6_SETTING = "deploy.privnet.ipv6";
  * or a daemon that does not say.
  */
 export async function dualStackNetworks(): Promise<ReadonlySet<string> | null> {
-    const row = await prisma.setting.findUnique({ where: { key: IPV6_SETTING }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: IPV6_SETTING },
+        select: { value: true }
+    });
     if (!row) return null;
     try {
         const parsed = JSON.parse(row.value) as unknown;
-        return Array.isArray(parsed) ? new Set(parsed.filter((one): one is string => typeof one === "string")) : null;
+        return Array.isArray(parsed)
+            ? new Set(parsed.filter((one): one is string => typeof one === "string"))
+            : null;
     } catch {
         return null;
     }
@@ -210,7 +230,10 @@ export async function dualStackNetworks(): Promise<ReadonlySet<string> | null> {
  * is never removed - the daemon checks - so an environment switched back to
  * shared keeps working until its services are deployed onto the new setting.
  */
-export async function reconcilePrivateNetworks(): Promise<{ kept: number; removed: number } | null> {
+export async function reconcilePrivateNetworks(): Promise<{
+    kept: number;
+    removed: number;
+} | null> {
     if (!getCapabilities().privateNetworks) return null;
     // A link whose service is gone has no network left to keep.
     await pruneCrossLinks();
@@ -237,14 +260,26 @@ export async function pruneCrossLinks(): Promise<number> {
         take: MAX_LINKS
     });
     if (links.length === 0) return 0;
-    const targets = (kind: string) => links.filter((link) => link.targetKind === kind).map((link) => link.targetId);
+    const targets = (kind: string) =>
+        links.filter((link) => link.targetKind === kind).map((link) => link.targetId);
     const [sources, apps, dbs] = await Promise.all([
-        prisma.application.findMany({ where: { id: { in: links.map((link) => link.sourceId) } }, select: { id: true } }),
-        prisma.application.findMany({ where: { id: { in: targets("application") } }, select: { id: true } }),
-        prisma.managedDatabase.findMany({ where: { id: { in: targets("database") } }, select: { id: true } })
+        prisma.application.findMany({
+            where: { id: { in: links.map((link) => link.sourceId) } },
+            select: { id: true }
+        }),
+        prisma.application.findMany({
+            where: { id: { in: targets("application") } },
+            select: { id: true }
+        }),
+        prisma.managedDatabase.findMany({
+            where: { id: { in: targets("database") } },
+            select: { id: true }
+        })
     ]);
     const present = new Set([...sources, ...apps, ...dbs].map((one) => one.id));
-    const gone = links.filter((link) => !present.has(link.sourceId) || !present.has(link.targetId)).map((link) => link.id);
+    const gone = links
+        .filter((link) => !present.has(link.sourceId) || !present.has(link.targetId))
+        .map((link) => link.id);
     if (gone.length > 0) await prisma.privateLink.deleteMany({ where: { id: { in: gone } } });
     return gone.length;
 }

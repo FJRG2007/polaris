@@ -568,7 +568,9 @@ function DatabaseCard({
                 )}
                 <Badge>{dbEngineLabel(database.engine)}</Badge>
                 {database.hostedOnInstance && <Badge>{t("view.sharedInstance")}</Badge>}
-                {database.hostedCount ? <Badge>{t("view.hosts", { count: database.hostedCount })}</Badge> : null}
+                {database.hostedCount ? (
+                    <Badge>{t("view.hosts", { count: database.hostedCount })}</Badge>
+                ) : null}
             </div>
 
             {error && <p className="text-xs text-danger">{error}</p>}
@@ -725,7 +727,9 @@ function DatabaseConnectionDialog({
                                 connection.cluster
                                     ? t("view.connection.uriCluster")
                                     : connection.hosts.length > 1
-                                      ? t("view.connection.uriMembers", { count: connection.hosts.length })
+                                      ? t("view.connection.uriMembers", {
+                                            count: connection.hosts.length
+                                        })
                                       : t("view.connection.uriHint")
                             }
                         >
@@ -735,7 +739,9 @@ function DatabaseConnectionDialog({
                             <>
                                 <Field
                                     label={t("view.connection.nodes")}
-                                    hint={t("view.connection.nodesHint", { masters: connection.cluster.masters })}
+                                    hint={t("view.connection.nodesHint", {
+                                        masters: connection.cluster.masters
+                                    })}
                                 >
                                     <CopyRow value={connection.cluster.nodes.join(",")} />
                                 </Field>
@@ -751,7 +757,10 @@ function DatabaseConnectionDialog({
                             <Field
                                 label={t("view.connection.readUri")}
                                 hint={t("view.connection.readUriHint", {
-                                    reference: connection.reference.replace("DATABASE_URL", "READ_URL")
+                                    reference: connection.reference.replace(
+                                        "DATABASE_URL",
+                                        "READ_URL"
+                                    )
                                 })}
                             >
                                 <CopyRow value={connection.readUri} secret={!revealed} />
@@ -788,7 +797,9 @@ function DatabaseConnectionDialog({
                                 ) : (
                                     <Eye className="size-4" />
                                 )}
-                                {revealed ? t("view.connection.hidePassword") : t("view.connection.showPassword")}
+                                {revealed
+                                    ? t("view.connection.hidePassword")
+                                    : t("view.connection.showPassword")}
                             </Button>
                             {connection.exposedPort && (
                                 <span className="text-xs text-muted-foreground">
@@ -1054,7 +1065,9 @@ function NewUploadForm({ environmentId, onDone }: { environmentId: string; onDon
 }
 
 /** What a template creates besides its own service, in the picker's words. */
-function templateExtra(template: ServiceTemplate): { engine: string } | { companion: string } | null {
+function templateExtra(
+    template: ServiceTemplate
+): { engine: string } | { companion: string } | null {
     if (template.database) return { engine: dbEngineLabel(template.database.engine) };
     if (template.companion) return { companion: template.companion.label };
     return null;
@@ -1107,8 +1120,12 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                                     return (
                                         <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                                             {"engine" in extra
-                                                ? t("view.template.withEngine", { engine: extra.engine })
-                                                : t("view.template.withCompanion", { companion: extra.companion })}
+                                                ? t("view.template.withEngine", {
+                                                      engine: extra.engine
+                                                  })
+                                                : t("view.template.withCompanion", {
+                                                      companion: extra.companion
+                                                  })}
                                         </span>
                                     );
                                 })()}
@@ -1142,7 +1159,9 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {picked.database && (
                 <p className="text-xs text-muted-foreground">
-                    {t("view.template.createsDatabase", { engine: dbEngineLabel(picked.database.engine) })}
+                    {t("view.template.createsDatabase", {
+                        engine: dbEngineLabel(picked.database.engine)
+                    })}
                 </p>
             )}
             {picked.companion && (
@@ -1225,7 +1244,8 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !image.trim()}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.image.deploy")}
+                    {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                    {t("view.image.deploy")}
                 </Button>
             </div>
         </div>
@@ -1365,7 +1385,11 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 <p className="rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-xs text-muted-foreground">
                     {t.rich("view.github.publicOnly", {
                         link: (chunks) => (
-                            <a key="link" href="/account/connections" className="text-primary hover:underline">
+                            <a
+                                key="link"
+                                href="/account/connections"
+                                className="text-primary hover:underline"
+                            >
                                 {chunks}
                             </a>
                         )
@@ -1458,7 +1482,9 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                             label={t("view.github.dockerfilePath")}
                             hint={
                                 rootDirectory.trim()
-                                    ? t("view.github.relativeTo", { directory: rootDirectory.trim() })
+                                    ? t("view.github.relativeTo", {
+                                          directory: rootDirectory.trim()
+                                      })
                                     : undefined
                             }
                         >
@@ -1484,7 +1510,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !canSubmit}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.github.deploy")}
+                    {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                    {t("view.github.deploy")}
                 </Button>
             </div>
         </div>
@@ -1655,13 +1682,22 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     {info.namedDatabases && (
                         <Field
                             label={t("view.database.runsOn")}
-                            hint={hosted ? t("view.database.runsOnShared") : t("view.database.runsOnOwn")}
+                            hint={
+                                hosted
+                                    ? t("view.database.runsOnShared")
+                                    : t("view.database.runsOnOwn")
+                            }
                         >
                             <Select
                                 value={instanceId}
                                 onValueChange={setInstanceId}
                                 options={[
-                                    { value: DEDICATED, label: t("view.database.newInstance", { engine: info.label }) },
+                                    {
+                                        value: DEDICATED,
+                                        label: t("view.database.newInstance", {
+                                            engine: info.label
+                                        })
+                                    },
                                     ...instances.map((instance) => ({
                                         value: instance.id,
                                         label: t("view.database.instanceOption", {
@@ -1719,7 +1755,10 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
 
                     {info.namedUsers && (
                         <>
-                            <Field label={t("view.database.databaseName")} hint={t("view.database.databaseNameHint")}>
+                            <Field
+                                label={t("view.database.databaseName")}
+                                hint={t("view.database.databaseNameHint")}
+                            >
                                 <Input
                                     value={databaseName}
                                     onChange={(event) => setDatabaseName(event.target.value)}
@@ -1774,7 +1813,8 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !parsed.success}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} {t("view.database.add")}
+                    {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                    {t("view.database.add")}
                 </Button>
             </div>
         </div>
@@ -1822,13 +1862,17 @@ function AutoDeployDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{t("view.autoDeployDialog.title", { name: app.name })}</DialogTitle>
+                    <DialogTitle>
+                        {t("view.autoDeployDialog.title", { name: app.name })}
+                    </DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
                             <span className="font-medium">{t("view.autoDeployDialog.onPush")}</span>
-                            <span className="block text-xs text-muted-foreground">{t("view.autoDeployDialog.onPushHint")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("view.autoDeployDialog.onPushHint")}
+                            </span>
                         </span>
                         <Switch
                             checked={enabled}
@@ -1848,7 +1892,9 @@ function AutoDeployDialog({
                     </Field>
                     <Field
                         label={t("view.autoDeployDialog.commitFilter")}
-                        hint={t("view.autoDeployDialog.commitFilterHint", { pattern: "regex:<pattern>" })}
+                        hint={t("view.autoDeployDialog.commitFilterHint", {
+                            pattern: "regex:<pattern>"
+                        })}
                     >
                         <Input
                             value={filter}
@@ -1877,7 +1923,8 @@ function AutoDeployDialog({
                             {t("view.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} {t("view.save")}
+                            {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {t("view.save")}
                         </Button>
                     </div>
                 </div>
@@ -1957,14 +2004,19 @@ function DomainDialog({
                                             })
                                         }
                                         aria-label={
-                                            domain.enabled ? t("view.domainDialog.disable") : t("view.domainDialog.enable")
+                                            domain.enabled
+                                                ? t("view.domainDialog.disable")
+                                                : t("view.domainDialog.enable")
                                         }
                                     />
                                 </div>
                             ))}
                         </div>
                     )}
-                    <Field label={t("view.domainDialog.custom")} hint={t("view.domainDialog.customHint")}>
+                    <Field
+                        label={t("view.domainDialog.custom")}
+                        hint={t("view.domainDialog.customHint")}
+                    >
                         <Input
                             value={hostname}
                             onChange={(event) => setHostname(event.target.value)}
@@ -1983,7 +2035,8 @@ function DomainDialog({
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end">
                         <Button onClick={submit} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} {t("view.domainDialog.add")}
+                            {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {t("view.domainDialog.add")}
                         </Button>
                     </div>
                 </div>
@@ -2108,7 +2161,9 @@ function MetricsBadge({ applicationId }: { applicationId: string }) {
 
     if (!data?.state) return null;
     const parts = [data.state];
-    if (typeof data.cpuPercent === "number") parts.push(t("view.metricCpu", { percent: data.cpuPercent.toFixed(0) }));
-    if (typeof data.memPercent === "number") parts.push(t("view.metricMem", { percent: data.memPercent.toFixed(0) }));
+    if (typeof data.cpuPercent === "number")
+        parts.push(t("view.metricCpu", { percent: data.cpuPercent.toFixed(0) }));
+    if (typeof data.memPercent === "number")
+        parts.push(t("view.metricMem", { percent: data.memPercent.toFixed(0) }));
     return <Badge>{parts.join(" · ")}</Badge>;
 }

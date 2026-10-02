@@ -40,12 +40,18 @@ describe("deriveCapabilities", () => {
 
     it("keeps every service on the proxy network under a daemon that predates private networks", () => {
         expect(deriveCapabilities(fullHealth).privateNetworks).toBe(false);
-        const current = { ...fullHealth, capabilities: { ...fullHealth.capabilities, privateNetworks: true } };
+        const current = {
+            ...fullHealth,
+            capabilities: { ...fullHealth.capabilities, privateNetworks: true }
+        };
         expect(deriveCapabilities(current).privateNetworks).toBe(true);
         // Private names are their own report: a daemon that makes private networks
         // but predates names gives none.
         expect(deriveCapabilities(current).privateNames).toBe(false);
-        const named = { ...fullHealth, capabilities: { ...fullHealth.capabilities, privateNames: true } };
+        const named = {
+            ...fullHealth,
+            capabilities: { ...fullHealth.capabilities, privateNames: true }
+        };
         expect(deriveCapabilities(named).privateNames).toBe(true);
     });
 });

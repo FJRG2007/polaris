@@ -99,22 +99,32 @@ export function DatabaseManageDialog({
 
     const tabs: { value: Tab; label: string }[] = overview
         ? [
-              ...(overview.upgrade ? [{ value: "versions" as const, label: t("database.tabs.version") }] : []),
+              ...(overview.upgrade
+                  ? [{ value: "versions" as const, label: t("database.tabs.version") }]
+                  : []),
               ...(overview.redis || overview.mongo || overview.limits || overview.topology
                   ? [{ value: "settings" as const, label: t("database.tabs.settings") }]
                   : []),
               // A database inside another instance is reached through that one's container.
-              ...(!overview.hosted ? [{ value: "network" as const, label: t("database.tabs.network") }] : []),
-              ...(overview.pitr ? [{ value: "pitr" as const, label: t("database.tabs.pitr") }] : []),
+              ...(!overview.hosted
+                  ? [{ value: "network" as const, label: t("database.tabs.network") }]
+                  : []),
+              ...(overview.pitr
+                  ? [{ value: "pitr" as const, label: t("database.tabs.pitr") }]
+                  : []),
               // A cluster's keys are spread over its masters; one dump cannot be loaded into it.
               ...(!overview.storage && !overview.redis?.clusterMasters
                   ? [{ value: "copy" as const, label: t("database.tabs.copy") }]
                   : []),
-              ...(overview.storage ? [{ value: "buckets" as const, label: t("database.tabs.buckets") }] : []),
+              ...(overview.storage
+                  ? [{ value: "buckets" as const, label: t("database.tabs.buckets") }]
+                  : []),
               { value: "activity" as const, label: t("database.tabs.activity") }
           ]
         : [];
-    const current = tabs.some((entry) => entry.value === tab) ? tab : (tabs[0]?.value ?? "activity");
+    const current = tabs.some((entry) => entry.value === tab)
+        ? tab
+        : (tabs[0]?.value ?? "activity");
 
     function ask(confirmation: Confirmation) {
         setConfirmError(null);
@@ -141,7 +151,9 @@ export function DatabaseManageDialog({
                 <DialogHeader className="pr-8">
                     <DialogTitle className="flex items-center gap-2">
                         <DbEngineIcon engine={database.engine} className="size-6" />
-                        <span className="truncate" title={database.name}>{database.name}</span>
+                        <span className="truncate" title={database.name}>
+                            {database.name}
+                        </span>
                         {overview ? (
                             <Badge>
                                 {core.dbEngineLabel(overview.engine)} {overview.version}
@@ -151,11 +163,15 @@ export function DatabaseManageDialog({
                     </DialogTitle>
                     {overview?.hosted ? (
                         <DialogDescription>
-                            {t("database.hosted", { host: overview.hostName ?? t("database.anotherInstance") })}
+                            {t("database.hosted", {
+                                host: overview.hostName ?? t("database.anotherInstance")
+                            })}
                         </DialogDescription>
                     ) : overview?.recovery ? (
                         <DialogDescription>
-                            {t("database.recovered", { from: overview.recovery.from ?? t("database.removedInstance") })}
+                            {t("database.recovered", {
+                                from: overview.recovery.from ?? t("database.removedInstance")
+                            })}
                         </DialogDescription>
                     ) : null}
                 </DialogHeader>
@@ -190,9 +206,16 @@ export function DatabaseManageDialog({
                             </ScrollRow>
                         ) : null}
                         {!overview.deployed && current !== "activity" ? (
-                            <p className="text-sm text-muted-foreground">{t("database.provisionFirst")}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {t("database.provisionFirst")}
+                            </p>
                         ) : current === "versions" && overview.upgrade ? (
-                            <VersionsSection overview={overview} manage={manage} ask={ask} onChanged={load} />
+                            <VersionsSection
+                                overview={overview}
+                                manage={manage}
+                                ask={ask}
+                                onChanged={load}
+                            />
                         ) : current === "settings" ? (
                             <div className="flex flex-col gap-5">
                                 {overview.topology ? <ClusterSection overview={overview} /> : null}
@@ -208,7 +231,9 @@ export function DatabaseManageDialog({
                         ) : current === "buckets" ? (
                             <BucketsSection storeId={overview.id} manage={manage} ask={ask} />
                         ) : null}
-                        {current === "activity" || running ? <ActivityList overview={overview} compact={current !== "activity"} /> : null}
+                        {current === "activity" || running ? (
+                            <ActivityList overview={overview} compact={current !== "activity"} />
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -219,12 +244,18 @@ export function DatabaseManageDialog({
                                 <DialogTitle>{confirm.title}</DialogTitle>
                                 <DialogDescription>{confirm.body}</DialogDescription>
                             </DialogHeader>
-                            {confirmError ? <p className="text-sm text-danger">{confirmError}</p> : null}
+                            {confirmError ? (
+                                <p className="text-sm text-danger">{confirmError}</p>
+                            ) : null}
                             <DialogFooter>
                                 <Button variant="ghost" onClick={() => setConfirm(null)}>
                                     {t("database.cancel")}
                                 </Button>
-                                <Button variant={confirm.danger ? "danger" : "primary"} disabled={pending} onClick={agree}>
+                                <Button
+                                    variant={confirm.danger ? "danger" : "primary"}
+                                    disabled={pending}
+                                    onClick={agree}
+                                >
                                     {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                                     {confirm.label}
                                 </Button>
@@ -239,7 +270,15 @@ export function DatabaseManageDialog({
 
 type Ask = (confirmation: Confirmation) => void;
 
-function Section({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
+function Section({
+    title,
+    hint,
+    children
+}: {
+    title: string;
+    hint?: ReactNode;
+    children: ReactNode;
+}) {
     return (
         <section className="flex flex-col gap-2">
             <div>
@@ -287,7 +326,13 @@ function VersionsSection({
     const refresh = version === overview.version;
     const caveat = refresh ? null : core.dbVersionCaveat(overview.engine, version);
     const options = [
-        { value: overview.version, label: t("database.versions.newestRelease", { engine: label, version: overview.version }) },
+        {
+            value: overview.version,
+            label: t("database.versions.newestRelease", {
+                engine: label,
+                version: overview.version
+            })
+        },
         ...upgrade.versions.map((entry) => ({ value: entry, label: `${label} ${entry}` }))
     ];
 
@@ -305,12 +350,29 @@ function VersionsSection({
                     ? t("database.versions.refreshMembers")
                     : t("database.versions.refreshInstance")
                 : overview.topology?.kind === "replicaSet"
-                  ? t("database.versions.replicaSet", { engine: label, version, current: overview.version }) + runsAt
+                  ? t("database.versions.replicaSet", {
+                        engine: label,
+                        version,
+                        current: overview.version
+                    }) + runsAt
                   : overview.storage
                     ? t("database.versions.store", { version, current: overview.version })
-                    : t("database.versions.dumpRestore", { engine: label, version, current: overview.version }) + runsAt,
-            label: at ? t("database.versions.schedule") : refresh ? t("database.versions.update") : t("database.versions.upgrade"),
-            run: () => actions.upgradeDatabaseAction({ databaseId: overview.id, version, ...(at ? { at } : {}) })
+                    : t("database.versions.dumpRestore", {
+                          engine: label,
+                          version,
+                          current: overview.version
+                      }) + runsAt,
+            label: at
+                ? t("database.versions.schedule")
+                : refresh
+                  ? t("database.versions.update")
+                  : t("database.versions.upgrade"),
+            run: () =>
+                actions.upgradeDatabaseAction({
+                    databaseId: overview.id,
+                    version,
+                    ...(at ? { at } : {})
+                })
         });
     }
 
@@ -328,7 +390,11 @@ function VersionsSection({
             {upgrade.state === "scheduled" && upgrade.at ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm">
                     <span>
-                        {t("database.versions.movingAt", { engine: label, version: upgrade.to ?? "", time: format.dateTime(upgrade.at) })}
+                        {t("database.versions.movingAt", {
+                            engine: label,
+                            version: upgrade.to ?? "",
+                            time: format.dateTime(upgrade.at)
+                        })}
                     </span>
                     {manage ? (
                         <Button size="sm" variant="ghost" disabled={pending} onClick={cancel}>
@@ -339,7 +405,8 @@ function VersionsSection({
             ) : null}
             {upgrade.state === "running" || upgrade.state === "starting" ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" /> {t("database.versions.moving", { engine: label, version: upgrade.to ?? "" })}
+                    <Loader2 className="size-4 animate-spin" />{" "}
+                    {t("database.versions.moving", { engine: label, version: upgrade.to ?? "" })}
                 </p>
             ) : null}
             {upgrade.state === "failed" && upgrade.error ? (
@@ -387,7 +454,10 @@ function VersionsSection({
                     <div>
                         <Button
                             size="sm"
-                            disabled={when === "later" && (!moment || moment.getTime() < Date.now() + 60_000)}
+                            disabled={
+                                when === "later" &&
+                                (!moment || moment.getTime() < Date.now() + 60_000)
+                            }
                             onClick={start}
                         >
                             {when === "later"
@@ -402,7 +472,10 @@ function VersionsSection({
 
             {manage && upgrade.previousVersion && upgrade.previousVolume ? (
                 <Section
-                    title={t("database.versions.previousKept", { engine: label, version: upgrade.previousVersion })}
+                    title={t("database.versions.previousKept", {
+                        engine: label,
+                        version: upgrade.previousVersion
+                    })}
                     hint={t("database.versions.previousHint", { volume: upgrade.previousVolume })}
                 >
                     <div>
@@ -411,8 +484,13 @@ function VersionsSection({
                             variant="secondary"
                             onClick={() =>
                                 ask({
-                                    title: t("database.versions.revertTitle", { engine: label, version: upgrade.previousVersion ?? "" }),
-                                    body: t("database.versions.revertBody", { version: upgrade.previousVersion ?? "" }),
+                                    title: t("database.versions.revertTitle", {
+                                        engine: label,
+                                        version: upgrade.previousVersion ?? ""
+                                    }),
+                                    body: t("database.versions.revertBody", {
+                                        version: upgrade.previousVersion ?? ""
+                                    }),
                                     label: t("database.versions.goBack"),
                                     danger: true,
                                     run: () => actions.revertUpgradeAction(overview.id)
@@ -432,7 +510,9 @@ function VersionsSection({
 // Settings
 // ---------------------------------------------------------------------------
 
-type MemberState = NonNullable<Awaited<ReturnType<typeof actions.databaseMembersAction>>["members"]>[number];
+type MemberState = NonNullable<
+    Awaited<ReturnType<typeof actions.databaseMembersAction>>["members"]
+>[number];
 
 const ROLE_LABELS: Readonly<Record<string, NamespaceKey<"deployData">>> = {
     member: "database.roles.member",
@@ -492,7 +572,11 @@ function ClusterSection({ overview }: { overview: Overview }) {
                     disabled={pending}
                     onClick={check}
                 >
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="size-4" />
+                    )}
                 </Button>
             </div>
             {error ? <p className="text-xs text-danger">{error}</p> : null}
@@ -500,18 +584,29 @@ function ClusterSection({ overview }: { overview: Overview }) {
                 {topology.members.map((member) => {
                     const state = states?.get(member.name);
                     return (
-                        <li key={member.name} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                        <li
+                            key={member.name}
+                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                        >
                             <span className="flex min-w-0 flex-col">
                                 <span className="truncate font-mono text-xs" title={member.name}>
                                     {member.name}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                    {ROLE_LABELS[member.role] ? t(ROLE_LABELS[member.role]!) : member.role}
-                                    {member.set && member.role !== "member" ? ` - ${member.set}` : ""}
+                                    {ROLE_LABELS[member.role]
+                                        ? t(ROLE_LABELS[member.role]!)
+                                        : member.role}
+                                    {member.set && member.role !== "member"
+                                        ? ` - ${member.set}`
+                                        : ""}
                                 </span>
                             </span>
                             {state ? (
-                                <span className={`text-xs ${state.healthy ? "text-success" : "text-warning"}`}>{state.state}</span>
+                                <span
+                                    className={`text-xs ${state.healthy ? "text-success" : "text-warning"}`}
+                                >
+                                    {state.state}
+                                </span>
                             ) : error ? null : (
                                 <Skeleton className="h-4 w-20" />
                             )}
@@ -525,7 +620,15 @@ function ClusterSection({ overview }: { overview: Overview }) {
 
 /** The most CPU and memory the instance's container may use, applied by
  *  starting it again. Blank is no limit. */
-function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
+function LimitsSection({
+    overview,
+    manage,
+    ask
+}: {
+    overview: Overview;
+    manage: boolean;
+    ask: Ask;
+}) {
     const t = useTranslations("deployData");
     const limits = overview.limits;
     const [cpus, setCpus] = useState(limits?.cpus == null ? "" : String(limits.cpus));
@@ -540,11 +643,16 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
     return (
         <Section
             title={t("database.limits.title")}
-            hint={(overview.topology ? t("database.limits.eachMember") : "") + t("database.limits.hint")}
+            hint={
+                (overview.topology ? t("database.limits.eachMember") : "") +
+                t("database.limits.hint")
+            }
         >
             <div className="flex flex-wrap gap-3">
                 <label className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t("database.limits.cpus")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("database.limits.cpus")}
+                    </span>
                     <Input
                         type="number"
                         min={0.05}
@@ -557,7 +665,9 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
                     />
                 </label>
                 <label className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t("database.limits.memory")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("database.limits.memory")}
+                    </span>
                     <Input
                         type="number"
                         min={16}
@@ -571,7 +681,9 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
                 </label>
             </div>
             {!parsed.success ? (
-                <p className="text-xs text-danger">{parsed.error.issues[0]?.message ?? t("database.limits.check")}</p>
+                <p className="text-xs text-danger">
+                    {parsed.error.issues[0]?.message ?? t("database.limits.check")}
+                </p>
             ) : null}
             {manage ? (
                 <div>
@@ -583,7 +695,11 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
                                 title: t("database.limits.confirmTitle"),
                                 body: t("database.limits.confirmBody"),
                                 label: t("database.apply"),
-                                run: () => actions.setDatabaseLimitsAction({ databaseId: overview.id, ...next })
+                                run: () =>
+                                    actions.setDatabaseLimitsAction({
+                                        databaseId: overview.id,
+                                        ...next
+                                    })
                             })
                         }
                     >
@@ -595,7 +711,15 @@ function LimitsSection({ overview, manage, ask }: { overview: Overview; manage: 
     );
 }
 
-function SettingsSection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
+function SettingsSection({
+    overview,
+    manage,
+    ask
+}: {
+    overview: Overview;
+    manage: boolean;
+    ask: Ask;
+}) {
     const t = useTranslations("deployData");
     const redis = overview.redis;
     const mongo = overview.mongo;
@@ -603,7 +727,9 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
     const [size, setSize] = useState(String(redis?.maxMemoryMb ?? 256));
 
     if (redis) {
-        const changed = mode !== redis.mode || (mode === "cache" && Number(size) !== (redis.maxMemoryMb ?? 256));
+        const changed =
+            mode !== redis.mode ||
+            (mode === "cache" && Number(size) !== (redis.maxMemoryMb ?? 256));
         const masters = redis.clusterMasters;
         return (
             <>
@@ -612,7 +738,9 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
                         title={t("database.redis.cluster")}
                         hint={t("database.redis.clusterHint", { masters })}
                     >
-                        <p className="text-xs text-muted-foreground">{t("database.redis.clusterBackup")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("database.redis.clusterBackup")}
+                        </p>
                     </Section>
                 ) : null}
                 <Section title={t("database.redis.title")} hint={t(`database.redis.notes.${mode}`)}>
@@ -620,7 +748,10 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
                         aria-label={t("database.redis.mode")}
                         value={mode}
                         onValueChange={setMode}
-                        options={core.REDIS_MODES.map((value) => ({ value, label: t(`database.redis.labels.${value}`) }))}
+                        options={core.REDIS_MODES.map((value) => ({
+                            value,
+                            label: t(`database.redis.labels.${value}`)
+                        }))}
                     />
                     {mode === "cache" ? (
                         <div className="w-48">
@@ -629,7 +760,10 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
                                 onValueChange={setSize}
                                 options={core.REDIS_CACHE_SIZES_MB.map((value) => ({
                                     value: String(value),
-                                    label: value >= 1024 ? t("database.redis.limitGb", { size: value / 1024 }) : t("database.redis.limitMb", { size: value })
+                                    label:
+                                        value >= 1024
+                                            ? t("database.redis.limitGb", { size: value / 1024 })
+                                            : t("database.redis.limitMb", { size: value })
                                 }))}
                             />
                         </div>
@@ -651,7 +785,9 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
                                             actions.setRedisModeAction({
                                                 databaseId: overview.id,
                                                 mode,
-                                                ...(mode === "cache" ? { maxMemoryMb: Number(size) } : {})
+                                                ...(mode === "cache"
+                                                    ? { maxMemoryMb: Number(size) }
+                                                    : {})
                                             })
                                     })
                                 }
@@ -667,21 +803,26 @@ function SettingsSection({ overview, manage, ask }: { overview: Overview; manage
 
     if (mongo) {
         return (
-            <Section
-                title={t("database.mongo.title")}
-                hint={t("database.mongo.hint")}
-            >
+            <Section title={t("database.mongo.title")} hint={t("database.mongo.hint")}>
                 <label className="flex items-center gap-2 text-sm">
                     <Switch
                         checked={mongo.replicaSet}
                         disabled={!manage}
                         onChange={(enabled) =>
                             ask({
-                                title: enabled ? t("database.mongo.onTitle") : t("database.mongo.offTitle"),
-                                body: enabled ? t("database.mongo.onBody") : t("database.mongo.offBody"),
+                                title: enabled
+                                    ? t("database.mongo.onTitle")
+                                    : t("database.mongo.offTitle"),
+                                body: enabled
+                                    ? t("database.mongo.onBody")
+                                    : t("database.mongo.offBody"),
                                 label: enabled ? t("database.turnOn") : t("database.turnOff"),
                                 danger: !enabled,
-                                run: () => actions.setMongoReplicaSetAction({ databaseId: overview.id, enabled })
+                                run: () =>
+                                    actions.setMongoReplicaSetAction({
+                                        databaseId: overview.id,
+                                        enabled
+                                    })
                             })
                         }
                     />
@@ -706,14 +847,13 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
     const [name, setName] = useState(`${overview.name}-recovered`);
     const moment = fromLocalInput(target);
     const earliest = pitr.from ? new Date(pitr.from) : null;
-    const inWindow = Boolean(moment && earliest && moment >= earliest && moment.getTime() <= Date.now());
+    const inWindow = Boolean(
+        moment && earliest && moment >= earliest && moment.getTime() <= Date.now()
+    );
 
     return (
         <div className="flex flex-col gap-4">
-            <Section
-                title={t("database.pitr.title")}
-                hint={t("database.pitr.hint")}
-            >
+            <Section title={t("database.pitr.title")} hint={t("database.pitr.hint")}>
                 <div className="flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-2 text-sm">
                         <Switch
@@ -721,12 +861,20 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                             disabled={!manage}
                             onChange={(enabled) =>
                                 ask({
-                                    title: enabled ? t("database.pitr.onTitle") : t("database.pitr.offTitle"),
-                                    body: enabled ? t("database.pitr.onBody") : t("database.pitr.offBody"),
+                                    title: enabled
+                                        ? t("database.pitr.onTitle")
+                                        : t("database.pitr.offTitle"),
+                                    body: enabled
+                                        ? t("database.pitr.onBody")
+                                        : t("database.pitr.offBody"),
                                     label: enabled ? t("database.turnOn") : t("database.turnOff"),
                                     danger: !enabled,
                                     run: () =>
-                                        actions.setPitrAction({ databaseId: overview.id, enabled, keepDays: Number(keepDays) })
+                                        actions.setPitrAction({
+                                            databaseId: overview.id,
+                                            enabled,
+                                            keepDays: Number(keepDays)
+                                        })
                                 })
                             }
                         />
@@ -739,7 +887,11 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                             onValueChange={(value) => {
                                 setKeepDays(value);
                                 if (pitr.enabled) {
-                                    void actions.setPitrAction({ databaseId: overview.id, enabled: true, keepDays: Number(value) });
+                                    void actions.setPitrAction({
+                                        databaseId: overview.id,
+                                        enabled: true,
+                                        keepDays: Number(value)
+                                    });
                                 }
                             }}
                             options={core.PITR_KEEP_DAYS.map((days) => ({
@@ -752,7 +904,10 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                 {pitr.enabled ? (
                     <p className="text-xs text-muted-foreground">
                         {pitr.from
-                            ? t("database.pitr.window", { from: format.dateTime(pitr.from), count: pitr.baseBackups.length })
+                            ? t("database.pitr.window", {
+                                  from: format.dateTime(pitr.from),
+                                  count: pitr.baseBackups.length
+                              })
                             : t("database.pitr.firstBackup")}
                     </p>
                 ) : null}
@@ -791,7 +946,9 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
                                 ask({
                                     title: t("database.pitr.confirmTitle", {
                                         name: overview.name,
-                                        time: format.dateTime(moment.toISOString(), { seconds: true })
+                                        time: format.dateTime(moment.toISOString(), {
+                                            seconds: true
+                                        })
                                     }),
                                     body: t("database.pitr.confirmBody", { name: name.trim() }),
                                     label: t("database.pitr.recover"),
@@ -820,7 +977,9 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
 function CopySection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
     const t = useTranslations("deployData");
     const [from, setFrom] = useState<"managed" | "url">("managed");
-    const [sources, setSources] = useState<{ id: string; name: string; where: string }[] | null>(null);
+    const [sources, setSources] = useState<{ id: string; name: string; where: string }[] | null>(
+        null
+    );
     const [sourceId, setSourceId] = useState("");
     const [url, setUrl] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -838,13 +997,20 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
         };
     }, [overview.id, manage]);
 
-    if (!manage) return <p className="text-sm text-muted-foreground">{t("database.copy.needsPermission")}</p>;
+    if (!manage)
+        return (
+            <p className="text-sm text-muted-foreground">{t("database.copy.needsPermission")}</p>
+        );
 
     const parsed = core.databaseCopySchema.safeParse(
-        from === "managed" ? { databaseId: overview.id, fromDatabaseId: sourceId || undefined } : { databaseId: overview.id, fromUrl: url.trim() || undefined }
+        from === "managed"
+            ? { databaseId: overview.id, fromDatabaseId: sourceId || undefined }
+            : { databaseId: overview.id, fromUrl: url.trim() || undefined }
     );
     const readable =
-        from === "url" && url.trim() ? core.parseExternalSource(url.trim(), overview.engine) !== null : true;
+        from === "url" && url.trim()
+            ? core.parseExternalSource(url.trim(), overview.engine) !== null
+            : true;
     const sourceName = sources?.find((source) => source.id === sourceId)?.name;
 
     return (
@@ -866,13 +1032,20 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                 sources === null && !error ? (
                     <Skeleton className="h-9 w-full" />
                 ) : sources && sources.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">{t("database.copy.noOther", { engine: core.dbEngineLabel(overview.engine) })}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("database.copy.noOther", {
+                            engine: core.dbEngineLabel(overview.engine)
+                        })}
+                    </p>
                 ) : (
                     <Select
                         value={sourceId}
                         onValueChange={setSourceId}
                         placeholder={t("database.copy.pick")}
-                        options={(sources ?? []).map((source) => ({ value: source.id, label: `${source.name} (${source.where})` }))}
+                        options={(sources ?? []).map((source) => ({
+                            value: source.id,
+                            label: `${source.name} (${source.where})`
+                        }))}
                     />
                 )
             ) : (
@@ -896,7 +1069,12 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                     {!readable ? (
                         <p className="text-xs text-warning">
                             {t("database.copy.useScheme", {
-                                scheme: overview.engine === "postgres" ? "postgresql" : overview.engine === "mongo" ? "mongodb" : overview.engine
+                                scheme:
+                                    overview.engine === "postgres"
+                                        ? "postgresql"
+                                        : overview.engine === "mongo"
+                                          ? "mongodb"
+                                          : overview.engine
                             })}
                         </p>
                     ) : (
@@ -999,22 +1177,41 @@ function BucketsSection({ storeId, manage, ask }: { storeId: string; manage: boo
             {manage ? (
                 <div className="flex flex-wrap items-start gap-2">
                     <div className="min-w-48 flex-1">
-                        <Input value={name} onChange={(event) => setName(event.target.value)} // i18n-ignore: an example bucket name
-                        placeholder="new-bucket" />
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)} // i18n-ignore: an example bucket name
+                            placeholder="new-bucket"
+                        />
                         {name.trim() && !valid.success ? (
-                            <p className="mt-1 text-xs text-warning">{valid.error.issues[0]?.message}</p>
+                            <p className="mt-1 text-xs text-warning">
+                                {valid.error.issues[0]?.message}
+                            </p>
                         ) : null}
                     </div>
                     <Button size="sm" disabled={!valid.success || pending} onClick={create}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} {t("database.buckets.add")}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Plus className="size-4" />
+                        )}{" "}
+                        {t("database.buckets.add")}
                     </Button>
                 </div>
             ) : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             {list === null && !error ? <Skeleton className="h-24 w-full" /> : null}
-            {list?.buckets?.length === 0 ? <p className="text-sm text-muted-foreground">{t("database.buckets.empty")}</p> : null}
+            {list?.buckets?.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("database.buckets.empty")}</p>
+            ) : null}
             {list?.buckets?.map((bucket) => (
-                <BucketCard key={bucket.id} bucket={bucket} manage={manage} ask={ask} onChanged={load} onRemove={() => setRemoving(bucket)} />
+                <BucketCard
+                    key={bucket.id}
+                    bucket={bucket}
+                    manage={manage}
+                    ask={ask}
+                    onChanged={load}
+                    onRemove={() => setRemoving(bucket)}
+                />
             ))}
             {list?.unmanaged && list.unmanaged.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
@@ -1071,7 +1268,9 @@ function BucketCard({
     const [lifetime, setLifetime] = useState("3600");
     const [baseUrl, setBaseUrl] = useState("");
     const [signed, setSigned] = useState<string | null>(null);
-    const [candidates, setCandidates] = useState<{ id: string; name: string; storeName: string }[] | null>(null);
+    const [candidates, setCandidates] = useState<
+        { id: string; name: string; storeName: string }[] | null
+    >(null);
 
     function run(work: () => Promise<{ error?: string }>, after?: () => void) {
         setError(null);
@@ -1084,7 +1283,11 @@ function BucketCard({
     }
 
     const keyValid = core.bucketKeySchema.safeParse({ bucketId: bucket.id, name: keyName, access });
-    const ruleValid = core.lifecycleRuleSchema.safeParse({ bucketId: bucket.id, prefix, days: Number(days) });
+    const ruleValid = core.lifecycleRuleSchema.safeParse({
+        bucketId: bucket.id,
+        prefix,
+        days: Number(days)
+    });
     const presignValid = core.presignSchema.safeParse({
         bucketId: bucket.id,
         key: objectKey,
@@ -1096,9 +1299,17 @@ function BucketCard({
     return (
         <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-sm" title={bucket.name}>{bucket.name}</span>
+                <span className="truncate font-mono text-sm" title={bucket.name}>
+                    {bucket.name}
+                </span>
                 {manage ? (
-                    <Button size="icon" variant="ghost" aria-label={t("database.buckets.removeNamed", { name: bucket.name })} title={t("database.buckets.remove")} onClick={onRemove}>
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label={t("database.buckets.removeNamed", { name: bucket.name })}
+                        title={t("database.buckets.remove")}
+                        onClick={onRemove}
+                    >
                         <Trash2 className="size-4" />
                     </Button>
                 ) : null}
@@ -1106,13 +1317,19 @@ function BucketCard({
             {error ? <p className="text-xs text-danger">{error}</p> : null}
 
             <Section title={t("database.buckets.keys")} hint={t("database.buckets.keysHint")}>
-                {bucket.keys.length === 0 ? <p className="text-xs text-muted-foreground">{t("database.buckets.noKeys")}</p> : null}
+                {bucket.keys.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">{t("database.buckets.noKeys")}</p>
+                ) : null}
                 {bucket.keys.map((key) => (
                     <div key={key.id} className="flex items-center gap-2 text-xs">
                         <KeyRound className="size-3.5 text-muted-foreground" />
                         <span className="font-medium">{key.name}</span>
                         <code className="font-mono text-muted-foreground">{key.accessKey}</code>
-                        <Badge>{key.access === "readonly" ? t("database.buckets.readOnly") : t("database.buckets.readWrite")}</Badge>
+                        <Badge>
+                            {key.access === "readonly"
+                                ? t("database.buckets.readOnly")
+                                : t("database.buckets.readWrite")}
+                        </Badge>
                         {manage ? (
                             <Button
                                 size="icon"
@@ -1122,11 +1339,17 @@ function BucketCard({
                                 title={t("database.buckets.revokeKey")}
                                 onClick={() =>
                                     ask({
-                                        title: t("database.buckets.revokeTitle", { name: key.name }),
+                                        title: t("database.buckets.revokeTitle", {
+                                            name: key.name
+                                        }),
                                         body: t("database.buckets.revokeBody"),
                                         label: t("database.buckets.revoke"),
                                         danger: true,
-                                        run: () => actions.deleteBucketKeyAction({ bucketId: bucket.id, keyId: key.id })
+                                        run: () =>
+                                            actions.deleteBucketKeyAction({
+                                                bucketId: bucket.id,
+                                                keyId: key.id
+                                            })
                                     })
                                 }
                             >
@@ -1140,15 +1363,24 @@ function BucketCard({
                         <p className="text-xs text-warning">{t("database.buckets.copySecret")}</p>
                         <CopyRow value={secret.accessKey} />
                         <CopyRow value={secret.secretKey} />
-                        <Button size="sm" variant="ghost" className="self-end" onClick={() => setSecret(null)}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="self-end"
+                            onClick={() => setSecret(null)}
+                        >
                             {t("database.buckets.done")}
                         </Button>
                     </div>
                 ) : null}
                 {manage ? (
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input value={keyName} onChange={(event) => setKeyName(event.target.value)} // i18n-ignore: an example key name
-                            placeholder="key-name" className="w-40" />
+                        <Input
+                            value={keyName}
+                            onChange={(event) => setKeyName(event.target.value)} // i18n-ignore: an example key name
+                            placeholder="key-name"
+                            className="w-40"
+                        />
                         <div className="w-40">
                             <Select
                                 value={access}
@@ -1166,9 +1398,16 @@ function BucketCard({
                             onClick={() =>
                                 run(
                                     async () => {
-                                        const result = await actions.createBucketKeyAction({ bucketId: bucket.id, name: keyName.trim(), access });
+                                        const result = await actions.createBucketKeyAction({
+                                            bucketId: bucket.id,
+                                            name: keyName.trim(),
+                                            access
+                                        });
                                         if (result.accessKey && result.secretKey) {
-                                            setSecret({ accessKey: result.accessKey, secretKey: result.secretKey });
+                                            setSecret({
+                                                accessKey: result.accessKey,
+                                                secretKey: result.secretKey
+                                            });
                                         }
                                         return result;
                                     },
@@ -1185,8 +1424,12 @@ function BucketCard({
             <Section title={t("database.buckets.expiry")} hint={t("database.buckets.expiryHint")}>
                 {bucket.lifecycle.map((rule) => (
                     <div key={rule.prefix} className="flex items-center gap-2 text-xs">
-                        <code className="font-mono">{rule.prefix || t("database.buckets.wholeBucket")}</code>
-                        <span className="text-muted-foreground">{t("database.buckets.afterDays", { count: rule.days })}</span>
+                        <code className="font-mono">
+                            {rule.prefix || t("database.buckets.wholeBucket")}
+                        </code>
+                        <span className="text-muted-foreground">
+                            {t("database.buckets.afterDays", { count: rule.days })}
+                        </span>
                         {manage ? (
                             <Button
                                 size="icon"
@@ -1195,7 +1438,14 @@ function BucketCard({
                                 aria-label={t("database.buckets.removeRule")}
                                 title={t("database.buckets.removeRule")}
                                 disabled={pending}
-                                onClick={() => run(() => actions.removeLifecycleRuleAction({ bucketId: bucket.id, prefix: rule.prefix }))}
+                                onClick={() =>
+                                    run(() =>
+                                        actions.removeLifecycleRuleAction({
+                                            bucketId: bucket.id,
+                                            prefix: rule.prefix
+                                        })
+                                    )
+                                }
                             >
                                 <Trash2 className="size-3.5" />
                             </Button>
@@ -1204,7 +1454,12 @@ function BucketCard({
                 ))}
                 {manage ? (
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input value={prefix} onChange={(event) => setPrefix(event.target.value)} placeholder={t("database.buckets.prefixPlaceholder")} className="w-44" />
+                        <Input
+                            value={prefix}
+                            onChange={(event) => setPrefix(event.target.value)}
+                            placeholder={t("database.buckets.prefixPlaceholder")}
+                            className="w-44"
+                        />
                         <div className="w-36">
                             <Select
                                 value={days}
@@ -1220,7 +1475,15 @@ function BucketCard({
                             variant="secondary"
                             disabled={!ruleValid.success || pending}
                             onClick={() =>
-                                run(() => actions.setLifecycleRuleAction({ bucketId: bucket.id, prefix: prefix.trim(), days: Number(days) }), () => setPrefix(""))
+                                run(
+                                    () =>
+                                        actions.setLifecycleRuleAction({
+                                            bucketId: bucket.id,
+                                            prefix: prefix.trim(),
+                                            days: Number(days)
+                                        }),
+                                    () => setPrefix("")
+                                )
                             }
                         >
                             {t("database.buckets.addRule")}
@@ -1230,10 +1493,17 @@ function BucketCard({
             </Section>
 
             {manage ? (
-                <Section title={t("database.buckets.presign")} hint={t("database.buckets.presignHint")}>
+                <Section
+                    title={t("database.buckets.presign")}
+                    hint={t("database.buckets.presignHint")}
+                >
                     <div className="flex flex-wrap items-center gap-2">
-                        <Input value={objectKey} onChange={(event) => setObjectKey(event.target.value)} // i18n-ignore: an example object key
-                            placeholder="path/to/file.png" className="min-w-48 flex-1" />
+                        <Input
+                            value={objectKey}
+                            onChange={(event) => setObjectKey(event.target.value)} // i18n-ignore: an example object key
+                            placeholder="path/to/file.png"
+                            className="min-w-48 flex-1"
+                        />
                         <div className="w-32">
                             <Select
                                 value={method}
@@ -1248,7 +1518,10 @@ function BucketCard({
                             <Select
                                 value={lifetime}
                                 onValueChange={setLifetime}
-                                options={PRESIGN_LIFETIMES.map((option) => ({ value: option.value, label: t(option.label) }))}
+                                options={PRESIGN_LIFETIMES.map((option) => ({
+                                    value: option.value,
+                                    label: t(option.label)
+                                }))}
                             />
                         </div>
                     </div>
@@ -1300,22 +1573,35 @@ function BucketCard({
                                 )
                             })}
                         </span>
-                        <Badge variant={bucket.replicationState === "failed" ? "danger" : "success"}>
-                            {bucket.replicationState === "failed" ? t("database.buckets.stopped") : t("database.running")}
+                        <Badge
+                            variant={bucket.replicationState === "failed" ? "danger" : "success"}
+                        >
+                            {bucket.replicationState === "failed"
+                                ? t("database.buckets.stopped")
+                                : t("database.running")}
                         </Badge>
                         {manage ? (
                             <Button
                                 size="sm"
                                 variant="ghost"
                                 disabled={pending}
-                                onClick={() => run(() => actions.setBucketReplicationAction({ bucketId: bucket.id, toBucketId: null }))}
+                                onClick={() =>
+                                    run(() =>
+                                        actions.setBucketReplicationAction({
+                                            bucketId: bucket.id,
+                                            toBucketId: null
+                                        })
+                                    )
+                                }
                             >
                                 {t("database.buckets.stop")}
                             </Button>
                         ) : null}
                     </div>
                 ) : null}
-                {bucket.replicationError ? <p className="text-xs text-danger">{bucket.replicationError}</p> : null}
+                {bucket.replicationError ? (
+                    <p className="text-xs text-danger">{bucket.replicationError}</p>
+                ) : null}
                 {manage && !bucket.replicateTo ? (
                     candidates === null ? (
                         <div>
@@ -1323,10 +1609,16 @@ function BucketCard({
                                 size="sm"
                                 variant="ghost"
                                 onClick={() =>
-                                    void actions.replicationCandidatesAction(bucket.id).then((result) => {
-                                        if (result.candidates) setCandidates(result.candidates);
-                                        else setError(result.error ?? t("database.buckets.candidatesUnreadable"));
-                                    })
+                                    void actions
+                                        .replicationCandidatesAction(bucket.id)
+                                        .then((result) => {
+                                            if (result.candidates) setCandidates(result.candidates);
+                                            else
+                                                setError(
+                                                    result.error ??
+                                                        t("database.buckets.candidatesUnreadable")
+                                                );
+                                        })
                                 }
                             >
                                 {t("database.buckets.replicate")}
@@ -1340,7 +1632,14 @@ function BucketCard({
                         <Select
                             value=""
                             placeholder={t("database.buckets.replicateInto")}
-                            onValueChange={(toBucketId) => run(() => actions.setBucketReplicationAction({ bucketId: bucket.id, toBucketId }))}
+                            onValueChange={(toBucketId) =>
+                                run(() =>
+                                    actions.setBucketReplicationAction({
+                                        bucketId: bucket.id,
+                                        toBucketId
+                                    })
+                                )
+                            }
                             options={candidates.map((candidate) => ({
                                 value: candidate.id,
                                 label: `${candidate.name} (${candidate.storeName})`
@@ -1369,22 +1668,45 @@ const KIND_LABEL: Record<string, NamespaceKey<"deployData">> = {
 function ActivityList({ overview, compact }: { overview: Overview; compact: boolean }) {
     const t = useTranslations("deployData");
     const format = useDisplayFormat();
-    const rows = compact ? overview.operations.filter((operation) => operation.status === "running") : overview.operations;
+    const rows = compact
+        ? overview.operations.filter((operation) => operation.status === "running")
+        : overview.operations;
     if (rows.length === 0) {
-        return compact ? null : <p className="text-sm text-muted-foreground">{t("database.nothingRun")}</p>;
+        return compact ? null : (
+            <p className="text-sm text-muted-foreground">{t("database.nothingRun")}</p>
+        );
     }
     return (
         <ul className="flex flex-col gap-2">
             {rows.map((operation) => (
-                <li key={operation.id} className="rounded-md border border-border px-3 py-2 text-xs">
+                <li
+                    key={operation.id}
+                    className="rounded-md border border-border px-3 py-2 text-xs"
+                >
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{KIND_LABEL[operation.kind] ? t(KIND_LABEL[operation.kind]!) : operation.kind}</span>
+                        <span className="font-medium">
+                            {KIND_LABEL[operation.kind]
+                                ? t(KIND_LABEL[operation.kind]!)
+                                : operation.kind}
+                        </span>
                         <Badge
-                            variant={operation.status === "failed" ? "danger" : operation.status === "running" ? "neutral" : "success"}
+                            variant={
+                                operation.status === "failed"
+                                    ? "danger"
+                                    : operation.status === "running"
+                                      ? "neutral"
+                                      : "success"
+                            }
                         >
-                            {operation.status === "running" ? t("database.running") : operation.status === "failed" ? t("database.failed") : t("database.done")}
+                            {operation.status === "running"
+                                ? t("database.running")
+                                : operation.status === "failed"
+                                  ? t("database.failed")
+                                  : t("database.done")}
                         </Badge>
-                        <span className="ml-auto text-muted-foreground">{format.dateTime(operation.startedAt)}</span>
+                        <span className="ml-auto text-muted-foreground">
+                            {format.dateTime(operation.startedAt)}
+                        </span>
                     </div>
                     {operation.status === "running" ? (
                         <p className="mt-1 flex items-center gap-1.5 text-muted-foreground">
@@ -1395,7 +1717,9 @@ function ActivityList({ overview, compact }: { overview: Overview; compact: bool
                                           done: core.formatBytes(BigInt(operation.doneBytes)),
                                           total: core.formatBytes(BigInt(operation.totalBytes))
                                       })
-                                    : t("database.progress", { done: core.formatBytes(BigInt(operation.doneBytes)) })
+                                    : t("database.progress", {
+                                          done: core.formatBytes(BigInt(operation.doneBytes))
+                                      })
                                 : ""}
                         </p>
                     ) : null}

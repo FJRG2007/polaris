@@ -22,7 +22,13 @@ export const PRIVATE_ALIASES_MAX = 8;
 const RESERVED = new Set(["localhost", "polaris", "internal"]);
 
 /** What is wrong with a name, for the sentence the field shows. */
-export type PrivateNameProblem = "empty" | "tooLong" | "characters" | "edges" | "letter" | "reserved";
+export type PrivateNameProblem =
+    | "empty"
+    | "tooLong"
+    | "characters"
+    | "edges"
+    | "letter"
+    | "reserved";
 
 /** The one normalizer: trimmed and lowercased, which is how DNS compares names. */
 export function normalizePrivateName(raw: string): string {

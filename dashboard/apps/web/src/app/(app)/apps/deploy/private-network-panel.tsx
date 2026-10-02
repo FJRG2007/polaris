@@ -18,9 +18,28 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Badge, Button, CopyButton, Input, Select, Skeleton } from "@polaris/ui";
-import type { NamesApplied, PrivateNetworkStatus, PrivateNetworkView } from "@/lib/deploy/private-names";
-import { CheckCircle2, CircleAlert, CircleDashed, Clock, Loader2, Network, Pencil, Plus, X } from "lucide-react";
-import { FORMER_NAME_GRACE_DAYS, normalizePrivateName, privateNameProblem, type PrivateNameProblem } from "@polaris/core";
+import type {
+    NamesApplied,
+    PrivateNetworkStatus,
+    PrivateNetworkView
+} from "@/lib/deploy/private-names";
+import {
+    CheckCircle2,
+    CircleAlert,
+    CircleDashed,
+    Clock,
+    Loader2,
+    Network,
+    Pencil,
+    Plus,
+    X
+} from "lucide-react";
+import {
+    FORMER_NAME_GRACE_DAYS,
+    normalizePrivateName,
+    privateNameProblem,
+    type PrivateNameProblem
+} from "@polaris/core";
 import {
     addCrossLinkAction,
     checkPrivateNameAction,
@@ -46,14 +65,16 @@ const PROBLEM_KEYS = {
     reserved: "problems.reserved"
 } as const satisfies Record<PrivateNameProblem, string>;
 
-const APPLIED_RENAME = { now: "renamed", next: "renamedNext", first: "renamedLater" } as const satisfies Record<
-    NamesApplied,
-    string
->;
-const APPLIED_SAVE = { now: "savedRedeploy", next: "savedNext", first: "savedLater" } as const satisfies Record<
-    NamesApplied,
-    string
->;
+const APPLIED_RENAME = {
+    now: "renamed",
+    next: "renamedNext",
+    first: "renamedLater"
+} as const satisfies Record<NamesApplied, string>;
+const APPLIED_SAVE = {
+    now: "savedRedeploy",
+    next: "savedNext",
+    first: "savedLater"
+} as const satisfies Record<NamesApplied, string>;
 
 const STATUS_TONE: Record<PrivateNetworkStatus, string> = {
     ready: "text-success-ink",
@@ -73,7 +94,9 @@ function StatusIcon({ status }: { status: PrivateNetworkStatus }) {
     return <CircleAlert className="size-4 shrink-0" />;
 }
 
-const code = (chunks: ReactNode) => <code className="rounded bg-muted px-1 font-mono text-[0.8125rem]">{chunks}</code>;
+const code = (chunks: ReactNode) => (
+    <code className="rounded bg-muted px-1 font-mono text-[0.8125rem]">{chunks}</code>
+);
 
 export function PrivateNetworkPanel({ kind, id }: { kind: Kind; id: string }) {
     const t = useTranslations("deployPrivateNet");
@@ -122,7 +145,10 @@ export function PrivateNetworkPanel({ kind, id }: { kind: Kind; id: string }) {
     return (
         <section className="flex flex-col gap-3" aria-labelledby={`${key}-private-title`}>
             <div className="flex flex-col gap-0.5">
-                <h3 id={`${key}-private-title`} className="flex items-center gap-2 text-sm font-medium">
+                <h3
+                    id={`${key}-private-title`}
+                    className="flex items-center gap-2 text-sm font-medium"
+                >
                     <Network className="size-4 text-muted-foreground" /> {t("title")}
                 </h3>
                 <p className="text-xs text-muted-foreground">{t("intro")}</p>
@@ -203,31 +229,46 @@ function PanelBody({
                             <CopyButton value={view.domain} label={t("copyLabel")} />
                         </div>
                         <div className="flex items-center gap-2">
-                            {view.family && <Badge variant="neutral">{t(`family.${view.family}`)}</Badge>}
+                            {view.family && (
+                                <Badge variant="neutral">{t(`family.${view.family}`)}</Badge>
+                            )}
                             {canEdit && enabled && (
-                                <Button size="xs" variant="outline" onClick={() => setEditing(true)}>
+                                <Button
+                                    size="xs"
+                                    variant="outline"
+                                    onClick={() => setEditing(true)}
+                                >
                                     <Pencil /> {t("edit")}
                                 </Button>
                             )}
                         </div>
                     </div>
                 )}
-                <p className={`flex items-center gap-1.5 text-xs font-medium ${STATUS_TONE[view.status]}`}>
+                <p
+                    className={`flex items-center gap-1.5 text-xs font-medium ${STATUS_TONE[view.status]}`}
+                >
                     <StatusIcon status={view.status} /> {t(`status.${view.status}`)}
                 </p>
                 {view.status === "unsupported" && (
                     <p className="text-xs text-muted-foreground">
                         {t.rich("statusHint.unsupported", {
                             link: (chunks) => (
-                                <Link href="/admin/settings" className="text-primary hover:underline">
+                                <Link
+                                    href="/admin/settings"
+                                    className="text-primary hover:underline"
+                                >
                                     {chunks}
                                 </Link>
                             )
                         })}
                     </p>
                 )}
-                {(view.status === "pending" || view.status === "offline" || view.status === "kept") && (
-                    <p className="text-xs text-muted-foreground">{t(`statusHint.${view.status}`)}</p>
+                {(view.status === "pending" ||
+                    view.status === "offline" ||
+                    view.status === "kept") && (
+                    <p className="text-xs text-muted-foreground">
+                        {t(`statusHint.${view.status}`)}
+                    </p>
                 )}
                 {view.status === "taken" && (
                     <p className="text-xs text-muted-foreground">
@@ -235,35 +276,63 @@ function PanelBody({
                     </p>
                 )}
                 {answers && (
-                    <p className="text-xs text-muted-foreground">{t.rich("shortName", { name: view.name, code })}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t.rich("shortName", { name: view.name, code })}
+                    </p>
                 )}
                 {answers && view.port !== null && (
                     <p className="text-xs text-muted-foreground">
                         {view.portless && view.port !== 80
-                            ? t.rich("portless", { url: `http://${view.domain}`, port: view.port, code })
-                            : t.rich("port", { port: view.port, address: `${view.domain}:${view.port}`, code })}
+                            ? t.rich("portless", {
+                                  url: `http://${view.domain}`,
+                                  port: view.port,
+                                  code
+                              })
+                            : t.rich("port", {
+                                  port: view.port,
+                                  address: `${view.domain}:${view.port}`,
+                                  code
+                              })}
                     </p>
                 )}
                 {view.former.map((entry) => (
                     <p key={entry.name} className="text-xs text-muted-foreground">
-                        {t.rich("former", { name: entry.name, date: format.date(entry.until), code })}
+                        {t.rich("former", {
+                            name: entry.name,
+                            date: format.date(entry.until),
+                            code
+                        })}
                     </p>
                 ))}
             </div>
             {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
 
-            {enabled && <AliasEditor kind={kind} id={id} view={view} canEdit={canEdit} onChanged={onChanged} />}
+            {enabled && (
+                <AliasEditor
+                    kind={kind}
+                    id={id}
+                    view={view}
+                    canEdit={canEdit}
+                    onChanged={onChanged}
+                />
+            )}
 
             <div className="flex flex-col gap-1.5">
                 <h4 className="text-xs font-medium">{t("reach")}</h4>
-                {view.linksMode && <p className="text-xs text-muted-foreground">{t("reachLinks")}</p>}
+                {view.linksMode && (
+                    <p className="text-xs text-muted-foreground">{t("reachLinks")}</p>
+                )}
                 {view.reach.length === 0 ? (
                     <p className="text-xs text-muted-foreground">{t("reachNone")}</p>
                 ) : (
                     <ul className="flex flex-wrap gap-1.5">
                         {view.reach.map((peer) => (
                             <li key={peer.id}>
-                                <Badge variant="neutral" className="max-w-56 truncate" title={peer.name}>
+                                <Badge
+                                    variant="neutral"
+                                    className="max-w-56 truncate"
+                                    title={peer.name}
+                                >
                                     {peer.name}
                                 </Badge>
                             </li>
@@ -273,7 +342,8 @@ function PanelBody({
                 {unreachableByServer(view).map(([server, services]) => (
                     <div key={server} className="flex flex-col gap-0.5">
                         <p className="flex items-center gap-1.5 text-xs font-medium text-warning-ink">
-                            <CircleAlert className="size-3.5 shrink-0" /> {t("unreachable", { server })}
+                            <CircleAlert className="size-3.5 shrink-0" />{" "}
+                            {t("unreachable", { server })}
                         </p>
                         <p className="text-xs text-muted-foreground">
                             {t("unreachableHint", { services: services.join(", ") })}
@@ -293,7 +363,15 @@ function PanelBody({
                 )}
             </div>
 
-            {enabled && <CrossProjectLinks kind={kind} id={id} view={view} canEdit={canEdit} onChanged={onChanged} />}
+            {enabled && (
+                <CrossProjectLinks
+                    kind={kind}
+                    id={id}
+                    view={view}
+                    canEdit={canEdit}
+                    onChanged={onChanged}
+                />
+            )}
         </div>
     );
 }
@@ -301,7 +379,8 @@ function PanelBody({
 /** The services that cannot call it, grouped by the server they are on. */
 function unreachableByServer(view: PrivateNetworkView): [string, string[]][] {
     const groups = new Map<string, string[]>();
-    for (const peer of view.unreachable) groups.set(peer.serverName, [...(groups.get(peer.serverName) ?? []), peer.name]);
+    for (const peer of view.unreachable)
+        groups.set(peer.serverName, [...(groups.get(peer.serverName) ?? []), peer.name]);
     return [...groups];
 }
 
@@ -320,7 +399,11 @@ function RenameForm({
 }) {
     const t = useTranslations("deployPrivateNet");
     const [value, setValue] = useState(current);
-    const [check, setCheck] = useState<{ name: string; available: boolean; message?: string } | null>(null);
+    const [check, setCheck] = useState<{
+        name: string;
+        available: boolean;
+        message?: string;
+    } | null>(null);
     const [checking, setChecking] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
@@ -395,7 +478,9 @@ function RenameForm({
                         aria-invalid={Boolean(message)}
                         className="min-w-0 flex-1 border-0 font-mono focus-visible:ring-0"
                     />
-                    <span className="shrink-0 pr-2 font-mono text-sm text-muted-foreground">.polaris.internal</span>
+                    <span className="shrink-0 pr-2 font-mono text-sm text-muted-foreground">
+                        .polaris.internal
+                    </span>
                 </div>
             </label>
             <p className="min-h-4 text-xs" aria-live="polite">
@@ -411,13 +496,26 @@ function RenameForm({
                     </span>
                 ) : null}
             </p>
-            <p className="text-xs text-muted-foreground">{t("renameHint", { days: FORMER_NAME_GRACE_DAYS })}</p>
+            <p className="text-xs text-muted-foreground">
+                {t("renameHint", { days: FORMER_NAME_GRACE_DAYS })}
+            </p>
             {error && <p className="text-xs text-danger-ink">{error}</p>}
             <div className="flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={pending}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={onCancel}
+                    disabled={pending}
+                >
                     {t("cancel")}
                 </Button>
-                <Button type="submit" size="sm" aria-disabled={!available || pending} disabled={pending}>
+                <Button
+                    type="submit"
+                    size="sm"
+                    aria-disabled={!available || pending}
+                    disabled={pending}
+                >
                     {pending && <Loader2 className="animate-spin" />} {t("update")}
                 </Button>
             </div>
@@ -609,7 +707,10 @@ function CrossProjectLinks({
             {view.crossLinks.length > 0 && (
                 <ul className="flex flex-col gap-1">
                     {view.crossLinks.map((link) => (
-                        <li key={link.id} className="flex items-start justify-between gap-2 text-xs">
+                        <li
+                            key={link.id}
+                            className="flex items-start justify-between gap-2 text-xs"
+                        >
                             <div className="flex min-w-0 flex-col gap-0.5">
                                 <span className="text-muted-foreground">
                                     {t.rich(link.direction === "in" ? "linkIn" : "linkOut", {
@@ -619,7 +720,9 @@ function CrossProjectLinks({
                                         code
                                     })}
                                 </span>
-                                {!link.sameServer && <span className="text-warning-ink">{t("linkOtherServer")}</span>}
+                                {!link.sameServer && (
+                                    <span className="text-warning-ink">{t("linkOtherServer")}</span>
+                                )}
                             </div>
                             {canEdit && (
                                 <Button
@@ -658,12 +761,23 @@ function CrossProjectLinks({
                                 aria-label={t("allowPick")}
                                 className="w-full sm:w-72"
                             />
-                            <Button size="sm" onClick={allow} aria-disabled={!picked || pending} disabled={pending}>
-                                {pending && <Loader2 className="animate-spin" />} {t("allowConfirm")}
+                            <Button
+                                size="sm"
+                                onClick={allow}
+                                aria-disabled={!picked || pending}
+                                disabled={pending}
+                            >
+                                {pending && <Loader2 className="animate-spin" />}{" "}
+                                {t("allowConfirm")}
                             </Button>
                         </>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => setChoosing(false)} disabled={pending}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setChoosing(false)}
+                        disabled={pending}
+                    >
                         {t("cancel")}
                     </Button>
                 </div>

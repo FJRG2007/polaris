@@ -66,7 +66,8 @@ export function parsePrivateNetwork(raw: string | null | undefined): StoredPriva
     let parsed: Record<string, unknown> = {};
     try {
         const value = JSON.parse(raw ?? "{}") as unknown;
-        if (value && typeof value === "object" && !Array.isArray(value)) parsed = value as Record<string, unknown>;
+        if (value && typeof value === "object" && !Array.isArray(value))
+            parsed = value as Record<string, unknown>;
     } catch {
         // Nothing chosen.
     }
@@ -77,7 +78,10 @@ export function parsePrivateNetwork(raw: string | null | undefined): StoredPriva
     const former = Array.isArray(parsed.former)
         ? parsed.former.flatMap((entry: unknown) => {
               const one = entry as { name?: unknown; until?: unknown } | null;
-              return one && label(one.name) && typeof one.until === "string" && !Number.isNaN(Date.parse(one.until))
+              return one &&
+                  label(one.name) &&
+                  typeof one.until === "string" &&
+                  !Number.isNaN(Date.parse(one.until))
                   ? [{ name: one.name, until: one.until }]
                   : [];
           })
@@ -86,7 +90,9 @@ export function parsePrivateNetwork(raw: string | null | undefined): StoredPriva
     const live =
         liveRaw && Array.isArray(liveRaw.names)
             ? {
-                  ...(typeof liveRaw.deploymentId === "string" ? { deploymentId: liveRaw.deploymentId } : {}),
+                  ...(typeof liveRaw.deploymentId === "string"
+                      ? { deploymentId: liveRaw.deploymentId }
+                      : {}),
                   names: liveRaw.names.filter((one): one is string => typeof one === "string")
               }
             : undefined;
@@ -99,7 +105,9 @@ function serialize(stored: StoredPrivateNetwork): string {
 
 /** The service's name: the one chosen, else the one its slug makes. */
 export function privateNameOf(service: { slug: string; privateNetwork: string }): string {
-    return parsePrivateNetwork(service.privateNetwork).name ?? core.defaultPrivateName(service.slug);
+    return (
+        parsePrivateNetwork(service.privateNetwork).name ?? core.defaultPrivateName(service.slug)
+    );
 }
 
 /** `<name>.polaris.internal` for a service. */
@@ -109,15 +117,22 @@ export function privateDomainOf(service: { slug: string; privateNetwork: string 
 
 /** The former names still inside their grace period. */
 export function formerInGrace(stored: StoredPrivateNetwork, now = new Date()): string[] {
-    return stored.former.filter((entry) => Date.parse(entry.until) > now.getTime()).map((entry) => entry.name);
+    return stored.former
+        .filter((entry) => Date.parse(entry.until) > now.getTime())
+        .map((entry) => entry.name);
 }
 
 /** Every label a service answers to on its own names network: its name, its
  *  extra names and the former names still answering. */
-export function labelsOf(service: { slug: string; privateNetwork: string }, now = new Date()): string[] {
+export function labelsOf(
+    service: { slug: string; privateNetwork: string },
+    now = new Date()
+): string[] {
     const stored = parsePrivateNetwork(service.privateNetwork);
     const name = stored.name ?? core.defaultPrivateName(service.slug);
-    return [...new Set([name, ...stored.aliases, ...formerInGrace(stored, now).slice(-MAX_FORMER)])];
+    return [
+        ...new Set([name, ...stored.aliases, ...formerInGrace(stored, now).slice(-MAX_FORMER)])
+    ];
 }
 
 /** How many former names answer at once: the latest renames. */
@@ -190,7 +205,8 @@ export async function prepareDeployNames(input: {
     readonly target: TargetFacts;
     readonly kept?: boolean;
 }): Promise<DeployNames> {
-    if (!namesOn(input.target)) return { enabled: false, live: [], crossLinks: [], networkAliases: {}, domain: null };
+    if (!namesOn(input.target))
+        return { enabled: false, live: [], crossLinks: [], networkAliases: {}, domain: null };
     const labels = input.kept ? [] : await answeringLabels(input, input.environment.id);
     const own = ownNamesNetwork({
         mode: networkModeOf(input.environment.networkMode),
@@ -200,16 +216,24 @@ export async function prepareDeployNames(input: {
     const links = await prisma.privateLink.findMany({
         where:
             input.kind === "application"
-                ? { OR: [{ sourceId: input.id }, { targetKind: "application", targetId: input.id }] }
+                ? {
+                      OR: [
+                          { sourceId: input.id },
+                          { targetKind: "application", targetId: input.id }
+                      ]
+                  }
                 : { targetKind: "database", targetId: input.id },
         select: { id: true, targetKind: true, targetId: true, sourceId: true },
         orderBy: { createdAt: "asc" },
         take: 64
     });
-    const networkAliases: Record<string, string[]> = labels.length > 0 ? { [own]: namesFor(labels[0]!, labels.slice(1)) } : {};
+    const networkAliases: Record<string, string[]> =
+        labels.length > 0 ? { [own]: namesFor(labels[0]!, labels.slice(1)) } : {};
     for (const link of links) {
         if (labels.length > 0 && link.targetKind === input.kind && link.targetId === input.id) {
-            networkAliases[crossLinkNetwork(link.id)] = labels.map((label) => crossProjectDomain(label, input.projectSlug));
+            networkAliases[crossLinkNetwork(link.id)] = labels.map((label) =>
+                crossProjectDomain(label, input.projectSlug)
+            );
         }
     }
     const primary = privateNameOf(input);
@@ -236,8 +260,14 @@ export async function recordLiveNames(
 ): Promise<void> {
     const row =
         kind === "application"
-            ? await prisma.application.findUnique({ where: { id }, select: { privateNetwork: true } })
-            : await prisma.managedDatabase.findUnique({ where: { id }, select: { privateNetwork: true } });
+            ? await prisma.application.findUnique({
+                  where: { id },
+                  select: { privateNetwork: true }
+              })
+            : await prisma.managedDatabase.findUnique({
+                  where: { id },
+                  select: { privateNetwork: true }
+              });
     if (!row) return;
     const stored = parsePrivateNetwork(row.privateNetwork);
     const now = Date.now();
@@ -259,7 +289,9 @@ export async function answeringLabels(
     const own = claimantOf(service);
     const clashes = contestedLabels(own, await environmentLabels(environmentId));
     for (const [label, holder] of clashes) {
-        console.warn(`polaris: private name ${label} of ${service.kind} ${service.id} is kept by ${holder}; left out`);
+        console.warn(
+            `polaris: private name ${label} of ${service.kind} ${service.id} is kept by ${holder}; left out`
+        );
     }
     return own.labels.filter((label) => !clashes.has(label));
 }
@@ -309,7 +341,10 @@ export function contestedLabels(own: Claimant, others: readonly Claimant[]): Map
     const contested = new Map<string, string>();
     for (const label of own.labels) {
         const holder = others.find(
-            (one) => !(one.kind === own.kind && one.id === own.id) && one.labels.includes(label) && keepsLabel(one, own, label)
+            (one) =>
+                !(one.kind === own.kind && one.id === own.id) &&
+                one.labels.includes(label) &&
+                keepsLabel(one, own, label)
         );
         if (holder) contested.set(label, holder.label);
     }
@@ -344,7 +379,10 @@ export function referencedDomain(
     const live = stored.live;
     if (!live || !live.names.includes(domain)) return containerName;
     // An application's names are live once the deployment that carried them serves.
-    if (service.currentDeploymentId !== undefined && live.deploymentId !== service.currentDeploymentId) {
+    if (
+        service.currentDeploymentId !== undefined &&
+        live.deploymentId !== service.currentDeploymentId
+    ) {
         return containerName;
     }
     return domain;
@@ -397,7 +435,13 @@ export async function checkPrivateName(
 }
 
 async function loadService(kind: PrivateKind, id: string) {
-    const select = { id: true, slug: true, name: true, environmentId: true, privateNetwork: true } as const;
+    const select = {
+        id: true,
+        slug: true,
+        name: true,
+        environmentId: true,
+        privateNetwork: true
+    } as const;
     const found =
         kind === "application"
             ? await prisma.application.findUnique({ where: { id }, select })
@@ -422,7 +466,11 @@ export class PrivateNameRefusal extends Error {
  * resolve to the new one from their next deploy. Answers whether anything
  * changed - the caller redeploys the service so its container takes the name.
  */
-export async function renamePrivateName(kind: PrivateKind, id: string, raw: string): Promise<{ name: string; previous: string }> {
+export async function renamePrivateName(
+    kind: PrivateKind,
+    id: string,
+    raw: string
+): Promise<{ name: string; previous: string }> {
     const service = await loadService(kind, id);
     const check = await checkPrivateName(kind, id, service.environmentId, raw);
     if (check.problem) throw new PrivateNameRefusal(check.problem);
@@ -438,7 +486,9 @@ export async function renamePrivateName(kind: PrivateKind, id: string, raw: stri
         // becomes a former name, keeping the later of two dates if it already was.
         aliases: stored.aliases.filter((alias) => alias !== check.name),
         former: [
-            ...stored.former.filter((entry) => entry.name !== check.name && entry.name !== previous),
+            ...stored.former.filter(
+                (entry) => entry.name !== check.name && entry.name !== previous
+            ),
             { name: previous, until }
         ]
     });
@@ -446,7 +496,11 @@ export async function renamePrivateName(kind: PrivateKind, id: string, raw: stri
 }
 
 /** Replace a service's extra names, each checked like a name. */
-export async function setPrivateAliases(kind: PrivateKind, id: string, raw: readonly string[]): Promise<string[]> {
+export async function setPrivateAliases(
+    kind: PrivateKind,
+    id: string,
+    raw: readonly string[]
+): Promise<string[]> {
     if (raw.length > core.PRIVATE_ALIASES_MAX) throw new PrivateNameRefusal("tooMany");
     const service = await loadService(kind, id);
     const stored = parsePrivateNetwork(service.privateNetwork);
@@ -487,7 +541,9 @@ export interface ReferenceEdge {
  * `${{name.KEY}}` references in their variables - the lines the canvas draws.
  * A secret is opened to look, and only the edge leaves this function.
  */
-export async function referenceEdges(environmentIds: readonly string[]): Promise<Map<string, ReferenceEdge[]>> {
+export async function referenceEdges(
+    environmentIds: readonly string[]
+): Promise<Map<string, ReferenceEdge[]>> {
     const edges = new Map<string, ReferenceEdge[]>();
     if (environmentIds.length === 0) return edges;
     const [applications, databases] = await Promise.all([
@@ -605,8 +661,16 @@ const STARTING = new Set(["queued", "provisioning", "building", "deploying", "pe
 const UP = new Set(["running", "deployed", "sleeping", "active", "healthy", "ready"]);
 
 /** What the Private network panel shows for one service. Callers authorize it. */
-export async function privateNetworkView(kind: PrivateKind, id: string): Promise<PrivateNetworkView> {
-    const environmentSelect = { id: true, projectId: true, networkMode: true, layout: true } as const;
+export async function privateNetworkView(
+    kind: PrivateKind,
+    id: string
+): Promise<PrivateNetworkView> {
+    const environmentSelect = {
+        id: true,
+        projectId: true,
+        networkMode: true,
+        layout: true
+    } as const;
     const targetSelect = { id: true, kind: true, hostId: true, runtime: true, name: true } as const;
     const service =
         kind === "application"
@@ -624,7 +688,10 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
                       volumes: { select: { id: true } },
                       environment: { select: environmentSelect },
                       target: { select: targetSelect },
-                      domains: { where: { enabled: true, deploymentId: null }, select: { targetPort: true, kind: true } }
+                      domains: {
+                          where: { enabled: true, deploymentId: null },
+                          select: { targetPort: true, kind: true }
+                      }
                   }
               })
             : await prisma.managedDatabase.findUnique({
@@ -656,7 +723,9 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
         const { getApplicationDeployStatuses } = await import("@/lib/deploy-service");
         // Never deployed reads as not running: nothing answers to its names yet.
         state = (await getApplicationDeployStatuses([service]))[service.id] ?? "never";
-        liveNow = stored.live?.deploymentId !== undefined && stored.live.deploymentId === service.currentDeploymentId;
+        liveNow =
+            stored.live?.deploymentId !== undefined &&
+            stored.live.deploymentId === service.currentDeploymentId;
     } else {
         state = service.status;
         liveNow = true;
@@ -670,7 +739,9 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
     const wanted = [
         ...[name, ...stored.aliases].filter((one) => !clashes.has(one)).map(privateDomain),
         // And the name each linked project calls it by, on that link's network.
-        ...(clashes.has(name) ? [] : links.filter((link) => link.direction === "in").map((link) => link.domain))
+        ...(clashes.has(name)
+            ? []
+            : links.filter((link) => link.direction === "in").map((link) => link.domain))
     ];
     const carries = liveNow && wanted.every((one) => stored.live?.names.includes(one));
     const status: PrivateNetworkStatus = !enabled
@@ -693,7 +764,11 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
             const { dualStackNetworks } = await import("./service-networks");
             const dual = await dualStackNetworks();
             if (!dual) return null;
-            const own = ownNamesNetwork({ mode, environmentId: service.environment.id, serviceId: service.id });
+            const own = ownNamesNetwork({
+                mode,
+                environmentId: service.environment.id,
+                serviceId: service.id
+            });
             return dual.has(own) ? ("dual" as const) : ("ipv4" as const);
         })(),
         prisma.application.findMany({
@@ -720,7 +795,8 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
         serverName: peer.target.name
     });
 
-    const port = "sourceType" in service ? containerPortOf(service) : defaultDbPort(service.image) || null;
+    const port =
+        "sourceType" in service ? containerPortOf(service) : defaultDbPort(service.image) || null;
     return {
         kind,
         projectId: service.environment.projectId,
@@ -734,12 +810,18 @@ export async function privateNetworkView(kind: PrivateKind, id: string): Promise
         serverName: service.target.name,
         port,
         portless:
-            enabled && kind === "application" && service.target.runtime === "compose" && port !== null,
+            enabled &&
+            kind === "application" &&
+            service.target.runtime === "compose" &&
+            port !== null,
         sharedEnvironment: mode === "shared",
         linksMode: mode === "links",
         reach: callers.filter((peer) => peer.target.id === service.target.id).map(asPeer),
         unreachable: callers.filter((peer) => peer.target.id !== service.target.id).map(asPeer),
-        crossLinks: links.map(({ serverId, ...link }) => ({ ...link, sameServer: serverId === service.target.id }))
+        crossLinks: links.map(({ serverId, ...link }) => ({
+            ...link,
+            sameServer: serverId === service.target.id
+        }))
     };
 }
 
@@ -761,7 +843,9 @@ async function crossLinksOf(
         ...links.map((link) => link.sourceId),
         ...links.filter((link) => link.targetKind === "application").map((link) => link.targetId)
     ];
-    const dbIds = links.filter((link) => link.targetKind === "database").map((link) => link.targetId);
+    const dbIds = links
+        .filter((link) => link.targetKind === "database")
+        .map((link) => link.targetId);
     const select = {
         id: true,
         name: true,
@@ -814,7 +898,10 @@ export async function crossLinkCandidates(
     id: string,
     userId: string
 ): Promise<CrossLinkCandidate[]> {
-    const select = { targetId: true, environment: { select: { projectId: true, project: { select: { ownerId: true } } } } } as const;
+    const select = {
+        targetId: true,
+        environment: { select: { projectId: true, project: { select: { ownerId: true } } } }
+    } as const;
     const service =
         kind === "application"
             ? await prisma.application.findUnique({ where: { id }, select })
@@ -833,17 +920,28 @@ export async function crossLinkCandidates(
                 id: true,
                 name: true,
                 environmentId: true,
-                environment: { select: { name: true, projectId: true, project: { select: { name: true } } } }
+                environment: {
+                    select: { name: true, projectId: true, project: { select: { name: true } } }
+                }
             },
             orderBy: { name: "asc" },
             take: 200
         }),
-        prisma.privateLink.findMany({ where: { targetKind: kind, targetId: id }, select: { sourceId: true } })
+        prisma.privateLink.findMany({
+            where: { targetKind: kind, targetId: id },
+            select: { sourceId: true }
+        })
     ]);
-    const { accessCan, accessInEnvironment, projectAccess } = await import("@/lib/deploy-project-access");
+    const { accessCan, accessInEnvironment, projectAccess } = await import(
+        "@/lib/deploy-project-access"
+    );
     const projectIds = [...new Set(apps.map((app) => app.environment.projectId))];
     const accesses = new Map(
-        await Promise.all(projectIds.map(async (projectId) => [projectId, await projectAccess(projectId, userId)] as const))
+        await Promise.all(
+            projectIds.map(
+                async (projectId) => [projectId, await projectAccess(projectId, userId)] as const
+            )
+        )
     );
     const taken = new Set(linked.map((link) => link.sourceId));
     return apps
@@ -880,7 +978,8 @@ export async function addCrossLink(
         prisma.application.findUnique({ where: { id: sourceId }, select })
     ]);
     if (!target || !source) throw new PrivateLinkRefusal("missing");
-    if (target.environment.projectId === source.environment.projectId) throw new PrivateLinkRefusal("sameProject");
+    if (target.environment.projectId === source.environment.projectId)
+        throw new PrivateLinkRefusal("sameProject");
     if (target.targetId !== source.targetId) throw new PrivateLinkRefusal("otherServer");
     await prisma.privateLink.upsert({
         where: { targetKind_targetId_sourceId: { targetKind: kind, targetId: id, sourceId } },
@@ -915,17 +1014,29 @@ export type NamesApplied = "now" | "next" | "first";
  * running database is left as it is: recreating it cuts every connection to it,
  * which nobody asked for by renaming it, so it takes them on its next deploy.
  */
-export async function redeployForNames(kind: PrivateKind, id: string, actorId: string): Promise<NamesApplied> {
+export async function redeployForNames(
+    kind: PrivateKind,
+    id: string,
+    actorId: string
+): Promise<NamesApplied> {
     if (kind === "application") {
         const app = await prisma.application.findUnique({
             where: { id },
-            select: { currentDeploymentId: true, environment: { select: { project: { select: { ownerId: true } } } } }
+            select: {
+                currentDeploymentId: true,
+                environment: { select: { project: { select: { ownerId: true } } } }
+            }
         });
         if (!app?.currentDeploymentId) return "first";
         const { redeployForEnvScope } = await import("@/lib/deploy-service");
-        await redeployForEnvScope("application", id, app.environment.project.ownerId, actorId, { reason: "private-names" });
+        await redeployForEnvScope("application", id, app.environment.project.ownerId, actorId, {
+            reason: "private-names"
+        });
         return "now";
     }
-    const db = await prisma.managedDatabase.findUnique({ where: { id }, select: { status: true, parentId: true } });
+    const db = await prisma.managedDatabase.findUnique({
+        where: { id },
+        select: { status: true, parentId: true }
+    });
     return db && !db.parentId && db.status === "running" ? "next" : "first";
 }

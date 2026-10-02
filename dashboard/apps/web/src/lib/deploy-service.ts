@@ -40,7 +40,13 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { copyScopeValues, decryptedValue } from "./deploy/env-values";
 import { challengeActive, floodedServices } from "./deploy/edge-state";
 import { hasTunnel, networksForService } from "./deploy/service-networks";
-import { answeringLabels, namesOn, prepareDeployNames, privateNameOf, recordLiveNames } from "./deploy/private-names";
+import {
+    answeringLabels,
+    namesOn,
+    prepareDeployNames,
+    privateNameOf,
+    recordLiveNames
+} from "./deploy/private-names";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { resolveBuildMachine, type BuildMachine } from "./deploy/build-machine";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -3220,7 +3226,8 @@ export async function deployApplication(
     // The names this release carries count as live once it is the one serving. A
     // scale step in place adds copies to the release already serving, which keeps
     // what it was recorded with.
-    if (liveNames && !scaled?.cutover) await recordLiveNames("application", applicationId, liveNames, deployment.id);
+    if (liveNames && !scaled?.cutover)
+        await recordLiveNames("application", applicationId, liveNames, deployment.id);
     // Every release is kept under a name of its own so it can be run again later
     // exactly as it was; a rollback runs one of those instead of making one. The
     // build also goes at the commit it names, when there is one - the branch head

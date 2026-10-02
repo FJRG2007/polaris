@@ -98,9 +98,20 @@ export async function checkPrivateNameAction(
     if (!parsed.success) return { available: false, message: t(PROBLEM_KEYS.tooLong) };
     try {
         const service = await reach(kind, id, user.id, "service.configure");
-        const check = await names.checkPrivateName(service.kind, service.id, service.environmentId, parsed.data);
-        if (check.problem) return { name: check.name, available: false, message: t(PROBLEM_KEYS[check.problem]) };
-        if (check.takenBy) return { name: check.name, available: false, message: t("taken", { service: check.takenBy }) };
+        const check = await names.checkPrivateName(
+            service.kind,
+            service.id,
+            service.environmentId,
+            parsed.data
+        );
+        if (check.problem)
+            return { name: check.name, available: false, message: t(PROBLEM_KEYS[check.problem]) };
+        if (check.takenBy)
+            return {
+                name: check.name,
+                available: false,
+                message: t("taken", { service: check.takenBy })
+            };
         return { name: check.name, available: true };
     } catch (caught) {
         return { available: false, message: await refusal(caught) };
@@ -140,7 +151,8 @@ export async function setPrivateAliasesAction(
 ): Promise<{ error?: string; applied?: names.NamesApplied }> {
     const user = await requirePermission("deploy.manage");
     const parsed = aliasesSchema.safeParse(aliases);
-    if (!parsed.success) return { error: (await words())("tooManyAliases", { max: PRIVATE_ALIASES_MAX }) };
+    if (!parsed.success)
+        return { error: (await words())("tooManyAliases", { max: PRIVATE_ALIASES_MAX }) };
     try {
         const service = await reach(kind, id, user.id, "service.configure");
         const saved = await names.setPrivateAliases(service.kind, service.id, parsed.data);
@@ -201,7 +213,11 @@ export async function addCrossLinkAction(
 }
 
 /** Close a link between two projects, from either side. */
-export async function removeCrossLinkAction(kind: Kind, id: string, linkId: string): Promise<{ error?: string }> {
+export async function removeCrossLinkAction(
+    kind: Kind,
+    id: string,
+    linkId: string
+): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
         const service = await reach(kind, id, user.id, "service.configure");

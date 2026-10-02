@@ -496,29 +496,33 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
     const networks = joinedNetworks(plan.networks, network);
     // Its private names go on the container that carries the database's own name.
     const named = <T extends ComposeSpecService>(service: T): T =>
-        service.name === plan.ref.name ? { ...service, ...networkAliasesFor(plan.networkAliases, networks) } : service;
+        service.name === plan.ref.name
+            ? { ...service, ...networkAliasesFor(plan.networkAliases, networks) }
+            : service;
     // A cluster is one project of equal nodes, reaching each other by name on
     // the networks they share. Nothing is published: a client is redirected
     // between nodes by name, which only the network can resolve.
     if (plan.nodes && plan.nodes.length > 0) {
         return {
             project: plan.ref.project,
-            services: plan.nodes.map((node) => named({
-                name: node.name,
-                image: plan.image,
-                pullPolicy: dbPullPolicy(plan),
-                env: { ...plan.env },
-                command: [...node.command],
-                ports: [],
-                volumes: [
-                    { source: node.volumeName, target: plan.dataPath, kind: "volume" as const }
-                ],
-                labels: {},
-                networks,
-                extraHosts: [HOST_GATEWAY],
-                restart: "unless-stopped",
-                ...limitFields(plan.limits)
-            })),
+            services: plan.nodes.map((node) =>
+                named({
+                    name: node.name,
+                    image: plan.image,
+                    pullPolicy: dbPullPolicy(plan),
+                    env: { ...plan.env },
+                    command: [...node.command],
+                    ports: [],
+                    volumes: [
+                        { source: node.volumeName, target: plan.dataPath, kind: "volume" as const }
+                    ],
+                    labels: {},
+                    networks,
+                    extraHosts: [HOST_GATEWAY],
+                    restart: "unless-stopped",
+                    ...limitFields(plan.limits)
+                })
+            ),
             volumes: plan.nodes.map((node) => node.volumeName),
             networks
         };

@@ -126,8 +126,15 @@ export function forwarderService(serviceName: string, port: number): ComposeSpec
 export function withPortForwarders(spec: ComposeSpec, port: number | undefined): ComposeSpec {
     if (port === undefined || port === PORTLESS_PORT) return spec;
     const forwarded = spec.services.filter(
-        (service) => !service.networkMode && Object.keys(service.networkAliases ?? {}).some(isNamesNetwork)
+        (service) =>
+            !service.networkMode && Object.keys(service.networkAliases ?? {}).some(isNamesNetwork)
     );
     if (forwarded.length === 0) return spec;
-    return { ...spec, services: [...spec.services, ...forwarded.map((service) => forwarderService(service.name, port))] };
+    return {
+        ...spec,
+        services: [
+            ...spec.services,
+            ...forwarded.map((service) => forwarderService(service.name, port))
+        ]
+    };
 }

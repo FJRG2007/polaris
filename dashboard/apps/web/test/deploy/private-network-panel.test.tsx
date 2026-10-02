@@ -113,22 +113,46 @@ describe("the private networking panel", () => {
             available: false,
             message: "worker already answers to that name."
         });
-        await waitFor(() => expect(checkPrivateNameAction).toHaveBeenCalledWith("application", "service-1", "worker"));
+        await waitFor(() =>
+            expect(checkPrivateNameAction).toHaveBeenCalledWith(
+                "application",
+                "service-1",
+                "worker"
+            )
+        );
         expect(await screen.findByText("worker already answers to that name.")).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Update" }).getAttribute("aria-disabled")).toBe("true");
+        expect(screen.getByRole("button", { name: "Update" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
 
         await user.clear(input);
         await user.type(input, "api-v2");
         checkPrivateNameAction.mockResolvedValueOnce({ name: "api-v2", available: true });
-        await waitFor(() => expect(checkPrivateNameAction).toHaveBeenCalledWith("application", "service-1", "api-v2"));
+        await waitFor(() =>
+            expect(checkPrivateNameAction).toHaveBeenCalledWith(
+                "application",
+                "service-1",
+                "api-v2"
+            )
+        );
         expect(await screen.findByText("Endpoint name available!")).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Update" }).getAttribute("aria-disabled")).toBe("false");
+        expect(screen.getByRole("button", { name: "Update" }).getAttribute("aria-disabled")).toBe(
+            "false"
+        );
 
         renamePrivateNameAction.mockResolvedValueOnce({ applied: "next" });
         await user.click(screen.getByRole("button", { name: "Update" }));
-        await waitFor(() => expect(renamePrivateNameAction).toHaveBeenCalledWith("application", "service-1", "api-v2"));
+        await waitFor(() =>
+            expect(renamePrivateNameAction).toHaveBeenCalledWith(
+                "application",
+                "service-1",
+                "api-v2"
+            )
+        );
         expect(
-            await screen.findByText("Renamed. It takes the new name on its next deploy, so its connections are not cut now.")
+            await screen.findByText(
+                "Renamed. It takes the new name on its next deploy, so its connections are not cut now."
+            )
         ).toBeTruthy();
     });
 
@@ -159,17 +183,30 @@ describe("the private networking panel", () => {
         await mountReady();
 
         crossLinkCandidatesAction.mockResolvedValueOnce({
-            candidates: [{ id: "svc-2", name: "checkout", projectName: "Storefront", environmentName: "production" }]
+            candidates: [
+                {
+                    id: "svc-2",
+                    name: "checkout",
+                    projectName: "Storefront",
+                    environmentName: "production"
+                }
+            ]
         });
         await user.click(screen.getByRole("button", { name: "Allow a service" }));
-        await waitFor(() => expect(crossLinkCandidatesAction).toHaveBeenCalledWith("application", "service-1"));
+        await waitFor(() =>
+            expect(crossLinkCandidatesAction).toHaveBeenCalledWith("application", "service-1")
+        );
 
-        await user.click(await screen.findByRole("combobox", { name: "Service of another project" }));
+        await user.click(
+            await screen.findByRole("combobox", { name: "Service of another project" })
+        );
         const option = await screen.findByRole("option", { name: /checkout/ });
         addCrossLinkAction.mockResolvedValueOnce({});
         await user.click(option);
 
         await user.click(screen.getByRole("button", { name: "Allow" }));
-        await waitFor(() => expect(addCrossLinkAction).toHaveBeenCalledWith("application", "service-1", "svc-2"));
+        await waitFor(() =>
+            expect(addCrossLinkAction).toHaveBeenCalledWith("application", "service-1", "svc-2")
+        );
     });
 });

@@ -87,18 +87,19 @@ export default async function DeployProjectPage({
     // currently points at, which has a container name and a published port of its
     // own - so the terminal, the file browser and the direct IP:port link all have
     // to follow it.
-    const [caps, statuses, serverIp, tunnelDomains, attention, serving, references] = await Promise.all([
-        canManage ? capabilitiesFor("deploy") : null,
-        getApplicationDeployStatuses(
-            allApps.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
-        ),
-        getPublicIp(),
-        listActiveTunnelDomains(appIds),
-        serviceAttention(appIds),
-        servingReleases(allApps.map((app) => ({ ...app, environment: { project } }))),
-        // Only the edges leave the server; the variables they come from never do.
-        referenceEdges(project.environments.map((environment) => environment.id))
-    ]);
+    const [caps, statuses, serverIp, tunnelDomains, attention, serving, references] =
+        await Promise.all([
+            canManage ? capabilitiesFor("deploy") : null,
+            getApplicationDeployStatuses(
+                allApps.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
+            ),
+            getPublicIp(),
+            listActiveTunnelDomains(appIds),
+            serviceAttention(appIds),
+            servingReleases(allApps.map((app) => ({ ...app, environment: { project } }))),
+            // Only the edges leave the server; the variables they come from never do.
+            referenceEdges(project.environments.map((environment) => environment.id))
+        ]);
     const localReady = Boolean(caps?.deploy);
 
     const summary: ProjectSummary = {

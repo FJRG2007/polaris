@@ -125,18 +125,25 @@ export function serviceNetworks(input: NetworkPlanInput): string[] {
     const names = input.names ? [...namesNetworksOf(input), ...(input.crossLinks ?? [])] : [];
     if (input.mode === "shared") return [input.proxyNetwork, ...names];
     const proxy = input.joinsProxy ? [input.proxyNetwork] : [];
-    if (input.mode === "environment") return [...proxy, environmentNetwork(input.environmentId), ...names];
+    if (input.mode === "environment")
+        return [...proxy, environmentNetwork(input.environmentId), ...names];
     // Its own, so what links to it can reach it, and each one it links to. A link
     // in either direction is a connection both ways, because a reply travels the
     // same network the request came in on.
-    return [...proxy, serviceNetwork(input.serviceId), ...linkedPeers(input).map(serviceNetwork), ...names];
+    return [
+        ...proxy,
+        serviceNetwork(input.serviceId),
+        ...linkedPeers(input).map(serviceNetwork),
+        ...names
+    ];
 }
 
 /** The services one service links to on its environment's canvas, sorted. */
 function linkedPeers(input: Pick<NetworkPlanInput, "serviceId" | "links">): string[] {
     const peers = new Set<string>();
     for (const link of input.links ?? []) {
-        if (link.source === input.serviceId && link.target !== input.serviceId) peers.add(link.target);
+        if (link.source === input.serviceId && link.target !== input.serviceId)
+            peers.add(link.target);
     }
     return [...peers].sort();
 }
@@ -146,14 +153,20 @@ function linkedPeers(input: Pick<NetworkPlanInput, "serviceId" | "links">): stri
  * `links` mode - the names networks of the services it links to, so it can call
  * them by name. Never a network Polaris's own containers are on.
  */
-function namesNetworksOf(input: Pick<NetworkPlanInput, "mode" | "environmentId" | "serviceId" | "links">): string[] {
+function namesNetworksOf(
+    input: Pick<NetworkPlanInput, "mode" | "environmentId" | "serviceId" | "links">
+): string[] {
     if (input.mode !== "links") return [namesNetwork(input.environmentId)];
     return [serviceNamesNetwork(input.serviceId), ...linkedPeers(input).map(serviceNamesNetwork)];
 }
 
 /** The network a service's own private names go on (see `namesNetworksOf`). */
-export function ownNamesNetwork(input: Pick<NetworkPlanInput, "mode" | "environmentId" | "serviceId">): string {
-    return input.mode === "links" ? serviceNamesNetwork(input.serviceId) : namesNetwork(input.environmentId);
+export function ownNamesNetwork(
+    input: Pick<NetworkPlanInput, "mode" | "environmentId" | "serviceId">
+): string {
+    return input.mode === "links"
+        ? serviceNamesNetwork(input.serviceId)
+        : namesNetwork(input.environmentId);
 }
 
 /**
@@ -216,7 +229,9 @@ export function ensurePrivateNetworksScript(names: readonly string[], swarm: boo
     const statements: string[] = [];
     for (const name of [...new Set(names)].filter(isPrivateNetwork)) {
         const create = `docker network create --label ${PRIVATE_NETWORK_LABEL} ${driver}`;
-        const ranges = Array.from({ length: FALLBACK_ATTEMPTS }, (_, attempt) => fallbackSubnet(name, attempt));
+        const ranges = Array.from({ length: FALLBACK_ATTEMPTS }, (_, attempt) =>
+            fallbackSubnet(name, attempt)
+        );
         // A bridge is asked for dual stack first, as the daemon does; an engine
         // that cannot give it one refuses and the network is made IPv4-only.
         const dual = swarm ? "" : `${create} --ipv6 ${name} >/dev/null 2>&1 || `;
@@ -224,7 +239,9 @@ export function ensurePrivateNetworksScript(names: readonly string[], swarm: boo
             `${dual}${create} ${name} >/dev/null 2>&1 || { for s in ${ranges.join(" ")}; do ${create} --subnet "$s" ${name} >/dev/null 2>&1 && break; done; true; }`,
             `docker network inspect ${name} >/dev/null 2>&1 || { echo "could not create network ${name}: this server has no address range left for another network" >&2; exit 1; }`
         ];
-        statements.push(`if ! docker network inspect ${name} >/dev/null 2>&1; then ${missing.join("; ")}; fi`);
+        statements.push(
+            `if ! docker network inspect ${name} >/dev/null 2>&1; then ${missing.join("; ")}; fi`
+        );
         // The edge dials containers by the names Polaris gave them, so it never
         // joins a network that carries names somebody chose.
         if (!isNamesNetwork(name)) {
