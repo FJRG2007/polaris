@@ -25,6 +25,9 @@ import { engineStats, type DatabaseStats } from "@/lib/data/stats";
 import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
 import { DataRequestError, ReadOnlyError } from "@/lib/data/driver";
 import { getTranslations } from "@/lib/i18n/request";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { withDriver } from "@/lib/data/open";
+import { readPrivateKey, SshKeyError } from "@/lib/data/ssh-key";
 import { dataText } from "@/lib/data/words";
 import type {
     DataColumn,
@@ -90,6 +93,8 @@ export async function saveConnectionAction(
     input: connections.SaveConnectionInput
 ): Promise<{ id?: string; error?: string }> {
     const me = await actor();
+    const refused = await dialAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(() => connections.saveConnection(me.id, input));
     if (result.error) return { error: result.error };
     revalidatePath(PATH);
@@ -104,13 +109,141 @@ export async function deleteConnectionAction(id: string): Promise<{ error?: stri
     return {};
 }
 
+/**
+ * How many connection attempts one account may make a minute, between the
+ * test button, a save (which signs in to the SSH server) and the checks of a
+ * changed key or certificate. Each one dials an address somebody typed with a
+ * credential somebody typed, so without a ceiling the form is a way to guess
+ * passwords against somebody's server - or against anybody's, through Polaris.
+ */
+const DIAL_LIMIT = 20;
+const DIAL_WINDOW_MS = 60_000;
+
+/** One attempt counted against the account, or the refusal to give. */
+async function dialAllowed(userId: string): Promise<string | null> {
+    const throttle = await rateLimit(`databases-dial:${userId}`, DIAL_LIMIT, DIAL_WINDOW_MS);
+    if (throttle.ok) return null;
+    const t = await getTranslations("databases");
+    return t("refusals.tooManyAttempts", { seconds: Math.ceil(throttle.retryAfterMs / 1000) });
+}
+
 /** Open it and say what answered, which is the only test worth running. */
 export async function testConnectionAction(
     id: string
 ): Promise<{ version?: string; error?: string }> {
     const me = await actor();
+    const refused = await dialAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(() => browser.version(me.id, String(id)));
     return result.error ? { error: result.error } : { version: result.value };
+}
+
+/**
+ * Open what the form describes, without saving it, and say what answered. The
+ * same checks a save makes, and the same rule about which stored secrets an
+ * edit keeps - a stored password is only sent to the address it was saved for.
+ */
+export async function testDraftAction(
+    input: connections.SaveConnectionInput
+): Promise<{ version?: string; error?: string }> {
+    const me = await actor();
+    const refused = await dialAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(() =>
+        connections.testDraft(me.id, input, (address) =>
+            withDriver(address, (driver) => driver.version())
+        )
+    );
+    return result.error ? { error: result.error } : { version: result.value };
+}
+
+/**
+ * Read a private key the form was given, with ssh2's own parser, and say what
+ * it is - or why it cannot be used: a public key, a locked one, a wrong
+ * passphrase. Nothing is stored and the key is not sent back, only its type and
+ * fingerprint. Counted separately from dialling, since it costs this server
+ * CPU (an encrypted key's KDF) rather than anybody else a connection.
+ */
+export async function inspectKeyAction(
+    key: string,
+    passphrase: string | null
+): Promise<{ type?: string; fingerprint?: string; error?: string }> {
+    const me = await actor();
+    const text = typeof key === "string" ? key : "";
+    const phrase = typeof passphrase === "string" && passphrase !== "" ? passphrase : null;
+    const t = await getTranslations("databases");
+    if (text.length > 16_384) return { error: dataText(t, "That file is too large.") };
+    const throttle = await rateLimit(`databases-key:${me.id}`, 30, DIAL_WINDOW_MS);
+    if (!throttle.ok) {
+        return {
+            error: t("refusals.tooManyAttempts", {
+                seconds: Math.ceil(throttle.retryAfterMs / 1000)
+            })
+        };
+    }
+    try {
+        const read = readPrivateKey(text, phrase);
+        return { type: read.type, fingerprint: read.fingerprint };
+    } catch (error) {
+        if (error instanceof SshKeyError) return { error: dataText(t, error.message) };
+        console.error("databases: a private key could not be read", error);
+        return { error: t("refusals.generic") };
+    }
+}
+
+/** The SSH key the server presents now, next to the pinned one. Read without
+ *  signing in. */
+export async function checkHostKeyAction(
+    id: string
+): Promise<{ check?: connections.HostKeyCheck; error?: string }> {
+    const me = await actor();
+    const refused = await dialAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(() => connections.checkHostKey(me.id, String(id)));
+    return result.error ? { error: result.error } : { check: result.value };
+}
+
+/** Pin the key the reader was shown, if it is still the one presented. */
+export async function trustHostKeyAction(
+    id: string,
+    fingerprint: string
+): Promise<{ fingerprint?: string; error?: string }> {
+    const me = await actor();
+    const refused = await dialAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(() =>
+        connections.trustHostKey(me.id, String(id), String(fingerprint))
+    );
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return { fingerprint: result.value };
+}
+
+/** The certificate the server presents now, next to the trusted one. */
+export async function checkCertificateAction(
+    id: string
+): Promise<{ check?: connections.CertificateCheck; error?: string }> {
+    const me = await actor();
+    const refused = await dialAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(() => connections.checkCertificate(me.id, String(id)));
+    return result.error ? { error: result.error } : { check: result.value };
+}
+
+/** Trust the certificate the reader was shown, if it is still the one presented. */
+export async function trustCertificateAction(
+    id: string,
+    fingerprint: string
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const refused = await dialAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(() =>
+        connections.trustCertificate(me.id, String(id), String(fingerprint))
+    );
+    if (result.error) return { error: result.error };
+    revalidatePath(PATH);
+    return {};
 }
 
 export async function browseAction(

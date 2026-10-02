@@ -12,7 +12,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
     captureHostKey,
     connectTunnel,
+    FORWARD_REFUSED,
     openTunnel,
+    presentedHostKey,
+    sshFingerprint,
     TunnelError,
     type DataTunnel
 } from "@/lib/data/tunnel";
@@ -26,6 +29,7 @@ interface FakeClient {
 const opened: FakeClient[] = [];
 const forwarded: { host: string; port: number }[] = [];
 let refuse: string | null = null;
+let forwardFails: { reason?: number } | null = null;
 
 function client(name: string): FakeClient {
     const made: FakeClient = {
@@ -46,7 +50,9 @@ const deps = {
     },
     forward: (async (_client: unknown, host: string, port: number) => {
         forwarded.push({ host, port });
-        return { channel: `${host}:${port}` } as never;
+        if (forwardFails)
+            throw Object.assign(new Error("(SSH) Channel open failure: open failed"), forwardFails);
+        return { channel: `${host}:${port}`, close() {} } as never;
     }) as never
 };
 
@@ -72,6 +78,7 @@ beforeEach(() => {
     opened.length = 0;
     forwarded.length = 0;
     refuse = null;
+    forwardFails = null;
 });
 
 describe("connectTunnel", () => {
@@ -118,6 +125,30 @@ describe("openTunnel", () => {
         );
         failed.mockRestore();
     });
+
+    it("says when the SSH server will not forward for this login, and hangs up", async () => {
+        forwardFails = { reason: 1 };
+        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
+            FORWARD_REFUSED.prohibited("ssh.example.com")
+        );
+        expect(opened.every((entry) => entry.ended)).toBe(true);
+    });
+
+    it("says when nothing answers at the database's address on the SSH server", async () => {
+        forwardFails = { reason: 2 };
+        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
+            FORWARD_REFUSED.unreachable("ssh.example.com", "127.0.0.1:5432")
+        );
+    });
+
+    it("falls back to the general sentence for any other forwarding failure", async () => {
+        forwardFails = {};
+        const failed = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
+            /could not open the SSH tunnel through ssh.example.com/
+        );
+        failed.mockRestore();
+    });
 });
 
 describe("captureHostKey", () => {
@@ -145,7 +176,7 @@ describe("captureHostKey", () => {
 
         await expect(
             captureHostKey(TARGET, null, { connect, forward: deps.forward })
-        ).rejects.toThrow(/different key than the one Polaris pinned/);
+        ).rejects.toThrow(/different SSH key than the one pinned/);
     });
 
     it("passes a failure that was not the key through as itself", async () => {
@@ -157,5 +188,60 @@ describe("captureHostKey", () => {
         await expect(
             captureHostKey(TARGET, null, { connect, forward: deps.forward })
         ).rejects.toThrow(/authentication methods failed/);
+    });
+});
+
+describe("a changed key on the way in", () => {
+    it("refuses a jump server whose key changed, naming it, before the target is tried", async () => {
+        const connect = async (options: SshConnectOptions) => {
+            if (options.host === "bastion.example.com") {
+                options.onHostKey?.("NOT-BBBB");
+                throw new Error("Handshake failed");
+            }
+            return client(options.host) as never;
+        };
+        const refused = await connectTunnel(
+            { ...viaJump, jumpLabel: "bastion" },
+            { connect, forward: deps.forward }
+        ).catch((error: unknown) => error);
+        expect(refused).toBeInstanceOf(TunnelError);
+        expect((refused as TunnelError).keyChanged).toEqual({ hop: "jump", presented: "NOT-BBBB" });
+        expect((refused as Error).message).toMatch(/^bastion answered with a different SSH key/);
+        expect(forwarded).toEqual([]);
+    });
+
+    it("says the target's changed key from openTunnel too, rather than 'check the server is up'", async () => {
+        const connect = async (options: SshConnectOptions) => {
+            options.onHostKey?.("CHANGED");
+            throw new Error("Handshake failed");
+        };
+        await expect(
+            openTunnel(direct, "127.0.0.1", 5432, { connect, forward: deps.forward })
+        ).rejects.toThrow(/different SSH key than the one pinned/);
+    });
+
+    it("reads the presented key without offering any credential", async () => {
+        let offered: SshConnectOptions | null = null;
+        const connect = async (options: SshConnectOptions) => {
+            offered = options;
+            options.onHostKey?.("PRESENTED");
+            // A real verifier with an empty pin list refuses here, before auth.
+            throw new Error("Handshake failed");
+        };
+        const key = await presentedHostKey(
+            { host: "ssh.example.com", port: 22, username: "root" },
+            null,
+            null,
+            { connect, forward: deps.forward }
+        );
+        expect(key).toBe("PRESENTED");
+        expect(offered!.pinnedHostKey).toEqual([]);
+        expect(offered!.auth).toEqual({ method: "password", password: "" });
+    });
+
+    it("prints a key the way OpenSSH does", () => {
+        expect(sshFingerprint(Buffer.from("key").toString("base64"))).toMatch(
+            /^SHA256:[A-Za-z0-9+/]{43}$/
+        );
     });
 });

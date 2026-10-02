@@ -30,10 +30,12 @@ import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { dataText } from "@/lib/data/words";
+import { spreadsheetSafe } from "@/lib/data/spreadsheet";
 import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
     DataColumn,
@@ -362,9 +364,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                 />
 
                 {readOnly && (
-                    <span className="text-xs text-muted-foreground">
-                        {t("bench.readOnly")}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t("bench.readOnly")}</span>
                 )}
 
                 {error && (
@@ -447,8 +447,10 @@ function rowsAsText(
     columns: readonly DataColumn[]
 ): string {
     if (rows.length === 0) return "";
-    const header = columns.map((column) => column.name).join("\t");
-    const body = rows.map((row) => columns.map((column) => cellText(row[column.name])).join("\t"));
+    const header = columns.map((column) => spreadsheetSafe(column.name)).join("\t");
+    const body = rows.map((row) =>
+        columns.map((column) => spreadsheetSafe(cellText(row[column.name]))).join("\t")
+    );
     return [header, ...body].join("\n");
 }
 
@@ -788,7 +790,10 @@ function RowsPanel({
                           ? cursorPaged
                               ? page.total === null
                                   ? t("bench.keys", { count: page.rows.length })
-                                  : t("bench.keysOf", { count: page.rows.length, total: page.total })
+                                  : t("bench.keysOf", {
+                                        count: page.rows.length,
+                                        total: page.total
+                                    })
                               : page.total === null
                                 ? t("bench.rows", {
                                       from: page.rows.length === 0 ? 0 : offset + 1,
@@ -829,7 +834,10 @@ function RowsPanel({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -944,7 +952,10 @@ function RowsPanel({
                                                                     }
                                                                 />
                                                             ) : (
-                                                                cell(row[column.name], t("bench.emptyValue"))
+                                                                cell(
+                                                                    row[column.name],
+                                                                    t("bench.emptyValue")
+                                                                )
                                                             )}
                                                         </td>
                                                     );
@@ -1007,7 +1018,9 @@ function RowsPanel({
                                             >
                                                 <Copy className="size-3.5" />
                                                 {picked.size > 1
-                                                    ? t("bench.copyRowsJson", { count: picked.size })
+                                                    ? t("bench.copyRowsJson", {
+                                                          count: picked.size
+                                                      })
                                                     : t("bench.copyRowJson")}
                                             </ContextMenuItem>
                                             <ContextMenuItem
@@ -1078,7 +1091,9 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                         {value.type}
-                        {value.ttl === null ? "" : t("bench.expires", { seconds: Math.round(value.ttl / 1000) })}
+                        {value.ttl === null
+                            ? ""
+                            : t("bench.expires", { seconds: Math.round(value.ttl / 1000) })}
                     </span>
                     <Button size="sm" variant="ghost" onClick={onClose}>
                         {t("tabs.close")}
@@ -1114,9 +1129,7 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </p>
                 )}
                 {value.truncated && (
-                    <p className="text-xs text-muted-foreground">
-                        {t("bench.truncated")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("bench.truncated")}</p>
                 )}
             </CardBody>
         </Card>
@@ -1209,11 +1222,15 @@ function QueryPanel({
                     )}
                     {t("bench.run")}
                 </Button>
-                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>{/* i18n-ignore a key chord */}
+                {/* i18n-ignore a key chord */}
+                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -1230,10 +1247,21 @@ function QueryPanel({
                             </span>
                             <span className="shrink-0">
                                 {result.affected === null
-                                    ? t("bench.resultRows", { count: result.rows.length, ms: result.ms })
-                                    : t("bench.resultChanged", { count: result.affected, ms: result.ms })}
+                                    ? t("bench.resultRows", {
+                                          count: result.rows.length,
+                                          ms: result.ms
+                                      })
+                                    : t("bench.resultChanged", {
+                                          count: result.affected,
+                                          ms: result.ms
+                                      })}
                             </span>
                         </div>
+                        {result.note && (
+                            <p className="border-b border-border px-3 py-1 text-xs text-warning">
+                                {dataText(t, result.note)}
+                            </p>
+                        )}
                         {result.rows.length > 0 && (
                             <div className="max-h-72 overflow-auto overscroll-contain">
                                 <table className="w-full text-xs">
