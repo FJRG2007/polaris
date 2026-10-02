@@ -37,6 +37,8 @@ pointing here. The guard reads:
 | `POLARIS_PUBLIC_URL` | Fallback Polaris base URL for a login redirect, used only when the route's rule carries none (see below) | - |
 | `POLARIS_EDGE_COOKIE` | Edge-token cookie name | `polaris.edge` |
 | `POLARIS_EDGE_GUARD_PORT` | Listen port | `8080` |
+| `POLARIS_EDGE_INTEL_FILE` | Path to the bans/Tor-exits/revocations snapshot Polaris pushes over SSH (see below) | `/edge-intel/waf-intel.json` |
+| `POLARIS_CONTROL_PLANE_URL` | Address this container reaches Polaris on directly, to probe whether it is up - set only where the two share a network. Falls back to the route's own login address, which from beside Polaris is often unreachable (no hairpin NAT, split DNS) | - |
 
 ## Where the login lives
 
