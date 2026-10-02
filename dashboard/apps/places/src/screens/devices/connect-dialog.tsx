@@ -45,7 +45,15 @@ import type { DeviceView } from "../../lib/device-kinds";
 import * as registry from "../../lib/device-connections";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceAccountView } from "../../lib/device-accounts";
-import { Check, ChevronRight, ExternalLink, Loader2, RefreshCw, Search, Upload } from "lucide-react";
+import {
+    Check,
+    ChevronRight,
+    ExternalLink,
+    Loader2,
+    RefreshCw,
+    Search,
+    Upload
+} from "lucide-react";
 import {
     Badge,
     Button,
