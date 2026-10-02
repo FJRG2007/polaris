@@ -76,7 +76,7 @@ export function readPrivateKey(text: string, passphrase: string | null): ReadKey
         return finish(converted, null, true);
     }
     if (shape.format === "pkcs8") {
-        return finish(opensshFromPkcs8(key, passphrase), null, true);
+        return finish(opensshFromPkcs8(key, passphrase, shape.encrypted), null, true);
     }
     return finish(key, shape.encrypted ? passphrase : null, false);
 }
@@ -217,14 +217,16 @@ const CURVES: Readonly<Record<string, "nistp256" | "nistp384" | "nistp521">> = {
     "P-521": "nistp521"
 };
 
-function opensshFromPkcs8(key: string, passphrase: string | null): string {
+function opensshFromPkcs8(key: string, passphrase: string | null, encrypted: boolean): string {
     let object: crypto.KeyObject;
     try {
         object = crypto.createPrivateKey(passphrase ? { key, passphrase } : { key });
     } catch (error) {
         const code = (error as { code?: string }).code ?? "";
         const message = (error as Error).message ?? "";
-        if (/passphrase|decrypt|bad decrypt/i.test(`${code} ${message}`)) {
+        // A wrong passphrase leaves valid CBC padding about one time in 256, and
+        // OpenSSL then reports the garbage as an unsupported key, not a bad decrypt.
+        if (encrypted || /passphrase|decrypt|bad decrypt/i.test(`${code} ${message}`)) {
             throw new SshKeyError(
                 passphrase ? SSH_KEY_REFUSALS.wrongPassphrase : SSH_KEY_REFUSALS.locked
             );

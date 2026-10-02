@@ -150,6 +150,26 @@ describe("keys converted to OpenSSH", () => {
         expect(() => readPrivateKey(pem, "nope")).toThrow(SSH_KEY_REFUSALS.wrongPassphrase);
     });
 
+    it("calls a wrong passphrase wrong even when OpenSSL calls it unsupported", () => {
+        const { privateKey } = crypto.generateKeyPairSync("ed25519");
+        const pem = privateKey
+            .export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase: "s3cret" })
+            .toString();
+        // About one wrong passphrase in 256 decrypts to valid padding, and OpenSSL
+        // then reports an unsupported key rather than a bad decrypt.
+        let unpadded: string | null = null;
+        for (let i = 0; i < 10_000 && unpadded === null; i++) {
+            try {
+                crypto.createPrivateKey({ key: pem, passphrase: `nope${i}` });
+            } catch (error) {
+                if ((error as { code?: string }).code !== "ERR_OSSL_BAD_DECRYPT")
+                    unpadded = `nope${i}`;
+            }
+        }
+        expect(unpadded).not.toBeNull();
+        expect(() => readPrivateKey(pem, unpadded)).toThrow(SSH_KEY_REFUSALS.wrongPassphrase);
+    });
+
     it("converts PuTTY's own RSA files, locked and not", () => {
         const plain = readFileSync(join(fixtures, "ppk_rsa"), "utf8");
         const locked = readFileSync(join(fixtures, "ppk_rsa_enc"), "utf8");
