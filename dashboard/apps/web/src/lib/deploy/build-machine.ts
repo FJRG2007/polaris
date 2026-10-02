@@ -8,7 +8,9 @@
  * the deploy package).
  *
  * Stored as `buildOn` in the service's build settings: "local" for the Polaris
- * host, a server's id, or nothing for where it runs. Only a build from source has
+ * host, a server's id, `pool:<id>` for the machine a runner pool runs on, or
+ * nothing for where it runs. A pool is followed rather than copied: move the pool
+ * to another server and the builds go with it. Only a build from source has
  * anything to build; an image source is pulled where it runs whatever this says.
  */
 
@@ -18,7 +20,17 @@ import type { TargetRow } from "./runtime";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 /** The choice as it is sent and stored: nothing, the Polaris host, or a server. */
-export const buildOnSchema = z.union([z.literal(""), z.literal("local"), z.string().uuid()]);
+export const buildOnSchema = z.union([
+    z.literal(""),
+    z.literal("local"),
+    z.string().uuid(),
+    z.string().regex(/^pool:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+]);
+
+/** The pool a choice names, or null when it names none. */
+function poolOf(choice: string): string | null {
+    return choice.startsWith("pool:") ? choice.slice(5) : null;
+}
 export type BuildOn = z.infer<typeof buildOnSchema>;
 
 /** How the log names the Polaris host. */
@@ -63,6 +75,31 @@ export async function resolveBuildMachine(
     if (!choice) return null;
     const local = runsLocally(app.target);
     const runsOn = local ? POLARIS_HOST : app.target.name;
+    const poolId = poolOf(choice);
+    if (poolId) {
+        const pool = await prisma.runnerPool.findFirst({
+            where: { id: poolId, ownerId },
+            select: { name: true, hostId: true, host: { select: { name: true } } }
+        });
+        if (!pool) {
+            throw new Error("The runner pool this service builds on no longer exists. Choose another under its settings.");
+        }
+        const name = `${pool.name} (${pool.host?.name ?? POLARIS_HOST})`;
+        if (!pool.hostId) {
+            if (local) return null;
+            return {
+                target: { id: "build:local", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "" },
+                name,
+                runsOn
+            };
+        }
+        if (!local && app.target.hostId === pool.hostId) return null;
+        return {
+            target: { id: `build:${pool.hostId}`, kind: "host", hostId: pool.hostId, runtime: "compose", proxyNetwork: "" },
+            name,
+            runsOn
+        };
+    }
     if (choice === "local") {
         if (local) return null;
         return {
@@ -114,6 +151,17 @@ export async function buildMachineOptions(applicationId: string, ownerId: string
         if (!local && host.id === app.target.hostId) continue;
         options.push({ value: host.id, label: host.name });
     }
+    const pools = await prisma.runnerPool.findMany({
+        where: { ownerId },
+        select: { id: true, name: true, host: { select: { name: true } } },
+        orderBy: { name: "asc" }
+    });
+    for (const pool of pools) {
+        options.push({
+            value: `pool:${pool.id}`,
+            label: t("buildMachine.pool", { name: pool.name, server: pool.host?.name ?? t("buildMachine.polarisHost") })
+        });
+    }
     const value = storedBuildOn(app.buildConfig);
     return {
         value: options.some((option) => option.value === value) ? value : "",
@@ -129,7 +177,11 @@ export async function setBuildMachine(applicationId: string, ownerId: string, va
         select: { buildConfig: true }
     });
     if (!app) throw new Error("Application not found");
-    if (value && value !== "local") {
+    const poolId = poolOf(value);
+    if (poolId) {
+        const pool = await prisma.runnerPool.findFirst({ where: { id: poolId, ownerId }, select: { id: true } });
+        if (!pool) throw new Error("That runner pool does not exist");
+    } else if (value && value !== "local") {
         const host = await prisma.host.findFirst({ where: { id: value, ownerId }, select: { id: true } });
         if (!host) throw new Error("That server is not connected");
     }

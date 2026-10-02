@@ -82,6 +82,9 @@ export interface ComposeSpecService {
     /** Other names the container answers to on every network it joins (see
      *  `AppDeployPlan.alias`). */
     readonly aliases?: string[];
+    /** Further names it answers to on one network only, keyed by that network: the
+     *  names an operator's own services call it by on a network of theirs. */
+    readonly networkAliases?: Readonly<Record<string, readonly string[]>>;
     /** Names this container can reach that DNS cannot answer, as `name:address`.
      *  One of them is always here - see `HOST_GATEWAY`. */
     readonly extraHosts?: string[];
@@ -169,6 +172,23 @@ export function forCompose(spec: ComposeSpec): ComposeSpec {
     };
 }
 
+/**
+ * The per-network names a plan asks for, kept to the networks the service really
+ * joins - a name for a network it is not on would be refused by the daemon - and
+ * left out entirely when there are none, so a spec for every other service is the
+ * same bytes it always was.
+ */
+function networkAliasesFor(
+    asked: AppDeployPlan["networkAliases"],
+    networks: readonly string[]
+): Pick<ComposeSpecService, "networkAliases"> {
+    if (!asked) return {};
+    const kept = Object.fromEntries(
+        Object.entries(asked).filter(([net, names]) => networks.includes(net) && names.length > 0)
+    );
+    return Object.keys(kept).length > 0 ? { networkAliases: kept } : {};
+}
+
 /** Build the structured spec for an application deployment. */
 export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: string): ComposeSpec {
     const joined = joinedNetworks(plan.networks, network);
@@ -182,6 +202,13 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
         edge: plan.edge,
         replicas: plan.replicas
     });
+    // A release changing over beside the one it replaces mounts the named volumes
+    // the service has always had - created by its own project, so named after it -
+    // by their exact names, declared external: its own project would otherwise be
+    // handed a fresh, empty volume of the same name. Binds and shares are paths on
+    // the machine and are the same files from any project.
+    const shared = plan.sharedVolumesFrom;
+    const volumeName = (source: string) => (shared ? `${shared}_${source}` : source);
     const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
     // The planned networks plus any extra networks the plan requests (deduped, in
     // order, so the proxy network stays first where the service is on it). Both the
@@ -222,7 +249,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                     }))
                 ],
                 volumes: plan.volumes.map((volume) => ({
-                    source: volume.source,
+                    source: volume.kind === "volume" ? volumeName(volume.source) : volume.source,
                     target: volume.mountPath,
                     kind: volume.kind
                 })),
@@ -230,6 +257,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 ...(plan.command && plan.command.length > 0 ? { command: [...plan.command] } : {}),
                 networks,
                 ...(plan.alias && plan.alias !== plan.ref.name ? { aliases: [plan.alias] } : {}),
+                ...networkAliasesFor(plan.networkAliases, networks),
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped",
                 replicas: plan.replicas > 1 ? plan.replicas : undefined,
@@ -244,7 +272,8 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                     : undefined
             }
         ],
-        volumes: namedVolumes,
+        volumes: shared ? [] : namedVolumes,
+        ...(shared && namedVolumes.length > 0 ? { externalVolumes: namedVolumes.map(volumeName) } : {}),
         networks
     };
 }
@@ -316,9 +345,10 @@ function numberedNames(name: string, count: number, tag: string): string[] {
  * A release that stands beside the one it replaces runs under names of its own and
  * answers to the service's names by alias. Each of its copies also answers to the
  * matching copy name of every alias - its second copy to the service's own second
- * copy name - so the edge, which dials the service's copies by those names, finds
- * the new copies beside the old ones and only the new ones once the old are gone,
- * with no route rewritten in between.
+ * copy name - so whatever reaches the service's copies by those names (another
+ * service, an edge that still holds an older file) finds the new copies beside the
+ * old ones and only the new ones once the old are gone. The edge itself dials the
+ * serving release's own copy names, switched when the release is promoted.
  *
  * When it runs fewer copies than the route still dials (`dialled`: the release it
  * replaces ran more), the copy names past its own count are answered as well, by
@@ -392,17 +422,22 @@ export function deployBlockLines(
  * network, the services beside it on their environment's own. The daemon renders
  * the same.
  */
-export function serviceNetworkLines(service: Pick<ComposeSpecService, "networks" | "aliases">): string[] {
+export function serviceNetworkLines(
+    service: Pick<ComposeSpecService, "networks" | "aliases" | "networkAliases">
+): string[] {
     if (service.networks.length === 0) return [];
     const aliases = service.aliases ?? [];
-    if (aliases.length === 0) return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
+    const own = service.networkAliases ?? {};
+    if (aliases.length === 0 && Object.keys(own).length === 0) {
+        return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
+    }
     return [
         "    networks:",
-        ...service.networks.flatMap((net) => [
-            `      ${net}:`,
-            "        aliases:",
-            ...aliases.map((alias) => `          - ${yamlQuote(alias)}`)
-        ])
+        ...service.networks.flatMap((net) => {
+            const names = [...aliases, ...(own[net] ?? [])];
+            if (names.length === 0) return [`      ${net}: {}`];
+            return [`      ${net}:`, "        aliases:", ...names.map((alias) => `          - ${yamlQuote(alias)}`)];
+        })
     ];
 }
 

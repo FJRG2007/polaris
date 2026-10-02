@@ -215,11 +215,20 @@
     "issues": {
         "notAPrefix": "Eso no es un prefijo",
         "nameRequired": "Ponle un nombre",
-        "repoRequired": "Polaris necesita el repositorio"
+        "repoRequired": "Polaris necesita el repositorio",
+        "networkName": "Un nombre de red lleva letras, números, puntos, guiones y _",
+        "networkReserved": "Esa red es de Docker o del propio Polaris",
+        "networkAlias": "Un nombre en una red lleva letras, números y guiones, no en los extremos",
+        "networkTwice": "Pon cada red una sola vez",
+        "networkTooMany": "Hasta 8 redes, con hasta 8 nombres cada una"
     },
     "external": {
         "unknownAccount": "Cuenta desconocida",
         "moveOutNeedsVariables": "Copiar las variables requiere acceso a ellas. Muévelo sin ellas o pide ese acceso.",
         "moveHomeNeedsVariables": "Copiar las variables requiere acceso a ellas. Tráelo sin ellas o pide ese acceso."
+    },
+    "behaviour": {
+        "loadFailed": "No se pudo leer cómo se despliega este servicio",
+        "saveFailed": "No se pudo guardar cómo se despliega este servicio"
     }
 }

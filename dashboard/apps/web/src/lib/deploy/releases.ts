@@ -91,23 +91,26 @@ export function keepsReleases(app: {
  * Whether a deploy of this service starts the new version beside the running one
  * and changes over once it is serving, instead of replacing it in place.
  *
- * The new release runs in a project of its own under a name of its own, and also
- * answers to the service's own name on the proxy network - which is how the edge,
- * a tunnel and every other service find it - so the change-over moves no address
- * at all. The one it replaced is taken down once the new one is serving. With
- * several copies, every copy of the new release answers to the service's name for
- * that copy as well (see `expandReplicas`), so the edge's route - which names each
- * copy - reaches the new copies the same way, keeping its sticky cookie and health
- * path, and is never rewritten for it. Never rewritten on purpose: a route that
- * named the new release's own containers would need the edge to take a new file
- * before the old copies went, and an edge frozen on its last good configuration by
- * one bad file elsewhere would go on dialling copies that no longer exist.
+ * The new release runs in a project of its own under a name of its own, beside
+ * the one serving. It also answers to the service's own name on the networks it
+ * joins, which is how every other service and a tunnel connector reach it, so for
+ * them the change-over moves no address. The edge is different: it dials the
+ * serving release by its own container names (`edgeDialName`), and the new one is
+ * written into its route only once it is promoted - after it came up, passed its
+ * healthcheck and opened its port. So the old release takes every request from the
+ * edge until then, the switch is one atomic file write, and the old one is drained
+ * and taken down only once the edge has been told (see `promoteDeployment`). With
+ * several copies the route names each copy of the serving release, keeping its
+ * sticky cookie and health path. A release that does not come up is taken down and
+ * the route never named it.
  *
- * Only where two copies can run at once without stepping on each other: no
- * volume (both would hold the same files), nothing published on the host (both
- * would want the same port), and not a compose file of the owner's own, whose
- * names are its own business. A service that keeps its releases already runs them
- * side by side.
+ * Only where two copies can run at once without stepping on each other: nothing
+ * published on the host (both would want the same port), not a compose file of
+ * the owner's own, whose names are its own business, and no volume unless the
+ * owner said two copies may share them for the seconds of the change-over
+ * (`overlapVolumes`) - a program that locks its data directory, or a database file
+ * one process writes, would fail or be corrupted by a second copy. A service that
+ * keeps its releases already runs them side by side.
  *
  * And only where the edge in front of it dials the service by name from routes
  * Polaris writes (`edge`). This host's always does. Another server's does once it
@@ -120,31 +123,105 @@ export function keepsReleases(app: {
  * Polaris is dialled on the host port that server publishes, which is the
  * published-port case already refused here.
  */
-export function runsCutover(
-    app: {
-        keepReleases: boolean;
-        publishPort: boolean;
-        sourceType: string;
-        sourceConfig: string;
-        volumes: readonly unknown[];
-        target: { runtime: string };
-    },
-    edge: { readonly followsPushedRoutes: boolean }
-): boolean {
-    if (
-        app.keepReleases ||
-        app.publishPort ||
-        app.sourceType === "compose" ||
-        !edge.followsPushedRoutes
-    )
-        return false;
-    if (app.volumes.length > 0 || app.target.runtime !== "compose") return false;
+export function runsCutover(app: CutoverSubject, edge: { readonly followsPushedRoutes: boolean }): boolean {
+    return !app.keepReleases && app.target.runtime === "compose" && restartReasons(app, edge).length === 0;
+}
+
+/** What `runsCutover` and `deployStrategy` read about a service. */
+export interface CutoverSubject {
+    readonly id?: string;
+    readonly keepReleases: boolean;
+    readonly publishPort: boolean;
+    readonly sourceType: string;
+    readonly sourceConfig: string;
+    readonly volumes: readonly { readonly name?: string }[];
+    /** Whether two copies may share the volumes for the change-over. */
+    readonly overlapVolumes?: boolean;
+    readonly target: { readonly runtime: string; readonly kind?: string };
+}
+
+/** Why a deploy stops the running version before it starts the new one. */
+export type RestartReason =
+    | { readonly code: "hostPort"; readonly port: number; readonly protocol: "tcp" | "udp" }
+    | { readonly code: "volumes"; readonly names: readonly string[] }
+    | { readonly code: "compose" }
+    | { readonly code: "edge" }
+    | { readonly code: "history" }
+    | { readonly code: "unreadable" };
+
+/**
+ * How a deploy of this service replaces the running version, as the screen says it:
+ *
+ * - `overlap`: the new version starts beside the old one, the edge is switched to
+ *   it once it serves, and the old one is drained and stopped.
+ * - `kept`: every release runs in its own project on its own port, and the edge is
+ *   re-pointed at the newest once it serves.
+ * - `swarm`: the engine replaces it start-first and rolls back by itself.
+ * - `restart`: stopped, then started - with every reason it has to be.
+ */
+export type DeployStrategy =
+    | { readonly mode: "overlap" | "kept" | "swarm" }
+    | { readonly mode: "restart"; readonly reasons: readonly RestartReason[] };
+
+/**
+ * Every reason a deploy of this service has to stop the running version first.
+ * Empty means nothing stops two copies running at once. Read by the deploy, which
+ * acts on it, and by the screen, which says it - so the two never disagree.
+ */
+export function restartReasons(
+    app: CutoverSubject,
+    edge: { readonly followsPushedRoutes: boolean },
+    hostPortOf: (id: string) => number = () => 0
+): RestartReason[] {
+    const reasons: RestartReason[] = [];
+    let source: { hostPort?: unknown; hostProtocol?: unknown; extraPorts?: unknown };
     try {
-        const source = JSON.parse(app.sourceConfig) as { extraPorts?: unknown };
-        return !Array.isArray(source.extraPorts) || source.extraPorts.length === 0;
+        source = JSON.parse(app.sourceConfig) as typeof source;
     } catch {
-        return false;
+        return [{ code: "unreadable" }];
     }
+    if (app.publishPort) {
+        reasons.push({
+            code: "hostPort",
+            port: typeof source.hostPort === "number" ? source.hostPort : hostPortOf(app.id ?? ""),
+            protocol: source.hostProtocol === "udp" ? "udp" : "tcp"
+        });
+    }
+    if (Array.isArray(source.extraPorts)) {
+        for (const entry of source.extraPorts as { host?: unknown; protocol?: unknown }[]) {
+            if (typeof entry?.host !== "number") continue;
+            reasons.push({ code: "hostPort", port: entry.host, protocol: entry.protocol === "udp" ? "udp" : "tcp" });
+        }
+    }
+    if (app.sourceType === "compose") reasons.push({ code: "compose" });
+    // Swarm never lets two tasks share a volume (`forSwarm`), whatever the setting.
+    if (app.volumes.length > 0 && (!app.overlapVolumes || app.target.runtime !== "compose")) {
+        reasons.push({ code: "volumes", names: app.volumes.map((volume) => volume.name ?? "").filter(Boolean) });
+    }
+    if (!edge.followsPushedRoutes && app.target.runtime === "compose") reasons.push({ code: "edge" });
+    return reasons;
+}
+
+/** How a deploy of this service replaces what runs - see `DeployStrategy`. */
+export function deployStrategy(
+    app: CutoverSubject,
+    edge: { readonly followsPushedRoutes: boolean },
+    hostPortOf?: (id: string) => number
+): DeployStrategy {
+    if (app.target.runtime === "swarm") {
+        const volumes = app.volumes.length > 0;
+        return volumes
+            ? { mode: "restart", reasons: restartReasons({ ...app, publishPort: false, sourceConfig: "{}" }, edge) }
+            : { mode: "swarm" };
+    }
+    if (app.keepReleases) {
+        if (keepsReleases({ ...app, target: { kind: app.target.kind ?? "local" } })) return { mode: "kept" };
+    }
+    const reasons = restartReasons(app, edge, hostPortOf);
+    if (reasons.length === 0 && !app.keepReleases) return { mode: "overlap" };
+    // A service set to keep its releases where it cannot (another server) is
+    // replaced in place, and says that is why when nothing else does.
+    return { mode: "restart", reasons: reasons.length > 0 ? reasons : [{ code: "history" }] };
 }
 
 /**
@@ -159,6 +236,24 @@ export function markerOf(deployment: {
     cutover?: boolean;
 }): string {
     return deployment.cutover ? releaseMarker({ id: deployment.id }) : releaseMarker(deployment);
+}
+
+/**
+ * The container the edge dials for a service: the one the release serving it runs
+ * under. A change-over release is dialled by its own name, not by the service's
+ * name it also answers to - that alias is live from the moment its container
+ * starts, so dialling it would send visitors to a version that has not proved it
+ * serves yet. Its own name is only written into the route when it is promoted,
+ * after it came up and opened its port, which is what makes the switch a
+ * switch: the old release takes every request until then, and none after the edge
+ * takes the new file. The alias stays for everything that reaches the service
+ * from inside (another service, a tunnel connector), which is never re-pointed.
+ */
+export function edgeDialName(
+    base: ReleaseRef,
+    current: { readonly id: string; readonly cutover: boolean } | null | undefined
+): string {
+    return current?.cutover ? releaseRef(base, markerOf({ id: current.id, cutover: true })).name : base.name;
 }
 
 /**

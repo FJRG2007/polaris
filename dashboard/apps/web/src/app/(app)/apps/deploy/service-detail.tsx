@@ -34,6 +34,7 @@ import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
+import { DeployBehaviourSection } from "./deploy-behaviour-section";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
@@ -412,7 +413,8 @@ function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: Display
                 ? t("deployments.viaPush", { source })
                 : t("deployments.via", { source });
     const took = deployment.durationMs !== null ? t("deployments.took", { duration: duration(deployment.durationMs) }) : "";
-    return `${relativeTime(deployment.createdAt, format)}${by}${via}${took}`;
+    const built = deployment.builtOn ? t("deployments.builtOn", { machine: deployment.builtOn }) : "";
+    return `${relativeTime(deployment.createdAt, format)}${by}${via}${built}${took}`;
 }
 
 /** A deploy's length the way a person says it: "48s", "3m 12s". */
@@ -3508,6 +3510,8 @@ function SettingsTab({
             {can("service.configure") && <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />}
 
             {can("service.configure") && <BuildMachineSection applicationId={app.id} />}
+
+            <DeployBehaviourSection applicationId={app.id} canConfigure={can("service.configure")} />
 
             {can("service.configure") && <ScalingSection applicationId={app.id} onChanged={onChanged} />}
 

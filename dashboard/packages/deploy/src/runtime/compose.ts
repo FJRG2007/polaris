@@ -11,9 +11,9 @@ import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
-import { tailIntoLog, waitUntilServing } from "./readiness.js";
-import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
+import { tailIntoLog, waitUntilListening, waitUntilServing } from "./readiness.js";
+import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
 import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, expandReplicas } from "../compose-spec.js";
 import type {
@@ -222,7 +222,29 @@ export class ComposeRuntime implements RuntimeDriver {
                 return fail(ctx, ready.reason);
             }
         }
-        waited();
+        // Running is not serving: the edge is only moved onto a release that
+        // accepts connections on the port it will be dialled on, so a version that
+        // is still booting - or bound to localhost - never answers a visitor.
+        const port = effectivePlan.awaitPort ? effectivePlan.expose?.container : undefined;
+        let unchecked = false;
+        if (port !== undefined) {
+            for (const service of spec.services) {
+                const listening = await waitUntilListening(ctx, service.name, port);
+                if (!listening.ok) {
+                    waited("it did not");
+                    await tailIntoLog(ctx, service.name);
+                    return fail(ctx, listening.reason);
+                }
+                if ("unchecked" in listening) unchecked = true;
+            }
+        }
+        waited(
+            port === undefined
+                ? undefined
+                : unchecked
+                  ? `its image has no way to show its sockets, so port ${port} was not checked`
+                  : `listening on port ${port}`
+        );
         // The release landed, so whatever it replaced is unreferenced from this
         // moment. Handed back now rather than at a threshold: waiting means
         // carrying every superseded image until the machine is nearly full,

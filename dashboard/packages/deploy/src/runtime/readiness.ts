@@ -105,6 +105,93 @@ export async function waitUntilServing(
     }
 }
 
+/** How long a release has to start listening on its port, on top of coming up. A
+ *  cold JVM or a first migration can take a couple of minutes; a wedge cannot hide
+ *  behind this for longer. */
+export const PORT_DEADLINE_MS = 3 * 60_000;
+
+/** What the container's own socket tables say about one port. */
+export type PortState = "listening" | "loopback" | "closed";
+
+/** Hex `0100007F` / `00000000000000000000000001000000` -> whether it is a loopback
+ *  address, as `/proc/net/tcp{,6}` writes them (each 32-bit word little-endian). */
+function isLoopbackHex(address: string): boolean {
+    if (address.length === 8) return address.endsWith("7F");
+    if (address.length === 32) {
+        // ::1, and ::ffff:127.x.x.x (an IPv4 loopback seen through the v6 table).
+        if (address === "00000000000000000000000001000000") return true;
+        return address.startsWith("0000000000000000FFFF0000") && address.endsWith("7F");
+    }
+    return false;
+}
+
+/**
+ * Whether `/proc/net/tcp` and `/proc/net/tcp6` (concatenated, as `cat` prints them)
+ * hold a listening socket on `port` that a peer on the network can reach. A socket
+ * bound to loopback only is reported apart, because it is the one failure that
+ * looks like success from inside: the program says it is serving, and nothing
+ * outside the container can open it.
+ */
+export function portStateFrom(table: string, port: number): PortState {
+    const wanted = port.toString(16).toUpperCase().padStart(4, "0");
+    let loopback = false;
+    for (const line of table.split("\n")) {
+        const fields = line.trim().split(/\s+/);
+        // sl local_address rem_address st ...; 0A is LISTEN.
+        if (fields.length < 4 || fields[3] !== "0A") continue;
+        const [address, hexPort] = (fields[1] ?? "").split(":");
+        if (!address || hexPort?.toUpperCase() !== wanted) continue;
+        if (!isLoopbackHex(address.toUpperCase())) return "listening";
+        loopback = true;
+    }
+    return loopback ? "loopback" : "closed";
+}
+
+export type PortReadiness = Readiness | { readonly ok: true; readonly unchecked: true };
+
+/**
+ * Wait until `container` accepts connections on `port`, read from the container's
+ * own socket tables - no network position needed, so it is the same check on this
+ * host and on a server reached over SSH, and it needs nothing in the image beyond
+ * `cat`. An image without one (distroless, scratch) cannot be looked into; that is
+ * said, and the release is taken as up on the checks it has already passed.
+ */
+export async function waitUntilListening(
+    ctx: RuntimeContext,
+    container: string,
+    port: number,
+    clock: { now: () => number; sleep: (ms: number) => Promise<void> } = {
+        now: () => Date.now(),
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    },
+    deadlineMs = PORT_DEADLINE_MS
+): Promise<PortReadiness> {
+    if (typeof ctx.ports.runIn !== "function") return { ok: true, unchecked: true };
+    const deadline = clock.now() + deadlineMs;
+    let last: PortState = "closed";
+    for (;;) {
+        const read = await Promise.resolve()
+            .then(() => ctx.ports.runIn(container, ["cat", "/proc/net/tcp", "/proc/net/tcp6"]))
+            .catch(() => null);
+        // `cat` exits 1 when one of the two tables is missing (no IPv6) but still
+        // prints the other, so the output is what decides, not the code.
+        if (!read || !/\blocal_address\b/.test(read.output)) {
+            return { ok: true, unchecked: true };
+        }
+        last = portStateFrom(read.output, port);
+        if (last === "listening") return { ok: true };
+        if (clock.now() >= deadline) break;
+        await clock.sleep(POLL_MS);
+    }
+    return {
+        ok: false,
+        reason:
+            last === "loopback"
+                ? `the new version listens on port ${port} on localhost only, so nothing outside its container can reach it - have it listen on 0.0.0.0`
+                : `the new version did not start listening on port ${port} within ${Math.round(deadlineMs / 1000)} seconds - check the port it serves on`
+    };
+}
+
 /** The last lines a container printed, into the deploy log, so a release that
  *  did not come up says why in the place somebody is already reading. */
 export async function tailIntoLog(ctx: RuntimeContext, container: string, lines = 40): Promise<void> {

@@ -42,5 +42,11 @@
         "give": "Could not give access",
         "notAccess": "That is not access on this server",
         "remove": "Could not remove that access"
+    },
+    "deployGap": {
+        "none": "Redeploy has no downtime: the new version takes over once it answers.",
+        "hostPort": "Redeploy restarts it: it binds port {port}/{protocol} on the server, which two versions cannot share.",
+        "volumes": "Redeploy restarts it: it keeps data on {names}, which two copies must not write at once.",
+        "other": "Redeploy restarts it. Its service settings in Deploy say why."
     }
 }
