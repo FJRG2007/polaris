@@ -121,6 +121,38 @@ export function parseInventory(output: string): InventoryItem[] {
 }
 
 /**
+ * Where 1.21.5 and later keep what a player wears and holds in the offhand,
+ * apart from `Inventory`: each member of `equipment`, and the slot it is
+ * everywhere else.
+ */
+export const EQUIPMENT_SLOTS: Readonly<Record<string, number>> = {
+    head: 103,
+    chest: 102,
+    legs: 101,
+    feet: 100,
+    offhand: -106
+};
+
+/** The stacks in a `data get entity ... equipment` reply, each in the slot it is
+ *  everywhere else. Empty for anything that is not that reply. */
+export function parseEquipment(output: string): InventoryItem[] {
+    return (
+        readFirstAccepted(dataReplyValue(output), "{", (compound) => {
+            const items: InventoryItem[] = [];
+            for (const field of splitTopLevel(compound.slice(1, -1))) {
+                const colon = topLevelColon(field);
+                if (colon === -1) continue;
+                const slot = EQUIPMENT_SLOTS[unquote(field.slice(0, colon))];
+                if (slot === undefined) continue;
+                const item = readItem(field.slice(colon + 1).trim());
+                if (item) items.push({ ...item, slot });
+            }
+            return items;
+        }) ?? []
+    );
+}
+
+/**
  * The one stack in a `data get entity ... Inventory[{Slot:Nb}]` reply.
  *
  * A single slot rather than the whole bag, which is what a write asks for before

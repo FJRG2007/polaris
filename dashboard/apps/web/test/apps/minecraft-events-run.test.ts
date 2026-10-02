@@ -5939,6 +5939,45 @@ describe("players' own things through an arena", () => {
         expect(stashRows.size).toBe(0);
     });
 
+    it("never counts or plays somebody kept out who could not be sent back, and still sends them home at the end", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        const sayAll = server.sayAll;
+        let gone = false;
+        // Off the server the moment she is moved in: her bag cannot be looked
+        // at again, and she cannot be sent back.
+        server.sayAll = async (lines) => {
+            await sayAll(lines);
+            if (!gone && lines.some((line) => / tp Ana /.test(line))) {
+                gone = true;
+                world.online = ["Ben"];
+            }
+        };
+        try {
+            setUp([duelOf()]);
+            await joinAndStart("duel");
+        } finally {
+            server.sayAll = sayAll;
+        }
+        expect(gone).toBe(true);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]).toMatchObject({
+            outcome: "cancelled",
+            keptOut: [{ name: "Ana", why: "unread" }]
+        });
+        expect(after.arenaLeftovers.flatMap((one) => one.entrants.map((e) => e.name))).toEqual([
+            "Ana"
+        ]);
+        // Back on: sent home by the sweep, with everything.
+        world.online = ["Ana", "Ben"];
+        await events.sweepEvents();
+        expect(world.inv.Ana).toEqual(ana);
+        expect(state().arenaLeftovers).toEqual([]);
+        expect(stashRows.size).toBe(0);
+    });
+
     it("gives back a stash kept in barrels before this, and takes away only the blocks it placed", async () => {
         world.online = ["Ana"];
         world.inv = { Ana: new Map() };

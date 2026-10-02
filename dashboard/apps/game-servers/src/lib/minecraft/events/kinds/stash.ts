@@ -40,6 +40,7 @@ import { z } from "zod";
 import * as storage from "../../stack-storage";
 import type { InventoryItem } from "../../inventory";
 import { itemArgument, replaceSlot } from "../../item-argument";
+import { readInt, splitTopLevel, topLevelColon, unquote } from "../../snbt";
 import { COMMAND_BYTES_MAX, commandBytes } from "../../command-size";
 
 const pointSchema = z.object({ x: z.number().int(), y: z.number().int(), z: z.number().int() });
@@ -100,7 +101,26 @@ export const SLOTS: readonly number[] = [
 /** The event's own kit: the event's, cleared at the end - never kept, and never
  *  in the way of anybody coming in. */
 export function isKit(item: InventoryItem): boolean {
-    return item.data?.snbt.includes("polaris_event") ?? false;
+    if (!item.data) return false;
+    const root = fieldsOf(item.data.snbt);
+    const marked =
+        item.data.era === "components"
+            ? fieldsOf(root.get("minecraft:custom_data") ?? root.get("custom_data") ?? "")
+            : root;
+    return readInt(marked.get("polaris_event")) === 1;
+}
+
+/** A compound's own members by key, its nested ones left whole. */
+function fieldsOf(snbt: string): Map<string, string> {
+    const fields = new Map<string, string>();
+    const text = snbt.trim();
+    if (!text.startsWith("{") || !text.endsWith("}")) return fields;
+    for (const field of splitTopLevel(text.slice(1, -1))) {
+        const colon = topLevelColon(field);
+        if (colon === -1) continue;
+        fields.set(unquote(field.slice(0, colon)), field.slice(colon + 1).trim());
+    }
+    return fields;
 }
 
 /** A stack as the game holds an item - `{id, count, components}` - for building

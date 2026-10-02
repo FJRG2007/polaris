@@ -41,6 +41,40 @@ describe("keeping a player's things", () => {
         expect(stash.takeable(item(150, "curios:ring"))).toBe(false);
     });
 
+    it("knows the kit by its marker, never by a name that spells it", () => {
+        expect(
+            stash.isKit(
+                item(0, "minecraft:stone_sword", '{"minecraft:custom_data": {polaris_event: 1b}}')
+            )
+        ).toBe(true);
+        expect(
+            stash.isKit(
+                item(0, "minecraft:iron_shovel", "{polaris_event: 1b, CanDestroy: []}", "tag")
+            )
+        ).toBe(true);
+        expect(
+            stash.isKit(
+                item(
+                    0,
+                    "minecraft:diamond_chestplate",
+                    `{"minecraft:custom_name": '"polaris_event"'}`
+                )
+            )
+        ).toBe(false);
+        expect(
+            stash.isKit(
+                item(
+                    0,
+                    "minecraft:diamond_chestplate",
+                    '{"minecraft:custom_data": {note: "polaris_event: 1b"}}'
+                )
+            )
+        ).toBe(false);
+        expect(
+            stash.isKit(item(0, "minecraft:stone", "{display: {Name: '\"polaris_event\"'}}", "tag"))
+        ).toBe(false);
+    });
+
     it("writes a stack taken into a slot nobody is owed yet", () => {
         expect(stash.slotFor(102, new Set([0]))).toBe(102);
         expect(stash.slotFor(102, new Set([102, 9]))).toBe(10);

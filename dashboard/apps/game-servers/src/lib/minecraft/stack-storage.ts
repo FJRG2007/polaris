@@ -193,9 +193,10 @@ export function holdLines(name: string, key: string, tag: string): string[] {
     ];
 }
 
-/** The held stack copied into a player's slot (`replaceSlot`'s name for it). */
+/** The held stack copied into a player's slot (`replaceSlot`'s name for it) -
+ *  only while that slot is empty, whatever the version keeps it in. */
 export function fromHolderLine(name: string, slot: string, tag: string): string {
-    return `item replace entity ${name} ${slot} from entity ${holder(tag)} contents`;
+    return `execute unless items entity ${name} ${slot} * run item replace entity ${name} ${slot} from entity ${holder(tag)} contents`;
 }
 
 export function releaseLine(tag: string): string {

@@ -70,6 +70,7 @@ async function say(argv: string[]): Promise<string> {
                 ? `${player} has the following entity data: ${entry(Number(one[1]), stack)}`
                 : `Found no elements matching ${path}`;
         }
+        if (path !== "Inventory") return `Found no elements matching ${path}`;
         const all = [...bag.entries()]
             .sort(([a], [b]) => a - b)
             .map(([slot, stack]) => entry(slot, stack));

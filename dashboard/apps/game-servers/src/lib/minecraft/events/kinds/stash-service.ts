@@ -7,6 +7,10 @@
  */
 
 import * as stash from "./stash";
+import * as speech from "../../speech";
+import * as written from "../messages";
+import * as commands from "../commands";
+import type { KeptOut } from "../state";
 import { prisma } from "@polaris/db";
 import { createHash } from "node:crypto";
 import { stripFormatting } from "../../parse";
@@ -86,6 +90,31 @@ export interface StashResult {
     readonly stash: stash.Stash | null;
     /** Why they must not be let in; null when everything of theirs is put away. */
     readonly refused: { readonly why: StashRefusal; readonly items: string[] } | null;
+}
+
+/** What players read, in one language or - given `speech.EVERY` - in every one. */
+const messages = speech.spoken(written);
+
+/**
+ * Somebody kept out for `refused`: told why, and written into the run's list of
+ * who was kept out - once, for whatever kept them out last. Answers the list.
+ */
+export async function keepOut(
+    server: ServerContainer,
+    keptOut: readonly KeptOut[] | undefined,
+    name: string,
+    refused: NonNullable<StashResult["refused"]>,
+    language: speech.Speech
+): Promise<KeptOut[]> {
+    await server.say([
+        `tellraw ${name} ${commands.text(
+            messages.tag(language) + messages.keptOut(refused.why, refused.items, language)
+        )}`
+    ]);
+    return [
+        ...(keptOut ?? []).filter((each) => each.name.toLowerCase() !== name.toLowerCase()),
+        { name, why: refused.why, items: [...refused.items] }
+    ];
 }
 
 /** How many times what somebody carries is read and put away before it is
@@ -542,12 +571,11 @@ async function writeLong(
     const build = stash.longLines(key, item);
     if (!slot || !build) return;
     try {
-        await server.sayAll([...build, ...storage.holdLines(name, key, tag)]);
-        const there = stripFormatting(
-            await server.say(["data", "get", "entity", name, `Inventory[{Slot:${item.slot}b}]`])
-        );
-        if (isDataReply(there)) return;
-        await server.say([storage.fromHolderLine(name, slot, tag)]);
+        await server.sayAll([
+            ...build,
+            ...storage.holdLines(name, key, tag),
+            storage.fromHolderLine(name, slot, tag)
+        ]);
     } finally {
         await server.sayAll([storage.releaseLine(tag), storage.forgetLine(key)]);
     }

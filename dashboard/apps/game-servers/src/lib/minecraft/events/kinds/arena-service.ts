@@ -89,6 +89,7 @@ export class EventStopped extends Error {}
 export class TooFew extends EventStopped {}
 
 const NO_PLACE = "No dry ground was found for it near the players";
+const ONE_SIDED = "Everybody left in it was on the same team";
 /** Why it was called off, as the history keeps it (and `messages.cancelReason`
  *  says it to players). */
 const tooFew = (joined: number, needed: number) => `Only ${joined} joined; it needs ${needed}`;
@@ -366,7 +367,11 @@ async function bringIn(ctx: KindContext): Promise<void> {
         : hillside
           ? []
           : build.KIT_IDS;
-    const moved = new Set(run.entrants.map((one) => lower(one.name)));
+    const moved = new Set(
+        [...run.entrants, ...(run.sentOut ?? []), ...(run.keptOut ?? [])].map((one) =>
+            lower(one.name)
+        )
+    );
     const waiting = run.joined.filter((name) => !moved.has(lower(name)));
     if (waiting.length > 0) {
         const say = (line: string) => ctx.server.say([line]);
@@ -473,6 +478,9 @@ async function bringIn(ctx: KindContext): Promise<void> {
     // in sent back with their things.
     const needed = catalog.joinersNeeded(run.preset);
     if (ctx.run.entrants.length < needed) throw new TooFew(tooFew(ctx.run.entrants.length, needed));
+    // Everybody left on the one team: nobody to play against.
+    if (duelling && [0, 1].some((side) => !ctx.run.entrants.some((one) => one.side === side)))
+        throw new TooFew(ONE_SIDED);
     const out: string[] = [];
     if (theme !== null)
         out.push(commands.say(messages.tag(language) + messages.themeLine(theme, language)));
@@ -523,19 +531,15 @@ async function stashOne(ctx: KindContext, one: stored.Entrant, inside = false): 
     );
     if (!result.refused) return true;
     let entrant = ctx.run.entrants.find((each) => each.name === one.name) ?? one;
-    await ctx.server.say([
-        arena.tellTo(
-            one.name,
-            messages.tag(ctx.language) +
-                messages.keptOut(result.refused.why, result.refused.items, ctx.language)
-        )
-    ]);
     ctx.run = {
         ...ctx.run,
-        keptOut: [
-            ...(ctx.run.keptOut ?? []).filter((each) => each.name !== one.name),
-            { name: one.name, why: result.refused.why, items: result.refused.items }
-        ]
+        keptOut: await stashService.keepOut(
+            ctx.server,
+            ctx.run.keptOut,
+            one.name,
+            result.refused,
+            ctx.language
+        )
     };
     const drop = async () => {
         ctx.run = {
@@ -562,8 +566,17 @@ async function stashOne(ctx: KindContext, one: stored.Entrant, inside = false): 
               ctx.language
           )
         : null;
-    // Not on to be sent back: still owed the trip, at the end with everybody.
+    // Not on to be sent back: still owed the trip, at the end with everybody -
+    // never played, and never brought back in by a tick.
     if (left) {
+        ctx.run = {
+            ...ctx.run,
+            entrants: ctx.run.entrants.filter((each) => each.name !== one.name),
+            sentOut: [
+                ...(ctx.run.sentOut ?? []).filter((each) => each.name !== one.name),
+                ...left.entrants
+            ]
+        };
         await ctx.persist();
         return false;
     }
@@ -935,7 +948,7 @@ export function leftoverOf(
     run: stored.EventRun,
     gamerules: Readonly<Record<string, string>> = {}
 ): stored.ArenaLeftover | null {
-    const entrants = run.entrants.filter((one) => one.away);
+    const entrants = [...run.entrants, ...(run.sentOut ?? [])].filter((one) => one.away);
     if (!run.arena && !run.site && entrants.length === 0) return null;
     return {
         id: run.id,

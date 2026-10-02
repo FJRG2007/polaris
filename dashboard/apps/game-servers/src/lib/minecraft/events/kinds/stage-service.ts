@@ -471,19 +471,15 @@ async function stashSaved(
         inside ? saved.stash : null
     );
     if (!result.refused) return true;
-    await server.say([
-        tell(
-            name,
-            messages.tag(loop.language) +
-                messages.keptOut(result.refused.why, result.refused.items, loop.language)
-        )
-    ]);
     loop.run = {
         ...loop.run,
-        keptOut: [
-            ...(loop.run.keptOut ?? []).filter((each) => !same(each.name, name)),
-            { name, why: result.refused.why, items: result.refused.items }
-        ]
+        keptOut: await stashService.keepOut(
+            server,
+            loop.run.keptOut,
+            name,
+            result.refused,
+            loop.language
+        )
     };
     // Back where they were - or, never moved, left there - with whatever was
     // taken given back; never counted as racing.

@@ -9,6 +9,7 @@
 
 import type { Heading } from "./commands";
 import {
+    itemName,
     KIND_NAMES,
     type EventKind,
     type GatherMaterial,
@@ -294,6 +295,8 @@ export function cancelReason(note: string, language: Language): string {
     if (only) return `solo se apuntaron ${only[1]} y hacen falta ${only[2]}.`;
     const known: Readonly<Record<string, string>> = {
         "Called off": "lo ha cancelado un administrador.",
+        "Everybody left in it was on the same team":
+            "todos los que quedaban eran del mismo equipo.",
         "Fewer than two players joined": "se apuntaron menos de dos jugadores.",
         "No dry ground was found for it near the players":
             "no se encontró un sitio libre y seguro cerca de los jugadores.",
@@ -1044,11 +1047,6 @@ export function takenBack(language: Language): string {
     return language === "es"
         ? `${INFO}Estás de vuelta. El kit del evento se ha retirado; todo lo tuyo sigue igual.`
         : `${INFO}You are back. The event's kit was taken back; everything of yours is as it was.`;
-}
-
-/** An item id as a player reads it: `minecraft:shulker_box` is "shulker box". */
-function itemName(id: string): string {
-    return (id.split(":").pop() ?? id).replace(/_/g, " ");
 }
 
 /**

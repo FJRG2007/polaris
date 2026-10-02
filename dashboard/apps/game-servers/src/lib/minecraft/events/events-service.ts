@@ -660,6 +660,7 @@ export async function startEvent(input: {
         site: null,
         arena: null,
         entrants: [],
+        sentOut: [],
         marker: null,
         kit: [],
         readyAt: null,

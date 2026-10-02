@@ -1595,7 +1595,7 @@ export function MinecraftEvents({
                                                 names: (entry.keptOut ?? [])
                                                     .map((one) =>
                                                         one.items.length > 0
-                                                            ? `${one.name} (${one.items.map((id) => id.split(":").pop()!.replace(/_/g, " ")).join(", ")})`
+                                                            ? `${one.name} (${one.items.map(catalog.itemName).join(", ")})`
                                                             : one.name
                                                     )
                                                     .join(", ")

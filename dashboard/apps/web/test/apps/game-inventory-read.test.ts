@@ -20,6 +20,7 @@ function server(answers: Record<string, string>) {
 }
 
 const WHOLE_BAG = "data get entity Alice Inventory";
+const WORN = "data get entity Alice equipment";
 
 describe("readLiveInventory", () => {
     it("takes the whole bag in one question when the reply arrives whole", async () => {
@@ -33,7 +34,7 @@ describe("readLiveInventory", () => {
         expect(reading.answered).toBe(true);
         expect(reading.chunked).toBe(false);
         expect(reading.items.map((item) => item.id)).toEqual(["minecraft:stone", "minecraft:torch"]);
-        expect(asked).toEqual([WHOLE_BAG]);
+        expect(asked).toEqual([WHOLE_BAG, WORN]);
     });
 
     it("reports an empty bag as empty, without asking forty more questions", async () => {
@@ -42,7 +43,7 @@ describe("readLiveInventory", () => {
         const { ask, asked } = server({ [WHOLE_BAG]: said("Alice", "[]") });
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading).toMatchObject({ answered: true, chunked: false, unreadable: 0, items: [] });
-        expect(asked).toEqual([WHOLE_BAG]);
+        expect(asked).toEqual([WHOLE_BAG, WORN]);
     });
 
     it("reads the bag a stack at a time when the whole-bag reply was cut off", async () => {
@@ -64,7 +65,8 @@ describe("readLiveInventory", () => {
             WHOLE_BAG,
             "data get entity Alice Inventory[0]",
             "data get entity Alice Inventory[1]",
-            "data get entity Alice Inventory[2]"
+            "data get entity Alice Inventory[2]",
+            WORN
         ]);
     });
 
@@ -77,6 +79,25 @@ describe("readLiveInventory", () => {
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.unreadable).toBe(1);
         expect(reading.items.map((item) => item.id)).toEqual(["minecraft:bread"]);
+    });
+
+    it("reads what is worn and in the offhand from equipment on 1.21.5 and later", async () => {
+        const { ask } = server({
+            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:stone", count: 64}]'),
+            [WORN]: said(
+                "Alice",
+                '{chest: {id: "minecraft:diamond_chestplate", count: 1, components: {"minecraft:damage": 3}}, offhand: {id: "minecraft:shield", count: 1}, body: {id: "minecraft:saddle", count: 1}}'
+            )
+        });
+        const reading = await readLiveInventory(ask, "Alice");
+        expect(reading.items.map((item) => [item.slot, item.id])).toEqual([
+            [-106, "minecraft:shield"],
+            [0, "minecraft:stone"],
+            [102, "minecraft:diamond_chestplate"]
+        ]);
+        expect(reading.items.find((item) => item.slot === 102)?.data?.snbt).toBe(
+            '{"minecraft:damage": 3}'
+        );
     });
 
     it("does not claim an answer when the server refused", async () => {
@@ -103,7 +124,7 @@ describe("readLiveInventory", () => {
         const { ask, asked } = server(answers);
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.items).toHaveLength(41);
-        expect(asked).toHaveLength(42);
+        expect(asked).toHaveLength(43);
     });
 });
 

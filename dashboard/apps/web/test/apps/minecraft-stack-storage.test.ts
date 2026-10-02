@@ -213,7 +213,7 @@ describe("writing a stack too long for one command", () => {
             `data modify entity @e[type=minecraft:item_display,tag=pe_hd1,limit=1] item set from storage ${storage.STORAGE} k1`
         ]);
         expect(storage.fromHolderLine("Ana", "armor.chest", "pe_hd1")).toBe(
-            "item replace entity Ana armor.chest from entity @e[type=minecraft:item_display,tag=pe_hd1,limit=1] contents"
+            "execute unless items entity Ana armor.chest * run item replace entity Ana armor.chest from entity @e[type=minecraft:item_display,tag=pe_hd1,limit=1] contents"
         );
     });
 });

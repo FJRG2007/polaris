@@ -209,6 +209,9 @@ export const runSchema = z.object({
     arena: arenaSchema.nullable().default(null),
     /** Who it moved, and where each came from. */
     entrants: z.array(entrantSchema).default([]),
+    /** Taken from and then kept out (`keptOut`), and not yet put back or given
+     *  back their things: never played, only sent home at the end. */
+    sentOut: z.array(entrantSchema).default([]),
     /** How the kit it handed out is marked, and which items it was. */
     marker: z.enum(MARKERS).nullable().default(null),
     kit: z.array(z.string()).default([]),
