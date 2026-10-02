@@ -10,10 +10,17 @@
  * every screen and two senders in a list are tellable apart before their names
  * are read.
  *
+ * It is the same face every account in Polaris has (`Avatar`), not a copy of
+ * it: the initials are drawn first and the picture is laid over them once one
+ * has actually arrived. That is what this used to get wrong. It drew the picture
+ * and waited - an empty circle for as long as the server spent looking for a
+ * mark, which on a cold mailbox is seconds - and a colleague with no photo is
+ * answered with a transparent pixel rather than a refusal, so their circle
+ * stayed empty for good. Now there is never a hole: letters until a real picture
+ * loads, and letters again if none does.
+ *
  * The picture is fetched by Polaris rather than by the browser, so the sender's
- * site learns that a server asked and nothing about the reader. The `<img>`
- * failing is not an error state - it is the ordinary answer for a sender with no
- * mark, and it is what puts the initials back.
+ * site learns that a server asked and nothing about the reader.
  *
  * A mark that cannot be seen is the other failure, and it is quieter. Most sites
  * publish a near-black logo on transparency, drawn for their own white page: in
@@ -27,7 +34,7 @@
 
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
-import { initials, tintFor } from "@polaris/core";
+import { Avatar } from "@/components/avatar";
 import { markColor, plateFor } from "@/lib/mailbox/mark-plate";
 
 /** How big the mark is sampled at. A logo's colour does not need more, and this
@@ -60,18 +67,26 @@ function measure(image: HTMLImageElement): string | null {
     }
 }
 
+/** The name a sender is drawn by: what they call themselves, else the part of
+ *  their address before the `@`, else the address. Never empty while there is
+ *  an address, so there are always letters to draw. */
+export function senderLabel(name: string, address: string): string {
+    return name.trim() || address.split("@")[0] || address;
+}
+
 export function SenderFace({
     name,
     address,
+    size = 28,
     className
 }: {
     name: string;
     address: string;
+    size?: number;
     className?: string;
 }) {
-    const [drawn, setDrawn] = useState(true);
     const [plate, setPlate] = useState<string | null>(() => plates.get(address) ?? null);
-    const label = name.trim() || address.split("@")[0] || address;
+    const label = senderLabel(name, address);
 
     useEffect(() => {
         setPlate(plates.get(address) ?? null);
@@ -87,51 +102,31 @@ export function SenderFace({
         setPlate(found);
     };
 
-    /**
-     * A picture the browser already had is complete before React mounts it, and
-     * an onLoad that fired before there was a handler is one that never fires -
-     * which would leave every second visit to a mailbox unplated. So the element
-     * is asked whether it is already there, as well as being listened to.
-     */
-    const attach = (image: HTMLImageElement | null): void => {
-        if (image?.complete && image.naturalWidth > 0) settle(image);
-    };
-
     return (
-        <span
-            aria-hidden
-            className={cn(
-                "flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-medium text-white",
-                className
-            )}
-            // A plate is only ever drawn under a mark that needs one, so a mark
-            // that reads on both themes keeps the column as plain as it was.
-            style={
-                !drawn
-                    ? { backgroundColor: tintFor(address || label) }
-                    : plate
-                      ? { backgroundColor: plate, padding: 2 }
-                      : undefined
-            }
-        >
-            {drawn && address ? (
-                <img
-                    src={`/api/mail/face/${encodeURIComponent(address)}`}
-                    alt=""
-                    className="size-full object-contain"
-                    // An image is draggable by default, which would make the
-                    // face its own drag rather than the row's - see the row in
-                    // mail-view.tsx.
-                    draggable={false}
-                    loading="lazy"
-                    decoding="async"
-                    ref={attach}
-                    onLoad={(event) => settle(event.currentTarget)}
-                    onError={() => setDrawn(false)}
-                />
-            ) : (
-                initials(label)
-            )}
+        // Hidden from a screen reader: the name is beside it, and two letters
+        // read out before every sender are noise.
+        <span aria-hidden className={cn("inline-flex shrink-0", className)}>
+            <Avatar
+                // Keyed by the address so a row reused for another sender does
+                // not carry the last one's loaded state across.
+                key={address}
+                person={{
+                    id: null,
+                    name: label,
+                    image: address ? `/api/mail/face/${encodeURIComponent(address)}` : null
+                }}
+                size={size}
+                status={false}
+                tint={address || label}
+                fit="contain"
+                // A plate only under a mark that needs one, so a mark that reads
+                // on both themes keeps the column as plain as it was.
+                backdrop={plate}
+                onPicture={settle}
+                // A mailbox is a long list; the rows below the fold are asked
+                // for as they come near, with their letters showing until then.
+                lazy
+            />
         </span>
     );
 }

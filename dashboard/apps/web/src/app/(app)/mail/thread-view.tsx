@@ -53,6 +53,7 @@ const FileViewer = dynamic(
     { ssr: false }
 );
 import { useBusy } from "./use-busy";
+import { SenderFace } from "./sender-face";
 import { readMessage } from "./message-store";
 import { DeliveryNote } from "./delivery-note";
 import type { MailViewContext } from "./mail-view";
@@ -904,6 +905,17 @@ function MessageCard({
                                     ? "text-muted-foreground"
                                     : "font-semibold text-foreground"
                             )}
+                {/* Who wrote it, before the name is read - the same face the
+                    row in the list has, initials and all when there is no
+                    picture to be had. */}
+                {sender ? (
+                    <SenderFace
+                        name={sender.name}
+                        address={sender.address}
+                        size={open ? 32 : 20}
+                        className={open ? undefined : "self-center"}
+                    />
+                ) : null}
                         >
                             {sender ? core.addressName(sender) : t("view.nobody")}
                         </span>

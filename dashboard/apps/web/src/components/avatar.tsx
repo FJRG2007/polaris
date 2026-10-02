@@ -117,7 +117,12 @@ export function Avatar({
     decoration: chosen,
     decorated = false,
     openable = false,
-    callBadge
+    callBadge,
+    tint,
+    fit = "cover",
+    backdrop,
+    onPicture,
+    lazy = false
 }: {
     person: AvatarPerson;
     size?: number;
@@ -189,6 +194,23 @@ export function Avatar({
      * where one is drawn at a size the dot would swallow.
      */
     status?: boolean;
+    /** What the colour under the initials is derived from, when the id is not
+     *  the right thing to tell faces apart by - a sender, who has no account
+     *  here, is told apart by their address. */
+    tint?: string;
+    /** `contain` for a mark rather than a photograph: a logo is drawn whole,
+     *  never cropped to the circle. */
+    fit?: "cover" | "contain";
+    /** What sits behind a picture once one has loaded. Unset keeps the tint,
+     *  which a photograph covers anyway; a mark on transparency is given
+     *  nothing (`null`) or a plate it needs to be seen on. */
+    backdrop?: string | null;
+    /** Told the moment a real picture has loaded, with the element, for a
+     *  caller that measures what arrived. */
+    onPicture?: (image: HTMLImageElement) => void;
+    /** Ask for the picture only once the face scrolls near the screen - for a
+     *  long list, where the initials already say who it is meanwhile. */
+    lazy?: boolean;
 }) {
     const t = useTranslations("components");
     const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
@@ -249,6 +271,7 @@ export function Avatar({
     const mayOpen = usePhotoOpenable(openable ? person.id : null);
     const opens = photoOpens({ openable, hasPhoto: real, allowed: mayOpen, source });
     const shape = square ? "rounded-md" : "rounded-full";
+    const pictured = real && !failed;
 
     // The dot sits outside the picture, so it is not clipped by the circle the
     // face is cut into - which is why the face has a wrapper at all when there
@@ -270,7 +293,10 @@ export function Avatar({
                 width: inner,
                 height: inner,
                 fontSize: Math.max(9, Math.round(inner * 0.4)),
-                backgroundColor: tintFor(person.id ?? person.name)
+                backgroundColor:
+                    pictured && backdrop !== undefined
+                        ? (backdrop ?? "transparent")
+                        : tintFor(tint ?? person.id ?? person.name)
             }}
         >
             {/* Underneath until there is something to put over them, and then
@@ -280,7 +306,7 @@ export function Avatar({
                 "DY" printed across a mark, on every screen that draws one. A
                 picture that loaded is the answer to what this face shows, so the
                 letters stop being the answer. */}
-            {real && !failed ? null : initials(person.name)}
+            {pictured ? null : initials(person.name)}
             {source && !failed && (
                 // eslint-disable-next-line @next/next/no-img-element -- one small image per person, no loader wanted
                 <img
@@ -290,8 +316,25 @@ export function Avatar({
                     // The blank pixel is one pixel across, so this is the whole
                     // test for "is there a photo behind this face" and it costs
                     // no request of its own.
-                    onLoad={(event) => setReal(event.currentTarget.naturalWidth > 1)}
-                    className={cn("absolute inset-0 size-full object-cover", shape)}
+                    onLoad={(event) => {
+                        const image = event.currentTarget;
+                        setReal(image.naturalWidth > 1);
+                        if (image.naturalWidth > 1) onPicture?.(image);
+                    }}
+                    // A face is part of whatever row it sits in. An image is
+                    // draggable by default, which made the face its own drag
+                    // instead of the row's.
+                    draggable={false}
+                    // Laid over the initials without moving anything: the box
+                    // is the face's own size whether or not this ever arrives.
+                    decoding="async"
+                    loading={lazy ? "lazy" : undefined}
+                    style={pictured && backdrop ? { padding: 2 } : undefined}
+                    className={cn(
+                        "absolute inset-0 size-full",
+                        fit === "contain" ? "object-contain" : "object-cover",
+                        shape
+                    )}
                 />
             )}
         </span>
