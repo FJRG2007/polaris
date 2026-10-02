@@ -177,7 +177,6 @@ export function AppSwitcher({
 }) {
     const [query, setQuery] = useState("");
     const [ownOpen, setOwnOpen] = useState(false);
-    const [focusSearch, setFocusSearch] = useState(true);
     const [dragOrder, setDragOrder] = useState<{ key: string; ids: string[] } | null>(null);
     const [said, setSaid] = useState("");
     const dragging = useRef<string | null>(null);
@@ -212,14 +211,14 @@ export function AppSwitcher({
         );
     }
 
+    // A finger does not get the field focused: that raises the on-screen
+    // keyboard over the grid it opened the menu to look at. Read on every render
+    // so the menu opened from elsewhere (the rail's More apps) is held to it too.
+    const focusSearch =
+        typeof window === "undefined" || !window.matchMedia?.("(pointer: coarse)").matches;
+
     function setOpen(next: boolean) {
-        if (next) {
-            // A finger does not get the field focused: that raises the on-screen
-            // keyboard over the grid it opened the menu to look at.
-            setFocusSearch(
-                typeof window === "undefined" || !window.matchMedia?.("(pointer: coarse)").matches
-            );
-        } else {
+        if (!next) {
             setQuery("");
             setDragOrder(null);
             setSaid("");
@@ -332,6 +331,7 @@ export function AppSwitcher({
             event.stopPropagation();
             if (next) next.focus();
             else if (event.shiftKey) root.querySelector<HTMLElement>("input")?.focus();
+            else firstFooterItem(root)?.focus();
             return;
         }
         if (!isTile) return;
@@ -364,6 +364,7 @@ export function AppSwitcher({
         event.preventDefault();
         event.stopPropagation();
         if (next === "search") root.querySelector<HTMLElement>("input")?.focus();
+        else if (next === "footer") firstFooterItem(root)?.focus();
         else next?.focus();
     }
 
@@ -452,7 +453,10 @@ export function AppSwitcher({
                     </div>
                 ))}
                 {footer ? (
-                    <div className="mt-2 flex flex-col gap-0.5 border-t border-border pt-2">
+                    <div
+                        data-launcher-footer=""
+                        className="mt-2 flex flex-col gap-0.5 border-t border-border pt-2"
+                    >
                         {footer}
                     </div>
                 ) : null}
@@ -464,12 +468,19 @@ export function AppSwitcher({
     );
 }
 
+/** The first option under the grid that can take focus, if there is one. */
+function firstFooterItem(root: HTMLElement) {
+    return root.querySelector<HTMLElement>(
+        "[data-launcher-footer] [role=menuitem]:not([data-disabled])"
+    );
+}
+
 /**
  * Where an arrow key goes from one tile: along the grid for left and right,
  * a row for up and down - into the section above or below at the same column
  * when the row runs out - and to the ends for Home and End. Up from the top row
- * is the search field. `null` is "nowhere further"; `undefined` is "not a key
- * this answers".
+ * is the search field, and down from the last row is the footer. `null` is
+ * "nowhere further"; `undefined` is "not a key this answers".
  */
 function gridStep(
     root: HTMLElement,
@@ -477,7 +488,7 @@ function gridStep(
     key: string,
     id: string,
     pressed: string
-): HTMLElement | "search" | null | undefined {
+): HTMLElement | "search" | "footer" | null | undefined {
     const find = (sectionKey: string, appId: string) =>
         root.querySelector<HTMLElement>(
             `[${TILE}="${quoted(appId)}"][data-launcher-section="${quoted(sectionKey)}"]`
@@ -520,7 +531,7 @@ function gridStep(
     if (pressed === "ArrowDown") {
         if (row + 1 < rows) return pick(section, row + 1);
         const below = drawn[sectionAt + 1];
-        return below ? pick(below, 0) : null;
+        return below ? pick(below, 0) : "footer";
     }
     if (row > 0) return pick(section, row - 1);
     const above = drawn[sectionAt - 1];
@@ -580,7 +591,9 @@ function AppTile({
                     draggable={drag ? true : false}
                     {...{ [TILE]: app.id, "data-launcher-section": section }}
                     aria-current={active ? "page" : undefined}
-                    aria-keyshortcuts={drag ? "Alt+ArrowLeft Alt+ArrowRight" : undefined}
+                    aria-keyshortcuts={
+                        drag ? "Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown" : undefined
+                    }
                     title={app.description ? `${app.label} - ${app.description}` : app.label}
                     className={cn(
                         "flex w-full flex-col items-center gap-1.5 rounded-lg px-1 pb-1.5 pt-2.5 text-center",

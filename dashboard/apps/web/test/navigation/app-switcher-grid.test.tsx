@@ -9,7 +9,7 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Gamepad2, HardDrive, MessageCircle } from "lucide-react";
-import { AppSwitcher, type AppSwitcherSection } from "@polaris/ui";
+import { AppSwitcher, DropdownMenuItem, type AppSwitcherSection } from "@polaris/ui";
 import { cleanup, render, screen, within } from "@testing-library/react";
 
 afterEach(cleanup);
@@ -48,7 +48,12 @@ const MANY = Array.from({ length: 32 }, (_, at) => ({
     href: `/app-${at + 1}`
 }));
 const MANY_SECTIONS: AppSwitcherSection[] = [
-    { key: "favorites", label: "Favorites", ids: ["app-1", "app-2", "app-3", "app-4"], arrangeable: true },
+    {
+        key: "favorites",
+        label: "Favorites",
+        ids: ["app-1", "app-2", "app-3", "app-4"],
+        arrangeable: true
+    },
     { key: "work", label: "Work", ids: MANY.slice(4, 18).map((app) => app.id) },
     { key: "tools", label: "Tools", ids: MANY.slice(18).map((app) => app.id) }
 ];
@@ -177,6 +182,26 @@ describe("walking the app switcher with the keyboard", () => {
         expect(document.activeElement).toBe(tile("chat"));
     });
 
+    it("goes on to the options under the grid from the last row and the last tab stop", async () => {
+        const user = userEvent.setup();
+        render(
+            <AppSwitcher
+                apps={MANY}
+                currentAppId="app-1"
+                sections={MANY_SECTIONS}
+                footer={<DropdownMenuItem>Arrange favorites</DropdownMenuItem>}
+            />
+        );
+        await openMenu(user, /app 1/i);
+        const arrange = screen.getByRole("menuitem", { name: "Arrange favorites" });
+        await user.keyboard("{ArrowDown}{End}{ArrowDown}");
+        expect(document.activeElement).toBe(arrange);
+        await user.keyboard("{ArrowUp}");
+        tile("app-32")?.focus();
+        await user.keyboard("{Tab}");
+        expect(document.activeElement).toBe(arrange);
+    });
+
     it("moves a favorite with Alt and an arrow, says where it went, and keeps it focused", async () => {
         const user = userEvent.setup();
         const onArrange = vi.fn();
@@ -195,6 +220,22 @@ describe("walking the app switcher with the keyboard", () => {
         expect(screen.getByText("App 1 moved to position 2 of 4")).toBeTruthy();
     });
 
+    it("advertises every move a favorite makes", async () => {
+        const user = userEvent.setup();
+        render(
+            <AppSwitcher
+                apps={MANY}
+                currentAppId="app-1"
+                sections={MANY_SECTIONS}
+                onArrange={() => undefined}
+            />
+        );
+        await openMenu(user, /app 1/i);
+        expect(tile("app-1")?.getAttribute("aria-keyshortcuts")).toBe(
+            "Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown"
+        );
+    });
+
     it("does not move an app that is not a favorite, nor one already at the end", async () => {
         const user = userEvent.setup();
         const onArrange = vi.fn();
@@ -210,5 +251,24 @@ describe("walking the app switcher with the keyboard", () => {
         await user.keyboard("{ArrowDown}{Alt>}{ArrowLeft}{/Alt}");
         await user.keyboard("{ArrowDown}{ArrowDown}{Alt>}{ArrowRight}{/Alt}");
         expect(onArrange).not.toHaveBeenCalled();
+    });
+});
+
+describe("opening the app switcher on a touch screen", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("leaves the search unfocused when the menu is opened from elsewhere", async () => {
+        vi.stubGlobal("matchMedia", (query: string) => ({
+            matches: query === "(pointer: coarse)",
+            media: query,
+            addEventListener() {},
+            removeEventListener() {}
+        }));
+        render(
+            <AppSwitcher apps={APPS} currentAppId="drive" open onOpenChange={() => undefined} />
+        );
+        const field = await screen.findByRole("textbox", { name: "Search apps" });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(document.activeElement).not.toBe(field);
     });
 });
