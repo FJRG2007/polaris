@@ -169,6 +169,11 @@ with one thing does not get the rest.
 - **Analytics** - cookieless web analytics for the sites you host.
 - **Firewall** - a rule per protection: allow and deny lists, country and network
   rules, bot and scraper defences, injection scanning, and automatic bans.
+- **Domain security** - every domain Polaris knows, audited for spoofable mail
+  (SPF, DKIM, DMARC, MTA-STS), DNS exposure (DNSSEC, CAA, open zone transfers,
+  dangling records), registration (expiry, transfer lock) and web hardening
+  (TLS, HSTS, security headers), with one-click fixes where Polaris manages the
+  domain and a notice the moment a daily re-check finds it worse than before.
 - **Places** - the places you own, their cameras and their smart devices: live
   views, clips, events, detections and alerts that arrive as messages; switches,
   plugs, lights, locks, air conditioners and air purifiers from Tuya, TP-Link,
