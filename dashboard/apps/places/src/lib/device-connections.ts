@@ -114,6 +114,17 @@ export interface ConnectionPairing {
     /** How long one attempt is waited on before the dialog stops asking and
      *  offers a new one. Polaris' own bound where the maker publishes none. */
     readonly lifetimeMs: number;
+    /**
+     * A file the attempt may ask for after its first step, when the driver
+     * answers a `file` step (`PairingNext`): what the picker accepts, the most
+     * it takes, and where people get one. Its words are
+     * `connections.<id>.pairing.file.*`.
+     */
+    readonly file?: {
+        readonly accept: string;
+        readonly maxBytes: number;
+        readonly href: string;
+    };
 }
 
 /** One way of reaching one make's devices. */
@@ -679,8 +690,23 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         // Philips says nothing about how long its emailed code lasts. Ten
         // minutes is Polaris' own bound: time to find the email, not a box left
         // waiting for ever. Nothing is polled; the code is sent once typed.
-        pairing: { kind: "code", pollMs: 3_000, lifetimeMs: 600_000 },
-        kinds: ["air"],
+        //
+        // The file is the Philips Air+ app itself, for the fan and heater cloud:
+        // Polaris reads a signing value out of it and keeps nothing of the file
+        // (`integrations/apk-secret.ts`). A whole app bundle is a few hundred
+        // megabytes at most. The link is where the Air+ fan integration points
+        // people for it (Yooork/HA_Philips_Air_Plus, README).
+        pairing: {
+            kind: "code",
+            pollMs: 3_000,
+            lifetimeMs: 600_000,
+            file: {
+                accept: ".apk,.apkm,.xapk",
+                maxBytes: 600 * 1024 * 1024,
+                href: "https://www.apkmirror.com/apk/versuni-netherlands-b-v/philips-air/"
+            }
+        },
+        kinds: ["air", "appliance"],
         search: [
             "philips",
             "air+",
@@ -689,6 +715,13 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "air purifier",
             "purifier",
             "air quality",
+            "fan",
+            "heater",
+            "cx3550",
+            "airfryer",
+            "homeid",
+            "nutriu",
+            "espresso",
             "cloud",
             "account"
         ]
@@ -1035,7 +1068,20 @@ export function connectionWords(t: PlacesTranslator, connection: DeviceConnectio
             ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label }
             : undefined,
         reach: t(`connections.reach.${connection.reach}`),
-        pairingPrompt: connection.pairing ? say(`${base}.pairing.prompt`) : undefined
+        pairingPrompt: connection.pairing ? say(`${base}.pairing.prompt`) : undefined,
+        pairingFile: connection.pairing?.file
+            ? {
+                  title: say(`${base}.pairing.file.title`) ?? "",
+                  why: (summary: string) =>
+                      t.has(`${base}.pairing.file.why`)
+                          ? t(`${base}.pairing.file.why` as PlacesKey, { summary })
+                          : "",
+                  where: say(`${base}.pairing.file.where`) ?? "",
+                  link: say(`${base}.pairing.file.link`) ?? "",
+                  field: say(`${base}.pairing.file.field`) ?? "",
+                  skip: say(`${base}.pairing.file.skip`) ?? ""
+              }
+            : undefined
     };
 }
 

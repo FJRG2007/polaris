@@ -77,10 +77,10 @@ describe("a refusal from Places", () => {
         expect(
             placesRefusalText(
                 es,
-                "Polaris found no air purifier on this Philips account. What it saw: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10). Check that the purifier is in the Air+ app under this same email."
+                "Polaris found no device on this Philips account. What it saw: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10); Philips Air: 0. Check that the device is in a Philips app under this same email."
             )
         ).toBe(
-            "Polaris no ha encontrado ningún purificador en esta cuenta Philips. Lo que vio: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10). Comprueba que el purificador está en la app Air+ con este mismo email."
+            "Polaris no ha encontrado ningún dispositivo en esta cuenta Philips. Lo que vio: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0651/10); Philips Air: 0. Comprueba que está en una app de Philips con este mismo email."
         );
     });
 

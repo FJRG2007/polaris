@@ -9950,6 +9950,10 @@ model PlaceDevice {
     /// measures and how worn its filters are, as `air-kinds` validates it. Null
     /// for every other kind. Its headline figure is also `value`.
     air            Json?
+    /// What a kitchen appliance (an airfryer, a multicooker, an espresso
+    /// machine) last reported doing - its status, programme, temperatures and
+    /// time left - as `appliance-kinds` validates it. Null for every other kind.
+    appliance      Json?
     /// open | closed | unknown | none - the door itself, when a sensor is paired.
     /// `none` is no sensor, which is not the same as not knowing.
     doorState      String    @default("none")

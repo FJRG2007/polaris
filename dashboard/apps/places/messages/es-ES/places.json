@@ -436,7 +436,7 @@
         "tuyaKeys": "Tuya rechazó las claves. Puede que se hayan revocado o que el proyecto no cubra estos dispositivos.",
         "tuyaRefused": "Tuya rechazó la petición.",
         "reconnect": "Hay que volver a conectar {name}",
-        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} climate {un aire acondicionado} air {un purificador} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} turnOff {se apague} setMode {cambie de modo} setTemperature {cambie de temperatura} setFan {cambie el ventilador} setOption {cambie un ajuste} setHumidity {cambie la humedad} other {haga eso}}",
+        "kindCannot": "A {kind, select, lock {una cerradura} opener {un abridor de puerta} switch {un interruptor} outlet {un enchufe} light {una luz} climate {un aire acondicionado} air {un purificador} appliance {un electrodoméstico} other {un sensor}} no se le puede pedir que {action, select, lock {cierre} unlock {abra el cerrojo} unlatch {abra} turnOn {se encienda} turnOff {se apague} setMode {cambie de modo} setTemperature {cambie de temperatura} setFan {cambie el ventilador} setOption {cambie un ajuste} setHumidity {cambie la humedad} stop {se pare} other {haga eso}}",
         "watchOnly": "{name} está configurado para vigilarse, no para manejarse",
         "notConnected": "{name} no está conectado a nada",
         "notAnswering": "{name} no respondía la última vez que se comprobó",
@@ -549,13 +549,20 @@
         "philipsCloudNoCode": "Philips no ha enviado un código a esa dirección. Comprueba que es la que usas en la app Air+.",
         "philipsCloudUnfinished": "Esa dirección aún no es una cuenta Philips completa. Entra una vez en la app Philips Air+ y vuelve a intentarlo.",
         "philipsCloudBadCode": "Ese código no es correcto o ha caducado. Pide otro.",
-        "philipsCloudQuiet": "El purificador no ha respondido a través de la nube de Philips.",
-        "philipsCloudBusy": "El purificador está ocupado. Vuelve a intentarlo en un momento.",
-        "philipsCloudLinkRefused": "La nube de Philips no deja a Polaris llegar a este purificador. Vuelve a conectar la cuenta.",
+        "philipsCloudQuiet": "El dispositivo no ha respondido a través de la nube de Philips.",
+        "philipsCloudBusy": "El dispositivo está ocupado. Vuelve a intentarlo en un momento.",
+        "philipsCloudLinkRefused": "La nube de Philips no deja a Polaris llegar a este dispositivo. Vuelve a conectar la cuenta.",
         "philipsCloudNotOnAccount": "Ese dispositivo no está en esta cuenta Philips.",
         "philipsCloudEnterCode": "Escribe el código del email",
-        "philipsCloudOnlyOthers": "Polaris ha encontrado aparatos en esta cuenta Philips, pero ningún purificador. Lo que vio: {summary}.",
-        "philipsCloudNothing": "Polaris no ha encontrado ningún purificador en esta cuenta Philips. Lo que vio: {summary}. Comprueba que el purificador está en la app Air+ con este mismo email."
+        "philipsCloudNothing": "Polaris no ha encontrado ningún dispositivo en esta cuenta Philips. Lo que vio: {summary}. Comprueba que está en una app de Philips con este mismo email.",
+        "airMattersRefused": "La nube de ventiladores de Philips rechazó el acceso. Sube otra vez la app Philips Air+.",
+        "apkNotAnApp": "Ese archivo no es una app. Sube la app Philips Air+ como archivo .apk, .apkm o .xapk.",
+        "apkNoSecret": "Polaris no encuentra lo que necesita en ese archivo. Sube la app Philips Air+ entera, no una parte suelta o de idioma.",
+        "apkAmbiguous": "Ese archivo tiene más de un candidato y Polaris no sabe cuál usa Philips. Sube la propia app Philips Air+.",
+        "pairingRanOut": "Ese paso ha tardado demasiado y ha caducado. Vuelve a empezar la conexión.",
+        "uploadToGoOn": "Sube el archivo de la app Philips Air+ para seguir",
+        "fileTooLarge": "Ese archivo es más grande de lo que puede ser una app.",
+        "fileEmpty": "No ha llegado nada. Vuelve a elegir el archivo."
     },
     "connections": {
         "nuki-web": {
@@ -880,23 +887,31 @@
             }
         },
         "philips-cloud": {
-            "label": "Cuenta Philips Air+",
-            "summary": "Los purificadores de tu cuenta Philips Air+, por la nube de Philips como la app. Funciona desde cualquier red.",
-            "note": "No oficial: Philips no publica una API para esto, así que podría dejar de funcionar si Philips cambia su nube. Entra con un código que Philips te envía por email, y no se guarda ninguna contraseña. Modelos que conoce: AC0650, AC0651, AC1715 y AC3221; los demás solo muestran lecturas y encendido. Si el aparato está en la misma red que Polaris, la conexión local no depende de Philips.",
+            "label": "Cuenta Philips",
+            "summary": "Los purificadores, ventiladores y electrodomésticos de tu cuenta Philips, por la nube de Philips como sus apps. Funciona desde cualquier red.",
+            "note": "No oficial: Philips no publica una API para esto, así que podría dejar de funcionar si Philips cambia su nube. Entra con un código que Philips te envía por email, y no se guarda ninguna contraseña. Purificadores que conoce: AC0650, AC0651, AC1715, AC3221 y AC3360, y el ventilador CX3550; los demás solo muestran lecturas y encendido. Los electrodomésticos se muestran y nunca se encienden; una freidora se puede parar. Ventiladores y calefactores piden una vez el archivo de la app Philips Air+. Si un purificador está en la misma red que Polaris, la conexión local no depende de Philips.",
             "steps": {
-                "s0": "Configura el purificador en la app Philips Air+ y entra en ella con tu email.",
+                "s0": "Configura el aparato en su app de Philips (Air+, HomeID o NutriU) y entra en ella con tu email.",
                 "s1": "Escribe ese email y pulsa Pedir código. Philips te envía un código de un solo uso.",
-                "s2": "Escribe aquí el código. Polaris muestra los purificadores de la cuenta."
+                "s2": "Escribe aquí el código. Polaris muestra los aparatos de la cuenta y pide el archivo de la app Philips Air+ si lo necesita."
             },
             "fields": {
                 "email": {
                     "label": "Email",
-                    "hint": "El que usas para entrar en la app Philips Air+.",
+                    "hint": "El que usas para entrar en la app de Philips.",
                     "placeholder": "tu@ejemplo.com"
                 }
             },
             "pairing": {
-                "prompt": "Philips ha enviado un código de un solo uso a ese email. Puede tardar un minuto; mira también en spam."
+                "prompt": "Philips ha enviado un código de un solo uso a ese email. Puede tardar un minuto; mira también en spam.",
+                "file": {
+                    "title": "Sube el archivo de la app Philips Air+ (.apk)",
+                    "why": "Las listas Air+ y HomeID de Philips no tienen ningún aparato de aire ({summary}). Ventiladores, calefactores y algunos purificadores están en una tercera nube de Philips, que solo acepta accesos firmados con un valor que Philips guarda dentro de su app Air+. Polaris lee ese valor del archivo sin ejecutarlo, lo guarda cifrado con esta conexión y borra el archivo.",
+                    "where": "Descárgala (com.philips.ph.homecare) desde APKMirror en el navegador; vale cualquier versión.",
+                    "link": "APKMirror",
+                    "field": "Archivo app Philips Air+",
+                    "skip": "Conectar sin él"
+                }
             }
         },
         "notEmail": "Escribe un email completo, como nombre@ejemplo.com."
@@ -1156,7 +1171,8 @@
             "light": "Luz",
             "sensor": "Sensor",
             "climate": "Aire acondicionado",
-            "air": "Purificador"
+            "air": "Purificador",
+            "appliance": "Electrodoméstico"
         },
         "groups": {
             "lock": "Puertas",
@@ -1166,7 +1182,8 @@
             "light": "Luces",
             "sensor": "Sensores",
             "climate": "Clima",
-            "air": "Aire"
+            "air": "Aire",
+            "appliance": "Cocina"
         },
         "states": {
             "locked": "Cerrada",
@@ -1203,7 +1220,8 @@
             "set-temperature": "Temperatura",
             "set-fan": "Ventilador",
             "set-option": "Ajuste",
-            "set-humidity": "Humedad"
+            "set-humidity": "Humedad",
+            "stop": "Parar"
         },
         "via": {
             "polaris": "desde Polaris",
@@ -1230,7 +1248,8 @@
             "set-temperature": "Temperatura fijada",
             "set-fan": "Ventilador cambiado",
             "set-option": "Ajuste cambiado",
-            "set-humidity": "Humedad fijada"
+            "set-humidity": "Humedad fijada",
+            "stop": "Parado"
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
@@ -1301,7 +1320,9 @@
                 "speed_3": "Nivel 3",
                 "turbo": "Turbo",
                 "natural": "Natural",
-                "ventilation": "Ventilación"
+                "ventilation": "Ventilación",
+                "eco": "Eco",
+                "pet_hair": "Pelo de mascota"
             },
             "speeds": {
                 "sleep": "Sueño",
@@ -1327,7 +1348,8 @@
             "options": {
                 "childLock": "Bloqueo niños",
                 "light": "Luz pantalla",
-                "humidify": "Humidificar"
+                "humidify": "Humidificar",
+                "oscillate": "Oscilación"
             },
             "filters": {
                 "pre": "Prefiltro",
@@ -1363,6 +1385,29 @@
                 "veryPoor": "Ponlo alto y pasa poco tiempo en la habitación.",
                 "extremelyPoor": "Ponlo en turbo y evita la habitación si puedes."
             }
+        },
+        "appliance": {
+            "types": {
+                "airfryer": "Freidora",
+                "multicooker": "Multicocina",
+                "espresso": "Cafetera espresso"
+            },
+            "statuses": {
+                "standby": "En espera",
+                "idle": "Lista",
+                "mainmenu": "Menú",
+                "setting": "Ajustando",
+                "parasetting": "Ajustando valores",
+                "precook": "Preparando",
+                "cooking": "Cocinando",
+                "pause": "En pausa",
+                "maintain": "Mantiene calor",
+                "finish": "Terminado",
+                "user_action": "Requiere acción",
+                "powersave": "Ahorro",
+                "pairing": "Vinculando"
+            },
+            "left": "quedan {time}"
         }
     },
     "devicesView": {
@@ -1441,6 +1486,19 @@
             "lifePercent": "Queda {percent}%",
             "lifeHours": "Quedan {hours} h",
             "quality": "Calidad"
+        },
+        "appliance": {
+            "type": "Aparato",
+            "status": "Estado",
+            "program": "Receta",
+            "target": "Fijada en",
+            "current": "Ahora",
+            "remaining": "Queda",
+            "total": "Programado",
+            "unknown": "Aún no ha dicho qué está haciendo.",
+            "watchOnly": "Solo se vigila: Polaris no maneja este modelo.",
+            "nothingToStop": "No hay nada en marcha",
+            "stopName": "Parar {name}"
         }
     },
     "deviceDialog": {
@@ -1479,7 +1537,12 @@
             "getCode": "Pedir código",
             "codeField": "Código del email",
             "resend": "Pedir otro código",
-            "codeExpired": "Este código ha caducado. Pide otro."
+            "codeExpired": "Este código ha caducado. Pide otro.",
+            "fileType": "Elige un archivo {accept}.",
+            "fileLarge": "Ese archivo es más grande de lo que puede ser una app.",
+            "fileFailed": "No se pudo enviar el archivo. Inténtalo de nuevo.",
+            "fileReading": "Leyendo la app",
+            "fileSend": "Subir"
         },
         "unsupported": "Conectado. {count, plural, one {Este modelo aún no es compatible} other {Estos modelos aún no son compatibles}} ({models}): se muestran con encendido y lo que {count, plural, one {informa} other {informan}}, pero sus modos aún no se pueden cambiar desde Polaris.",
         "done": "Listo"

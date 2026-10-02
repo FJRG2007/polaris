@@ -9,8 +9,12 @@
  * way a unit does.
  */
 
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { zipFiles } from "@polaris-app/calendar/src/lib/zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- a fake broker ----------------------------------------------------------------
@@ -135,6 +139,9 @@ function philips(
         /** The HomeID backend's appliances, served the way the profile embeds
          *  them or behind its link; absent, the backend is not there. */
         homeIdApp?: { appliances: unknown[]; embedded?: boolean };
+        /** The account's id at Gigya, which the email sign-in answers; null
+         *  for an answer without one. */
+        uid?: string | null;
     } = {}
 ) {
     const issued = new Map<string, string>();
@@ -143,8 +150,13 @@ function philips(
     );
     route(at("/accounts.auth.otp.email.login"), (_url, init) => {
         const body = new URLSearchParams(String(init.body));
+        const uid = options.uid === undefined ? "gigya-uid-1" : options.uid;
         return body.get("code") === "123456" && body.get("vToken") === "vt-1"
-            ? jsonReply({ errorCode: 0, sessionInfo: { cookieValue: "gigya-session" } })
+            ? jsonReply({
+                  errorCode: 0,
+                  sessionInfo: { cookieValue: "gigya-session" },
+                  ...(uid ? { UID: uid } : {})
+              })
             : jsonReply({ errorCode: 403042, errorMessage: "Invalid code" });
     });
     route(at("/authorize"), (url) => {
@@ -325,15 +337,37 @@ describe("signing in with an emailed code", () => {
         expect(answer.done && answer.credentials.client).toBe("homeid");
     });
 
-    it("refuses an account with nothing on it, saying what it saw in each place", async () => {
+    it("asks for the Air+ app when no list holds an air device, saying what it saw", async () => {
         philips({ homeIdApp: { appliances: [] } });
+        const answer = await driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com" },
+            { vToken: "vt-1", code: "123456" }
+        );
+        expect(answer).toMatchObject({
+            done: false,
+            next: {
+                step: "file",
+                summary: "Air+: 0; HomeID: 0; HomeID app: 0",
+                skippable: false
+            }
+        });
+        // The browser gets a handle and nothing it could sign in with.
+        const shown = JSON.stringify(answer);
+        for (const secret of ["gigya-uid-1", "gigya-session", "access-", "refresh-"]) {
+            expect(shown).not.toContain(secret);
+        }
+        expect(logged).toEqual([]);
+    });
+
+    it("refuses an account with nothing on it and no id to ask the third cloud with", async () => {
+        philips({ homeIdApp: { appliances: [] }, uid: null });
         await expect(
             driver.philipsCloudDriver.pair!.poll(
                 { email: "owner@example.com" },
                 { vToken: "vt-1", code: "123456" }
             )
         ).rejects.toThrow(
-            "Polaris found no air purifier on this Philips account. What it saw: Air+: 0; HomeID: 0; HomeID app: 0. Check that the purifier is in the Air+ app under this same email."
+            "Polaris found no device on this Philips account. What it saw: Air+: 0; HomeID: 0; HomeID app: 0. Check that the device is in a Philips app under this same email."
         );
     });
 
@@ -367,6 +401,165 @@ describe("signing in with an emailed code", () => {
     });
 });
 
+// --- the third cloud --------------------------------------------------------------
+
+describe("going on to Philips' fan and heater cloud", () => {
+    const SECRET = `a_${"c0ffee00".repeat(4)}`;
+    let scratch = "";
+
+    beforeEach(async () => {
+        scratch = await mkdtemp(join(tmpdir(), "philips-file-test-"));
+    });
+
+    afterEach(async () => {
+        await rm(scratch, { recursive: true, force: true });
+    });
+
+    /** A token shaped like the backend's, ending in 2100, signed by nobody. */
+    const fixtureToken = () =>
+        `fixture.${Buffer.from(JSON.stringify({ exp: 4102444800 })).toString("base64url")}.fixture`;
+
+    /** An app file with the value in its code, as a stored ZIP. */
+    async function appFile(): Promise<string> {
+        const path = join(scratch, "air.apk");
+        await writeFile(
+            path,
+            zipFiles([{ name: "classes.dex", text: `dex\u0000 ${SECRET} \u0000code` }])
+        );
+        return path;
+    }
+
+    /** Philips' fan and heater cloud, for one account. */
+    function airMatters(options: { refuse?: boolean; devices?: unknown[] } = {}) {
+        route(
+            (url) => url.pathname === "/enduser/v2/getToken/",
+            () =>
+                jsonReply(
+                    options.refuse
+                        ? { meta: { code: 10001, message: "Lack of Signature" } }
+                        : { meta: { code: 0 }, data: { token: fixtureToken() } }
+                )
+        );
+        route(
+            (url) => url.pathname === "/enduser/deviceList/",
+            () =>
+                jsonReply({
+                    meta: { code: 0 },
+                    data: options.devices ?? [
+                        {
+                            device_id: "00000000000000000000000000000001",
+                            device_info: { name: "Fan1", modelid: "CX3550/01", type: "Trident" }
+                        },
+                        {
+                            device_id: "00000000000000000000000000000002",
+                            device_info: { name: "Heater", modelid: "CX5120/11", type: "Sirius" }
+                        }
+                    ]
+                })
+        );
+    }
+
+    async function toFileStep() {
+        const answer = await driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com" },
+            { vToken: "vt-1", code: "123456" }
+        );
+        if (answer.done || !answer.next) throw new Error("no file step");
+        return answer.next;
+    }
+
+    it("signs in with the account's id and the app's value, and keeps both", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        airMatters();
+        const next = await toFileStep();
+        const read = await driver.philipsCloudDriver.pair!.file!(await appFile());
+        // A handle, never the value.
+        expect(JSON.stringify(read)).not.toContain(SECRET);
+        const answer = await driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com" },
+            { ...next.state, ...read }
+        );
+        expect(answer).toMatchObject({
+            done: true,
+            credentials: {
+                email: "owner@example.com",
+                source: "none",
+                airMattersUser: "gigya-uid-1",
+                airMattersSecret: SECRET
+            },
+            unsupported: ["CX5120/11"]
+        });
+        const getToken = calls.find((call) => call.url.pathname === "/enduser/v2/getToken/")!;
+        expect(JSON.parse(String(getToken.init.body)).username).toBe("PHILIPS:gigya-uid-1");
+        // Used once: the same handles cannot finish a second pairing.
+        await expect(
+            driver.philipsCloudDriver.pair!.poll(
+                { email: "owner@example.com" },
+                { ...next.state, ...read }
+            )
+        ).rejects.toThrow("That step took too long and has run out. Start connecting again.");
+        expect(logged).toEqual([]);
+    });
+
+    it("keeps the step when the third cloud refuses the value, so another file can be tried", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        airMatters({ refuse: true });
+        const next = await toFileStep();
+        const read = await driver.philipsCloudDriver.pair!.file!(await appFile());
+        const poll = () =>
+            driver.philipsCloudDriver.pair!.poll(
+                { email: "owner@example.com" },
+                { ...next.state, ...read }
+            );
+        await expect(poll()).rejects.toThrow(
+            "Philips' fan and heater cloud refused the sign-in. Upload the Philips Air+ app again."
+        );
+        await expect(poll()).rejects.toThrow(/refused the sign-in/);
+    });
+
+    it("says what it saw in all three places when the third holds nothing either", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        airMatters({ devices: [] });
+        const next = await toFileStep();
+        const read = await driver.philipsCloudDriver.pair!.file!(await appFile());
+        await expect(
+            driver.philipsCloudDriver.pair!.poll(
+                { email: "owner@example.com" },
+                { ...next.state, ...read }
+            )
+        ).rejects.toThrow(
+            "What it saw: Air+: 0; HomeID: 0; HomeID app: 0; Philips Air: 0. Check that the device is in a Philips app under this same email."
+        );
+    });
+
+    it("refuses a handle it never gave out, or one for another address", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        const next = await toFileStep();
+        await expect(
+            driver.philipsCloudDriver.pair!.poll(
+                { email: "owner@example.com" },
+                { ticket: "made-up", appSecret: "made-up" }
+            )
+        ).rejects.toThrow(/has run out/);
+        await expect(
+            driver.philipsCloudDriver.pair!.poll(
+                { email: "someone-else@example.com" },
+                { ...next.state, skip: "1" }
+            )
+        ).rejects.toThrow(/has run out/);
+    });
+
+    it("will not go on without the app where there was nothing else", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        const next = await toFileStep();
+        await expect(
+            driver.philipsCloudDriver.pair!.poll(
+                { email: "owner@example.com" },
+                { ...next.state, skip: "1" }
+            )
+        ).rejects.toThrow("Upload the Philips Air+ app file to go on");
+    });
+});
 // --- keeping it alive -------------------------------------------------------------
 
 describe("renewing the sign-in", () => {
@@ -570,15 +763,27 @@ describe("finding the purifiers on an account", () => {
         expect(snapshot).toMatchObject({ externalId: "ext-2", name: "Hall", model: "AC1715/11" });
     });
 
-    it("leaves a kitchen appliance out, and says that is all there was", async () => {
+    it("keeps a kitchen appliance, and offers to go on without the Air+ app", async () => {
         philips({
             homeIdApp: {
                 appliances: [{ name: "Fryer", externalDeviceId: "ext-3", ctn: "HD9880/90" }]
             }
         });
-        await expect(sign()).rejects.toThrow(
-            "Polaris found appliances on this Philips account, but no air purifier. What it saw: Air+: 0; HomeID: 0; HomeID app: 1 (HD9880/90)."
+        const answer = await sign();
+        expect(answer).toMatchObject({
+            done: false,
+            next: { summary: "Air+: 0; HomeID: 0; HomeID app: 1 (HD9880/90)", skippable: true }
+        });
+        if (answer.done || !answer.next) throw new Error("no file step");
+        const skipped = await driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com" },
+            { ...answer.next.state, skip: "1" }
         );
+        expect(skipped).toMatchObject({
+            done: true,
+            credentials: { client: "homeid", source: "homeid-app" }
+        });
+        expect(skipped.done && "unsupported" in skipped).toBe(false);
     });
 
     it("notes a list that failed and still tries the next", async () => {
@@ -608,10 +813,14 @@ describe("finding the purifiers on an account", () => {
                 new Headers(init.headers).get("authorization") === homeid,
             reply: () => jsonReply({ message: "Forbidden" }, 403)
         });
-        await expect(sign()).rejects.toThrow(
-            "Polaris found an air purifier on this Philips account, but Philips does not let this sign-in control it. What it saw: Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0850/11); HomeID account: HTTP 401/403."
-        );
-        expect(logged).toHaveLength(1);
+        expect(await sign()).toMatchObject({
+            done: false,
+            next: {
+                summary:
+                    "Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0850/11); HomeID account: HTTP 401/403",
+                skippable: false
+            }
+        });
     });
 
     it("adds its own query to a backend link that already carries one", async () => {
@@ -627,9 +836,17 @@ describe("finding the purifiers on an account", () => {
     });
 
     it("logs what it saw once, with no token, id, email or code in it", async () => {
-        philips({ airplusDevices: [{ uuid: "secret-uuid", ctn: "HD9280/90" }] });
+        philips({ uid: null });
+        routes.unshift({
+            match: (url) => url.pathname.endsWith("/user/self/device"),
+            reply: () => jsonReply({ devices: [{ uuid: "secret-uuid", ctn: "HD9280/90" }] })
+        });
+        routes.unshift({
+            match: (url) => url.pathname.endsWith("/user/self"),
+            reply: () => jsonReply({ message: "Forbidden" }, 403)
+        });
         await expect(sign()).rejects.toThrow(
-            "What it saw: Air+: 1 (HD9280/90); HomeID: 0; HomeID app: network."
+            "What it saw: Air+: 1 (HD9280/90); HomeID: 1 (HD9280/90); HomeID app: network; Air+ account: HTTP 401/403; HomeID account: HTTP 401/403."
         );
         expect(logged).toHaveLength(1);
         const line = JSON.stringify(logged);

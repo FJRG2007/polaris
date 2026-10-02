@@ -436,7 +436,7 @@
         "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "tuyaRefused": "Tuya refused the request.",
         "reconnect": "{name} has to be connected again",
-        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} air {air purifier} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} setHumidity {change humidity} other {do that}}",
+        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} air {air purifier} appliance {kitchen appliance} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} setHumidity {change humidity} stop {stop} other {do that}}",
         "watchOnly": "{name} is set to be watched, not operated",
         "notConnected": "{name} is not connected to anything",
         "notAnswering": "{name} was not answering when it was last checked",
@@ -549,13 +549,20 @@
         "philipsCloudNoCode": "Philips did not send a code to that address. Check it is the one you sign in to the Air+ app with.",
         "philipsCloudUnfinished": "That address is not a finished Philips account yet. Sign in once in the Philips Air+ app, then try again.",
         "philipsCloudBadCode": "That code is not right or has expired. Ask for a new one.",
-        "philipsCloudQuiet": "The air purifier did not answer through Philips' cloud.",
-        "philipsCloudBusy": "The air purifier is busy. Try again in a moment.",
-        "philipsCloudLinkRefused": "Philips' cloud would not let Polaris reach this air purifier. Connect the account again.",
+        "philipsCloudQuiet": "The device did not answer through Philips' cloud.",
+        "philipsCloudBusy": "The device is busy. Try again in a moment.",
+        "philipsCloudLinkRefused": "Philips' cloud would not let Polaris reach this device. Connect the account again.",
         "philipsCloudNotOnAccount": "That device is not on this Philips account.",
         "philipsCloudEnterCode": "Enter the code from the email",
-        "philipsCloudOnlyOthers": "Polaris found appliances on this Philips account, but no air purifier. What it saw: {summary}.",
-        "philipsCloudNothing": "Polaris found no air purifier on this Philips account. What it saw: {summary}. Check that the purifier is in the Air+ app under this same email."
+        "philipsCloudNothing": "Polaris found no device on this Philips account. What it saw: {summary}. Check that the device is in a Philips app under this same email.",
+        "airMattersRefused": "Philips' fan and heater cloud refused the sign-in. Upload the Philips Air+ app again.",
+        "apkNotAnApp": "That file is not an app file. Upload the Philips Air+ app as an .apk, .apkm or .xapk file.",
+        "apkNoSecret": "Polaris could not find what it needs in that file. Upload the whole Philips Air+ app, not a split or language part of it.",
+        "apkAmbiguous": "That file holds more than one candidate, so Polaris cannot tell which one Philips uses. Upload the Philips Air+ app itself.",
+        "pairingRanOut": "That step took too long and has run out. Start connecting again.",
+        "uploadToGoOn": "Upload the Philips Air+ app file to go on",
+        "fileTooLarge": "That file is larger than an app file can be.",
+        "fileEmpty": "Nothing arrived. Choose the file again."
     },
     "connections": {
         "nuki-web": {
@@ -880,23 +887,31 @@
             }
         },
         "philips-cloud": {
-            "label": "Philips Air+ account",
-            "summary": "The purifiers on your Philips Air+ account, through Philips' cloud like the app. Works from any network.",
-            "note": "Unofficial: Philips publishes no API for this, so it could stop working if Philips changes its cloud. It signs in with a code Philips emails you, and no password is kept. Models it knows: AC0650, AC0651, AC1715 and AC3221; others show their readings and power only. If the unit is on the same network as Polaris, the local connection does not depend on Philips.",
+            "label": "Philips account",
+            "summary": "The air purifiers, fans and kitchen appliances on your Philips account, through Philips' cloud like its apps. Works from any network.",
+            "note": "Unofficial: Philips publishes no API for this, so it could stop working if Philips changes its cloud. It signs in with a code Philips emails you, and no password is kept. Purifier models it knows: AC0650, AC0651, AC1715, AC3221 and AC3360, and the CX3550 fan; others show their readings and power only. Kitchen appliances are shown, never started; an airfryer can be stopped. Fans and heaters need the Philips Air+ app file once. If a purifier is on the same network as Polaris, the local connection does not depend on Philips.",
             "steps": {
-                "s0": "Set the purifier up in the Philips Air+ app and sign in there with your email.",
+                "s0": "Set the device up in its Philips app (Air+, HomeID or NutriU) and sign in there with your email.",
                 "s1": "Type that email and select Email me a code. Philips sends you a one-time code.",
-                "s2": "Type the code here. Polaris lists the purifiers on the account."
+                "s2": "Type the code here. Polaris lists the devices on the account, and asks for the Philips Air+ app file if it needs it."
             },
             "fields": {
                 "email": {
                     "label": "Email",
-                    "hint": "The one you sign in to the Philips Air+ app with.",
+                    "hint": "The one you sign in to the Philips app with.",
                     "placeholder": "you@example.com"
                 }
             },
             "pairing": {
-                "prompt": "Philips has emailed a one-time code to that address. It can take a minute to arrive; check spam too."
+                "prompt": "Philips has emailed a one-time code to that address. It can take a minute to arrive; check spam too.",
+                "file": {
+                    "title": "Upload the Philips Air+ app file (.apk)",
+                    "why": "Philips' Air+ and HomeID lists hold no air device ({summary}). Fans, heaters and some purifiers are on a third Philips cloud, which only accepts sign-ins signed with a value Philips keeps inside its Air+ app. Polaris reads that value from the file without running it, keeps it encrypted with this connection and deletes the file.",
+                    "where": "Download it (com.philips.ph.homecare) from APKMirror in your browser; any version works.",
+                    "link": "APKMirror",
+                    "field": "Philips Air+ app file",
+                    "skip": "Connect without it"
+                }
             }
         },
         "notEmail": "Type a whole email address, like name@example.com."
@@ -1156,7 +1171,8 @@
             "light": "Light",
             "sensor": "Sensor",
             "climate": "Air conditioner",
-            "air": "Air purifier"
+            "air": "Air purifier",
+            "appliance": "Kitchen appliance"
         },
         "groups": {
             "lock": "Doors",
@@ -1166,7 +1182,8 @@
             "light": "Lights",
             "sensor": "Sensors",
             "climate": "Climate",
-            "air": "Air"
+            "air": "Air",
+            "appliance": "Kitchen"
         },
         "states": {
             "locked": "Locked",
@@ -1194,7 +1211,8 @@
             "set-temperature": "Temperature",
             "set-fan": "Fan speed",
             "set-option": "Setting",
-            "set-humidity": "Humidity"
+            "set-humidity": "Humidity",
+            "stop": "Stop"
         },
         "via": {
             "polaris": "from Polaris",
@@ -1221,7 +1239,8 @@
             "set-temperature": "Temperature set",
             "set-fan": "Fan speed changed",
             "set-option": "Setting changed",
-            "set-humidity": "Humidity set"
+            "set-humidity": "Humidity set",
+            "stop": "Stopped"
         },
         "kindStates": {
             "lock": {
@@ -1301,7 +1320,9 @@
                 "speed_3": "Speed 3",
                 "turbo": "Turbo",
                 "natural": "Natural",
-                "ventilation": "Ventilation"
+                "ventilation": "Ventilation",
+                "eco": "Eco",
+                "pet_hair": "Pet hair boost"
             },
             "speeds": {
                 "sleep": "Sleep",
@@ -1327,7 +1348,8 @@
             "options": {
                 "childLock": "Child lock",
                 "light": "Display light",
-                "humidify": "Humidify"
+                "humidify": "Humidify",
+                "oscillate": "Oscillation"
             },
             "filters": {
                 "pre": "Pre-filter",
@@ -1363,6 +1385,29 @@
                 "veryPoor": "Run it on high and spend little time in the room.",
                 "extremelyPoor": "Run it on turbo and stay out of the room if you can."
             }
+        },
+        "appliance": {
+            "types": {
+                "airfryer": "Airfryer",
+                "multicooker": "Multicooker",
+                "espresso": "Espresso machine"
+            },
+            "statuses": {
+                "standby": "Standby",
+                "idle": "Idle",
+                "mainmenu": "Main menu",
+                "setting": "Setting",
+                "parasetting": "Adjusting settings",
+                "precook": "Preparing",
+                "cooking": "Cooking",
+                "pause": "Paused",
+                "maintain": "Keeping warm",
+                "finish": "Finished",
+                "user_action": "Action needed",
+                "powersave": "Power saving",
+                "pairing": "Pairing"
+            },
+            "left": "{time} left"
         }
     },
     "devicesView": {
@@ -1441,6 +1486,19 @@
             "lifePercent": "{percent}% left",
             "lifeHours": "{hours} h left",
             "quality": "Air quality"
+        },
+        "appliance": {
+            "type": "Appliance",
+            "status": "Status",
+            "program": "Recipe",
+            "target": "Set to",
+            "current": "Now at",
+            "remaining": "Time left",
+            "total": "Set for",
+            "unknown": "It has not said what it is doing yet.",
+            "watchOnly": "Watched only: Polaris does not drive this model.",
+            "nothingToStop": "Nothing is running",
+            "stopName": "Stop {name}"
         }
     },
     "deviceDialog": {
@@ -1479,7 +1537,12 @@
             "getCode": "Email me a code",
             "codeField": "Code from the email",
             "resend": "Send a new code",
-            "codeExpired": "This code has expired. Ask for a new one."
+            "codeExpired": "This code has expired. Ask for a new one.",
+            "fileType": "Choose an {accept} file.",
+            "fileLarge": "That file is larger than an app file can be.",
+            "fileFailed": "The file could not be sent. Try again.",
+            "fileReading": "Reading the app file",
+            "fileSend": "Upload"
         },
         "unsupported": "Connected. {count, plural, one {This model is} other {These models are}} not supported yet ({models}): listed with power and what {count, plural, one {it reports} other {they report}}, but modes cannot be set from Polaris yet.",
         "done": "Done"
