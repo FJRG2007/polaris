@@ -160,6 +160,32 @@ export async function regeneratePassword(
     ownerId: string,
     restart: (serviceIds: readonly string[]) => void
 ): Promise<DependentService[]> {
+    await oneChangeAtATime(databaseId, () => changePassword(databaseId, ownerId));
+    const dependents = await dependentServices(databaseId, ownerId);
+    if (dependents.length > 0) restart(dependents.map((service) => service.id));
+    return dependents;
+}
+
+/** Password changes waiting or running, by database. */
+const passwordChanges = new Map<string, Promise<void>>();
+
+/**
+ * Run `work` once every change already asked of this database has finished.
+ * Two at once would each set the engine and each store their own, in whichever
+ * order they finish, and leave the stored password one the engine refuses.
+ */
+function oneChangeAtATime(databaseId: string, work: () => Promise<void>): Promise<void> {
+    const turn = (passwordChanges.get(databaseId) ?? Promise.resolve()).then(work);
+    const settled = turn.catch(() => undefined);
+    passwordChanges.set(databaseId, settled);
+    void settled.then(() => {
+        if (passwordChanges.get(databaseId) === settled) passwordChanges.delete(databaseId);
+    });
+    return turn;
+}
+
+/** Set a new password in the engine and store it, read from what is stored now. */
+async function changePassword(databaseId: string, ownerId: string): Promise<void> {
     const context = await instanceContext(databaseId, ownerId);
     if (!core.isDbEngine(context.engine)) {
         throw new DatabaseOperationError("An object store's keys are managed from its Buckets panel.");
@@ -190,10 +216,6 @@ export async function regeneratePassword(
         throw error;
     }
     forgetHealth(context.id);
-
-    const dependents = await dependentServices(databaseId, ownerId);
-    if (dependents.length > 0) restart(dependents.map((service) => service.id));
-    return dependents;
 }
 
 /** Host ports Polaris hands to applications (`hostPortForApp`), which a database

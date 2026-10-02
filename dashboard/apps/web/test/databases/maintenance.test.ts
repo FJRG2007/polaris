@@ -52,11 +52,12 @@ describe("removing an extension", () => {
 });
 
 describe("vacuuming a table", () => {
-    it("finds the table by bound schema and name, then vacuums it quoted, never FULL", async () => {
+    it("finds the table by bound schema and name, then vacuums it quoted with room past the browsing timeout, never FULL", async () => {
         const run = fake(true);
         await vacuumTable(run, "public", 'we"ird');
         expect(run.calls[0]?.params).toEqual(["public", 'we"ird']);
-        expect(run.calls[1]?.statement).toBe('VACUUM (ANALYZE) "public"."we""ird"');
+        expect(run.calls[1]?.statement).toBe("SET statement_timeout = 1800000");
+        expect(run.calls[2]?.statement).toBe('VACUUM (ANALYZE) "public"."we""ird"');
         await expect(vacuumTable(fake(false), "public", "missing")).rejects.toThrow("There is nothing here by that name.");
     });
 });

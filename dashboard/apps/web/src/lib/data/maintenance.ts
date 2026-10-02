@@ -34,6 +34,10 @@ const KEPT_EXTENSIONS = new Set(["plpgsql"]);
 /** How many extensions a list holds at most. A stock image ships about sixty. */
 const EXTENSION_LIMIT = 500;
 
+/** How long a vacuum may run. The connection's own limit is set for browsing,
+ *  and a bloated table - the one the Stats tab offers this for - outlasts it. */
+const VACUUM_TIMEOUT_MS = 30 * 60_000;
+
 function rowsOf(results: Awaited<ReturnType<Run>>): Record<string, unknown>[] {
     const result = results[0];
     if (!result) return [];
@@ -91,5 +95,6 @@ export async function vacuumTable(run: Run, schema: string, table: string): Prom
         )
     );
     if (known.length !== 1) throw new DataRequestError("There is nothing here by that name.");
+    await run(`SET statement_timeout = ${VACUUM_TIMEOUT_MS}`);
     await run(`VACUUM (ANALYZE) ${quoteQualified([schema, table], quoteSqlIdent)}`);
 }

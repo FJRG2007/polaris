@@ -108,6 +108,23 @@ describe("a new password", () => {
         expect((await admin.dependentServices(DB, "owner-1")).map((service) => service.id)).toEqual(["app-1", "app-2"]);
     });
 
+    it("sets and stores one change before the next one starts", async () => {
+        state.findFirst.mockResolvedValue({ environmentId: "env-1", slug: "shop", name: "Shop" });
+        const order: string[] = [];
+        state.runIn.mockImplementation(async () => {
+            order.push("engine");
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            return { code: 0, output: "" };
+        });
+        state.update.mockImplementation(async () => {
+            order.push("stored");
+            return {};
+        });
+        await Promise.all([admin.regeneratePassword(DB, "owner-1", vi.fn()), admin.regeneratePassword(DB, "owner-1", vi.fn())]);
+        expect(order).toEqual(["engine", "stored", "engine", "stored"]);
+        state.runIn.mockImplementation(async () => ({ code: 0, output: "" }));
+    });
+
     it("puts the old password back in the engine when it cannot be stored", async () => {
         state.update.mockRejectedValueOnce(new Error("database is down"));
         await expect(admin.regeneratePassword(DB, "owner-1", vi.fn())).rejects.toThrow("database is down");
