@@ -50,7 +50,8 @@ const deps = {
     },
     forward: (async (_client: unknown, host: string, port: number) => {
         forwarded.push({ host, port });
-        if (forwardFails) throw Object.assign(new Error("(SSH) Channel open failure: open failed"), forwardFails);
+        if (forwardFails)
+            throw Object.assign(new Error("(SSH) Channel open failure: open failed"), forwardFails);
         return { channel: `${host}:${port}`, close() {} } as never;
     }) as never
 };
@@ -199,9 +200,10 @@ describe("a changed key on the way in", () => {
             }
             return client(options.host) as never;
         };
-        const refused = await connectTunnel({ ...viaJump, jumpLabel: "bastion" }, { connect, forward: deps.forward }).catch(
-            (error: unknown) => error
-        );
+        const refused = await connectTunnel(
+            { ...viaJump, jumpLabel: "bastion" },
+            { connect, forward: deps.forward }
+        ).catch((error: unknown) => error);
         expect(refused).toBeInstanceOf(TunnelError);
         expect((refused as TunnelError).keyChanged).toEqual({ hop: "jump", presented: "NOT-BBBB" });
         expect((refused as Error).message).toMatch(/^bastion answered with a different SSH key/);
@@ -213,9 +215,9 @@ describe("a changed key on the way in", () => {
             options.onHostKey?.("CHANGED");
             throw new Error("Handshake failed");
         };
-        await expect(openTunnel(direct, "127.0.0.1", 5432, { connect, forward: deps.forward })).rejects.toThrow(
-            /different SSH key than the one pinned/
-        );
+        await expect(
+            openTunnel(direct, "127.0.0.1", 5432, { connect, forward: deps.forward })
+        ).rejects.toThrow(/different SSH key than the one pinned/);
     });
 
     it("reads the presented key without offering any credential", async () => {
@@ -238,6 +240,8 @@ describe("a changed key on the way in", () => {
     });
 
     it("prints a key the way OpenSSH does", () => {
-        expect(sshFingerprint(Buffer.from("key").toString("base64"))).toMatch(/^SHA256:[A-Za-z0-9+/]{43}$/);
+        expect(sshFingerprint(Buffer.from("key").toString("base64"))).toMatch(
+            /^SHA256:[A-Za-z0-9+/]{43}$/
+        );
     });
 });

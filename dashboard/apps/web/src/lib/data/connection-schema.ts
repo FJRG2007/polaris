@@ -257,7 +257,8 @@ export const saveConnectionSchema = z
                     code: "custom",
                     path: ["ssh", "passphrase"],
                     // i18n-ignore said in the reader's words by lib/data/words
-                    message: "Paste the private key this passphrase is for, or clear the passphrase."
+                    message:
+                        "Paste the private key this passphrase is for, or clear the passphrase."
                 });
             }
             if (ssh.privateKey) {
@@ -270,7 +271,8 @@ export const saveConnectionSchema = z
                           : shape.encrypted && !ssh.passphrase
                             ? KEY_REFUSALS.locked
                             : null;
-                if (message) context.addIssue({ code: "custom", path: ["ssh", "privateKey"], message });
+                if (message)
+                    context.addIssue({ code: "custom", path: ["ssh", "privateKey"], message });
             }
         }
         const host = hostname("database").safeParse(value.host ?? "");
@@ -285,7 +287,10 @@ export const saveConnectionSchema = z
             const issue = certificateIssue(value[field]);
             if (issue) context.addIssue({ code: "custom", path: [field], message: issue });
         }
-        if (value.tlsClientKey && !/-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----/.test(value.tlsClientKey)) {
+        if (
+            value.tlsClientKey &&
+            !/-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----/.test(value.tlsClientKey)
+        ) {
             context.addIssue({
                 code: "custom",
                 path: ["tlsClientKey"],
@@ -297,7 +302,8 @@ export const saveConnectionSchema = z
                 code: "custom",
                 path: ["tlsClientKey"],
                 // i18n-ignore said in the reader's words by lib/data/words
-                message: "This key is locked with a passphrase. Save a copy without one and use that file."
+                message:
+                    "This key is locked with a passphrase. Save a copy without one and use that file."
             });
         }
         // A certificate and its key are replaced together: one without the other
@@ -348,5 +354,7 @@ export function looksPublic(host: string): boolean {
     const name = host.trim().toLowerCase().replace(/\.$/, "");
     if (!name.includes(".")) return false;
     if (/^[\d.]+$/.test(name) || name.includes(":")) return false;
-    return !/\.(?:local|lan|internal|home|corp|localdomain|localhost|test|intranet|home\.arpa)$/.test(name);
+    return !/\.(?:local|lan|internal|home|corp|localdomain|localhost|test|intranet|home\.arpa)$/.test(
+        name
+    );
 }

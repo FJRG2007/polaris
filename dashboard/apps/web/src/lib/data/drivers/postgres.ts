@@ -74,7 +74,8 @@ export class PostgresDriver implements data.DataDriver {
             application_name: "polaris-data-browser"
         });
         await client.connect();
-        if (this.address.readOnly) await client.query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY");
+        if (this.address.readOnly)
+            await client.query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY");
         this.client = client;
         return client;
     }
@@ -153,10 +154,15 @@ export class PostgresDriver implements data.DataDriver {
         }));
     }
 
-    async rows(namespace: string | null, relation: string, query: data.RowQuery): Promise<data.DataPage> {
+    async rows(
+        namespace: string | null,
+        relation: string,
+        query: data.RowQuery
+    ): Promise<data.DataPage> {
         const client = await this.open();
         const columns = await this.columns(namespace, relation);
-        if (columns.length === 0) throw new data.DataRequestError("That table has no columns to read.");
+        if (columns.length === 0)
+            throw new data.DataRequestError("That table has no columns to read.");
         const target = quoteQualified([namespace ?? "public", relation], quoteSqlIdent);
 
         // Only a column this table actually has can be ordered by, and the name
@@ -198,7 +204,11 @@ export class PostgresDriver implements data.DataDriver {
         };
     }
 
-    async count(namespace: string | null, relation: string, filter: string | null): Promise<number> {
+    async count(
+        namespace: string | null,
+        relation: string,
+        filter: string | null
+    ): Promise<number> {
         const client = await this.open();
         const target = quoteQualified([namespace ?? "public", relation], quoteSqlIdent);
         const params: unknown[] = [];

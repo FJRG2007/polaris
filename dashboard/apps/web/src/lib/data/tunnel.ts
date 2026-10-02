@@ -48,7 +48,10 @@ export class TunnelError extends Error {
         message: string,
         /** Set when the cause was an SSH server presenting a key other than the
          *  pinned one: which hop, and the key it presented. */
-        readonly keyChanged: { readonly hop: "target" | "jump"; readonly presented: string } | null = null
+        readonly keyChanged: {
+            readonly hop: "target" | "jump";
+            readonly presented: string;
+        } | null = null
     ) {
         super(message);
         this.name = "TunnelError";
@@ -109,7 +112,10 @@ function watched(options: SshConnectOptions): {
 }
 
 /** Whether a hop failed because its key was not the pinned one. */
-function keyRefused(options: SshConnectOptions, presented: string | undefined): presented is string {
+function keyRefused(
+    options: SshConnectOptions,
+    presented: string | undefined
+): presented is string {
     return (
         presented !== undefined &&
         options.pinnedHostKey !== undefined &&
@@ -168,8 +174,10 @@ export async function connectTunnel(
 
 function forwardRefusal(error: unknown, server: string, host: string, port: number): TunnelError {
     const reason = (error as { reason?: unknown } | null)?.reason;
-    if (reason === ADMINISTRATIVELY_PROHIBITED) return new TunnelError(FORWARD_REFUSED.prohibited(server));
-    if (reason === CONNECT_FAILED) return new TunnelError(FORWARD_REFUSED.unreachable(server, `${host}:${port}`));
+    if (reason === ADMINISTRATIVELY_PROHIBITED)
+        return new TunnelError(FORWARD_REFUSED.prohibited(server));
+    if (reason === CONNECT_FAILED)
+        return new TunnelError(FORWARD_REFUSED.unreachable(server, `${host}:${port}`));
     console.error("databases: the SSH server did not forward to the database", error);
     return new TunnelError(tunnelFailed(server));
 }
@@ -204,9 +212,11 @@ export async function openTunnel(
         for (const client of clients) client.end();
     };
     try {
-        const channel = await deps.forward(clients[0]!, remoteHost, remotePort).catch((error: unknown) => {
-            throw forwardRefusal(error, tunnel.label, remoteHost, remotePort);
-        });
+        const channel = await deps
+            .forward(clients[0]!, remoteHost, remotePort)
+            .catch((error: unknown) => {
+                throw forwardRefusal(error, tunnel.label, remoteHost, remotePort);
+            });
         channel.close();
         const forward = await listenForward(clients[0]!, remoteHost, remotePort);
         return {

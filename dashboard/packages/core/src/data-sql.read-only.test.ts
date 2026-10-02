@@ -21,9 +21,7 @@ describe("PostgreSQL's grammar", () => {
     });
 
     it("does not let a comment marker inside a string hide the code after it", () => {
-        expect(
-            statementWrites("SELECT ' --', pg_terminate_backend(42)", "postgres")
-        ).toBe(true);
+        expect(statementWrites("SELECT ' --', pg_terminate_backend(42)", "postgres")).toBe(true);
         expect(statementWrites("SELECT '/*', pg_reload_conf(), '*/'", "postgres")).toBe(true);
     });
 

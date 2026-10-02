@@ -95,9 +95,7 @@ export class MysqlDriver implements data.DataDriver {
 
     async version(): Promise<string> {
         const connection = await this.open();
-        const [rows] = await connection.query<mysql.RowDataPacket[]>(
-            "SELECT VERSION() AS version"
-        );
+        const [rows] = await connection.query<mysql.RowDataPacket[]>("SELECT VERSION() AS version");
         return String(rows[0]?.version ?? "MySQL");
     }
 
@@ -164,7 +162,8 @@ export class MysqlDriver implements data.DataDriver {
     ): Promise<data.DataPage> {
         const connection = await this.open();
         const columns = await this.columns(namespace, relation);
-        if (columns.length === 0) throw new data.DataRequestError("That table has no columns to read.");
+        if (columns.length === 0)
+            throw new data.DataRequestError("That table has no columns to read.");
         const target = quoteQualified(
             [namespace ?? this.address.database ?? null, relation],
             quoteBacktickIdent
@@ -199,7 +198,11 @@ export class MysqlDriver implements data.DataDriver {
         return { columns, rows: rows as Record<string, unknown>[], total: null };
     }
 
-    async count(namespace: string | null, relation: string, filter: string | null): Promise<number> {
+    async count(
+        namespace: string | null,
+        relation: string,
+        filter: string | null
+    ): Promise<number> {
         const connection = await this.open();
         const target = quoteQualified(
             [namespace ?? this.address.database ?? null, relation],

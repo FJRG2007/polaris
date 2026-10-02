@@ -67,7 +67,9 @@ afterEach(() => {
 
 function open() {
     return render(
-        <ConnectionDialog connection={null} onClose={() => undefined} onSaved={() => undefined} />, { wrapper: MessagesWrapper });
+        <ConnectionDialog connection={null} onClose={() => undefined} onSaved={() => undefined} />,
+        { wrapper: MessagesWrapper }
+    );
 }
 
 /** A saved connection reached over SSH, as the list hands one to the form. */
@@ -97,7 +99,9 @@ function tunnelled(tunnel: Record<string, unknown>) {
             }
             onClose={() => undefined}
             onSaved={() => undefined}
-        />, { wrapper: MessagesWrapper });
+        />,
+        { wrapper: MessagesWrapper }
+    );
 }
 
 const MANUAL_TUNNEL = {

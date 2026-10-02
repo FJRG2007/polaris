@@ -45,7 +45,10 @@ export function quoteQualified(
     parts: readonly (string | null | undefined)[],
     quote: (name: string) => string
 ): string {
-    return parts.filter((part): part is string => Boolean(part)).map(quote).join(".");
+    return parts
+        .filter((part): part is string => Boolean(part))
+        .map(quote)
+        .join(".");
 }
 
 /**
@@ -363,8 +366,10 @@ export function redisCommandWrites(command: string): boolean {
     if (!REDIS_READS.has(name)) return true;
     const sub = (words[1] ?? "").toLowerCase();
     if (name === "config" && sub !== "get") return true;
-    if (name === "client" && !["list", "info", "getname", "id", "no-evict"].includes(sub)) return true;
-    if (name === "object" && !["encoding", "freq", "idletime", "refcount", "help"].includes(sub)) return true;
+    if (name === "client" && !["list", "info", "getname", "id", "no-evict"].includes(sub))
+        return true;
+    if (name === "object" && !["encoding", "freq", "idletime", "refcount", "help"].includes(sub))
+        return true;
     if (name === "memory" && !["usage", "stats", "doctor", "help"].includes(sub)) return true;
     if (name === "xinfo" && !["stream", "groups", "consumers", "help"].includes(sub)) return true;
     return false;

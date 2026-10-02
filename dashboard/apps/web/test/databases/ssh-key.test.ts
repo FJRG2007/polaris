@@ -39,7 +39,9 @@ function mpint(value: Buffer): Buffer {
     let start = 0;
     while (start < value.length - 1 && value[start] === 0) start += 1;
     const trimmed = value.subarray(start);
-    return wire((trimmed[0] as number) & 0x80 ? Buffer.concat([Buffer.from([0]), trimmed]) : trimmed);
+    return wire(
+        (trimmed[0] as number) & 0x80 ? Buffer.concat([Buffer.from([0]), trimmed]) : trimmed
+    );
 }
 
 /** The SSH public blob of a Node key object, built from its JWK - independently
@@ -48,8 +50,11 @@ function blobOf(publicKey: crypto.KeyObject): Buffer {
     const jwk = publicKey.export({ format: "jwk" });
     const b = (value: string | undefined) => Buffer.from(value ?? "", "base64url");
     if (jwk.kty === "OKP") return Buffer.concat([wire("ssh-ed25519"), wire(b(jwk.x))]);
-    if (jwk.kty === "RSA") return Buffer.concat([wire("ssh-rsa"), mpint(b(jwk.e)), mpint(b(jwk.n))]);
-    const curve = { "P-256": "nistp256", "P-384": "nistp384", "P-521": "nistp521" }[jwk.crv as string] as string;
+    if (jwk.kty === "RSA")
+        return Buffer.concat([wire("ssh-rsa"), mpint(b(jwk.e)), mpint(b(jwk.n))]);
+    const curve = { "P-256": "nistp256", "P-384": "nistp384", "P-521": "nistp521" }[
+        jwk.crv as string
+    ] as string;
     return Buffer.concat([
         wire(`ecdsa-sha2-${curve}`),
         wire(curve),
@@ -75,14 +80,20 @@ describe("keys ssh2 reads as they are", () => {
         });
         expect(sshKeyShape(pair.private)).toMatchObject({ kind: "private", encrypted: true });
         expect(readPrivateKey(pair.private, "correct horse").passphrase).toBe("correct horse");
-        expect(() => readPrivateKey(pair.private, "wrong")).toThrow(SSH_KEY_REFUSALS.wrongPassphrase);
+        expect(() => readPrivateKey(pair.private, "wrong")).toThrow(
+            SSH_KEY_REFUSALS.wrongPassphrase
+        );
         expect(() => readPrivateKey(pair.private, null)).toThrow(SSH_KEY_REFUSALS.locked);
     });
 
     it("refuses an OpenSSH key whose KDF would tie this server up", () => {
         // Made with 16 rounds, then told it needs 101, one over the cap: the rounds live in
         // the clear header, which is all an attacker has to write.
-        const pair = utils.generateKeyPairSync("ed25519", { passphrase: "p", cipher: "aes256-ctr", rounds: 16 });
+        const pair = utils.generateKeyPairSync("ed25519", {
+            passphrase: "p",
+            cipher: "aes256-ctr",
+            rounds: 16
+        });
         const body = Buffer.from(
             pair.private.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, ""),
             "base64"
@@ -98,7 +109,9 @@ ${body.toString("base64")}
     });
 
     it("takes an old PEM RSA key", () => {
-        const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+        const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", {
+            modulusLength: 2048
+        });
         const pem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
         expect(readPrivateKey(pem, null).fingerprint).toBe(fingerprintOf(blobOf(publicKey)));
     });
@@ -126,7 +139,11 @@ describe("keys converted to OpenSSH", () => {
         const pem = privateKey
             .export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase: "s3cret" })
             .toString();
-        expect(sshKeyShape(pem)).toMatchObject({ kind: "private", format: "pkcs8", encrypted: true });
+        expect(sshKeyShape(pem)).toMatchObject({
+            kind: "private",
+            format: "pkcs8",
+            encrypted: true
+        });
         const read = readPrivateKey(pem, "s3cret");
         expect(read.passphrase).toBeNull();
         expect(read.fingerprint).toBe(fingerprintOf(blobOf(publicKey)));
@@ -149,7 +166,11 @@ describe("keys converted to OpenSSH", () => {
     it("converts a PuTTY Ed25519 file, which ssh2 cannot read itself", () => {
         const { privateKey, publicKey } = crypto.generateKeyPairSync("ed25519");
         const jwk = privateKey.export({ format: "jwk" });
-        const ppk = puttyV2("ssh-ed25519", [Buffer.from(jwk.x!, "base64url")], [Buffer.from(jwk.d!, "base64url")]);
+        const ppk = puttyV2(
+            "ssh-ed25519",
+            [Buffer.from(jwk.x!, "base64url")],
+            [Buffer.from(jwk.d!, "base64url")]
+        );
         expect(utils.parseKey(ppk)).toBeInstanceOf(Error);
         expect(readPrivateKey(ppk, null).fingerprint).toBe(fingerprintOf(blobOf(publicKey)));
     });
@@ -164,14 +185,18 @@ describe("what is refused", () => {
     it("says a file that is not a key is not one", () => {
         expect(() => readPrivateKey("hello", null)).toThrow(SSH_KEY_REFUSALS.unknown);
         expect(() =>
-            readPrivateKey("-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----", null)
+            readPrivateKey(
+                "-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----",
+                null
+            )
         ).toThrow();
     });
 
     it("refuses a PuTTY file whose MAC does not match", () => {
         const plain = readFileSync(join(fixtures, "ppk_rsa"), "utf8");
-        const tampered = plain.replace(/Private-MAC: ([0-9a-f])/, (_all, first: string) =>
-            `Private-MAC: ${first === "0" ? "1" : "0"}`
+        const tampered = plain.replace(
+            /Private-MAC: ([0-9a-f])/,
+            (_all, first: string) => `Private-MAC: ${first === "0" ? "1" : "0"}`
         );
         expect(() => readPrivateKey(tampered, null)).toThrow(SSH_KEY_REFUSALS.unknown);
     });
@@ -192,7 +217,13 @@ function puttyV2(algorithm: string, publicParts: Buffer[], privateParts: Buffer[
     const mac = crypto
         .createHmac("sha1", macKey)
         .update(
-            Buffer.concat([string(algorithm), string("none"), string(comment), string(publicBlob), string(privateBlob)])
+            Buffer.concat([
+                string(algorithm),
+                string("none"),
+                string(comment),
+                string(publicBlob),
+                string(privateBlob)
+            ])
         )
         .digest("hex");
     const lines = (blob: Buffer) => blob.toString("base64").match(/.{1,64}/g) ?? [];

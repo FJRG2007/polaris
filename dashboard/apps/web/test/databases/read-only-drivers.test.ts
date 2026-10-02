@@ -108,9 +108,13 @@ describe("PostgreSQL, any mode", () => {
 
 describe("MongoDB aggregation stages", () => {
     it("treats $out and $merge as writes, however deep", () => {
-        expect(writesThroughStage({ aggregate: "users", pipeline: [{ $match: {} }, { $out: "copy" }] })).toBe(true);
         expect(
-            writesThroughStage({ explain: { aggregate: "u", pipeline: [{ $facet: { a: [{ $merge: "x" }] } }] } })
+            writesThroughStage({ aggregate: "users", pipeline: [{ $match: {} }, { $out: "copy" }] })
+        ).toBe(true);
+        expect(
+            writesThroughStage({
+                explain: { aggregate: "u", pipeline: [{ $facet: { a: [{ $merge: "x" }] } }] }
+            })
         ).toBe(true);
         expect(writesThroughStage({ find: "users", filter: { active: true } })).toBe(false);
     });

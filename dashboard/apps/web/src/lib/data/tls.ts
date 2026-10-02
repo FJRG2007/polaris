@@ -39,12 +39,23 @@ export interface DataTls {
 }
 
 /** No encryption. */
-export const NO_TLS: DataTls = { mode: "disable", ca: null, clientCert: null, clientKey: null, name: null };
+export const NO_TLS: DataTls = {
+    mode: "disable",
+    ca: null,
+    clientCert: null,
+    clientKey: null,
+    name: null
+};
 
 /** The mode a row saved before modes existed is read as: its switch said
  *  "encrypted, not verified", which is `require`. */
 export function legacyTlsMode(tlsOn: boolean, mode: string | null | undefined): TlsMode {
-    if (mode === "disable" || mode === "require" || mode === "verify-ca" || mode === "verify-full") {
+    if (
+        mode === "disable" ||
+        mode === "require" ||
+        mode === "verify-ca" ||
+        mode === "verify-full"
+    ) {
         return mode;
     }
     return tlsOn ? "require" : "disable";
@@ -54,7 +65,9 @@ export function legacyTlsMode(tlsOn: boolean, mode: string | null | undefined): 
  * The options for `tls.connect` - or null for a plain connection. The SNI name
  * is only set when it is a name: an address in SNI is refused by RFC 6066.
  */
-export function tlsConnectOptions(settings: DataTls | null | undefined): tls.ConnectionOptions | null {
+export function tlsConnectOptions(
+    settings: DataTls | null | undefined
+): tls.ConnectionOptions | null {
     if (!settings || settings.mode === "disable") return null;
     const options: tls.ConnectionOptions = {};
     if (settings.name && !isAddress(settings.name)) options.servername = settings.name;
@@ -84,11 +97,11 @@ function isAddress(name: string): boolean {
 export const TLS_REFUSALS = {
     untrusted:
         "The database's certificate is not signed by an authority this connection trusts, so nothing was sent to it. If its certificate was replaced, check it in the connection's settings.",
-    expired: "The database's certificate has expired or is not valid yet, so nothing was sent to it.",
+    expired:
+        "The database's certificate has expired or is not valid yet, so nothing was sent to it.",
     wrongName: (name: string) =>
         `The database's certificate is not for ${name}, so nothing was sent to it.`,
-    noTls:
-        "This database server does not accept encrypted connections. Turn encryption off for it, or turn TLS on at the server."
+    noTls: "This database server does not accept encrypted connections. Turn encryption off for it, or turn TLS on at the server."
 } as const;
 
 const UNTRUSTED = new Set([
@@ -114,12 +127,17 @@ export function tlsRefusal(error: unknown, name: string | null): string | null {
         const message = typeof link.message === "string" ? link.message : "";
         if (UNTRUSTED.has(code)) return TLS_REFUSALS.untrusted;
         if (EXPIRED.has(code)) return TLS_REFUSALS.expired;
-        if (code === "ERR_TLS_CERT_ALTNAME_INVALID" || /Hostname\/IP does not match/i.test(message)) {
+        if (
+            code === "ERR_TLS_CERT_ALTNAME_INVALID" ||
+            /Hostname\/IP does not match/i.test(message)
+        ) {
             return TLS_REFUSALS.wrongName(name ?? "this server");
         }
         if (
             code === "HANDSHAKE_NO_SSL_SUPPORT" ||
-            /does not support SSL|does not support secure connection|SSL is not enabled/i.test(message)
+            /does not support SSL|does not support secure connection|SSL is not enabled/i.test(
+                message
+            )
         ) {
             return TLS_REFUSALS.noTls;
         }
@@ -130,7 +148,12 @@ export function tlsRefusal(error: unknown, name: string | null): string | null {
 function* causes(error: unknown): Generator<{ code?: unknown; message?: unknown }> {
     let current: unknown = error;
     for (let depth = 0; depth < 6 && current && typeof current === "object"; depth += 1) {
-        const link = current as { code?: unknown; message?: unknown; cause?: unknown; reason?: unknown };
+        const link = current as {
+            code?: unknown;
+            message?: unknown;
+            cause?: unknown;
+            reason?: unknown;
+        };
         yield link;
         current = link.cause ?? link.reason;
     }

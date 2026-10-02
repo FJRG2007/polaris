@@ -31,7 +31,15 @@ describe("classifyAddress", () => {
     });
 
     it("calls loopback and private ranges internal", () => {
-        for (const address of ["127.0.0.1", "10.1.2.3", "172.20.0.5", "192.168.1.10", "100.64.0.1", "::1", "fd12::1"]) {
+        for (const address of [
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.20.0.5",
+            "192.168.1.10",
+            "100.64.0.1",
+            "::1",
+            "fd12::1"
+        ]) {
             expect(classifyAddress(address), address).toBe("internal");
         }
     });
@@ -50,7 +58,9 @@ describe("classifyAddress", () => {
 
 describe("resolveEgress", () => {
     it("refuses a member's private address, naming the way round it", async () => {
-        await expect(resolveEgress("10.0.0.5", "member")).rejects.toThrow(/over SSH through a server of yours/);
+        await expect(resolveEgress("10.0.0.5", "member")).rejects.toThrow(
+            /over SSH through a server of yours/
+        );
     });
 
     it("lets whoever runs the instance reach its own network", async () => {
@@ -61,12 +71,16 @@ describe("resolveEgress", () => {
     });
 
     it("refuses the metadata service to everybody", async () => {
-        await expect(resolveEgress("169.254.169.254", "instance")).rejects.toBeInstanceOf(EgressRefusal);
+        await expect(resolveEgress("169.254.169.254", "instance")).rejects.toBeInstanceOf(
+            EgressRefusal
+        );
     });
 
     it("judges what a name resolves to, not the name", async () => {
-        const lookup = answers({ "postgres": ["172.18.0.4"], "db.example.com": ["203.0.113.9"] });
-        await expect(resolveEgress("postgres", "member", lookup)).rejects.toThrow(/private network/);
+        const lookup = answers({ postgres: ["172.18.0.4"], "db.example.com": ["203.0.113.9"] });
+        await expect(resolveEgress("postgres", "member", lookup)).rejects.toThrow(
+            /private network/
+        );
         await expect(resolveEgress("db.example.com", "member", lookup)).resolves.toEqual({
             address: "203.0.113.9",
             name: "db.example.com"
@@ -75,7 +89,9 @@ describe("resolveEgress", () => {
 
     it("refuses a name with any internal answer among public ones", async () => {
         const lookup = answers({ "mixed.example.com": ["203.0.113.9", "127.0.0.1"] });
-        await expect(resolveEgress("mixed.example.com", "member", lookup)).rejects.toThrow(/private network/);
+        await expect(resolveEgress("mixed.example.com", "member", lookup)).rejects.toThrow(
+            /private network/
+        );
     });
 
     it("says a name that resolves to nothing is not found", async () => {

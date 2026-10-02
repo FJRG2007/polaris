@@ -296,7 +296,11 @@ export function ConnectionDialog({
     const keyLocked = keyShape?.kind === "private" && keyShape.encrypted;
 
     // What ssh2 itself makes of the key, asked once the text settles.
-    const [keyRead, setKeyRead] = useState<{ text: string; error?: string; summary?: string } | null>(null);
+    const [keyRead, setKeyRead] = useState<{
+        text: string;
+        error?: string;
+        summary?: string;
+    } | null>(null);
     useEffect(() => {
         if (sshAuth !== "key" || !sshKey.trim() || keyShape?.kind !== "private") {
             setKeyRead(null);
@@ -392,7 +396,9 @@ export function ConnectionDialog({
         <Dialog open onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{connection ? t("dialog.editTitle") : t("dialog.newTitle")}</DialogTitle>
+                    <DialogTitle>
+                        {connection ? t("dialog.editTitle") : t("dialog.newTitle")}
+                    </DialogTitle>
                     <DialogDescription>{t("dialog.intro")}</DialogDescription>
                 </DialogHeader>
 
@@ -438,7 +444,9 @@ export function ConnectionDialog({
                                     />
                                 </Field>
                                 {chosenManaged?.refusal ? (
-                                    <p className="text-xs text-warning">{dataText(t, chosenManaged.refusal)}</p>
+                                    <p className="text-xs text-warning">
+                                        {dataText(t, chosenManaged.refusal)}
+                                    </p>
                                 ) : (
                                     chosenManaged &&
                                     !chosenManaged.reachable && (
@@ -459,7 +467,11 @@ export function ConnectionDialog({
                                         onValueChange={(next) => setEngine(next as typeof engine)}
                                     />
                                 </Field>
-                                <Field label={t("dialog.port")} className="w-24 shrink-0" error={shown("port", port)}>
+                                <Field
+                                    label={t("dialog.port")}
+                                    className="w-24 shrink-0"
+                                    error={shown("port", port)}
+                                >
                                     <Input
                                         inputMode="numeric"
                                         value={port}
@@ -497,7 +509,11 @@ export function ConnectionDialog({
                                 label={t("dialog.password")}
                                 error={
                                     passwordAgain
-                                        ? t(sameDestination ? "dialog.passwordAgainTls" : "dialog.passwordAgain")
+                                        ? t(
+                                              sameDestination
+                                                  ? "dialog.passwordAgainTls"
+                                                  : "dialog.passwordAgain"
+                                          )
                                         : undefined
                                 }
                                 hint={connection?.hasPassword ? t("dialog.keepSaved") : undefined}
@@ -506,12 +522,19 @@ export function ConnectionDialog({
                                     type="password"
                                     autoComplete="new-password"
                                     value={password}
-                                    placeholder={connection?.hasPassword ? t("dialog.savedSecret") : undefined}
+                                    placeholder={
+                                        connection?.hasPassword
+                                            ? t("dialog.savedSecret")
+                                            : undefined
+                                    }
                                     onChange={(event) => setPassword(event.target.value)}
                                 />
                             </Field>
 
-                            <Field label={t("dialog.tls")} hint={t(`dialog.tlsModes.${tlsMode}.hint`)}>
+                            <Field
+                                label={t("dialog.tls")}
+                                hint={t(`dialog.tlsModes.${tlsMode}.hint`)}
+                            >
                                 <Select
                                     value={tlsMode}
                                     onValueChange={(next) => {
@@ -519,15 +542,20 @@ export function ConnectionDialog({
                                         setTlsMode(next as schema.TlsMode);
                                     }}
                                     aria-label={t("dialog.tls")}
-                                    options={(["disable", "require", "verify-ca", "verify-full"] as const).map(
-                                        (mode) => ({ value: mode, label: t(`dialog.tlsModes.${mode}.label`) })
-                                    )}
+                                    options={(
+                                        ["disable", "require", "verify-ca", "verify-full"] as const
+                                    ).map((mode) => ({
+                                        value: mode,
+                                        label: t(`dialog.tlsModes.${mode}.label`)
+                                    }))}
                                 />
                             </Field>
                             {tlsMode === "require" && (
                                 <p className="flex items-start gap-2 text-xs text-warning">
                                     <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-                                    {savedTls?.legacy ? t("dialog.tlsLegacy") : t("dialog.tlsUnverified")}
+                                    {savedTls?.legacy
+                                        ? t("dialog.tlsLegacy")
+                                        : t("dialog.tlsUnverified")}
                                 </p>
                             )}
                             {verifying && (
@@ -535,12 +563,16 @@ export function ConnectionDialog({
                                     <Field label={t("dialog.tlsTrust")}>
                                         <Select
                                             value={tlsTrust}
-                                            onValueChange={(next) => setTlsTrust(next as schema.TlsTrust)}
+                                            onValueChange={(next) =>
+                                                setTlsTrust(next as schema.TlsTrust)
+                                            }
                                             aria-label={t("dialog.tlsTrust")}
-                                            options={(["system", "upload", "server"] as const).map((trust) => ({
-                                                value: trust,
-                                                label: t(`dialog.tlsTrusts.${trust}`)
-                                            }))}
+                                            options={(["system", "upload", "server"] as const).map(
+                                                (trust) => ({
+                                                    value: trust,
+                                                    label: t(`dialog.tlsTrusts.${trust}`)
+                                                })
+                                            )}
                                         />
                                     </Field>
                                     {tlsTrust === "upload" && (
@@ -560,7 +592,9 @@ export function ConnectionDialog({
                                     )}
                                     {tlsTrust === "server" && (
                                         <>
-                                            <p className="text-xs text-muted-foreground">{t("dialog.tlsServerNote")}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {t("dialog.tlsServerNote")}
+                                            </p>
                                             {connection &&
                                                 savedTls?.trust === "server" &&
                                                 savedTls.authority &&
@@ -592,7 +626,8 @@ export function ConnectionDialog({
                                                 onChange={setClientCert}
                                                 saved={
                                                     keepsSecrets
-                                                        ? (savedTls?.clientCertificate?.subject ?? null)
+                                                        ? (savedTls?.clientCertificate?.subject ??
+                                                          null)
                                                         : null
                                                 }
                                                 error={shown("tlsClientCert", clientCert)}
@@ -710,7 +745,10 @@ export function ConnectionDialog({
                                                     setSshAuth(next as schema.SshAuthMethod)
                                                 }
                                                 options={[
-                                                    { value: "password", label: t("dialog.password") },
+                                                    {
+                                                        value: "password",
+                                                        label: t("dialog.password")
+                                                    },
                                                     { value: "key", label: t("dialog.privateKey") }
                                                 ]}
                                             />
@@ -727,23 +765,32 @@ export function ConnectionDialog({
                                                         type="password"
                                                         autoComplete="new-password"
                                                         value={sshPassword}
-                                                        placeholder={keepsSshSecret ? t("dialog.savedSecret") : undefined}
+                                                        placeholder={
+                                                            keepsSshSecret
+                                                                ? t("dialog.savedSecret")
+                                                                : undefined
+                                                        }
                                                         onChange={(event) =>
                                                             setSshPassword(event.target.value)
                                                         }
                                                     />
                                                 </Field>
-                                            ) : keepsSshSecret && !replacingKey && saved?.mode === "manual" ? (
+                                            ) : keepsSshSecret &&
+                                              !replacingKey &&
+                                              saved?.mode === "manual" ? (
                                                 <div className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-xs">
                                                     <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="font-medium text-foreground">{t("dialog.keySaved")}</p>
+                                                        <p className="font-medium text-foreground">
+                                                            {t("dialog.keySaved")}
+                                                        </p>
                                                         {saved.keyFingerprint && (
                                                             <p
                                                                 className="truncate font-mono text-muted-foreground"
                                                                 title={`${saved.keyType ?? ""} ${saved.keyFingerprint}`}
                                                             >
-                                                                {saved.keyType} {saved.keyFingerprint}
+                                                                {saved.keyType}{" "}
+                                                                {saved.keyFingerprint}
                                                             </p>
                                                         )}
                                                     </div>
@@ -767,7 +814,8 @@ export function ConnectionDialog({
                                                         secret
                                                         placeholder={t("dialog.keyPlaceholder")}
                                                         hint={
-                                                            keyRead?.text === sshKey && keyRead.summary
+                                                            keyRead?.text === sshKey &&
+                                                            keyRead.summary
                                                                 ? keyRead.summary
                                                                 : t("dialog.privateKeyHint")
                                                         }
@@ -777,14 +825,19 @@ export function ConnectionDialog({
                                                         <Field
                                                             label={t("dialog.passphrase")}
                                                             hint={t("dialog.passphraseHint")}
-                                                            error={shown("ssh.passphrase", sshPassphrase)}
+                                                            error={shown(
+                                                                "ssh.passphrase",
+                                                                sshPassphrase
+                                                            )}
                                                         >
                                                             <Input
                                                                 type="password"
                                                                 autoComplete="off"
                                                                 value={sshPassphrase}
                                                                 onChange={(event) =>
-                                                                    setSshPassphrase(event.target.value)
+                                                                    setSshPassphrase(
+                                                                        event.target.value
+                                                                    )
                                                                 }
                                                             />
                                                         </Field>
@@ -794,7 +847,11 @@ export function ConnectionDialog({
                                             {(servers.length > 0 || jumpGone) && (
                                                 <Field
                                                     label={t("dialog.jump")}
-                                                    error={jumpUnpicked ? t("dialog.jumpGone") : undefined}
+                                                    error={
+                                                        jumpUnpicked
+                                                            ? t("dialog.jumpGone")
+                                                            : undefined
+                                                    }
                                                     hint={t("dialog.jumpHint")}
                                                 >
                                                     <Select
@@ -843,7 +900,9 @@ export function ConnectionDialog({
                             role="status"
                             className={cn(
                                 "rounded-md px-3 py-2 text-sm",
-                                tested.ok ? "bg-success-soft text-success-ink" : "bg-danger-soft text-danger-ink"
+                                tested.ok
+                                    ? "bg-success-soft text-success-ink"
+                                    : "bg-danger-soft text-danger-ink"
                             )}
                         >
                             {tested.text}
@@ -867,7 +926,11 @@ export function ConnectionDialog({
                             onClick={() => void test()}
                             disabled={!complete || testing}
                         >
-                            {testing ? <Loader2 className="size-4 animate-spin" /> : <Activity className="size-4" />}
+                            {testing ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Activity className="size-4" />
+                            )}
                             {t("dialog.test")}
                         </Button>
                     )}
@@ -886,7 +949,10 @@ export function ConnectionDialog({
 }
 
 /** Whether the tunnel in the form leads to the same place as the saved one. */
-function sameTunnel(saved: DataConnectionView["tunnel"], ssh: schema.SshTunnelInput | null): boolean {
+function sameTunnel(
+    saved: DataConnectionView["tunnel"],
+    ssh: schema.SshTunnelInput | null
+): boolean {
     if (!saved || !ssh) return !saved && !ssh;
     if (saved.mode === "server" || ssh.mode === "server") {
         return saved.mode === "server" && ssh.mode === "server" && saved.hostId === ssh.hostId;
@@ -975,7 +1041,11 @@ function FileField({
                 aria-label={label}
                 aria-invalid={said ? true : undefined}
                 value={value}
-                placeholder={saved ? t("dialog.savedFile", { what: saved }) : (placeholder ?? t("dialog.filePlaceholder"))}
+                placeholder={
+                    saved
+                        ? t("dialog.savedFile", { what: saved })
+                        : (placeholder ?? t("dialog.filePlaceholder"))
+                }
                 onChange={(event) => onChange(event.target.value)}
                 onDragOver={(event) => {
                     event.preventDefault();
@@ -987,9 +1057,17 @@ function FileField({
                     setOver(false);
                     take(event.dataTransfer.files?.[0]);
                 }}
-                className={cn("font-mono text-xs", secret && value && "[-webkit-text-security:disc]", over && "border-primary")}
+                className={cn(
+                    "font-mono text-xs",
+                    secret && value && "[-webkit-text-security:disc]",
+                    over && "border-primary"
+                )}
             />
-            {said ? <span className="text-danger">{said}</span> : hint ? <span className="break-all">{hint}</span> : null}
+            {said ? (
+                <span className="text-danger">{said}</span>
+            ) : hint ? (
+                <span className="break-all">{hint}</span>
+            ) : null}
         </div>
     );
 }
@@ -1014,8 +1092,13 @@ function HostKeyCheck({ connectionId, pinned }: { connectionId: string; pinned: 
     const check = async () => {
         setState({ kind: "busy" });
         const result = await actions.checkHostKeyAction(connectionId);
-        if (result.error || !result.check) return setState({ kind: "failed", text: result.error ?? "" });
-        setState(result.check.matches ? { kind: "same" } : { kind: "changed", presented: result.check.presented });
+        if (result.error || !result.check)
+            return setState({ kind: "failed", text: result.error ?? "" });
+        setState(
+            result.check.matches
+                ? { kind: "same" }
+                : { kind: "changed", presented: result.check.presented }
+        );
     };
     const trust = async (fingerprint: string) => {
         setState({ kind: "busy" });
@@ -1033,20 +1116,35 @@ function HostKeyCheck({ connectionId, pinned }: { connectionId: string; pinned: 
                         {current}
                     </p>
                 </div>
-                <Button variant="outline" size="sm" disabled={state.kind === "busy"} onClick={() => void check()}>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={state.kind === "busy"}
+                    onClick={() => void check()}
+                >
                     {state.kind === "busy" && <Loader2 className="size-4 animate-spin" />}
                     {t("dialog.checkKey")}
                 </Button>
             </div>
             {state.kind === "same" && <p className="text-success-ink">{t("dialog.keySame")}</p>}
-            {state.kind === "trusted" && <p className="text-success-ink">{t("dialog.keyTrusted")}</p>}
+            {state.kind === "trusted" && (
+                <p className="text-success-ink">{t("dialog.keyTrusted")}</p>
+            )}
             {state.kind === "failed" && <p className="text-danger">{state.text}</p>}
             {state.kind === "changed" && (
-                <div role="alert" className="flex flex-col gap-2 rounded-md bg-danger-soft p-2 text-danger-ink">
+                <div
+                    role="alert"
+                    className="flex flex-col gap-2 rounded-md bg-danger-soft p-2 text-danger-ink"
+                >
                     <p className="font-medium">{t("dialog.keyDifferent")}</p>
                     <p className="break-all font-mono">{state.presented}</p>
                     <p>{t("dialog.keyDifferentHint")}</p>
-                    <Button variant="danger" size="sm" className="self-start" onClick={() => void trust(state.presented)}>
+                    <Button
+                        variant="danger"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => void trust(state.presented)}
+                    >
                         {t("dialog.trustKey")}
                     </Button>
                 </div>
@@ -1076,7 +1174,8 @@ function CertificateCheck({
     const check = async () => {
         setState({ kind: "busy" });
         const result = await actions.checkCertificateAction(connectionId);
-        if (result.error || !result.check) return setState({ kind: "failed", text: result.error ?? "" });
+        if (result.error || !result.check)
+            return setState({ kind: "failed", text: result.error ?? "" });
         setState(
             result.check.matches
                 ? { kind: "same" }
@@ -1101,20 +1200,33 @@ function CertificateCheck({
                     <p className="truncate font-medium text-foreground" title={trusted.subject}>
                         {trusted.subject}
                     </p>
-                    <p className="truncate font-mono text-muted-foreground" title={trusted.fingerprint}>
+                    <p
+                        className="truncate font-mono text-muted-foreground"
+                        title={trusted.fingerprint}
+                    >
                         {trusted.fingerprint}
                     </p>
                 </div>
-                <Button variant="outline" size="sm" disabled={state.kind === "busy"} onClick={() => void check()}>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={state.kind === "busy"}
+                    onClick={() => void check()}
+                >
                     {state.kind === "busy" && <Loader2 className="size-4 animate-spin" />}
                     {t("dialog.checkCert")}
                 </Button>
             </div>
             {state.kind === "same" && <p className="text-success-ink">{t("dialog.certSame")}</p>}
-            {state.kind === "trusted" && <p className="text-success-ink">{t("dialog.certTrusted")}</p>}
+            {state.kind === "trusted" && (
+                <p className="text-success-ink">{t("dialog.certTrusted")}</p>
+            )}
             {state.kind === "failed" && <p className="text-danger">{state.text}</p>}
             {state.kind === "changed" && (
-                <div role="alert" className="flex flex-col gap-2 rounded-md bg-danger-soft p-2 text-danger-ink">
+                <div
+                    role="alert"
+                    className="flex flex-col gap-2 rounded-md bg-danger-soft p-2 text-danger-ink"
+                >
                     <p className="font-medium">{t("dialog.certDifferent")}</p>
                     <p className="break-all">{state.subject}</p>
                     <p className="break-all font-mono">{state.fingerprint}</p>

@@ -7,7 +7,13 @@
 import { describe, expect, it } from "vitest";
 import { legacyTlsMode, tlsConnectOptions, tlsRefusal, NO_TLS, type DataTls } from "@/lib/data/tls";
 
-const base: DataTls = { mode: "verify-full", ca: null, clientCert: null, clientKey: null, name: "db.example.com" };
+const base: DataTls = {
+    mode: "verify-full",
+    ca: null,
+    clientCert: null,
+    clientKey: null,
+    name: "db.example.com"
+};
 
 describe("tlsConnectOptions", () => {
     it("is nothing at all when encryption is off", () => {
@@ -15,7 +21,9 @@ describe("tlsConnectOptions", () => {
     });
 
     it("checks nothing only in require, the mode that says so", () => {
-        expect(tlsConnectOptions({ ...base, mode: "require" })).toMatchObject({ rejectUnauthorized: false });
+        expect(tlsConnectOptions({ ...base, mode: "require" })).toMatchObject({
+            rejectUnauthorized: false
+        });
     });
 
     it("verifies the chain and the name in verify-full", () => {

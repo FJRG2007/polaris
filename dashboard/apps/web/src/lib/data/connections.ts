@@ -192,13 +192,16 @@ export const CONNECTION_REFUSALS = {
     sshSecretAgain:
         "Enter the SSH password or key again. The SSH server changed, and a saved login is only sent to the server it was saved for.",
     caMissing: "Upload the certificate of the authority that signed the server's certificate.",
-    caInvalid: "That certificate file could not be read. Use a PEM file with one or more certificates.",
+    caInvalid:
+        "That certificate file could not be read. Use a PEM file with one or more certificates.",
     clientMissing: "Add the client certificate and its key.",
     clientInvalid: "That client certificate and key could not be read, or do not belong together.",
-    keyChangedAgain: "The server's key changed again since you checked it. Check it again before trusting it.",
+    keyChangedAgain:
+        "The server's key changed again since you checked it. Check it again before trusting it.",
     certificateChangedAgain:
         "The server's certificate changed again since you checked it. Check it again before trusting it.",
-    notTrustOnFirstUse: "This connection does not trust the server's own certificate, so there is nothing to check.",
+    notTrustOnFirstUse:
+        "This connection does not trust the server's own certificate, so there is nothing to check.",
     notManualTunnel: "This connection has no SSH login of its own to check.",
     secretUnreadable: "The saved password could not be read. Enter it again."
 } as const;
@@ -532,7 +535,12 @@ function polarisAddress(): DataAddress | null {
         database,
         username: decodeURIComponent(url.username) || null,
         password: decodeURIComponent(url.password) || null,
-        tls: { ...NO_TLS, mode, ca: mode.startsWith("verify") ? polarisAuthority(url) : null, name: url.hostname },
+        tls: {
+            ...NO_TLS,
+            mode,
+            ca: mode.startsWith("verify") ? polarisAuthority(url) : null,
+            name: url.hostname
+        },
         readOnly: true
     };
 }
@@ -590,7 +598,8 @@ export async function saveConnection(userId: string, input: SaveConnectionInput)
     const existing = parsed.id
         ? await prisma.dataConnection.findFirst({ where: { id: parsed.id, ownerId: userId } })
         : null;
-    if (parsed.id && !existing) throw new DataConnectionError("That connection is not there any more.");
+    if (parsed.id && !existing)
+        throw new DataConnectionError("That connection is not there any more.");
 
     const id = existing?.id ?? randomUUID();
     const { fields } = await prepareConnection(userId, parsed, existing);
@@ -620,7 +629,8 @@ export async function testDraft(
     const existing = parsed.id
         ? await prisma.dataConnection.findFirst({ where: { id: parsed.id, ownerId: userId } })
         : null;
-    if (parsed.id && !existing) throw new DataConnectionError("That connection is not there any more.");
+    if (parsed.id && !existing)
+        throw new DataConnectionError("That connection is not there any more.");
     if (parsed.managedDatabaseId) {
         return open(await managedAddress(userId, parsed.managedDatabaseId, true));
     }
@@ -666,14 +676,18 @@ async function prepareConnection(
     const dialled = parsed.ssh ? null : await judged(parsed.host, scope);
 
     const sameDestination = existing !== null && sameRoute(existing, parsed, tunnel);
-    const weaker = existing !== null && weakerTls(legacyTlsMode(existing.tls, existing.tlsMode), parsed.tlsMode);
+    const weaker =
+        existing !== null &&
+        weakerTls(legacyTlsMode(existing.tls, existing.tlsMode), parsed.tlsMode);
     const keepsSecrets = sameDestination && !weaker;
     const previous = existing ? storedSecrets(existing, Boolean(parsed.password)) : {};
     // A password is only ever sent to the address it was typed for, and over a
     // channel at least as safe as the one it was typed for.
     if (!parsed.password && previous.password !== undefined && !keepsSecrets) {
         throw new DataConnectionError(
-            sameDestination ? CONNECTION_REFUSALS.passwordAgainTls : CONNECTION_REFUSALS.passwordAgain
+            sameDestination
+                ? CONNECTION_REFUSALS.passwordAgainTls
+                : CONNECTION_REFUSALS.passwordAgain
         );
     }
     const stored = keepsSecrets ? previous : {};
@@ -855,7 +869,8 @@ async function tlsColumns(
 /** Every certificate in an uploaded authority file, re-written as PEM so what is
  *  stored is exactly what was parsed. */
 function readAuthorities(text: string): string {
-    const blocks = text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? [];
+    const blocks =
+        text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? [];
     if (blocks.length === 0 || blocks.length > MAX_AUTHORITIES) {
         throw new DataConnectionError(CONNECTION_REFUSALS.caInvalid);
     }
@@ -889,7 +904,8 @@ async function readServerCertificate(
         try {
             return await probeServerCertificate(target.engine, { host, port, name: target.host });
         } catch (error) {
-            if (error instanceof CertificateProbeError) throw new DataConnectionError(error.message);
+            if (error instanceof CertificateProbeError)
+                throw new DataConnectionError(error.message);
             throw error;
         }
     };
@@ -924,7 +940,11 @@ const CLEAR_TUNNEL = {
 };
 
 type TunnelColumnValues = {
-    -readonly [K in keyof typeof CLEAR_TUNNEL]: (typeof CLEAR_TUNNEL)[K] | string | number | Uint8Array;
+    -readonly [K in keyof typeof CLEAR_TUNNEL]:
+        | (typeof CLEAR_TUNNEL)[K]
+        | string
+        | number
+        | Uint8Array;
 } & {
     sshMode: string | null;
     sshHostId: string | null;
@@ -961,7 +981,11 @@ async function tunnelColumns(
     if (!ssh) return { columns: { ...CLEAR_TUNNEL }, tunnel: null };
 
     if (ssh.mode === "server") {
-        const server = await ownServer(userId, ssh.hostId, "The server to tunnel through is not one of yours.");
+        const server = await ownServer(
+            userId,
+            ssh.hostId,
+            "The server to tunnel through is not one of yours."
+        );
         return {
             columns: { ...CLEAR_TUNNEL, sshMode: "server", sshHostId: ssh.hostId },
             tunnel: { target: serverOptions(server), jump: null, label: server.name }
@@ -986,9 +1010,16 @@ async function tunnelColumns(
         stored.sshUsername === ssh.username;
     const typed = typedSecret(ssh);
     const keepSecret =
-        !typed && sameServer && stored?.sshAuthMethod === ssh.authMethod && stored.sshEncryptedCredential;
+        !typed &&
+        sameServer &&
+        stored?.sshAuthMethod === ssh.authMethod &&
+        stored.sshEncryptedCredential;
     if (!typed && !keepSecret) {
-        if (!sameServer && stored?.sshEncryptedCredential && stored.sshAuthMethod === ssh.authMethod) {
+        if (
+            !sameServer &&
+            stored?.sshEncryptedCredential &&
+            stored.sshAuthMethod === ssh.authMethod
+        ) {
             throw new DataConnectionError(CONNECTION_REFUSALS.sshSecretAgain);
         }
         throw new DataConnectionError(
@@ -997,7 +1028,8 @@ async function tunnelColumns(
                 : "Paste the private key for the SSH login."
         );
     }
-    const credentials: SshCredentials = typed?.credentials ?? readSshCredentials(stored as StoredRow);
+    const credentials: SshCredentials =
+        typed?.credentials ?? readSshCredentials(stored as StoredRow);
     const keySummary = typed ? typed.summary : (stored?.sshKeySummary ?? null);
 
     // The key already on record for this same login. A re-save keeps being
@@ -1005,7 +1037,8 @@ async function tunnelColumns(
     // trust whatever answers at that address - and only the route to it can have
     // changed, so the jump server is no part of this.
     const pinned: string | null = sameServer && stored?.sshHostKey ? stored.sshHostKey : null;
-    const unchanged = !typed && pinned !== null && (stored?.sshJumpHostId ?? null) === ssh.jumpHostId;
+    const unchanged =
+        !typed && pinned !== null && (stored?.sshJumpHostId ?? null) === ssh.jumpHostId;
 
     let hostKey = unchanged ? pinned : null;
     if (!hostKey) {
@@ -1044,7 +1077,9 @@ async function tunnelColumns(
             sshPort: ssh.port,
             sshUsername: ssh.username,
             sshAuthMethod: ssh.authMethod,
-            sshEncryptedCredential: blob ? blob.ciphertext : (stored?.sshEncryptedCredential ?? null),
+            sshEncryptedCredential: blob
+                ? blob.ciphertext
+                : (stored?.sshEncryptedCredential ?? null),
             sshCredentialNonce: blob ? blob.nonce : (stored?.sshCredentialNonce ?? null),
             sshCredentialKeyId: blob ? blob.keyId : (stored?.sshCredentialKeyId ?? null),
             sshHostKey: hostKey,
@@ -1080,7 +1115,9 @@ function typedSecret(
     ssh: Extract<Parsed["ssh"], { mode: "manual" }>
 ): { credentials: SshCredentials; summary: string | null } | null {
     if (ssh.authMethod === "password") {
-        return ssh.password ? { credentials: { method: "password", password: ssh.password }, summary: null } : null;
+        return ssh.password
+            ? { credentials: { method: "password", password: ssh.password }, summary: null }
+            : null;
     }
     if (!ssh.privateKey) return null;
     let key;
@@ -1301,11 +1338,16 @@ export interface HostKeyCheck {
 async function manualTunnelRow(userId: string, id: string) {
     const row = await savedRow(userId, id);
     const view = tunnelView(row);
-    if (!view || view.mode !== "manual") throw new DataConnectionError(CONNECTION_REFUSALS.notManualTunnel);
+    if (!view || view.mode !== "manual")
+        throw new DataConnectionError(CONNECTION_REFUSALS.notManualTunnel);
     const broken = tunnelBroken(view);
     if (broken) throw new DataConnectionError(broken);
     const jump = view.jumpHostId
-        ? await ownServer(userId, view.jumpHostId, "The server this tunnel jumps through is not one of yours any more.")
+        ? await ownServer(
+              userId,
+              view.jumpHostId,
+              "The server this tunnel jumps through is not one of yours any more."
+          )
         : null;
     const host = jump ? view.host : await judged(view.host, await egressScope(userId));
     return { row, view, jump, host };
@@ -1335,7 +1377,11 @@ export async function checkHostKey(userId: string, id: string): Promise<HostKeyC
  * in between is not trusted on the strength of the first look. The stored login
  * is then signed in with, against that key, before anything is written.
  */
-export async function trustHostKey(userId: string, id: string, fingerprint: string): Promise<string> {
+export async function trustHostKey(
+    userId: string,
+    id: string,
+    fingerprint: string
+): Promise<string> {
     const { row, view, jump, host } = await manualTunnelRow(userId, id);
     const presented = await presentedHostKey(
         { host, port: view.port, username: view.username },
@@ -1404,13 +1450,20 @@ export async function checkCertificate(userId: string, id: string): Promise<Cert
 
 /** Trust the certificate the server presents now, if it is the one the reader
  *  was shown. */
-export async function trustCertificate(userId: string, id: string, fingerprint: string): Promise<CertificateSummary> {
+export async function trustCertificate(
+    userId: string,
+    id: string,
+    fingerprint: string
+): Promise<CertificateSummary> {
     const { row, tunnel, dialled, target } = await trustOnFirstUseRow(userId, id);
     const presented = await readServerCertificate(target, tunnel, dialled);
     if (presented.summary.fingerprint !== fingerprint) {
         throw new DataConnectionError(CONNECTION_REFUSALS.certificateChangedAgain);
     }
-    await prisma.dataConnection.update({ where: { id: row.id }, data: { tlsCaCert: presented.anchor } });
+    await prisma.dataConnection.update({
+        where: { id: row.id },
+        data: { tlsCaCert: presented.anchor }
+    });
     return presented.summary;
 }
 
@@ -1464,9 +1517,11 @@ export async function managedAddress(
         return address(engine, container, enginePort, credentials, readOnly, hosted, null);
     }
     if (published) {
-        if (local) return address(engine, "127.0.0.1", published, credentials, readOnly, hosted, null);
+        if (local)
+            return address(engine, "127.0.0.1", published, credentials, readOnly, hosted, null);
         const tunnel = await targetTunnel(row.target.host?.id ?? null);
-        if (tunnel) return address(engine, "127.0.0.1", published, credentials, readOnly, hosted, tunnel);
+        if (tunnel)
+            return address(engine, "127.0.0.1", published, credentials, readOnly, hosted, tunnel);
         const host = row.target.host?.address as string;
         return address(engine, host, published, credentials, readOnly, hosted, null);
     }

@@ -10,6 +10,9 @@ import type { ParsedKey } from "ssh2";
 
 /** A parsed key, a list of them for a file that holds several, or the parser's
  *  own error. */
-export function parseKey(data: string | Buffer, passphrase?: string | Buffer): ParsedKey | ParsedKey[] | Error {
+export function parseKey(
+    data: string | Buffer,
+    passphrase?: string | Buffer
+): ParsedKey | ParsedKey[] | Error {
     return utils.parseKey(data, passphrase) as ParsedKey | ParsedKey[] | Error;
 }

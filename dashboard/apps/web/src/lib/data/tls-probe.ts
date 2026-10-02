@@ -50,11 +50,9 @@ export class CertificateProbeError extends Error {
 }
 
 export const PROBE_REFUSALS = {
-    noTls:
-        "This database server does not accept encrypted connections. Turn encryption off for it, or turn TLS on at the server.",
+    noTls: "This database server does not accept encrypted connections. Turn encryption off for it, or turn TLS on at the server.",
     unreachable: (where: string) => `Polaris could not reach ${where} to read its certificate.`,
-    noRoot:
-        "The server's certificate is signed by an authority it does not send, so there is nothing to trust on first use. Upload that authority's certificate instead."
+    noRoot: "The server's certificate is signed by an authority it does not send, so there is nothing to trust on first use. Upload that authority's certificate instead."
 } as const;
 
 /** Where to dial, and the name the certificate is read for. */
@@ -120,7 +118,11 @@ function selfIssued(certificate: tls.DetailedPeerCertificate): boolean {
 }
 
 function toPem(der: Buffer): string {
-    const body = der.toString("base64").match(/.{1,64}/g)?.join("\n") ?? "";
+    const body =
+        der
+            .toString("base64")
+            .match(/.{1,64}/g)
+            ?.join("\n") ?? "";
     return `-----BEGIN CERTIFICATE-----\n${body}\n-----END CERTIFICATE-----\n`;
 }
 
@@ -141,16 +143,15 @@ async function handshake(
     trust?: string
 ): Promise<tls.DetailedPeerCertificate> {
     const socket = dial(target.host, target.port);
-    const timer = setTimeout(
-        () => socket.destroy(new Error("probe timed out")),
-        PROBE_TIMEOUT_MS
-    );
+    const timer = setTimeout(() => socket.destroy(new Error("probe timed out")), PROBE_TIMEOUT_MS);
     try {
         await new Promise<void>((resolve, reject) => {
             socket.once("connect", resolve);
             socket.once("error", reject);
         }).catch(() => {
-            throw new CertificateProbeError(PROBE_REFUSALS.unreachable(`${target.name}:${target.port}`));
+            throw new CertificateProbeError(
+                PROBE_REFUSALS.unreachable(`${target.name}:${target.port}`)
+            );
         });
 
         if (engine === "postgres") await postgresPreamble(socket);
@@ -210,7 +211,8 @@ async function mysqlPreamble(socket: Socket): Promise<void> {
     const versionEnd = greeting.indexOf(0, 1);
     // version, NUL, connection id (4), auth data (8), filler (1), then flags.
     const flagsAt = versionEnd + 1 + 4 + 8 + 1;
-    if (versionEnd < 0 || flagsAt + 2 > greeting.length) throw new CertificateProbeError(PROBE_REFUSALS.noTls);
+    if (versionEnd < 0 || flagsAt + 2 > greeting.length)
+        throw new CertificateProbeError(PROBE_REFUSALS.noTls);
     if ((greeting.readUInt16LE(flagsAt) & CLIENT_SSL) === 0) {
         throw new CertificateProbeError(PROBE_REFUSALS.noTls);
     }

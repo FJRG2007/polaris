@@ -90,7 +90,11 @@ vi.mock("@/lib/host-service", () => {
             this.name = "HostCredentialsError";
         }
     }
-    return { HostCredentialsError, getHostConnection, getHostConnectionUnscoped: getHostConnection };
+    return {
+        HostCredentialsError,
+        getHostConnection,
+        getHostConnectionUnscoped: getHostConnection
+    };
 
     async function getHostConnection(hostId: string, ownerId: string) {
         if (ownerId !== ALICE) throw new Error("Host not found");
@@ -660,7 +664,13 @@ describe("the list", () => {
 describe("a saved password", () => {
     it("is kept by an edit that still points at the same database", async () => {
         saved = [row({ host: "db.example.com" })];
-        await saveConnection(ALICE, { ...base, id: CONNECTION, host: "db.example.com", password: null, name: "Renamed" });
+        await saveConnection(ALICE, {
+            ...base,
+            id: CONNECTION,
+            host: "db.example.com",
+            password: null,
+            name: "Renamed"
+        });
         const sealed = JSON.parse((written?.encryptedCredential as Buffer).toString("utf8"));
         expect(sealed).toEqual({ password: "app-secret" });
     });
@@ -668,7 +678,12 @@ describe("a saved password", () => {
     it("is not sent to a new address: the edit asks for it again", async () => {
         saved = [row({ host: "db.example.com" })];
         await expect(
-            saveConnection(ALICE, { ...base, id: CONNECTION, host: "ssh.example.com", password: null })
+            saveConnection(ALICE, {
+                ...base,
+                id: CONNECTION,
+                host: "ssh.example.com",
+                password: null
+            })
         ).rejects.toThrow(/Enter the password again/);
         expect(written).toBeNull();
     });
@@ -696,7 +711,9 @@ describe("a saved password", () => {
                 sshPort: 22,
                 sshUsername: "root",
                 sshAuthMethod: "key",
-                sshEncryptedCredential: Buffer.from(JSON.stringify({ method: "key", privateKey: KEY })),
+                sshEncryptedCredential: Buffer.from(
+                    JSON.stringify({ method: "key", privateKey: KEY })
+                ),
                 sshCredentialNonce: Buffer.from("nonce"),
                 sshCredentialKeyId: "k1",
                 sshHostKey: Buffer.from("hostkey").toString("base64"),
@@ -711,6 +728,8 @@ describe("a saved password", () => {
             hasPassword: true,
             tunnel: { keyType: "ssh-ed25519", keyFingerprint: "SHA256:abc" }
         });
-        expect((listed[0]?.tunnel as { hostKeyFingerprint: string }).hostKeyFingerprint).toMatch(/^SHA256:/);
+        expect((listed[0]?.tunnel as { hostKeyFingerprint: string }).hostKeyFingerprint).toMatch(
+            /^SHA256:/
+        );
     });
 });

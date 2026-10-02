@@ -95,7 +95,8 @@ describe("splitting a box of SQL", () => {
     });
 
     it("keeps a PostgreSQL dollar-quoted body whole", () => {
-        const body = "CREATE FUNCTION f() RETURNS int AS $$ BEGIN; RETURN 1; END; $$ LANGUAGE plpgsql";
+        const body =
+            "CREATE FUNCTION f() RETURNS int AS $$ BEGIN; RETURN 1; END; $$ LANGUAGE plpgsql";
         expect(splitStatements(body, "postgres")).toEqual([body]);
     });
 

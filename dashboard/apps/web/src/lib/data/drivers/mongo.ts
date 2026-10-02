@@ -62,7 +62,8 @@ export function writesThroughStage(value: unknown, depth = 0): boolean {
     if (depth > 32 || value === null || typeof value !== "object") return false;
     if (Array.isArray(value)) return value.some((entry) => writesThroughStage(entry, depth + 1));
     return Object.entries(value as Record<string, unknown>).some(
-        ([key, nested]) => key === "$out" || key === "$merge" || writesThroughStage(nested, depth + 1)
+        ([key, nested]) =>
+            key === "$out" || key === "$merge" || writesThroughStage(nested, depth + 1)
     );
 }
 
@@ -138,13 +139,12 @@ export class MongoDriver implements data.DataDriver {
         const name = namespace ?? this.address.database;
         if (!name) return [];
         const collections = await client.db(name).listCollections().toArray();
-        return collections
-            .map((entry) => ({
-                name: entry.name,
-                namespace: name,
-                kind: entry.type === "view" ? ("view" as const) : ("collection" as const),
-                rows: null
-            }));
+        return collections.map((entry) => ({
+            name: entry.name,
+            namespace: name,
+            kind: entry.type === "view" ? ("view" as const) : ("collection" as const),
+            rows: null
+        }));
     }
 
     async columns(namespace: string | null, relation: string): Promise<data.DataColumn[]> {
@@ -309,12 +309,15 @@ function typeName(value: unknown): string {
  *  gets to ask a server to do. */
 function parseCommand(command: string): Document {
     const text = command.trim();
-    if (!text) throw new data.DataRequestError("Type a command document, for example { find: \"users\", limit: 20 }.");
+    if (!text)
+        throw new data.DataRequestError(
+            'Type a command document, for example { find: "users", limit: 20 }.'
+        );
     try {
         return JSON.parse(text) as Document;
     } catch {
         throw new data.DataRequestError(
-            "That is not a command document. Mongo takes JSON here, for example { find: \"users\", filter: { active: true }, limit: 20 } - with the field names quoted."
+            'That is not a command document. Mongo takes JSON here, for example { find: "users", filter: { active: true }, limit: 20 } - with the field names quoted.'
         );
     }
 }

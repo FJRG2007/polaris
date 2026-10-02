@@ -31,20 +31,24 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That name is too long.": "refusals.nameTooLong",
     "Unknown engine.": "refusals.unknownEngine",
     "Pick a database.": "refusals.pickDatabase",
-    "Paste the private key this passphrase is for, or clear the passphrase.": "refusals.passphraseAlone",
+    "Paste the private key this passphrase is for, or clear the passphrase.":
+        "refusals.passphraseAlone",
     "That file is too large.": "refusals.fileTooLarge",
     "That is a public key. Use the private key - the file without .pub.": "refusals.publicKey",
-    "That is not a private key Polaris can read. Use an OpenSSH, PEM or PuTTY key.": "refusals.notAKey",
+    "That is not a private key Polaris can read. Use an OpenSSH, PEM or PuTTY key.":
+        "refusals.notAKey",
     "This key is locked with a passphrase. Enter it below.": "refusals.keyLocked",
     "That file holds a private key. Use the certificate here.": "refusals.certIsKey",
     "That is not a PEM certificate.": "refusals.notACert",
     "That is not a PEM private key.": "refusals.notAPemKey",
-    "This key is locked with a passphrase. Save a copy without one and use that file.": "refusals.pemKeyLocked",
+    "This key is locked with a passphrase. Save a copy without one and use that file.":
+        "refusals.pemKeyLocked",
     "Add the key that goes with this certificate.": "refusals.clientKeyMissing",
     "Add the certificate that goes with this key.": "refusals.clientCertMissing",
     // Reading a private key.
     "That passphrase does not unlock this key.": "refusals.wrongPassphrase",
-    "Polaris cannot use this kind of key. Use an Ed25519, ECDSA or RSA key.": "refusals.keyUnsupported",
+    "Polaris cannot use this kind of key. Use an Ed25519, ECDSA or RSA key.":
+        "refusals.keyUnsupported",
     "This key asks for more work to unlock than Polaris allows. Save it again with fewer KDF rounds (100 or less).":
         "refusals.keyTooCostly",
     "This PuTTY key is locked in PuTTY's newer format, which Polaris cannot unlock. In PuTTYgen, export it as an OpenSSH key, or save it with no passphrase, and use that file.":
@@ -52,7 +56,8 @@ const EXACT: Readonly<Record<string, Key>> = {
     // TLS.
     "The database's certificate is not signed by an authority this connection trusts, so nothing was sent to it. If its certificate was replaced, check it in the connection's settings.":
         "refusals.certUntrusted",
-    "The database's certificate has expired or is not valid yet, so nothing was sent to it.": "refusals.certExpired",
+    "The database's certificate has expired or is not valid yet, so nothing was sent to it.":
+        "refusals.certExpired",
     "This database server does not accept encrypted connections. Turn encryption off for it, or turn TLS on at the server.":
         "refusals.noTls",
     "The server's certificate is signed by an authority it does not send, so there is nothing to trust on first use. Upload that authority's certificate instead.":
@@ -64,14 +69,19 @@ const EXACT: Readonly<Record<string, Key>> = {
         "refusals.passwordAgain",
     "Enter the SSH password or key again. The SSH server changed, and a saved login is only sent to the server it was saved for.":
         "refusals.sshSecretAgain",
-    "Upload the certificate of the authority that signed the server's certificate.": "refusals.caMissing",
-    "That certificate file could not be read. Use a PEM file with one or more certificates.": "refusals.caInvalid",
+    "Upload the certificate of the authority that signed the server's certificate.":
+        "refusals.caMissing",
+    "That certificate file could not be read. Use a PEM file with one or more certificates.":
+        "refusals.caInvalid",
     "Add the client certificate and its key.": "refusals.clientMissing",
-    "That client certificate and key could not be read, or do not belong together.": "refusals.clientInvalid",
-    "The server's key changed again since you checked it. Check it again before trusting it.": "refusals.keyChangedAgain",
+    "That client certificate and key could not be read, or do not belong together.":
+        "refusals.clientInvalid",
+    "The server's key changed again since you checked it. Check it again before trusting it.":
+        "refusals.keyChangedAgain",
     "The server's certificate changed again since you checked it. Check it again before trusting it.":
         "refusals.certChangedAgain",
-    "This connection does not trust the server's own certificate, so there is nothing to check.": "refusals.notTofu",
+    "This connection does not trust the server's own certificate, so there is nothing to check.":
+        "refusals.notTofu",
     "This connection has no SSH login of its own to check.": "refusals.notManualTunnel",
     "The saved password could not be read. Enter it again.": "refusals.secretUnreadable",
     // The connection service.
@@ -80,8 +90,10 @@ const EXACT: Readonly<Record<string, Key>> = {
     "Enter the password for the SSH login.": "refusals.sshPassword",
     "Paste the private key for the SSH login.": "refusals.sshKey",
     "That database is not one you can open.": "refusals.notYours",
-    "The server this connection tunnels through is not one of yours any more.": "refusals.tunnelGone",
-    "This connection's SSH login is incomplete. Edit it and save it again.": "refusals.sshIncomplete",
+    "The server this connection tunnels through is not one of yours any more.":
+        "refusals.tunnelGone",
+    "This connection's SSH login is incomplete. Edit it and save it again.":
+        "refusals.sshIncomplete",
     "The server this tunnel jumps through is not one of yours any more.": "refusals.jumpGone",
     "That database is not there any more.": "refusals.databaseGone",
     "An object store is browsed from its Buckets panel, not as a database.": "refusals.objectStore",
@@ -100,7 +112,8 @@ const EXACT: Readonly<Record<string, Key>> = {
     "No such column to change.": "refusals.noSuchColumn",
     "That column is part of the primary key. Changing it moves the row, so it goes through the statement box.":
         "refusals.primaryKeyColumn",
-    "That row cannot be identified - the page it came from did not carry its whole primary key.": "refusals.rowUnknown",
+    "That row cannot be identified - the page it came from did not carry its whole primary key.":
+        "refusals.rowUnknown",
     "Open a database first.": "refusals.openFirst",
     'Type a command document, for example { find: "users", limit: 20 }.': "refusals.mongoEmpty",
     'That is not a command document. Mongo takes JSON here, for example { find: "users", filter: { active: true }, limit: 20 } - with the field names quoted.':
@@ -115,8 +128,10 @@ const EXACT: Readonly<Record<string, Key>> = {
         "insights.noPerformanceSchema",
     // What the list says about a connection.
     "Read-only. Polaris itself runs on this one.": "notes.polaris",
-    "The server this connection tunnels through was removed from Servers. Edit it to pick another.": "notes.tunnelRemoved",
-    "The server this tunnel jumps through was removed from Servers. Edit it to pick another.": "notes.jumpRemoved"
+    "The server this connection tunnels through was removed from Servers. Edit it to pick another.":
+        "notes.tunnelRemoved",
+    "The server this tunnel jumps through was removed from Servers. Edit it to pick another.":
+        "notes.jumpRemoved"
 };
 
 /** What a read-only connection refused, by what the driver said it was. */
@@ -181,7 +196,11 @@ const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
         "refusals.certUnreachable",
         ["target"]
     ],
-    [/^The database's certificate is not for (.+), so nothing was sent to it\.$/, "refusals.certWrongName", ["host"]],
+    [
+        /^The database's certificate is not for (.+), so nothing was sent to it\.$/,
+        "refusals.certWrongName",
+        ["host"]
+    ],
     [
         /^Polaris does not connect to (\S+): it is a link-local or metadata address, which never holds a database\.$/,
         "refusals.egressForbidden",
@@ -221,7 +240,10 @@ export function dataText(t: Words, message: string | undefined): string | undefi
         const params: Record<string, string> = {};
         names.forEach((name, index) => {
             const value = match[index + 1] ?? "";
-            params[name] = name === "secret" ? t(value === "password" ? "refusals.secretPassword" : "refusals.secretKey") : value;
+            params[name] =
+                name === "secret"
+                    ? t(value === "password" ? "refusals.secretPassword" : "refusals.secretKey")
+                    : value;
         });
         return t(key, params);
     }
@@ -250,11 +272,11 @@ export function whereText(t: Words, where: string): string {
  *  label that is matched. A figure a newer driver adds keeps its own name. */
 const STAT_LABELS: Readonly<Record<string, Key>> = {
     "Commands a second": "stats.labels.commandsPerSecond",
-    "Connections": "stats.labels.connections",
-    "Memory": "stats.labels.memory",
-    "Keys": "stats.labels.keys",
+    Connections: "stats.labels.connections",
+    Memory: "stats.labels.memory",
+    Keys: "stats.labels.keys",
     "Memory fragmentation": "stats.labels.fragmentation",
-    "Commands": "stats.labels.commands",
+    Commands: "stats.labels.commands",
     "Cache hits": "stats.labels.cacheHits",
     "Cache misses": "stats.labels.cacheMisses",
     "Expired keys": "stats.labels.expiredKeys",
@@ -264,29 +286,29 @@ const STAT_LABELS: Readonly<Record<string, Key>> = {
     "Bytes out": "stats.labels.bytesOut",
     "Running queries": "stats.labels.runningQueries",
     "Size on disk": "stats.labels.sizeOnDisk",
-    "Transactions": "stats.labels.transactions",
-    "Rollbacks": "stats.labels.rollbacks",
+    Transactions: "stats.labels.transactions",
+    Rollbacks: "stats.labels.rollbacks",
     "Blocks read from disk": "stats.labels.blocksFromDisk",
     "Rows read": "stats.labels.rowsRead",
     "Rows inserted": "stats.labels.rowsInserted",
     "Rows updated": "stats.labels.rowsUpdated",
     "Rows deleted": "stats.labels.rowsDeleted",
-    "Deadlocks": "stats.labels.deadlocks",
+    Deadlocks: "stats.labels.deadlocks",
     "Spilled to disk": "stats.labels.spilled",
-    "Statements": "stats.labels.statements",
-    "Selects": "stats.labels.selects",
-    "Writes": "stats.labels.writes",
+    Statements: "stats.labels.statements",
+    Selects: "stats.labels.selects",
+    Writes: "stats.labels.writes",
     "Buffer pool hits": "stats.labels.bufferHits",
     "Read from disk": "stats.labels.readFromDisk",
     "Slow queries": "stats.labels.slowQueries",
     "Refused connections": "stats.labels.refusedConnections",
     "Connections free": "stats.labels.connectionsFree",
-    "Collections": "stats.labels.collections",
-    "Documents": "stats.labels.documents",
-    "Queries": "stats.labels.queries",
-    "Inserts": "stats.labels.inserts",
-    "Updates": "stats.labels.updates",
-    "Deletes": "stats.labels.deletes",
+    Collections: "stats.labels.collections",
+    Documents: "stats.labels.documents",
+    Queries: "stats.labels.queries",
+    Inserts: "stats.labels.inserts",
+    Updates: "stats.labels.updates",
+    Deletes: "stats.labels.deletes",
     "Cursor reads": "stats.labels.cursorReads"
 };
 

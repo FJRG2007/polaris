@@ -175,7 +175,11 @@ export async function inspectKeyAction(
     if (text.length > 16_384) return { error: dataText(t, "That file is too large.") };
     const throttle = await rateLimit(`databases-key:${me.id}`, 30, DIAL_WINDOW_MS);
     if (!throttle.ok) {
-        return { error: t("refusals.tooManyAttempts", { seconds: Math.ceil(throttle.retryAfterMs / 1000) }) };
+        return {
+            error: t("refusals.tooManyAttempts", {
+                seconds: Math.ceil(throttle.retryAfterMs / 1000)
+            })
+        };
     }
     try {
         const read = readPrivateKey(text, phrase);

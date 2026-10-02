@@ -48,7 +48,8 @@ export const SSH_KEY_REFUSALS = {
     ...KEY_REFUSALS,
     wrongPassphrase: "That passphrase does not unlock this key.",
     unsupported: "Polaris cannot use this kind of key. Use an Ed25519, ECDSA or RSA key.",
-    tooCostly: "This key asks for more work to unlock than Polaris allows. Save it again with fewer KDF rounds (100 or less).",
+    tooCostly:
+        "This key asks for more work to unlock than Polaris allows. Save it again with fewer KDF rounds (100 or less).",
     newPutty:
         "This PuTTY key is locked in PuTTY's newer format, which Polaris cannot unlock. In PuTTYgen, export it as an OpenSSH key, or save it with no passphrase, and use that file."
 } as const;
@@ -89,7 +90,13 @@ function finish(privateKey: string, passphrase: string | null, converted: boolea
     }
     const blob = parsed.getPublicSSH();
     const digest = crypto.createHash("sha256").update(blob).digest("base64").replace(/=+$/, "");
-    return { privateKey, passphrase, type: parsed.type, fingerprint: `SHA256:${digest}`, converted };
+    return {
+        privateKey,
+        passphrase,
+        type: parsed.type,
+        fingerprint: `SHA256:${digest}`,
+        converted
+    };
 }
 
 function parseWithSsh2(privateKey: string, passphrase: string | null): ParsedKey {
@@ -103,7 +110,8 @@ function parseWithSsh2(privateKey: string, passphrase: string | null): ParsedKey
 
 function ssh2Refusal(message: string): string {
     if (/no passphrase given/i.test(message)) return SSH_KEY_REFUSALS.locked;
-    if (/bad passphrase|integrity check failed/i.test(message)) return SSH_KEY_REFUSALS.wrongPassphrase;
+    if (/bad passphrase|integrity check failed/i.test(message))
+        return SSH_KEY_REFUSALS.wrongPassphrase;
     if (/unsupported/i.test(message)) return SSH_KEY_REFUSALS.unsupported;
     return SSH_KEY_REFUSALS.unknown;
 }
@@ -217,7 +225,9 @@ function opensshFromPkcs8(key: string, passphrase: string | null): string {
         const code = (error as { code?: string }).code ?? "";
         const message = (error as Error).message ?? "";
         if (/passphrase|decrypt|bad decrypt/i.test(`${code} ${message}`)) {
-            throw new SshKeyError(passphrase ? SSH_KEY_REFUSALS.wrongPassphrase : SSH_KEY_REFUSALS.locked);
+            throw new SshKeyError(
+                passphrase ? SSH_KEY_REFUSALS.wrongPassphrase : SSH_KEY_REFUSALS.locked
+            );
         }
         throw new SshKeyError(SSH_KEY_REFUSALS.unknown);
     }
@@ -313,7 +323,10 @@ function readPpk(text: string): PpkFile {
 
 /** The keys PuTTY derives from a passphrase: the cipher key and IV, and the MAC
  *  key. Version 3 uses Argon2, which this Node may not have. */
-function ppkKeys(file: PpkFile, passphrase: string): { cipherKey: Buffer; iv: Buffer; macKey: Buffer } {
+function ppkKeys(
+    file: PpkFile,
+    passphrase: string
+): { cipherKey: Buffer; iv: Buffer; macKey: Buffer } {
     if (file.version === 2) {
         const hash = (counter: number) =>
             crypto
@@ -324,7 +337,11 @@ function ppkKeys(file: PpkFile, passphrase: string): { cipherKey: Buffer; iv: Bu
         return {
             cipherKey: Buffer.concat([hash(0), hash(1)]).subarray(0, 32),
             iv: Buffer.alloc(16),
-            macKey: crypto.createHash("sha1").update("putty-private-key-file-mac-key").update(passphrase).digest()
+            macKey: crypto
+                .createHash("sha1")
+                .update("putty-private-key-file-mac-key")
+                .update(passphrase)
+                .digest()
         };
     }
     if (file.encryption === "none") {
@@ -355,7 +372,11 @@ function ppkKeys(file: PpkFile, passphrase: string): { cipherKey: Buffer; iv: Bu
         memory,
         passes
     });
-    return { cipherKey: derived.subarray(0, 32), iv: derived.subarray(32, 48), macKey: derived.subarray(48, 80) };
+    return {
+        cipherKey: derived.subarray(0, 32),
+        iv: derived.subarray(32, 48),
+        macKey: derived.subarray(48, 80)
+    };
 }
 
 type Argon2Sync = (
@@ -373,7 +394,8 @@ type Argon2Sync = (
 function opensshFromPpk(text: string, passphrase: string | null): string {
     const file = readPpk(text);
     const encrypted = file.encryption !== "none";
-    if (encrypted && file.encryption !== "aes256-cbc") throw new SshKeyError(SSH_KEY_REFUSALS.unsupported);
+    if (encrypted && file.encryption !== "aes256-cbc")
+        throw new SshKeyError(SSH_KEY_REFUSALS.unsupported);
     if (encrypted && !passphrase) throw new SshKeyError(SSH_KEY_REFUSALS.locked);
 
     const keys = ppkKeys(file, encrypted ? (passphrase as string) : "");
@@ -397,7 +419,9 @@ function opensshFromPpk(text: string, passphrase: string | null): string {
         .update(macData)
         .digest();
     if (mac.length !== file.mac.length || !crypto.timingSafeEqual(mac, file.mac)) {
-        throw new SshKeyError(encrypted ? SSH_KEY_REFUSALS.wrongPassphrase : SSH_KEY_REFUSALS.unknown);
+        throw new SshKeyError(
+            encrypted ? SSH_KEY_REFUSALS.wrongPassphrase : SSH_KEY_REFUSALS.unknown
+        );
     }
 
     const pub = new Reader(file.publicBlob);
@@ -419,7 +443,8 @@ function opensshFromPpk(text: string, passphrase: string | null): string {
         // PuTTY writes the 32-byte seed as an unsigned little-endian integer,
         // so a seed that ends in zero bytes comes out shorter.
         const stored = priv.string();
-        if (stored.length > 32 || publicKey.length !== 32) throw new SshKeyError(SSH_KEY_REFUSALS.unknown);
+        if (stored.length > 32 || publicKey.length !== 32)
+            throw new SshKeyError(SSH_KEY_REFUSALS.unknown);
         const seed = Buffer.concat([stored, Buffer.alloc(32 - stored.length)]);
         return opensshPrivateKey({ type, publicKey, seed }, file.comment);
     }

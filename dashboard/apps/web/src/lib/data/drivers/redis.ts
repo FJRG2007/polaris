@@ -216,7 +216,9 @@ export class RedisDriver implements data.DataDriver {
                 return {
                     ...common,
                     value: null,
-                    entries: members.slice(0, VALUE_ELEMENTS).map((value) => ({ field: "", value })),
+                    entries: members
+                        .slice(0, VALUE_ELEMENTS)
+                        .map((value) => ({ field: "", value })),
                     truncated: size > members.length
                 };
             }
@@ -241,7 +243,10 @@ export class RedisDriver implements data.DataDriver {
 
     async run(command: string): Promise<data.QueryResult[]> {
         const results: data.QueryResult[] = [];
-        for (const line of command.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean)) {
+        for (const line of command
+            .split(/\r?\n/)
+            .map((entry) => entry.trim())
+            .filter(Boolean)) {
             if (this.address.readOnly && redisCommandWrites(line)) {
                 throw new data.ReadOnlyError(`\`${line.split(/\s+/)[0]}\``);
             }
