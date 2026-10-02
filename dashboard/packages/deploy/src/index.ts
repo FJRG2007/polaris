@@ -108,6 +108,7 @@ export {
     PRIVATE_NETWORK_PREFIX,
     REMOTE_EDGE_CONTAINERS,
     crossLinkNetwork,
+    cutLinkNetworkScript,
     ensurePrivateNetworksScript,
     environmentNetwork,
     fallbackSubnet,

@@ -65,6 +65,50 @@ pub fn is_names_network(name: &str) -> bool {
         && matches!(name.as_bytes().get(PREFIX.len()), Some(b'n' | b'p' | b'x'))
 }
 
+/// Whether a network is the one a link between two projects runs over - the only
+/// kind `cut` acts on.
+pub fn is_link_network(name: &str) -> bool {
+    is_names_network(name) && name.as_bytes().get(PREFIX.len()) == Some(&b'x')
+}
+
+/// Close a link between two projects now: every container on its network is
+/// disconnected from it, so the two services stop reaching each other at once
+/// rather than on their next deploy. The network itself is left, empty, for the
+/// reconcile to remove; a container that is restarted does not rejoin it, since
+/// a disconnect also drops it from the container's own settings. A network that
+/// is not there is nothing to close.
+pub fn cut(name: &str) -> Result<usize, String> {
+    if !is_link_network(name) {
+        return Err("only a link network can be cut".into());
+    }
+    if !exists(name) {
+        return Ok(0);
+    }
+    let Some(attached) = attached_ids(name) else {
+        return Err(format!("could not read who is on {name}"));
+    };
+    for id in &attached {
+        let (ok, said) = docker(&[
+            "network".to_string(),
+            "disconnect".to_string(),
+            "-f".to_string(),
+            name.to_string(),
+            id.clone(),
+        ]);
+        if !ok {
+            return Err(format!(
+                "could not disconnect a container from {name}: {}",
+                said.trim()
+            ));
+        }
+    }
+    // Read back: what decides whether access is closed is who is still on it.
+    match attached_ids(name) {
+        Some(left) if left.is_empty() => Ok(attached.len()),
+        _ => Err(format!("{name} still has containers on it")),
+    }
+}
+
 /// Whether Polaris's own containers join a private network: the environment and
 /// service networks, which carry only container names Polaris minted.
 fn stack_joins(name: &str) -> bool {
@@ -543,6 +587,20 @@ mod tests {
             assert!(!stack_joins(names), "{names}");
         }
         assert!(!is_names_network("polaris-proxy"));
+    }
+
+    #[test]
+    fn only_a_link_network_can_be_cut() {
+        assert!(is_link_network("polaris-net-x0123456789"));
+        for other in [
+            "polaris-net-n0123456789",
+            "polaris-net-e0123456789",
+            "polaris-proxy",
+            "bridge",
+        ] {
+            assert!(!is_link_network(other), "{other}");
+            assert!(cut(other).is_err(), "{other}");
+        }
     }
 
     #[test]

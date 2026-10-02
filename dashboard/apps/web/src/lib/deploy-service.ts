@@ -45,7 +45,8 @@ import {
     namesOn,
     prepareDeployNames,
     privateNameOf,
-    recordLiveNames
+    promoteStagedNames,
+    stageNames
 } from "./deploy/private-names";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { resolveBuildMachine, type BuildMachine } from "./deploy/build-machine";
@@ -3235,11 +3236,10 @@ export async function deployApplication(
     } else if (scaled?.cutover) {
         planned = (await buildAppPlan(applicationId, ownerId, scaled)).plan;
     }
-    // The names this release carries count as live once it is the one serving. A
-    // scale step in place adds copies to the release already serving, which keeps
-    // what it was recorded with.
-    if (liveNames && !scaled?.cutover)
-        await recordLiveNames("application", applicationId, liveNames, deployment.id);
+    // The names this release carries are held until it is promoted - only then do
+    // they count as live (see `promoteRelease`). A scale step in place adds copies
+    // to the release already serving, which keeps what it was recorded with.
+    if (liveNames && !scaled?.cutover) await stageNames(applicationId, liveNames, deployment.id);
     // Every release is kept under a name of its own so it can be run again later
     // exactly as it was; a rollback runs one of those instead of making one. The
     // build also goes at the commit it names, when there is one - the branch head
@@ -4747,6 +4747,10 @@ async function promoteRelease(
         where: { id: dep.deployableId },
         // A release that just came up is awake, whatever its service was before.
         data: { currentDeploymentId: deploymentId, asleepSince: null }
+    });
+    // Its private names count as live from here: it is the one serving them.
+    await promoteStagedNames(dep.deployableId, deploymentId).catch((error) => {
+        console.error("polaris: could not record a release's private names:", error);
     });
     // The switch: the edge routes are rewritten to dial the release now current,
     // which a change-over release only becomes after it came up and opened its

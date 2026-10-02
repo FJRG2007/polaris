@@ -78,6 +78,7 @@
     "linkRefused": {
         "missing": "Ese servicio ya no existe.",
         "sameProject": "Los dos servicios están en este proyecto: ya se llaman por nombre.",
-        "otherServer": "Los dos servicios están en servidores distintos, y los nombres privados no los cruzan."
+        "otherServer": "Los dos servicios están en servidores distintos, y los nombres privados no los cruzan.",
+        "unreachable": "Su servidor no ha respondido, así que el enlace sigue abierto. Inténtalo cuando esté en línea."
     }
 }

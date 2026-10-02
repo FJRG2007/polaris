@@ -63,6 +63,10 @@ vi.mock("@polaris/db", () => ({
             update: updater("database", () => databases)
         },
         privateLink: {
+            deleteMany: async ({ where }: { where: { id: string } }) => {
+                links = links.filter((link) => link.id !== where.id);
+                return { count: 1 };
+            },
             findMany: async ({ where }: { where?: { OR?: Record<string, string>[] } } = {}) =>
                 where?.OR
                     ? links.filter((link) =>
@@ -83,6 +87,19 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@polaris/hostd-client", () => ({ HostdClient: class {} }));
+
+/** The networks a link removal took everyone off, and whether the server answers. */
+const cut: string[] = [];
+let serverAnswers = true;
+vi.mock("@/lib/deploy/runtime", () => ({
+    getPorts: async () => ({
+        cutNetwork: async (name: string) => {
+            if (!serverAnswers) throw new Error("connection refused");
+            cut.push(name);
+        },
+        dispose: async () => undefined
+    })
+}));
 
 const names = await import("@/lib/deploy/private-names");
 const { wantedPrivateNetworks } = await import("@/lib/deploy/service-networks");
@@ -472,5 +489,69 @@ describe("the canvas lines", () => {
         ]);
         // `web` lives in env-1, so a service of env-2 naming it draws nothing.
         expect(edges.get("env-2")).toBeUndefined();
+    });
+});
+
+describe("a release's names", () => {
+    const container = "shop-api-abcd";
+    const app = () => applications[0]!;
+
+    it("are only held while it deploys, and count as live once it is promoted", async () => {
+        await names.stageNames("a1", ["api.polaris.internal", "api"], "dep-2");
+        // Deploying, or failed: nothing reads them as live.
+        expect(names.parsePrivateNetwork(app().privateNetwork).live).toBeUndefined();
+        expect(
+            names.referencedDomain({ ...app(), currentDeploymentId: "dep-2", target: LOCAL }, container)
+        ).toBe(container);
+
+        // A promotion of another deployment leaves them waiting.
+        await names.promoteStagedNames("a1", "dep-1");
+        expect(names.parsePrivateNetwork(app().privateNetwork).live).toBeUndefined();
+
+        await names.promoteStagedNames("a1", "dep-2");
+        const stored = names.parsePrivateNetwork(app().privateNetwork);
+        expect(stored.pending).toBeUndefined();
+        expect(stored.live).toEqual({ deploymentId: "dep-2", names: ["api.polaris.internal", "api"] });
+        expect(
+            names.referencedDomain({ ...app(), currentDeploymentId: "dep-2", target: LOCAL }, container)
+        ).toBe("api.polaris.internal");
+    });
+
+    it("keep what the serving release was given while a newer one is still deploying", async () => {
+        await names.stageNames("a1", ["api.polaris.internal", "api"], "dep-1");
+        await names.promoteStagedNames("a1", "dep-1");
+        await names.stageNames("a1", ["backend.polaris.internal", "backend"], "dep-2");
+        const stored = names.parsePrivateNetwork(app().privateNetwork);
+        expect(stored.live?.deploymentId).toBe("dep-1");
+        expect(stored.pending?.deploymentId).toBe("dep-2");
+    });
+});
+
+describe("closing a link between projects", () => {
+    beforeEach(() => {
+        cut.length = 0;
+        serverAnswers = true;
+        const target = { id: "t1", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "polaris-proxy" };
+        Object.assign(databases[0]!, { target, environment: { project: { ownerId: "owner" } } });
+        Object.assign(applications[0]!, { target, environment: { project: { ownerId: "owner" } } });
+        links = [{ id: "l1", targetKind: "database", targetId: "d1", sourceId: "x9" }];
+    });
+
+    it("from a database's side takes everyone off the link's network at once", async () => {
+        await names.revokeCrossLink(links[0]!);
+        expect(cut).toEqual([deploy.crossLinkNetwork("l1")]);
+        expect(links).toEqual([]);
+    });
+
+    it("keeps the link on record, and says so, when the server cannot be told", async () => {
+        serverAnswers = false;
+        await expect(names.revokeCrossLink(links[0]!)).rejects.toMatchObject({ reason: "unreachable" });
+        expect(links).toHaveLength(1);
+    });
+
+    it("only drops the record where nothing could still be on it", async () => {
+        // A target already removed has no container on the link.
+        await names.revokeCrossLink({ id: "l2", targetKind: "database", targetId: "gone" });
+        expect(cut).toEqual([]);
     });
 });

@@ -253,6 +253,22 @@ export function ensurePrivateNetworksScript(names: readonly string[], swarm: boo
     return statements;
 }
 
+/**
+ * The shell statements that close a link between two projects on another server
+ * at once - the same as the daemon's `cut`: every container on the link's network
+ * is disconnected, and the statements fail unless nothing is left on it. Only a
+ * link network is ever named; one that is not there is nothing to close.
+ */
+export function cutLinkNetworkScript(name: string): string[] {
+    if (!/^polaris-net-x[a-f0-9]{10}$/.test(name)) throw new Error("only a link network can be cut");
+    const attached = `docker network inspect --format '{{range $id, $c := .Containers}}{{$id}} {{end}}' ${name}`;
+    return [
+        `if docker network inspect ${name} >/dev/null 2>&1; then ` +
+            `for c in $(${attached}); do docker network disconnect -f ${name} "$c" || exit 1; done; ` +
+            `test -z "$(${attached} | tr -d ' ')" || { echo "${name} still has containers on it" >&2; exit 1; }; fi`
+    ];
+}
+
 /** The private networks in a list, in order - what a connector or an edge has to
  *  join to reach a service by name once it has left the proxy network. Never a
  *  names network: those are for the services beside it alone. */

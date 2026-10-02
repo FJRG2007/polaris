@@ -258,6 +258,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/world/trim") => deploy_world_trim(req, body),
         ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
         ("POST", "/v1/deploy/networks/reconcile") => deploy_networks_reconcile(state, req, body),
+        ("POST", "/v1/deploy/networks/cut") => deploy_networks_cut(state, req, body),
         _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -447,6 +448,40 @@ fn deploy_networks_reconcile<R: Read>(state: &AppState, req: &Request, body: &mu
             "ipv6": report.ipv6,
         }),
     )
+}
+
+/// A link network to close now.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NetworkCutRequest {
+    name: String,
+}
+
+/// Close a link between two projects at once (see `networks::cut`). Only a link
+/// network can be named; answers how many containers were taken off it.
+fn deploy_networks_cut<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    if !state.config.docker_socket.exists() {
+        return Response::not_implemented("docker is not available on this host");
+    }
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: NetworkCutRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid cut request"),
+    };
+    if !networks::is_link_network(&request.name) {
+        return Response::bad_request("invalid network name");
+    }
+    match networks::cut(&request.name) {
+        Ok(disconnected) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "disconnected": disconnected }),
+        ),
+        Err(msg) => Response::text(502, "Bad Gateway", &msg),
+    }
 }
 
 /// Deploy a validated spec onto a swarm via `docker stack deploy`, streaming

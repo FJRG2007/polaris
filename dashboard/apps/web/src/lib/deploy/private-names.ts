@@ -58,6 +58,8 @@ export interface StoredPrivateNetwork {
     readonly aliases: readonly string[];
     readonly former: readonly FormerName[];
     readonly live?: { readonly deploymentId?: string; readonly names: readonly string[] };
+    /** The names a deployment in flight will carry, waiting for it to serve. */
+    readonly pending?: { readonly deploymentId: string; readonly names: readonly string[] };
 }
 
 /** What is stored, read back whole however old the row is; anything malformed is
@@ -96,7 +98,21 @@ export function parsePrivateNetwork(raw: string | null | undefined): StoredPriva
                   names: liveRaw.names.filter((one): one is string => typeof one === "string")
               }
             : undefined;
-    return { ...(name ? { name } : {}), aliases, former, ...(live ? { live } : {}) };
+    const pendingRaw = parsed.pending as { deploymentId?: unknown; names?: unknown } | undefined;
+    const pending =
+        pendingRaw && typeof pendingRaw.deploymentId === "string" && Array.isArray(pendingRaw.names)
+            ? {
+                  deploymentId: pendingRaw.deploymentId,
+                  names: pendingRaw.names.filter((one): one is string => typeof one === "string")
+              }
+            : undefined;
+    return {
+        ...(name ? { name } : {}),
+        aliases,
+        former,
+        ...(live ? { live } : {}),
+        ...(pending ? { pending } : {})
+    };
 }
 
 function serialize(stored: StoredPrivateNetwork): string {
@@ -256,26 +272,64 @@ export async function recordLiveNames(
     kind: PrivateKind,
     id: string,
     names: readonly string[],
-    deploymentId?: string
+    deploymentId?: string,
+    /** What is stored, when the caller has just read it. */
+    current?: StoredPrivateNetwork
 ): Promise<void> {
-    const row =
-        kind === "application"
-            ? await prisma.application.findUnique({
-                  where: { id },
-                  select: { privateNetwork: true }
-              })
-            : await prisma.managedDatabase.findUnique({
-                  where: { id },
-                  select: { privateNetwork: true }
-              });
-    if (!row) return;
-    const stored = parsePrivateNetwork(row.privateNetwork);
+    let stored = current;
+    if (!stored) {
+        const row =
+            kind === "application"
+                ? await prisma.application.findUnique({
+                      where: { id },
+                      select: { privateNetwork: true }
+                  })
+                : await prisma.managedDatabase.findUnique({
+                      where: { id },
+                      select: { privateNetwork: true }
+                  });
+        if (!row) return;
+        stored = parsePrivateNetwork(row.privateNetwork);
+    }
     const now = Date.now();
     await persist(kind, id, {
         ...stored,
         former: stored.former.filter((entry) => Date.parse(entry.until) > now),
         live: { ...(deploymentId ? { deploymentId } : {}), names: [...names] }
     });
+}
+
+/**
+ * Hold the names a deployment of an application will carry until it serves.
+ * Nothing reads them as live yet: a reference keeps the container name and the
+ * panel does not say "Ready" for a release that may still fail or never be
+ * promoted. `promoteStagedNames` moves them over once it is the one serving.
+ */
+export async function stageNames(applicationId: string, names: readonly string[], deploymentId: string): Promise<void> {
+    const row = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { privateNetwork: true }
+    });
+    if (!row) return;
+    const stored = parsePrivateNetwork(row.privateNetwork);
+    await persist("application", applicationId, { ...stored, pending: { deploymentId, names: [...names] } });
+}
+
+/**
+ * The deployment just promoted is the one serving: the names it was staged with
+ * become live. Anything staged for another deployment - one superseded, or a
+ * redeploy still on its way - is left as it is.
+ */
+export async function promoteStagedNames(applicationId: string, deploymentId: string): Promise<void> {
+    const row = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { privateNetwork: true }
+    });
+    if (!row) return;
+    const stored = parsePrivateNetwork(row.privateNetwork);
+    if (stored.pending?.deploymentId !== deploymentId) return;
+    const { pending, ...rest } = stored;
+    await recordLiveNames("application", applicationId, pending.names, deploymentId, rest);
 }
 
 /**
@@ -993,13 +1047,47 @@ export async function crossLinkOf(linkId: string) {
     return prisma.privateLink.findUnique({ where: { id: linkId } });
 }
 
-export async function removeCrossLink(linkId: string): Promise<void> {
-    await prisma.privateLink.deleteMany({ where: { id: linkId } });
+/**
+ * Close a link between two projects, taking effect at once from either side.
+ *
+ * Every container is taken off the link's network on the server both services
+ * run on before the row goes, and the row only goes once that worked. Waiting
+ * for a redeploy would leave access open - a database is never restarted for a
+ * name - and deleting the row first would say it is closed while it is not. If
+ * the server cannot be reached the link stays, and the refusal says so.
+ */
+export async function revokeCrossLink(link: {
+    readonly id: string;
+    readonly targetKind: string;
+    readonly targetId: string;
+}): Promise<void> {
+    const select = {
+        target: { select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true } },
+        environment: { select: { project: { select: { ownerId: true } } } }
+    } as const;
+    const service =
+        link.targetKind === "database"
+            ? await prisma.managedDatabase.findUnique({ where: { id: link.targetId }, select })
+            : await prisma.application.findUnique({ where: { id: link.targetId }, select });
+    // A target that is gone has no container left on the link to take off.
+    if (service && namesOn(service.target)) {
+        const { getPorts } = await import("./runtime");
+        const ports = await getPorts(service.target, service.environment.project.ownerId);
+        try {
+            await ports.cutNetwork(crossLinkNetwork(link.id));
+        } catch (error) {
+            console.error("polaris: a link between projects could not be closed:", error);
+            throw new PrivateLinkRefusal("unreachable");
+        } finally {
+            await ports.dispose().catch(() => undefined);
+        }
+    }
+    await prisma.privateLink.deleteMany({ where: { id: link.id } });
 }
 
 /** Why a link was refused, for the action to word. */
 export class PrivateLinkRefusal extends Error {
-    constructor(readonly reason: "missing" | "sameProject" | "otherServer") {
+    constructor(readonly reason: "missing" | "sameProject" | "otherServer" | "unreachable") {
         super(reason);
     }
 }

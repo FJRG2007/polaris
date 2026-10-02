@@ -274,3 +274,19 @@ describe("the port-80 forwarder", () => {
         expect(yaml).toContain('    network_mode: "service:shop-api-abcd"\n');
     });
 });
+
+describe("closing a link on a server reached over SSH", () => {
+    it("takes everyone off the link's network and fails unless it ends up empty", () => {
+        const name = net.crossLinkNetwork("l1");
+        const script = net.cutLinkNetworkScript(name).join("; ");
+        expect(script).toContain(`network disconnect -f ${name}`);
+        expect(script).toContain("still has containers on it");
+        expect(script).toContain("exit 1");
+    });
+
+    it("is refused for any network that is not a link's", () => {
+        for (const other of [net.namesNetwork("e"), net.environmentNetwork("e"), "polaris-proxy", "bridge"]) {
+            expect(() => net.cutLinkNetworkScript(other)).toThrow();
+        }
+    });
+});

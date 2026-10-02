@@ -227,7 +227,9 @@ export async function removeCrossLinkAction(
             ((link.targetKind === service.kind && link.targetId === service.id) ||
                 (service.kind === "application" && link.sourceId === service.id));
         if (!link || !own) return { error: (await words())("linkRefused.missing") };
-        await names.removeCrossLink(link.id);
+        // Closed on the server before anything says it is: refused, and kept on
+        // record, when the server cannot be told.
+        await names.revokeCrossLink(link);
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.private-link.remove",
@@ -235,10 +237,6 @@ export async function removeCrossLinkAction(
             targetId: service.id,
             metadata: { target: link.targetId, source: link.sourceId }
         });
-        // This side leaves the link's network, which is all it takes for the two to
-        // stop reaching each other - the other side, in a project this person may
-        // not be allowed to touch, leaves it on its own next deploy.
-        await names.redeployForNames(service.kind, service.id, user.id);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

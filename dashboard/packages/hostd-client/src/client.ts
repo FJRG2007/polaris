@@ -230,6 +230,15 @@ export class HostdClient {
         };
     }
 
+    /** Take every container off a link network between two projects, now. Throws
+     *  unless the daemon says nothing is left on it. */
+    public async cutPrivateNetwork(name: string): Promise<void> {
+        const response = await this.call("POST", "/v1/deploy/networks/cut", JSON.stringify({ name }));
+        if (response.status !== 200) {
+            throw new Error(`hostd network cut failed (${response.status}): ${response.body}`);
+        }
+    }
+
     /** Authenticate to a private registry (`docker login`). Resolves on success and
      *  throws on failure; the password rides in the JSON body, never in argv. */
     public async deployLogin(registry: string, username: string, password: string): Promise<void> {
