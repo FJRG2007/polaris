@@ -16,7 +16,9 @@
  * setting worth nothing.
  *
  * Applied by `filterMic`, which is the one place a microphone is put through a
- * graph on its way out.
+ * graph on its way out. A change reaches a call already running, not only the
+ * next one - see `useSfuCall`'s own tracking of this setting, and
+ * `FilteredMic.setGain`.
  */
 
 import { useCallback, useEffect, useState } from "react";

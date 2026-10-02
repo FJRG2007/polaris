@@ -381,7 +381,8 @@
             "laugh": "Funny",
             "surprise": "Surprised",
             "heart": "Love it"
-        }
+        },
+        "sentLevel": "What others hear"
     },
     "meetingRoom": {
         "meeting": "Meeting",
@@ -809,7 +810,13 @@
         "streamAttenuation": "Stream attenuation",
         "howFarOtherVoicesAre": "How far other voices are lowered while a stream plays",
         "lowersEverybodyElseWhileA": "Lowers everybody else while a stream plays.",
-        "howLoud": "How loud {name} is"
+        "howLoud": "How loud {name} is",
+        "arrives": {
+            "quieter": "Arrives {db} dB quieter than the others",
+            "louder": "Arrives {db} dB louder than the others",
+            "same": "Arrives about as loud as the others",
+            "unknown": "Not heard long enough to compare"
+        }
     },
     "search": {
         "searchWidth": "Search width",
@@ -1367,5 +1374,10 @@
         "join": "Join",
         "askToJoin": "Ask to join",
         "call": "Call"
+    },
+    "quietMic": {
+        "quiet": "You arrive about {db} dB quieter than everyone else. Turn your microphone up, set Background noise to Standard, or check the input level your computer gives this microphone.",
+        "atMax": "You arrive about {db} dB quieter than everyone else, with your microphone volume already at its highest. Move closer to it, set Background noise to Standard, or raise the input level your computer gives this microphone.",
+        "turnUp": "Turn up"
     }
 }

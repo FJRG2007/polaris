@@ -68,7 +68,8 @@ import {
     UNRESTRICTED,
     type SeatRestriction
 } from "@/lib/chat/voice-moderation";
-import { voiceSettings } from "./voice-settings";
+import { useMicGain } from "./mic-gain";
+import { useVoiceSettings, voiceSettings } from "./voice-settings";
 import { playCallSound } from "@/lib/call-sounds";
 import { shareSound } from "./call-share-sound";
 import { withCameraDevice } from "./camera-device";
@@ -565,6 +566,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const screenAudio = useRef<MediaStreamTrack | null>(null);
     // The microphone with a model between it and the call, when one is running.
     const filtered = useRef<FilteredMic | null>(null);
+    const filterRound = useRef(0);
     // The camera with a background drawn behind it, on the same terms.
     const masked = useRef<MaskedCamera | null>(null);
     /**
@@ -1182,20 +1184,25 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * Put the chosen filter between the microphone and the call, or take away
      * the one that was there.
      */
-    const startFilter = useCallback(async () => {
+    const startFilter = useCallback(async (): Promise<boolean> => {
+        const round = (filterRound.current += 1);
         await filtered.current?.stop();
         filtered.current = null;
         setMicFilter(null);
         setFilteredTrack(null);
 
         const track = mic.current;
-        if (!track) return;
+        if (!track) return round === filterRound.current;
 
         // The browser's own processors first, whatever comes after them.
         await applyMicCleanup(track);
 
         const built = await filterMic(track, micCleanup(), licensed.current);
-        if (!built) return;
+        if (round !== filterRound.current) {
+            await built?.stop();
+            return false;
+        }
+        if (!built) return true;
         // The microphone may have been muted while the model was loading.
         built.track.enabled = track.enabled;
         filtered.current = built;
@@ -1203,6 +1210,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // The gate listens to whichever of the two the reader asked for. Told
         // here because this is where the second one starts existing.
         setFilteredTrack(built.track);
+        return true;
     }, []);
 
     /**
@@ -1479,9 +1487,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             connecting = true;
             const ticket = await actions
                 .callTokenAction(inCall)
-                .catch(
-                    () => ({ error: t("errors.callUnreachable") }) as CallTicket
-                );
+                .catch(() => ({ error: t("errors.callUnreachable") }) as CallTicket);
             // Released on every path that gives up before there is a room to guard
             // the attempt instead. `waiting` in particular: somebody in the lobby is
             // told "not yet", and the next roster change has to be able to try again.
@@ -2704,6 +2710,54 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         },
         [outgoingMic, publish, publishLocalPreview, rememberCleanMic, startFilter]
     );
+
+    /**
+     * The microphone volume, followed during the call.
+     *
+     * It used to be read once, when the graph was built, so somebody told they
+     * were quiet moved the slider - in the call's own menu or on the devices
+     * screen - and nothing changed until the next call. A running graph takes
+     * the new level as it is; a microphone with no graph yet (no model, volume
+     * untouched) gets one, which is a swap of the published track like a change
+     * of the noise setting.
+     */
+    const [volumeNow] = useMicGain();
+    const volumeSeen = useRef(volumeNow);
+    const volumeBuilding = useRef(false);
+    useEffect(() => {
+        if (volumeSeen.current === volumeNow) return;
+        volumeSeen.current = volumeNow;
+        const running = filtered.current;
+        if (running) {
+            running.setGain(volumeNow);
+            return;
+        }
+        if (volumeBuilding.current) return;
+        // Before the call has a microphone up, the graph built while joining
+        // reads the setting for itself.
+        if (!mic.current || room.current?.state !== CONNECTED) return;
+        volumeBuilding.current = true;
+        void (async () => {
+            try {
+                if (!(await startFilter())) return;
+                filtered.current?.setGain(volumeSeen.current);
+                await publish(MICROPHONE, outgoingMic());
+                settleMic();
+                publishLocalPreview();
+            } finally {
+                volumeBuilding.current = false;
+            }
+        })();
+    }, [outgoingMic, publish, publishLocalPreview, settleMic, startFilter, volumeNow]);
+
+    /**
+     * The browser's gain control and the bypass, followed during the call too.
+     * Both are constraints on the open track, so nothing is republished.
+     */
+    const [voiceNow] = useVoiceSettings();
+    useEffect(() => {
+        void applyMicCleanup(mic.current);
+    }, [voiceNow.autoGainControl, voiceNow.bypassProcessing]);
 
     /**
      * Change what is drawn behind the camera, mid-call.

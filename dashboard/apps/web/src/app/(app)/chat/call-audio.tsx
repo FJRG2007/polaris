@@ -34,6 +34,7 @@ import { Volume2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
+import { CallLoudnessProbe } from "./call-loudness-probe";
 import { useVoiceSettings } from "./voice-settings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
@@ -174,6 +175,9 @@ export function CallAudio({ call }: { call: CallState }) {
 
     return (
         <>
+            {/* How loud each voice arrives, for the person menu and the hint
+                that tells somebody they are quiet - see `call-loudness`. */}
+            <CallLoudnessProbe call={call} />
             {others.map((person) => (
                 <RemoteAudio
                     key={person.id}

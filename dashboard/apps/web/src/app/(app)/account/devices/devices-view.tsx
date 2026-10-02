@@ -79,6 +79,7 @@ export function DevicesView() {
             <MicrophoneCard
                 threshold={voice.activityThreshold}
                 showThreshold={voice.inputMode === "activity"}
+                gateHearsFiltered={voice.advancedActivity}
             />
             <CameraCard />
             <InputModeCard voice={voice} setVoice={setVoice} />
@@ -91,10 +92,12 @@ export function DevicesView() {
  *  it is working at all. */
 function MicrophoneCard({
     threshold,
-    showThreshold
+    showThreshold,
+    gateHearsFiltered
 }: {
     threshold: number;
     showThreshold: boolean;
+    gateHearsFiltered: boolean;
 }) {
     const { devices, chosenId, choose } = useMicrophones();
     const t = useTranslations("account");
@@ -114,7 +117,14 @@ function MicrophoneCard({
     /** The call's own microphone, when there is a call: the meter reads it rather
      *  than asking the browser for the same device a second time. */
     const held = useHeldCall();
-    const inCall = held?.session ? (held.call.localStream?.getAudioTracks()[0] ?? null) : null;
+    // What the call sends rather than the device behind it: the noise model and
+    // the volume both sit between the two, and a device that reads healthy while
+    // the voice leaves quiet is the case this screen exists to show.
+    const inCallDevice = held?.session
+        ? (held.call.localStream?.getAudioTracks()[0] ?? null)
+        : null;
+    const inCall = held?.session ? (held.call.outgoing ?? inCallDevice) : null;
+    const rawForGate = showThreshold && !gateHearsFiltered;
 
     const stop = useCallback(() => {
         // The graph goes before the device does: it holds an audio context, and
@@ -132,6 +142,34 @@ function MicrophoneCard({
     // Never left running. A tab closed on an open microphone is a light that
     // stays on, and this is a screen somebody opens and wanders away from.
     useEffect(() => stop, [stop]);
+
+    // The volume moved during a test is heard in the test, the way it is in a
+    // call: the running graph takes it, and a test with no graph yet gets one.
+    // Only on a change of the volume: the graph a test starts with is built by
+    // the press that starts it, and two builds racing would leave one running.
+    const gainSeen = useRef(gain);
+    useEffect(() => {
+        if (gainSeen.current === gain) return;
+        gainSeen.current = gain;
+        if (filter.current) {
+            filter.current.setGain(gain);
+            return;
+        }
+        const track = tested;
+        if (!track || gain === 1) return;
+        let current = true;
+        void filterMic(track, cleanup, null, gain).then((built) => {
+            if (!current || filter.current) {
+                void built?.stop();
+                return;
+            }
+            filter.current = built;
+            setFilterState(built);
+        });
+        return () => {
+            current = false;
+        };
+    }, [cleanup, gain, tested]);
 
     const start = async () => {
         setError("");
@@ -155,11 +193,18 @@ function MicrophoneCard({
             // this is the screen that finds out, and the reason comes with it.
             if (track) {
                 const built = await filterMic(track, cleanup);
-                setFilterState(built);
-                filter.current = built;
+                // A volume moved while this was building has built its own.
+                if (filter.current) {
+                    void built?.stop();
+                } else {
+                    setFilterState(built);
+                    filter.current = built;
+                }
             }
         } catch (caught) {
-            setError(tChat(`media.refused.${refusalOf(caught)}` as const, { device: "microphone" }));
+            setError(
+                tChat(`media.refused.${refusalOf(caught)}` as const, { device: "microphone" })
+            );
             stop();
         }
     };
@@ -203,7 +248,9 @@ function MicrophoneCard({
                                 : [{ value: "", label: t("devices.mic.pressTest") }]
                         }
                     />
-                    <span className="text-xs text-muted-foreground">{t("devices.mic.namesHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.mic.namesHint")}
+                    </span>
                 </label>
 
                 <div className="flex flex-col gap-1.5">
@@ -211,7 +258,11 @@ function MicrophoneCard({
                     {/* Drawn whether or not anything is being measured: an empty
                         row is what says the test is the thing that fills it. */}
                     <MicLevelMeter
-                        track={tested ?? inCall}
+                        track={
+                            rawForGate
+                                ? (tested ?? inCallDevice)
+                                : (filterState?.track ?? tested ?? inCall)
+                        }
                         listen
                         deviceId={chosenId}
                         threshold={showThreshold ? threshold : undefined}
@@ -267,7 +318,9 @@ function MicrophoneCard({
                         onChange={(event) => setGain(Number(event.target.value) / 100)}
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                     />
-                    <span className="text-xs text-muted-foreground">{t("devices.mic.volumeHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.mic.volumeHint")}
+                    </span>
                 </div>
 
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -417,7 +470,6 @@ function CameraCard() {
         }
     };
 
-
     return (
         <Card>
             <CardBody className="flex flex-col gap-4">
@@ -528,8 +580,16 @@ function CameraCard() {
                             underneath them. */}
                         <button
                             type="button"
-                            title={own ? t("devices.camera.changePicture") : t("devices.camera.ownPicture")}
-                            aria-label={own ? t("devices.camera.changePicture") : t("devices.camera.ownPicture")}
+                            title={
+                                own
+                                    ? t("devices.camera.changePicture")
+                                    : t("devices.camera.ownPicture")
+                            }
+                            aria-label={
+                                own
+                                    ? t("devices.camera.changePicture")
+                                    : t("devices.camera.ownPicture")
+                            }
                             aria-pressed={own}
                             onClick={() => picker.current?.click()}
                             className={cn(
@@ -546,7 +606,9 @@ function CameraCard() {
                             )}
                         </button>
                     </div>
-                    <span className="text-xs text-muted-foreground">{t("devices.camera.pictureStays")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.camera.pictureStays")}
+                    </span>
                 </div>
                 <input
                     ref={picker}
@@ -644,7 +706,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                         >
                             {listening ? t("devices.input.pressKey") : keyName(voice.pttKey, t)}
                         </Button>
-                        <span className="text-xs text-muted-foreground">{t("devices.input.keyHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.input.keyHint")}
+                        </span>
                     </div>
                 ) : null}
 
@@ -668,7 +732,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">{t("devices.input.thresholdHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.input.thresholdHint")}
+                        </span>
                     </div>
                 ) : null}
 
@@ -692,7 +758,9 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">{t("devices.input.releaseHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.input.releaseHint")}
+                        </span>
                     </div>
                 ) : null}
             </CardBody>
@@ -767,7 +835,9 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                             }
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">{t("devices.advanced.howFarHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("devices.advanced.howFarHint")}
+                        </span>
                     </div>
                 ) : null}
                 <div className="flex flex-col gap-1">
@@ -789,7 +859,9 @@ function AdvancedCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Cha
                         }
                         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                     />
-                    <span className="text-xs text-muted-foreground">{t("devices.advanced.streamHint")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("devices.advanced.streamHint")}
+                    </span>
                 </div>
             </CardBody>
         </Card>
