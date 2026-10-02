@@ -110,7 +110,9 @@ describe("the MAC box, while typed into", () => {
         expect(shown(macs.formatMacInput("aa-bb-cc-dd-ee-ff", 17, box("|")))).toBe(
             "AA:BB:CC:DD:EE:FF|"
         );
-        expect(shown(macs.formatMacInput("aabb.ccdd.eeff", 14, box("|")))).toBe("AA:BB:CC:DD:EE:FF|");
+        expect(shown(macs.formatMacInput("aabb.ccdd.eeff", 14, box("|")))).toBe(
+            "AA:BB:CC:DD:EE:FF|"
+        );
     });
 
     it("keeps the caret by digits when a selection is deleted", () => {

@@ -61,7 +61,10 @@ async function locate(
     const resolved: Record<string, string> = { ...credentials };
     for (const { key, mac } of wanted) {
         const before = previous?.find((entry) => entry.key === key)?.address;
-        const address = await locateMac(mac, before ? { fresh: true, avoid: before, own } : { own });
+        const address = await locateMac(
+            mac,
+            before ? { fresh: true, avoid: before, own } : { own }
+        );
         if (!address) throw new DriverError(macNotFound(mac), "unreachable");
         located.push({ key, mac, address });
         resolved[key] = address;
@@ -155,8 +158,11 @@ export function withAddresses(driver: DeviceDriver): DeviceDriver {
         ...(driver.history
             ? {
                   history: async (credentials: Credentials, limit: number) =>
-                      (await run(id, credentials, own, (resolved) => driver.history!(resolved, limit)))
-                          .value
+                      (
+                          await run(id, credentials, own, (resolved) =>
+                              driver.history!(resolved, limit)
+                          )
+                      ).value
               }
             : {}),
         ...(driver.probe

@@ -424,10 +424,7 @@ export async function markSynced(id: string): Promise<void> {
 
 /** Scans in flight and what the last one found, per connection: a dialog opened
  *  twice, or by two people, asks the network once. */
-const scans = new Map<
-    string,
-    { at: number; running: boolean; value: Promise<DiscoveredUnit[]> }
->();
+const scans = new Map<string, { at: number; running: boolean; value: Promise<DiscoveredUnit[]> }>();
 /** A scan answers for this long before the network is asked again. */
 const SCAN_TTL_MS = 15_000;
 
