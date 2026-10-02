@@ -1,6 +1,6 @@
 /*
  * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
- * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
+ * Copyright 2026 Mainfunc, Inc.
  */
 
 /** Ruler tick math (PowerPoint-style): 0 sits at the slide center and values

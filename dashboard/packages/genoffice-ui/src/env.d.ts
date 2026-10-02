@@ -1,6 +1,6 @@
 /*
  * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
- * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
+ * Copyright 2026 Mainfunc, Inc.
  */
 
 /** bidi-js has no types (pptx-render sources are compiled into this project via the workspace source export; its bundled d.ts does not come along) */

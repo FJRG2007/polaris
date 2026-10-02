@@ -1,6 +1,6 @@
 /*
  * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
- * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
+ * Copyright 2026 Mainfunc, Inc.
  */
 
 /** Word's default endnote numbering is lowercase roman (footnotes stay arabic) — the visual cue that separates the two note kinds. */

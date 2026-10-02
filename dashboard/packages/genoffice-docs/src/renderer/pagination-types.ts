@@ -1,6 +1,6 @@
 /*
  * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
- * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
+ * Copyright 2026 Mainfunc, Inc.
  */
 
 // Records shared by the pagination modules: measured blocks, page slices,

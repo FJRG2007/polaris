@@ -1,6 +1,6 @@
 /*
  * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
- * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
+ * Copyright 2026 Mainfunc, Inc.
  */
 
 /** The one preset palette shared by every color picker in the PDF app
