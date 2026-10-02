@@ -3850,7 +3850,11 @@ describe("a treasure hunt", () => {
         expect(
             world.sent
                 .slice(since)
-                .some((line) => line.includes(`particle minecraft:end_rod ${first.x + 0.5} `))
+                .some((line) =>
+                    line.includes(
+                        `particle minecraft:end_rod ${first.x + 0.5} ${first.y + 8} ${first.z + 0.5} `
+                    )
+                )
         ).toBe(false);
 
         await play(7 * 60_000);

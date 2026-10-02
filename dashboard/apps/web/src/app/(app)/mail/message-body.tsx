@@ -32,8 +32,9 @@
 import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { cleanedAlready, sanitizeMail } from "./sanitize";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function MessageBody({
@@ -389,7 +390,13 @@ export function SandboxedHtml({
     // differed between its HTML and the browser's first paint is a hydration
     // mismatch on the most security-sensitive component in the app.
     const t = useTranslations("mail");
-    const [origin, setOrigin] = useState("");
+    // Read during the first render when there is a window to read it from. A
+    // body is only ever fetched by the browser, so this component is never part
+    // of a server render and cannot mismatch one - and waiting for an effect to
+    // learn it cost every opened message an extra render before its frame.
+    const [origin, setOrigin] = useState(() =>
+        typeof window === "undefined" ? "" : window.location.origin
+    );
     useEffect(() => {
         setOrigin(window.location.origin);
     }, []);
@@ -402,42 +409,20 @@ export function SandboxedHtml({
     // by is only the padding around a screen-tall block, so the frame stops
     // offering a scrollbar for it rather than scroll a few pixels of margin.
     const [settled, setSettled] = useState(false);
-    const [clean, setClean] = useState<string | null>(null);
+    // A message this tab has already cleaned draws in the same render, rather
+    // than one render later behind a pulsing box - see `sanitize`.
+    const [clean, setClean] = useState<string | null>(() => cleanedAlready(html));
 
     useEffect(() => {
         let live = true;
-        void (async () => {
-            const purify = (await import("dompurify")).default;
-            const sanitized = purify.sanitize(html, {
-                // `data-remote-*` is how the server parks an address it held
-                // back. It has to survive the sanitizer or "show pictures" has
-                // nothing to put back.
-                ADD_ATTR: [
-                    "target",
-                    "data-remote-src",
-                    "data-remote-srcset",
-                    "data-remote-background",
-                    "data-remote-poster"
-                ],
-                FORBID_TAGS: [
-                    "script",
-                    "iframe",
-                    "object",
-                    "embed",
-                    "form",
-                    "input",
-                    "button",
-                    "meta",
-                    "base"
-                ],
-                FORBID_ATTR: ["srcdoc", "formaction", "ping"],
-                // Mail is full of tables and inline styles and always will be.
-                // They are safe inside a frame with no same-origin and a policy
-                // that forbids every outside load.
-                ALLOW_DATA_ATTR: true
-            });
+        const ready = cleanedAlready(html);
+        if (ready !== null) {
+            setClean(ready);
+            return;
+        }
+        void sanitizeMail(html).then((sanitized) => {
             if (live) setClean(sanitized);
-        })();
+        });
         return () => {
             live = false;
         };
@@ -466,7 +451,10 @@ export function SandboxedHtml({
     const [heard, setHeard] = useState(false);
     useEffect(() => {
         if (heard || clean === null || !origin) return;
-        const timer = setTimeout(() => setHeight((current) => Math.max(current, UNHEARD_HEIGHT)), 2500);
+        const timer = setTimeout(
+            () => setHeight((current) => Math.max(current, UNHEARD_HEIGHT)),
+            2500
+        );
         return () => clearTimeout(timer);
     }, [heard, clean, origin]);
 
@@ -493,10 +481,7 @@ export function SandboxedHtml({
 
     if (clean === null || !origin) {
         return (
-            <div
-                className="h-24 animate-pulse rounded-md bg-card"
-                aria-label={t("body.opening")}
-            />
+            <div className="h-24 animate-pulse rounded-md bg-card" aria-label={t("body.opening")} />
         );
     }
 

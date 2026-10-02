@@ -53,9 +53,11 @@ const FileViewer = dynamic(
     { ssr: false }
 );
 import { useBusy } from "./use-busy";
+import { SenderFace } from "./sender-face";
 import { readMessage } from "./message-store";
 import { DeliveryNote } from "./delivery-note";
 import type { MailViewContext } from "./mail-view";
+import { keptMessage, peekMessage } from "./message-store";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
@@ -428,7 +430,9 @@ export function ThreadView({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={context.permanentDelete ? t("view.deleteForever") : t("view.trash")}
+                        aria-label={
+                            context.permanentDelete ? t("view.deleteForever") : t("view.trash")
+                        }
                         title={context.permanentDelete ? t("view.deleteForever") : t("view.trash")}
                         disabled={busy}
                         onClick={() => act(context.permanentDelete ? "delete" : "trash")}
@@ -557,7 +561,9 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { pinned: !thread.pinned },
-                            thread.pinned ? t("thread.announce.unpinned") : t("thread.announce.pinned")
+                            thread.pinned
+                                ? t("thread.announce.unpinned")
+                                : t("thread.announce.pinned")
                         )
                     }
                 >
@@ -572,9 +578,7 @@ function ConversationMenu({
                     onSelect={() =>
                         change(
                             { muted: !thread.muted },
-                            thread.muted
-                                ? t("thread.announce.unmuted")
-                                : t("thread.announce.muted")
+                            thread.muted ? t("thread.announce.unmuted") : t("thread.announce.muted")
                         )
                     }
                 >
@@ -767,18 +771,68 @@ function MessageCard({
         [message.attachments]
     );
     const viewingAt = viewing ? positionOf(openable, viewing.path) : -1;
-    const [readable, setReadable] = useState<ReadableMessage | null>(null);
+    /**
+     * Whether the attachment viewer has been needed yet.
+     *
+     * It is a large module with stylesheets of its own, and mounting it with
+     * every message - closed, waiting - meant the first message of a session
+     * could not be drawn until all of that had downloaded: the browser holds a
+     * render back for a stylesheet it has been handed. So it mounts the first
+     * time a file is opened, and stays mounted after so it can animate shut.
+     */
+    const [viewerWanted, setViewerWanted] = useState(false);
+    useEffect(() => {
+        if (viewing) setViewerWanted(true);
+    }, [viewing]);
+    /**
+     * The words, from wherever they are nearest.
+     *
+     * This tab's own answer draws in the same render the card opens in. Failing
+     * that, what the device kept from an earlier visit draws while the request
+     * is in the air, and the answer replaces it when it lands - a kept body is
+     * the right words, but whether its pictures load and the addresses they load
+     * from are the server's to say. Only a message with nothing to show says it
+     * could not be opened.
+     */
+    const [readable, setReadable] = useState<ReadableMessage | null>(
+        () => peekMessage(message.id)?.readable ?? null
+    );
     const [failed, setFailed] = useState("");
+    const asked = useRef(false);
+    const mounted = useRef(true);
+    /** Whether any words are on screen, so a failed refresh behind them is not
+     *  reported as a message that cannot be opened. */
+    const showing = useRef(readable !== null);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     useEffect(() => {
-        if (!open || readable) return;
-        let live = true;
+        if (!open || asked.current) return;
+        asked.current = true;
+        if (peekMessage(message.id)) return;
+        let fresh = false;
+        void keptMessage(message.id).then((kept) => {
+            if (!kept || fresh || !mounted.current) return;
+            showing.current = true;
+            setReadable(kept.readable);
+        });
         void (async () => {
             try {
                 const opened = await readMessage(message.id);
-                if (live) setReadable(opened.readable);
+                fresh = true;
+                if (!mounted.current) return;
+                showing.current = true;
+                setFailed("");
+                setReadable(opened.readable);
             } catch (caught) {
-                if (!live) return;
+                // Asked again the next time it is opened, which is what somebody
+                // folding and unfolding a message that failed means.
+                asked.current = false;
+                if (!mounted.current || showing.current) return;
                 setFailed(
                     caught instanceof Error && caught.message
                         ? mailRefusalText(t, caught.message)
@@ -786,10 +840,7 @@ function MessageCard({
                 );
             }
         })();
-        return () => {
-            live = false;
-        };
-    }, [open, readable, message.id]);
+    }, [open, message.id]);
 
     /**
      * Opening a message marks it read.
@@ -856,6 +907,17 @@ function MessageCard({
                 aria-expanded={open}
                 onClick={onToggle}
             >
+                {/* Who wrote it, before the name is read - the same face the
+                    row in the list has, initials and all when there is no
+                    picture to be had. */}
+                {sender ? (
+                    <SenderFace
+                        name={sender.name}
+                        address={sender.address}
+                        size={open ? 32 : 20}
+                        className={open ? undefined : "self-center"}
+                    />
+                ) : null}
                 {open ? (
                     // Each person is a chip rather than text: copy under the
                     // pointer, and the rest on the right-click. See
@@ -1104,7 +1166,9 @@ function MessageCard({
                                                     );
                                                 }}
                                                 className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
-                                                aria-label={t("view.saveNamed", { name: file.name })}
+                                                aria-label={t("view.saveNamed", {
+                                                    name: file.name
+                                                })}
                                                 title={t("view.saveNamed", { name: file.name })}
                                                 download
                                             >
@@ -1180,26 +1244,28 @@ function MessageCard({
                 documents, pictures, code. Written once there and pointed at a
                 different source here rather than reimplemented, which is the
                 whole reason it takes a `urlFor`. */}
-            <FileViewer
-                target={viewing}
-                readOnly
-                urlFor={(target, inline) =>
-                    `/api/mail/attachments/${target.path}${inline ? "?inline=1" : ""}`
-                }
-                onOpenChange={(open) => (open ? undefined : setViewing(null))}
-                steps={
-                    viewing && viewingAt !== -1
-                        ? {
-                              index: viewingAt,
-                              count: openable.length,
-                              onStep: (by) => {
-                                  const next = stepFrom(openable, viewing.path, by);
-                                  if (next) setViewing(viewerTargetOf(next));
+            {viewerWanted ? (
+                <FileViewer
+                    target={viewing}
+                    readOnly
+                    urlFor={(target, inline) =>
+                        `/api/mail/attachments/${target.path}${inline ? "?inline=1" : ""}`
+                    }
+                    onOpenChange={(open) => (open ? undefined : setViewing(null))}
+                    steps={
+                        viewing && viewingAt !== -1
+                            ? {
+                                  index: viewingAt,
+                                  count: openable.length,
+                                  onStep: (by) => {
+                                      const next = stepFrom(openable, viewing.path, by);
+                                      if (next) setViewing(viewerTargetOf(next));
+                                  }
                               }
-                          }
-                        : undefined
-                }
-            />
+                            : undefined
+                    }
+                />
+            ) : null}
         </li>
     );
 }

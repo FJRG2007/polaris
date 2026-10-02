@@ -57,6 +57,7 @@ export default async function MailLayout({ children }: { children: React.ReactNo
                 identities={identities}
                 unread={unread}
                 viewerName={user.name}
+                viewerId={user.id}
                 shelf={shelfOrgId ?? "personal"}
             >
                 {children}

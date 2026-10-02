@@ -45,7 +45,9 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
-import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
+import { warmSanitizer } from "./sanitize";
+import { optimistically, stillOwed, withPatch, type ThreadPatch } from "./optimistic";
+import { useMailList, useMailThread, warmThread, type MailListAnswer } from "./use-mail-list";
 import { leavesTheView, runBetween, scopeOf, MAIL_DRAG_TYPE } from "./mail-actions";
 import {
     useCallback,
@@ -437,10 +439,7 @@ export function MailView({
         //
         // Dropped per conversation rather than all at once, so a list that has
         // stopped sending one is the end of hiding it and nothing else is.
-        const here = new Set(threads.map((thread) => thread.id));
-        const held = Object.fromEntries(
-            Object.entries(inFlight.current).filter(([id, over]) => !over.gone || here.has(id))
-        );
+        const held = stillOwed(inFlight.current, new Set(threads.map((thread) => thread.id)));
         inFlight.current = held;
         setPatched(held);
     }, [threads]);
@@ -483,11 +482,7 @@ export function MailView({
     }, [cursor, firstPage, loadingMore, page]);
 
     const patch = useCallback((ids: readonly string[], change: ThreadPatch) => {
-        setPatched((held) => {
-            const next = { ...held };
-            for (const id of ids) next[id] = { ...next[id], ...change };
-            return next;
-        });
+        setPatched((held) => withPatch(held, ids, change));
     }, []);
 
     /** The same, for a change the mail server has been asked for and has not
@@ -499,9 +494,7 @@ export function MailView({
 
     const patchUntilAnswered = useCallback(
         (ids: readonly string[], change: ThreadPatch) => {
-            const held = { ...inFlight.current };
-            for (const id of ids) held[id] = { ...held[id], ...change };
-            inFlight.current = held;
+            inFlight.current = withPatch(inFlight.current, ids, change);
             patch(ids, change);
         },
         [patch]
@@ -594,15 +587,21 @@ export function MailView({
         })();
     }, []);
     const warm = useCallback(
-        (messageId: string) => {
-            if (!messageId || warmed.current.has(messageId)) return;
+        (messageId: string, threadId = "") => {
+            // The conversation itself as well as its newest body: opening one is
+            // two requests, and warming only the body left the other one standing
+            // between the press and the pane. It is a database read with no
+            // mail server behind it, so it does not wait in the body's queue.
+            const bodyWanted = Boolean(messageId) && !warmed.current.has(messageId);
+            if (!bodyWanted && !threadId) return;
             if (warming.current) clearTimeout(warming.current);
             warming.current = setTimeout(() => {
                 warming.current = null;
-                warmSoon(messageId);
+                warmThread(threadId, revision);
+                if (bodyWanted) warmSoon(messageId);
             }, WARM_AFTER_MS);
         },
-        [warmSoon]
+        [revision, warmSoon]
     );
     /**
      * The same, with the wait taken off.
@@ -615,7 +614,8 @@ export function MailView({
      * head start and waited the full round trip with a spinner in front of them.
      */
     const warmNow = useCallback(
-        (messageId: string) => {
+        (messageId: string, threadId = "") => {
+            warmThread(threadId, revision);
             if (!messageId || warmed.current.has(messageId)) return;
             if (warming.current) {
                 clearTimeout(warming.current);
@@ -623,8 +623,21 @@ export function MailView({
             }
             warmSoon(messageId);
         },
-        [warmSoon]
+        [revision, warmSoon]
     );
+
+    /**
+     * The sanitizer, while the reader is still looking at the list.
+     *
+     * It is fetched on demand because nothing before a conversation needs it,
+     * which made it the last thing the first open of a session waited for - a
+     * script download after the message had already arrived. Asked for once the
+     * list has had its turn, so it never competes with the rows.
+     */
+    useEffect(() => {
+        const timer = setTimeout(warmSanitizer, 1_000);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Nothing outlives the screen: a timer that fires after this list is gone,
     // or a slot drained after it, asks for a body nobody is waiting for.
@@ -948,7 +961,9 @@ export function MailView({
                     Object.entries(inFlight.current).filter(([, over]) => over.gone)
                 );
                 setSelected([]);
-                toast.show({ title: t("shell.moved", { count: messageIds.length, folder: folderName }) });
+                toast.show({
+                    title: t("shell.moved", { count: messageIds.length, folder: folderName })
+                });
                 if (leaving) {
                     reloadLists();
                     return;
@@ -1046,8 +1061,27 @@ export function MailView({
     // to open exactly as somebody hovering is, and the wait afterwards is the
     // same wait.
     useEffect(() => {
-        if (onRow?.leadMessageId) warm(onRow.leadMessageId);
-    }, [onRow?.leadMessageId, warm]);
+        if (onRow?.leadMessageId) warm(onRow.leadMessageId, onRow.id);
+    }, [onRow?.leadMessageId, onRow?.id, warm]);
+
+    /**
+     * The conversations either side of the one being read.
+     *
+     * Reading a mailbox is mostly going to the next one - by arrow, by filing
+     * this one, by "open the next" - so those two are fetched while this one is
+     * being read, and the step costs nothing. The next one's body as well, through
+     * the same one-at-a-time queue a pointer uses; the previous one has usually
+     * just been read.
+     */
+    useEffect(() => {
+        if (!openThreadId) return;
+        const at = threads.findIndex((thread) => thread.id === openThreadId);
+        if (at < 0) return;
+        const next = threads[at + 1];
+        const previous = threads[at - 1];
+        if (previous) warmThread(previous.id, revision);
+        if (next) warm(next.leadMessageId, next.id);
+    }, [openThreadId, threads, warm, revision]);
     const rowMessageIds = onRow ? [onRow.leadMessageId].filter(Boolean) : [];
 
     /**
@@ -1075,7 +1109,9 @@ export function MailView({
                       act(
                           shown(onRow).important ? "unimportant" : "important",
                           rowMessageIds,
-                          shown(onRow).important ? t("thread.announce.unimportant") : t("thread.announce.important")
+                          shown(onRow).important
+                              ? t("thread.announce.unimportant")
+                              : t("thread.announce.important")
                       );
                   },
                   pin: () => {
@@ -1110,13 +1146,16 @@ export function MailView({
                       if (openThread) closeOpen();
                   },
                   archive: () => {
-                      if (context.canArchive) act("archive", rowMessageIds, t("thread.announce.archived"));
+                      if (context.canArchive)
+                          act("archive", rowMessageIds, t("thread.announce.archived"));
                   },
                   trash: () =>
                       act(
                           context.permanentDelete ? "delete" : "trash",
                           rowMessageIds,
-                          context.permanentDelete ? t("thread.announce.deleted") : t("thread.announce.trashed")
+                          context.permanentDelete
+                              ? t("thread.announce.deleted")
+                              : t("thread.announce.trashed")
                       ),
                   junk: () => act("junk", rowMessageIds, t("thread.announce.junk")),
                   star: () => {
@@ -1384,9 +1423,7 @@ export function MailView({
                     <div className="flex items-center gap-2">
                         <Checkbox
                             checked={allPicked}
-                            aria-label={
-                                allPicked ? t("list.clearSelection") : t("keys.selectAll")
-                            }
+                            aria-label={allPicked ? t("list.clearSelection") : t("keys.selectAll")}
                             onChange={(event) =>
                                 setSelected(
                                     event.target.checked ? threads.map((thread) => thread.id) : []
@@ -1405,14 +1442,10 @@ export function MailView({
                                     variant="ghost"
                                     size="icon"
                                     aria-label={
-                                        layout === "split"
-                                            ? t("list.oneAtATime")
-                                            : t("list.split")
+                                        layout === "split" ? t("list.oneAtATime") : t("list.split")
                                     }
                                     title={
-                                        layout === "split"
-                                            ? t("list.oneAtATime")
-                                            : t("list.split")
+                                        layout === "split" ? t("list.oneAtATime") : t("list.split")
                                     }
                                     onClick={() => setLayout(layout === "split" ? "full" : "split")}
                                 >
@@ -1465,7 +1498,11 @@ export function MailView({
                                         title={t("view.archive")}
                                         disabled={busy}
                                         onClick={() =>
-                                            act("archive", selectedMessageIds, t("thread.announce.archived"))
+                                            act(
+                                                "archive",
+                                                selectedMessageIds,
+                                                t("thread.announce.archived")
+                                            )
                                         }
                                     >
                                         <Archive className="size-4 shrink-0" aria-hidden />
@@ -1490,7 +1527,11 @@ export function MailView({
                                     title={t("view.markUnread")}
                                     disabled={busy}
                                     onClick={() =>
-                                        act("unread", selectedMessageIds, t("thread.announce.unread"))
+                                        act(
+                                            "unread",
+                                            selectedMessageIds,
+                                            t("thread.announce.unread")
+                                        )
                                     }
                                 >
                                     <Mail className="size-4 shrink-0" aria-hidden />
@@ -1513,7 +1554,11 @@ export function MailView({
                                         title={t("view.restore")}
                                         disabled={busy}
                                         onClick={() =>
-                                            act("restore", selectedMessageIds, t("thread.announce.restored"))
+                                            act(
+                                                "restore",
+                                                selectedMessageIds,
+                                                t("thread.announce.restored")
+                                            )
                                         }
                                     >
                                         <Undo2 className="size-4 shrink-0" aria-hidden />
@@ -1526,7 +1571,11 @@ export function MailView({
                                         title={t("list.junk")}
                                         disabled={busy}
                                         onClick={() =>
-                                            act("junk", selectedMessageIds, t("thread.announce.junk"))
+                                            act(
+                                                "junk",
+                                                selectedMessageIds,
+                                                t("thread.announce.junk")
+                                            )
                                         }
                                     >
                                         <Bug className="size-4 shrink-0" aria-hidden />
@@ -1644,8 +1693,10 @@ export function MailView({
                                         <ThreadRow
                                             thread={shown(thread)}
                                             onCursor={onRow?.id === thread.id}
-                                            onPeek={() => warm(thread.leadMessageId)}
-                                            onDecided={() => warmNow(thread.leadMessageId)}
+                                            onPeek={() => warm(thread.leadMessageId, thread.id)}
+                                            onDecided={() =>
+                                                warmNow(thread.leadMessageId, thread.id)
+                                            }
                                             open={openThread?.id === thread.id}
                                             picked={selected.includes(thread.id)}
                                             color={accountColor(thread.accountId)}
@@ -1838,9 +1889,7 @@ export function MailView({
                     <ConversationSkeleton />
                 ) : (
                     <div className="flex flex-1 items-center justify-center p-8">
-                        <p className="text-[13px] text-foreground-subtle">
-                            {t("list.pick")}
-                        </p>
+                        <p className="text-[13px] text-foreground-subtle">{t("list.pick")}</p>
                     </div>
                 )}
             </section>
@@ -2067,9 +2116,7 @@ function ListFilters({
                     variant="ghost"
                     size="icon"
                     aria-pressed={filter === "unread"}
-                    aria-label={
-                        filter === "unread" ? t("list.showAll") : t("list.showUnread")
-                    }
+                    aria-label={filter === "unread" ? t("list.showAll") : t("list.showUnread")}
                     title={filter === "unread" ? t("list.showAll") : t("list.showUnread")}
                     className={cn(filter === "unread" && "bg-muted text-foreground")}
                     onClick={() => go({ filter: filter === "unread" ? "" : "unread" })}
@@ -2240,48 +2287,6 @@ function ShortcutSheet({ keymap, onClose }: { keymap: core.MailKeymap; onClose: 
     );
 }
 
-/** What an action changes about a row before the server has confirmed it. Only
- *  the things a list actually draws differently. */
-interface ThreadPatch {
-    unreadCount?: number;
-    starred?: boolean;
-    important?: boolean;
-    pinned?: boolean;
-    muted?: boolean;
-    /** Taken out of this list. Drawn as gone at once and put back if the server
-     *  refuses, rather than left sitting there while a mail server is asked. */
-    gone?: boolean;
-}
-
-/**
- * How a row should look the instant an action is asked for.
- *
- * Every action, including the ones that take the conversation out of the list.
- * That was held back at first on the grounds that a row vanishing and
- * reappearing after a refusal is worse than the wait - but the wait is a round
- * trip to somebody's mail server, and pressing Archive and watching the row sit
- * there reads as the button not having worked. A refusal is rare, it says why,
- * and the row comes back.
- */
-function optimistically(action: MailAction): ThreadPatch | null {
-    switch (action) {
-        case "read":
-            return { unreadCount: 0 };
-        case "unread":
-            return { unreadCount: 1 };
-        case "star":
-            return { starred: true };
-        case "unstar":
-            return { starred: false };
-        case "important":
-            return { important: true };
-        case "unimportant":
-            return { important: false };
-        default:
-            return leavesTheView(action) ? { gone: true } : null;
-    }
-}
-
 /**
  * What a row says about itself besides who and what: important, pinned, muted.
  *
@@ -2442,7 +2447,12 @@ function ThreadRow({
                 event.dataTransfer.setData("text/plain", "");
             }}
             className={cn(
-                "group relative border-b border-border/60",
+                // Rows scrolled out of view are not laid out or painted. A list
+                // somebody has scrolled a few pages down is a few hundred of
+                // these, and every one of them was being redrawn on each change
+                // to the selection; `auto` remembers each row's real height, so
+                // the scrollbar does not jump as they come back.
+                "group relative border-b border-border/60 [contain-intrinsic-size:auto_64px] [content-visibility:auto]",
                 // Unread is a lift off the page as well as bolder text. Weight
                 // alone is what a list of forty read messages and three unread
                 // ones looked like: three rows in a slightly darker grey,
@@ -2540,10 +2550,20 @@ function ThreadRow({
                         event.preventDefault();
                         goShallow(mailAddress({ open: thread.id }));
                     }}
-                    className={cn("min-w-0 flex-1", wide && "flex items-baseline gap-3")}
+                    // Wide is one line - sender, subject, snippet, date - but only
+                    // where a line has room for all four. Below `md` (a phone, a
+                    // narrow window) it is two: who and when, then what. One
+                    // line at 390 px cut the subject, the preview and the date
+                    // off the right-hand edge.
+                    className={cn("min-w-0 flex-1", wide && "md:flex md:items-baseline md:gap-3")}
                     aria-current={open ? "true" : undefined}
                 >
-                    <div className={cn("flex items-baseline gap-2", wide && "w-56 shrink-0")}>
+                    <div
+                        className={cn(
+                            "flex min-w-0 items-baseline gap-2",
+                            wide && "md:w-56 md:shrink-0"
+                        )}
+                    >
                         <span
                             // Same reason, same row: three names in a group
                             // conversation are cut after the first, and which
@@ -2563,9 +2583,18 @@ function ThreadRow({
                             </span>
                         ) : null}
                         <RowMarks thread={thread} />
-                        {wide ? null : <Stamp thread={thread} bySize={bySize} />}
+                        <Stamp
+                            thread={thread}
+                            bySize={bySize}
+                            className={wide ? "md:hidden" : undefined}
+                        />
                     </div>
-                    <div className={cn("min-w-0", wide && "flex flex-1 items-baseline gap-2")}>
+                    <div
+                        className={cn(
+                            "min-w-0",
+                            wide && "mt-0.5 flex items-baseline gap-2 md:mt-0 md:flex-1"
+                        )}
+                    >
                         <p
                             // The whole of it, for a row that is showing half.
                             // A subject is the one thing in a row somebody is
@@ -2592,7 +2621,9 @@ function ThreadRow({
                             </p>
                         </div>
                     </div>
-                    {wide ? <Stamp thread={thread} bySize={bySize} /> : null}
+                    {wide ? (
+                        <Stamp thread={thread} bySize={bySize} className="hidden md:flex" />
+                    ) : null}
                     {thread.labels.length > 0 && !wide ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                             {thread.labels.map((label) => (
@@ -2669,7 +2700,9 @@ function ThreadRow({
                             onClick={() =>
                                 onAct(
                                     permanentDelete ? "delete" : "trash",
-                                    permanentDelete ? t("thread.announce.deleted") : t("thread.announce.trashed")
+                                    permanentDelete
+                                        ? t("thread.announce.deleted")
+                                        : t("thread.announce.trashed")
                                 )
                             }
                         />
@@ -2758,7 +2791,11 @@ function faceOf(
  * repeated down the whole screen that tells nobody anything. A message somebody
  * sent to themself is the one case where it is all there is, and then it stands.
  */
-function people(t: NamespaceTranslator<"mail">, thread: MailThreadView, mine: ReadonlySet<string>): string {
+function people(
+    t: NamespaceTranslator<"mail">,
+    thread: MailThreadView,
+    mine: ReadonlySet<string>
+): string {
     const others = thread.participants.filter(
         (entry) => !mine.has(entry.address.trim().toLowerCase())
     );
@@ -2794,11 +2831,24 @@ function people(t: NamespaceTranslator<"mail">, thread: MailThreadView, mine: Re
  * how old it is - both are why somebody picks one row out of forty - and the
  * preview line is the one thing on the row that is genuinely prose.
  */
-function Stamp({ thread, bySize }: { thread: MailThreadView; bySize: boolean }) {
+function Stamp({
+    thread,
+    bySize,
+    className
+}: {
+    thread: MailThreadView;
+    bySize: boolean;
+    className?: string;
+}) {
     const format = useDisplayFormat();
     const t = useTranslations("mail");
     return (
-        <span className="flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-foreground-subtle">
+        <span
+            className={cn(
+                "flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-foreground-subtle",
+                className
+            )}
+        >
             {thread.hasAttachments ? (
                 <Paperclip className="size-3 shrink-0" aria-label={t("list.hasAttachments")} />
             ) : null}

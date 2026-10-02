@@ -51,6 +51,12 @@ export function rememberSnapshotBuild(stamp: string | null): void {
     servedBuild = stamp;
 }
 
+/** The build this document came from, once the shell has said, for another
+ *  store that has to refuse what an older build wrote (`mail-cache`). */
+export function snapshotBuild(): string | null {
+    return buildKnown ? servedBuild : null;
+}
+
 /** The snapshot for `key` if it exists and is younger than `maxAgeMs`. */
 export function readSnapshot<T>(key: string, maxAgeMs: number): Snapshot<T> | null {
     if (typeof sessionStorage === "undefined") return null;

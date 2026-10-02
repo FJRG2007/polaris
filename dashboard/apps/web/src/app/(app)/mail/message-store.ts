@@ -20,12 +20,16 @@
  *   kept, so a hover followed immediately by a press is one fetch, and a message
  *   opened, collapsed and opened again is none.
  *
- * In memory and nowhere else. Somebody's mail is not something to leave in
- * storage a later page can read, and a tab that is closed is a cache that should
- * be gone.
+ * Between visits, the device keeps the last bodies read through `mail-cache`:
+ * the signed-in reader's own, bounded, dropped on sign-out - and only after the
+ * same sanitizer the reading pane uses, so what is kept is what was drawn and
+ * never the markup as it arrived. Nothing here goes into web storage, which
+ * any later page on this origin could read.
  */
 
+import { sanitizeMail } from "./sanitize";
 import type { AnswerableMessage } from "./answering";
+import { mailCache } from "@/lib/mailbox/mail-cache";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
 
 /** One message, as the endpoint answers it. */
@@ -38,6 +42,9 @@ export interface OpenedMessage {
 export class MailOpenError extends Error {}
 
 const held = new Map<string, Promise<OpenedMessage>>();
+/** The same answers once they have arrived, so a pane can draw one in the very
+ *  render that opens it instead of a render later. */
+const settled = new Map<string, OpenedMessage>();
 
 /** How many messages' words this tab keeps. Enough for any conversation and a
  *  long walk down a list; past it the oldest is dropped, because a mailbox left
@@ -52,7 +59,15 @@ async function fetchMessage(messageId: string): Promise<OpenedMessage> {
         const said = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new MailOpenError(said?.error ?? "That message could not be opened.");
     }
-    return (await response.json()) as OpenedMessage;
+    const answer = (await response.json()) as OpenedMessage;
+    // Cleaned here, once, so the copy this tab holds and the copy the device
+    // keeps are both the cleaned one. The pane cleans it again on the way into
+    // its frame, which changes nothing and costs nothing - see `sanitize`.
+    const html = await sanitizeMail(answer.readable.html).catch(() => null);
+    if (html === null) return answer;
+    const opened: OpenedMessage = { ...answer, readable: { ...answer.readable, html } };
+    mailCache.write("message", messageId, opened, opened.envelope.accountId);
+    return opened;
 }
 
 /**
@@ -66,14 +81,23 @@ export function readMessage(messageId: string): Promise<OpenedMessage> {
     const already = held.get(messageId);
     if (already) return already;
 
-    const asked = fetchMessage(messageId).catch((caught: unknown) => {
-        held.delete(messageId);
-        throw caught;
-    });
+    const asked = fetchMessage(messageId).then(
+        (opened) => {
+            if (held.get(messageId) === asked) settled.set(messageId, opened);
+            return opened;
+        },
+        (caught: unknown) => {
+            held.delete(messageId);
+            throw caught;
+        }
+    );
     held.set(messageId, asked);
     if (held.size > KEEP) {
         const oldest = held.keys().next();
-        if (!oldest.done && oldest.value !== messageId) held.delete(oldest.value);
+        if (!oldest.done && oldest.value !== messageId) {
+            held.delete(oldest.value);
+            settled.delete(oldest.value);
+        }
     }
     return asked;
 }
@@ -92,8 +116,26 @@ export function messageHeld(messageId: string): boolean {
     return held.has(messageId);
 }
 
+/** The message, if this tab already has its answer - without waiting. */
+export function peekMessage(messageId: string): OpenedMessage | null {
+    return settled.get(messageId) ?? null;
+}
+
+/**
+ * What this device kept of a message from an earlier visit, or nothing.
+ *
+ * Drawn while the request for it is still in the air, and replaced by that
+ * answer when it lands: the words of a message do not change, but whether its
+ * pictures load does, and the addresses they load from are signed for a day.
+ */
+export function keptMessage(messageId: string): Promise<OpenedMessage | null> {
+    return mailCache.read<OpenedMessage>("message", messageId);
+}
+
 /** Forget one - what an action that changes the message underneath it has to
  *  do, or the pane would go on drawing what it used to say. */
 export function forgetMessage(messageId: string): void {
     held.delete(messageId);
+    settled.delete(messageId);
+    mailCache.forget("message", messageId);
 }

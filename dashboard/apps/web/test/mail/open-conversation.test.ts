@@ -180,8 +180,11 @@ describe("the address stops naming what was moved", () => {
         expect(view).toContain("Object.entries(inFlight.current).filter(([, over]) => over.gone)");
         // What lets it go is the list itself, per conversation: the first one
         // that no longer has the row.
-        expect(view).toContain("const here = new Set(threads.map((thread) => thread.id));");
-        expect(view).toContain("filter(([id, over]) => !over.gone || here.has(id))");
+        // The rule itself is `stillOwed` (see `optimistic-rows.test.ts`); here,
+        // only that the list hands it every row it still sends.
+        expect(view).toContain(
+            "stillOwed(inFlight.current, new Set(threads.map((thread) => thread.id)))"
+        );
         // A flag the server has written is still dropped at the answer: the next
         // list says it too, and holding it would be the screen disagreeing with
         // the mailbox for ever.

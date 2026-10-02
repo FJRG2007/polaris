@@ -41,7 +41,9 @@ vi.mock("@/app/(app)/mail/mail-shell", () => ({
 }));
 
 vi.mock("@/app/(app)/mail/message-store", () => ({
-    readMessage: async () => ({ readable: { html: "", text: "", remoteBlocked: 0 } })
+    readMessage: async () => ({ readable: { html: "", text: "", remoteBlocked: 0 } }),
+    peekMessage: () => null,
+    keptMessage: async () => null
 }));
 
 vi.mock("@/app/(app)/mail/actions", () => ({
@@ -133,7 +135,9 @@ function draw(to: readonly core.MailAddress[], cc: readonly core.MailAddress[]):
                 context={CONTEXT}
                 markRead="never"
             />
-        </ToastProvider>, { wrapper: MessagesWrapper });
+        </ToastProvider>,
+        { wrapper: MessagesWrapper }
+    );
 }
 
 /** One row of the header, read the way somebody reads it. */

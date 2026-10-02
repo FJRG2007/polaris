@@ -9,10 +9,9 @@
  * would have seen, through the same sanitizer and the same sandboxed frame.
  */
 
+import { openMessage } from "./open";
 import { readThreadView } from "./views";
 import type * as core from "@polaris/core";
-import { readableMessage } from "./reading";
-import { loadBody, messageForReading } from "./messages";
 
 /**
  * The most messages one printout carries.
@@ -54,15 +53,13 @@ export async function printableThread(
     const kept = view.messages.slice(-PRINT_LIMIT);
 
     const messages: PrintableMessage[] = [];
+    // One at a time, and through the same path the reading pane opens a message
+    // by: a body that is not held yet is a session on the mail server, and sixty
+    // of those at once is how a large host locks an account out of its mailbox.
     for (const message of kept) {
-        const body = await loadBody(userId, message.id);
-        const held = await messageForReading(userId, message.id);
-        if (!held) continue;
-        const readable = await readableMessage(message.accountId, message.id, userId, held.policy, {
-            ...held.row,
-            bodyHtml: body.html || held.row.bodyHtml,
-            bodyText: body.text || held.row.bodyText
-        });
+        const opened = await openMessage(userId, message.id);
+        if (!opened) continue;
+        const readable = opened.readable;
         messages.push({
             id: message.id,
             from: message.from,
