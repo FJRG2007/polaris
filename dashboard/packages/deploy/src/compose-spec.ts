@@ -7,7 +7,12 @@
  */
 
 import { traefikLabels } from "./traefik.js";
-import type { AppDeployPlan, DbDeployPlan, DbMemberPlan, ResourceLimits } from "./runtime/driver.js";
+import type {
+    AppDeployPlan,
+    DbDeployPlan,
+    DbMemberPlan,
+    ResourceLimits
+} from "./runtime/driver.js";
 
 export interface ComposeSpecPort {
     readonly host: number;
@@ -82,6 +87,9 @@ export interface ComposeSpecService {
     /** Other names the container answers to on every network it joins (see
      *  `AppDeployPlan.alias`). */
     readonly aliases?: string[];
+    /** Further names it answers to on one network only, keyed by that network: the
+     *  names an operator's own services call it by on a network of theirs. */
+    readonly networkAliases?: Readonly<Record<string, readonly string[]>>;
     /** Names this container can reach that DNS cannot answer, as `name:address`.
      *  One of them is always here - see `HOST_GATEWAY`. */
     readonly extraHosts?: string[];
@@ -128,7 +136,9 @@ export function composeValue(value: string): string {
 
 /** Every value in a map, escaped for compose. */
 function composeValues(values: Readonly<Record<string, string>>): Record<string, string> {
-    return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, composeValue(value)]));
+    return Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [key, composeValue(value)])
+    );
 }
 
 /**
@@ -149,9 +159,15 @@ function composeValues(values: Readonly<Record<string, string>>): Record<string,
  */
 export function forCompose(spec: ComposeSpec): ComposeSpec {
     for (const service of spec.services) {
-        const args = [...(service.command ?? []), ...(service.entrypoint ?? []), ...(service.healthcheck?.test ?? [])];
+        const args = [
+            ...(service.command ?? []),
+            ...(service.entrypoint ?? []),
+            ...(service.healthcheck?.test ?? [])
+        ];
         if (args.some((arg) => /[\x00-\x1f\x7f]/.test(arg))) {
-            throw new Error(`${service.name}'s command holds a line break or another control character, which a container cannot be started with.`);
+            throw new Error(
+                `${service.name}'s command holds a line break or another control character, which a container cannot be started with.`
+            );
         }
     }
     return {
@@ -169,8 +185,29 @@ export function forCompose(spec: ComposeSpec): ComposeSpec {
     };
 }
 
+/**
+ * The per-network names a plan asks for, kept to the networks the service really
+ * joins - a name for a network it is not on would be refused by the daemon - and
+ * left out entirely when there are none, so a spec for every other service is the
+ * same bytes it always was.
+ */
+function networkAliasesFor(
+    asked: AppDeployPlan["networkAliases"],
+    networks: readonly string[]
+): Pick<ComposeSpecService, "networkAliases"> {
+    if (!asked) return {};
+    const kept = Object.fromEntries(
+        Object.entries(asked).filter(([net, names]) => networks.includes(net) && names.length > 0)
+    );
+    return Object.keys(kept).length > 0 ? { networkAliases: kept } : {};
+}
+
 /** Build the structured spec for an application deployment. */
-export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: string): ComposeSpec {
+export function appComposeSpec(
+    plan: AppDeployPlan,
+    imageTag: string,
+    network: string
+): ComposeSpec {
     const joined = joinedNetworks(plan.networks, network);
     const labels = traefikLabels({
         serviceName: plan.ref.name,
@@ -182,7 +219,16 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
         edge: plan.edge,
         replicas: plan.replicas
     });
-    const namedVolumes = plan.volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
+    // A release changing over beside the one it replaces mounts the named volumes
+    // the service has always had - created by its own project, so named after it -
+    // by their exact names, declared external: its own project would otherwise be
+    // handed a fresh, empty volume of the same name. Binds and shares are paths on
+    // the machine and are the same files from any project.
+    const shared = plan.sharedVolumesFrom;
+    const volumeName = (source: string) => (shared ? `${shared}_${source}` : source);
+    const namedVolumes = plan.volumes
+        .filter((volume) => volume.kind === "volume")
+        .map((volume) => volume.source);
     // The planned networks plus any extra networks the plan requests (deduped, in
     // order, so the proxy network stays first where the service is on it). Both the
     // daemon and the remote YAML renderer emit every top-level network as external,
@@ -199,7 +245,10 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 // for. A release kept under `polaris-release/...` - every image
                 // deploy pins one, and a rollback runs one - exists on this
                 // machine alone, so asking for it again fails the deploy.
-                pullPolicy: plan.build.method === "image" && imageTag === plan.build.imageRef ? "always" : "never",
+                pullPolicy:
+                    plan.build.method === "image" && imageTag === plan.build.imageRef
+                        ? "always"
+                        : "never",
                 env: { ...plan.env },
                 // Publish a host port so the app is reachable over the host's IP
                 // (LAN/intranet) with no reverse proxy - bound on all interfaces,
@@ -211,7 +260,9 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                               {
                                   host: plan.expose.host,
                                   container: plan.expose.container,
-                                  ...(plan.expose.protocol ? { protocol: plan.expose.protocol } : {})
+                                  ...(plan.expose.protocol
+                                      ? { protocol: plan.expose.protocol }
+                                      : {})
                               }
                           ]
                         : []),
@@ -222,7 +273,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                     }))
                 ],
                 volumes: plan.volumes.map((volume) => ({
-                    source: volume.source,
+                    source: volume.kind === "volume" ? volumeName(volume.source) : volume.source,
                     target: volume.mountPath,
                     kind: volume.kind
                 })),
@@ -230,6 +281,7 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                 ...(plan.command && plan.command.length > 0 ? { command: [...plan.command] } : {}),
                 networks,
                 ...(plan.alias && plan.alias !== plan.ref.name ? { aliases: [plan.alias] } : {}),
+                ...networkAliasesFor(plan.networkAliases, networks),
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped",
                 replicas: plan.replicas > 1 ? plan.replicas : undefined,
@@ -244,7 +296,10 @@ export function appComposeSpec(plan: AppDeployPlan, imageTag: string, network: s
                     : undefined
             }
         ],
-        volumes: namedVolumes,
+        volumes: shared ? [] : namedVolumes,
+        ...(shared && namedVolumes.length > 0
+            ? { externalVolumes: namedVolumes.map(volumeName) }
+            : {}),
         networks
     };
 }
@@ -316,9 +371,10 @@ function numberedNames(name: string, count: number, tag: string): string[] {
  * A release that stands beside the one it replaces runs under names of its own and
  * answers to the service's names by alias. Each of its copies also answers to the
  * matching copy name of every alias - its second copy to the service's own second
- * copy name - so the edge, which dials the service's copies by those names, finds
- * the new copies beside the old ones and only the new ones once the old are gone,
- * with no route rewritten in between.
+ * copy name - so whatever reaches the service's copies by those names (another
+ * service, an edge that still holds an older file) finds the new copies beside the
+ * old ones and only the new ones once the old are gone. The edge itself dials the
+ * serving release's own copy names, switched when the release is promoted.
  *
  * When it runs fewer copies than the route still dials (`dialled`: the release it
  * replaces ran more), the copy names past its own count are answered as well, by
@@ -335,13 +391,22 @@ export function expandReplicas(spec: ComposeSpec, dialled = 1): ComposeSpec {
             const shared = service.aliases ?? [];
             const numbered = shared.map((alias) => replicaNames(alias, Math.max(count, dialled)));
             const answered = (index: number) =>
-                numbered.flatMap((names) => names.filter((_, at) => at > 0 && at % count === index));
+                numbered.flatMap((names) =>
+                    names.filter((_, at) => at > 0 && at % count === index)
+                );
             return replicaNames(service.name, count).map((name, index) => {
                 const extra = answered(index);
                 if (index === 0) {
-                    return extra.length > 0 ? { ...service, aliases: [...new Set([...shared, ...extra])] } : service;
+                    return extra.length > 0
+                        ? { ...service, aliases: [...new Set([...shared, ...extra])] }
+                        : service;
                 }
-                return { ...service, name, ports: [], aliases: [...new Set([...shared, service.name, ...extra])] };
+                return {
+                    ...service,
+                    name,
+                    ports: [],
+                    aliases: [...new Set([...shared, service.name, ...extra])]
+                };
             });
         })
     };
@@ -365,7 +430,10 @@ export function deployBlockLines(
     if (!replicated && !service.rollingUpdate && !limited) return [];
     const lines = ["    deploy:"];
     if (replicated || service.rollingUpdate) {
-        lines.push("      mode: replicated", `      replicas: ${replicated ? service.replicas : 1}`);
+        lines.push(
+            "      mode: replicated",
+            `      replicas: ${replicated ? service.replicas : 1}`
+        );
     }
     if (limited) {
         lines.push("      resources:", "        limits:");
@@ -392,24 +460,35 @@ export function deployBlockLines(
  * network, the services beside it on their environment's own. The daemon renders
  * the same.
  */
-export function serviceNetworkLines(service: Pick<ComposeSpecService, "networks" | "aliases">): string[] {
+export function serviceNetworkLines(
+    service: Pick<ComposeSpecService, "networks" | "aliases" | "networkAliases">
+): string[] {
     if (service.networks.length === 0) return [];
     const aliases = service.aliases ?? [];
-    if (aliases.length === 0) return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
+    const own = service.networkAliases ?? {};
+    if (aliases.length === 0 && Object.keys(own).length === 0) {
+        return ["    networks:", ...service.networks.map((net) => `      - ${net}`)];
+    }
     return [
         "    networks:",
-        ...service.networks.flatMap((net) => [
-            `      ${net}:`,
-            "        aliases:",
-            ...aliases.map((alias) => `          - ${yamlQuote(alias)}`)
-        ])
+        ...service.networks.flatMap((net) => {
+            const names = [...aliases, ...(own[net] ?? [])];
+            if (names.length === 0) return [`      ${net}: {}`];
+            return [
+                `      ${net}:`,
+                "        aliases:",
+                ...names.map((alias) => `          - ${yamlQuote(alias)}`)
+            ];
+        })
     ];
 }
 
 /** Build the structured spec for a managed-database deployment. */
 export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec {
     const ports: ComposeSpecPort[] =
-        plan.exposePort !== undefined ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }] : [];
+        plan.exposePort !== undefined
+            ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }]
+            : [];
     const networks = joinedNetworks(plan.networks, network);
     // A cluster is one project of equal nodes, reaching each other by name on
     // the networks they share. Nothing is published: a client is redirected
@@ -424,7 +503,9 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
                 env: { ...plan.env },
                 command: [...node.command],
                 ports: [],
-                volumes: [{ source: node.volumeName, target: plan.dataPath, kind: "volume" as const }],
+                volumes: [
+                    { source: node.volumeName, target: plan.dataPath, kind: "volume" as const }
+                ],
                 labels: {},
                 networks,
                 extraHosts: [HOST_GATEWAY],
@@ -459,7 +540,9 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
         ],
         volumes: [
             plan.volumeName,
-            ...(plan.extraVolumes ?? []).filter((volume) => volume.kind === "volume").map((volume) => volume.source)
+            ...(plan.extraVolumes ?? [])
+                .filter((volume) => volume.kind === "volume")
+                .map((volume) => volume.source)
         ],
         networks
     };
@@ -476,10 +559,16 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
  * compose's. The point-in-time archive mounts of `extraVolumes` are a
  * PostgreSQL single instance's and are not carried here.
  */
-function dbMembersSpec(plan: DbDeployPlan, members: readonly DbMemberPlan[], networks: string[]): ComposeSpec {
+function dbMembersSpec(
+    plan: DbDeployPlan,
+    members: readonly DbMemberPlan[],
+    networks: string[]
+): ComposeSpec {
     const names = new Set(members.map((member) => member.name));
-    if (names.size !== members.length) throw new Error("Two members of one database cannot share a name");
-    if (!names.has(plan.ref.name)) throw new Error("A database's own name must be one of its members");
+    if (names.size !== members.length)
+        throw new Error("Two members of one database cannot share a name");
+    if (!names.has(plan.ref.name))
+        throw new Error("A database's own name must be one of its members");
     return {
         project: plan.ref.project,
         services: members.map((member) => {
@@ -490,11 +579,18 @@ function dbMembersSpec(plan: DbDeployPlan, members: readonly DbMemberPlan[], net
                 pullPolicy: dbPullPolicy(plan),
                 env: { ...member.env },
                 command: member.command ? [...member.command] : undefined,
-                ports: member.exposePort !== undefined ? [{ host: member.exposePort, container: defaultDbPort(image) }] : [],
-                volumes: member.volumeName ? [{ source: member.volumeName, target: plan.dataPath, kind: "volume" }] : [],
+                ports:
+                    member.exposePort !== undefined
+                        ? [{ host: member.exposePort, container: defaultDbPort(image) }]
+                        : [],
+                volumes: member.volumeName
+                    ? [{ source: member.volumeName, target: plan.dataPath, kind: "volume" }]
+                    : [],
                 labels: {},
                 networks,
-                ...(member.aliases && member.aliases.length > 0 ? { aliases: [...member.aliases] } : {}),
+                ...(member.aliases && member.aliases.length > 0
+                    ? { aliases: [...member.aliases] }
+                    : {}),
                 extraHosts: [HOST_GATEWAY],
                 restart: "unless-stopped",
                 ...limitFields(plan.limits)
@@ -508,7 +604,14 @@ function dbMembersSpec(plan: DbDeployPlan, members: readonly DbMemberPlan[], net
 /** Every image a database plan runs, once each: a rolling upgrade has members
  *  on two at a time, and each has to be on the host before compose starts. */
 export function dbPlanImages(plan: DbDeployPlan): string[] {
-    return [...new Set([plan.image, ...(plan.members ?? []).map((member) => member.image ?? plan.image)].filter(Boolean))];
+    return [
+        ...new Set(
+            [
+                plan.image,
+                ...(plan.members ?? []).map((member) => member.image ?? plan.image)
+            ].filter(Boolean)
+        )
+    ];
 }
 
 function dbPullPolicy(plan: DbDeployPlan): ComposePullPolicy {
@@ -516,7 +619,9 @@ function dbPullPolicy(plan: DbDeployPlan): ComposePullPolicy {
 }
 
 /** A plan's limits as spec fields, leaving out the ones it does not set. */
-function limitFields(limits: ResourceLimits | undefined): Pick<ComposeSpecService, "cpus" | "memoryMb"> {
+function limitFields(
+    limits: ResourceLimits | undefined
+): Pick<ComposeSpecService, "cpus" | "memoryMb"> {
     return {
         ...(limits?.cpus !== undefined ? { cpus: limits.cpus } : {}),
         ...(limits?.memoryMb !== undefined ? { memoryMb: limits.memoryMb } : {})
@@ -545,7 +650,11 @@ export function defaultDbPort(image: string): number {
  * `bind` sources are confined under `volumeRoot`, `nas` sources under `mountRoot`
  * (where storage connections are mounted) - mirroring the daemon's confinement.
  */
-export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRoot: string): string {
+export function renderComposeYaml(
+    spec: ComposeSpec,
+    volumeRoot: string,
+    mountRoot: string
+): string {
     const lines: string[] = ["services:"];
     for (const service of spec.services) {
         lines.push(`  ${service.name}:`);
@@ -598,9 +707,12 @@ export function renderComposeYaml(spec: ComposeSpec, volumeRoot: string, mountRo
         if (service.healthcheck) {
             lines.push("    healthcheck:");
             lines.push(`      test: [${service.healthcheck.test.map(yamlQuote).join(", ")}]`);
-            if (service.healthcheck.interval) lines.push(`      interval: ${service.healthcheck.interval}s`);
-            if (service.healthcheck.retries) lines.push(`      retries: ${service.healthcheck.retries}`);
-            if (service.healthcheck.startPeriod) lines.push(`      start_period: ${service.healthcheck.startPeriod}s`);
+            if (service.healthcheck.interval)
+                lines.push(`      interval: ${service.healthcheck.interval}s`);
+            if (service.healthcheck.retries)
+                lines.push(`      retries: ${service.healthcheck.retries}`);
+            if (service.healthcheck.startPeriod)
+                lines.push(`      start_period: ${service.healthcheck.startPeriod}s`);
         }
         lines.push(...deployBlockLines(service));
     }

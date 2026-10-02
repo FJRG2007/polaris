@@ -76,6 +76,12 @@ pub struct ServiceSpec {
     /// reaches the service by that name keeps reaching it across the change.
     #[serde(default)]
     pub aliases: Vec<String>,
+    /// Further names the container answers to on ONE network only: the name an
+    /// operator's own services already call it by, on a network of theirs it was
+    /// asked to join. Kept off every other network - on the shared proxy network a
+    /// short name like `api` would answer for another project's service too.
+    #[serde(default)]
+    pub network_aliases: BTreeMap<String, Vec<String>>,
     /// Names this container can reach that DNS cannot answer, as `name:address`.
     /// Always carries `host.docker.internal:host-gateway`: a container Polaris
     /// starts routinely talks to something the host publishes - the camera relay,
@@ -212,6 +218,19 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
         for alias in &service.aliases {
             if !valid_name(alias) {
                 return Err(format!("invalid network alias: {alias}"));
+            }
+        }
+        for (net, aliases) in &service.network_aliases {
+            if !service.networks.contains(net) {
+                return Err(format!(
+                    "aliases for {} on {net} need it to join {net}",
+                    service.name
+                ));
+            }
+            for alias in aliases {
+                if !valid_name(alias) {
+                    return Err(format!("invalid network alias: {alias}"));
+                }
             }
         }
         for dep in &service.depends_on {
@@ -421,17 +440,27 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
         }
         if !service.networks.is_empty() {
             out.push_str("    networks:\n");
-            if service.aliases.is_empty() {
+            if service.aliases.is_empty() && service.network_aliases.is_empty() {
                 for net in &service.networks {
                     out.push_str(&format!("      - {net}\n"));
                 }
             } else {
-                // The mapping form, which is the only one that can carry aliases;
-                // they go on every network, since whoever reaches the service by
-                // name may be on any of them.
+                // The mapping form, which is the only one that can carry aliases.
+                // The shared ones go on every network, since whoever reaches the
+                // service by name may be on any of them; a network's own only on it.
                 for net in &service.networks {
+                    let own = service.network_aliases.get(net);
+                    let names: Vec<&String> = service
+                        .aliases
+                        .iter()
+                        .chain(own.into_iter().flatten())
+                        .collect();
+                    if names.is_empty() {
+                        out.push_str(&format!("      {net}: {{}}\n"));
+                        continue;
+                    }
                     out.push_str(&format!("      {net}:\n        aliases:\n"));
-                    for alias in &service.aliases {
+                    for alias in names {
                         out.push_str(&format!("          - {}\n", yaml_quote(alias)));
                     }
                 }
@@ -1462,6 +1491,42 @@ mod tests {
             r#"{"project":"p","services":[{"name":"web","image":"nginx","aliases":["web2"]}]}"#,
         );
         assert!(validate_spec(&orphan, &config).is_err());
+    }
+
+    #[test]
+    fn a_network_alias_answers_on_that_network_only() {
+        // An operator's own network the service was asked to join: the short name
+        // their services call it by answers there, and never on the shared proxy
+        // network, where it would answer for another project's service as well.
+        let config = test_config();
+        let joined = spec(
+            r#"{"project":"p","services":[{"name":"acme-api-1a2b","image":"nginx","networks":["polaris-proxy","app_network"],"networkAliases":{"app_network":["api"]}}],"networks":["polaris-proxy","app_network"]}"#,
+        );
+        assert!(validate_spec(&joined, &config).is_ok());
+        let rendered = render_compose(&joined, &config);
+        assert!(rendered.contains("      polaris-proxy: {}\n"));
+        assert!(rendered.contains("      app_network:\n        aliases:\n          - \"api\"\n"));
+        assert!(rendered.contains("  app_network:\n    external: true\n"));
+
+        // With the shared alias too, each network carries what applies to it.
+        let both = spec(
+            r#"{"project":"p","services":[{"name":"acme-api-1a2b-x","image":"nginx","networks":["polaris-proxy","app_network"],"aliases":["acme-api-1a2b"],"networkAliases":{"app_network":["api"]}}],"networks":["polaris-proxy","app_network"]}"#,
+        );
+        let rendered = render_compose(&both, &config);
+        assert!(rendered.contains("      polaris-proxy:\n        aliases:\n          - \"acme-api-1a2b\"\n      app_network:"));
+        assert!(rendered.contains(
+            "      app_network:\n        aliases:\n          - \"acme-api-1a2b\"\n          - \"api\"\n"
+        ));
+
+        // Only on a network it joins, and only a valid name.
+        let elsewhere = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["polaris-proxy"],"networkAliases":{"app_network":["api"]}}]}"#,
+        );
+        assert!(validate_spec(&elsewhere, &config).is_err());
+        let bad = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["app_network"],"networkAliases":{"app_network":["not valid"]}}]}"#,
+        );
+        assert!(validate_spec(&bad, &config).is_err());
     }
 
     #[test]

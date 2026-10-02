@@ -215,11 +215,20 @@
     "issues": {
         "notAPrefix": "That is not a prefix",
         "nameRequired": "Give it a name",
-        "repoRequired": "Polaris needs the repository"
+        "repoRequired": "Polaris needs the repository",
+        "networkName": "A network name is letters, digits, dots, dashes and underscores",
+        "networkReserved": "That network belongs to Docker or to Polaris itself",
+        "networkAlias": "A name on a network is letters, digits and dashes, not at either end",
+        "networkTwice": "List each network once",
+        "networkTooMany": "Up to 8 networks, with up to 8 names each"
     },
     "external": {
         "unknownAccount": "Unknown account",
         "moveOutNeedsVariables": "Copying the variables needs access to them. Move it without them, or ask for that access.",
         "moveHomeNeedsVariables": "Copying the variables needs access to them. Bring it over without them, or ask for that access."
+    },
+    "behaviour": {
+        "loadFailed": "Could not read how this service deploys",
+        "saveFailed": "Could not save how this service deploys"
     }
 }

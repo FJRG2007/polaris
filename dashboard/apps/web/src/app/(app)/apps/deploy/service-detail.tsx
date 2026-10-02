@@ -34,6 +34,7 @@ import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
+import { DeployBehaviourSection } from "./deploy-behaviour-section";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
@@ -46,7 +47,12 @@ import { describeServiceEvent, unresolvedSetupFailure } from "./service-history"
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
-import { isTunnelHostname, runtimeVersionSchema, type DisplayFormat, type ProjectCapability } from "@polaris/core";
+import {
+    isTunnelHostname,
+    runtimeVersionSchema,
+    type DisplayFormat,
+    type ProjectCapability
+} from "@polaris/core";
 import {
     CONSUMPTION_METRICS,
     MetricsHistory,
@@ -272,7 +278,10 @@ export function ServiceDetail({
                         >
                             {t(TAB_LABEL[name])}
                             {dots[name] && (
-                                <TabAttentionDot label={dots[name]} className="mb-0.5 ml-1.5 align-middle" />
+                                <TabAttentionDot
+                                    label={dots[name]}
+                                    className="mb-0.5 ml-1.5 align-middle"
+                                />
                             )}
                         </button>
                     ))}
@@ -330,14 +339,26 @@ type DepSummary = Awaited<ReturnType<typeof deployActions.listDeploymentsAction>
 /** A deployment's state as one chip. Every chip on a row is a Badge, so the
  *  state, the rollback marks and the kept-image mark share one shape. */
 function depBadge(deployment: DepSummary): {
-    label: "badge.active" | "badge.cancelled" | "badge.failed" | "badge.queued" | "badge.deploying" | "badge.removed";
+    label:
+        | "badge.active"
+        | "badge.cancelled"
+        | "badge.failed"
+        | "badge.queued"
+        | "badge.deploying"
+        | "badge.removed";
     variant: "success" | "danger" | "warning" | "neutral";
 } {
     if (deployment.isCurrent) return { label: "badge.active", variant: "success" };
     if (["failed", "cancelled", "rolled_back"].includes(deployment.status))
-        return { label: deployment.status === "cancelled" ? "badge.cancelled" : "badge.failed", variant: "danger" };
+        return {
+            label: deployment.status === "cancelled" ? "badge.cancelled" : "badge.failed",
+            variant: "danger"
+        };
     if (["queued", "deploying"].includes(deployment.status))
-        return { label: deployment.status === "queued" ? "badge.queued" : "badge.deploying", variant: "warning" };
+        return {
+            label: deployment.status === "queued" ? "badge.queued" : "badge.deploying",
+            variant: "warning"
+        };
     return { label: "badge.removed", variant: "neutral" };
 }
 
@@ -359,7 +380,8 @@ function isSettled(deployment: DepSummary): boolean {
 
 function depTitle(deployment: DepSummary, t: ServiceT): string {
     if (deployment.commitMessage) return deployment.commitMessage;
-    if (deployment.commitSha) return t("deployments.titleCommit", { sha: deployment.commitSha.slice(0, 7) });
+    if (deployment.commitSha)
+        return t("deployments.titleCommit", { sha: deployment.commitSha.slice(0, 7) });
     return t("deployments.titleManual");
 }
 
@@ -393,7 +415,12 @@ function DeployAvatar({ app, deployment }: { app: ProjectApp; deployment?: DepSu
 /** Deployment subtitle: relative time, optional author, what started it, and how
  *  long it took once it has finished. A rollback or a restart with changed
  *  variables says so instead of naming a source, since nothing was built. */
-function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: DisplayFormat, t: ServiceT): string {
+function deploySubtitle(
+    deployment: DepSummary,
+    app: ProjectApp,
+    format: DisplayFormat,
+    t: ServiceT
+): string {
     const by = deployment.authorName ? t("deployments.by", { name: deployment.authorName }) : "";
     const source = sourceLabel(app, t);
     const via = deployment.rollbackOfId
@@ -405,14 +432,20 @@ function deploySubtitle(deployment: DepSummary, app: ProjectApp, format: Display
             : deployment.trigger === "scale"
               ? t("deployments.viaScale")
               : deployment.trigger === "upload"
-              ? t("deployments.viaUpload")
-              : deployment.trigger === "preview"
-              ? t("deployments.viaPreview", { source })
-              : deployment.trigger === "push"
-                ? t("deployments.viaPush", { source })
-                : t("deployments.via", { source });
-    const took = deployment.durationMs !== null ? t("deployments.took", { duration: duration(deployment.durationMs) }) : "";
-    return `${relativeTime(deployment.createdAt, format)}${by}${via}${took}`;
+                ? t("deployments.viaUpload")
+                : deployment.trigger === "preview"
+                  ? t("deployments.viaPreview", { source })
+                  : deployment.trigger === "push"
+                    ? t("deployments.viaPush", { source })
+                    : t("deployments.via", { source });
+    const took =
+        deployment.durationMs !== null
+            ? t("deployments.took", { duration: duration(deployment.durationMs) })
+            : "";
+    const built = deployment.builtOn
+        ? t("deployments.builtOn", { machine: deployment.builtOn })
+        : "";
+    return `${relativeTime(deployment.createdAt, format)}${by}${via}${built}${took}`;
 }
 
 /** A deploy's length the way a person says it: "48s", "3m 12s". */
@@ -439,11 +472,7 @@ function KeptChip({ deployment }: { deployment: DepSummary }) {
                 <Badge
                     variant="primary"
                     className="shrink-0"
-                    title={
-                        deployment.pinned
-                            ? t("kept.pinnedTitle")
-                            : t("kept.instantTitle")
-                    }
+                    title={deployment.pinned ? t("kept.pinnedTitle") : t("kept.instantTitle")}
                 >
                     {deployment.pinned ? t("kept.pinned") : t("kept.instant")}
                 </Badge>
@@ -593,7 +622,8 @@ function DeploymentMenu({
                     </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onSelect={redeploy}>
-                    <RotateCw className="size-4" /> {isActive ? t("menu.redeploy") : t("menu.deployLatest")}
+                    <RotateCw className="size-4" />{" "}
+                    {isActive ? t("menu.redeploy") : t("menu.deployLatest")}
                 </DropdownMenuItem>
                 {deployment.imageKept && (
                     <DropdownMenuItem
@@ -614,16 +644,26 @@ function DeploymentMenu({
                 {deployment.canTakeTraffic &&
                     (deployment.trafficPercent !== null ? (
                         <DropdownMenuItem
-                            onSelect={() => run(() => deployActions.setDeploymentTrafficAction(deployment.id, null))}
+                            onSelect={() =>
+                                run(() =>
+                                    deployActions.setDeploymentTrafficAction(deployment.id, null)
+                                )
+                            }
                         >
-                            <Split className="size-4" /> {t("menu.stopTraffic", { percent: deployment.trafficPercent })}
+                            <Split className="size-4" />{" "}
+                            {t("menu.stopTraffic", { percent: deployment.trafficPercent })}
                         </DropdownMenuItem>
                     ) : (
                         [10, 50].map((percent) => (
                             <DropdownMenuItem
                                 key={percent}
                                 onSelect={() =>
-                                    run(() => deployActions.setDeploymentTrafficAction(deployment.id, percent))
+                                    run(() =>
+                                        deployActions.setDeploymentTrafficAction(
+                                            deployment.id,
+                                            percent
+                                        )
+                                    )
                                 }
                             >
                                 <Split className="size-4" /> {t("menu.sendTraffic", { percent })}
@@ -773,13 +813,15 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     <span className="inline-flex items-center gap-1">
                         <MapPin className="size-3.5" /> {region}
                     </span>
-                    <span>
-                        {t("deployments.replicas", { count: app.replicas })}
-                    </span>
+                    <span>{t("deployments.replicas", { count: app.replicas })}</span>
                 </div>
                 {can("deploy.run") && (
                     <Button size="sm" disabled={busy} onClick={deploy}>
-                        {busy ? <Loader2 className="size-4 animate-spin" /> : t("deployments.deploy")}
+                        {busy ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            t("deployments.deploy")
+                        )}
                     </Button>
                 )}
             </div>
@@ -918,7 +960,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                         {deploySubtitle(deployment, app, format, t)}
                                                     </p>
                                                     {!isSettled(deployment) && (
-                                                        <InFlightSteps deploymentId={deployment.id} />
+                                                        <InFlightSteps
+                                                            deploymentId={deployment.id}
+                                                        />
                                                     )}
                                                 </div>
                                                 {deployment.commitSha && (
@@ -1098,7 +1142,10 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
                 lines === null ? (
                     <Loading />
                 ) : (
-                    <ActivityFeed lines={lines} describe={(line) => describeServiceEvent(line, t)} />
+                    <ActivityFeed
+                        lines={lines}
+                        describe={(line) => describeServiceEvent(line, t)}
+                    />
                 )
             ) : null}
         </div>
@@ -1110,7 +1157,13 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
  * rather than only inside the folded activity. A failed setup command can be run
  * again from here; a deploy that never started is fixed by deploying.
  */
-function SetupFailure({ applicationId, failure }: { applicationId: string; failure: ActivityLine }) {
+function SetupFailure({
+    applicationId,
+    failure
+}: {
+    applicationId: string;
+    failure: ActivityLine;
+}) {
     const t = useTranslations("deployService");
     const can = useProjectCan();
     const [started, setStarted] = useState(false);
@@ -1137,14 +1190,21 @@ function SetupFailure({ applicationId, failure }: { applicationId: string; failu
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="min-w-0">
                     <span className="block text-sm font-medium">
-                        {failure.action === "setup-failed" ? t("activity.setupFailed") : t("activity.notDeployed")}
+                        {failure.action === "setup-failed"
+                            ? t("activity.setupFailed")
+                            : t("activity.notDeployed")}
                     </span>
-                    <span className="block text-xs text-muted-foreground">{describeServiceEvent(failure, t)}</span>
-                    {hint ? <span className="block text-xs text-muted-foreground">{hint}</span> : null}
+                    <span className="block text-xs text-muted-foreground">
+                        {describeServiceEvent(failure, t)}
+                    </span>
+                    {hint ? (
+                        <span className="block text-xs text-muted-foreground">{hint}</span>
+                    ) : null}
                 </span>
                 {rerunnable && !started ? (
                     <Button variant="secondary" size="sm" onClick={rerun} disabled={pending}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} {t("activity.rerun")}
+                        {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                        {t("activity.rerun")}
                     </Button>
                 ) : null}
             </div>
@@ -1349,7 +1409,10 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
     const format = useDisplayFormat();
     const rows: Array<[string, ReactNode]> = [
         [t("details.status"), deployment?.status ?? "-"],
-        [t("details.commit"), deployment?.commitSha ? <CommitRef deployment={deployment} chars={12} /> : "-"],
+        [
+            t("details.commit"),
+            deployment?.commitSha ? <CommitRef deployment={deployment} chars={12} /> : "-"
+        ],
         [t("details.message"), deployment?.commitMessage ?? "-"],
         [t("details.started"), deployment ? format.dateTime(deployment.createdAt) : "-"],
         [t("details.domain"), (primaryDomain(app.domains) ?? app.domains[0])?.hostname ?? "-"]
@@ -1382,7 +1445,8 @@ function LivePill() {
     const t = useTranslations("deployService");
     return (
         <span className="inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="size-1.5 animate-pulse rounded-full bg-success-solid" /> {t("logs.live")}
+            <span className="size-1.5 animate-pulse rounded-full bg-success-solid" />{" "}
+            {t("logs.live")}
         </span>
     );
 }
@@ -1468,9 +1532,7 @@ function RuntimeLogView({
         return (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
                 <p className="text-sm text-muted-foreground">
-                    {pending
-                        ? t("logs.stillBuilding")
-                        : t("logs.neverStarted")}
+                    {pending ? t("logs.stillBuilding") : t("logs.neverStarted")}
                 </p>
                 <Button size="sm" variant="outline" onClick={onSeeBuild}>
                     <ScrollText className="size-4" />
@@ -1812,20 +1874,16 @@ function HttpLogsView({
                         </Button>
                     </div>
                 ) : (
-                    <Empty
-                        text={
-                            all.length > 0
-                                ? t("http.noMatch")
-                                : t("http.empty")
-                        }
-                    />
+                    <Empty text={all.length > 0 ? t("http.noMatch") : t("http.empty")} />
                 )
             ) : (
                 <div className="max-h-[26rem] overflow-auto overscroll-contain rounded-md border border-border/60">
                     <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-card text-muted-foreground">
                             <tr className="border-b border-border/60 text-left">
-                                <th className="whitespace-nowrap px-3 py-2 font-medium">{t("http.time")}</th>
+                                <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                    {t("http.time")}
+                                </th>
                                 <th className="px-3 py-2 font-medium">{t("http.method")}</th>
                                 <th className="px-3 py-2 font-medium">{t("http.status")}</th>
                                 <th className="px-3 py-2 font-medium">{t("http.path")}</th>
@@ -1916,7 +1974,11 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                 scopeId={scope === "application" ? app.id : app.environmentId}
                 canWrite={can("variables.write")}
                 canDeploy={can("deploy.run")}
-                redeployTarget={scope === "application" ? t("variables.redeployService") : t("variables.redeployEnvironment")}
+                redeployTarget={
+                    scope === "application"
+                        ? t("variables.redeployService")
+                        : t("variables.redeployEnvironment")
+                }
             />
         </div>
     );
@@ -1944,7 +2006,9 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
     return (
         <div className="flex flex-col gap-4 py-1">
             {stale ? (
-                <p className="text-xs text-warning">{t("metrics.lastReading", { reason: stale })}</p>
+                <p className="text-xs text-warning">
+                    {t("metrics.lastReading", { reason: stale })}
+                </p>
             ) : null}
             {loading ? (
                 <Loading />
@@ -1961,7 +2025,14 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
                         }
                     />
                     <div className="rounded-lg border border-border/60 p-4 text-sm sm:col-span-2">
-                        {t.rich("metrics.state", { state: data.state, strong: (chunks) => <span key="state" className="font-medium">{chunks}</span> })}
+                        {t.rich("metrics.state", {
+                            state: data.state,
+                            strong: (chunks) => (
+                                <span key="state" className="font-medium">
+                                    {chunks}
+                                </span>
+                            )
+                        })}
                     </div>
                 </div>
             ) : (
@@ -2210,7 +2281,13 @@ function QuickTunnelRow({
             href={status.url}
             // The sidecar can be up with a hostname that no longer answers, so say
             // which it is instead of presenting every running tunnel as a live link.
-            badge={!status.url ? t("tunnels.starting") : status.reachable ? t("tunnels.quickLink") : t("tunnels.notAnswering")}
+            badge={
+                !status.url
+                    ? t("tunnels.starting")
+                    : status.reachable
+                      ? t("tunnels.quickLink")
+                      : t("tunnels.notAnswering")
+            }
             enabled
             pending={pending}
             onToggle={() =>
@@ -2334,7 +2411,11 @@ type ExposureKind =
     | "cf-quick"
     | "ngrok";
 
-const EXPOSURE_OPTIONS: { value: ExposureKind; label: NamespaceKey<"deployService">; icon: ReactNode }[] = [
+const EXPOSURE_OPTIONS: {
+    value: ExposureKind;
+    label: NamespaceKey<"deployService">;
+    icon: ReactNode;
+}[] = [
     {
         value: "zone",
         label: "exposure.zone",
@@ -2422,11 +2503,18 @@ function dnsAdvice(
     t: ServiceT
 ): { text: string; record?: { name: string; ip: string; conflict: boolean } } | null {
     if (!dns || dns.status === "unchanged") return null;
-    if (dns.status === "created") return { text: t("domains.dnsCreated", { hostname, ip: dns.ip ?? "" }) };
-    const record = dns.ip ? { name: hostname, ip: dns.ip, conflict: dns.status === "conflict" } : undefined;
+    if (dns.status === "created")
+        return { text: t("domains.dnsCreated", { hostname, ip: dns.ip ?? "" }) };
+    const record = dns.ip
+        ? { name: hostname, ip: dns.ip, conflict: dns.status === "conflict" }
+        : undefined;
     if (dns.status === "conflict") {
         return {
-            text: t("domains.dnsConflict", { hostname, content: dns.content ?? "", ip: dns.ip ?? "" }),
+            text: t("domains.dnsConflict", {
+                hostname,
+                content: dns.content ?? "",
+                ip: dns.ip ?? ""
+            }),
             record
         };
     }
@@ -2510,7 +2598,9 @@ function DomainCertificateButton({
                 <DialogContent>
                     <DialogTitle>{t("certificate.title", { hostname })}</DialogTitle>
                     <div className="flex flex-col gap-3 text-sm">
-                        <p className="text-xs text-muted-foreground">{t("certificate.intro", { hostname })}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("certificate.intro", { hostname })}
+                        </p>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("certificate.chain")}
                             <Textarea
@@ -2992,7 +3082,9 @@ function SettingsTab({
                 <section className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
                         <h3 className="text-sm font-medium">{t("settings.publicAccess")}</h3>
-                        <p className="text-xs text-muted-foreground">{t("settings.publicAccessIntro")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("settings.publicAccessIntro")}
+                        </p>
                     </div>
                     <ServedByChoice app={app} onChanged={onChanged} />
 
@@ -3006,11 +3098,15 @@ function SettingsTab({
                                             title={
                                                 domain.healthStatus === "down"
                                                     ? domain.healthDetail
-                                                        ? t("settings.notReachableDetail", { detail: domain.healthDetail })
+                                                        ? t("settings.notReachableDetail", {
+                                                              detail: domain.healthDetail
+                                                          })
                                                         : t("settings.notReachable")
                                                     : domain.healthStatus === "up"
                                                       ? domain.healthCode
-                                                          ? t("settings.reachableCode", { code: domain.healthCode })
+                                                          ? t("settings.reachableCode", {
+                                                                code: domain.healthCode
+                                                            })
                                                           : t("settings.reachable")
                                                       : t("settings.checking")
                                             }
@@ -3053,14 +3149,16 @@ function SettingsTab({
                                         supplied={domain.hasCertificate === true}
                                         onChanged={onChanged}
                                     />
-                                    {domain.cdn !== undefined && domain.kind !== "lan" && !domain.hostname.endsWith(".plr.local") && (
-                                        <DomainCdnButton
-                                            domainId={domain.id}
-                                            hostname={domain.hostname}
-                                            enabled={domain.cdn}
-                                            onChanged={onChanged}
-                                        />
-                                    )}
+                                    {domain.cdn !== undefined &&
+                                        domain.kind !== "lan" &&
+                                        !domain.hostname.endsWith(".plr.local") && (
+                                            <DomainCdnButton
+                                                domainId={domain.id}
+                                                hostname={domain.hostname}
+                                                enabled={domain.cdn}
+                                                onChanged={onChanged}
+                                            />
+                                        )}
                                     <Switch
                                         checked={domain.enabled}
                                         onChange={(next) =>
@@ -3073,7 +3171,9 @@ function SettingsTab({
                                             })
                                         }
                                         aria-label={
-                                            domain.enabled ? t("settings.disableDomain") : t("settings.enableDomain")
+                                            domain.enabled
+                                                ? t("settings.disableDomain")
+                                                : t("settings.enableDomain")
                                         }
                                     />
                                     <span className="flex w-5 shrink-0 items-center justify-center">
@@ -3285,7 +3385,9 @@ function SettingsTab({
                                     )}
                                 </div>
                             )}
-                            {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote.text}</p>}
+                            {dnsNote && (
+                                <p className="text-xs text-muted-foreground">{dnsNote.text}</p>
+                            )}
                             {dnsNote?.record && (
                                 <DnsRecordTable
                                     records={[
@@ -3485,7 +3587,9 @@ function SettingsTab({
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
                             <span className="font-medium">{t("settings.keepReleases")}</span>
-                            <span className="block text-xs text-muted-foreground">{t("settings.keepReleasesHint")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("settings.keepReleasesHint")}
+                            </span>
                         </span>
                         <Switch
                             checked={keepReleases}
@@ -3500,16 +3604,26 @@ function SettingsTab({
             {can("service.configure") && (
                 <div className="flex justify-end">
                     <Button onClick={saveSettings} disabled={pending}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} {t("settings.save")}
+                        {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                        {t("settings.save")}
                     </Button>
                 </div>
             )}
 
-            {can("service.configure") && <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />}
+            {can("service.configure") && (
+                <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
+            )}
 
             {can("service.configure") && <BuildMachineSection applicationId={app.id} />}
 
-            {can("service.configure") && <ScalingSection applicationId={app.id} onChanged={onChanged} />}
+            <DeployBehaviourSection
+                applicationId={app.id}
+                canConfigure={can("service.configure")}
+            />
+
+            {can("service.configure") && (
+                <ScalingSection applicationId={app.id} onChanged={onChanged} />
+            )}
 
             {can("service.create") && can("service.configure") && <MoveOutSection app={app} />}
 
@@ -3569,8 +3683,12 @@ function ServedByChoice({ app, onChanged }: { app: ProjectApp; onChanged: () => 
             />
             <p className="text-xs text-muted-foreground">
                 {current === "polaris"
-                    ? t("servedBy.polarisHint", { server: app.serverName || t("servedBy.thatServer") })
-                    : t("servedBy.serverHint", { server: app.serverName || t("servedBy.thatServer") })}
+                    ? t("servedBy.polarisHint", {
+                          server: app.serverName || t("servedBy.thatServer")
+                      })
+                    : t("servedBy.serverHint", {
+                          server: app.serverName || t("servedBy.thatServer")
+                      })}
                 {pending ? t("servedBy.saving") : ""}
             </p>
             {error && <p className="text-xs text-danger">{error}</p>}
@@ -3671,7 +3789,8 @@ function DangerSection({
                     disabled={staged}
                     onClick={() => setConfirming(true)}
                 >
-                    <Trash2 className="size-4" /> {staged ? t("panel.removalPending") : t("danger.delete")}
+                    <Trash2 className="size-4" />{" "}
+                    {staged ? t("panel.removalPending") : t("danger.delete")}
                 </Button>
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -3740,7 +3859,9 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
                     <Button variant="outline" onClick={move} disabled={pending}>
                         {pending && <Loader2 className="size-4 animate-spin" />}{" "}
                         {t("server.moveTo", {
-                            server: options.find((server) => server.id === serverId)?.name ?? t("server.fallback")
+                            server:
+                                options.find((server) => server.id === serverId)?.name ??
+                                t("server.fallback")
                         })}
                     </Button>
                 </div>

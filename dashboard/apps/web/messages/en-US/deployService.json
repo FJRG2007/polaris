@@ -62,7 +62,8 @@
         "successful": "Deployment successful",
         "disabled": "Deployment disabled",
         "status": "Status: {status}",
-        "history": "History"
+        "history": "History",
+        "builtOn": " - built on {machine}"
     },
     "kept": {
         "rollbackTitle": "Put back from a kept image",
@@ -454,7 +455,8 @@
         "title": "Build on",
         "hint": "Another machine builds the image and sends it here, so a small server can run what it could not build.",
         "itsServer": "The server it runs on",
-        "polarisHost": "The Polaris host"
+        "polarisHost": "The Polaris host",
+        "pool": "Runner pool {name} ({server})"
     },
     "steps": {
         "state": {
@@ -478,5 +480,41 @@
         },
         "progress": "Deploy progress",
         "aria": "{step}: {state}"
+    },
+    "behaviour": {
+        "title": "Deploys",
+        "loadFailed": "Could not read how this service deploys",
+        "noGap": "Zero downtime",
+        "restart": "Restarts on deploy",
+        "mode": {
+            "overlap": "The new version starts beside the running one. The edge moves to it once it answers on its port, then the old one is drained and stopped. If it does not come up, the old one keeps serving.",
+            "kept": "Each version runs on its own, and the edge moves to the newest once it answers on its port.",
+            "swarm": "Swarm starts the new task before stopping the old one and rolls back by itself if it fails."
+        },
+        "reason": {
+            "hostPort": "It binds port {port}/{protocol} on the server, and two versions cannot hold one port. Turn off the open port under Networking if only the domain needs to reach it.",
+            "volumes": "It keeps data on {names}. Two copies of a program that locks or writes one file there can fail or corrupt it, so the old one is stopped first.",
+            "newVolumes": "This deploy creates {names}, so it restarts this once. Deploys after it have no gap.",
+            "compose": "It runs your own compose file, whose names Polaris does not change.",
+            "edge": "This server's edge does not take routes from Polaris yet. Prepare it on the server's page.",
+            "history": "It keeps its previous versions, which only run side by side on the Polaris host.",
+            "unreadable": "Its settings could not be read. Save them again."
+        },
+        "overlap": "Share volumes during the switch",
+        "overlapHint": "For uploads or a cache. Leave off for a database or anything that locks its data folder: two copies would hold the same files for a few seconds.",
+        "networks": "Your networks",
+        "networksHint": "Docker networks already on the server that this service joins on its next deploy, with the names other containers there call it by ({name} when left empty). Polaris never creates or removes them.",
+        "networkName": "Network",
+        "networkAliases": "Names on that network",
+        "addNetwork": "Add network",
+        "removeNetwork": "Remove network",
+        "saveNetworks": "Save",
+        "issue": {
+            "networkName": "Letters, digits, dots, dashes and underscores",
+            "networkReserved": "That network belongs to Docker or Polaris",
+            "networkAlias": "Names are letters, digits and dashes",
+            "networkTwice": "Each network once",
+            "networkTooMany": "Up to 8 networks and 8 names each"
+        }
     }
 }

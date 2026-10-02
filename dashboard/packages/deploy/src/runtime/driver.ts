@@ -90,6 +90,10 @@ export interface AppDeployPlan {
      *  web's inbound ingest directly; empty for a normal app. Each must already
      *  exist on the target (compose declares them external). */
     readonly extraNetworks?: readonly string[];
+    /** Names the service answers to on one network only, keyed by network: on a
+     *  network of the operator's own it was asked to join, the names their other
+     *  services already call it by. Never on the shared proxy network. */
+    readonly networkAliases?: Readonly<Record<string, readonly string[]>>;
     readonly domains: readonly TraefikDomain[];
     /** Resolved WAF rules to materialize into this service's edge labels (allowlist
      *  + denylist + require-login). Omitted when the service has no WAF rules. */
@@ -97,7 +101,11 @@ export interface AppDeployPlan {
     /** Host port to publish so the app is reachable directly over the host's IP
      *  (LAN/intranet), independent of any reverse proxy. `container` is the port
      *  the app listens on inside the container. */
-    readonly expose?: { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" };
+    readonly expose?: {
+        readonly host: number;
+        readonly container: number;
+        readonly protocol?: "tcp" | "udp";
+    };
     /**
      * Keep the service off every interface of the host: its port is not published at
      * all, and the edge reaches it by name on the proxy network instead. `expose` still
@@ -107,9 +115,10 @@ export interface AppDeployPlan {
     readonly private?: boolean;
     /**
      * A second name the container answers to on the proxy network: the service's
-     * own, carried by a release that runs beside the one it replaces. Everything that
-     * reaches the service by that name - the edge, a tunnel, another service - goes
-     * on reaching it while the container behind it changes.
+     * own, carried by a release that runs beside the one it replaces. Whatever reaches
+     * the service by that name - a tunnel connector, another service - goes on
+     * reaching it while the container behind it changes. The edge does not: it dials
+     * the serving release by its own name, switched once the new one serves.
      */
     readonly alias?: string;
     /** How many copies the release it replaces runs, when that is more than this
@@ -123,10 +132,29 @@ export interface AppDeployPlan {
     /** Further ports to publish beside the main one. A Java Minecraft server that
      *  Bedrock clients can also join answers on a second, UDP port - one service,
      *  two doors, so it cannot be modelled as the single exposed port. */
-    readonly extraPorts?: readonly { readonly host: number; readonly container: number; readonly protocol?: "tcp" | "udp" }[];
+    readonly extraPorts?: readonly {
+        readonly host: number;
+        readonly container: number;
+        readonly protocol?: "tcp" | "udp";
+    }[];
     /** True when `expose.container` is a fallback guess (the user did not pin a
      *  port), so the runtime may refine it from the image's own exposed port. */
     readonly autoContainerPort?: boolean;
+    /**
+     * Count the release as up only once something in it accepts connections on
+     * `expose.container` from outside the container. Set for a service the edge or a
+     * tunnel sends traffic to: a container that is running but not yet listening -
+     * or listening on localhost only - would be put in front of visitors and answer
+     * nothing. Left off for a worker, which has no port to wait for.
+     */
+    readonly awaitPort?: boolean;
+    /**
+     * The compose project whose named volumes this release mounts, by their exact
+     * names and declared external, instead of owning volumes of its own: a release
+     * changing over beside the one it replaces, allowed to share the service's
+     * volumes for those seconds (see `overlapVolumes` on the service).
+     */
+    readonly sharedVolumesFrom?: string;
     /** Named volumes / binds to attach: mountPath -> source. `nas` is a bind
      *  confined under the storage mount root (`<connectionId>/<subpath>`). */
     readonly volumes: readonly {

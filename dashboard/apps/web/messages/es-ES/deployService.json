@@ -62,7 +62,8 @@
         "successful": "Despliegue correcto",
         "disabled": "Despliegue desactivado",
         "status": "Estado: {status}",
-        "history": "Historial"
+        "history": "Historial",
+        "builtOn": " - compilado en {machine}"
     },
     "kept": {
         "rollbackTitle": "Restaurado de una imagen",
@@ -454,7 +455,8 @@
         "title": "Compilar en",
         "hint": "Otra máquina compila la imagen y la envía aquí, para que un servidor pequeño pueda ejecutar lo que no podría compilar.",
         "itsServer": "Su propio servidor",
-        "polarisHost": "El host de Polaris"
+        "polarisHost": "El host de Polaris",
+        "pool": "Grupo de runners {name} ({server})"
     },
     "steps": {
         "state": {
@@ -478,5 +480,41 @@
         },
         "progress": "Progreso",
         "aria": "{step}: {state}"
+    },
+    "behaviour": {
+        "title": "Despliegue",
+        "loadFailed": "No se pudo leer cómo se despliega este servicio",
+        "noGap": "Sin cortes",
+        "restart": "Reinicia al desplegar",
+        "mode": {
+            "overlap": "La versión nueva arranca junto a la que está en marcha. El edge pasa a ella cuando responde en su puerto, y la anterior se vacía y se detiene. Si no arranca, la anterior sigue sirviendo.",
+            "kept": "Cada versión corre por separado, y el edge pasa a la más nueva cuando responde en su puerto.",
+            "swarm": "Swarm arranca la tarea nueva antes de parar la anterior y vuelve atrás solo si falla."
+        },
+        "reason": {
+            "hostPort": "Ocupa el puerto {port}/{protocol} del servidor, y dos versiones no pueden tener el mismo puerto. Desactiva el puerto abierto en Red si solo el dominio necesita llegar a él.",
+            "volumes": "Guarda datos en {names}. Dos copias de un programa que bloquea o escribe un archivo ahí pueden fallar o corromperlo, así que la anterior se para primero.",
+            "newVolumes": "Este despliegue crea {names}, así que reinicia esta vez. Los siguientes no cortan el servicio.",
+            "compose": "Usa tu propio archivo compose, cuyos nombres Polaris no cambia.",
+            "edge": "El edge de este servidor aún no recibe rutas de Polaris. Prepáralo en la página del servidor.",
+            "history": "Conserva sus versiones anteriores, que solo corren a la vez en el host de Polaris.",
+            "unreadable": "No se pudieron leer sus ajustes. Guárdalos de nuevo."
+        },
+        "overlap": "Compartir volúmenes al cambiar",
+        "overlapHint": "Para subidas o una caché. Déjalo apagado para una base de datos o algo que bloquee su carpeta de datos: dos copias usarían los mismos archivos unos segundos.",
+        "networks": "Tus redes",
+        "networksHint": "Redes de Docker que ya existen en el servidor y a las que este servicio se une en su próximo despliegue, con los nombres con que lo llaman los demás contenedores ({name} si se deja vacío). Polaris nunca las crea ni las borra.",
+        "networkName": "Red",
+        "networkAliases": "Nombres en esa red",
+        "addNetwork": "Añadir red",
+        "removeNetwork": "Quitar red",
+        "saveNetworks": "Guardar",
+        "issue": {
+            "networkName": "Letras, números, puntos, guiones y _",
+            "networkReserved": "Esa red es de Docker o de Polaris",
+            "networkAlias": "Nombres con letras, números y guiones",
+            "networkTwice": "Cada red una sola vez",
+            "networkTooMany": "Hasta 8 redes y 8 nombres cada una"
+        }
     }
 }

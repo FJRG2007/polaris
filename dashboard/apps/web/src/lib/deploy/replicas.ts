@@ -8,9 +8,9 @@
  * spreads its own replicas behind one name and one published port, so it is
  * routed the way a single copy is.
  *
- * The names are always the service's own, whichever release is serving: a release
- * started beside the one it replaces answers to them as well (see `expandReplicas`),
- * so a deploy changes what answers on each name and never the route.
+ * The names are those of the release serving it (`edgeDialName`): a release
+ * started beside the one it replaces is written into the route only once it is
+ * promoted, so the edge never balances onto a copy that has not proved it serves.
  */
 
 import type { AppRoute } from "./router";

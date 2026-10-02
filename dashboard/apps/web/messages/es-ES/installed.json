@@ -42,5 +42,11 @@
         "give": "No se ha podido dar acceso",
         "notAccess": "Eso no es un acceso de este servidor",
         "remove": "No se ha podido quitar ese acceso"
+    },
+    "deployGap": {
+        "none": "Redesplegar no corta el servicio: la versión nueva entra cuando responde.",
+        "hostPort": "Redesplegar lo reinicia: ocupa el puerto {port}/{protocol} del servidor, que dos versiones no pueden compartir.",
+        "volumes": "Redesplegar lo reinicia: guarda datos en {names}, que dos copias no deben escribir a la vez.",
+        "other": "Redesplegar lo reinicia. Sus ajustes en Deploy dicen por qué."
     }
 }

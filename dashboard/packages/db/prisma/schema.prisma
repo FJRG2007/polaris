@@ -1898,6 +1898,12 @@ model Host {
     // *.apps.example.com), so its services get real domains served by its own
     // edge. Null falls back to the IP-derived free subdomain.
     wildcardDomain      String?
+    // Whether the server is shared with containers Polaris did not start, so a
+    // clean-up only removes images and build cache - never a stopped container or
+    // a network nothing is attached to, which may be the operator's own. Null until
+    // the operator decides or Polaris finds a container it did not start there;
+    // while null, what runs there is looked at again on every clean-up.
+    sharedHost          Boolean?
     // Server public key (base64) pinned on the trust-on-add test connect.
     hostKey             String?
     // What the machine says it runs, as it words it ("Ubuntu 24.04.1 LTS",
@@ -4456,6 +4462,17 @@ model Application {
     // nothing an install already reaches that way stops answering; a service made
     // from the Deploy screen starts with it off, reached only through the edge.
     publishPort         Boolean   @default(true)
+    // Whether a deploy of a service with volumes starts the new version beside the
+    // running one, both on the same volumes for the seconds of the change-over.
+    // Off by default: two copies of a program that holds a lock on its data, or
+    // writes one file from one process, fail or corrupt it - so such a service is
+    // stopped first and then started, and the screen says so. Turned on for a
+    // volume of uploads or a cache, where two writers are fine.
+    overlapVolumes      Boolean   @default(false)
+    // JSON [{ name, aliases[] }]: networks of the operator's own that the service
+    // joins on every deploy, beside its own, with the names it answers to there.
+    // Never created or removed by Polaris - they are declared external.
+    externalNetworks    String    @default("[]")
     // JSON: what the edge does in front of this service beyond routing to it - rate
     // limits, a concurrency cap, the browser challenge, security headers,
     // redirects and rewrites. Read whole through `parseAppEdgeConfig`, which
@@ -4828,6 +4845,10 @@ model Deployment {
     // replaced is taken down once this one is serving. Named after the deployment
     // rather than its commit, so redeploying one commit still gets a fresh container.
     cutover        Boolean   @default(false)
+    // The machine its image was built on, as the history names it, when that was
+    // not the one it runs on. Null for a build where it runs, and for an image
+    // pulled or a kept release run again.
+    builtOn        String?
     // How many copies it was started with. The edge dials the copies of the release
     // that is serving rather than the count the service is set to, which moves
     // before the release that carries it is up. Null on every deployment made

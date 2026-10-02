@@ -303,7 +303,11 @@ describe("the script, run", () => {
                 kind: "leave",
                 at: "2026-10-01T00:30:00.000Z"
             });
-        }
+        },
+        // Four real shell invocations over up to 6000 lines of chatter: heavier
+        // than the suite's default timeout once every core is busy with the rest
+        // of the run, not a hang - see the timeout note on vitest.config.ts.
+        60_000
     );
 
     it.runIf(sh)(

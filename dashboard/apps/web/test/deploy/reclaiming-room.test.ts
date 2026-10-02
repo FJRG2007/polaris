@@ -60,7 +60,10 @@ describe("making room on a server", () => {
             fileURLToPath(new URL("../../src/lib/deploy/ports-ssh.ts", import.meta.url)),
             "utf8"
         );
-        expect(ports).toContain("PRUNE_EVERY_ENGINE");
+        // Chosen by the same function the timer's sweep uses, so a shared server is
+        // swept carefully on both paths (see `pruneCommandFor`).
+        expect(ports).toContain("pruneCommandFor(");
+        expect(ports).toContain("isSharedHost(");
         // And it asks the disk the same way, through the same constant rather
         // than through a second copy of the command.
         expect(ports).toContain("DF_ROOT");

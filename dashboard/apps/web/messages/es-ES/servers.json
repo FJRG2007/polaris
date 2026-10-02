@@ -384,5 +384,11 @@
             "notHostname": "Host no válido",
             "writeSomething": "Escribe algo primero"
         }
+    },
+    "shared": {
+        "title": "Compartido con otros contenedores",
+        "hint": "Aquí corren contenedores ajenos a Polaris, así que la limpieza solo quita imágenes sin uso y la caché de compilación, nunca un contenedor parado ni una red. Se activa solo cuando Polaris encuentra contenedores que no inició.",
+        "loadFailed": "No se pudo leer este ajuste",
+        "saveFailed": "No se pudo guardar este ajuste"
     }
 }
