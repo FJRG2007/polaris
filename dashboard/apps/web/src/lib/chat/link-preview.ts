@@ -95,9 +95,7 @@ export interface KnownPreview {
 
 /** What is already known for these addresses. Never fetches: a read path that
  *  could fetch is a read path that hangs on somebody else's server. */
-export async function knownPreviews(
-    urls: readonly string[]
-): Promise<Map<string, KnownPreview>> {
+export async function knownPreviews(urls: readonly string[]): Promise<Map<string, KnownPreview>> {
     const wanted = [...new Set(urls)];
     if (wanted.length === 0) return new Map();
 
@@ -377,10 +375,7 @@ async function describeByOembed(url: URL): Promise<Described | null> {
 
 /** One small JSON document from an address already checked, or null when what
  *  came back was not one. */
-async function readJson(
-    url: URL,
-    accept: string
-): Promise<Record<string, unknown> | null> {
+async function readJson(url: URL, accept: string): Promise<Record<string, unknown> | null> {
     const response = await follow(url, accept);
     if (!response?.ok) return null;
     if (!(response.headers.get("content-type") ?? "").toLowerCase().includes("json")) return null;
@@ -389,7 +384,9 @@ async function readJson(
     if (!bytes) return null;
 
     try {
-        const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: false }).decode(bytes));
+        const parsed: unknown = JSON.parse(
+            new TextDecoder("utf-8", { fatal: false }).decode(bytes)
+        );
         return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
     } catch {
         return null;
@@ -472,10 +469,7 @@ function hexColour(value: unknown): string | null {
  */
 function meta(html: string, name: string): string | null {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(
-        `<meta[^>]+(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`,
-        "i"
-    );
+    const pattern = new RegExp(`<meta[^>]+(?:property|name)\\s*=\\s*["']${escaped}["'][^>]*>`, "i");
     const tag = pattern.exec(html)?.[0];
     if (!tag) return null;
     const content = /content\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1];
