@@ -171,6 +171,8 @@ export interface ProjectSummary {
                 /** Served through Cloudflare's proxy. Absent on a tunnel's name,
                  *  which has no domain row of its own to change. */
                 cdn?: boolean;
+                /** The port this address dials; absent on a tunnel's name. */
+                targetPort?: number;
             }[];
             volumes: {
                 id: string;

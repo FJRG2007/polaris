@@ -538,6 +538,9 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
+      # ECDSA P-256 keys, as Railway issues: smaller handshakes than the RSA4096
+      # default. A certificate already issued keeps its key until it is renewed.
+      - "--certificatesresolvers.letsencrypt.acme.keytype=EC256"
     ports:
       - "80:80"
       - "443:443"

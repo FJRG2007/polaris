@@ -1212,6 +1212,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
             pathPrefix: true,
             certResolver: true,
             targetPort: true,
+            portPinned: true,
             servedBy: true,
             applicationId: true,
             deploymentId: true,
@@ -1433,7 +1434,11 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                       serving.get(domain.application.currentDeploymentId ?? "")
                   )
                 : undefined;
-            const privately = own && (!domain.application.publishPort || copies !== undefined);
+            // A domain pointed at a port of its own reaches the container by name on
+            // that port: the host publishes only the service's own port.
+            const pinnedPort = own && domain.portPinned ? domain.targetPort : null;
+            const privately =
+                own && (!domain.application.publishPort || copies !== undefined || pinnedPort !== null);
             const dialHost = privately
                 ? ownName
                 : remoteHostId
@@ -1448,7 +1453,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                 certResolver: domain.certResolver,
                 dialHost,
                 dialPort: privately
-                    ? containerPortOf({ ...domain.application, domains: [domain] })
+                    ? (pinnedPort ?? containerPortOf({ ...domain.application, domains: [domain] }))
                     : hostPortForApp(dialTarget(domain, isolated)),
                 ...balancedOver(copies, edgeOf.get(domain.applicationId)?.edge),
                 ...canaryRoute(
@@ -2456,8 +2461,12 @@ async function buildAppPlan(
     const hostProtocol = source.hostProtocol === "udp" ? "udp" : undefined;
     // Further doors into the same service (a Java Minecraft server that Bedrock
     // clients join answers on a UDP port beside its own).
-    const extraPorts = Array.isArray(source.extraPorts)
-        ? source.extraPorts.flatMap((entry: unknown) => {
+    // TCP proxies added from the service's networking panel publish the same way.
+    const extraPorts = Array.isArray(source.extraPorts) || Array.isArray(source.tcpProxies)
+        ? [
+              ...(Array.isArray(source.extraPorts) ? source.extraPorts : []),
+              ...(Array.isArray(source.tcpProxies) ? source.tcpProxies : [])
+          ].flatMap((entry: unknown) => {
               if (typeof entry !== "object" || entry === null) return [];
               const port = entry as { host?: unknown; container?: unknown; protocol?: unknown };
               if (typeof port.host !== "number" || typeof port.container !== "number") return [];

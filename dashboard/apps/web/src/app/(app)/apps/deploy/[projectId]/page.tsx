@@ -12,7 +12,7 @@ import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
-import { getApplicationDeployStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
+import { containerPortOf, getApplicationDeployStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
 
 export const dynamic = "force-dynamic";
 
@@ -172,7 +172,15 @@ export default async function DeployProjectPage({
                             // panel only needs to say which certificate is in use.
                             hasCertificate: domain.certPem !== null,
                             servedBy: domain.servedBy,
-                            cdn: domain.cdn
+                            cdn: domain.cdn,
+                            // What the edge dials for it: its own port where one was
+                            // chosen for it - and always on a server whose own edge
+                            // serves it, which dials each domain's port - else the
+                            // service's.
+                            targetPort:
+                                domain.portPinned || (app.target.kind !== "local" && domain.servedBy !== "polaris")
+                                    ? domain.targetPort
+                                    : containerPortOf(app)
                         })),
                     tunnelDomains.get(app.id) ?? []
                 ),

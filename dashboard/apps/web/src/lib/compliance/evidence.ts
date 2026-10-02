@@ -91,6 +91,10 @@ export const EVIDENCE_CHANGE_ACTIONS: Readonly<Record<EvidenceArea, readonly str
         "deploy.domain.add",
         "deploy.domain.remove",
         "deploy.domain.toggle",
+        "deploy.domain.port",
+        "deploy.domain.rename",
+        "deploy.tcp_proxy.add",
+        "deploy.tcp_proxy.remove",
         "deploy.domain.cert.set",
         "deploy.domain.cert.clear"
     ],

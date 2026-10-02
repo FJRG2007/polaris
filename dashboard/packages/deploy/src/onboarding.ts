@@ -174,7 +174,9 @@ export function onboardingScript(options: OnboardingOptions): string {
             "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",
             "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web",
             `--certificatesresolvers.letsencrypt.acme.email=${options.acmeEmail}`,
-            "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json"
+            "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json",
+            // ECDSA keys, the same as the edge on the Polaris host.
+            "--certificatesresolvers.letsencrypt.acme.keytype=EC256"
         ].join(" "),
         ...guardSteps,
         // A recreated edge comes back on the proxy network only, and a service kept
