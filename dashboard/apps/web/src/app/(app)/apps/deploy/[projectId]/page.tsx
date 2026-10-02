@@ -5,13 +5,21 @@ import { getPublicIp } from "@/lib/domain-service";
 import type { ProjectSummary } from "../deploy-view";
 import { servingReleases } from "@/lib/deploy/releases";
 import { referenceEdges } from "@/lib/deploy/private-names";
+import { dialsPinnedPort } from "@/lib/deploy/public-net";
 import { capabilitiesFor } from "@/lib/host-capabilities";
 import { projectAccess } from "@/lib/deploy-project-access";
+import { serviceRunStates } from "@/lib/deploy/run-states";
+import { elsewhereByService, refreshStale } from "@/lib/deploy/external-services";
 import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
-import { getApplicationDeployStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
+import {
+    containerPortOf,
+    getApplicationDeployStatuses,
+    getProjectFull,
+    hostPortForApp
+} from "@/lib/deploy-service";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +95,10 @@ export default async function DeployProjectPage({
     // currently points at, which has a container name and a published port of its
     // own - so the terminal, the file browser and the direct IP:port link all have
     // to follow it.
-    const [caps, statuses, serverIp, tunnelDomains, attention, serving, references] =
+    // Kept current on its own clock and never waited for: a provider having a bad
+    // morning must not hold the board, which draws what was last read.
+    void refreshStale(projectId).catch(() => undefined);
+    const [caps, statuses, serverIp, tunnelDomains, attention, serving, elsewhere, references] =
         await Promise.all([
             canManage ? capabilitiesFor("deploy") : null,
             getApplicationDeployStatuses(
@@ -97,10 +108,13 @@ export default async function DeployProjectPage({
             listActiveTunnelDomains(appIds),
             serviceAttention(appIds),
             servingReleases(allApps.map((app) => ({ ...app, environment: { project } }))),
+            elsewhereByService(projectId, allApps),
             // Only the edges leave the server; the variables they come from never do.
             referenceEdges(project.environments.map((environment) => environment.id))
         ]);
     const localReady = Boolean(caps?.deploy);
+    // Whether each service is up, apart from how its last deploy went.
+    const runStates = await serviceRunStates(allApps, statuses);
 
     const summary: ProjectSummary = {
         id: project.id,
@@ -120,6 +134,10 @@ export default async function DeployProjectPage({
                 // What the service is doing now: the build in flight, or the release
                 // it serves. Null only when it has never been deployed.
                 deployStatus: statuses[app.id] ?? null,
+                runState: runStates[app.id] ?? "never",
+                // The same service running on Vercel or Railway, with the domains it
+                // serves production on.
+                elsewhere: elsewhere.get(app.id) ?? [],
                 targetId: app.targetId,
                 serverId:
                     app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,
@@ -165,7 +183,23 @@ export default async function DeployProjectPage({
                             // panel only needs to say which certificate is in use.
                             hasCertificate: domain.certPem !== null,
                             servedBy: domain.servedBy,
-                            cdn: domain.cdn
+                            cdn: domain.cdn,
+                            // What the edge dials for it: its own port where one was
+                            // chosen for it and the edge dials it - and always on a
+                            // server whose own edge serves it, which dials each
+                            // domain's port - else the service's.
+                            targetPort:
+                                (domain.portPinned &&
+                                    dialsPinnedPort(domain, {
+                                        remote:
+                                            app.target.kind !== "local" &&
+                                            app.target.hostId !== null,
+                                        keptRelease:
+                                            (serving.get(app.id)?.portSubject ?? app.id) !== app.id
+                                    })) ||
+                                (app.target.kind !== "local" && domain.servedBy !== "polaris")
+                                    ? domain.targetPort
+                                    : containerPortOf(app)
                         })),
                     tunnelDomains.get(app.id) ?? []
                 ),

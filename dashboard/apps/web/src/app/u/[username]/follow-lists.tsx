@@ -28,7 +28,7 @@
  * letter still lands where it should.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
@@ -125,6 +125,11 @@ function Count({
 /** How long a keystroke waits before it becomes a request. Long enough that
  *  typing a name is one query rather than eight, short enough to read as live. */
 const SEARCH_DEBOUNCE_MS = 220;
+
+const PERSON_FIELDS: readonly SearchField<Person>[] = [
+    { text: (person) => person.name, weight: 3 },
+    { text: (person) => person.username, weight: 2 }
+];
 
 /** One of the two lists: searched, and loaded as it is scrolled. */
 function PeopleDialog({
@@ -232,16 +237,7 @@ function PeopleDialog({
     const shown = useMemo(() => {
         const term = query.trim();
         if (!term || people.length === 0) return people;
-        const ranked = new Fuse(people, {
-            threshold: 0.35,
-            ignoreLocation: true,
-            keys: [
-                { name: "name", weight: 3 },
-                { name: "username", weight: 2 }
-            ]
-        })
-            .search(term)
-            .map((hit) => hit.item);
+        const ranked = searchItems(people, term, PERSON_FIELDS);
         const seen = new Set(ranked.map((person) => person.id));
         return [...ranked, ...people.filter((person) => !seen.has(person.id))];
     }, [people, query]);
@@ -257,7 +253,9 @@ function PeopleDialog({
             <DialogContent className="max-w-sm">
                 <PlainNames>
                     <DialogTitle>
-                        {which === "followers" ? t("profile.followersTitle", { name }) : t("profile.followingTitle", { name })}
+                        {which === "followers"
+                            ? t("profile.followersTitle", { name })
+                            : t("profile.followingTitle", { name })}
                     </DialogTitle>
 
                     <div className="relative">

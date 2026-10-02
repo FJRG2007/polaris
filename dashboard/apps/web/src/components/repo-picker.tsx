@@ -17,7 +17,7 @@
  * the widest gate of the three.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { Button, Input } from "@polaris/ui";
 import { GitHubMark } from "@/components/brand-icons";
 import { externalGitUrl } from "@/lib/repo-reference";
@@ -31,6 +31,9 @@ export interface PickerRepo {
     defaultBranch: string;
     private: boolean;
 }
+
+/** A repository is found by its "owner/name". */
+const REPO_FIELDS: readonly SearchField<PickerRepo>[] = [{ text: (repo) => repo.fullName }];
 
 /** What the connected account can reach. */
 export interface RepoListResult {
@@ -129,11 +132,10 @@ export function RepoPicker({
     const trimmed = query.trim();
     const external = onPickUrl ? externalGitUrl(trimmed) : null;
 
-    const fuse = useMemo(
-        () => new Fuse(repos, { keys: ["fullName"], threshold: 0.4, ignoreLocation: true }),
-        [repos]
+    const mine = useMemo(
+        () => (trimmed ? searchItems(repos, trimmed, REPO_FIELDS, { limit: 20 }) : repos),
+        [repos, trimmed]
     );
-    const mine = trimmed ? fuse.search(trimmed, { limit: 20 }).map((match) => match.item) : repos;
 
     // Ask GitHub for whatever the loaded list does not already hold. A URL that is
     // not GitHub's is nothing to search for - it is the answer already.
@@ -210,16 +212,25 @@ export function RepoPicker({
                 )}
             </div>
 
-            <div className={`${maxHeightClass} overflow-auto overscroll-contain rounded-md border border-border/60`}>
+            <div
+                className={`${maxHeightClass} overflow-auto overscroll-contain rounded-md border border-border/60`}
+            >
                 {external && onPickUrl ? (
                     <button
                         type="button"
                         onClick={() => onPickUrl(external)}
                         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
                     >
-                        <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                        <span className="min-w-0 flex-1 truncate" title={external}>{external}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">{t("repoPicker.useUrl")}</span>
+                        <Globe
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                        <span className="min-w-0 flex-1 truncate" title={external}>
+                            {external}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                            {t("repoPicker.useUrl")}
+                        </span>
                     </button>
                 ) : loading && repos.length === 0 ? (
                     <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
@@ -237,7 +248,9 @@ export function RepoPicker({
                     <>
                         {mine.length > 0 && (
                             <RepoGroup
-                                label={connected ? t("repoPicker.yours") : t("repoPicker.repositories")}
+                                label={
+                                    connected ? t("repoPicker.yours") : t("repoPicker.repositories")
+                                }
                                 repos={mine}
                                 selected={selected}
                                 onPick={onPick}
@@ -287,7 +300,9 @@ function RepoGroup({
                     }`}
                 >
                     <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate" title={repo.fullName}>{repo.fullName}</span>
+                    <span className="min-w-0 flex-1 truncate" title={repo.fullName}>
+                        {repo.fullName}
+                    </span>
                     <span className="flex shrink-0 items-center gap-2 pl-2 text-xs text-muted-foreground">
                         {repo.private && <Lock className="size-3.5" />}
                         {repo.defaultBranch}

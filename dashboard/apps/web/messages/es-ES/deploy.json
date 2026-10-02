@@ -146,7 +146,9 @@
         },
         "status": "Estado: {status}",
         "metricCpu": "{percent} % cpu",
-        "metricMem": "{percent} % mem"
+        "metricMem": "{percent} % mem",
+        "production": "producción",
+        "elsewhereStatus": "{provider} en su proveedor: {status}"
     },
     "move": {
         "variables": {
@@ -252,7 +254,12 @@
         "adding": "Añadiendo",
         "addButton": "Añadir",
         "deleteTitle": "Quitar servicio",
-        "deleteQuestion": "¿Quitar <strong>{name}</strong>?"
+        "deleteQuestion": "¿Quitar <strong>{name}</strong>?",
+        "production": "Producción:",
+        "sameAs": "Mismo servicio que",
+        "sameAsNone": "Ninguno de este proyecto",
+        "sameAsLabel": "Con qué servicio coincide {name}",
+        "sameRepository": "Por repositorio"
     },
     "newEnvironment": {
         "option": "Nuevo entorno",
@@ -390,5 +397,20 @@
         "service": "Servicio",
         "empty": "No hay servicios en este entorno de los que mostrar logs.",
         "capped": "Se muestran los primeros {count} servicios. Elige uno para ver el resto."
+    },
+    "runState": {
+        "never": "Sin desplegar",
+        "queued": "En cola",
+        "deploying": "Desplegando",
+        "running": "En marcha",
+        "stopped": "Detenido",
+        "sleeping": "Dormido",
+        "crashed": "Caído",
+        "failed": "Fallido"
+    },
+    "runStateHint": {
+        "crashed": "Debería estar en marcha y lleva unos minutos sin verse en marcha.",
+        "sleeping": "Dormido por inactividad. Arranca de nuevo con la próxima visita.",
+        "stopped": "Detenido a propósito. Sus direcciones muestran una página de no disponible hasta que arranque."
     }
 }

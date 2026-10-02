@@ -17,6 +17,7 @@
 
 import { prisma } from "@polaris/db";
 import { readCredential } from "@/lib/connections/store";
+import { parseGithubRepo } from "@/lib/repo-reference";
 import { AWS, awsDriver } from "@/lib/deploy/providers/aws";
 import { VERCEL, vercelDriver } from "@/lib/deploy/providers/vercel";
 import { RAILWAY, railwayDriver } from "@/lib/deploy/providers/railway";
@@ -49,6 +50,11 @@ export function isProvider(provider: string): boolean {
  *  board saying what is out there, and a minute is fresh enough for that. */
 const READING_TTL_MS = 60_000;
 
+/** How long the production domains and the repository are trusted. They change
+ *  when somebody adds a domain or reconnects a repository, not minute by minute,
+ *  so they are read on a slower clock than the release status. */
+const DOMAINS_TTL_MS = 10 * 60_000;
+
 /** One of these as a screen sees it. No token, and no id of anybody else's. */
 export interface ExternalServiceView {
     readonly id: string;
@@ -70,6 +76,12 @@ export interface ExternalServiceView {
     /** What it is called on the provider, so somebody can tell two of them apart
      *  without opening either. */
     readonly account: string | null;
+    /** Where it serves production, as the provider reports it. */
+    readonly productionDomains: readonly string[];
+    /** The Polaris service somebody said it is the same thing as. */
+    readonly applicationId: string | null;
+    /** `owner/name` of the repository the provider builds. */
+    readonly repo: string | null;
 }
 
 const FIELDS = {
@@ -88,7 +100,11 @@ const FIELDS = {
     lastCommitSha: true,
     lastCommitMessage: true,
     error: true,
-    checkedAt: true
+    checkedAt: true,
+    applicationId: true,
+    repo: true,
+    productionDomains: true,
+    domainsCheckedAt: true
 } as const;
 
 type Row = {
@@ -108,7 +124,24 @@ type Row = {
     lastCommitMessage: string | null;
     error: string | null;
     checkedAt: Date | null;
+    applicationId: string | null;
+    repo: string | null;
+    productionDomains: string | null;
+    domainsCheckedAt: Date | null;
 };
+
+/** The stored production domains, ignoring anything that is not a list of names. */
+export function domainsOf(json: string | null): string[] {
+    if (!json) return [];
+    try {
+        const value = JSON.parse(json) as unknown;
+        return Array.isArray(value)
+            ? value.filter((entry): entry is string => typeof entry === "string")
+            : [];
+    } catch {
+        return [];
+    }
+}
 
 function refOf(row: Row): ProviderRef {
     try {
@@ -139,7 +172,10 @@ function toView(row: Row, account: string | null): ExternalServiceView {
         lastCommitMessage: row.lastCommitMessage,
         error: row.error,
         checkedAt: row.checkedAt?.toISOString() ?? null,
-        account
+        account,
+        productionDomains: domainsOf(row.productionDomains),
+        applicationId: row.applicationId,
+        repo: row.repo
     };
 }
 
@@ -235,9 +271,27 @@ export async function refreshExternalService(
     const row = await requireService(projectId, id);
     let state: ExternalState | null = null;
     let failure: string | null = null;
+    // The domains and the repository, when their own clock says so. Each is
+    // best-effort: a provider that will not say keeps what was last read.
+    let slow: { productionDomains?: string; repo?: string | null; domainsCheckedAt: Date } | null =
+        null;
     try {
         const token = await tokenFor(row);
-        state = await driverFor(row.provider).state(token, row.externalId, refOf(row));
+        const driver = driverFor(row.provider);
+        state = await driver.state(token, row.externalId, refOf(row));
+        if (!row.domainsCheckedAt || Date.now() - row.domainsCheckedAt.getTime() > DOMAINS_TTL_MS) {
+            const [domains, source] = await Promise.all([
+                driver.productionDomains
+                    ? driver.productionDomains(token, row.externalId, refOf(row)).catch(() => null)
+                    : Promise.resolve(null),
+                driver.source(token, row.externalId, refOf(row)).catch(() => undefined)
+            ]);
+            slow = {
+                ...(domains ? { productionDomains: JSON.stringify(domains.slice(0, 20)) } : {}),
+                ...(source !== undefined ? { repo: source?.repo.toLowerCase() ?? null } : {}),
+                domainsCheckedAt: new Date()
+            };
+        }
     } catch (caught) {
         failure = caught instanceof Error ? caught.message : "That service could not be read";
     }
@@ -253,13 +307,125 @@ export async function refreshExternalService(
                   lastCommitSha: state.commitSha,
                   lastCommitMessage: state.commitMessage,
                   error: state.error,
-                  checkedAt: new Date()
+                  checkedAt: new Date(),
+                  ...slow
               }
             : { error: failure, checkedAt: new Date() },
         select: FIELDS
     });
     const accounts = await accountsFor([updated]);
     return toView(updated, accounts.get(updated.connectionId) ?? null);
+}
+
+/**
+ * Say which Polaris service a row is the same thing as, or that it is none.
+ *
+ * Refused for a service that is not in this project: the link is what puts this
+ * provider's domains on that service's card, and a card in another project is
+ * somebody else's.
+ */
+export async function linkExternalService(
+    projectId: string,
+    id: string,
+    applicationId: string | null
+): Promise<ExternalServiceView> {
+    const row = await requireService(projectId, id);
+    if (applicationId) {
+        const app = await prisma.application.findFirst({
+            where: { id: applicationId, environment: { projectId } },
+            select: { id: true }
+        });
+        if (!app) throw new ProviderError("That service is not in this project", "refused");
+    }
+    const updated = await prisma.externalService.update({
+        where: { id: row.id },
+        data: { applicationId },
+        select: FIELDS
+    });
+    const accounts = await accountsFor([updated]);
+    return toView(updated, accounts.get(updated.connectionId) ?? null);
+}
+
+/** What a service's card says about the copy of it running elsewhere. */
+export interface ElsewhereSummary {
+    readonly id: string;
+    readonly provider: string;
+    readonly name: string;
+    readonly status: string;
+    readonly domains: readonly string[];
+    /** The release URL, for a provider that reports no domains of its own. */
+    readonly url: string | null;
+    /** Linked by somebody, or matched because both build the same repository. */
+    readonly linked: "explicit" | "repository";
+}
+
+/** `owner/name`, lowercased, of the GitHub repository a service builds, or null. */
+export function repoOfSource(sourceConfig: string): string | null {
+    try {
+        const source = JSON.parse(sourceConfig) as Record<string, unknown>;
+        const raw = typeof source.repoUrl === "string" ? source.repoUrl : "";
+        const parsed = parseGithubRepo(raw);
+        return parsed ? `${parsed.owner}/${parsed.repo}`.toLowerCase() : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Which of a project's services also run elsewhere, in one query.
+ *
+ * A row counts for a service when somebody linked them, or - with no link on the
+ * row at all - when both build the same repository, which is the one fact that
+ * makes two of them the same code without anybody guessing from a name. Read from
+ * the stored rows only: what keeps those current is `refreshStale`, which is never
+ * awaited by the page that draws this.
+ */
+export async function elsewhereByService(
+    projectId: string,
+    apps: readonly { id: string; sourceConfig: string }[]
+): Promise<Map<string, ElsewhereSummary[]>> {
+    const result = new Map<string, ElsewhereSummary[]>();
+    if (apps.length === 0) return result;
+    const rows = await prisma.externalService.findMany({
+        where: { environment: { projectId } },
+        orderBy: { name: "asc" },
+        select: {
+            id: true,
+            provider: true,
+            name: true,
+            status: true,
+            url: true,
+            applicationId: true,
+            repo: true,
+            productionDomains: true
+        }
+    });
+    if (rows.length === 0) return result;
+    for (const app of apps) {
+        const repo = repoOfSource(app.sourceConfig);
+        const matched = rows.flatMap((row): ElsewhereSummary[] => {
+            const linked =
+                row.applicationId === app.id
+                    ? ("explicit" as const)
+                    : !row.applicationId && repo && row.repo === repo
+                      ? ("repository" as const)
+                      : null;
+            if (!linked) return [];
+            return [
+                {
+                    id: row.id,
+                    provider: row.provider,
+                    name: row.name,
+                    status: row.status,
+                    domains: domainsOf(row.productionDomains),
+                    url: row.url,
+                    linked
+                }
+            ];
+        });
+        if (matched.length > 0) result.set(app.id, matched);
+    }
+    return result;
 }
 
 /** Every service of a project, read again where the reading has gone stale. Runs

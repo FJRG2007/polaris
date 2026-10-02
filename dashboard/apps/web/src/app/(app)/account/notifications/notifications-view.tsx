@@ -18,7 +18,7 @@
  * answered from the pages behind it.
  */
 
-import Fuse from "fuse.js";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import Link from "next/link";
 import { RelativeTime } from "@/components/relative-time";
 import { eventLabel } from "./event-names";
@@ -54,24 +54,15 @@ type Order = (typeof ORDERS)[number];
 type SearchableRow = NotificationView & { eventLabel: string };
 
 /**
- * Fuzzy search over what a row says.
- *
- * A threshold and field weights rather than the defaults: a title is what people
- * remember and the body is where the detail is, and a search loose enough to
- * forgive a typo is also loose enough to match nothing in particular if it is
- * let run over an id.
+ * What a search reads of a row: the title, which is what people remember and
+ * the only place a typo is forgiven, then the body, where the detail is, then
+ * the name of its event. Never the id.
  */
-function searchIndex(rows: readonly SearchableRow[]): Fuse<SearchableRow> {
-    return new Fuse([...rows], {
-        threshold: 0.35,
-        ignoreLocation: true,
-        keys: [
-            { name: "title", weight: 3 },
-            { name: "body", weight: 2 },
-            { name: "eventLabel", weight: 1 }
-        ]
-    });
-}
+const NOTIFICATION_FIELDS: readonly SearchField<SearchableRow>[] = [
+    { text: (row) => row.title, weight: 3 },
+    { text: (row) => row.body, weight: 2 },
+    { text: (row) => row.eventLabel, weight: 1 }
+];
 
 export function NotificationsView() {
     const { items, unread, markRead, markAllRead, remove, clearAll, markManyRead, removeMany } =
@@ -109,21 +100,19 @@ export function NotificationsView() {
         [merged, event, state]
     );
 
-    // A fuzzy search has an order of its own - how well each row matched - and
-    // overriding it with "newest" would throw away the only thing that makes a
-    // loose match useful. So a search keeps its ranking, and the order picker
-    // applies to everything else.
-    const fuse = useMemo(() => searchIndex(narrowed), [narrowed]);
+    // A search has an order of its own - how well each row matched - so it is
+    // ranked by that first, and the order picker decides between rows that
+    // matched equally well.
     const needle = query.trim();
     const rows = useMemo(() => {
-        if (needle) return fuse.search(needle).map((hit) => hit.item);
         const sorted = [...narrowed];
         if (order === "oldest") sorted.reverse();
         // Stable, so the unread keep the order they were already in rather than
         // being shuffled among themselves.
-        if (order === "unread") sorted.sort((left, right) => Number(left.read) - Number(right.read));
-        return sorted;
-    }, [fuse, needle, narrowed, order]);
+        if (order === "unread")
+            sorted.sort((left, right) => Number(left.read) - Number(right.read));
+        return needle ? searchItems(sorted, needle, NOTIFICATION_FIELDS) : sorted;
+    }, [needle, narrowed, order]);
 
     // Only what is on screen: an id a filter has since hidden is not something a
     // bulk verb should quietly write to.
@@ -155,7 +144,10 @@ export function NotificationsView() {
 
     const eventOptions = [
         { value: ALL_EVENTS, label: t("history.allEvents") },
-        ...NOTIFICATION_EVENTS.map((entry) => ({ value: entry.id, label: eventLabel(t, entry.id) ?? entry.label }))
+        ...NOTIFICATION_EVENTS.map((entry) => ({
+            value: entry.id,
+            label: eventLabel(t, entry.id) ?? entry.label
+        }))
     ];
 
     return (
@@ -195,7 +187,10 @@ export function NotificationsView() {
                     <Select
                         value={state}
                         onValueChange={(value) => setState(value as StateFilter)}
-                        options={STATES.map((value) => ({ value, label: t(`history.states.${value}` as const) }))}
+                        options={STATES.map((value) => ({
+                            value,
+                            label: t(`history.states.${value}` as const)
+                        }))}
                         aria-label={t("history.filterState")}
                     />
                 </div>
@@ -206,7 +201,10 @@ export function NotificationsView() {
                         // A search ranks by how well each row matched, so a
                         // position among those rows is not one anybody chose.
                         disabled={needle !== ""}
-                        options={ORDERS.map((value) => ({ value, label: t(`history.orders.${value}` as const) }))}
+                        options={ORDERS.map((value) => ({
+                            value,
+                            label: t(`history.orders.${value}` as const)
+                        }))}
                         aria-label={t("history.order")}
                     />
                 </div>
@@ -274,9 +272,15 @@ export function NotificationsView() {
                             checked={allShownPicked}
                             indeterminate={selected.length > 0 && !allShownPicked}
                             onChange={() =>
-                                setPicked(allShownPicked ? new Set() : new Set(rows.map((row) => row.id)))
+                                setPicked(
+                                    allShownPicked ? new Set() : new Set(rows.map((row) => row.id))
+                                )
                             }
-                            aria-label={allShownPicked ? t("history.clearSelection") : t("history.selectAll")}
+                            aria-label={
+                                allShownPicked
+                                    ? t("history.clearSelection")
+                                    : t("history.selectAll")
+                            }
                         />
                         <span className="text-xs text-muted-foreground">
                             {t("history.count", { count: rows.length })}
@@ -302,7 +306,11 @@ export function NotificationsView() {
             {!ended && (rows.length > 0 || narrowing) ? (
                 <div className="flex justify-center">
                     <Button size="sm" variant="ghost" onClick={loadOlder} disabled={loading}>
-                        {loading ? <Loader2 className="size-4 animate-spin" /> : <ChevronDown className="size-4" />}
+                        {loading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <ChevronDown className="size-4" />
+                        )}
                         {t("history.loadOlder")}
                     </Button>
                 </div>
@@ -346,7 +354,9 @@ function NotificationRow({
             <NotificationFace row={row} className="mt-0.5" />
             <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-[0.8125rem] font-medium leading-5">
-                    {!row.read ? <span className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
+                    {!row.read ? (
+                        <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                    ) : null}
                     {row.href ? (
                         <NotificationLink href={row.href} onOpen={onRead}>
                             {row.title}
@@ -355,7 +365,9 @@ function NotificationRow({
                         <span className="truncate">{row.title}</span>
                     )}
                 </p>
-                {row.body ? <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.body}</p> : null}
+                {row.body ? (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.body}</p>
+                ) : null}
                 <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-muted-foreground/70">
                     <RelativeTime iso={row.createdAt} />
                     <span aria-hidden="true">-</span>
@@ -375,11 +387,19 @@ function NotificationRow({
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
                 {!row.read ? (
-                    <RowAction label={t("history.markAsRead")} onClick={onRead} className="hover:text-success">
+                    <RowAction
+                        label={t("history.markAsRead")}
+                        onClick={onRead}
+                        className="hover:text-success"
+                    >
                         <Check className="size-3.5" />
                     </RowAction>
                 ) : null}
-                <RowAction label={t("history.delete")} onClick={onRemove} className="hover:text-danger">
+                <RowAction
+                    label={t("history.delete")}
+                    onClick={onRemove}
+                    className="hover:text-danger"
+                >
                     <X className="size-3.5" />
                 </RowAction>
             </div>
@@ -406,7 +426,13 @@ function NotificationLink({
         );
     }
     return (
-        <a href={href} target="_blank" rel="noreferrer noopener" onClick={onOpen} className={className}>
+        <a
+            href={href}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={onOpen}
+            className={className}
+        >
             {children}
         </a>
     );
@@ -430,10 +456,7 @@ function RowAction({
             onClick={onClick}
             aria-label={label}
             title={label}
-            className={cn(
-                "rounded p-1 text-muted-foreground transition-colors ",
-                className
-            )}
+            className={cn("rounded p-1 text-muted-foreground transition-colors ", className)}
         >
             {children}
         </button>

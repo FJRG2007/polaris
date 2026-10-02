@@ -98,6 +98,11 @@ const code = (chunks: ReactNode) => (
     <code className="rounded bg-muted px-1 font-mono text-[0.8125rem]">{chunks}</code>
 );
 
+/** The id the panel's section carries, for a link elsewhere on the tab to jump to it. */
+export function privateNetworkAnchor(id: string): string {
+    return `private-network-${id}`;
+}
+
 export function PrivateNetworkPanel({ kind, id }: { kind: Kind; id: string }) {
     const t = useTranslations("deployPrivateNet");
     const key = `${kind}:${id}`;
@@ -143,7 +148,11 @@ export function PrivateNetworkPanel({ kind, id }: { kind: Kind; id: string }) {
     );
 
     return (
-        <section className="flex flex-col gap-3" aria-labelledby={`${key}-private-title`}>
+        <section
+            id={privateNetworkAnchor(id)}
+            className="flex scroll-mt-4 flex-col gap-3"
+            aria-labelledby={`${key}-private-title`}
+        >
             <div className="flex flex-col gap-0.5">
                 <h3
                     id={`${key}-private-title`}

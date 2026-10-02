@@ -146,7 +146,9 @@
         },
         "status": "Status: {status}",
         "metricCpu": "{percent}% cpu",
-        "metricMem": "{percent}% mem"
+        "metricMem": "{percent}% mem",
+        "production": "production",
+        "elsewhereStatus": "{provider} on its provider: {status}"
     },
     "move": {
         "variables": {
@@ -252,7 +254,12 @@
         "adding": "Adding",
         "addButton": "Add",
         "deleteTitle": "Delete service",
-        "deleteQuestion": "Delete <strong>{name}</strong>?"
+        "deleteQuestion": "Delete <strong>{name}</strong>?",
+        "production": "Production:",
+        "sameAs": "Same service as",
+        "sameAsNone": "None of this project's",
+        "sameAsLabel": "Which service {name} is the same as",
+        "sameRepository": "Matched by repository"
     },
     "newEnvironment": {
         "option": "New environment",
@@ -390,5 +397,20 @@
         "service": "Service",
         "empty": "No services in this environment to log.",
         "capped": "Showing the first {count} services. Pick one to see the rest."
+    },
+    "runState": {
+        "never": "Not deployed",
+        "queued": "Queued",
+        "deploying": "Deploying",
+        "running": "Running",
+        "stopped": "Stopped",
+        "sleeping": "Sleeping",
+        "crashed": "Crashed",
+        "failed": "Failed"
+    },
+    "runStateHint": {
+        "crashed": "It should be running, and it has not been seen running for a few minutes.",
+        "sleeping": "Asleep for being idle. It starts again on the next visit.",
+        "stopped": "Stopped on purpose. Its addresses show a not-running page until it is started."
     }
 }

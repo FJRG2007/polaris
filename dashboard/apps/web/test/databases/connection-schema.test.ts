@@ -3,10 +3,14 @@
  * schema, so what is asserted here is what both of them do.
  */
 
+import { utils as sshUtils } from "ssh2";
 import { describe, expect, it } from "vitest";
 import {
     connectionIssues,
+    looksPublic,
     saveConnectionSchema,
+    sshKeyShape,
+    weakerTls,
     type SaveConnectionInput
 } from "@/lib/data/connection-schema";
 
@@ -138,5 +142,128 @@ describe("the SSH tunnel", () => {
                 })
             )["ssh.jumpHostId"]
         ).toBe("Pick the server to jump through.");
+    });
+});
+
+describe("what the form can tell from the text", () => {
+    const keyed = (privateKey: string, passphrase: string | null = null) =>
+        draft({
+            ssh: {
+                mode: "manual",
+                host: "ssh.example.com",
+                username: "root",
+                authMethod: "key",
+                privateKey,
+                passphrase
+            }
+        });
+
+    it("points out a public key pasted where the private one goes", () => {
+        const pair = sshUtils.generateKeyPairSync("ed25519");
+        expect(connectionIssues(keyed(pair.public))["ssh.privateKey"]).toMatch(
+            /That is a public key/
+        );
+    });
+
+    it("asks for the passphrase of a locked key, and only then", () => {
+        const locked = sshUtils.generateKeyPairSync("ed25519", {
+            passphrase: "p",
+            cipher: "aes256-ctr",
+            rounds: 4
+        });
+        expect(sshKeyShape(locked.private)).toMatchObject({
+            kind: "private",
+            format: "openssh",
+            encrypted: true
+        });
+        expect(connectionIssues(keyed(locked.private))["ssh.privateKey"]).toMatch(
+            /locked with a passphrase/
+        );
+        expect(connectionIssues(keyed(locked.private, "p"))["ssh.privateKey"]).toBeUndefined();
+        const open = sshUtils.generateKeyPairSync("ed25519");
+        expect(sshKeyShape(open.private)).toMatchObject({ encrypted: false });
+    });
+
+    it("recognises a PuTTY file", () => {
+        expect(sshKeyShape("PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: aes256-cbc\n")).toEqual(
+            {
+                kind: "private",
+                format: "ppk",
+                encrypted: true
+            }
+        );
+    });
+
+    it("refuses a private key uploaded as a certificate", () => {
+        const issues = connectionIssues(
+            draft({
+                tlsMode: "verify-full",
+                tlsTrust: "upload",
+                tlsCaCert: "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----"
+            })
+        );
+        expect(issues.tlsCaCert).toMatch(/holds a private key/);
+    });
+
+    it("asks for a client certificate's key alongside it", () => {
+        const issues = connectionIssues(
+            draft({
+                tlsMode: "require",
+                tlsClientAuth: true,
+                tlsClientCert: "-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----"
+            })
+        );
+        expect(issues.tlsClientKey).toBe("Add the key that goes with this certificate.");
+    });
+
+    it("refuses a client key locked with a passphrase, since there is nowhere to give it", () => {
+        const locked = (key: string) =>
+            connectionIssues(
+                draft({
+                    tlsMode: "require",
+                    tlsClientAuth: true,
+                    tlsClientCert: "-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----",
+                    tlsClientKey: key
+                })
+            ).tlsClientKey;
+        expect(
+            locked("-----BEGIN ENCRYPTED PRIVATE KEY-----\nx\n-----END ENCRYPTED PRIVATE KEY-----")
+        ).toMatch(/locked with a passphrase/);
+        expect(
+            locked(
+                "-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nx\n-----END RSA PRIVATE KEY-----"
+            )
+        ).toMatch(/locked with a passphrase/);
+        expect(locked("-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----")).toBeUndefined();
+    });
+
+    it("refuses a field the form never sends", () => {
+        expect(saveConnectionSchema.safeParse({ ...draft(), ownerId: "someone" }).success).toBe(
+            false
+        );
+    });
+
+    it("refuses a host carrying a MongoDB option or a second host", () => {
+        expect(connectionIssues(draft({ host: "db.example.com?authSource=x" })).host).toBeDefined();
+        expect(connectionIssues(draft({ host: "a.example.com,b.example.com" })).host).toBeDefined();
+        expect(connectionIssues(draft({ host: "[2001:db8::1]" })).host).toBeUndefined();
+    });
+});
+
+describe("which hosts start on full verification", () => {
+    it("is a public name, not an address or a private suffix", () => {
+        expect(looksPublic("db.example.com")).toBe(true);
+        expect(looksPublic("10.0.0.4")).toBe(false);
+        expect(looksPublic("postgres")).toBe(false);
+        expect(looksPublic("nas.local")).toBe(false);
+    });
+});
+
+describe("a weaker encryption mode", () => {
+    it("is any mode that checks less than the saved one", () => {
+        expect(weakerTls("verify-full", "require")).toBe(true);
+        expect(weakerTls("verify-ca", "disable")).toBe(true);
+        expect(weakerTls("require", "require")).toBe(false);
+        expect(weakerTls("require", "verify-full")).toBe(false);
     });
 });

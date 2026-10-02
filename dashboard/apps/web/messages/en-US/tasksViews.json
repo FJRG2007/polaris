@@ -80,6 +80,10 @@
         "noMatch": "No tasks match this view.",
         "noMatchDescription": "Change the filters, or add the first one."
     },
+    "search": {
+        "noMatch": "No task contains “{query}”.",
+        "noMatchDescription": "Every word you type has to be in the task's name, reference, description or tags."
+    },
     "table": {
         "task": "Task",
         "status": "Status",

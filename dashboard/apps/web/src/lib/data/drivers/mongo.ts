@@ -16,6 +16,7 @@
  */
 
 import * as data from "../driver";
+import { tlsConnectOptions } from "../tls";
 import { MongoClient, type Document } from "mongodb";
 
 /** Databases that belong to the server rather than to anybody's application. */
@@ -48,6 +49,24 @@ const READ_COMMANDS = new Set([
     "currentop"
 ]);
 
+/** Commands that take a `maxTimeMS`, and get one when none was given. */
+const BOUNDED_COMMANDS = new Set(["find", "aggregate", "count", "distinct"]);
+
+/**
+ * Whether a command document carries an aggregation stage that writes: `$out`
+ * and `$merge` turn an `aggregate` - a read by its name - into a write to
+ * another collection. Searched at any depth, since an `explain` or a
+ * `$facet`/`$lookup` can carry a pipeline inside it.
+ */
+export function writesThroughStage(value: unknown, depth = 0): boolean {
+    if (depth > 32 || value === null || typeof value !== "object") return false;
+    if (Array.isArray(value)) return value.some((entry) => writesThroughStage(entry, depth + 1));
+    return Object.entries(value as Record<string, unknown>).some(
+        ([key, nested]) =>
+            key === "$out" || key === "$merge" || writesThroughStage(nested, depth + 1)
+    );
+}
+
 export class MongoDriver implements data.DataDriver {
     readonly shape = "document" as const;
     private client: MongoClient | null = null;
@@ -56,19 +75,33 @@ export class MongoDriver implements data.DataDriver {
 
     private async open(): Promise<MongoClient> {
         if (this.client) return this.client;
+        // The credentials go in as options rather than into the URI, so they are
+        // never part of a string a driver might print in an error.
         const auth =
             this.address.username && this.address.password
-                ? `${encodeURIComponent(this.address.username)}:${encodeURIComponent(this.address.password)}@`
-                : "";
-        // No `authSource` unless one was resolved: the driver then signs in
-        // against `admin`, which is where an account somebody made by hand lives.
-        // A database Polaris provisioned carries its own, because its user was
-        // created inside it.
-        const uri = `mongodb://${auth}${this.address.host}:${this.address.port}/?${new URLSearchParams({
+                ? { auth: { username: this.address.username, password: this.address.password } }
+                : {};
+        const host = this.address.host.includes(":") ? `[${this.address.host}]` : this.address.host;
+        const tls = this.address.tls;
+        const secure = tlsConnectOptions(tls);
+        const client = new MongoClient(`mongodb://${host}:${this.address.port}/`, {
+            ...auth,
+            // No `authSource` unless one was resolved: the driver then signs in
+            // against `admin`, which is where an account somebody made by hand
+            // lives. A database Polaris provisioned carries its own, because its
+            // user was created inside it.
             ...(this.address.authSource ? { authSource: this.address.authSource } : {}),
-            ...(this.address.tls ? { tls: "true", tlsAllowInvalidCertificates: "true" } : {})
-        }).toString()}`;
-        const client = new MongoClient(uri, {
+            // This one server and no other: a replica set's members are names
+            // the server hands back, and following them would dial addresses
+            // nobody typed and nothing judged.
+            directConnection: true,
+            ...(secure
+                ? {
+                      tls: true,
+                      ...secure,
+                      ...(tls.mode === "require" ? { tlsAllowInvalidCertificates: true } : {})
+                  }
+                : {}),
             serverSelectionTimeoutMS: 8000,
             connectTimeoutMS: 8000,
             appName: "polaris-data-browser"
@@ -106,13 +139,12 @@ export class MongoDriver implements data.DataDriver {
         const name = namespace ?? this.address.database;
         if (!name) return [];
         const collections = await client.db(name).listCollections().toArray();
-        return collections
-            .map((entry) => ({
-                name: entry.name,
-                namespace: name,
-                kind: entry.type === "view" ? ("view" as const) : ("collection" as const),
-                rows: null
-            }));
+        return collections.map((entry) => ({
+            name: entry.name,
+            namespace: name,
+            kind: entry.type === "view" ? ("view" as const) : ("collection" as const),
+            rows: null
+        }));
     }
 
     async columns(namespace: string | null, relation: string): Promise<data.DataColumn[]> {
@@ -164,8 +196,12 @@ export class MongoDriver implements data.DataDriver {
     async run(command: string): Promise<data.QueryResult[]> {
         const parsed = parseCommand(command);
         const name = Object.keys(parsed)[0]?.toLowerCase() ?? "";
-        if (this.address.readOnly && !READ_COMMANDS.has(name)) {
+        if (this.address.readOnly && (!READ_COMMANDS.has(name) || writesThroughStage(parsed))) {
             throw new data.ReadOnlyError(`\`${name}\``);
+        }
+        // A read nobody bounded is bounded here, the way the grid's reads are.
+        if (BOUNDED_COMMANDS.has(name) && parsed.maxTimeMS === undefined) {
+            parsed.maxTimeMS = data.STATEMENT_TIMEOUT_MS;
         }
         const client = await this.open();
         const database = this.address.database ?? "admin";
@@ -273,12 +309,15 @@ function typeName(value: unknown): string {
  *  gets to ask a server to do. */
 function parseCommand(command: string): Document {
     const text = command.trim();
-    if (!text) throw new data.DataRequestError("Type a command document, for example { find: \"users\", limit: 20 }.");
+    if (!text)
+        throw new data.DataRequestError(
+            'Type a command document, for example { find: "users", limit: 20 }.'
+        );
     try {
         return JSON.parse(text) as Document;
     } catch {
         throw new data.DataRequestError(
-            "That is not a command document. Mongo takes JSON here, for example { find: \"users\", filter: { active: true }, limit: 20 } - with the field names quoted."
+            'That is not a command document. Mongo takes JSON here, for example { find: "users", filter: { active: true }, limit: 20 } - with the field names quoted.'
         );
     }
 }

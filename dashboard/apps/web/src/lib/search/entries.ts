@@ -27,6 +27,7 @@ import {
     type AppSection,
     type SectionGate
 } from "@/lib/apps";
+import type { SearchField } from "@polaris/core/search-text";
 
 export type SearchResourceKind =
     | "project"
@@ -59,6 +60,15 @@ export interface CommandEntry {
     /** Terms that should also match, beyond the label. */
     keywords?: string[];
 }
+
+/** Where a typed query is looked for in an entry: the label first, then the
+ *  terms that should also find it, then where it lives and its heading. */
+export const COMMAND_ENTRY_FIELDS: readonly SearchField<CommandEntry>[] = [
+    { text: (entry) => entry.label, weight: 3 },
+    { text: (entry) => entry.keywords, weight: 2 },
+    { text: (entry) => entry.context, weight: 1 },
+    { text: (entry) => entry.group, weight: 1 }
+];
 
 const RESOURCE_ICONS: Record<SearchResourceKind, LucideIcon> = {
     project: Boxes,

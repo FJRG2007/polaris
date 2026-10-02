@@ -42,9 +42,7 @@ export type RailwayAccount = z.infer<typeof meSchema>;
 
 const envelopeSchema = z.object({
     data: z.unknown().optional(),
-    errors: z
-        .array(z.object({ message: z.string().default("") }))
-        .optional()
+    errors: z.array(z.object({ message: z.string().default("") })).optional()
 });
 
 /**
@@ -55,7 +53,11 @@ const envelopeSchema = z.object({
  * back as a perfectly successful HTTP response carrying "Not Authorized". Both
  * are read, and their own sentence is what reaches the screen.
  */
-async function query(token: string, document: string, variables: Record<string, unknown> = {}): Promise<unknown> {
+async function query(
+    token: string,
+    document: string,
+    variables: Record<string, unknown> = {}
+): Promise<unknown> {
     let response: Response;
     try {
         response = await fetch(API, {
@@ -70,11 +72,17 @@ async function query(token: string, document: string, variables: Record<string, 
             body: JSON.stringify({ query: document, variables })
         });
     } catch {
-        throw new RailwayError("Railway could not be reached. Try again in a moment.", "unreachable");
+        throw new RailwayError(
+            "Railway could not be reached. Try again in a moment.",
+            "unreachable"
+        );
     }
 
     if (response.status === 401 || response.status === 403) {
-        throw new RailwayError("Railway refused the token. It may have been revoked.", "unauthorized");
+        throw new RailwayError(
+            "Railway refused the token. It may have been revoked.",
+            "unauthorized"
+        );
     }
 
     const text = await response.text().catch(() => "");
@@ -88,7 +96,8 @@ async function query(token: string, document: string, variables: Record<string, 
     }
 
     const parsed = envelopeSchema.safeParse(payload);
-    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new RailwayError("Railway answered with something unexpected.", "refused");
 
     const complaint = parsed.data.errors?.[0]?.message?.trim();
     if (complaint) {
@@ -119,7 +128,8 @@ export async function railwayAccount(token: string): Promise<RailwayAccount> {
     const parsed = z
         .object({ me: meSchema })
         .safeParse(await query(token, "query { me { id name email } }"));
-    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new RailwayError("Railway answered with something unexpected.", "refused");
     return parsed.data.me;
 }
 
@@ -136,7 +146,8 @@ export async function railwayProjects(token: string): Promise<RailwayNamed[]> {
     const parsed = z
         .object({ projects: nodesOf(namedSchema) })
         .safeParse(await query(token, "query { projects { edges { node { id name } } } }"));
-    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new RailwayError("Railway answered with something unexpected.", "refused");
     return parsed.data.projects.edges.map((edge) => edge.node);
 }
 
@@ -173,7 +184,8 @@ export async function railwayProject(token: string, id: string): Promise<Railway
             { id }
         )
     );
-    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new RailwayError("Railway answered with something unexpected.", "refused");
     const project = parsed.data.project;
     return {
         id: project.id,
@@ -216,8 +228,43 @@ export async function railwayDeployments(
             }
         )
     );
-    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new RailwayError("Railway answered with something unexpected.", "refused");
     return parsed.data.deployments.edges.map((edge) => edge.node);
+}
+
+const railwayDomainsSchema = z.object({
+    domains: z.object({
+        serviceDomains: z.array(z.object({ domain: z.string() })).default([]),
+        customDomains: z.array(z.object({ domain: z.string() })).default([])
+    })
+});
+
+/**
+ * Where one service answers in one environment: its custom domains first, then
+ * the `*.up.railway.app` names Railway generated for it.
+ */
+export async function railwayDomains(
+    token: string,
+    input: { project: string; service: string; environment: string }
+): Promise<string[]> {
+    const parsed = railwayDomainsSchema.safeParse(
+        await query(
+            token,
+            `query domains($projectId: String!, $environmentId: String!, $serviceId: String!) {
+                domains(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId) {
+                    serviceDomains { domain }
+                    customDomains { domain }
+                }
+            }`,
+            { projectId: input.project, environmentId: input.environment, serviceId: input.service }
+        )
+    );
+    if (!parsed.success)
+        throw new RailwayError("Railway answered with something unexpected.", "refused");
+    return [...parsed.data.domains.customDomains, ...parsed.data.domains.serviceDomains].map(
+        (entry) => entry.domain.toLowerCase()
+    );
 }
 
 /**
@@ -250,7 +297,8 @@ export async function railwayVariables(
     const parsed = z
         .object({ variables: z.record(z.string(), z.string()).default({}) })
         .safeParse(answer);
-    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    if (!parsed.success)
+        throw new RailwayError("Railway answered with something unexpected.", "refused");
 
     const found: Record<string, string> = {};
     for (const [key, value] of Object.entries(parsed.data.variables)) {

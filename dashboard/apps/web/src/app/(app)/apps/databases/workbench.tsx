@@ -26,15 +26,17 @@
  * file browser uses, so what somebody has learnt in Drive works here.
  */
 
-import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { dataText } from "@/lib/data/words";
+import { spreadsheetSafe } from "@/lib/data/spreadsheet";
 import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { searchItems, type SearchField } from "@polaris/core/search-text";
 import type {
     DataColumn,
     DataNamespace,
@@ -94,6 +96,10 @@ type RelationOrder = (typeof RELATION_ORDERS)[number]["value"];
 /** Where this browser's preference is kept. A habit of the person reading rather
  *  than a property of the database, so it belongs here and not in a row. */
 const ORDER_KEY = "polaris.databases.order";
+
+const RELATION_FIELDS: readonly SearchField<DataRelation>[] = [
+    { text: (relation) => relation.name }
+];
 
 export function Workbench({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
     const t = useTranslations("databases");
@@ -208,19 +214,15 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
         void load(null);
     }, [load]);
 
-    // Fuzzy, over what is already here: a schema is a few hundred names at most,
-    // and the one somebody is looking for is usually half-remembered - "user_sess"
-    // has to find `user_sessions`, and a transposition has to find it too. Ranked,
-    // so the closest is at the top rather than wherever the catalogue put it.
-    const fuse = useMemo(
-        () => new Fuse(relations ?? [], { keys: ["name"], threshold: 0.3, ignoreLocation: true }),
-        [relations]
-    );
+    // Over what is already here: a schema is a few hundred names at most, and the
+    // one somebody is looking for is usually half-remembered - "user_sess" has to
+    // find `user_sessions`, and a transposition has to find it too. Ranked, so the
+    // closest is at the top rather than wherever the catalogue put it.
     const shown = useMemo(() => {
         const needle = find.trim();
         // A search is already ranked by how well each name matched; re-ordering
         // it by anything else throws that away.
-        if (needle) return fuse.search(needle).map((hit) => hit.item);
+        if (needle) return searchItems(relations ?? [], needle, RELATION_FIELDS);
         const list = [...(relations ?? [])];
         if (order === "rows") {
             // A table whose size the engine does not keep sinks rather than
@@ -234,7 +236,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
             list.sort((left, right) => left.name.localeCompare(right.name));
         }
         return list;
-    }, [fuse, relations, find, order]);
+    }, [relations, find, order]);
 
     return (
         <div className="flex min-h-0 flex-1 gap-4">
@@ -362,9 +364,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                 />
 
                 {readOnly && (
-                    <span className="text-xs text-muted-foreground">
-                        {t("bench.readOnly")}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t("bench.readOnly")}</span>
                 )}
 
                 {error && (
@@ -447,8 +447,10 @@ function rowsAsText(
     columns: readonly DataColumn[]
 ): string {
     if (rows.length === 0) return "";
-    const header = columns.map((column) => column.name).join("\t");
-    const body = rows.map((row) => columns.map((column) => cellText(row[column.name])).join("\t"));
+    const header = columns.map((column) => spreadsheetSafe(column.name)).join("\t");
+    const body = rows.map((row) =>
+        columns.map((column) => spreadsheetSafe(cellText(row[column.name]))).join("\t")
+    );
     return [header, ...body].join("\n");
 }
 
@@ -788,7 +790,10 @@ function RowsPanel({
                           ? cursorPaged
                               ? page.total === null
                                   ? t("bench.keys", { count: page.rows.length })
-                                  : t("bench.keysOf", { count: page.rows.length, total: page.total })
+                                  : t("bench.keysOf", {
+                                        count: page.rows.length,
+                                        total: page.total
+                                    })
                               : page.total === null
                                 ? t("bench.rows", {
                                       from: page.rows.length === 0 ? 0 : offset + 1,
@@ -829,7 +834,10 @@ function RowsPanel({
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -944,7 +952,10 @@ function RowsPanel({
                                                                     }
                                                                 />
                                                             ) : (
-                                                                cell(row[column.name], t("bench.emptyValue"))
+                                                                cell(
+                                                                    row[column.name],
+                                                                    t("bench.emptyValue")
+                                                                )
                                                             )}
                                                         </td>
                                                     );
@@ -1007,7 +1018,9 @@ function RowsPanel({
                                             >
                                                 <Copy className="size-3.5" />
                                                 {picked.size > 1
-                                                    ? t("bench.copyRowsJson", { count: picked.size })
+                                                    ? t("bench.copyRowsJson", {
+                                                          count: picked.size
+                                                      })
                                                     : t("bench.copyRowJson")}
                                             </ContextMenuItem>
                                             <ContextMenuItem
@@ -1078,7 +1091,9 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                         {value.type}
-                        {value.ttl === null ? "" : t("bench.expires", { seconds: Math.round(value.ttl / 1000) })}
+                        {value.ttl === null
+                            ? ""
+                            : t("bench.expires", { seconds: Math.round(value.ttl / 1000) })}
                     </span>
                     <Button size="sm" variant="ghost" onClick={onClose}>
                         {t("tabs.close")}
@@ -1114,9 +1129,7 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </p>
                 )}
                 {value.truncated && (
-                    <p className="text-xs text-muted-foreground">
-                        {t("bench.truncated")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("bench.truncated")}</p>
                 )}
             </CardBody>
         </Card>
@@ -1209,11 +1222,15 @@ function QueryPanel({
                     )}
                     {t("bench.run")}
                 </Button>
-                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>{/* i18n-ignore a key chord */}
+                {/* i18n-ignore a key chord */}
+                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>
             </div>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -1230,10 +1247,21 @@ function QueryPanel({
                             </span>
                             <span className="shrink-0">
                                 {result.affected === null
-                                    ? t("bench.resultRows", { count: result.rows.length, ms: result.ms })
-                                    : t("bench.resultChanged", { count: result.affected, ms: result.ms })}
+                                    ? t("bench.resultRows", {
+                                          count: result.rows.length,
+                                          ms: result.ms
+                                      })
+                                    : t("bench.resultChanged", {
+                                          count: result.affected,
+                                          ms: result.ms
+                                      })}
                             </span>
                         </div>
+                        {result.note && (
+                            <p className="border-b border-border px-3 py-1 text-xs text-warning">
+                                {dataText(t, result.note)}
+                            </p>
+                        )}
                         {result.rows.length > 0 && (
                             <div className="max-h-72 overflow-auto overscroll-contain">
                                 <table className="w-full text-xs">

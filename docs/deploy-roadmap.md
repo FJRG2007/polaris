@@ -61,16 +61,16 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 
 | Item                                     | Status  | Prio | Notes                                                                           |
 | ---------------------------------------- | ------- | ---- | ------------------------------------------------------------------------------- |
-| Free subdomain                           | done    | P0   |                                                                                 |
-| Custom domain + Let's Encrypt            | done    | P0   | or a certificate you supply                                                     |
+| Free subdomain                           | done    | P0   | generated name editable in place, checked for availability                      |
+| Custom domain + Let's Encrypt            | done    | P0   | or a certificate you supply; issued keys are ECDSA (EC256), like Railway         |
 | Wildcard certificates                    | done    | P1   | owner domains                                                                   |
-| DNS records managed                      | done    | P1   | Cloudflare zone editor                                                          |
+| DNS records managed                      | done    | P1   | Cloudflare zone editor; a custom domain's panel reads its DNS live and tells a Cloudflare-proxied record from one pointed elsewhere |
 | Private networking between services      | done    | P0   | Railway-style: each service answers to `<name>.polaris.internal` and its bare name on a network of its own (dual stack where the engine gives it one), port-less via a port-80 forwarder; editable endpoint name with an availability check and a 7-day grace period for the old one, extra aliases; `POLARIS_PRIVATE_DOMAIN` and service variable references follow renames; opt-in links let one service of another project on the same server call it by name |
-| Multiple domains per service             | done    | P1   | added one at a time                                                             |
+| Multiple domains per service             | done    | P1   | added one at a time; each domain can pin its own target port (Railway's per-domain port), independent of the service's own |
 | Redirects / rewrites                     | done    | P2   | Service > Settings                                                              |
 | Load balancing (copies, sticky, health)  | done    | P1   |                                                                                 |
 | Weighted traffic to a kept release       | done    | P2   | 10% or 50%, sticky per visitor                                                  |
-| TCP/UDP (non-HTTP) exposure              | partial | P2   | a service's port can be opened on the machine's address; no UDP, no extra ports |
+| TCP/UDP (non-HTTP) exposure              | done    | P2   | up to 8 raw TCP proxies per service, each a container port published on a public port from a dedicated range; still no UDP |
 | Login required / IP allowlist on a route | done    | P2   | Firewall > access rules                                                         |
 | CDN                                      | done    | P2   | Cloudflare proxy, cache purged after deploys                                    |
 

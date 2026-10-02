@@ -4654,6 +4654,17 @@ model ExternalService {
     error             String?
     checkedAt         DateTime?
 
+    /// The Polaris service this is the same thing as, when somebody said so (or a
+    /// move did). Soft pointer, no FK: deleting either half leaves the other alone.
+    applicationId     String?   @db.Uuid
+    /// `owner/name` of the repository the provider builds, as it reports it - what
+    /// matches a row to a Polaris service built from the same repository.
+    repo              String?
+    /// JSON array of the hostnames the provider serves production on.
+    productionDomains String?
+    /// When the two above were last read: on their own, slower clock.
+    domainsCheckedAt  DateTime?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
@@ -4661,6 +4672,7 @@ model ExternalService {
 
     @@unique([environmentId, slug])
     @@index([environmentId])
+    @@index([applicationId])
     @@index([connectionId])
 }
 
@@ -4932,6 +4944,10 @@ model Domain {
     // release is current. Soft pointer (no FK), like Deployment.deployableId.
     deploymentId  String?  @db.Uuid
     targetPort    Int
+    // Set when somebody chose this port for this one address - a second port of
+    // the service on a name of its own. Unpinned, the edge follows the service's
+    // own port, which is what every domain did before this existed.
+    portPinned    Boolean  @default(false)
     https         Boolean  @default(true)
     // When off, the hostname stops serving the app (its route is dropped) but the
     // record is kept so it can be re-enabled from the service's domain settings.
@@ -5185,11 +5201,21 @@ model DataConnection {
     port                Int?
     database            String?
     username            String?
-    // Envelope-encrypted secret (JSON: password).
+    // Envelope-encrypted secret (JSON: password, and a client certificate key).
     encryptedCredential Bytes?
     credentialNonce     Bytes?
     credentialKeyId     String?
     tls                 Boolean   @default(false)
+    // disable | require | verify-ca | verify-full. Null on a row saved before
+    // modes existed, read as "require" when `tls` is on.
+    tlsMode             String?
+    // system | upload | server - what a verifying mode checks against.
+    tlsTrust            String?
+    // PEM: the uploaded authority, or the server's own certificate trusted on
+    // first use. Public data, not a secret.
+    tlsCaCert           String?
+    // PEM: the client certificate presented. Its key is sealed with the password.
+    tlsClientCert       String?
     readOnly            Boolean   @default(false)
     // null | server | manual | manual-jump
     sshMode             String?
@@ -5207,6 +5233,8 @@ model DataConnection {
     sshCredentialKeyId  String?
     // The SSH server's key (base64), pinned when the connection was saved.
     sshHostKey          String?
+    // "<type> <SHA256 fingerprint>" of the stored private key, for the form.
+    sshKeySummary       String?
     // The registered server a "manual-jump" login is reached through.
     sshJumpHostId       String?   @db.Uuid
     lastUsedAt          DateTime?

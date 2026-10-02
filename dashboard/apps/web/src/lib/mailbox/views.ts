@@ -14,7 +14,6 @@
  * Reaching the end asks for the next page; it never reaches for all of them.
  */
 
-import Fuse from "fuse.js";
 import { cache } from "react";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -369,10 +368,10 @@ const SEARCH_SET_ASIDE = ["trash", "junk", "all"] as const;
  * the sender's own address used to find nothing - so those, the phrases, the
  * exclusions and the loose words are answered over what comes back.
  *
- * The loose words go through Fuse, which is what makes a search forgiving: a
- * half-remembered name, a subject typed from memory, an address with one letter
- * wrong. Everything with an operator on it stays exact, because somebody who
- * wrote `from:ana` meant Ana.
+ * The loose words go through the shared search: every one has to be in the
+ * subject, the people, the preview or the body, and a subject typed with a
+ * letter wrong is still found when nothing matches as typed. Everything with an
+ * operator on it stays exact, because somebody who wrote `from:ana` meant Ana.
  *
  * A conversation is searched whole: every message of one that is in the list
  * being searched, not only the messages that put it there. A thread is in the
@@ -446,27 +445,35 @@ async function matchingThreads(
     const exact = searchable.filter((message) => core.mailSearchAdmits(message, terms));
     if (!terms.text) return new Set(exact.map((message) => message.threadId));
 
-    const fuse = new Fuse(exact, {
-        includeScore: false,
-        ignoreLocation: true,
-        threshold: 0.35,
-        minMatchCharLength: 2,
-        keys: [
-            { name: "subject", weight: 0.4 },
-            // One field rather than three, so a name in the To line scores the
-            // same as the same name in the From line - which is what somebody
-            // typing a colleague's name into the box means.
-            {
-                name: "people",
-                weight: 0.3,
-                getFn: (message) => [...message.from, ...message.to, ...message.cc]
-            },
-            { name: "snippet", weight: 0.2 },
-            { name: "body", weight: 0.1 }
-        ]
-    });
-    return new Set(fuse.search(terms.text).map((hit) => hit.item.threadId));
+    return new Set(
+        core.searchItems(exact, terms.text, MAIL_SEARCH_FIELDS).map((message) => message.threadId)
+    );
 }
+
+/** One message as the search box reads it. */
+interface SearchableMessage {
+    readonly subject: string;
+    readonly snippet: string;
+    readonly body: string;
+    readonly from: readonly string[];
+    readonly to: readonly string[];
+    readonly cc: readonly string[];
+}
+
+/**
+ * Where a search looks in a message, the subject first: it is the title, the
+ * one place a typo is forgiven. Every word typed has to be in one of these, so
+ * a word in no message finds no conversation.
+ */
+const MAIL_SEARCH_FIELDS: readonly core.SearchField<SearchableMessage>[] = [
+    { text: (message) => message.subject, weight: 4 },
+    // One field rather than three, so a name in the To line scores the same as
+    // the same name in the From line - which is what somebody typing a
+    // colleague's name into the box means.
+    { text: (message) => [...message.from, ...message.to, ...message.cc], weight: 3 },
+    { text: (message) => message.snippet, weight: 2 },
+    { text: (message) => message.body, weight: 1 }
+];
 
 /** An address list as words a search can match: the name and the address of each
  *  person on the message, because people search for both. */

@@ -132,6 +132,12 @@ describe("runsCutover", () => {
                 routed
             )
         ).toBe(false);
+        expect(
+            releases.runsCutover(
+                { ...plain, sourceConfig: '{"tcpProxies":[{"host":40001,"container":5432}]}' },
+                routed
+            )
+        ).toBe(false);
         expect(releases.runsCutover({ ...plain, sourceType: "compose" }, routed)).toBe(false);
         expect(releases.runsCutover({ ...plain, sourceConfig: "not json" }, routed)).toBe(false);
     });

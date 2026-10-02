@@ -21,7 +21,9 @@ let applications: { id: string; sourceConfig: string }[] = [];
 let settings: Record<string, string> = {};
 
 vi.mock("@polaris/db", () => ({
-    prisma: { application: { findMany: vi.fn(async () => applications.map((row) => ({ ...row }))) } }
+    prisma: {
+        application: { findMany: vi.fn(async () => applications.map((row) => ({ ...row }))) }
+    }
 }));
 // Derived ports are a hash of the app id in the real thing; here they are stated,
 // so a test can put one exactly where it would hurt.
@@ -36,10 +38,20 @@ vi.mock("@/lib/setting-store", () => ({
 const { availableHostPort, takenHostPorts } = await import("@/lib/apps/port-registry");
 
 /** An app that pinned a port, the way an installed game server does. */
-function pinned(id: string, hostPort: number, hostProtocol: "tcp" | "udp" = "tcp", extraPorts: unknown[] = []) {
+function pinned(
+    id: string,
+    hostPort: number,
+    hostProtocol: "tcp" | "udp" = "tcp",
+    extraPorts: unknown[] = []
+) {
     return {
         id,
-        sourceConfig: JSON.stringify({ imageRef: "example", hostPort, hostProtocol, ...(extraPorts.length ? { extraPorts } : {}) })
+        sourceConfig: JSON.stringify({
+            imageRef: "example",
+            hostPort,
+            hostProtocol,
+            ...(extraPorts.length ? { extraPorts } : {})
+        })
     };
 }
 
@@ -51,7 +63,9 @@ beforeEach(() => {
 describe("what counts as taken", () => {
     it("sees the ports a pinned app also publishes, not just the one it pinned", async () => {
         // The crossplay case: one service, two doors, and the second was invisible.
-        applications = [pinned("java-1", 25565, "tcp", [{ host: 19132, container: 19132, protocol: "udp" }])];
+        applications = [
+            pinned("java-1", 25565, "tcp", [{ host: 19132, container: 19132, protocol: "udp" }])
+        ];
 
         const taken = await takenHostPorts();
 
@@ -59,8 +73,24 @@ describe("what counts as taken", () => {
         expect(taken.has("udp:19132")).toBe(true);
     });
 
+    it("sees the public ports a service's TCP proxies publish", async () => {
+        applications = [
+            {
+                id: "db-1",
+                sourceConfig: JSON.stringify({
+                    imageRef: "example",
+                    tcpProxies: [{ container: 5432, host: 40123 }]
+                })
+            }
+        ];
+
+        expect((await takenHostPorts()).has("tcp:40123")).toBe(true);
+    });
+
     it("sees the port derived for an app that pinned none", async () => {
-        applications = [{ id: "derived-on-25565", sourceConfig: JSON.stringify({ imageRef: "example" }) }];
+        applications = [
+            { id: "derived-on-25565", sourceConfig: JSON.stringify({ imageRef: "example" }) }
+        ];
 
         expect((await takenHostPorts()).has("tcp:25565")).toBe(true);
     });
@@ -86,13 +116,17 @@ describe("handing out a port", () => {
     it("does not hand a second crossplay server the UDP port the first is on", async () => {
         // The bug this file exists for: `extraPorts` was not consulted, so both
         // servers were published on 19132 and the second could not bind.
-        applications = [pinned("java-1", 25565, "tcp", [{ host: 19132, container: 19132, protocol: "udp" }])];
+        applications = [
+            pinned("java-1", 25565, "tcp", [{ host: 19132, container: 19132, protocol: "udp" }])
+        ];
 
         expect(await availableHostPort(19132, "udp")).toBe(19133);
     });
 
     it("steps over a port an unpinned app already derived", async () => {
-        applications = [{ id: "derived-on-25565", sourceConfig: JSON.stringify({ imageRef: "example" }) }];
+        applications = [
+            { id: "derived-on-25565", sourceConfig: JSON.stringify({ imageRef: "example" }) }
+        ];
 
         expect(await availableHostPort(25565, "tcp")).toBe(25566);
     });
