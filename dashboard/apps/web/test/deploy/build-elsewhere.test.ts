@@ -18,19 +18,23 @@ import { randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 
-const { findFirstHost, findFirstDeployment, findUniqueApp, deployApplication, resolveService } = vi.hoisted(() => ({
-    findFirstHost: vi.fn(),
-    findFirstDeployment: vi.fn(),
-    findUniqueApp: vi.fn(),
-    deployApplication: vi.fn(async () => "dep-1"),
-    resolveService: vi.fn(async () => ({ access: { ownerId: "owner-1" }, applicationId: "019f8506-683f-7dd0-9c13-1e9ee9237fe3" }))
-}));
+const { findFirstHost, findFirstDeployment, findUniqueApp, findFirstRunnerPool, deployApplication, resolveService } = vi.hoisted(
+    () => ({
+        findFirstHost: vi.fn(),
+        findFirstDeployment: vi.fn(),
+        findUniqueApp: vi.fn(),
+        findFirstRunnerPool: vi.fn(),
+        deployApplication: vi.fn(async () => "dep-1"),
+        resolveService: vi.fn(async () => ({ access: { ownerId: "owner-1" }, applicationId: "019f8506-683f-7dd0-9c13-1e9ee9237fe3" }))
+    })
+);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         host: { findFirst: findFirstHost },
         deployment: { findFirst: findFirstDeployment },
-        application: { findUnique: findUniqueApp }
+        application: { findUnique: findUniqueApp },
+        runnerPool: { findFirst: findFirstRunnerPool }
     }
 }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: tmpdir() }) }));
@@ -46,8 +50,13 @@ const HOST = "019f9000-1111-7000-8000-222233334444";
 const remote = { kind: "host", hostId: "019f9000-aaaa-7000-8000-222233334444", name: "small-box" };
 const local = { kind: "local", hostId: null, name: "Local" };
 
+const POOL = "019f9000-2222-7000-8000-333344445555";
+
 describe("where a build goes", () => {
-    beforeEach(() => findFirstHost.mockReset());
+    beforeEach(() => {
+        findFirstHost.mockReset();
+        findFirstRunnerPool.mockReset();
+    });
 
     it("builds where it runs when nothing is chosen, or the choice is that machine", async () => {
         expect(await resolveBuildMachine({ buildConfig: "{}", target: remote }, "owner-1")).toBeNull();
@@ -82,6 +91,43 @@ describe("where a build goes", () => {
         expect(storedBuildOn(JSON.stringify({ buildOn: "anything" }))).toBe("");
         expect(storedBuildOn("not json")).toBe("");
         expect(storedBuildOn(JSON.stringify({ buildOn: HOST }))).toBe(HOST);
+    });
+
+    it("follows a runner pool to the server it runs on", async () => {
+        findFirstRunnerPool.mockResolvedValueOnce({ name: "ci-runners", hostId: HOST, host: { name: "big-box" } });
+        const machine = await resolveBuildMachine(
+            { buildConfig: JSON.stringify({ buildOn: `pool:${POOL}` }), target: local },
+            "owner-1"
+        );
+        expect(machine).toMatchObject({
+            target: { kind: "host", hostId: HOST },
+            name: "ci-runners (big-box)",
+            runsOn: "the Polaris host"
+        });
+        expect(findFirstRunnerPool).toHaveBeenCalledWith(expect.objectContaining({ where: { id: POOL, ownerId: "owner-1" } }));
+    });
+
+    it("follows a runner pool to the Polaris host when the pool names none", async () => {
+        findFirstRunnerPool.mockResolvedValueOnce({ name: "ci-runners", hostId: null, host: null });
+        const machine = await resolveBuildMachine(
+            { buildConfig: JSON.stringify({ buildOn: `pool:${POOL}` }), target: remote },
+            "owner-1"
+        );
+        expect(machine).toMatchObject({ target: { kind: "local" }, name: "ci-runners (the Polaris host)" });
+    });
+
+    it("builds where it runs when the pool's own server is the one it runs on", async () => {
+        findFirstRunnerPool.mockResolvedValueOnce({ name: "ci-runners", hostId: remote.hostId, host: { name: "small-box" } });
+        expect(
+            await resolveBuildMachine({ buildConfig: JSON.stringify({ buildOn: `pool:${POOL}` }), target: remote }, "owner-1")
+        ).toBeNull();
+    });
+
+    it("refuses in words when that runner pool no longer exists", async () => {
+        findFirstRunnerPool.mockResolvedValueOnce(null);
+        await expect(
+            resolveBuildMachine({ buildConfig: JSON.stringify({ buildOn: `pool:${POOL}` }), target: local }, "owner-1")
+        ).rejects.toThrow("runner pool this service builds on no longer exists");
     });
 });
 
