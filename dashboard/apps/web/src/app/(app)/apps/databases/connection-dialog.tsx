@@ -21,8 +21,11 @@
  *
  * Encryption is the four modes every client names the same way (libpq's
  * `sslmode`), and a mode that checks nothing is only ever the reader's choice,
- * said as what it is when picked. A self-signed server is trusted the way the SSH
- * key below it is: its certificate is read when the connection is saved and
+ * said as what it is when picked. Typing a host that is not a tunnel and looks
+ * public (`looksPublic`) defaults the mode to `verify-full`, since that is the
+ * one a reader would want and the one easy to not think to pick; a private or
+ * tunnelled host defaults to off. A self-signed server is trusted the way the
+ * SSH key below it is: its certificate is read when the connection is saved and
  * checked every time after.
  *
  * Read-only is a tick, off unless somebody makes the choice: the browser refuses
@@ -33,20 +36,21 @@
  * save with, so a value the server would refuse is refused here first, in the
  * same words. No secret comes back from the server: a stored password, key or
  * client certificate is said to be there, never shown, and is kept when its
- * field is left empty - unless the connection now points somewhere else, which
- * asks for it again.
+ * field is left empty - unless the connection now points somewhere else, or the
+ * encryption is now weaker than it was saved under, either of which asks for it
+ * again.
  */
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { dataText } from "@/lib/data/words";
 import { runAction } from "@/lib/run-action";
+import * as schema from "@/lib/data/connection-schema";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DbEngineSelect } from "@/components/db-engine-select";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DataConnectionView, ManagedOption } from "@/lib/data/connections";
 import { Loader2, Plug, Database, Upload, KeyRound, ShieldAlert, Activity } from "lucide-react";
-import * as schema from "@/lib/data/connection-schema";
 import {
     Button,
     Dialog,

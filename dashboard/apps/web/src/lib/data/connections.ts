@@ -40,11 +40,13 @@
  *   on save and again on every open, and the driver is pointed at the address
  *   that was judged. Somebody who does not run the instance cannot point
  *   Polaris at its own network.
- * - **A kept secret is only kept for the same destination.** An edit that leaves
- *   the password empty keeps the stored one only while the engine, the address
- *   and the route to it are unchanged; pointing the connection somewhere else
- *   asks for the password again, so a stored password is never sent to an
- *   address it was not typed for. The SSH login follows the same rule.
+ * - **A kept secret is only kept for the same destination, over encryption at
+ *   least as strong.** An edit that leaves the password empty keeps the stored
+ *   one only while the engine, the address and the route to it are unchanged,
+ *   and the TLS mode has not been weakened; pointing the connection somewhere
+ *   else, or turning verification down, asks for the password again, so a
+ *   stored password is never sent to an address - or over a channel - it was
+ *   not typed for. The SSH login follows the same rule.
  * - **No secret leaves this module.** The views carry what a screen needs to
  *   say - that a password, a key or a client certificate is stored, a key's
  *   fingerprint, a certificate's subject - and never the thing itself.
@@ -52,6 +54,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { readFileSync } from "node:fs";
 import { loadEnv } from "@polaris/config";
 import { userHasPermission } from "@polaris/auth";
 import type { DataAddress, DataEngine } from "./driver";
@@ -62,7 +65,6 @@ import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { resolveEgress, EgressRefusal, type EgressScope } from "./egress";
 import { randomUUID, X509Certificate, createPrivateKey } from "node:crypto";
-import { readFileSync } from "node:fs";
 import {
     probeServerCertificate,
     summarize,

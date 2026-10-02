@@ -9,14 +9,27 @@
  * that is not published on the network can be reached over SSH from here.
  */
 
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { utils } from "ssh2";
 import { MessagesWrapper } from "../setup/i18n";
+import userEvent from "@testing-library/user-event";
+import { readPrivateKey, SshKeyError } from "@/lib/data/ssh-key";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const saved: unknown[] = [];
 
 vi.mock("@/app/(app)/apps/databases/actions", () => ({
+    // The real key reader, so this exercises the same parsing and passphrase
+    // handling the server action wraps - only its rate limiting and
+    // translation are stubbed out here.
+    inspectKeyAction: async (key: string, passphrase: string | null) => {
+        try {
+            const read = readPrivateKey(key, passphrase);
+            return { type: read.type, fingerprint: read.fingerprint };
+        } catch (error) {
+            return { error: error instanceof SshKeyError ? error.message : "refused" };
+        }
+    },
     engineOptionsAction: async () => ({
         engines: [
             { id: "postgres", label: "PostgreSQL", port: 5432 },
@@ -198,5 +211,53 @@ describe("the connection form", () => {
             readOnly: false,
             ssh: null
         });
+    });
+
+    it("turns encryption on verify-full for a public host, and off for a private one", async () => {
+        open();
+        const host = screen.getByLabelText("Host");
+        const tls = () => screen.getByRole("combobox", { name: "Encryption" });
+
+        await userEvent.type(host, "db.example.com");
+        expect(tls().textContent).toContain("Verify certificate and name");
+
+        await userEvent.clear(host);
+        await userEvent.type(host, "10.0.0.4");
+        expect(tls().textContent).toContain("Off");
+    });
+
+    it("imports a private key by drag-and-drop, reads it for real, and never echoes the passphrase back", async () => {
+        tunnelled(MANUAL_TUNNEL);
+        await userEvent.click(screen.getByRole("radio", { name: "Private key" }));
+
+        const passphrase = "correct horse battery staple";
+        const pair = utils.generateKeyPairSync("ed25519", {
+            passphrase,
+            cipher: "aes256-ctr",
+            rounds: 16
+        });
+        const file = new File([pair.private], "id_ed25519");
+        const field = screen.getByRole("textbox", { name: "Private key" });
+
+        fireEvent.drop(field, { dataTransfer: { files: [file] } });
+        await waitFor(() => expect((field as HTMLTextAreaElement).value).toBe(pair.private));
+
+        // Locked key: the form asks for the passphrase instead of guessing or
+        // moving on, and the field that holds it stays masked. (The show/hide
+        // toggle the password Input renders defeats jsdom's implicit
+        // label-control lookup, so the input is found through its label text
+        // instead of `getByLabelText`.)
+        const passphraseLabel = await screen.findByText("Key passphrase");
+        const passphraseField = passphraseLabel.closest("label")!.querySelector("input")!;
+        expect(passphraseField.getAttribute("type")).toBe("password");
+
+        await userEvent.type(passphraseField, passphrase);
+
+        // The real `readPrivateKey` runs on the dropped file; once it unlocks,
+        // its type and fingerprint are shown - and only those, never the
+        // passphrase or the key material itself.
+        const summary = await screen.findByText(/^ssh-ed25519 SHA256:/, {}, { timeout: 2000 });
+        expect(summary.textContent).not.toContain(passphrase);
+        expect(document.body.textContent).not.toContain(passphrase);
     });
 });
