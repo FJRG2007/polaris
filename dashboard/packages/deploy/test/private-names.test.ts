@@ -285,7 +285,12 @@ describe("closing a link on a server reached over SSH", () => {
     });
 
     it("is refused for any network that is not a link's", () => {
-        for (const other of [net.namesNetwork("e"), net.environmentNetwork("e"), "polaris-proxy", "bridge"]) {
+        for (const other of [
+            net.namesNetwork("e"),
+            net.environmentNetwork("e"),
+            "polaris-proxy",
+            "bridge"
+        ]) {
             expect(() => net.cutLinkNetworkScript(other)).toThrow();
         }
     });

@@ -22,7 +22,7 @@
         "kept": "It keeps previous deployments running, so each is reached by its own address and these names are not given out. Turn off Keep previous deployments to use them.",
         "unsupported": "This server's Polaris predates private names. Update it from <link>Settings</link> to turn them on."
     },
-    "shortName": "You can also simply call me <code>{name}</code>",
+    "shortName": "Also reachable as <code>{name}</code>",
     "portless": "<code>{url}</code> reaches port {port}. Adding <code>:{port}</code> works too.",
     "port": "It listens on port {port}: <code>{address}</code>",
     "edit": "Edit",
@@ -52,10 +52,16 @@
     "sharedEnvironment": "Services of other projects on this server can also reach it by its container name. <link>Give this environment its own network</link>.",
     "projects": "Other projects",
     "projectsHint": "Closed by default. Allow one service of another project on this server to call it by name.",
+    "linksSwarm": "Links between projects are not available on Swarm servers.",
     "linkIn": "{service} in {project} calls it as <code>{domain}</code>",
     "linkOut": "Calls {service} in {project} as <code>{domain}</code>",
     "linkOtherServer": "On another server, so the link does not connect them.",
     "removeLink": "Close the link with {service}",
+    "closeLink": {
+        "title": "Close the link with {service}?",
+        "body": "{service} loses its connections to this service now, and cannot call it by name again until the link is allowed again and both are redeployed.",
+        "confirm": "Close link"
+    },
     "allow": "Allow a service",
     "allowPick": "Service of another project",
     "allowOption": "{service} ({project}, {environment})",
@@ -79,6 +85,8 @@
         "missing": "That service is no longer there.",
         "sameProject": "Both services are in this project: they already reach each other by name.",
         "otherServer": "The two services run on different servers, which private names cannot cross.",
-        "unreachable": "Their server did not answer, so the link is still open. Try again once it is online."
+        "unreachable": "Their server did not answer, so the link is still open. Try again once it is online.",
+        "tooMany": "One of the two services already has as many links to other projects as it can take. Remove one first.",
+        "unsupported": "This server runs Swarm, which links between projects do not support."
     }
 }

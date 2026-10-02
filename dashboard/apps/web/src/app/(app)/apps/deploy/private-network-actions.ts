@@ -82,7 +82,8 @@ export async function privateNetworkAction(
         );
         return { view: await names.privateNetworkView(service.kind, service.id), canEdit };
     } catch (caught) {
-        return { error: await refusal(caught) };
+        console.error("polaris: a private network could not be read:", caught);
+        return { error: (await words())("loadFailed") };
     }
 }
 

@@ -22,7 +22,7 @@
         "kept": "Mantiene en marcha los despliegues anteriores, así que cada uno se alcanza por su propia dirección y estos nombres no se asignan. Desactiva Conservar despliegues anteriores para usarlos.",
         "unsupported": "El Polaris de este servidor es anterior a los nombres privados. Actualízalo desde <link>Ajustes</link> para activarlos."
     },
-    "shortName": "También puedes llamarme <code>{name}</code>",
+    "shortName": "También accesible como <code>{name}</code>",
     "portless": "<code>{url}</code> llega al puerto {port}. Con <code>:{port}</code> también funciona.",
     "port": "Escucha en el puerto {port}: <code>{address}</code>",
     "edit": "Editar",
@@ -52,10 +52,16 @@
     "sharedEnvironment": "Los servicios de otros proyectos de este servidor también llegan a él por el nombre de su contenedor. <link>Dale a este entorno su propia red</link>.",
     "projects": "Otros proyectos",
     "projectsHint": "Cerrado por defecto. Permite que un servicio de otro proyecto de este servidor lo llame por nombre.",
+    "linksSwarm": "Los enlaces entre proyectos no están disponibles en servidores Swarm.",
     "linkIn": "{service} de {project} lo llama como <code>{domain}</code>",
     "linkOut": "Llama a {service} de {project} como <code>{domain}</code>",
     "linkOtherServer": "Está en otro servidor, así que el enlace no los conecta.",
     "removeLink": "Cerrar el enlace con {service}",
+    "closeLink": {
+        "title": "¿Cerrar el enlace con {service}?",
+        "body": "{service} pierde ahora sus conexiones con este servicio y no podrá llamarlo por nombre hasta que se vuelva a permitir el enlace y se redesplieguen ambos.",
+        "confirm": "Cerrar enlace"
+    },
     "allow": "Permitir servicio",
     "allowPick": "Servicio de otro proyecto",
     "allowOption": "{service} ({project}, {environment})",
@@ -79,6 +85,8 @@
         "missing": "Ese servicio ya no existe.",
         "sameProject": "Los dos servicios están en este proyecto: ya se llaman por nombre.",
         "otherServer": "Los dos servicios están en servidores distintos, y los nombres privados no los cruzan.",
-        "unreachable": "Su servidor no ha respondido, así que el enlace sigue abierto. Inténtalo cuando esté en línea."
+        "unreachable": "Su servidor no ha respondido, así que el enlace sigue abierto. Inténtalo cuando esté en línea.",
+        "tooMany": "Uno de los dos servicios ya tiene todos los enlaces a otros proyectos que admite. Quita uno antes.",
+        "unsupported": "Este servidor usa Swarm, que no admite enlaces entre proyectos."
     }
 }

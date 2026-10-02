@@ -10,7 +10,18 @@ import { HostdClient } from "@polaris/hostd-client";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
 import { forCompose, isReleaseImage } from "@polaris/deploy";
 import { ImageStoreBusy, LOCAL_MACHINE, withImageUse } from "@/lib/deploy/image-store-lock";
-import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts, WorldTrimOptions } from "@polaris/deploy";
+import type {
+    BuildRequest,
+    ComposeSpec,
+    ExecResult,
+    ExecSpec,
+    ExecStream,
+    LogOptions,
+    MountTarget,
+    OutputSink,
+    RuntimePorts,
+    WorldTrimOptions
+} from "@polaris/deploy";
 
 /** Where the optimizer is put inside the container. The daemon runs this one
  *  path and no other, so the two have to agree on it. */
@@ -129,7 +140,8 @@ export class HostdPorts implements RuntimePorts {
     /** A refusal before any bytes arrive is the daemon's sentence, read here so
      *  it is not mistaken for the start of an archive. */
     public async exportImage(image: string): Promise<NodeJS.ReadableStream> {
-        if (!isReleaseImage(image)) throw new Error("only a kept release image can be sent to another machine");
+        if (!isReleaseImage(image))
+            throw new Error("only a kept release image can be sent to another machine");
         const response = await this.client.imageExport(image);
         const status = response.statusCode ?? 0;
         if (status < 200 || status >= 300) {
@@ -139,7 +151,11 @@ export class HostdPorts implements RuntimePorts {
         return response;
     }
 
-    public async importImage(archive: NodeJS.ReadableStream, size: number, onOutput?: OutputSink): Promise<void> {
+    public async importImage(
+        archive: NodeJS.ReadableStream,
+        size: number,
+        onOutput?: OutputSink
+    ): Promise<void> {
         await withImageUse(LOCAL_MACHINE, async () => {
             const response = await this.client.imageImport(archive, size);
             await drain(response, onOutput);
@@ -151,7 +167,10 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async inspect(ref: string): Promise<unknown> {
-        const response = await this.client.dockerRequest("GET", `/containers/${encodeURIComponent(ref)}/json`);
+        const response = await this.client.dockerRequest(
+            "GET",
+            `/containers/${encodeURIComponent(ref)}/json`
+        );
         if (response.status < 200 || response.status >= 300) {
             throw new Error(`inspect ${ref} failed (${response.status})`);
         }
@@ -174,7 +193,10 @@ export class HostdPorts implements RuntimePorts {
     }
 
     public async container(ref: string, action: "restart" | "stop" | "start"): Promise<void> {
-        const response = await this.client.dockerRequest("POST", `/containers/${encodeURIComponent(ref)}/${action}`);
+        const response = await this.client.dockerRequest(
+            "POST",
+            `/containers/${encodeURIComponent(ref)}/${action}`
+        );
         // 204 = done, 304 = already in that state (start/stop a no-op) - both fine.
         if (response.status !== 204 && response.status !== 304) {
             throw new Error(`${action} ${ref} failed (${response.status})`);
@@ -198,9 +220,17 @@ export class HostdPorts implements RuntimePorts {
      */
     public async listContainers(project: string): Promise<string[]> {
         const names = new Set<string>();
-        for (const label of [`com.docker.compose.project=${project}`, `com.docker.stack.namespace=${project}`]) {
-            const filters = encodeURIComponent(JSON.stringify({ label: [label], status: ["running"] }));
-            const response = await this.client.dockerRequest("GET", `/containers/json?filters=${filters}`);
+        for (const label of [
+            `com.docker.compose.project=${project}`,
+            `com.docker.stack.namespace=${project}`
+        ]) {
+            const filters = encodeURIComponent(
+                JSON.stringify({ label: [label], status: ["running"] })
+            );
+            const response = await this.client.dockerRequest(
+                "GET",
+                `/containers/json?filters=${filters}`
+            );
             if (response.status < 200 || response.status >= 300) continue;
             for (const name of containerNames(response.body)) names.add(name);
         }
@@ -277,15 +307,22 @@ export class HostdPorts implements RuntimePorts {
     ): Promise<ExecResult> {
         const bytes = Buffer.from(script, "utf8");
         await drain(
-            await this.client.fsWriteStream(container, WORLD_TOOL_PATH, Readable.from(bytes), bytes.length)
+            await this.client.fsWriteStream(
+                container,
+                WORLD_TOOL_PATH,
+                Readable.from(bytes),
+                bytes.length
+            )
         );
         const result = await this.client.worldTrim(container, options.world, {
             keepTicks: options.keepTicks,
             keepRadius: options.keepRadius,
             dryRun: options.dryRun
         });
-        if (!result.supported) throw new Error("This machine needs a newer Polaris to optimize a world");
-        if (result.running) throw new Error("The server has to be stopped before its world can be optimized");
+        if (!result.supported)
+            throw new Error("This machine needs a newer Polaris to optimize a world");
+        if (result.running)
+            throw new Error("The server has to be stopped before its world can be optimized");
         return { code: result.code, output: result.output };
     }
 
