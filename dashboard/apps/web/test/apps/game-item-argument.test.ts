@@ -8,7 +8,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { InventoryItem } from "@polaris-app/game-servers/src/lib/minecraft/inventory";
-import { AIR, isMovable, itemArgument, replaceSlot, writableSlots } from "@polaris-app/game-servers/src/lib/minecraft/item-argument";
+import {
+    AIR,
+    isMovable,
+    itemArgument,
+    replaceSlot,
+    writableSlots
+} from "@polaris-app/game-servers/src/lib/minecraft/item-argument";
 
 function stack(overrides: Partial<InventoryItem> = {}): InventoryItem {
     return { slot: 0, id: "minecraft:stone", count: 1, data: null, ...overrides };
@@ -24,7 +30,10 @@ describe("itemArgument", () => {
         // neither. The values cross over untouched.
         const item = stack({
             id: "minecraft:diamond_sword",
-            data: { era: "components", snbt: '{"minecraft:damage": 5, "minecraft:unbreakable": {}}' }
+            data: {
+                era: "components",
+                snbt: '{"minecraft:damage": 5, "minecraft:unbreakable": {}}'
+            }
         });
         expect(itemArgument(item)).toEqual({
             ok: true,
@@ -53,7 +62,9 @@ describe("itemArgument", () => {
         });
         const built = itemArgument(item);
         expect(built.ok).toBe(true);
-        expect(built.ok && built.value).toContain('minecraft:container=[{slot: 0, item: {id: "minecraft:tnt"');
+        expect(built.ok && built.value).toContain(
+            'minecraft:container=[{slot: 0, item: {id: "minecraft:tnt"'
+        );
     });
 
     it("writes an empty component set as an empty bracket pair", () => {

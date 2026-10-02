@@ -166,7 +166,11 @@ export function readFirstAccepted<T>(
     bracket: "[" | "{",
     read: (span: string) => T | null
 ): T | null {
-    for (let index = text.indexOf(bracket); index !== -1; index = text.indexOf(bracket, index + 1)) {
+    for (
+        let index = text.indexOf(bracket);
+        index !== -1;
+        index = text.indexOf(bracket, index + 1)
+    ) {
         const span = readBalanced(text, index);
         if (span === null) continue;
         const value = read(span);

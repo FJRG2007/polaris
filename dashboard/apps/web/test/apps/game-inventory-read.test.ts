@@ -33,7 +33,10 @@ describe("readLiveInventory", () => {
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.answered).toBe(true);
         expect(reading.chunked).toBe(false);
-        expect(reading.items.map((item) => item.id)).toEqual(["minecraft:stone", "minecraft:torch"]);
+        expect(reading.items.map((item) => item.id)).toEqual([
+            "minecraft:stone",
+            "minecraft:torch"
+        ]);
         expect(asked).toEqual([WHOLE_BAG, WORN]);
     });
 
@@ -51,9 +54,18 @@ describe("readLiveInventory", () => {
         // reassemble the rest, so a big bag ends mid-compound. Parsed as it stands
         // that is no stacks at all - a full inventory drawn as an empty one.
         const { ask, asked } = server({
-            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:netherite_helmet", Count: 1b, components: {"min'),
-            "data get entity Alice Inventory[0]": said("Alice", '{Slot: 103b, id: "minecraft:netherite_helmet", Count: 1b}'),
-            "data get entity Alice Inventory[1]": said("Alice", '{Slot: 0b, id: "minecraft:diamond", Count: 12b}')
+            [WHOLE_BAG]: said(
+                "Alice",
+                '[{Slot: 0b, id: "minecraft:netherite_helmet", Count: 1b, components: {"min'
+            ),
+            "data get entity Alice Inventory[0]": said(
+                "Alice",
+                '{Slot: 103b, id: "minecraft:netherite_helmet", Count: 1b}'
+            ),
+            "data get entity Alice Inventory[1]": said(
+                "Alice",
+                '{Slot: 0b, id: "minecraft:diamond", Count: 12b}'
+            )
         });
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.answered).toBe(true);
@@ -72,9 +84,18 @@ describe("readLiveInventory", () => {
 
     it("counts a stack it could not read even alone rather than dropping it", async () => {
         const { ask } = server({
-            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:shulker_box", Count: 1b, components: {"min'),
-            "data get entity Alice Inventory[0]": said("Alice", '{Slot: 0b, id: "minecraft:shulker_box", components: {"min'),
-            "data get entity Alice Inventory[1]": said("Alice", '{Slot: 1b, id: "minecraft:bread", Count: 5b}')
+            [WHOLE_BAG]: said(
+                "Alice",
+                '[{Slot: 0b, id: "minecraft:shulker_box", Count: 1b, components: {"min'
+            ),
+            "data get entity Alice Inventory[0]": said(
+                "Alice",
+                '{Slot: 0b, id: "minecraft:shulker_box", components: {"min'
+            ),
+            "data get entity Alice Inventory[1]": said(
+                "Alice",
+                '{Slot: 1b, id: "minecraft:bread", Count: 5b}'
+            )
         });
         const reading = await readLiveInventory(ask, "Alice");
         expect(reading.unreadable).toBe(1);
@@ -113,7 +134,10 @@ describe("readLiveInventory", () => {
         // A server that answered every index forever must not become an endless
         // loop of round trips.
         const answers: Record<string, string> = {
-            [WHOLE_BAG]: said("Alice", '[{Slot: 0b, id: "minecraft:stone", Count: 1b, components: {"min')
+            [WHOLE_BAG]: said(
+                "Alice",
+                '[{Slot: 0b, id: "minecraft:stone", Count: 1b, components: {"min'
+            )
         };
         for (let index = 0; index < 200; index += 1) {
             answers[`data get entity Alice Inventory[${index}]`] = said(

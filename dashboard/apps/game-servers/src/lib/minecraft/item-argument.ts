@@ -18,7 +18,13 @@
  */
 
 import { splitTopLevel, topLevelColon, unquote } from "./snbt";
-import { ARMOUR_SLOTS, HOTBAR_SLOTS, MAIN_SLOT_ROWS, OFFHAND_SLOT, type InventoryItem } from "./inventory";
+import {
+    ARMOUR_SLOTS,
+    HOTBAR_SLOTS,
+    MAIN_SLOT_ROWS,
+    OFFHAND_SLOT,
+    type InventoryItem
+} from "./inventory";
 
 /**
  * The per-argument ceiling the transport enforces (see `assertSafeArgument` in
@@ -41,7 +47,9 @@ export type ItemArgumentRefusal = "unreadable" | "too-long";
  * `components: {"minecraft:x": v}` and takes `id[minecraft:x=v]`; an older one
  * wrote `tag: {...}` and takes `id{...}` verbatim.
  */
-export function itemArgument(item: InventoryItem): { ok: true; value: string } | { ok: false; why: ItemArgumentRefusal } {
+export function itemArgument(
+    item: InventoryItem
+): { ok: true; value: string } | { ok: false; why: ItemArgumentRefusal } {
     const built = build(item);
     if (built === null) return { ok: false, why: "unreadable" };
     if (built.length > MAX_ARGUMENT_LENGTH) return { ok: false, why: "too-long" };
