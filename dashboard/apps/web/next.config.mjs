@@ -14,6 +14,31 @@ const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
  *  for `headers()`. */
 const FRAMEABLE_EXCEPT_EMBEDS = "/:path((?!cal/embed/).*)";
 
+/**
+ * The only sites a Polaris page may put in a frame: the chat's players
+ * (`EMBED_FRAME_ORIGINS` in `src/lib/chat/embeds.ts`, which a test holds this
+ * list to). Everything else Polaris frames is itself or a `srcdoc` document - a
+ * mail body, a print preview - which `frame-src` does not govern. Written out
+ * rather than imported because this file is read by Node before anything is
+ * compiled.
+ */
+const PLAYER_ORIGINS = [
+    "https://www.youtube-nocookie.com",
+    "https://player.vimeo.com",
+    "https://open.spotify.com",
+    "https://www.tiktok.com",
+    "https://www.instagram.com",
+    "https://platform.twitter.com",
+    "https://player.twitch.tv",
+    "https://clips.twitch.tv",
+    "https://w.soundcloud.com",
+    "https://embed.reddit.com",
+    "https://streamable.com",
+    "https://www.dailymotion.com",
+    "https://geo.dailymotion.com",
+    "https://player.kick.com"
+];
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
     output: "standalone",
@@ -112,12 +137,19 @@ const nextConfig = {
      *
      * The one exception is a published calendar's embed, `/cal/embed/<token>`, whose
      * whole purpose is to be framed by the operator's own website.
+     *
+     * The same policy says what Polaris itself may frame (`frame-src`): its own
+     * pages and the chat's players, and nothing else - so a frame injected into a
+     * page cannot load an arbitrary site inside Polaris.
      */
     headers: async () => [
         {
             source: FRAMEABLE_EXCEPT_EMBEDS,
             headers: [
-                { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+                {
+                    key: "Content-Security-Policy",
+                    value: `frame-ancestors 'self'; frame-src 'self' ${PLAYER_ORIGINS.join(" ")}`
+                },
                 { key: "X-Frame-Options", value: "SAMEORIGIN" }
             ]
         }

@@ -9,7 +9,7 @@
  * that is not published on the network can be reached over SSH from here.
  */
 
-import { utils } from "ssh2";
+import { ed25519Pair } from "./fixtures/ed25519";
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { readPrivateKey, SshKeyError } from "@/lib/data/ssh-key";
@@ -235,7 +235,7 @@ describe("the connection form", () => {
         await userEvent.click(screen.getByRole("radio", { name: "Private key" }));
 
         const passphrase = "correct horse battery staple";
-        const pair = utils.generateKeyPairSync("ed25519", {
+        const pair = ed25519Pair({
             passphrase,
             cipher: "aes256-ctr",
             rounds: 16

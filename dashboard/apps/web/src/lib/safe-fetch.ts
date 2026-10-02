@@ -223,6 +223,38 @@ export async function follow(
     accept = "text/html,application/xhtml+xml",
     sent?: SentBody
 ): Promise<GuardedResponse | null> {
+    return (await walk(start, accept, sent, null))?.response ?? null;
+}
+
+/**
+ * Where a link leads, without reading what is there.
+ *
+ * For the short links a site's share button hands out (`vm.tiktok.com/...`),
+ * which name nothing until they are followed. The hops are the same checked hops
+ * `follow` takes; the walk stops at the first address `arrived` accepts, before
+ * asking it anything, so learning where a share link points costs the redirects
+ * and never the page. An address that answers without redirecting is where it
+ * leads too, and its body is left unread.
+ */
+export async function whereLeads(start: URL, arrived: (url: URL) => boolean): Promise<URL | null> {
+    const walked = await walk(start, "text/html,application/xhtml+xml", undefined, arrived);
+    if (!walked) return null;
+    await walked.response?.body?.cancel().catch(() => undefined);
+    if (walked.response && !walked.response.ok) return null;
+    return walked.url;
+}
+
+/**
+ * The hop loop behind `follow` and `whereLeads`: the response it ended on and
+ * the address that answered it, or - when `arrived` stopped it - no response and
+ * the address it stopped at.
+ */
+async function walk(
+    start: URL,
+    accept: string,
+    sent: SentBody | undefined,
+    arrived: ((url: URL) => boolean) | null
+): Promise<{ response: GuardedResponse | null; url: URL } | null> {
     let url = start;
     /** Dropped on the redirects that mean "go and GET this instead". A 301, 302
      *  or 303 answering a POST is every client's cue to stop posting; only 307
@@ -260,10 +292,10 @@ export async function follow(
             return null;
         }
 
-        if (response.status < 300 || response.status >= 400) return response;
+        if (response.status < 300 || response.status >= 400) return { response, url };
 
         const next = response.headers.get("location");
-        if (!next) return response;
+        if (!next) return { response, url };
         if (response.status !== 307 && response.status !== 308) posting = false;
         try {
             url = new URL(next, url);
@@ -273,6 +305,7 @@ export async function follow(
         const checked = safeUrl(url.href);
         if (!checked) return null;
         url = checked;
+        if (arrived?.(url)) return (await reachable(url.hostname)) ? { response: null, url } : null;
     }
     return null;
 }

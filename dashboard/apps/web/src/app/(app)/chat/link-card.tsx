@@ -60,7 +60,9 @@ export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["pr
     // read before anything is painted, so the card does not arrive as a player
     // and then shrink.
     const secure = useSyncExternalStore(neverChanges, isSecure, assumeSecure);
-    const playable = embedFor(preview.url);
+    // A share link is played from where it led, which the server followed for
+    // it; the card itself still opens what was posted.
+    const playable = embedFor(preview.target ?? preview.url);
     const embed = playable && (!playable.needsParent || secure) ? playable : null;
 
     // The edge takes the site's own colour when it has published a usable one,

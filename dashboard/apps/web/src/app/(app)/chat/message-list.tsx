@@ -1130,8 +1130,16 @@ function Message({
                         <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-border" />
                         <button
                             type="button"
-                            aria-label={message.starred ? t("messageList.removeFromSaved") : t("messageList.saveThisMessage")}
-                            title={message.starred ? t("messageList.removeFromSaved") : t("messageList.save")}
+                            aria-label={
+                                message.starred
+                                    ? t("messageList.removeFromSaved")
+                                    : t("messageList.saveThisMessage")
+                            }
+                            title={
+                                message.starred
+                                    ? t("messageList.removeFromSaved")
+                                    : t("messageList.save")
+                            }
                             onClick={() => onStar(message)}
                             className={cn(
                                 "rounded p-1 transition-colors hover:bg-muted",
@@ -1270,7 +1278,11 @@ function KeepableImage({
                 type="button"
                 disabled={busy}
                 aria-pressed={kept === true}
-                aria-label={kept ? t("messageList.stopKeepingThisPicture") : t("messageList.keepThisPicture")}
+                aria-label={
+                    kept
+                        ? t("messageList.stopKeepingThisPicture")
+                        : t("messageList.keepThisPicture")
+                }
                 title={kept ? t("messageList.keptItIsInYour") : t("messageList.keepThis")}
                 onClick={() => void toggle()}
                 className={cn(
@@ -1553,7 +1565,9 @@ function QuoteLine({
     const body = (
         <>
             <CornerUpLeft className="size-3 shrink-0" />
-            {quote.forwarded && <span className="shrink-0 font-medium">{t("messageList.forwardedFrom")}</span>}
+            {quote.forwarded && (
+                <span className="shrink-0 font-medium">{t("messageList.forwardedFrom")}</span>
+            )}
             <span className="shrink-0 font-medium text-foreground">
                 {quote.authorName ?? t("messageList.somebodyWhoHasLeft")}
             </span>
@@ -1719,6 +1733,7 @@ function LinkArea({ message }: { message: ChatMessageView }) {
                 preview={{
                     id: "",
                     url: message.link,
+                    target: null,
                     title: "",
                     author: "",
                     accent: null,

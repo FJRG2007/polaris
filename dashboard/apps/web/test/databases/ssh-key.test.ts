@@ -8,6 +8,7 @@
  */
 
 import { utils } from "ssh2";
+import { ed25519Pair } from "./fixtures/ed25519";
 import * as crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -64,7 +65,7 @@ function blobOf(publicKey: crypto.KeyObject): Buffer {
 
 describe("keys ssh2 reads as they are", () => {
     it("takes an OpenSSH Ed25519 key", () => {
-        const pair = utils.generateKeyPairSync("ed25519");
+        const pair = ed25519Pair();
         const read = readPrivateKey(pair.private, null);
         expect(read.type).toBe("ssh-ed25519");
         expect(read.converted).toBe(false);

@@ -19,11 +19,14 @@
  * answer is reached on the server and in the browser and it can be tested
  * without either.
  *
- * What is deliberately *not* here: the short links a site hands out from its
- * share button (`vm.tiktok.com`, `on.soundcloud.com`, `redd.it`, Reddit's
- * `/s/` links). They name nothing on their own - the thing they point at is only
- * known by following the redirect, and a player is never built from somewhere
- * Polaris has not checked. Those get the ordinary card, which is still correct.
+ * The short links a site hands out from its share button (`vm.tiktok.com`,
+ * `on.soundcloud.com`, `spotify.link`, `redd.it`, Reddit's `/s/` links) name
+ * nothing on their own - the thing they point at is only known by following the
+ * redirect. `isShareLink` recognises them so the server can follow them once,
+ * through the same checked fetch as every unfurl, and store where they led
+ * (`landingOf`); the player is then built from that address, by the same rules
+ * as one posted directly. A player is never built from somewhere Polaris has not
+ * checked.
  */
 
 /**
@@ -205,6 +208,65 @@ const STREAMABLE_PAGES = new Set([
 /** A Dailymotion id always starts with an x. */
 const DAILYMOTION_ID = /^x[A-Za-z0-9]{3,12}$/;
 
+/** A Kick channel's name, and the first segments on kick.com that are Kick's
+ *  own pages rather than somebody's channel. */
+const KICK_CHANNEL = /^[A-Za-z0-9_-]{3,25}$/;
+const KICK_PAGES = new Set([
+    "browse",
+    "categories",
+    "category",
+    "following",
+    "search",
+    "settings",
+    "dashboard",
+    "subscriptions",
+    "messages",
+    "notifications",
+    "about",
+    "contact",
+    "careers",
+    "community-guidelines",
+    "terms-of-service",
+    "privacy-policy",
+    "dmca-policy",
+    "cookie-policy",
+    "creators",
+    "help",
+    "video",
+    "clips",
+    "login",
+    "signup",
+    "embed",
+    "popout"
+]);
+
+/** The code at the end of a share link: letters and digits, nothing else. */
+const SHARE_CODE = /^[A-Za-z0-9_-]{3,40}$/;
+
+/**
+ * Every origin a player built here is loaded from, including the one a player
+ * redirects to on its own (Dailymotion's embed answers with its newer player on
+ * `geo.dailymotion.com`). This is the whole of what Polaris' `frame-src` lets a
+ * page frame besides itself - next.config.mjs carries the same list, and a test
+ * holds the two and the builders above to each other.
+ */
+export const EMBED_FRAME_ORIGINS: readonly string[] = [
+    "https://www.youtube-nocookie.com",
+    "https://player.vimeo.com",
+    "https://open.spotify.com",
+    "https://www.tiktok.com",
+    "https://www.instagram.com",
+    "https://platform.twitter.com",
+    "https://player.twitch.tv",
+    "https://clips.twitch.tv",
+    "https://w.soundcloud.com",
+    "https://embed.reddit.com",
+    "https://streamable.com",
+    "https://www.dailymotion.com",
+    "https://geo.dailymotion.com",
+    "https://player.kick.com"
+];
+
 /**
  * The player for an address, or null when there is none.
  *
@@ -269,9 +331,67 @@ export function embedFor(address: string): Embed | null {
             return dailymotion(parts, url);
         case "dai.ly":
             return dailymotionVideo(parts[0] ?? "");
+        case "kick.com":
+        case "m.kick.com":
+            return kick(parts);
         default:
             return null;
     }
+}
+
+/**
+ * Whether an address is a share-button short link: one that names nothing until
+ * it is followed, and that the server should follow (once, checked, cached)
+ * before deciding what the link is.
+ *
+ * Only the exact shapes each site hands out. A short-link host is not a reason
+ * to follow anything posted on it - `vm.tiktok.com/a/b/c` is not a share link.
+ */
+export function isShareLink(address: string): boolean {
+    const url = parsed(address);
+    if (!url) return false;
+    const host = hostOf(url);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const [first = "", second = "", third = "", fourth = ""] = parts;
+
+    switch (host) {
+        case "vm.tiktok.com":
+        case "vt.tiktok.com":
+        case "on.soundcloud.com":
+        case "spotify.link":
+        case "redd.it":
+            return parts.length === 1 && SHARE_CODE.test(first);
+        case "tiktok.com":
+        case "m.tiktok.com":
+            return parts.length === 2 && first === "t" && SHARE_CODE.test(second);
+        case "reddit.com":
+        case "old.reddit.com":
+        case "new.reddit.com":
+        case "m.reddit.com":
+            return (
+                parts.length === 4 &&
+                first === "r" &&
+                SUBREDDIT.test(second) &&
+                third === "s" &&
+                SHARE_CODE.test(fourth)
+            );
+        default:
+            return false;
+    }
+}
+
+/**
+ * What is kept of the address a share link led to: the page, without the query.
+ *
+ * The query a share link lands on is the sharer's - `u_code`, `share_item_id`,
+ * `sender_device`, `si` - and none of it is needed to say what the thing is: every
+ * destination these short links lead to is named by its path. Keeping it would be
+ * storing who shared the link, and handing it to the site again on every play.
+ */
+export function landingOf(address: string): string | null {
+    const url = parsed(address);
+    if (!url) return null;
+    return `${url.protocol}//${url.host}${url.pathname}`;
 }
 
 /**
@@ -657,6 +777,24 @@ function dailymotion(parts: string[], url: URL): Embed | null {
         return dailymotionVideo(url.searchParams.get("video") ?? "");
     }
     return null;
+}
+
+/**
+ * A Kick channel, live. Kick's player is documented only for a channel's live
+ * stream (`player.kick.com/<channel>`); a past broadcast or a clip on Kick has no
+ * player of Kick's own to put in a frame, so those get the card.
+ */
+function kick(parts: string[]): Embed | null {
+    const [channel = ""] = parts;
+    if (parts.length !== 1 || KICK_PAGES.has(channel.toLowerCase())) return null;
+    if (!KICK_CHANNEL.test(channel)) return null;
+    return {
+        provider: "Kick",
+        url: `https://player.kick.com/${channel.toLowerCase()}`,
+        shape: "video",
+        start: "autoplay=true",
+        needsParent: false
+    };
 }
 
 function dailymotionVideo(id: string): Embed | null {
