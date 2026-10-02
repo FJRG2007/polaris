@@ -36,6 +36,7 @@ import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
 import { DeployBehaviourSection } from "./deploy-behaviour-section";
+import { PrivateNetworkPanel, privateNetworkAnchor } from "./private-network-panel";
 import { useDisplayFormat } from "@/components/display-format";
 import { TabAttentionDot, tabAttention } from "./attention-dot";
 import { DesktopServiceActions } from "@/components/desktop-app";
@@ -3138,6 +3139,8 @@ function SettingsTab({
                 </section>
             )}
 
+            <PrivateNetworkPanel kind="application" id={app.id} />
+
             {can("domains.manage") && (
                 <section className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
@@ -3511,7 +3514,7 @@ function SettingsTab({
                             </div>
                         </div>
                     </MethodBlock>
-                    <publicNet.PrivateNetworkingLink />
+                    <publicNet.PrivateNetworkingLink targetId={privateNetworkAnchor(app.id)} />
                 </section>
             )}
 

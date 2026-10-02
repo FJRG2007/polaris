@@ -554,6 +554,20 @@ export function DeployCanvas({
         return { x: p.x + NODE_W / 2, y: p.y + NODE_H / 2 };
     };
 
+    // The variable references between services, drawn under the links made by
+    // hand; one already drawn by hand is not drawn twice.
+    const referenceLines = (environment.referenceEdges ?? []).filter(
+        (edge) =>
+            nodeIds.has(edge.source) &&
+            nodeIds.has(edge.target) &&
+            !links.some(
+                (link) =>
+                    (link.source === edge.source && link.target === edge.target) ||
+                    (link.source === edge.target && link.target === edge.source)
+            )
+    );
+    const nameOf = (id: string): string => nodes.find((node) => node.id === id)?.name ?? "";
+
     // The link handle sits on the node's right edge, vertically centered - the
     // in-progress drag line starts there, not from the card centre.
     const handlePoint = (id: string): Point => {
@@ -692,6 +706,30 @@ export function DeployCanvas({
                                 width={extent.w}
                                 height={extent.h}
                             >
+                                {referenceLines.map((line) => {
+                                    const a = center(line.source);
+                                    const b = center(line.target);
+                                    const midX = (a.x + b.x) / 2;
+                                    return (
+                                        <path
+                                            key={`ref-${line.source}-${line.target}`}
+                                            d={`M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`}
+                                            fill="none"
+                                            stroke="hsl(var(--primary) / 0.55)"
+                                            strokeWidth={1.5}
+                                            strokeDasharray="6 5"
+                                            strokeLinecap="round"
+                                            className="pointer-events-auto"
+                                        >
+                                            <title>
+                                                {t("canvas.referenceLine", {
+                                                    source: nameOf(line.source),
+                                                    target: nameOf(line.target)
+                                                })}
+                                            </title>
+                                        </path>
+                                    );
+                                })}
                                 {links.map((link, index) => {
                                     const a = center(link.source);
                                     const b = center(link.target);

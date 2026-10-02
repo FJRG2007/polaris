@@ -24,9 +24,15 @@ import * as core from "@polaris/core";
 import { slugify } from "@polaris/deploy";
 import { scopeValues } from "./env-values";
 import { currentReleaseRef } from "./releases";
+import { containerPortOf, referencedDomain } from "./private-names";
 
 /** The variables a service is described by, besides the ones set on it. */
-const SERVICE_KEYS = ["POLARIS_PRIVATE_DOMAIN", "PORT", "POLARIS_PUBLIC_DOMAIN", "POLARIS_PUBLIC_URL"] as const;
+const SERVICE_KEYS = [
+    "POLARIS_PRIVATE_DOMAIN",
+    "PORT",
+    "POLARIS_PUBLIC_DOMAIN",
+    "POLARIS_PUBLIC_URL"
+] as const;
 
 interface Scope {
     readonly environmentId: string;
@@ -73,7 +79,8 @@ export async function resolveServiceReferences(
 
 function namesIn(texts: Iterable<string>): Set<string> {
     const names = new Set<string>();
-    for (const text of texts) for (const reference of core.referencesIn(text)) names.add(reference.name);
+    for (const text of texts)
+        for (const reference of core.referencesIn(text)) names.add(reference.name);
     return names;
 }
 
@@ -86,7 +93,8 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
         texts.push(...Object.values(record));
     };
 
-    if (names.has("shared")) remember("shared", await scopeValues("environment", scope.environmentId));
+    if (names.has("shared"))
+        remember("shared", await scopeValues("environment", scope.environmentId));
 
     const wanted = [...names].filter((name) => name !== "shared");
     if (wanted.length === 0) return texts;
@@ -101,6 +109,8 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
                 sourceType: true,
                 sourceConfig: true,
                 currentDeploymentId: true,
+                privateNetwork: true,
+                target: { select: { kind: true, hostId: true } },
                 environment: { select: { project: { select: { slug: true } } } },
                 domains: {
                     where: { enabled: true, deploymentId: null },
@@ -111,12 +121,23 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
         }),
         prisma.managedDatabase.findMany({
             where: { environmentId: scope.environmentId },
-            select: { id: true, slug: true, name: true, engine: true }
+            select: {
+                id: true,
+                slug: true,
+                name: true,
+                engine: true,
+                containerName: true,
+                privateNetwork: true,
+                parentId: true,
+                target: { select: { kind: true, hostId: true } }
+            }
         })
     ]);
 
     for (const name of wanted) {
-        const application = applications.find((one) => one.slug === name || slugify(one.name) === name);
+        const application = applications.find(
+            (one) => one.slug === name || slugify(one.name) === name
+        );
         if (application) {
             remember(name, {
                 ...(await scopeValues("application", application.id)),
@@ -128,14 +149,29 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
         if (database) {
             // Cycle: database-service reaches the deploy service, which reaches this.
             const { databaseConnection } = await import("@/lib/database-service");
-            const connection = await databaseConnection(database.id, scope.ownerId).catch(() => null);
+            const connection = await databaseConnection(database.id, scope.ownerId).catch(
+                () => null
+            );
             // A database never deployed has no address yet; the reference stays
             // unresolved and the refusal says which one.
             if (connection) {
-                remember(
-                    name,
-                    core.databaseReferenceKeys({ engine: database.engine, ...connection, clusterNodes: connection.cluster?.nodes })
-                );
+                remember(name, {
+                    ...core.databaseReferenceKeys({
+                        engine: database.engine,
+                        ...connection,
+                        clusterNodes: connection.cluster?.nodes
+                    }),
+                    // A database inside another instance is reached through that
+                    // instance's container, so it has no name of its own.
+                    ...(database.parentId
+                        ? {}
+                        : {
+                              POLARIS_PRIVATE_DOMAIN: referencedDomain(
+                                  database,
+                                  database.containerName || connection.host
+                              )
+                          })
+                });
             }
         }
     }
@@ -149,22 +185,18 @@ async function describeService(application: {
     sourceType: string;
     sourceConfig: string;
     currentDeploymentId: string | null;
+    privateNetwork: string;
+    target: { kind: string; hostId: string | null };
     environment: { project: { slug: string } };
     domains: { hostname: string; kind: string; targetPort: number }[];
 }): Promise<Record<(typeof SERVICE_KEYS)[number], string>> {
     const release = await currentReleaseRef(application);
-    let port: number | undefined;
-    try {
-        const source = JSON.parse(application.sourceConfig) as Record<string, unknown>;
-        if (typeof source.port === "number") port = source.port;
-    } catch {
-        // A service whose stored config cannot be read falls back to its domain.
-    }
     const domain = application.domains.find((one) => one.kind !== "lan") ?? application.domains[0];
-    const containerPort = port ?? domain?.targetPort ?? (application.sourceType === "image" ? 80 : 3000);
     return {
-        POLARIS_PRIVATE_DOMAIN: release.address,
-        PORT: String(containerPort),
+        // Its private name once its container answers to it; until then the
+        // container name, so a dependant deployed first still reaches it.
+        POLARIS_PRIVATE_DOMAIN: referencedDomain(application, release.address),
+        PORT: String(containerPortOf(application)),
         POLARIS_PUBLIC_DOMAIN: domain?.hostname ?? "",
         POLARIS_PUBLIC_URL: domain ? `https://${domain.hostname}` : ""
     };

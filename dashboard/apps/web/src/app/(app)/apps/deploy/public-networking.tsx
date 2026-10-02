@@ -10,9 +10,7 @@
  * domain" selector and its list of domains.
  */
 
-import Link from "next/link";
 import * as deployActions from "./actions";
-import { useParams } from "next/navigation";
 import * as netActions from "./public-networking-actions";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -633,18 +631,19 @@ export function TcpProxyList({
     );
 }
 
-/** Where private networking lives, from the public panel: the environment's
- *  network settings, in the project's environments section. */
-export function PrivateNetworkingLink() {
+/** Where private networking lives, from the public panel: the service's own
+ *  Private networking panel, a little further up the same tab. */
+export function PrivateNetworkingLink({ targetId }: { targetId: string }) {
     const t = useTranslations("deployService");
-    const params = useParams<{ projectId?: string }>();
-    if (!params?.projectId) return null;
     return (
-        <Link
-            href={`/apps/deploy/${params.projectId}/settings/environments`}
+        <button
+            type="button"
+            onClick={() =>
+                document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
             className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
         >
             <Network className="size-3.5" /> {t("publicNet.privateLink")}
-        </Link>
+        </button>
     );
 }

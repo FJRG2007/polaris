@@ -5,8 +5,9 @@
 //! The security boundary is a *structured* deploy spec, not free-form compose
 //! YAML. The web container sends a JSON `DeploySpec` (serde, `deny_unknown_fields`)
 //! that can only express safe shapes - there is no `privileged`, `cap_add`,
-//! `network_mode: host`, or arbitrary bind field to smuggle - and this daemon
-//! validates every value and renders the compose file itself. Bind mounts are
+//! `network_mode: host` (only `service:<sibling>`), or arbitrary bind field to
+//! smuggle - and this daemon validates every value and renders the compose file
+//! itself. Bind mounts are
 //! confined under the volume root; images, names, env, and labels are charset-
 //! checked. Even a fully compromised web container can therefore deploy only
 //! Polaris-shaped containers, never escalate to host root.
@@ -23,6 +24,7 @@ use std::thread;
 use serde::Deserialize;
 
 use crate::config::Config;
+use crate::networks;
 use crate::security::{self, PathError};
 
 /// A deploy request: one compose project made of one or more services.
@@ -82,6 +84,12 @@ pub struct ServiceSpec {
     /// short name like `api` would answer for another project's service too.
     #[serde(default)]
     pub network_aliases: BTreeMap<String, Vec<String>>,
+    /// Joins the network namespace of another service of the same spec
+    /// (`service:<name>`) instead of networks of its own: the forwarder that lets
+    /// a service be reached on port 80 by name, whatever port it listens on.
+    /// Nothing else is accepted - never the host's, never another project's.
+    #[serde(default)]
+    pub network_mode: Option<String>,
     /// Names this container can reach that DNS cannot answer, as `name:address`.
     /// Always carries `host.docker.internal:host-gateway`: a container Polaris
     /// starts routinely talks to something the host publishes - the camera relay,
@@ -227,10 +235,52 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
                     service.name
                 ));
             }
+            // Never on a network of Polaris's own - the proxy network, the stack's,
+            // an environment's - where Polaris's containers resolve names: a name
+            // somebody chose must not answer a lookup the dashboard or the edge
+            // makes. A names network carries nothing else, so it may.
+            if net.to_ascii_lowercase().starts_with("polaris") && !networks::is_names_network(net) {
+                return Err(format!(
+                    "aliases for {} cannot go on {net}, a network Polaris's own containers use",
+                    service.name
+                ));
+            }
+            if aliases.len() > MAX_NETWORK_ALIASES {
+                return Err(format!("too many aliases for {} on {net}", service.name));
+            }
             for alias in aliases {
-                if !valid_name(alias) {
+                let valid = if networks::is_names_network(net) {
+                    valid_dns_name(alias)
+                } else {
+                    valid_name(alias)
+                };
+                if !valid {
                     return Err(format!("invalid network alias: {alias}"));
                 }
+            }
+        }
+        if let Some(mode) = &service.network_mode {
+            let sibling = mode.strip_prefix("service:").unwrap_or("");
+            let known = spec
+                .services
+                .iter()
+                .any(|other| other.name == sibling && other.name != service.name);
+            if !known {
+                return Err(format!(
+                    "{} can only share the network of another service of this deploy",
+                    service.name
+                ));
+            }
+            if !service.networks.is_empty()
+                || !service.ports.is_empty()
+                || !service.aliases.is_empty()
+                || !service.network_aliases.is_empty()
+                || !service.extra_hosts.is_empty()
+            {
+                return Err(format!(
+                    "{} shares another service's network and cannot have networks, ports or names of its own",
+                    service.name
+                ));
             }
         }
         for dep in &service.depends_on {
@@ -376,6 +426,9 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
             "    container_name: {}\n",
             yaml_quote(&service.name)
         ));
+        if let Some(mode) = &service.network_mode {
+            out.push_str(&format!("    network_mode: {}\n", yaml_quote(mode)));
+        }
         if let Some(policy) = &service.pull_policy {
             out.push_str(&format!("    pull_policy: {}\n", yaml_quote(policy)));
         }
@@ -539,6 +592,25 @@ pub fn valid_project(name: &str) -> bool {
 }
 
 /// Docker object name: starts alphanumeric, then `[a-z0-9_.-]`, max 64.
+/// The most aliases one service may answer to on one network.
+const MAX_NETWORK_ALIASES: usize = 32;
+
+/// A DNS name as a private name must be: dot-separated labels of lowercase
+/// letters, digits and inner hyphens, each 1-63 long, 253 in all.
+pub fn valid_dns_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 253
+        && name.split('.').all(|label| {
+            !label.is_empty()
+                && label.len() <= 63
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        })
+}
+
 pub fn valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     match chars.next() {
@@ -1527,6 +1599,68 @@ mod tests {
             r#"{"project":"p","services":[{"name":"web","image":"nginx","networks":["app_network"],"networkAliases":{"app_network":["not valid"]}}]}"#,
         );
         assert!(validate_spec(&bad, &config).is_err());
+    }
+
+    #[test]
+    fn private_names_never_ride_on_a_network_polaris_uses() {
+        let config = test_config();
+        let named = spec(
+            r#"{"project":"p","services":[{"name":"api-abcd","image":"nginx","networks":["polaris-proxy","polaris-net-n0123456789"],"networkAliases":{"polaris-net-n0123456789":["api","api.polaris.internal"]}}],"networks":["polaris-proxy","polaris-net-n0123456789"]}"#,
+        );
+        assert!(validate_spec(&named, &config).is_ok());
+        let rendered = render_compose(&named, &config);
+        assert!(rendered.contains("      polaris-proxy: {}\n"));
+        assert!(rendered.contains(
+            "      polaris-net-n0123456789:\n        aliases:\n          - \"api\"\n          - \"api.polaris.internal\"\n"
+        ));
+
+        // Never on the shared network, the stack's own, or an environment network
+        // the dashboard and the edge are attached to.
+        for net in [
+            "polaris-proxy",
+            "polaris_default",
+            "polaris-hub",
+            "polaris-net-e0123456789",
+        ] {
+            let leaked = spec(&format!(
+                r#"{{"project":"p","services":[{{"name":"api","image":"nginx","networks":["{net}"],"networkAliases":{{"{net}":["api"]}}}}],"networks":["{net}"]}}"#
+            ));
+            assert!(validate_spec(&leaked, &config).is_err(), "{net}");
+        }
+        // On a names network, only a name DNS would answer.
+        for bad in ["Api", "-api", "api-", "a_b", "a..b", ""] {
+            let invalid = spec(&format!(
+                r#"{{"project":"p","services":[{{"name":"api","image":"nginx","networks":["polaris-net-n0123456789"],"networkAliases":{{"polaris-net-n0123456789":["{bad}"]}}}}]}}"#
+            ));
+            assert!(validate_spec(&invalid, &config).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_forwarder_only_shares_a_sibling_network() {
+        let config = test_config();
+        let ok = spec(
+            r#"{"project":"p","services":[{"name":"api","image":"nginx","networks":["polaris-proxy"]},{"name":"api-p80","image":"alpine/socat","networkMode":"service:api","dependsOn":["api"]}],"networks":["polaris-proxy"]}"#,
+        );
+        assert!(validate_spec(&ok, &config).is_ok());
+        assert!(render_compose(&ok, &config).contains("    network_mode: \"service:api\"\n"));
+        for mode in [
+            "host",
+            "service:api-p80",
+            "service:other",
+            "container:api",
+            "none",
+            "bridge",
+        ] {
+            let refused = spec(&format!(
+                r#"{{"project":"p","services":[{{"name":"api","image":"nginx"}},{{"name":"api-p80","image":"alpine/socat","networkMode":"{mode}"}}]}}"#
+            ));
+            assert!(validate_spec(&refused, &config).is_err(), "{mode}");
+        }
+        let own_ports = spec(
+            r#"{"project":"p","services":[{"name":"api","image":"nginx"},{"name":"api-p80","image":"alpine/socat","networkMode":"service:api","ports":[{"host":8080,"container":80}]}]}"#,
+        );
+        assert!(validate_spec(&own_ports, &config).is_err());
     }
 
     #[test]

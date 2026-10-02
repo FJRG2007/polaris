@@ -18,6 +18,7 @@ import {
     withImageUse
 } from "@/lib/deploy/image-store-lock";
 import {
+    cutLinkNetworkScript,
     ensurePrivateNetworksScript,
     forCompose,
     isReleaseImage,
@@ -295,6 +296,12 @@ export class SshPorts implements RuntimePorts {
                     });
                 })
         );
+    }
+
+    /** The daemon's `cut`, as an SSH session runs it: fails unless the link's
+     *  network is left with nothing on it. */
+    public async cutNetwork(name: string): Promise<void> {
+        await this.run(cutLinkNetworkScript(name).join("; "));
     }
 
     public async inspectImage(image: string): Promise<number[]> {

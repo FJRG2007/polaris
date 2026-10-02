@@ -18,6 +18,13 @@
 //! the same compose project - so the data browser can still open a database that
 //! has left the shared network, and the edge can still dial a service by name.
 //! Nothing an app sends can name any other container or any other network.
+//!
+//! Three more kinds carry a service's private names (`<name>.polaris.internal`
+//! and the bare `<name>`): one per environment (`n`), one per service in a
+//! linked environment (`p`), and one per link between two projects (`x`). Those
+//! names are chosen by whoever owns the service, so Polaris's own containers are
+//! never attached to them: a stack container that resolves `postgres` must find
+//! the stack's database, never a service somebody called `postgres`.
 
 use std::process::{Command, Stdio};
 
@@ -38,15 +45,74 @@ const FALLBACK_OCTET_B: u8 = 211;
 const FALLBACK_ATTEMPTS: u32 = 32;
 
 /// A private network name as the dashboard mints them: the prefix, one letter for
-/// what it scopes (`e` an environment, `s` a service), and ten hex characters.
+/// what it scopes (`e` an environment, `s` a service, `n` an environment's
+/// names, `p` a service's names, `x` a link between two projects), and ten hex
+/// characters.
 pub fn is_private_network(name: &str) -> bool {
     let Some(rest) = name.strip_prefix(PREFIX) else {
         return false;
     };
     let mut chars = rest.chars();
-    matches!(chars.next(), Some('e' | 's'))
+    matches!(chars.next(), Some('e' | 's' | 'n' | 'p' | 'x'))
         && rest.len() == 11
         && chars.all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
+}
+
+/// Whether a private network carries names its owner chose, which Polaris's own
+/// containers are never attached to (see the module notes).
+pub fn is_names_network(name: &str) -> bool {
+    is_private_network(name)
+        && matches!(name.as_bytes().get(PREFIX.len()), Some(b'n' | b'p' | b'x'))
+}
+
+/// Whether a network is the one a link between two projects runs over - the only
+/// kind `cut` acts on.
+pub fn is_link_network(name: &str) -> bool {
+    is_names_network(name) && name.as_bytes().get(PREFIX.len()) == Some(&b'x')
+}
+
+/// Close a link between two projects now: every container on its network is
+/// disconnected from it, so the two services stop reaching each other at once
+/// rather than on their next deploy. The network itself is left, empty, for the
+/// reconcile to remove; a container that is restarted does not rejoin it, since
+/// a disconnect also drops it from the container's own settings. A network that
+/// is not there is nothing to close.
+pub fn cut(name: &str) -> Result<usize, String> {
+    if !is_link_network(name) {
+        return Err("only a link network can be cut".into());
+    }
+    if !exists(name) {
+        return Ok(0);
+    }
+    let Some(attached) = attached_ids(name) else {
+        return Err(format!("could not read who is on {name}"));
+    };
+    for id in &attached {
+        let (ok, said) = docker(&[
+            "network".to_string(),
+            "disconnect".to_string(),
+            "-f".to_string(),
+            name.to_string(),
+            id.clone(),
+        ]);
+        if !ok {
+            return Err(format!(
+                "could not disconnect a container from {name}: {}",
+                said.trim()
+            ));
+        }
+    }
+    // Read back: what decides whether access is closed is who is still on it.
+    match attached_ids(name) {
+        Some(left) if left.is_empty() => Ok(attached.len()),
+        _ => Err(format!("{name} still has containers on it")),
+    }
+}
+
+/// Whether Polaris's own containers join a private network: the environment and
+/// service networks, which carry only container names Polaris minted.
+fn stack_joins(name: &str) -> bool {
+    is_private_network(name) && !is_names_network(name)
 }
 
 /// FNV-1a over the name, so a network asks for the same fallback range every time
@@ -78,8 +144,10 @@ fn subnet_taken(said: &str) -> bool {
     said.to_ascii_lowercase().contains("overlap")
 }
 
-/// The arguments that create one private network.
-pub fn create_args(name: &str, swarm: bool, subnet: Option<&str>) -> Vec<String> {
+/// The arguments that create one private network. `ipv6` asks a bridge for dual
+/// stack, with Docker choosing a unique local prefix for it; an overlay is never
+/// asked, since swarm refuses IPv6 without a prefix given to it.
+pub fn create_args(name: &str, swarm: bool, subnet: Option<&str>, ipv6: bool) -> Vec<String> {
     let mut args = vec![
         "network".to_string(),
         "create".to_string(),
@@ -92,6 +160,9 @@ pub fn create_args(name: &str, swarm: bool, subnet: Option<&str>) -> Vec<String>
         args.extend(["--driver", "overlay", "--attachable"].map(String::from));
     } else {
         args.extend(["--driver", "bridge"].map(String::from));
+        if ipv6 {
+            args.push("--ipv6".to_string());
+        }
     }
     if let Some(subnet) = subnet {
         args.push("--subnet".to_string());
@@ -127,8 +198,16 @@ fn exists(name: &str) -> bool {
 }
 
 /// Create one network, falling back to explicit subnets when Docker has none left.
+///
+/// A bridge is asked for dual stack first. An engine that cannot give it one - too
+/// old to pick an IPv6 prefix by itself, or with IPv6 turned off - refuses, and the
+/// network is made IPv4-only exactly as before; what it ended up with is reported
+/// by `reconcile`, so the dashboard never claims IPv6 a network does not have.
 fn create(name: &str, swarm: bool) -> Result<(), String> {
-    let (ok, said) = docker(&create_args(name, swarm, None));
+    if !swarm && docker(&create_args(name, false, None, true)).0 {
+        return Ok(());
+    }
+    let (ok, said) = docker(&create_args(name, swarm, None, false));
     if ok || exists(name) {
         return Ok(());
     }
@@ -144,13 +223,13 @@ fn create(name: &str, swarm: bool) -> Result<(), String> {
         "--filter".to_string(),
         format!("label={LABEL}"),
     ]);
-    let (ok, _) = docker(&create_args(name, swarm, None));
+    let (ok, _) = docker(&create_args(name, swarm, None, false));
     if ok {
         return Ok(());
     }
     for attempt in 0..FALLBACK_ATTEMPTS {
         let subnet = fallback_subnet(name, attempt);
-        let (ok, said) = docker(&create_args(name, swarm, Some(&subnet)));
+        let (ok, said) = docker(&create_args(name, swarm, Some(&subnet), false));
         if ok {
             return Ok(());
         }
@@ -258,12 +337,18 @@ pub fn ensure(networks: &[String], swarm: bool) -> Result<(), String> {
     if private.is_empty() {
         return Ok(());
     }
-    let stack = stack_container_ids();
+    let stack = if private.iter().any(|name| stack_joins(name)) {
+        stack_container_ids()
+    } else {
+        Vec::new()
+    };
     for name in private {
         if !exists(name) {
             create(name, swarm)?;
         }
-        attach_stack(name, &stack);
+        if stack_joins(name) {
+            attach_stack(name, &stack);
+        }
     }
     Ok(())
 }
@@ -273,6 +358,8 @@ pub fn ensure(networks: &[String], swarm: bool) -> Result<(), String> {
 pub struct Reconciled {
     pub kept: usize,
     pub removed: usize,
+    /// The kept networks that are dual stack, so the dashboard can say so.
+    pub ipv6: Vec<String>,
 }
 
 /// Which private networks on this machine are no longer wanted: every one not
@@ -321,16 +408,13 @@ pub fn reconcile(keep: &[String]) -> Reconciled {
         "--filter".to_string(),
         format!("label={LABEL}"),
         "--format".to_string(),
-        "{{.Name}}".to_string(),
+        "{{.Name}} {{.IPv6}}".to_string(),
     ]);
     if !ok {
         return Reconciled::default();
     }
-    let present: Vec<String> = printed
-        .split_whitespace()
-        .filter(|name| is_private_network(name))
-        .map(String::from)
-        .collect();
+    let listed = listed_networks(&printed);
+    let present: Vec<String> = listed.iter().map(|(name, _)| name.clone()).collect();
     let stack = stack_container_ids();
     let mut report = Reconciled::default();
     let gone = unwanted(&present, keep);
@@ -351,11 +435,29 @@ pub fn reconcile(keep: &[String]) -> Reconciled {
                 report.removed += 1;
             }
         } else {
-            attach_stack(name, &stack);
+            if stack_joins(name) {
+                attach_stack(name, &stack);
+            }
             report.kept += 1;
+            if listed.iter().any(|(listed, ipv6)| listed == name && *ipv6) {
+                report.ipv6.push(name.clone());
+            }
         }
     }
     report
+}
+
+/// The private networks `docker network ls` printed as `<name> <ipv6>` lines, with
+/// whether each is dual stack. Anything else on a line is ignored.
+pub fn listed_networks(printed: &str) -> Vec<(String, bool)> {
+    printed
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let name = parts.next()?;
+            is_private_network(name).then(|| (name.to_string(), parts.next() == Some("true")))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -366,10 +468,13 @@ mod tests {
     fn only_the_minted_shape_is_private() {
         assert!(is_private_network("polaris-net-e0123456789"));
         assert!(is_private_network("polaris-net-sabcdef0123"));
+        assert!(is_private_network("polaris-net-n0123456789"));
+        assert!(is_private_network("polaris-net-p0123456789"));
+        assert!(is_private_network("polaris-net-x0123456789"));
         for other in [
             "polaris-proxy",
             "polaris-net-",
-            "polaris-net-x0123456789",
+            "polaris-net-z0123456789",
             "polaris-net-e012345678",
             "polaris-net-e0123456789a",
             "polaris-net-eABCDEF0123",
@@ -404,7 +509,7 @@ mod tests {
     #[test]
     fn builds_the_arguments_for_either_engine() {
         assert_eq!(
-            create_args("polaris-net-e0123456789", false, None),
+            create_args("polaris-net-e0123456789", false, None, false),
             [
                 "network",
                 "create",
@@ -415,7 +520,16 @@ mod tests {
                 "polaris-net-e0123456789"
             ]
         );
-        let swarm = create_args("polaris-net-e0123456789", true, Some("10.211.4.0/24"));
+        let dual = create_args("polaris-net-n0123456789", false, None, true);
+        assert!(dual.contains(&"--ipv6".to_string()));
+        assert!(!create_args("polaris-net-n0123456789", true, None, true)
+            .contains(&"--ipv6".to_string()));
+        let swarm = create_args(
+            "polaris-net-e0123456789",
+            true,
+            Some("10.211.4.0/24"),
+            false,
+        );
         assert!(swarm.contains(&"overlay".to_string()));
         assert!(swarm.contains(&"--attachable".to_string()));
         assert!(swarm.contains(&"10.211.4.0/24".to_string()));
@@ -458,6 +572,48 @@ mod tests {
         );
         assert!(valid_compose_project("polaris"));
         assert!(!valid_compose_project("Polaris; x"));
+    }
+
+    #[test]
+    fn the_stack_never_joins_a_network_of_chosen_names() {
+        assert!(stack_joins("polaris-net-e0123456789"));
+        assert!(stack_joins("polaris-net-s0123456789"));
+        for names in [
+            "polaris-net-n0123456789",
+            "polaris-net-p0123456789",
+            "polaris-net-x0123456789",
+        ] {
+            assert!(is_names_network(names), "{names}");
+            assert!(!stack_joins(names), "{names}");
+        }
+        assert!(!is_names_network("polaris-proxy"));
+    }
+
+    #[test]
+    fn only_a_link_network_can_be_cut() {
+        assert!(is_link_network("polaris-net-x0123456789"));
+        for other in [
+            "polaris-net-n0123456789",
+            "polaris-net-e0123456789",
+            "polaris-proxy",
+            "bridge",
+        ] {
+            assert!(!is_link_network(other), "{other}");
+            assert!(cut(other).is_err(), "{other}");
+        }
+    }
+
+    #[test]
+    fn reads_which_networks_are_dual_stack() {
+        assert_eq!(
+            listed_networks(
+                "polaris-net-n0123456789 true\npolaris-net-e0123456789 false\npolaris-proxy true\n\n"
+            ),
+            vec![
+                ("polaris-net-n0123456789".to_string(), true),
+                ("polaris-net-e0123456789".to_string(), false)
+            ]
+        );
     }
 
     #[test]

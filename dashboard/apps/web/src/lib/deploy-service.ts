@@ -40,6 +40,14 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { copyScopeValues, decryptedValue } from "./deploy/env-values";
 import { challengeActive, floodedServices } from "./deploy/edge-state";
 import { hasTunnel, networksForService } from "./deploy/service-networks";
+import {
+    answeringLabels,
+    namesOn,
+    prepareDeployNames,
+    privateNameOf,
+    promoteStagedNames,
+    stageNames
+} from "./deploy/private-names";
 import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { resolveBuildMachine, type BuildMachine } from "./deploy/build-machine";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -89,6 +97,7 @@ import {
     releaseImage,
     normalizeZoneName,
     parseHttpLogs,
+    privateDomain,
     releaseDomain,
     resolveDockerfilePath,
     serviceName,
@@ -299,7 +308,9 @@ export async function createEnvironment(
     projectId: string,
     ownerId: string,
     name: string,
-    branch?: string | null
+    branch?: string | null,
+    /** How its services see each other; the column's default when absent. */
+    networkMode?: string
 ) {
     const project = await prisma.project.findFirst({ where: { id: projectId, ownerId } });
     if (!project) throw new Error("Project not found");
@@ -308,7 +319,14 @@ export async function createEnvironment(
     const existing = await prisma.environment.findFirst({ where: { projectId, slug } });
     if (existing) throw new Error("An environment with that name already exists");
     return prisma.environment.create({
-        data: { projectId, name, slug, isDefault: false, branch: branch?.trim() || null }
+        data: {
+            projectId,
+            name,
+            slug,
+            isDefault: false,
+            branch: branch?.trim() || null,
+            ...(networkMode ? { networkMode } : {})
+        }
     });
 }
 
@@ -509,7 +527,14 @@ export async function deleteEnvironment(environmentId: string, ownerId: string) 
  * services, its domains and its certificates with it, and the people who could
  * reach it would change underneath a running deployment.
  */
-export async function createProject(ownerId: string, name: string, orgId: string | null = null) {
+export async function createProject(
+    ownerId: string,
+    name: string,
+    orgId: string | null = null,
+    /** How its first environment's services see each other; the column's
+     *  default when absent. */
+    networkMode?: string
+) {
     const slug = slugify(name);
     if (!slug) throw new Error("Project name must contain letters or digits");
     return prisma.project.create({
@@ -518,7 +543,14 @@ export async function createProject(ownerId: string, name: string, orgId: string
             orgId,
             name,
             slug,
-            environments: { create: { name: "Production", slug: "production", isDefault: true } }
+            environments: {
+                create: {
+                    name: "Production",
+                    slug: "production",
+                    isDefault: true,
+                    ...(networkMode ? { networkMode } : {})
+                }
+            }
         },
         include: { environments: true }
     });
@@ -2371,6 +2403,8 @@ async function buildAppPlan(
     unresolved: string[];
     /** The image the service now needs in place of the stored one, when they differ. */
     imageRefChange?: string;
+    /** The private names this plan gives the service, or null where it gives none. */
+    liveNames: string[] | null;
 }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -2682,16 +2716,41 @@ async function buildAppPlan(
     // else its environment's own (or its links'), plus the proxy network only when
     // the edge has to dial it there.
     const routed = plan.domains.length > 0 || (await hasTunnel(app.id));
+    // And its private names, `<name>.polaris.internal`, on a network of their own
+    // (see `deploy/private-names.ts`), with the forwarder that answers port 80 for
+    // it where it listens elsewhere - plain compose only.
+    const names = await prepareDeployNames({
+        kind: "application",
+        id: app.id,
+        slug: app.slug,
+        privateNetwork: app.privateNetwork,
+        environment: app.environment,
+        projectSlug: project.slug,
+        target: app.target,
+        kept
+    });
     const networks = networksForService({
         environment: app.environment,
         serviceId: app.id,
         target: app.target,
         published: !plan.private,
-        routed
+        routed,
+        names: names.enabled,
+        crossLinks: names.crossLinks
     });
     // Something sends visitors to it, so it counts as up only once it accepts
     // connections on its port - that is the moment the edge is moved onto it.
-    const planned: AppDeployPlan = { ...plan, networks, ...(routed ? { awaitPort: true } : {}) };
+    const planned: AppDeployPlan = {
+        ...plan,
+        networks,
+        ...(routed ? { awaitPort: true } : {}),
+        ...(names.enabled
+            ? {
+                  networkAliases: { ...plan.networkAliases, ...names.networkAliases },
+                  ...(app.target.runtime === "compose" ? { forwardPort: containerPort } : {})
+              }
+            : {})
+    };
     let gitSource: GitSource | undefined;
     if (typeof source.repoUrl === "string" && source.repoUrl) {
         gitSource = {
@@ -2757,6 +2816,7 @@ async function buildAppPlan(
         buildConfig: app.buildConfig,
         buildCommands,
         keepsHistory: deployReleases.keepsReleases(app),
+        liveNames: names.enabled && !kept ? names.live : null,
         cutover: release ? cutover : await changesOver(app, ownerId),
         unresolved: references.unresolved,
         imageRefChange: imageRef !== storedImage ? imageRef : undefined
@@ -2928,6 +2988,10 @@ async function systemEnv(
             slug: true,
             name: true,
             currentDeploymentId: true,
+            privateNetwork: true,
+            keepReleases: true,
+            volumes: { select: { id: true } },
+            target: { select: { kind: true, hostId: true } },
             environment: {
                 select: {
                     id: true,
@@ -2948,6 +3012,14 @@ async function systemEnv(
     if (!app || app.environment.id !== environmentId) return {};
     const release = await deployReleases.currentReleaseRef(app);
     const domain = app.domains[0]?.hostname;
+    // Its private name where this deploy gives its container that name: not on a
+    // server that gives none, not to a release kept beside others, and not while
+    // another service of the environment keeps it.
+    const name = privateNameOf(app);
+    const named =
+        namesOn(app.target) &&
+        !deployReleases.keepsReleases(app) &&
+        (await answeringLabels({ ...app, kind: "application" }, app.environment.id)).includes(name);
     return {
         POLARIS_PROJECT_ID: app.environment.project.id,
         POLARIS_PROJECT_NAME: app.environment.project.name,
@@ -2955,7 +3027,7 @@ async function systemEnv(
         POLARIS_ENVIRONMENT_NAME: app.environment.name,
         POLARIS_SERVICE_ID: app.id,
         POLARIS_SERVICE_NAME: app.name,
-        POLARIS_PRIVATE_DOMAIN: release.address,
+        POLARIS_PRIVATE_DOMAIN: named ? privateDomain(name) : release.address,
         ...(domain ? { POLARIS_PUBLIC_DOMAIN: domain } : {}),
         ...(app.environment.branch ? { POLARIS_GIT_BRANCH: app.environment.branch } : {}),
         ...(app.environment.pullRequest !== null
@@ -3151,6 +3223,7 @@ export async function deployApplication(
     // own before the plan is handed to the runtime, and one that keeps its history
     // also the hostname it will answer on. Only those cases pay for the second plan.
     let planned = plan;
+    let liveNames = built.liveNames;
     if (keepsHistory || cutover) {
         const release = { id: deployment.id, commitSha, cutover };
         if (keepsHistory) {
@@ -3159,10 +3232,14 @@ export async function deployApplication(
                 return null;
             });
         }
-        planned = (await buildAppPlan(applicationId, ownerId, release)).plan;
+        ({ plan: planned, liveNames } = await buildAppPlan(applicationId, ownerId, release));
     } else if (scaled?.cutover) {
         planned = (await buildAppPlan(applicationId, ownerId, scaled)).plan;
     }
+    // The names this release carries are held until it is promoted - only then do
+    // they count as live (see `promoteRelease`). A scale step in place adds copies
+    // to the release already serving, which keeps what it was recorded with.
+    if (liveNames && !scaled?.cutover) await stageNames(applicationId, liveNames, deployment.id);
     // Every release is kept under a name of its own so it can be run again later
     // exactly as it was; a rollback runs one of those instead of making one. The
     // build also goes at the commit it names, when there is one - the branch head
@@ -4670,6 +4747,10 @@ async function promoteRelease(
         where: { id: dep.deployableId },
         // A release that just came up is awake, whatever its service was before.
         data: { currentDeploymentId: deploymentId, asleepSince: null }
+    });
+    // Its private names count as live from here: it is the one serving them.
+    await promoteStagedNames(dep.deployableId, deploymentId).catch((error) => {
+        console.error("polaris: could not record a release's private names:", error);
     });
     // The switch: the edge routes are rewritten to dial the release now current,
     // which a change-over release only becomes after it came up and opened its

@@ -4,6 +4,7 @@
         "tabs": {
             "version": "Version",
             "settings": "Settings",
+            "network": "Network",
             "pitr": "Point in time",
             "copy": "Copy data in",
             "buckets": "Buckets",

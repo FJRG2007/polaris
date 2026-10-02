@@ -50,6 +50,7 @@ import marketplace from "./marketplace.json";
 import publicPages from "./publicPages.json";
 import tasksDetail from "./tasksDetail.json";
 import deployConfig from "./deployConfig.json";
+import deployPrivateNet from "./deployPrivateNet.json";
 import deployServer from "./deployServer.json";
 import mailSettings from "./mailSettings.json";
 import deployProject from "./deployProject.json";
@@ -83,6 +84,7 @@ export default {
     deployConfig,
     deployData,
     deployProject,
+    deployPrivateNet,
     deployServer,
     deployService,
     deploySettings,

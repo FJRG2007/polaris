@@ -126,6 +126,12 @@ export interface RuntimePorts {
      *  when the image declares none or inspection is unavailable. */
     inspectImage(image: string): Promise<number[]>;
     /**
+     * Close a link between two projects now: take every container off its network
+     * (`polaris-net-x...` only). Resolves only once nothing is left on it, so a
+     * caller can tell access was really closed.
+     */
+    cutNetwork(name: string): Promise<void>;
+    /**
      * Remove a pinned release image once it has fallen out of the kept window.
      * Only ever handed a name `isReleaseImage` accepts; never forced, so an image
      * a container still runs is refused by the engine. Optional, because an

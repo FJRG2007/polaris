@@ -279,6 +279,7 @@
         "create": "Create"
     },
     "canvas": {
+        "referenceLine": "{source} uses the variables of {target}",
         "dockerImage": "Docker image",
         "gitRepository": "Git repository",
         "volume": "Volume",

@@ -97,6 +97,10 @@ export class HostdPorts implements RuntimePorts {
         }
     }
 
+    public async cutNetwork(name: string): Promise<void> {
+        await this.client.cutPrivateNetwork(name);
+    }
+
     public async inspectImage(image: string): Promise<number[]> {
         return this.client.inspectImage(image);
     }

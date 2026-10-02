@@ -96,6 +96,10 @@ export interface ComposeSpecService {
     readonly dependsOn?: string[];
     readonly restart?: string;
     readonly healthcheck?: ComposeSpecHealth;
+    /** `service:<name>` to share another service's network namespace - the port-80
+     *  forwarder (see `private-names.ts`), which then has no networks, ports or
+     *  names of its own. */
+    readonly networkMode?: string;
     /** Replica count for swarm deploys; ignored by plain compose. */
     readonly replicas?: number;
     /**
@@ -490,37 +494,48 @@ export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec 
             ? [{ host: plan.exposePort, container: defaultDbPort(plan.image) }]
             : [];
     const networks = joinedNetworks(plan.networks, network);
+    // Its private names go on the container that carries the database's own name.
+    const named = <T extends ComposeSpecService>(service: T): T =>
+        service.name === plan.ref.name
+            ? { ...service, ...networkAliasesFor(plan.networkAliases, networks) }
+            : service;
     // A cluster is one project of equal nodes, reaching each other by name on
     // the networks they share. Nothing is published: a client is redirected
     // between nodes by name, which only the network can resolve.
     if (plan.nodes && plan.nodes.length > 0) {
         return {
             project: plan.ref.project,
-            services: plan.nodes.map((node) => ({
-                name: node.name,
-                image: plan.image,
-                pullPolicy: dbPullPolicy(plan),
-                env: { ...plan.env },
-                command: [...node.command],
-                ports: [],
-                volumes: [
-                    { source: node.volumeName, target: plan.dataPath, kind: "volume" as const }
-                ],
-                labels: {},
-                networks,
-                extraHosts: [HOST_GATEWAY],
-                restart: "unless-stopped",
-                ...limitFields(plan.limits)
-            })),
+            services: plan.nodes.map((node) =>
+                named({
+                    name: node.name,
+                    image: plan.image,
+                    pullPolicy: dbPullPolicy(plan),
+                    env: { ...plan.env },
+                    command: [...node.command],
+                    ports: [],
+                    volumes: [
+                        { source: node.volumeName, target: plan.dataPath, kind: "volume" as const }
+                    ],
+                    labels: {},
+                    networks,
+                    extraHosts: [HOST_GATEWAY],
+                    restart: "unless-stopped",
+                    ...limitFields(plan.limits)
+                })
+            ),
             volumes: plan.nodes.map((node) => node.volumeName),
             networks
         };
     }
-    if (plan.members && plan.members.length > 0) return dbMembersSpec(plan, plan.members, networks);
+    if (plan.members && plan.members.length > 0) {
+        const spec = dbMembersSpec(plan, plan.members, networks);
+        return { ...spec, services: spec.services.map(named) };
+    }
     return {
         project: plan.ref.project,
         services: [
             {
+                ...networkAliasesFor(plan.networkAliases, networks),
                 name: plan.ref.name,
                 image: plan.image,
                 pullPolicy: dbPullPolicy(plan),
@@ -660,6 +675,7 @@ export function renderComposeYaml(
         lines.push(`  ${service.name}:`);
         lines.push(`    image: ${yamlQuote(service.image)}`);
         lines.push(`    container_name: ${yamlQuote(service.name)}`);
+        if (service.networkMode) lines.push(`    network_mode: ${yamlQuote(service.networkMode)}`);
         if (service.pullPolicy) lines.push(`    pull_policy: ${yamlQuote(service.pullPolicy)}`);
         if (service.restart) lines.push(`    restart: ${yamlQuote(service.restart)}`);
         if (Object.keys(service.env).length > 0) {

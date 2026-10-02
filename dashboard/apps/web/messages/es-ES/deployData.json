@@ -4,6 +4,7 @@
         "tabs": {
             "version": "Versión",
             "settings": "Ajustes",
+            "network": "Red",
             "pitr": "Punto temporal",
             "copy": "Importar datos",
             "buckets": "Buckets",

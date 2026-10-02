@@ -65,7 +65,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Custom domain + Let's Encrypt            | done    | P0   | or a certificate you supply; issued keys are ECDSA (EC256), like Railway         |
 | Wildcard certificates                    | done    | P1   | owner domains                                                                   |
 | DNS records managed                      | done    | P1   | Cloudflare zone editor; a custom domain's panel reads its DNS live and tells a Cloudflare-proxied record from one pointed elsewhere |
-| Private networking between services      | done    | P0   | per-environment network, reached by service name                                |
+| Private networking between services      | done    | P0   | Railway-style: each service answers to `<name>.polaris.internal` and its bare name on a network of its own (dual stack where the engine gives it one), port-less via a port-80 forwarder; editable endpoint name with an availability check and a 7-day grace period for the old one, extra aliases; `POLARIS_PRIVATE_DOMAIN` and service variable references follow renames; opt-in links let one service of another project on the same server call it by name |
 | Multiple domains per service             | done    | P1   | added one at a time; each domain can pin its own target port (Railway's per-domain port), independent of the service's own |
 | Redirects / rewrites                     | done    | P2   | Service > Settings                                                              |
 | Load balancing (copies, sticky, health)  | done    | P1   |                                                                                 |

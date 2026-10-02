@@ -4,6 +4,7 @@ import { ProjectDetail } from "../project-detail";
 import { getPublicIp } from "@/lib/domain-service";
 import type { ProjectSummary } from "../deploy-view";
 import { servingReleases } from "@/lib/deploy/releases";
+import { referenceEdges } from "@/lib/deploy/private-names";
 import { dialsPinnedPort } from "@/lib/deploy/public-net";
 import { capabilitiesFor } from "@/lib/host-capabilities";
 import { projectAccess } from "@/lib/deploy-project-access";
@@ -97,7 +98,7 @@ export default async function DeployProjectPage({
     // Kept current on its own clock and never waited for: a provider having a bad
     // morning must not hold the board, which draws what was last read.
     void refreshStale(projectId).catch(() => undefined);
-    const [caps, statuses, serverIp, tunnelDomains, attention, serving, elsewhere] =
+    const [caps, statuses, serverIp, tunnelDomains, attention, serving, elsewhere, references] =
         await Promise.all([
             canManage ? capabilitiesFor("deploy") : null,
             getApplicationDeployStatuses(
@@ -107,7 +108,9 @@ export default async function DeployProjectPage({
             listActiveTunnelDomains(appIds),
             serviceAttention(appIds),
             servingReleases(allApps.map((app) => ({ ...app, environment: { project } }))),
-            elsewhereByService(projectId, allApps)
+            elsewhereByService(projectId, allApps),
+            // Only the edges leave the server; the variables they come from never do.
+            referenceEdges(project.environments.map((environment) => environment.id))
         ]);
     const localReady = Boolean(caps?.deploy);
     // Whether each service is up, apart from how its last deploy went.
@@ -121,6 +124,7 @@ export default async function DeployProjectPage({
             name: environment.name,
             isDefault: environment.isDefault,
             layout: environment.layout,
+            referenceEdges: references.get(environment.id) ?? [],
             applications: environment.applications.map((app) => ({
                 id: app.id,
                 name: app.name,

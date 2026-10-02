@@ -18,6 +18,13 @@
  * reached by the services beside it, and the dashboard is attached to the private
  * network by the daemon that creates it.
  *
+ * Beside those, every service gets private names - `<name>.polaris.internal`
+ * and the bare `<name>` - on a network that carries nothing else: its
+ * environment's names network, or in `links` mode one of its own that the
+ * services linking to it join. The names are chosen by the service's owner, so
+ * Polaris's own containers (the dashboard, the edge) never join these: a name
+ * somebody picked can never answer a lookup the stack makes for its own.
+ *
  * Pure: the names are derived from ids, so a network is found again by name on
  * every deploy, and the daemon that creates it recognises the shape.
  */
@@ -40,9 +47,30 @@ export function serviceNetwork(serviceId: string): string {
     return `${PRIVATE_NETWORK_PREFIX}s${shortHash(`service:${serviceId}`, 10)}`;
 }
 
+/** The network an environment's services carry their private names on. */
+export function namesNetwork(environmentId: string): string {
+    return `${PRIVATE_NETWORK_PREFIX}n${shortHash(`names:${environmentId}`, 10)}`;
+}
+
+/** The network one service carries its private names on in `links` mode. */
+export function serviceNamesNetwork(serviceId: string): string {
+    return `${PRIVATE_NETWORK_PREFIX}p${shortHash(`names:${serviceId}`, 10)}`;
+}
+
+/** The network a link between two projects runs over: only its two services. */
+export function crossLinkNetwork(linkId: string): string {
+    return `${PRIVATE_NETWORK_PREFIX}x${shortHash(`link:${linkId}`, 10)}`;
+}
+
 /** Whether a name is one of these, in exactly the shape the daemon accepts. */
 export function isPrivateNetwork(name: string): boolean {
-    return /^polaris-net-[es][a-f0-9]{10}$/.test(name);
+    return /^polaris-net-[esnpx][a-f0-9]{10}$/.test(name);
+}
+
+/** Whether a private network carries names a service's owner chose - the kind
+ *  Polaris's own containers never join. */
+export function isNamesNetwork(name: string): boolean {
+    return /^polaris-net-[npx][a-f0-9]{10}$/.test(name);
 }
 
 /** A link on an environment's canvas, from one service to another. */
@@ -80,6 +108,11 @@ export interface NetworkPlanInput {
     readonly joinsProxy: boolean;
     /** The canvas links, for `links` mode. */
     readonly links?: readonly ServiceLink[];
+    /** Whether the service carries private names: the target makes names
+     *  networks. Off leaves the networks exactly as they were before names. */
+    readonly names?: boolean;
+    /** The networks of the links to other projects this service is on. */
+    readonly crossLinks?: readonly string[];
 }
 
 /**
@@ -87,17 +120,53 @@ export interface NetworkPlanInput {
  * edge's routing is exactly as it was for every service that still needs it.
  */
 export function serviceNetworks(input: NetworkPlanInput): string[] {
-    if (input.mode === "shared") return [input.proxyNetwork];
+    // The names networks go last, so the edge - which takes a service's first
+    // network as the one it dials it on - never picks one it is not on.
+    const names = input.names ? [...namesNetworksOf(input), ...(input.crossLinks ?? [])] : [];
+    if (input.mode === "shared") return [input.proxyNetwork, ...names];
     const proxy = input.joinsProxy ? [input.proxyNetwork] : [];
-    if (input.mode === "environment") return [...proxy, environmentNetwork(input.environmentId)];
+    if (input.mode === "environment")
+        return [...proxy, environmentNetwork(input.environmentId), ...names];
     // Its own, so what links to it can reach it, and each one it links to. A link
     // in either direction is a connection both ways, because a reply travels the
     // same network the request came in on.
+    return [
+        ...proxy,
+        serviceNetwork(input.serviceId),
+        ...linkedPeers(input).map(serviceNetwork),
+        ...names
+    ];
+}
+
+/** The services one service links to on its environment's canvas, sorted. */
+function linkedPeers(input: Pick<NetworkPlanInput, "serviceId" | "links">): string[] {
     const peers = new Set<string>();
     for (const link of input.links ?? []) {
-        if (link.source === input.serviceId && link.target !== input.serviceId) peers.add(link.target);
+        if (link.source === input.serviceId && link.target !== input.serviceId)
+            peers.add(link.target);
     }
-    return [...proxy, serviceNetwork(input.serviceId), ...[...peers].sort().map(serviceNetwork)];
+    return [...peers].sort();
+}
+
+/**
+ * The names networks a service joins: the one its own names are on, then - in
+ * `links` mode - the names networks of the services it links to, so it can call
+ * them by name. Never a network Polaris's own containers are on.
+ */
+function namesNetworksOf(
+    input: Pick<NetworkPlanInput, "mode" | "environmentId" | "serviceId" | "links">
+): string[] {
+    if (input.mode !== "links") return [namesNetwork(input.environmentId)];
+    return [serviceNamesNetwork(input.serviceId), ...linkedPeers(input).map(serviceNamesNetwork)];
+}
+
+/** The network a service's own private names go on (see `namesNetworksOf`). */
+export function ownNamesNetwork(
+    input: Pick<NetworkPlanInput, "mode" | "environmentId" | "serviceId">
+): string {
+    return input.mode === "links"
+        ? serviceNamesNetwork(input.serviceId)
+        : namesNetwork(input.environmentId);
 }
 
 /**
@@ -160,21 +229,49 @@ export function ensurePrivateNetworksScript(names: readonly string[], swarm: boo
     const statements: string[] = [];
     for (const name of [...new Set(names)].filter(isPrivateNetwork)) {
         const create = `docker network create --label ${PRIVATE_NETWORK_LABEL} ${driver}`;
-        const ranges = Array.from({ length: FALLBACK_ATTEMPTS }, (_, attempt) => fallbackSubnet(name, attempt));
+        const ranges = Array.from({ length: FALLBACK_ATTEMPTS }, (_, attempt) =>
+            fallbackSubnet(name, attempt)
+        );
+        // A bridge is asked for dual stack first, as the daemon does; an engine
+        // that cannot give it one refuses and the network is made IPv4-only.
+        const dual = swarm ? "" : `${create} --ipv6 ${name} >/dev/null 2>&1 || `;
         const missing = [
-            `${create} ${name} >/dev/null 2>&1 || { for s in ${ranges.join(" ")}; do ${create} --subnet "$s" ${name} >/dev/null 2>&1 && break; done; true; }`,
+            `${dual}${create} ${name} >/dev/null 2>&1 || { for s in ${ranges.join(" ")}; do ${create} --subnet "$s" ${name} >/dev/null 2>&1 && break; done; true; }`,
             `docker network inspect ${name} >/dev/null 2>&1 || { echo "could not create network ${name}: this server has no address range left for another network" >&2; exit 1; }`
         ];
         statements.push(
-            `if ! docker network inspect ${name} >/dev/null 2>&1; then ${missing.join("; ")}; fi`,
-            `for c in ${REMOTE_EDGE_CONTAINERS.join(" ")}; do docker network connect ${name} "$c" >/dev/null 2>&1 || true; done`
+            `if ! docker network inspect ${name} >/dev/null 2>&1; then ${missing.join("; ")}; fi`
         );
+        // The edge dials containers by the names Polaris gave them, so it never
+        // joins a network that carries names somebody chose.
+        if (!isNamesNetwork(name)) {
+            statements.push(
+                `for c in ${REMOTE_EDGE_CONTAINERS.join(" ")}; do docker network connect ${name} "$c" >/dev/null 2>&1 || true; done`
+            );
+        }
     }
     return statements;
 }
 
+/**
+ * The shell statements that close a link between two projects on another server
+ * at once - the same as the daemon's `cut`: every container on the link's network
+ * is disconnected, and the statements fail unless nothing is left on it. Only a
+ * link network is ever named; one that is not there is nothing to close.
+ */
+export function cutLinkNetworkScript(name: string): string[] {
+    if (!/^polaris-net-x[a-f0-9]{10}$/.test(name)) throw new Error("only a link network can be cut");
+    const attached = `docker network inspect --format '{{range $id, $c := .Containers}}{{$id}} {{end}}' ${name}`;
+    return [
+        `if docker network inspect ${name} >/dev/null 2>&1; then ` +
+            `for c in $(${attached}); do docker network disconnect -f ${name} "$c" || exit 1; done; ` +
+            `test -z "$(${attached} | tr -d ' ')" || { echo "${name} still has containers on it" >&2; exit 1; }; fi`
+    ];
+}
+
 /** The private networks in a list, in order - what a connector or an edge has to
- *  join to reach a service by name once it has left the proxy network. */
+ *  join to reach a service by name once it has left the proxy network. Never a
+ *  names network: those are for the services beside it alone. */
 export function privateNetworksOf(networks: readonly string[]): string[] {
-    return [...new Set(networks.filter(isPrivateNetwork))];
+    return [...new Set(networks.filter((name) => isPrivateNetwork(name) && !isNamesNetwork(name)))];
 }

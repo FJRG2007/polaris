@@ -112,6 +112,9 @@ export interface ProjectSummary {
         name: string;
         isDefault: boolean;
         layout: string;
+        /** Which service references which in its variables (`${{name.KEY}}`): the
+         *  lines the canvas draws between them, as Railway does. */
+        referenceEdges?: { source: string; target: string }[];
         applications: {
             id: string;
             name: string;
