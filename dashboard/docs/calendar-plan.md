@@ -246,7 +246,10 @@ week, `3`/`m` month, `4`/`y` year, `5`/`l`/`a` list, `6`/`x` custom days, `c`
 create, `e` open selected, `Backspace`/`Delete` delete selected, `z` undo, `/`
 search, `r` refresh, `s` settings, `+` add calendar, `?` overview, `Esc` close,
 `Ctrl/Cmd+Enter` and `Ctrl/Cmd+S` save, `Ctrl/Cmd+Delete` delete, `Ctrl/Cmd+D`
-duplicate.
+duplicate. On the grid: arrow keys move focus between day cells, `Enter`
+creates on the focused day, the menu key or `Shift+F10` opens its context menu,
+`Ctrl/Cmd+C` copies the focused event and `Ctrl/Cmd+V` pastes at the focused
+cell.
 
 ## Work-unit ledger
 
