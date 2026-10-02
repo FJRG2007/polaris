@@ -4,6 +4,7 @@ import { ProjectDetail } from "../project-detail";
 import { getPublicIp } from "@/lib/domain-service";
 import type { ProjectSummary } from "../deploy-view";
 import { servingReleases } from "@/lib/deploy/releases";
+import { dialsPinnedPort } from "@/lib/deploy/public-net";
 import { capabilitiesFor } from "@/lib/host-capabilities";
 import { projectAccess } from "@/lib/deploy-project-access";
 import { serviceRunStates } from "@/lib/deploy/run-states";
@@ -174,11 +175,16 @@ export default async function DeployProjectPage({
                             servedBy: domain.servedBy,
                             cdn: domain.cdn,
                             // What the edge dials for it: its own port where one was
-                            // chosen for it - and always on a server whose own edge
-                            // serves it, which dials each domain's port - else the
-                            // service's.
+                            // chosen for it and the edge dials it - and always on a
+                            // server whose own edge serves it, which dials each
+                            // domain's port - else the service's.
                             targetPort:
-                                domain.portPinned || (app.target.kind !== "local" && domain.servedBy !== "polaris")
+                                (domain.portPinned &&
+                                    dialsPinnedPort(domain, {
+                                        remote: app.target.kind !== "local" && app.target.hostId !== null,
+                                        keptRelease: (serving.get(app.id)?.portSubject ?? app.id) !== app.id
+                                    })) ||
+                                (app.target.kind !== "local" && domain.servedBy !== "polaris")
                                     ? domain.targetPort
                                     : containerPortOf(app)
                         })),

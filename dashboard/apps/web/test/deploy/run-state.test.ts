@@ -10,12 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const deploymentFindMany = vi.fn();
 const sampleGroupBy = vi.fn();
-const sampleFindFirst = vi.fn();
+const appFindMany = vi.fn();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         deployment: { findMany: deploymentFindMany },
-        metricSample: { groupBy: sampleGroupBy, findFirst: sampleFindFirst }
+        metricSample: { groupBy: sampleGroupBy },
+        application: { findMany: appFindMany }
     }
 }));
 
@@ -79,8 +80,20 @@ describe("serviceRunStates", () => {
     beforeEach(() => {
         deploymentFindMany.mockReset().mockResolvedValue([{ id: "rel-1", finishedAt: new Date(NOW - 3_600_000) }]);
         sampleGroupBy.mockReset().mockResolvedValue([]);
-        sampleFindFirst.mockReset().mockResolvedValue({ ts: new Date(NOW - 10_000) });
+        appFindMany.mockReset().mockResolvedValue([
+            placed("web"),
+            placed("api"),
+            placed("remote", { kind: "server", hostId: "host-1" }),
+            placed("stack", {}, "compose"),
+            placed("swarmed", { runtime: "swarm" })
+        ]);
     });
+
+    function placed(id: string, target: Record<string, unknown> = {}, sourceType = "nixpacks") {
+        return { id, sourceType, target: { kind: "local", hostId: null, runtime: "compose", ...target } };
+    }
+
+    const up = (id: string) => ({ id, desiredState: "running", asleepSince: null, currentDeploymentId: "rel-1" });
 
     it("reads the portfolio case: stopped, release row still running, no container", async () => {
         const states = await serviceRunStates(
@@ -103,7 +116,24 @@ describe("serviceRunStates", () => {
         );
         expect(states).toEqual({ web: "running", api: "crashed" });
         expect(sampleGroupBy).toHaveBeenCalledTimes(1);
+        expect(appFindMany).toHaveBeenCalledTimes(1);
         expect(sampleGroupBy.mock.calls[0]?.[0].where.ts.gte).toEqual(new Date(NOW - RECENT_SAMPLE_MS));
         expect(deploymentFindMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call a service crashed because a different machine was sampled", async () => {
+        sampleGroupBy.mockResolvedValue([{ subjectId: "web", _max: { ts: new Date(NOW - 5_000) } }]);
+        const states = await serviceRunStates([up("web"), up("remote")], { web: "running", remote: "running" }, NOW);
+        expect(states).toEqual({ web: "running", remote: "running" });
+    });
+
+    it("does not read an absent sample of a compose stack or a swarm task as a crash", async () => {
+        sampleGroupBy.mockResolvedValue([{ subjectId: "web", _max: { ts: new Date(NOW - 5_000) } }]);
+        const states = await serviceRunStates(
+            [up("stack"), up("swarmed")],
+            { stack: "running", swarmed: "running" },
+            NOW
+        );
+        expect(states).toEqual({ stack: "running", swarmed: "running" });
     });
 });

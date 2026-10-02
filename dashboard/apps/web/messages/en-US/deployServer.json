@@ -241,6 +241,7 @@
         "renameFailed": "Could not rename the domain.",
         "proxyLimit": "A service can hold {count} TCP proxies.",
         "rangeFull": "Every public port in the TCP proxy range is taken on this server.",
+        "portFixed": "This domain is reached on the service's own port. Change the service's port instead.",
         "failed": "That did not go through. Try again in a moment."
     }
 }

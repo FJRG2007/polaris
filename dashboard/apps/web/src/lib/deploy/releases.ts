@@ -182,7 +182,7 @@ export function restartReasons(
     hostPortOf: (id: string) => number = () => 0
 ): RestartReason[] {
     const reasons: RestartReason[] = [];
-    let source: { hostPort?: unknown; hostProtocol?: unknown; extraPorts?: unknown };
+    let source: { hostPort?: unknown; hostProtocol?: unknown; extraPorts?: unknown; tcpProxies?: unknown };
     try {
         source = JSON.parse(app.sourceConfig) as typeof source;
     } catch {
@@ -195,8 +195,9 @@ export function restartReasons(
             protocol: source.hostProtocol === "udp" ? "udp" : "tcp"
         });
     }
-    if (Array.isArray(source.extraPorts)) {
-        for (const entry of source.extraPorts as { host?: unknown; protocol?: unknown }[]) {
+    for (const list of [source.extraPorts, source.tcpProxies]) {
+        if (!Array.isArray(list)) continue;
+        for (const entry of list as { host?: unknown; protocol?: unknown }[]) {
             if (typeof entry?.host !== "number") continue;
             reasons.push({
                 code: "hostPort",

@@ -39,6 +39,7 @@ interface StoredPorts {
     readonly hostPort?: unknown;
     readonly hostProtocol?: unknown;
     readonly extraPorts?: unknown;
+    readonly tcpProxies?: unknown;
 }
 
 function asProtocol(value: unknown): PortProtocol {
@@ -63,8 +64,9 @@ export async function takenHostPorts(): Promise<Set<PortKey>> {
         } else {
             taken.add(portKey(hostPortForApp(row.id), "tcp"));
         }
-        if (Array.isArray(config.extraPorts)) {
-            for (const entry of config.extraPorts) {
+        for (const list of [config.extraPorts, config.tcpProxies]) {
+            if (!Array.isArray(list)) continue;
+            for (const entry of list) {
                 const extra = entry as { host?: unknown; protocol?: unknown };
                 if (typeof extra.host === "number") taken.add(portKey(extra.host, asProtocol(extra.protocol)));
             }

@@ -475,7 +475,7 @@ export function TcpProxyList({
         };
     }, [applicationId, nonce]);
 
-    if (!view || view.proxies.length === 0) return null;
+    if (!view || (view.proxies.length === 0 && !stale && !error)) return null;
     const host = view.publicHost ?? view.lanHost;
 
     function remove(port: number): void {
@@ -536,7 +536,7 @@ export function TcpProxyList({
                     </li>
                 );
             })}
-            {view.lanHost && view.publicHost && (
+            {view.proxies.length > 0 && view.lanHost && view.publicHost && (
                 <li className="text-xs text-muted-foreground">
                     {t("publicNet.tcpForward", {
                         ports: view.proxies.map((proxy) => proxy.host).join(", "),

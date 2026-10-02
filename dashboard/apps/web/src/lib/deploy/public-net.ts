@@ -193,3 +193,19 @@ export function publishedPortsOf(source: Record<string, unknown>): number[] {
     }
     return ports;
 }
+
+/**
+ * Whether the edge dials a domain on a port of its own. It does where the
+ * container is reached by name: on this machine's edge for the release the
+ * service serves, and on a server whose own edge serves the domain. A domain
+ * fronted here for another server, tied to one release, or served by a kept
+ * release is reached on the port the machine publishes, which is always the
+ * service's own.
+ */
+export function dialsPinnedPort(
+    domain: { readonly deploymentId: string | null; readonly servedBy: string },
+    service: { readonly remote: boolean; readonly keptRelease: boolean }
+): boolean {
+    if (service.remote) return domain.servedBy !== "polaris";
+    return domain.deploymentId === null && !service.keptRelease;
+}

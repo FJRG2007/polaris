@@ -12,9 +12,9 @@
  * seen doing. The machine's side comes from the metrics collector, which samples
  * every running container once a minute and skips one that is not running - so a
  * service that should be up and has stopped appearing in those samples has stopped
- * running. That is only said when the collector is evidently working (some service
- * was sampled recently), because a collector that never ran is not evidence of
- * anything.
+ * running. That is only said when the collector is evidently working on that
+ * service's machine (something there was sampled recently), because a collector
+ * that never ran, or never reached the machine, is not evidence of anything.
  */
 
 import { isInFlightStatus } from "./status";
@@ -47,7 +47,8 @@ export interface RunStateInput {
     readonly releasedAt: Date | null;
     /** The newest metrics sample of the service, if any recent one exists. */
     readonly lastSampleAt: Date | null;
-    /** Whether the collector sampled anything at all lately. */
+    /** Whether the collector sampled anything on this service's machine lately,
+     *  and can name the container it would sample. */
     readonly collectorAlive: boolean;
     readonly now: number;
 }

@@ -59,6 +59,14 @@ describe("what counts as taken", () => {
         expect(taken.has("udp:19132")).toBe(true);
     });
 
+    it("sees the public ports a service's TCP proxies publish", async () => {
+        applications = [
+            { id: "db-1", sourceConfig: JSON.stringify({ imageRef: "example", tcpProxies: [{ container: 5432, host: 40123 }] }) }
+        ];
+
+        expect((await takenHostPorts()).has("tcp:40123")).toBe(true);
+    });
+
     it("sees the port derived for an app that pinned none", async () => {
         applications = [{ id: "derived-on-25565", sourceConfig: JSON.stringify({ imageRef: "example" }) }];
 

@@ -29,7 +29,8 @@ const REFUSAL = {
     taken: "publicNet.taken",
     renameFailed: "publicNet.renameFailed",
     proxyLimit: "publicNet.proxyLimit",
-    rangeFull: "publicNet.rangeFull"
+    rangeFull: "publicNet.rangeFull",
+    portFixed: "publicNet.portFixed"
 } as const;
 
 async function refusal(caught: unknown, fallback: "publicNet.failed" = "publicNet.failed"): Promise<{ error: string }> {

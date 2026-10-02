@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => ({
     appFindFirst: vi.fn(),
     appFindMany: vi.fn(),
     appUpdate: vi.fn(),
+    appFindUniqueOrThrow: vi.fn(),
+    appUpdateMany: vi.fn(),
+    deploymentCount: vi.fn(),
+    connect: vi.fn(),
     managedFindMany: vi.fn(),
     syncAppRoutes: vi.fn(),
     checkZoneSubdomain: vi.fn(),
@@ -28,13 +32,30 @@ const mocks = vi.hoisted(() => ({
     resolveSoa: vi.fn()
 }));
 
-vi.mock("@polaris/db", () => ({
-    prisma: {
+vi.mock("@polaris/db", () => {
+    const prisma = {
         domain: { findFirst: mocks.domainFindFirst, findUnique: mocks.domainFindUnique, update: mocks.domainUpdate },
-        application: { findFirst: mocks.appFindFirst, findMany: mocks.appFindMany, update: mocks.appUpdate },
-        managedCertificate: { findMany: mocks.managedFindMany }
+        application: {
+            findFirst: mocks.appFindFirst,
+            findMany: mocks.appFindMany,
+            update: mocks.appUpdate,
+            findUniqueOrThrow: mocks.appFindUniqueOrThrow,
+            updateMany: mocks.appUpdateMany
+        },
+        deployment: { count: mocks.deploymentCount },
+        managedCertificate: { findMany: mocks.managedFindMany },
+        $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(prisma)
+    };
+    class PrismaClientKnownRequestError extends Error {
+        public constructor(public readonly code: string) {
+            super(code);
+        }
     }
-}));
+    return {
+        prisma,
+        Prisma: { TransactionIsolationLevel: { Serializable: "Serializable" }, PrismaClientKnownRequestError }
+    };
+});
 vi.mock("@/lib/deploy-service", () => ({
     syncAppRoutes: mocks.syncAppRoutes,
     checkZoneSubdomain: mocks.checkZoneSubdomain,
@@ -62,7 +83,8 @@ vi.mock("node:dns/promises", () => ({
 }));
 vi.mock("node:tls", () => ({
     // No certificate to read from here: the handshake fails at once.
-    connect: () => {
+    connect: (options: unknown) => {
+        mocks.connect(options);
         const socket = Object.assign(new EventEmitter(), { setTimeout: () => undefined, destroy: () => undefined });
         queueMicrotask(() => socket.emit("error", new Error("refused")));
         return socket;
@@ -96,20 +118,64 @@ beforeEach(() => {
     mocks.resolveCname.mockResolvedValue([]);
     mocks.resolveSoa.mockRejectedValue(new Error("ENODATA"));
     mocks.managedFindMany.mockResolvedValue([]);
+    mocks.deploymentCount.mockResolvedValue(0);
+    mocks.appUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.appFindUniqueOrThrow.mockImplementation(async () => ({
+        sourceConfig: (await mocks.appFindFirst())?.sourceConfig ?? "{}"
+    }));
 });
+
+function written(call = 0): unknown {
+    return JSON.parse(mocks.appUpdateMany.mock.calls[call]?.[0].data.sourceConfig as string);
+}
+
+function pinnable(overrides: Record<string, unknown> = {}, application: Record<string, unknown> = {}) {
+    return {
+        id: "d1",
+        deploymentId: null,
+        servedBy: "server",
+        application: {
+            sourceType: "nixpacks",
+            sourceConfig: '{"port":3000}',
+            currentDeploymentId: "rel-1",
+            target: { kind: "local", hostId: null },
+            ...application
+        },
+        ...overrides
+    };
+}
 
 describe("a port per domain", () => {
     it("pins a port other than the service's own, and republishes the routes", async () => {
-        mocks.domainFindFirst.mockResolvedValue({ id: "d1", application: { sourceType: "nixpacks", sourceConfig: '{"port":3000}' } });
+        mocks.domainFindFirst.mockResolvedValue(pinnable());
         await publicNet.setDomainPort("d1", OWNER, 9000);
         expect(mocks.domainUpdate).toHaveBeenCalledWith({ where: { id: "d1" }, data: { targetPort: 9000, portPinned: true } });
         expect(mocks.syncAppRoutes).toHaveBeenCalledTimes(1);
     });
 
     it("unpins a domain set back to the service's port, so it follows the service again", async () => {
-        mocks.domainFindFirst.mockResolvedValue({ id: "d1", application: { sourceType: "nixpacks", sourceConfig: '{"port":3000}' } });
+        mocks.domainFindFirst.mockResolvedValue(pinnable());
         await publicNet.setDomainPort("d1", OWNER, 3000);
         expect(mocks.domainUpdate.mock.calls[0]?.[0].data).toEqual({ targetPort: 3000, portPinned: false });
+    });
+
+    it("refuses a port the edge would not dial: another server's domain fronted here, one release's, a kept release's", async () => {
+        mocks.domainFindFirst.mockResolvedValue(pinnable({ servedBy: "polaris" }, { target: { kind: "server", hostId: "host-1" } }));
+        await expect(publicNet.setDomainPort("d1", OWNER, 9000)).rejects.toMatchObject({ code: "portFixed" });
+        mocks.domainFindFirst.mockResolvedValue(pinnable({ deploymentId: "rel-0" }));
+        await expect(publicNet.setDomainPort("d1", OWNER, 9000)).rejects.toMatchObject({ code: "portFixed" });
+        mocks.domainFindFirst.mockResolvedValue(pinnable());
+        mocks.deploymentCount.mockResolvedValue(1);
+        await expect(publicNet.setDomainPort("d1", OWNER, 9000)).rejects.toMatchObject({ code: "portFixed" });
+        expect(mocks.domainUpdate).not.toHaveBeenCalled();
+        await publicNet.setDomainPort("d1", OWNER, 3000);
+        expect(mocks.domainUpdate.mock.calls[0]?.[0].data).toEqual({ targetPort: 3000, portPinned: false });
+    });
+
+    it("pins on a server whose own edge serves the domain", async () => {
+        mocks.domainFindFirst.mockResolvedValue(pinnable({}, { target: { kind: "server", hostId: "host-1" } }));
+        await publicNet.setDomainPort("d1", OWNER, 9000);
+        expect(mocks.domainUpdate.mock.calls[0]?.[0].data).toEqual({ targetPort: 9000, portPinned: true });
     });
 
     it("refuses a port out of range, and a domain of another owner", async () => {
@@ -160,7 +226,7 @@ describe("renaming a generated name", () => {
 });
 
 describe("TCP proxies", () => {
-    it("takes a public port no service on the same machine publishes", async () => {
+    it("takes a public port no service publishes", async () => {
         mocks.appFindFirst.mockResolvedValue(app());
         mocks.appFindMany.mockResolvedValue([
             { sourceConfig: JSON.stringify({ hostPort: 25565 }) },
@@ -170,9 +236,25 @@ describe("TCP proxies", () => {
         expect(proxy.container).toBe(5432);
         expect(proxy.host).toBeGreaterThanOrEqual(40000);
         expect(proxy.host).not.toBe(40000);
-        expect(mocks.appFindMany).toHaveBeenCalledWith({ where: { targetId: "target-1" }, select: { sourceConfig: true } });
-        const written = JSON.parse(mocks.appUpdate.mock.calls[0]?.[0].data.sourceConfig as string);
-        expect(written).toEqual({ port: 3000, tcpProxies: [proxy] });
+        expect(mocks.appFindMany).toHaveBeenCalledWith({ select: { sourceConfig: true } });
+        expect(written()).toEqual({ port: 3000, tcpProxies: [proxy] });
+        expect(mocks.appUpdateMany.mock.calls[0]?.[0].where).toEqual({
+            id: app().id,
+            sourceConfig: JSON.stringify({ port: 3000 })
+        });
+    });
+
+    it("starts over on what a concurrent write left, so neither is lost", async () => {
+        mocks.appFindFirst.mockResolvedValue(app());
+        mocks.appFindMany.mockResolvedValue([]);
+        const raced = JSON.stringify({ port: 3000, tcpProxies: [{ container: 6379, host: 41234 }] });
+        mocks.appFindUniqueOrThrow
+            .mockResolvedValueOnce({ sourceConfig: JSON.stringify({ port: 3000 }) })
+            .mockResolvedValueOnce({ sourceConfig: raced });
+        mocks.appUpdateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
+        const proxy = await publicNet.addTcpProxy(app().id, OWNER, 5432);
+        expect(mocks.appUpdateMany).toHaveBeenCalledTimes(2);
+        expect(written(1)).toEqual({ port: 3000, tcpProxies: [{ container: 6379, host: 41234 }, proxy] });
     });
 
     it("returns the proxy a port already has rather than opening a second", async () => {
@@ -180,7 +262,7 @@ describe("TCP proxies", () => {
             app({ sourceConfig: JSON.stringify({ tcpProxies: [{ container: 6379, host: 41234 }] }) })
         );
         expect(await publicNet.addTcpProxy(app().id, OWNER, 6379)).toEqual({ container: 6379, host: 41234 });
-        expect(mocks.appUpdate).not.toHaveBeenCalled();
+        expect(mocks.appUpdateMany).not.toHaveBeenCalled();
     });
 
     it("holds a service to its limit", async () => {
@@ -194,7 +276,7 @@ describe("TCP proxies", () => {
             app({ sourceConfig: JSON.stringify({ port: 3000, tcpProxies: [{ container: 6379, host: 41234 }] }) })
         );
         await publicNet.removeTcpProxy(app().id, OWNER, 6379);
-        expect(JSON.parse(mocks.appUpdate.mock.calls[0]?.[0].data.sourceConfig as string)).toEqual({ port: 3000 });
+        expect(written()).toEqual({ port: 3000 });
     });
 });
 
@@ -262,5 +344,24 @@ describe("what a custom domain's DNS says", () => {
         expect(reading?.dns?.apex).toBe(true);
         expect(reading?.dns?.verdict).toBe("proxied");
         expect(reading?.dns?.records.map((record) => record.type)).toEqual(["A"]);
+    });
+
+    it("never opens a handshake to a name that resolves into a private network", async () => {
+        mocks.resolve4.mockResolvedValue(["10.0.0.5"]);
+        const internal = { ...custom, id: "d-internal", hostname: "internal.example.org" };
+        mocks.appFindFirst.mockResolvedValue(app({ id: "0190aaaa-0000-7000-8000-0000000000b3", domains: [internal] }));
+        const [reading] = await publicNet.domainReadings("0190aaaa-0000-7000-8000-0000000000b3", OWNER);
+        expect(reading?.cert?.verdict).toBe("unknown");
+        expect(mocks.connect).not.toHaveBeenCalled();
+    });
+
+    it("dials the public address it resolved, naming the host for SNI", async () => {
+        mocks.resolve4.mockResolvedValue(["104.16.1.2"]);
+        const outside = { ...custom, id: "d-outside", hostname: "outside.example.org" };
+        mocks.appFindFirst.mockResolvedValue(app({ id: "0190aaaa-0000-7000-8000-0000000000b4", domains: [outside] }));
+        await publicNet.domainReadings("0190aaaa-0000-7000-8000-0000000000b4", OWNER);
+        expect(mocks.connect).toHaveBeenCalledWith(
+            expect.objectContaining({ host: "104.16.1.2", servername: "outside.example.org", port: 443 })
+        );
     });
 });

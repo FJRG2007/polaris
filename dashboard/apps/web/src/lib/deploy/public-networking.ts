@@ -14,11 +14,11 @@
  */
 
 import { connect } from "node:tls";
-import { prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import { getPorts } from "./runtime";
 import { currentReleaseRef } from "./releases";
 import { getPublicIp } from "@/lib/domain-service";
-import { isWildcardHostname } from "@polaris/core";
+import { isPrivateIp, isWildcardHostname } from "@polaris/core";
 import { listDeployZones } from "@/lib/domain-zones";
 import { detectPublicIp } from "@/lib/network-service";
 import { resolve4, resolve6, resolveCname, resolveSoa } from "node:dns/promises";
@@ -47,7 +47,8 @@ export type PublicNetRefusalCode =
     | "taken"
     | "renameFailed"
     | "proxyLimit"
-    | "rangeFull";
+    | "rangeFull"
+    | "portFixed";
 
 export class PublicNetRefusal extends Error {
     public constructor(
@@ -194,10 +195,32 @@ export async function setDomainPort(domainId: string, ownerId: string, port: num
     if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new PublicNetRefusal("badPort");
     const domain = await prisma.domain.findFirst({
         where: { id: domainId, application: { environment: { project: { ownerId } } } },
-        select: { id: true, application: { select: { sourceType: true, sourceConfig: true } } }
+        select: {
+            id: true,
+            deploymentId: true,
+            servedBy: true,
+            application: {
+                select: {
+                    sourceType: true,
+                    sourceConfig: true,
+                    currentDeploymentId: true,
+                    target: { select: { kind: true, hostId: true } }
+                }
+            }
+        }
     });
     if (!domain) throw new PublicNetRefusal("notFound");
     const servicePort = containerPortOf(domain.application);
+    if (port !== servicePort) {
+        const { currentDeploymentId, target } = domain.application;
+        const keptRelease = currentDeploymentId
+            ? (await prisma.deployment.count({
+                  where: { id: currentDeploymentId, isolated: true, cutover: false }
+              })) > 0
+            : false;
+        const remote = target.kind !== "local" && target.hostId !== null;
+        if (!net.dialsPinnedPort(domain, { remote, keptRelease })) throw new PublicNetRefusal("portFixed");
+    }
     await prisma.domain.update({
         where: { id: domain.id },
         data: { targetPort: port, portPinned: port !== servicePort }
@@ -321,8 +344,13 @@ async function isZoneApex(hostname: string): Promise<boolean> {
     return soa;
 }
 
-/** The certificate a visitor is shown on a hostname, read with one handshake. */
-function readCertificate(hostname: string): Promise<{ validTo: Date; issuer: string | null; trusted: boolean } | null> {
+/** The certificate a visitor is shown on a hostname, read with one handshake.
+ *  Only ever made to a public address, so a stored name never points this
+ *  server's handshake at its own network. */
+async function readCertificate(hostname: string): Promise<{ validTo: Date; issuer: string | null; trusted: boolean } | null> {
+    const { addresses } = await lookup(hostname);
+    const address = addresses[0];
+    if (!address || addresses.some((entry) => isPrivateIp(entry))) return null;
     return new Promise((resolve) => {
         let settled = false;
         const finish = (value: { validTo: Date; issuer: string | null; trusted: boolean } | null) => {
@@ -331,7 +359,7 @@ function readCertificate(hostname: string): Promise<{ validTo: Date; issuer: str
             socket.destroy();
             resolve(value);
         };
-        const socket = connect({ host: hostname, port: 443, servername: hostname, rejectUnauthorized: false });
+        const socket = connect({ host: address, port: 443, servername: hostname, rejectUnauthorized: false });
         socket.setTimeout(LOOKUP_TIMEOUT_MS, () => finish(null));
         socket.once("error", () => finish(null));
         socket.once("secureConnect", () => {
@@ -478,31 +506,26 @@ export async function listTcpProxies(applicationId: string, ownerId: string): Pr
  *
  * Published by the container runtime, so it is raw TCP with nothing in between:
  * a database, a game, an MQTT broker. The public port is chosen from a band no
- * service's own port is ever drawn from, skipping every port another service on
- * the same machine already publishes. It takes effect when the service is next
- * started, which the panel offers to do at once.
+ * service's own port is ever drawn from, skipping every port any service
+ * already publishes. It takes effect when the service is next started, which
+ * the panel offers to do at once.
  */
 export async function addTcpProxy(applicationId: string, ownerId: string, containerPort: number): Promise<net.TcpProxy> {
     if (!Number.isInteger(containerPort) || containerPort < 1 || containerPort > 65_535) {
         throw new PublicNetRefusal("badPort");
     }
     const app = await ownedApp(applicationId, ownerId);
-    const source = parseSource(app.sourceConfig);
-    const proxies = net.tcpProxiesOf(source);
-    const existing = proxies.find((proxy) => proxy.container === containerPort);
-    if (existing) return existing;
-    if (proxies.length >= TCP_PROXY_LIMIT) throw new PublicNetRefusal("proxyLimit", { count: TCP_PROXY_LIMIT });
-    const neighbours = await prisma.application.findMany({
-        where: { targetId: app.targetId },
-        select: { sourceConfig: true }
-    });
-    const taken = new Set(neighbours.flatMap((row) => net.publishedPortsOf(parseSource(row.sourceConfig))));
-    const host = net.pickProxyPort(taken, parseInt(app.id.replace(/-/g, "").slice(-6), 16) + containerPort);
-    if (host === null) throw new PublicNetRefusal("rangeFull");
-    const proxy: net.TcpProxy = { container: containerPort, host };
-    await prisma.application.update({
-        where: { id: app.id },
-        data: { sourceConfig: JSON.stringify({ ...source, tcpProxies: [...proxies, proxy] }) }
+    const proxy = await rewriteSource(app.id, async (source, tx) => {
+        const proxies = net.tcpProxiesOf(source);
+        const existing = proxies.find((entry) => entry.container === containerPort);
+        if (existing) return { result: existing, next: null };
+        if (proxies.length >= TCP_PROXY_LIMIT) throw new PublicNetRefusal("proxyLimit", { count: TCP_PROXY_LIMIT });
+        const others = await tx.application.findMany({ select: { sourceConfig: true } });
+        const taken = new Set(others.flatMap((row) => net.publishedPortsOf(parseSource(row.sourceConfig))));
+        const host = net.pickProxyPort(taken, parseInt(app.id.replace(/-/g, "").slice(-6), 16) + containerPort);
+        if (host === null) throw new PublicNetRefusal("rangeFull");
+        const added: net.TcpProxy = { container: containerPort, host };
+        return { result: added, next: { ...source, tcpProxies: [...proxies, added] } };
     });
     forget(`ports:${app.id}`);
     return proxy;
@@ -510,10 +533,50 @@ export async function addTcpProxy(applicationId: string, ownerId: string, contai
 
 export async function removeTcpProxy(applicationId: string, ownerId: string, containerPort: number): Promise<void> {
     const app = await ownedApp(applicationId, ownerId);
-    const source = parseSource(app.sourceConfig);
-    const kept = net.tcpProxiesOf(source).filter((proxy) => proxy.container !== containerPort);
-    const next: Record<string, unknown> = { ...source };
-    if (kept.length > 0) next.tcpProxies = kept;
-    else delete next.tcpProxies;
-    await prisma.application.update({ where: { id: app.id }, data: { sourceConfig: JSON.stringify(next) } });
+    await rewriteSource(app.id, async (source) => {
+        const kept = net.tcpProxiesOf(source).filter((proxy) => proxy.container !== containerPort);
+        const next: Record<string, unknown> = { ...source };
+        if (kept.length > 0) next.tcpProxies = kept;
+        else delete next.tcpProxies;
+        return { result: undefined, next };
+    });
 }
+
+type SourceEdit<T> = (
+    source: Record<string, unknown>,
+    tx: Prisma.TransactionClient
+) => Promise<{ result: T; next: Record<string, unknown> | null }>;
+
+/** Read, change and write a service's source config as one serializable unit,
+ *  retried when a concurrent writer wins, so neither write is lost and two
+ *  services never pick the same public port. */
+async function rewriteSource<T>(applicationId: string, edit: SourceEdit<T>): Promise<T> {
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await prisma.$transaction(
+                async (tx) => {
+                    const row = await tx.application.findUniqueOrThrow({
+                        where: { id: applicationId },
+                        select: { sourceConfig: true }
+                    });
+                    const { result, next } = await edit(parseSource(row.sourceConfig), tx);
+                    if (next) {
+                        const written = await tx.application.updateMany({
+                            where: { id: applicationId, sourceConfig: row.sourceConfig },
+                            data: { sourceConfig: JSON.stringify(next) }
+                        });
+                        if (written.count !== 1) throw new SourceConflict();
+                    }
+                    return result;
+                },
+                { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+            );
+        } catch (error) {
+            const conflict = error instanceof SourceConflict
+                || (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034");
+            if (!conflict || attempt >= 5) throw error;
+        }
+    }
+}
+
+class SourceConflict extends Error {}
