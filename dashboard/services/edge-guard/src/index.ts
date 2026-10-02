@@ -10,6 +10,7 @@
 import { randomBytes } from "node:crypto";
 import type { GuardConfig } from "./authz.js";
 import { createIntelSource } from "./intel.js";
+import { createControlPlaneWatch, probeHealth } from "./control-plane.js";
 import { createProxyServer } from "./proxy.js";
 import { createGuardServer } from "./server.js";
 
@@ -23,6 +24,16 @@ const intel = createIntelSource(process.env.POLARIS_EDGE_INTEL_FILE);
  *  a restart. */
 const processKey = randomBytes(32).toString("base64url");
 
+/** Whether the Polaris each route signs visitors in through is answering. Probed in
+ *  the background, never on the request path - see control-plane.ts.
+ *
+ *  POLARIS_CONTROL_PLANE_URL is the address this container reaches Polaris on directly,
+ *  set only where the two share a network. The public address is what visitors use, but
+ *  from beside Polaris it is often unreachable (no hairpin NAT, split DNS), which would
+ *  read as Polaris being down while it is up. */
+const probeVia = (process.env.POLARIS_CONTROL_PLANE_URL ?? "").replace(/\/+$/, "");
+const controlPlane = createControlPlaneWatch((base) => probeHealth(probeVia || base));
+
 /** Resolve the guard config from the environment (re-read per request). */
 function loadConfig(): GuardConfig {
     const now = Date.now();
@@ -34,17 +45,22 @@ function loadConfig(): GuardConfig {
         now: Math.floor(now / 1000),
         intel: intel.current(now),
         challengeSecret: secret || processKey,
-        nonce: randomBytes(12).toString("base64url")
+        nonce: randomBytes(12).toString("base64url"),
+        controlPlane: (base) => controlPlane.reachable(base, now)
     };
 }
 
 const port = Number(process.env.POLARIS_EDGE_GUARD_PORT ?? 8080);
 const startup = loadConfig();
 if (!startup.secret) {
-    console.warn("polaris-edge-guard: POLARIS_AUTH_SECRET is unset; require-login routes will always redirect to login.");
+    console.warn(
+        "polaris-edge-guard: POLARIS_AUTH_SECRET is unset; require-login routes will always redirect to login."
+    );
 }
 if (!startup.authorizeUrl) {
-    console.warn("polaris-edge-guard: POLARIS_PUBLIC_URL is unset; login redirects will be malformed until it is set.");
+    console.warn(
+        "polaris-edge-guard: POLARIS_PUBLIC_URL is unset; login redirects will be malformed until it is set."
+    );
 }
 
 createGuardServer(loadConfig).listen(port, () => {

@@ -66,7 +66,9 @@ export function sendBlocked(res: ServerResponse, ctx: BlockContext): void {
     res.writeHead(403, {
         "content-type": document ? "text/html; charset=utf-8" : "text/plain; charset=utf-8",
         "cache-control": "no-store",
-        "x-content-type-options": "nosniff"
+        "x-content-type-options": "nosniff",
+        // A refusal is never something to show inside another site's page.
+        "x-frame-options": "DENY"
     });
     res.end(
         document

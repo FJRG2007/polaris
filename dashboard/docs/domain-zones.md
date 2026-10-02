@@ -60,7 +60,11 @@ their own. Two ways to leave that:
 - **A name on a completely different domain** is added as a custom domain instead, which
   needs no wildcard behind it either: `provisionHostnameDns()` (domain-dns) writes that
   one A record through the connected Cloudflare token, and the panel reports what to do
-  by hand when it cannot.
+  by hand when it cannot. The record points at whichever machine's edge actually
+  answers for that domain - the remote server's own address when its app is on a
+  remote target and served by that server's edge, Polaris's own address otherwise -
+  never at Polaris for a domain it does not serve. A remote server with no public
+  IPv4 Polaris can see is left for the operator to point by hand.
 
 A record already pointing somewhere else is never repointed - the name may be a live
 site - and the domain is added either way, since DNS that is not there yet only

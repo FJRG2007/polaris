@@ -585,6 +585,9 @@ services:
       POLARIS_AUTH_SECRET: ${POLARIS_AUTH_SECRET:?POLARIS_AUTH_SECRET is required}
       # Where the guard sends visitors to sign in for require-login routes.
       POLARIS_PUBLIC_URL: ${POLARIS_PUBLIC_URL:-https://polaris.local}
+      # Where it checks that Polaris is up. The public address is often unreachable from
+      # the machine it is served from (no hairpin NAT, split DNS); this one never is.
+      POLARIS_CONTROL_PLANE_URL: http://web:3000
       # Bans, Tor exits and flagged addresses, held in memory and re-read only when
       # the file changes - so enforcing one costs a map lookup, never a query.
       POLARIS_EDGE_INTEL_FILE: /edge-intel/waf-intel.json

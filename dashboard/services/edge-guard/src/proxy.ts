@@ -1,12 +1,15 @@
 /**
- * The guard's proxy mode, which exists for exactly one control: email obfuscation.
+ * The guard's proxy mode, which exists for the two controls that act on a RESPONSE:
+ * email obfuscation, and framing protection (clickjacking).
  *
  * Everything else the firewall does is a decision about a REQUEST, so Traefik's
  * forwardAuth is enough - it asks the guard, gets a status, and forwards to the app
- * itself. Obfuscation rewrites the RESPONSE, and forwardAuth never sees one. So for a
- * route with obfuscation on, Traefik points at the guard instead and the guard
- * forwards to the app, which is the only place in this design that sits in the data
- * path rather than beside it.
+ * itself. Both of these need the app's own response, and forwardAuth never sees one.
+ * So for such a route Traefik points at the guard instead and the guard forwards to
+ * the app, which is the only place in this design that sits in the data path rather
+ * than beside it. Framing protection only touches headers - it never buffers a body -
+ * because merging with the app's own `Content-Security-Policy` is something a blind
+ * Traefik header cannot do without replacing that policy (see `protectFrameHeaders`).
  *
  * Three things keep that from being a bad trade:
  *
@@ -31,13 +34,21 @@ import { sendVacant } from "./vacant.js";
 import type { Duplex } from "node:stream";
 import { sendRedirect } from "./redirect.js";
 import { sendBlocked } from "./block-page.js";
+import { sendSignInUnavailable } from "./signin-unavailable.js";
 import { connect as netConnect } from "node:net";
 import { sendChallenge } from "./challenge-page.js";
 import { request as httpsRequest } from "node:https";
 import { clientIp, evaluate, type GuardConfig } from "./authz.js";
 import { decodeGuardRule, verifyEdgeOrigin } from "@polaris/core/waf";
-import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import {
+    createServer,
+    request as httpRequest,
+    type IncomingMessage,
+    type Server,
+    type ServerResponse
+} from "node:http";
+import {
+    protectFrameHeaders,
     EMAIL_DECODE_PATH,
     EMAIL_DECODE_SCRIPT,
     obfuscateEmailsInHtml,
@@ -100,7 +111,10 @@ function rewritable(res: IncomingMessage): boolean {
 }
 
 /** The headers to forward upstream, minus the ones that are this connection's. */
-function upstreamHeaders(req: IncomingMessage, obfuscating: boolean): Record<string, string | string[]> {
+function upstreamHeaders(
+    req: IncomingMessage,
+    obfuscating: boolean
+): Record<string, string | string[]> {
     const out: Record<string, string | string[]> = {};
     for (const [name, value] of Object.entries(req.headers)) {
         if (value === undefined || HOP_BY_HOP.has(name)) continue;
@@ -179,7 +193,12 @@ export function createProxyServer(config: () => GuardConfig): Server {
         // one for, and the error page is a sub-request copied from the request as it
         // entered the errors middleware, which runs ahead of the one that stamps it.
         const routed = header(req, ORIGIN_HEADER) !== undefined;
-        if (!routed && (url === VACANT_PATH || url.startsWith(`${VACANT_PATH}/`) || url.startsWith(`${VACANT_PATH}?`))) {
+        if (
+            !routed &&
+            (url === VACANT_PATH ||
+                url.startsWith(`${VACANT_PATH}/`) ||
+                url.startsWith(`${VACANT_PATH}?`))
+        ) {
             sendVacant(res, {
                 host: header(req, "x-forwarded-host") ?? header(req, "host"),
                 accept: header(req, "accept"),
@@ -230,6 +249,13 @@ export function createProxyServer(config: () => GuardConfig): Server {
             return;
         }
         if (decision.status === 503) {
+            if ("signInUnavailable" in decision) {
+                sendSignInUnavailable(res, {
+                    host: header(req, "x-forwarded-host") ?? header(req, "host"),
+                    accept: header(req, "accept")
+                });
+                return;
+            }
             sendChallenge(res, {
                 challenge: decision.challenge,
                 bits: decision.bits,
@@ -241,8 +267,13 @@ export function createProxyServer(config: () => GuardConfig): Server {
             return;
         }
 
-        const obfuscating = decodeGuardRule(wafHeader).emailObfuscation === true;
-        forward(req, res, origin, obfuscating);
+        const rule = decodeGuardRule(wafHeader);
+        const frame = rule.frameAncestors;
+        const shape: HeaderShape =
+            frame === undefined
+                ? (headers) => headers
+                : (headers) => protectFrameHeaders(headers, frame);
+        forward(req, res, origin, rule.emailObfuscation === true, shape);
     });
 
     // A WebSocket (or any other upgrade) cannot be rewritten and must not be broken by
@@ -259,9 +290,21 @@ export function createProxyServer(config: () => GuardConfig): Server {
     return server;
 }
 
+/** What the route does to the response headers on their way out - framing protection,
+ *  or nothing. Applied on every branch, so a body that is not rewritten still gets it. */
+type HeaderShape = (
+    headers: Record<string, string | string[]>
+) => Record<string, string | string[] | undefined>;
+
 /** Forward one request upstream and write the response back, rewriting the body when
  *  it is HTML and the route asked for it. */
-function forward(req: IncomingMessage, res: ServerResponse, origin: string, obfuscating: boolean): void {
+function forward(
+    req: IncomingMessage,
+    res: ServerResponse,
+    origin: string,
+    obfuscating: boolean,
+    shape: HeaderShape
+): void {
     const target = new URL(req.url ?? "/", origin);
     const send = target.protocol === "https:" ? httpsRequest : httpRequest;
 
@@ -276,11 +319,14 @@ function forward(req: IncomingMessage, res: ServerResponse, origin: string, obfu
         },
         (response) => {
             if (!obfuscating || !rewritable(response)) {
-                res.writeHead(response.statusCode ?? 502, downstreamHeaders(response));
+                res.writeHead(
+                    response.statusCode ?? 502,
+                    defined(shape(downstreamHeaders(response)))
+                );
                 response.pipe(res);
                 return;
             }
-            collectAndRewrite(response, res);
+            collectAndRewrite(response, res, shape);
         }
     );
 
@@ -303,7 +349,11 @@ function forward(req: IncomingMessage, res: ServerResponse, origin: string, obfu
  * been collected is flushed and the rest is piped. The response therefore always
  * completes, whichever branch it takes.
  */
-function collectAndRewrite(upstream: IncomingMessage, res: ServerResponse): void {
+function collectAndRewrite(
+    upstream: IncomingMessage,
+    res: ServerResponse,
+    shape: HeaderShape
+): void {
     const chunks: Buffer[] = [];
     let size = 0;
     let flushed = false;
@@ -316,7 +366,10 @@ function collectAndRewrite(upstream: IncomingMessage, res: ServerResponse): void
             // Past the cap. Give up on rewriting, send what was held, and let the rest
             // stream - `content-length` is dropped because it may no longer describe
             // what is being sent.
-            res.writeHead(upstream.statusCode ?? 200, downstreamHeaders(upstream, ["content-length"]));
+            res.writeHead(
+                upstream.statusCode ?? 200,
+                defined(shape(downstreamHeaders(upstream, ["content-length"])))
+            );
             for (const held of chunks) res.write(held);
             res.write(chunk);
             upstream.pipe(res);
@@ -341,7 +394,7 @@ function collectAndRewrite(upstream: IncomingMessage, res: ServerResponse): void
         }
         const headers = downstreamHeaders(upstream, ["content-length"]);
         headers["content-length"] = String(out.length);
-        res.writeHead(upstream.statusCode ?? 200, headers);
+        res.writeHead(upstream.statusCode ?? 200, defined(shape(headers)));
         res.end(out);
     });
 
@@ -349,6 +402,15 @@ function collectAndRewrite(upstream: IncomingMessage, res: ServerResponse): void
         if (!res.headersSent) res.writeHead(502, { "content-type": "text/plain" });
         res.end();
     });
+}
+
+/** A header map with the absent entries dropped, which is what `writeHead` takes. */
+function defined(
+    headers: Record<string, string | string[] | undefined>
+): Record<string, string | string[]> {
+    const out: Record<string, string | string[]> = {};
+    for (const [name, value] of Object.entries(headers)) if (value !== undefined) out[name] = value;
+    return out;
 }
 
 /** Put the decoder script into the document. Before `</body>` where there is one, and
@@ -371,7 +433,8 @@ function splice(req: IncomingMessage, clientSocket: Duplex, head: Buffer, origin
         const lines = [`${req.method} ${req.url} HTTP/1.1`];
         for (const [name, value] of Object.entries(req.headers)) {
             if (value === undefined || name === ORIGIN_HEADER) continue;
-            for (const entry of Array.isArray(value) ? value : [value]) lines.push(`${name}: ${entry}`);
+            for (const entry of Array.isArray(value) ? value : [value])
+                lines.push(`${name}: ${entry}`);
         }
         upstream.write(`${lines.join("\r\n")}\r\n\r\n`);
         if (head.length > 0) upstream.write(head);

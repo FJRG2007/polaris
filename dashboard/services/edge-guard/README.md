@@ -14,7 +14,7 @@ gap while preserving the deploy resilience contract: it runs on the same server 
 the app and Traefik, holds **no rule state** (every rule arrives per request in the
 `X-Polaris-Waf` header that Traefik stamps on), and verifies login tokens **offline**
 with the shared secret. So the WAF keeps enforcing when the Polaris control plane is
-down; only minting a *new* login token needs Polaris up.
+down; only minting a _new_ login token needs Polaris up.
 
 ## Request contract
 
@@ -31,12 +31,14 @@ pointing here. The guard reads:
 
 ## Environment
 
-| Var | Purpose | Default |
-|---|---|---|
-| `POLARIS_AUTH_SECRET` | HMAC secret to verify edge tokens (deny-only routes need none) | - |
-| `POLARIS_PUBLIC_URL` | Fallback Polaris base URL for a login redirect, used only when the route's rule carries none (see below) | - |
-| `POLARIS_EDGE_COOKIE` | Edge-token cookie name | `polaris.edge` |
-| `POLARIS_EDGE_GUARD_PORT` | Listen port | `8080` |
+| Var                         | Purpose                                                                                                                                                                                                                                         | Default                      |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `POLARIS_AUTH_SECRET`       | HMAC secret to verify edge tokens (deny-only routes need none)                                                                                                                                                                                  | -                            |
+| `POLARIS_PUBLIC_URL`        | Fallback Polaris base URL for a login redirect, used only when the route's rule carries none (see below)                                                                                                                                        | -                            |
+| `POLARIS_EDGE_COOKIE`       | Edge-token cookie name                                                                                                                                                                                                                          | `polaris.edge`               |
+| `POLARIS_EDGE_GUARD_PORT`   | Listen port                                                                                                                                                                                                                                     | `8080`                       |
+| `POLARIS_EDGE_INTEL_FILE`   | Path to the bans/Tor-exits/revocations snapshot Polaris pushes over SSH (see below)                                                                                                                                                             | `/edge-intel/waf-intel.json` |
+| `POLARIS_CONTROL_PLANE_URL` | Address this container reaches Polaris on directly, to probe whether it is up - set only where the two share a network. Falls back to the route's own login address, which from beside Polaris is often unreachable (no hairpin NAT, split DNS) | -                            |
 
 ## Where the login lives
 
@@ -89,10 +91,10 @@ Deploy hostnames sit under a wildcard, so every name in the zone reaches the edg
 whether or not anything was deployed on it. The guard's proxy listener serves the page
 for those, on two paths Traefik rewrites to:
 
-| Path | Reached from | Answers |
-|---|---|---|
-| `/__polaris/vacant` | the catch-all router, for a name no app claims | **404**, "there is nothing running here" |
-| `/__polaris/vacant/down` | an app router's `errors` middleware on 502/503/504 | **502**, "this app is not running" |
+| Path                     | Reached from                                       | Answers                                  |
+| ------------------------ | -------------------------------------------------- | ---------------------------------------- |
+| `/__polaris/vacant`      | the catch-all router, for a name no app claims     | **404**, "there is nothing running here" |
+| `/__polaris/vacant/down` | an app router's `errors` middleware on 502/503/504 | **502**, "this app is not running"       |
 
 Both are served before the signed-origin check, since the point is that there is no
 origin. The state is the path and not a parameter: Traefik's rewrite keeps the visitor's
@@ -102,6 +104,30 @@ Every response carries `X-Polaris-Page: vacant`. Polaris fetches the path and ch
 it before pointing the edge here at all - a sidecar too old to know these paths answers
 with its generic `Bad gateway`, and an app's error page pointed at that would be worse
 than the 502 it replaced.
+
+## While Polaris is unreachable
+
+Every decision stays on this server. A route that requires a login carries Polaris's
+Ed25519 public key (`k`), and only a token signed by that key is accepted there - the
+shared secret this sidecar may also hold cannot mint one. Bans, Tor exits and accounts
+Polaris re-decided (revoked sessions, membership changes) come from the snapshot in
+`POLARIS_EDGE_INTEL_FILE`, which Polaris pushes to every server over SSH.
+
+The guard probes the login address's `/api/health` in the background, at most every 30
+seconds and only for routes that require a login. When it is known to be down:
+
+- A visitor with a valid token keeps access until the token's hard expiry (12 hours);
+  the 30-minute membership backstop stands down, since there is nowhere to refresh.
+- A visitor who needs to sign in, holds an expired token, or whose account Polaris
+  re-decided gets a 503 page saying sign-in is unavailable - never the app.
+
+## Framing protection
+
+A route whose rule carries `f` (allowed origins, possibly empty) is served through the
+proxy listener, which adds `Content-Security-Policy: frame-ancestors 'self' ...` as a
+separate policy beside the app's own and `X-Frame-Options: SAMEORIGIN` when no origin
+is allowed. An app that sent its own `frame-ancestors` is left untouched, and one that
+sent only `X-Frame-Options` gets the matching `frame-ancestors`.
 
 ## Fail-closed behavior
 

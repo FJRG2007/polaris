@@ -24,9 +24,9 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { quoteArg, DYNAMIC_DIR } from "@polaris/deploy";
 import { execCommand, openSshClient, type SshAuth } from "@polaris/ssh";
 import { renderDynamicConfig, type AppRoute, type Router } from "@/lib/deploy/router";
+import { quoteArg, DYNAMIC_DIR, EDGE_INTEL_DIR, EDGE_INTEL_FILE } from "@polaris/deploy";
 
 /**
  * How a pushed route ranks against the one a container declares in its own labels.
@@ -98,7 +98,11 @@ const REMOTE_EDGE_DYNAMIC = "/dynamic";
  * a file the edge refuses, and refusing one file freezes all the others.
  */
 export function remoteCertificatesScript(
-    certificates: readonly { readonly id: string; readonly certPem: string; readonly keyPem: string }[],
+    certificates: readonly {
+        readonly id: string;
+        readonly certPem: string;
+        readonly keyPem: string;
+    }[],
     nonce = randomBytes(6).toString("hex")
 ): string {
     const lines = ["set -e", `mkdir -p ${quoteArg(DYNAMIC_DIR)}`];
@@ -119,14 +123,46 @@ export function remoteCertificatesScript(
         const key = `${REMOTE_CERT_PREFIX}${certificate.id}.key`;
         put(crt, certificate.certPem, false);
         put(key, certificate.keyPem, true);
-        entries.push(`    - certFile: ${REMOTE_EDGE_DYNAMIC}/${crt}`, `      keyFile: ${REMOTE_EDGE_DYNAMIC}/${key}`);
+        entries.push(
+            `    - certFile: ${REMOTE_EDGE_DYNAMIC}/${crt}`,
+            `      keyFile: ${REMOTE_EDGE_DYNAMIC}/${key}`
+        );
     }
-    if (entries.length > 0) put(`${REMOTE_CERT_PREFIX}certs.yml`, ["tls:", "  certificates:", ...entries, ""].join("\n"), false);
+    if (entries.length > 0)
+        put(
+            `${REMOTE_CERT_PREFIX}certs.yml`,
+            ["tls:", "  certificates:", ...entries, ""].join("\n"),
+            false
+        );
     const keep = kept.length > 0 ? kept.map((name) => quoteArg(name)).join("|") : "''";
     lines.push(
         `for f in ${quoteArg(DYNAMIC_DIR)}/${REMOTE_CERT_PREFIX}*; do case "$(basename "$f")" in ${keep}) ;; *) rm -f "$f" ;; esac; done`
     );
     return lines.join("\n");
+}
+
+/**
+ * The script that gives a server's guard the firewall's current address list and the
+ * accounts Polaris has re-decided.
+ *
+ * Written beside the target and renamed over it like everything else here: the guard
+ * re-reads the file whenever it changes, and one it caught half-written would parse as
+ * nothing - it keeps its last good list in that case, but there is no reason to make it.
+ */
+export function remoteIntelScript(nonce = randomBytes(6).toString("hex")): string {
+    const target = `${EDGE_INTEL_DIR}/${EDGE_INTEL_FILE}`;
+    const temporary = `${EDGE_INTEL_DIR}/.${EDGE_INTEL_FILE}.${nonce}`;
+    return [
+        "set -e",
+        `mkdir -p ${quoteArg(EDGE_INTEL_DIR)}`,
+        // From stdin rather than the command line: the list grows with every ban and
+        // feed, and a command line is capped at a size a large one passes.
+        `cat > ${quoteArg(temporary)}`,
+        // Readable by the guard, which runs as an unprivileged user inside its
+        // container; nothing in it is a secret, only addresses and opaque account ids.
+        `chmod 644 ${quoteArg(temporary)}`,
+        `mv -f ${quoteArg(temporary)} ${quoteArg(target)}`
+    ].join("\n");
 }
 
 /** The script that takes Polaris's file off a server - for a server that no longer
@@ -162,14 +198,23 @@ export class RemoteRouter implements Router {
         await this.run(routes.length === 0 ? remoteClearScript() : remoteWriteScript(yaml));
     }
 
+    /** Give this server's guard the firewall's current address list. */
+    public async pushIntel(json: string): Promise<void> {
+        await this.run(remoteIntelScript(), "its address list", json);
+    }
+
     /** Replace the certificates Polaris gave this server's edge with exactly these. */
     public async pushCertificates(
-        certificates: readonly { readonly id: string; readonly certPem: string; readonly keyPem: string }[]
+        certificates: readonly {
+            readonly id: string;
+            readonly certPem: string;
+            readonly keyPem: string;
+        }[]
     ): Promise<void> {
         await this.run(remoteCertificatesScript(certificates));
     }
 
-    private async run(script: string): Promise<void> {
+    private async run(script: string, what = "its routes", input?: string): Promise<void> {
         const client = await openSshClient({
             host: this.edge.address,
             port: this.edge.port,
@@ -180,13 +225,14 @@ export class RemoteRouter implements Router {
         try {
             let complaint = "";
             const result = await execCommand(client, script, {
+                input,
                 onStderr: (chunk) => {
                     complaint += chunk.toString("utf8");
                 }
             });
             if (result.code !== 0) {
                 throw new Error(
-                    `That server would not take its routes${complaint.trim() ? `: ${complaint.trim().slice(0, 200)}` : ""}`
+                    `That server would not take ${what}${complaint.trim() ? `: ${complaint.trim().slice(0, 200)}` : ""}`
                 );
             }
         } finally {

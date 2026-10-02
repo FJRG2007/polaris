@@ -31,7 +31,8 @@ import Fuse from "fuse.js";
 import { RuleList } from "./rule-list";
 import { Section } from "./page-parts";
 import { ruleDescription } from "./rule-language";
-import { Loader2, Mail, Search } from "lucide-react";
+import { ChipList } from "./chip-list";
+import { Frame, Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
 import { useCallback, useEffect, useState } from "react";
 import type { WafInheritedView } from "@/lib/waf-service";
@@ -43,6 +44,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { localizeManaged } from "./waf-words";
 import {
+    normalizeFrameOrigin,
     WAF_MANAGED_RULES,
     WAF_RULES_MAX,
     wafManagedRule,
@@ -73,6 +75,8 @@ const BLANK: WafScopeRule = {
     sqlInjectionProtection: true,
     xssProtection: true,
     emailObfuscation: true,
+    frameProtection: true,
+    frameAncestors: [],
     presets: [],
     rules: []
 };
@@ -88,14 +92,22 @@ type View =
 
 /** Whether this scope's own rule arms a predefined rule. A feed is not stored on a
  *  scope at all, so it answers from the instance switch. */
-function managedEnabled(rule: WafManagedRule, saved: WafScopeRule, tor: WafFeedView | null): boolean {
+function managedEnabled(
+    rule: WafManagedRule,
+    saved: WafScopeRule,
+    tor: WafFeedView | null
+): boolean {
     if (rule.control.kind === "preset") return saved.presets.includes(rule.control.preset);
     if (rule.control.kind === "feed") return tor?.enabled ?? false;
     return saved[rule.control.setting];
 }
 
 /** The patch that switches one on or off, whichever half of the scope holds it. */
-function managedPatch(rule: WafManagedRule, saved: WafScopeRule, on: boolean): Partial<WafScopeRule> {
+function managedPatch(
+    rule: WafManagedRule,
+    saved: WafScopeRule,
+    on: boolean
+): Partial<WafScopeRule> {
     if (rule.control.kind === "setting") return { [rule.control.setting]: on };
     if (rule.control.kind === "feed") return {};
     const preset = rule.control.preset;
@@ -109,7 +121,10 @@ type Words = NamespaceTranslator<"firewall">;
 /** Said once, because the row and the rule's own page both say it. */
 const armedAbove = (t: Words) => ({ label: t("scope.armedAbove"), why: t("scope.armedAboveWhy") });
 const offAbove = (t: Words) => ({ label: t("scope.offAbove"), why: t("scope.offAboveWhy") });
-const instanceFeed = (t: Words) => ({ label: t("scope.instanceWide"), why: t("scope.instanceWideWhy") });
+const instanceFeed = (t: Words) => ({
+    label: t("scope.instanceWide"),
+    why: t("scope.instanceWideWhy")
+});
 
 /**
  * Who decides this rule, when it is not this scope.
@@ -145,7 +160,9 @@ function decidedElsewhere(
     if (!inherited) return undefined;
     if (rule.control.kind === "preset") {
         if (saved.presets.includes(rule.control.preset)) return undefined;
-        return inherited.presets.includes(rule.control.preset) ? { on: true, ...armedAbove(t) } : undefined;
+        return inherited.presets.includes(rule.control.preset)
+            ? { on: true, ...armedAbove(t) }
+            : undefined;
     }
     if (rule.control.setting === "browserIntegrity") {
         if (saved.browserIntegrity) return undefined;
@@ -326,12 +343,18 @@ export function WafEditor({
                 // A feed is the one rule this page can change instance-wide, so the
                 // switch stays live here for an operator - the row does not offer it.
                 decidedElsewhere={
-                    feed && canOperate ? undefined : decidedElsewhere(rule, saved, inherited, tor, canOperate, t)
+                    feed && canOperate
+                        ? undefined
+                        : decidedElsewhere(rule, saved, inherited, tor, canOperate, t)
                 }
                 // Only an operator is told how the fetch is going; for everybody else
                 // the rule is on or off and the plumbing is not theirs. The action
                 // withholds the figures too, so this is not the only gate.
-                feed={feed && canOperate ? (tor ?? { count: 0, fetchedAt: null, error: null }) : undefined}
+                feed={
+                    feed && canOperate
+                        ? (tor ?? { count: 0, fetchedAt: null, error: null })
+                        : undefined
+                }
                 onBack={backToList}
                 onToggle={(on) => (feed ? persistTor(on) : persist(managedPatch(rule, saved, on)))}
                 onCreateException={() =>
@@ -392,7 +415,8 @@ export function WafEditor({
     // typed on is one click away and nothing else would show they are still waiting.
     const addressesUnsaved =
         addresses !== null &&
-        JSON.stringify([addresses.allow, addresses.deny]) !== JSON.stringify([saved.ipAllowlist, saved.ipDenylist]);
+        JSON.stringify([addresses.allow, addresses.deny]) !==
+            JSON.stringify([saved.ipAllowlist, saved.ipDenylist]);
 
     const accessRows: PredefinedRuleRow[] = [
         {
@@ -407,7 +431,10 @@ export function WafEditor({
                 ? t("access.unsaved")
                 : addressCount === 0
                   ? t("access.noAddresses")
-                  : t("access.counts", { allowed: saved.ipAllowlist.length, blocked: saved.ipDenylist.length })
+                  : t("access.counts", {
+                        allowed: saved.ipAllowlist.length,
+                        blocked: saved.ipDenylist.length
+                    })
         },
         ...(offerLogin
             ? [
@@ -434,7 +461,9 @@ export function WafEditor({
             : [])
     ];
 
-    const managedRows: PredefinedRuleRow[] = WAF_MANAGED_RULES.map((core) => localizeManaged(core, t)).map((rule) => ({
+    const managedRows: PredefinedRuleRow[] = WAF_MANAGED_RULES.map((core) =>
+        localizeManaged(core, t)
+    ).map((rule) => ({
         id: rule.id,
         name: rule.label,
         description: rule.description,
@@ -468,10 +497,23 @@ export function WafEditor({
                               name: rule.name,
                               description: ruleDescription(rule, t)
                           })),
-                          ...accessRows.map((row) => ({ key: `row:${row.id}`, name: row.name, description: row.description })),
-                          ...managedRows.map((row) => ({ key: `row:${row.id}`, name: row.name, description: row.description }))
+                          ...accessRows.map((row) => ({
+                              key: `row:${row.id}`,
+                              name: row.name,
+                              description: row.description
+                          })),
+                          ...managedRows.map((row) => ({
+                              key: `row:${row.id}`,
+                              name: row.name,
+                              description: row.description
+                          }))
                       ],
-                      { keys: ["name", "description"], threshold: 0.35, ignoreLocation: true, minMatchCharLength: 2 }
+                      {
+                          keys: ["name", "description"],
+                          threshold: 0.35,
+                          ignoreLocation: true,
+                          minMatchCharLength: 2
+                      }
                   )
                       .search(needle)
                       .map((hit) => hit.item.key)
@@ -493,6 +535,7 @@ export function WafEditor({
     );
     const filtering = needle !== "" || status !== "all";
     const obfuscationOffAbove = inherited !== null && !inherited.emailObfuscation;
+    const framingOffAbove = inherited !== null && !inherited.frameProtection;
 
     return (
         <div className="flex flex-col gap-4">
@@ -534,7 +577,9 @@ export function WafEditor({
                 canEdit={!busy && !filtering}
                 hidden={hiddenRules}
                 matches={matches}
-                onCreate={() => setView({ kind: "custom", index: null, rule: emptyRule(saved.rules.length, t) })}
+                onCreate={() =>
+                    setView({ kind: "custom", index: null, rule: emptyRule(saved.rules.length, t) })
+                }
                 onEdit={(index) => {
                     const rule = saved.rules[index];
                     if (rule) setView({ kind: "custom", index, rule });
@@ -546,7 +591,9 @@ export function WafEditor({
                 title={t("access.title")}
                 hint={t("access.hint")}
                 canEdit={!busy}
-                onOpen={(id) => setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })}
+                onOpen={(id) =>
+                    setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })
+                }
                 onToggle={(_, on) => persist({ requireLogin: on })}
                 rows={accessRows.filter((row) => shown(`row:${row.id}`, row.enabled))}
             />
@@ -560,25 +607,36 @@ export function WafEditor({
                     const rule = wafManagedRule(id);
                     // A feed is not part of any scope's rule, and its row never offers
                     // the switch - persisting the scope for it would be a no-op write.
-                    if (rule && rule.control.kind !== "feed") persist(managedPatch(rule, saved, on));
+                    if (rule && rule.control.kind !== "feed")
+                        persist(managedPatch(rule, saved, on));
                 }}
                 rows={managedRows.filter((row) =>
-                    shown(`row:${row.id}`, row.decidedElsewhere ? row.decidedElsewhere.on : row.enabled)
+                    shown(
+                        `row:${row.id}`,
+                        row.decidedElsewhere ? row.decidedElsewhere.on : row.enabled
+                    )
                 )}
             />
 
             <Section title={t("shield.title")} hint={t("shield.hint")}>
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 gap-2">
-                        <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <Mail
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
                         <div className="min-w-0">
                             <div className="text-sm">{t("shield.obfuscation")}</div>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{t("shield.obfuscationHint")}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                {t("shield.obfuscationHint")}
+                            </p>
                             {/* It intersects across scopes, so a broader one can only
                                 switch it OFF - and this switch would otherwise sit on
                                 "on" while nothing was being rewritten. */}
                             {obfuscationOffAbove ? (
-                                <p className="mt-1 text-xs text-muted-foreground">{offAbove(t).why}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {offAbove(t).why}
+                                </p>
                             ) : null}
                         </div>
                     </div>
@@ -591,11 +649,18 @@ export function WafEditor({
                 </div>
             </Section>
 
+            <FramingSection
+                polaris={scopeType === "polaris"}
+                saved={saved}
+                offFromAbove={framingOffAbove}
+                allowedAbove={inherited?.frameAncestors ?? []}
+                busy={busy}
+                onChange={persist}
+            />
+
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <p className="text-xs text-muted-foreground">
-                {scopeType === "polaris"
-                    ? t("scope.polarisNote")
-                    : t("scope.remoteNote")}
+                {scopeType === "polaris" ? t("scope.polarisNote") : t("scope.remoteNote")}
             </p>
 
             {/* Under the rules rather than under whichever rule is open: what the
@@ -603,6 +668,98 @@ export function WafEditor({
                 rule page made it read as part of that rule. */}
             {instancePanels}
         </div>
+    );
+}
+
+/**
+ * Clickjacking protection for the scope: one switch, and the sites allowed to frame it
+ * anyway.
+ *
+ * Saved as it changes, unlike the address lists: an entry here can only widen who may
+ * frame a page, never lock its author out of anything, so there is no half-finished
+ * state worth holding back. On Polaris's own scope it is fixed on - the dashboard sends
+ * the header itself, with the calendar's published embeds as the one exception, so a
+ * switch here would claim a choice the page cannot make.
+ */
+function FramingSection({
+    polaris,
+    saved,
+    offFromAbove,
+    allowedAbove,
+    busy,
+    onChange
+}: {
+    polaris: boolean;
+    saved: WafScopeRule;
+    offFromAbove: boolean;
+    allowedAbove: readonly string[];
+    busy: boolean;
+    onChange: (patch: Partial<WafScopeRule>) => void;
+}) {
+    const t = useTranslations("firewall");
+    const on = polaris || (saved.frameProtection && !offFromAbove);
+    return (
+        <Section title={t("framing.title")} hint={t("framing.hint")}>
+            <div className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 gap-2">
+                        <Frame
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                        <div className="min-w-0">
+                            <div className="text-sm">{t("framing.title")}</div>
+                            {polaris ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {t("framing.polaris")}
+                                </p>
+                            ) : offFromAbove ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {offAbove(t).why}
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                    <Switch
+                        checked={on}
+                        disabled={busy || polaris || offFromAbove}
+                        onChange={(next) => onChange({ frameProtection: next })}
+                        aria-label={t("framing.title")}
+                    />
+                </div>
+                {on && !polaris ? (
+                    <div className="flex flex-col gap-1.5">
+                        <div className="text-sm">{t("framing.allowed")}</div>
+                        <p className="text-xs text-muted-foreground">{t("framing.allowedHint")}</p>
+                        <ChipList
+                            entries={saved.frameAncestors}
+                            placeholder={t("framing.placeholder")}
+                            validate={(value) => normalizeFrameOrigin(value) !== null}
+                            invalidMessage={t("framing.invalid")}
+                            disabled={busy}
+                            onChange={(next) =>
+                                onChange({
+                                    // Stored in the one form the edge writes, so the chip
+                                    // shows exactly what a browser will be told.
+                                    frameAncestors: [
+                                        ...new Set(
+                                            next.flatMap(
+                                                (entry) => normalizeFrameOrigin(entry) ?? []
+                                            )
+                                        )
+                                    ]
+                                })
+                            }
+                        />
+                        {allowedAbove.length > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("framing.allowedAbove", { sites: allowedAbove.join(", ") })}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
+            </div>
+        </Section>
     );
 }
 
@@ -633,7 +790,9 @@ function placed(
     // against the list the rule was just taken out of.
     const anchor = rules[position.index];
     const at = anchor ? without.indexOf(anchor) : -1;
-    return at < 0 ? [...without, rule] : [...without.slice(0, at + 1), rule, ...without.slice(at + 1)];
+    return at < 0
+        ? [...without, rule]
+        : [...without.slice(0, at + 1), rule, ...without.slice(at + 1)];
 }
 
 /** A rule that was opened by id and is not in this build - a pack retired in a

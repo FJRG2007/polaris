@@ -40,12 +40,12 @@
 import { loadEnv } from "@polaris/config";
 import { onboardingScript } from "@polaris/deploy";
 import { publicAppUrl } from "@/lib/domain-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { currentAcmeEmail } from "@/lib/tls/acme-edge";
 import { getHostConnection } from "@/lib/host-service";
+import { execCommand, openSshClient } from "@polaris/ssh";
 import { recordServerEvent } from "@/lib/server-notes-service";
 import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
-import { execCommand, openSshClient } from "@polaris/ssh";
-import { readerWords } from "@/lib/i18n/reader-words";
 
 /**
  * How the script is started on the server.
@@ -146,6 +146,10 @@ export interface ServerEdgeState {
      *  edge without it still serves everything deployed to it; what it cannot do
      *  is take a domain or a firewall change without the service being rebuilt. */
     readonly pushable: boolean;
+    /** Whether that guard reads the firewall's address list from this server's own
+     *  disk - bans, Tor exits, revoked sessions - so they hold while Polaris is off.
+     *  A guard started by an older Polaris has no such volume. */
+    readonly offline: boolean;
     /** Whether Polaris is setting this server up right now. */
     readonly settingUp: boolean;
     /** Why the server could not be asked, where it could not. Its own words. */
@@ -156,6 +160,7 @@ const UNREACHABLE: ServerEdgeState = {
     traefik: false,
     guard: false,
     pushable: false,
+    offline: false,
     settingUp: false,
     error: null
 };
@@ -171,7 +176,8 @@ const UNREACHABLE: ServerEdgeState = {
 const PROBE = [
     "printf 'traefik=%s\\n' \"$(docker inspect -f '{{.State.Running}}' polaris-traefik 2>/dev/null || echo none)\"",
     "printf 'guard=%s\\n' \"$(docker inspect -f '{{.State.Running}}' polaris-edge-guard 2>/dev/null || echo none)\"",
-    "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'providers.file.directory'; then printf 'pushable=true\\n'; else printf 'pushable=false\\n'; fi"
+    "if docker inspect -f '{{json .Args}}' polaris-traefik 2>/dev/null | grep -q 'providers.file.directory'; then printf 'pushable=true\\n'; else printf 'pushable=false\\n'; fi",
+    "if docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' polaris-edge-guard 2>/dev/null | grep -q '/edge-intel'; then printf 'offline=true\\n'; else printf 'offline=false\\n'; fi"
 ].join("\n");
 
 /** What the probe said, out of its own output. Anything unrecognised is false,
@@ -184,7 +190,8 @@ export function readEdgeProbe(output: string): Omit<ServerEdgeState, "error" | "
     return {
         traefik: said("traefik") === "true",
         guard: said("guard") === "true",
-        pushable: said("pushable") === "true"
+        pushable: said("pushable") === "true",
+        offline: said("offline") === "true"
     };
 }
 
@@ -215,7 +222,10 @@ export async function readServerEdge(hostId: string, ownerId: string): Promise<S
         return {
             ...UNREACHABLE,
             settingUp: isSettingUp(hostId),
-            error: error instanceof Error ? error.message : (await readerWords("api"))("refusals.deploy.unreachable")
+            error:
+                error instanceof Error
+                    ? error.message
+                    : (await readerWords("api"))("refusals.deploy.unreachable")
         };
     }
 }

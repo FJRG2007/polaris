@@ -9,8 +9,21 @@
  */
 
 import { expandWafPresets } from "./waf-presets.js";
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { wafCustomRuleSchema, type WafCustomRule, type WafPrincipalGrant } from "./schemas/deploy.js";
+import { cleanFrameAncestors } from "./frame-protection.js";
+import {
+    createHash,
+    createHmac,
+    createPublicKey,
+    sign as signBytes,
+    timingSafeEqual,
+    verify as verifyBytes,
+    type KeyObject
+} from "node:crypto";
+import {
+    wafCustomRuleSchema,
+    type WafCustomRule,
+    type WafPrincipalGrant
+} from "./schemas/deploy.js";
 
 /** The per-route rule the guard enforces. Empty denylist, no packs, no custom rules,
  *  no principal lists and no login = a no-op. */
@@ -65,6 +78,23 @@ export interface GuardRule {
      * case on essentially every route.
      */
     readonly challenge?: boolean;
+    /**
+     * Who may show the route's pages in a frame, besides the site itself. Absent means
+     * the edge adds no framing protection at all (an operator switched it off);
+     * present - even empty - means it does, with these origins allowed. Applied by the
+     * guard's proxy, which is the only place that sees the app's own headers - see
+     * `protectFrameHeaders`.
+     */
+    readonly frameAncestors?: readonly string[];
+    /**
+     * The public keys an edge token for this route may be signed with (Ed25519, raw
+     * 32 bytes as base64url), current first. Carried in the rule so the edge holds
+     * them with the rest of the route's policy and needs no secret to verify a login:
+     * present, and only a token signed by one of them is accepted - the shared HMAC
+     * secret on the server cannot mint one. Absent on an edge written before this,
+     * which keeps verifying the HMAC tokens it always did.
+     */
+    readonly keys?: readonly string[];
     /** Managed rule-pack ids, expanded to rules on decode. Sending ids rather than
      *  their contents is what keeps this header small: a pack of forty user agents
      *  is four bytes here and is stamped onto every single request to the route.
@@ -90,7 +120,9 @@ export interface GuardRule {
  * denylist, `l` = require-login, `a` = where to sign in, `n` = the principal lists that
  * login admits, `y` = the principals it refuses, `b` = browser integrity, `s` = SQL
  * injection protection, `x` = XSS protection, `e` = email obfuscation, `c` = the
- * browser challenge, `p` = pack ids, `r` = custom rules).
+ * browser challenge, `f` = the origins allowed to frame the route, present only while
+ * framing protection is on, `k` = the login's public keys, `p` = pack ids, `r` = custom
+ * rules).
  *
  * The login keys are left out entirely when they say nothing, which is the case on
  * essentially every route. They decode to the same empty result either way, and this
@@ -113,6 +145,10 @@ export function encodeGuardRule(rule: GuardRule): string {
             x: rule.xssProtection === true,
             e: rule.emailObfuscation === true,
             ...(rule.challenge === true ? { c: true } : {}),
+            ...(rule.frameAncestors !== undefined
+                ? { f: cleanFrameAncestors(rule.frameAncestors) }
+                : {}),
+            ...(rule.requireLogin && (rule.keys?.length ?? 0) > 0 ? { k: rule.keys } : {}),
             p: rule.presets ?? [],
             r: rule.rules
         })
@@ -245,11 +281,17 @@ function decodeUncached(header: string): GuardRule {
                 x?: unknown;
                 e?: unknown;
                 c?: unknown;
+                f?: unknown;
+                k?: unknown;
                 p?: unknown;
                 r?: unknown;
             };
-            const deny = Array.isArray(obj.d) ? obj.d.filter((v): v is string => typeof v === "string") : [];
-            const presets = Array.isArray(obj.p) ? obj.p.filter((v): v is string => typeof v === "string") : [];
+            const deny = Array.isArray(obj.d)
+                ? obj.d.filter((v): v is string => typeof v === "string")
+                : [];
+            const presets = Array.isArray(obj.p)
+                ? obj.p.filter((v): v is string => typeof v === "string")
+                : [];
             // `i` is the single injection flag the two below were split out of. A route
             // materialized before the split still carries it, and keeps both checks
             // until its edge is rewritten - dropping one silently on upgrade would be a
@@ -258,7 +300,8 @@ function decodeUncached(header: string): GuardRule {
             return {
                 deny,
                 requireLogin: obj.l === true,
-                loginUrl: normalizeLoginUrl(typeof obj.a === "string" ? obj.a : undefined) ?? undefined,
+                loginUrl:
+                    normalizeLoginUrl(typeof obj.a === "string" ? obj.a : undefined) ?? undefined,
                 loginAllowLists: parsePrincipalLists(obj.n),
                 loginDeny: parseGrants(obj.y),
                 browserIntegrity: obj.b === true,
@@ -266,6 +309,14 @@ function decodeUncached(header: string): GuardRule {
                 xssProtection: obj.x === true || legacy,
                 emailObfuscation: obj.e === true,
                 challenge: obj.c === true,
+                // Re-validated like the rules: each origin is written into a response
+                // header, so one that does not normalise is dropped, never echoed.
+                frameAncestors: Array.isArray(obj.f) ? cleanFrameAncestors(obj.f) : undefined,
+                keys: Array.isArray(obj.k)
+                    ? obj.k
+                          .filter((v): v is string => typeof v === "string" && ED25519_KEY.test(v))
+                          .slice(0, 4)
+                    : undefined,
                 presets,
                 rules: parseRules(obj.r),
                 managedRules: expandWafPresets(presets)
@@ -310,7 +361,11 @@ function parseGrants(value: unknown): WafPrincipalGrant[] {
         if (!entry || typeof entry !== "object") continue;
         const { r, f, u } = entry as { r?: unknown; f?: unknown; u?: unknown };
         if (typeof r !== "string" || r.length === 0) continue;
-        if ((f !== undefined && typeof f !== "number") || (u !== undefined && typeof u !== "number")) continue;
+        if (
+            (f !== undefined && typeof f !== "number") ||
+            (u !== undefined && typeof u !== "number")
+        )
+            continue;
         grants.push({ ref: r, from: f as number | undefined, until: u as number | undefined });
     }
     return grants;
@@ -387,7 +442,9 @@ export function verifyEdgeOrigin(value: string | undefined | null, secret: strin
     if (dot <= 0 || dot === value.length - 1) return null;
     const payload = value.slice(0, dot);
     const provided = Buffer.from(value.slice(dot + 1));
-    const expected = Buffer.from(createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url"));
+    const expected = Buffer.from(
+        createHmac("sha256", secret).update(`origin:${payload}`).digest("base64url")
+    );
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
     try {
         const origin = Buffer.from(payload, "base64url").toString("utf8");
@@ -464,7 +521,7 @@ export const MEMBERSHIP_MAX_AGE_SECONDS = 30 * 60;
  * a token can live can only concern tokens that have already expired. Two copies of
  * this number drifting apart would silently shorten that window.
  */
-export const EDGE_TOKEN_TTL_SECONDS = 8 * 60 * 60;
+export const EDGE_TOKEN_TTL_SECONDS = 12 * 60 * 60;
 
 /** Sign an edge token as `<payload>.<sig>` (HMAC-SHA256 over the payload). Mirrors
  *  the signed-cookie HMAC pattern used elsewhere (access-lock/share/file-request).
@@ -499,7 +556,10 @@ export function signEdgeToken(token: EdgeToken, secret: string): string {
  *
  * A token with no `iat` cannot be compared, so a known change supersedes it.
  */
-export function principalsSuperseded(token: { readonly iat?: number }, movedAt: number | null): boolean {
+export function principalsSuperseded(
+    token: { readonly iat?: number },
+    movedAt: number | null
+): boolean {
     if (movedAt === null) return false;
     return token.iat === undefined || movedAt > token.iat * 1000;
 }
@@ -516,6 +576,126 @@ export function principalsSuperseded(token: { readonly iat?: number }, movedAt: 
 export function membershipTooOld(token: { readonly iat?: number }, now: number): boolean {
     if (token.iat === undefined) return true;
     return now - token.iat > MEMBERSHIP_MAX_AGE_SECONDS;
+}
+
+/** A raw Ed25519 public key as the rule carries it: 32 bytes, base64url. */
+const ED25519_KEY = /^[A-Za-z0-9_-]{43}$/;
+
+/** What marks a token as Ed25519-signed rather than HMAC-signed. */
+const ED25519_PREFIX = "e.";
+
+/** The payload both kinds of token sign, written the same way by both. */
+function edgeTokenPayload(token: EdgeToken): string {
+    return Buffer.from(
+        JSON.stringify({
+            sub: token.sub,
+            aud: token.aud,
+            exp: token.exp,
+            iat: token.iat ?? Math.floor(Date.now() / 1000),
+            prn: token.prn ?? []
+        })
+    ).toString("base64url");
+}
+
+/**
+ * Sign an edge token with Polaris's private Ed25519 key, as `e.<payload>.<sig>`.
+ *
+ * The edge verifies it with the public half carried in the route's rule, so the
+ * servers running the edge hold nothing that can mint one - unlike the HMAC token,
+ * whose secret every guard has to be given.
+ */
+export function signEdgeTokenEd25519(token: EdgeToken, privateKey: KeyObject): string {
+    const payload = edgeTokenPayload(token);
+    const sig = signBytes(null, Buffer.from(`edge:${payload}`), privateKey).toString("base64url");
+    return `${ED25519_PREFIX}${payload}.${sig}`;
+}
+
+/** Public keys by their encoded form, so a request does not rebuild one. Bounded: the
+ *  key space is the keys Polaris has published, a handful at most. */
+const PUBLIC_KEYS = new Map<string, KeyObject | null>();
+
+function publicKey(encoded: string): KeyObject | null {
+    const known = PUBLIC_KEYS.get(encoded);
+    if (known !== undefined) return known;
+    let key: KeyObject | null = null;
+    try {
+        key = createPublicKey({ key: { kty: "OKP", crv: "Ed25519", x: encoded }, format: "jwk" });
+    } catch {
+        key = null;
+    }
+    if (PUBLIC_KEYS.size >= 16) PUBLIC_KEYS.clear();
+    PUBLIC_KEYS.set(encoded, key);
+    return key;
+}
+
+/** The fields of a verified payload, or null. Shared by both signatures. */
+function readEdgePayload(
+    payload: string,
+    now: number,
+    audience: string | undefined
+): EdgeToken | null {
+    try {
+        const raw: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+        if (raw && typeof raw === "object") {
+            const obj = raw as {
+                sub?: unknown;
+                aud?: unknown;
+                exp?: unknown;
+                iat?: unknown;
+                prn?: unknown;
+            };
+            if (
+                typeof obj.sub === "string" &&
+                typeof obj.aud === "string" &&
+                typeof obj.exp === "number" &&
+                obj.exp > now &&
+                (audience === undefined || obj.aud === audience)
+            ) {
+                const prn = Array.isArray(obj.prn)
+                    ? obj.prn.filter((v): v is string => typeof v === "string")
+                    : undefined;
+                const iat = typeof obj.iat === "number" ? obj.iat : undefined;
+                return { sub: obj.sub, aud: obj.aud, exp: obj.exp, iat, prn };
+            }
+        }
+    } catch {
+        // Fall through to null (invalid payload).
+    }
+    return null;
+}
+
+/**
+ * Verify an edge token against what the route trusts.
+ *
+ * A route whose rule carries public keys accepts ONLY a token one of them signed:
+ * the HMAC secret is on every server running a guard, so a token it signed proves
+ * nothing to a route that can do better. A route without keys (an edge written
+ * before them) keeps verifying HMAC tokens with the shared secret. Never throws.
+ */
+export function verifyEdgeTokenFor(
+    value: string | undefined | null,
+    trust: { readonly secret: string; readonly keys?: readonly string[] },
+    now: number,
+    audience?: string
+): EdgeToken | null {
+    const keys = trust.keys ?? [];
+    if (keys.length === 0) return verifyEdgeToken(value, trust.secret, now, audience);
+    if (!value || !value.startsWith(ED25519_PREFIX)) return null;
+    const body = value.slice(ED25519_PREFIX.length);
+    const dot = body.indexOf(".");
+    if (dot <= 0 || dot === body.length - 1) return null;
+    const payload = body.slice(0, dot);
+    const sig = Buffer.from(body.slice(dot + 1), "base64url");
+    const data = Buffer.from(`edge:${payload}`);
+    const trusted = keys.some((encoded) => {
+        const key = publicKey(encoded);
+        try {
+            return key !== null && verifyBytes(null, data, key, sig);
+        } catch {
+            return false;
+        }
+    });
+    return trusted ? readEdgePayload(payload, now, audience) : null;
 }
 
 /**
@@ -537,12 +717,20 @@ export function verifyEdgeToken(
     if (dot <= 0 || dot === value.length - 1) return null;
     const payload = value.slice(0, dot);
     const provided = Buffer.from(value.slice(dot + 1));
-    const expected = Buffer.from(createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url"));
+    const expected = Buffer.from(
+        createHmac("sha256", secret).update(`edge:${payload}`).digest("base64url")
+    );
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
     try {
         const raw: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
         if (raw && typeof raw === "object") {
-            const obj = raw as { sub?: unknown; aud?: unknown; exp?: unknown; iat?: unknown; prn?: unknown };
+            const obj = raw as {
+                sub?: unknown;
+                aud?: unknown;
+                exp?: unknown;
+                iat?: unknown;
+                prn?: unknown;
+            };
             if (
                 typeof obj.sub === "string" &&
                 typeof obj.aud === "string" &&
@@ -668,17 +856,26 @@ export function verifyEdgePass(
     if (dot <= 0 || dot === challenge.length - 1) return false;
     const body = challenge.slice(0, dot);
     const provided = Buffer.from(challenge.slice(dot + 1));
-    const expected = Buffer.from(createHmac("sha256", secret).update(`challenge:${body}`).digest("base64url"));
+    const expected = Buffer.from(
+        createHmac("sha256", secret).update(`challenge:${body}`).digest("base64url")
+    );
     if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return false;
     let payload: Partial<ChallengePayload>;
     try {
-        payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Partial<ChallengePayload>;
+        payload = JSON.parse(
+            Buffer.from(body, "base64url").toString("utf8")
+        ) as Partial<ChallengePayload>;
     } catch {
         return false;
     }
     if (typeof payload.h !== "string" || payload.h !== host.toLowerCase()) return false;
     if (typeof payload.a !== "string" || payload.a !== (ip ?? "")) return false;
-    if (typeof payload.i !== "number" || payload.i > now || now - payload.i >= EDGE_PASS_TTL_SECONDS) return false;
+    if (
+        typeof payload.i !== "number" ||
+        payload.i > now ||
+        now - payload.i >= EDGE_PASS_TTL_SECONDS
+    )
+        return false;
     if (typeof payload.b !== "number" || payload.b < 1 || payload.b > 32) return false;
     return edgeChallengeAnswered(challenge, counter, payload.b);
 }

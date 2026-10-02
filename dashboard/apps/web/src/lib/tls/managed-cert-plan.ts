@@ -65,7 +65,11 @@ export function plannedCertificates(input: {
     const verified = input.ownerDomains.filter((entry) => entry.verified);
     for (const entry of verified) {
         if (entry.domain === deployBase) continue;
-        wanted.set(entry.domain, { domain: entry.domain, source: "owner", ownerDomainId: entry.id });
+        wanted.set(entry.domain, {
+            domain: entry.domain,
+            source: "owner",
+            ownerDomainId: entry.id
+        });
     }
     for (const host of input.wildcardHosts) {
         const hostname = host.hostname.trim().toLowerCase();
@@ -77,9 +81,15 @@ export function plannedCertificates(input: {
         const under = verified
             .filter((entry) => within(base, entry.domain))
             .sort((a, b) => b.domain.length - a.domain.length)[0];
-        const theirs = under !== undefined && (host.orgId ? under.orgId === host.orgId : under.userId === host.ownerId);
+        const theirs =
+            under !== undefined &&
+            (host.orgId ? under.orgId === host.orgId : under.userId === host.ownerId);
         if (!theirs && !host.ownerIsAdmin) continue;
-        wanted.set(base, { domain: base, source: "hostname", ownerDomainId: theirs ? under.id : null });
+        wanted.set(base, {
+            domain: base,
+            source: "hostname",
+            ownerDomainId: theirs ? under.id : null
+        });
     }
     return [...wanted.values()];
 }
@@ -133,6 +143,22 @@ export interface ServedNameFacts {
     readonly ownerIsAdmin: boolean;
     /** Who enrolled the server, and so who is root on it. */
     readonly hostOwnerId: string;
+}
+
+/**
+ * Whether a name another server serves needs a certificate handed to it at all.
+ *
+ * Only a wildcard does. An exact name - `example.com`, `api.example.com` - is
+ * ordered and renewed by that server's own edge over HTTP, with nothing from here,
+ * which is what keeps it valid however long this machine is switched off. Handing it
+ * a wildcard that covers it would take that away: the edge does not order a name a
+ * certificate it holds already covers, so the name would ride a certificate only
+ * this machine can renew, and expire during an outage that outlasts the renewal
+ * margin. A wildcard has no such choice - it needs the DNS challenge, and the DNS
+ * credential stays here.
+ */
+export function needsHandedCertificate(name: { readonly hostname: string }): boolean {
+    return name.hostname.startsWith("*.");
 }
 
 /**

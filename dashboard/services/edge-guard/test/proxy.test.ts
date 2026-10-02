@@ -42,7 +42,10 @@ let proxyUrl = "";
 beforeAll(async () => {
     origin = createServer((req, res) => {
         const next = respond(req.url ?? "/");
-        res.writeHead(next.status ?? 200, { "content-type": "text/html; charset=utf-8", ...next.headers });
+        res.writeHead(next.status ?? 200, {
+            "content-type": "text/html; charset=utf-8",
+            ...next.headers
+        });
         res.end(next.body);
     });
     await new Promise<void>((done) => origin.listen(0, "127.0.0.1", done));
@@ -87,7 +90,9 @@ describe("rewriting", () => {
     });
 
     it("produces a token the decoder can read back", async () => {
-        respond = () => ({ body: '<html><body><a href="mailto:hola@ejemplo.com">c</a></body></html>' });
+        respond = () => ({
+            body: '<html><body><a href="mailto:hola@ejemplo.com">c</a></body></html>'
+        });
 
         const token = /#([0-9a-f]+)"/.exec((await get("/")).body)?.[1] ?? "";
 
@@ -154,7 +159,10 @@ describe("what it passes straight through", () => {
     });
 
     it("preserves the upstream's own headers", async () => {
-        respond = () => ({ headers: { "x-app-header": "kept" }, body: "<html><body>hola@ejemplo.com</body></html>" });
+        respond = () => ({
+            headers: { "x-app-header": "kept" },
+            body: "<html><body>hola@ejemplo.com</body></html>"
+        });
 
         expect((await get("/")).headers.get("x-app-header")).toBe("kept");
     });
@@ -262,7 +270,11 @@ describe("the firewall still applies", () => {
                 "x-forwarded-for": "203.0.113.5",
                 "x-forwarded-host": "app.example.com",
                 accept,
-                "x-polaris-waf": encodeGuardRule({ deny: ["203.0.113.0/24"], requireLogin: false, rules: [] })
+                "x-polaris-waf": encodeGuardRule({
+                    deny: ["203.0.113.0/24"],
+                    requireLogin: false,
+                    rules: []
+                })
             }
         });
     }
@@ -293,12 +305,95 @@ describe("the login handoff", () => {
                 [ORIGIN_HEADER]: signEdgeOrigin(originUrl, SECRET),
                 "x-forwarded-proto": "https",
                 "x-forwarded-host": "app.example.com",
-                "x-polaris-waf": encodeGuardRule({ deny: [], requireLogin: true, emailObfuscation: true, rules: [] })
+                "x-polaris-waf": encodeGuardRule({
+                    deny: [],
+                    requireLogin: true,
+                    emailObfuscation: true,
+                    rules: []
+                })
             }
         });
 
         expect(response.status).toBe(302);
         expect(response.headers.get("location")).toContain("/edge/authorize");
         expect(response.headers.get("cache-control")).toBe("no-store");
+    });
+});
+
+describe("framing protection", () => {
+    /** As `get`, with framing protection on for the route. */
+    async function framed(allowed: string[], obfuscate = false) {
+        const response = await fetch(`${proxyUrl}/`, {
+            headers: {
+                [ORIGIN_HEADER]: signEdgeOrigin(originUrl, SECRET),
+                "x-polaris-waf": encodeGuardRule({
+                    deny: [],
+                    requireLogin: false,
+                    emailObfuscation: obfuscate,
+                    frameAncestors: allowed,
+                    rules: []
+                })
+            }
+        });
+        return response.headers;
+    }
+
+    it("adds frame-ancestors and X-Frame-Options to a page that set neither", async () => {
+        respond = () => ({ body: "<html><body>hi</body></html>" });
+
+        const headers = await framed([]);
+
+        expect(headers.get("content-security-policy")).toBe("frame-ancestors 'self'");
+        expect(headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    });
+
+    it("adds its policy beside the app's own instead of replacing it", async () => {
+        respond = () => ({
+            headers: { "content-security-policy": "script-src 'self'" },
+            body: "<p>x</p>"
+        });
+
+        const policy = (await framed([])).get("content-security-policy") ?? "";
+
+        // Two policies, both enforced by the browser: the app's script rule survives.
+        expect(policy).toContain("script-src 'self'");
+        expect(policy).toContain("frame-ancestors 'self'");
+    });
+
+    it("keeps an app's own frame-ancestors untouched", async () => {
+        respond = () => ({
+            headers: { "content-security-policy": "frame-ancestors https://partner.example" },
+            body: "<p>x</p>"
+        });
+
+        const headers = await framed([]);
+
+        expect(headers.get("content-security-policy")).toBe(
+            "frame-ancestors https://partner.example"
+        );
+        expect(headers.get("x-frame-options")).toBeNull();
+    });
+
+    it("names the allowed sites and sends no X-Frame-Options, which cannot", async () => {
+        respond = () => ({ body: "<p>x</p>" });
+
+        const headers = await framed(["https://partner.example"]);
+
+        expect(headers.get("content-security-policy")).toBe(
+            "frame-ancestors 'self' https://partner.example"
+        );
+        expect(headers.get("x-frame-options")).toBeNull();
+    });
+
+    it("applies on a rewritten page too", async () => {
+        respond = () => ({ body: "<html><body><p>hola@ejemplo.com</p></body></html>" });
+
+        expect((await framed([], true)).get("x-frame-options")).toBe("SAMEORIGIN");
+    });
+
+    it("adds nothing on a route with it off", async () => {
+        respond = () => ({ body: "<p>x</p>" });
+
+        expect((await get("/", { obfuscate: false })).headers.get("x-frame-options")).toBeNull();
     });
 });

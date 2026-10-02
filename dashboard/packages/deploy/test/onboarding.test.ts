@@ -129,3 +129,32 @@ describe("a server Polaris sets up as root on behalf of its login", () => {
         expect(script).not.toContain("chown");
     });
 });
+
+describe("what the guard keeps on the server's own disk", () => {
+    const guarded = onboardingScript({
+        proxyNetwork: "polaris-net",
+        acmeEmail: "ops@example.com",
+        authSecret: "a-secret-of-sixteen-plus"
+    });
+
+    it("mounts the address list read-only and points the guard at it", () => {
+        // Bans, the Tor list and revoked sessions are read from here, so they hold
+        // while the control plane is unreachable.
+        expect(guarded).toContain("-v /var/lib/polaris/edge-intel:/edge-intel:ro");
+        expect(guarded).toContain("-e POLARIS_EDGE_INTEL_FILE=/edge-intel/waf-intel.json");
+        expect(guarded).toContain(
+            "mkdir -p /var/lib/polaris/deploy /var/lib/polaris/volumes /var/lib/polaris/traefik"
+        );
+        expect(guarded).toMatch(/mkdir -p [^\n]*\/var\/lib\/polaris\/edge-intel/);
+    });
+
+    it("hands the directory to the login that pushes into it", () => {
+        const owned = onboardingScript({
+            proxyNetwork: "polaris-net",
+            acmeEmail: "ops@example.com",
+            authSecret: "a-secret-of-sixteen-plus",
+            owner: "deploy"
+        });
+        expect(owned).toMatch(/chown -R deploy [^\n]*\/var\/lib\/polaris\/edge-intel/);
+    });
+});

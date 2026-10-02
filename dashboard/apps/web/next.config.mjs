@@ -10,6 +10,10 @@ import { dirname, join } from "node:path";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+/** Every path except a published calendar's embed, in the matcher syntax Next uses
+ *  for `headers()`. */
+const FRAMEABLE_EXCEPT_EMBEDS = "/:path((?!cal/embed/).*)";
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
     output: "standalone",
@@ -96,6 +100,28 @@ const nextConfig = {
      * at the same level is exactly the collision Next refuses to build. One
      * explicit list of prefixes keeps the page and the API from ever meeting.
      */
+    /**
+     * Clickjacking: no other site may show Polaris inside a frame.
+     *
+     * Sent by the app rather than by the edge in front of it, because more than one
+     * edge serves Polaris (Traefik's file route for the public names, compose labels
+     * for the local ones, Caddy in development) and only the app knows which of its
+     * pages are meant to be framed. `'self'` keeps every frame Polaris draws of
+     * itself working - and the ones it draws today are `srcdoc` documents (mail
+     * bodies, print previews), which carry no headers of their own anyway.
+     *
+     * The one exception is a published calendar's embed, `/cal/embed/<token>`, whose
+     * whole purpose is to be framed by the operator's own website.
+     */
+    headers: async () => [
+        {
+            source: FRAMEABLE_EXCEPT_EMBEDS,
+            headers: [
+                { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+                { key: "X-Frame-Options", value: "SAMEORIGIN" }
+            ]
+        }
+    ],
     rewrites: async () => [
         { source: "/vault/api/:path*", destination: "/api/bw/api/:path*" },
         { source: "/vault/identity/:path*", destination: "/api/bw/identity/:path*" },

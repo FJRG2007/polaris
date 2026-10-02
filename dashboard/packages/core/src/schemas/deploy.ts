@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { cidrOrIp } from "./link-rules.js";
+import { frameAncestorsSchema } from "../frame-protection.js";
 import { normalizeRelPath, UnsafePathError } from "../paths.js";
 
 export const DEPLOY_VOLUME_KINDS = ["volume", "bind", "nas"] as const;
@@ -494,6 +495,15 @@ export const wafRuleInputSchema = z
          * off (see `emailObfuscation` in ResolvedWaf for how the scopes combine).
          */
         emailObfuscation: z.boolean().default(true),
+        /**
+         * Refuse to be shown inside another site's frame (clickjacking). On by default,
+         * and combined across scopes like email obfuscation: any scope can switch it off
+         * for what it covers, a narrower one cannot switch it back on.
+         */
+        frameProtection: z.boolean().default(true),
+        /** Sites allowed to frame the scope anyway, as origins. Union across scopes:
+         *  a site one scope trusts to embed it stays trusted below it. */
+        frameAncestors: frameAncestorsSchema.default([]),
         presets: wafPresetList.default([]),
         rules: z.array(wafCustomRuleSchema).max(WAF_RULES_MAX).default([])
     })
@@ -581,6 +591,11 @@ export interface ResolvedWaf {
      * also what lets it default on everywhere without becoming impossible to escape.
      */
     readonly emailObfuscation: boolean;
+    /** True only if EVERY scope leaves framing protection on - intersected like email
+     *  obfuscation, for the same reason: it is on by default. */
+    readonly frameProtection: boolean;
+    /** Union of every scope's allowed framing origins. */
+    readonly frameAncestors: readonly string[];
     /** Union of every scope's enabled rule packs. Carried to the edge as ids and
      *  expanded there, so a pack of forty user agents costs four bytes on the wire. */
     readonly presets: readonly string[];

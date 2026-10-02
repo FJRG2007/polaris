@@ -345,6 +345,16 @@
         "obfuscation": "Email address obfuscation",
         "obfuscationHint": "Replaces email addresses in served HTML with a token the page decodes in the browser, so the address is not in the source. Visitors see no change. A harvester driving a real browser still reads it."
     },
+    "framing": {
+        "title": "Block embedding by other sites",
+        "hint": "Stops another site from showing these pages inside a frame of its own, the trick behind clickjacking. A page that already says who may frame it keeps its own choice.",
+        "allowed": "Sites allowed to embed",
+        "allowedHint": "Each one may show these pages in a frame. Empty means only this site.",
+        "allowedAbove": "Also allowed by a scope above: {sites}",
+        "placeholder": "https://example.com",
+        "invalid": "Use a site address like https://example.com or https://*.example.com",
+        "polaris": "Always on for Polaris. Published calendars stay embeddable on any site."
+    },
     "missing": {
         "text": "This rule is not part of this version of Polaris.",
         "back": "Back to the rules"

@@ -313,6 +313,8 @@
         "guardNo": "Sin el componente que decide del cortafuegos: una lista de direcciones permitidas sigue aplicándose, pero una lista de bloqueo, un paquete de reglas o una regla de inicio de sesión no.",
         "pushYes": "Recibe de Polaris las rutas y los cambios del cortafuegos al momento.",
         "pushNo": "Solo lee lo que le dice un contenedor desplegado, así que un dominio nuevo o una regla de cortafuegos editada esperan a que ese servicio se vuelva a compilar, y un despliegue sustituye la versión en marcha con un breve corte.",
+        "offlineYes": "Los bloqueos y las sesiones cerradas se guardan aquí, así que siguen valiendo con Polaris apagado.",
+        "offlineNo": "Los bloqueos y las sesiones cerradas de Polaris aún no llegan a este servidor. Configúralo otra vez.",
         "settingUp": "Preparándolo",
         "again": "Volver a prepararlo",
         "setUp": "Preparar este servidor",

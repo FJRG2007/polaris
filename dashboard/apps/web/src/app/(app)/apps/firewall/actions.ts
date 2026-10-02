@@ -160,6 +160,8 @@ export interface WafScopeRule {
     sqlInjectionProtection: boolean;
     xssProtection: boolean;
     emailObfuscation: boolean;
+    frameProtection: boolean;
+    frameAncestors: string[];
     presets: string[];
     rules: WafCustomRule[];
 }
@@ -470,8 +472,7 @@ export async function getWafAddressActivityAction(
         return { activity, accounts, ban: ban ?? undefined };
     } catch (caught) {
         return {
-            error:
-                await failure(caught, "errors.activity")
+            error: await failure(caught, "errors.activity")
         };
     }
 }

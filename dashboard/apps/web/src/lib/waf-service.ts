@@ -17,6 +17,8 @@
 import { prisma } from "@polaris/db";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
+    cleanFrameAncestors,
+    FRAME_ANCESTORS_MAX,
     instanceDefaultWafPresets,
     polarisDefaultWafPresets,
     WAF_SCOPE_ORDER,
@@ -62,7 +64,9 @@ function defaultPresets(scopeType: WafScopeType): string[] {
 function parseList(json: string): string[] {
     try {
         const parsed: unknown = JSON.parse(json);
-        return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((v): v is string => typeof v === "string")
+            : [];
     } catch {
         return [];
     }
@@ -113,6 +117,8 @@ interface RuleRow {
     readonly sqlInjectionProtection: boolean;
     readonly xssProtection: boolean;
     readonly emailObfuscation: boolean;
+    readonly frameProtection: boolean;
+    readonly frameAncestors: string;
     readonly presets: string;
     readonly rules: string;
 }
@@ -129,6 +135,8 @@ const RULE_SELECT = {
     sqlInjectionProtection: true,
     xssProtection: true,
     emailObfuscation: true,
+    frameProtection: true,
+    frameAncestors: true,
     presets: true,
     rules: true
 } as const;
@@ -151,6 +159,10 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
     let sqlInjectionProtection = true;
     let xssProtection = true;
     let emailObfuscation = true;
+    let frameProtection = true;
+    // Who may frame the scope anyway: a union, so a site one scope trusts to embed it
+    // stays trusted below it. Meaningless once any scope switches protection off.
+    const frameAncestors = new Set<string>();
     for (const row of ordered) {
         const allow = parseList(row.ipAllowlist);
         if (allow.length > 0) allowLists.push(allow);
@@ -173,6 +185,9 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
         if (!row.sqlInjectionProtection) sqlInjectionProtection = false;
         if (!row.xssProtection) xssProtection = false;
         if (!row.emailObfuscation) emailObfuscation = false;
+        if (!row.frameProtection) frameProtection = false;
+        for (const origin of cleanFrameAncestors(parseList(row.frameAncestors)))
+            frameAncestors.add(origin);
         // Concatenated, not merged: a rule set is ordered and first-match-wins, so a
         // broader scope's rules have to be offered the request first - otherwise a
         // project could write an `allow` that overrides an instance-wide block.
@@ -188,6 +203,8 @@ function mergeRules(rows: readonly RuleRow[]): ResolvedWaf {
         sqlInjectionProtection,
         xssProtection,
         emailObfuscation,
+        frameProtection,
+        frameAncestors: [...frameAncestors].slice(0, FRAME_ANCESTORS_MAX),
         presets: [...presets],
         rules
     };
@@ -210,6 +227,8 @@ const EMPTY_WAF: ResolvedWaf = {
     sqlInjectionProtection: true,
     xssProtection: true,
     emailObfuscation: true,
+    frameProtection: true,
+    frameAncestors: [],
     presets: [],
     rules: []
 };
@@ -226,6 +245,8 @@ const DEFAULT_GLOBAL_ROW: RuleRow = {
     sqlInjectionProtection: true,
     xssProtection: true,
     emailObfuscation: true,
+    frameProtection: true,
+    frameAncestors: "[]",
     presets: JSON.stringify(defaultPresets("global")),
     rules: "[]"
 };
@@ -240,7 +261,9 @@ const DEFAULT_POLARIS_ROW: RuleRow = {
 /** The rows to merge, standing in the instance defaults when the global scope has
  *  never been written. An existing row always wins, empty packs included. */
 function withInstanceDefaults(rows: readonly RuleRow[]): RuleRow[] {
-    return rows.some((row) => row.scopeType === "global") ? [...rows] : [DEFAULT_GLOBAL_ROW, ...rows];
+    return rows.some((row) => row.scopeType === "global")
+        ? [...rows]
+        : [DEFAULT_GLOBAL_ROW, ...rows];
 }
 
 /**
@@ -350,7 +373,8 @@ export async function wafSummary(): Promise<WafSummary> {
         denyEntries: rows.reduce((sum, row) => sum + parseList(row.ipDenylist).length, 0),
         allowScopes: rows.filter((row) => parseList(row.ipAllowlist).length > 0).length,
         loginScopes: rows.filter((row) => row.requireLogin).length,
-        injectionOffScopes: rows.filter((row) => !row.sqlInjectionProtection || !row.xssProtection).length
+        injectionOffScopes: rows.filter((row) => !row.sqlInjectionProtection || !row.xssProtection)
+            .length
     };
 }
 
@@ -361,9 +385,13 @@ export async function wafSummary(): Promise<WafSummary> {
  * on instances with many domains. Every id in the input maps to a decision - an
  * unknown id gets the empty decision, so lookups never miss.
  */
-export async function resolveWafBatch(applicationIds: readonly string[]): Promise<Map<string, ResolvedWaf>> {
+export async function resolveWafBatch(
+    applicationIds: readonly string[]
+): Promise<Map<string, ResolvedWaf>> {
     const ids = [...new Set(applicationIds)];
-    const result = new Map<string, ResolvedWaf>(ids.map((id): [string, ResolvedWaf] => [id, EMPTY_WAF]));
+    const result = new Map<string, ResolvedWaf>(
+        ids.map((id): [string, ResolvedWaf] => [id, EMPTY_WAF])
+    );
     if (ids.length === 0) return result;
     const apps = await prisma.application.findMany({
         where: { id: { in: ids } },
@@ -411,7 +439,11 @@ export async function resolveWafBatch(applicationIds: readonly string[]): Promis
         const hostId = app.target?.hostId ?? null;
         const applicable = [
             ...globalRows,
-            ...(hostId ? (groupsByHost.get(hostId) ?? []).flatMap((id) => byScope.get(`server-group:${id}`) ?? []) : []),
+            ...(hostId
+                ? (groupsByHost.get(hostId) ?? []).flatMap(
+                      (id) => byScope.get(`server-group:${id}`) ?? []
+                  )
+                : []),
             ...(hostId ? (byScope.get(`server:${hostId}`) ?? []) : []),
             ...(byScope.get(`project:${app.environment.projectId}`) ?? []),
             ...(byScope.get(`environment:${app.environmentId}`) ?? []),
@@ -434,6 +466,9 @@ export interface WafRuleView {
     readonly sqlInjectionProtection: boolean;
     readonly xssProtection: boolean;
     readonly emailObfuscation: boolean;
+    readonly frameProtection: boolean;
+    /** Sites this scope alone allows to frame it. */
+    readonly frameAncestors: string[];
     /** Managed rule packs enabled on this scope alone - not the union it inherits. */
     readonly presets: string[];
     readonly rules: WafCustomRule[];
@@ -446,7 +481,11 @@ export interface WafRuleView {
  * `system.manage` (not the member-held `deploy.manage`) - so ownership always passes
  * here for them.
  */
-async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeId: string): Promise<void> {
+async function assertScopeOwner(
+    ownerId: string,
+    scopeType: WafScopeType,
+    scopeId: string
+): Promise<void> {
     if (scopeType === "global" || scopeType === "polaris") return;
     if (scopeType === "project") {
         if ((await prisma.project.count({ where: { id: scopeId, ownerId } })) === 0) {
@@ -455,7 +494,9 @@ async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeI
         return;
     }
     if (scopeType === "environment") {
-        if ((await prisma.environment.count({ where: { id: scopeId, project: { ownerId } } })) === 0) {
+        if (
+            (await prisma.environment.count({ where: { id: scopeId, project: { ownerId } } })) === 0
+        ) {
             throw new Error("Environment not found");
         }
         return;
@@ -472,7 +513,11 @@ async function assertScopeOwner(ownerId: string, scopeType: WafScopeType, scopeI
         }
         return;
     }
-    if ((await prisma.application.count({ where: { id: scopeId, environment: { project: { ownerId } } } })) === 0) {
+    if (
+        (await prisma.application.count({
+            where: { id: scopeId, environment: { project: { ownerId } } }
+        })) === 0
+    ) {
         throw new Error("Service not found");
     }
 }
@@ -496,6 +541,8 @@ export async function getWafRule(
             sqlInjectionProtection: true,
             xssProtection: true,
             emailObfuscation: true,
+            frameProtection: true,
+            frameAncestors: true,
             presets: true,
             rules: true
         }
@@ -515,6 +562,8 @@ export async function getWafRule(
             sqlInjectionProtection: true,
             xssProtection: true,
             emailObfuscation: true,
+            frameProtection: true,
+            frameAncestors: [],
             presets: defaultPresets(scopeType),
             rules: []
         };
@@ -529,6 +578,8 @@ export async function getWafRule(
         sqlInjectionProtection: row.sqlInjectionProtection,
         xssProtection: row.xssProtection,
         emailObfuscation: row.emailObfuscation,
+        frameProtection: row.frameProtection,
+        frameAncestors: cleanFrameAncestors(parseList(row.frameAncestors)),
         presets: parseList(row.presets),
         rules: parseCustomRules(row.rules)
     };
@@ -554,6 +605,9 @@ export interface WafInheritedView {
     readonly sqlInjectionProtection: boolean;
     readonly xssProtection: boolean;
     readonly emailObfuscation: boolean;
+    readonly frameProtection: boolean;
+    /** Sites a scope above already allows to frame this one. */
+    readonly frameAncestors: string[];
 }
 
 /** Nothing above it: the two instance-wide scopes, and any scope whose parents are
@@ -564,7 +618,9 @@ const NOTHING_INHERITED: WafInheritedView = {
     requireLogin: false,
     sqlInjectionProtection: true,
     xssProtection: true,
-    emailObfuscation: true
+    emailObfuscation: true,
+    frameProtection: true,
+    frameAncestors: []
 };
 
 /**
@@ -628,7 +684,9 @@ export async function getWafInherited(
         requireLogin: merged.requireLogin,
         sqlInjectionProtection: merged.sqlInjectionProtection,
         xssProtection: merged.xssProtection,
-        emailObfuscation: merged.emailObfuscation
+        emailObfuscation: merged.emailObfuscation,
+        frameProtection: merged.frameProtection,
+        frameAncestors: [...merged.frameAncestors]
     };
 }
 
@@ -701,7 +759,9 @@ export async function setWafRule(
         !parsed.browserIntegrity &&
         parsed.sqlInjectionProtection &&
         parsed.xssProtection &&
-        parsed.emailObfuscation;
+        parsed.emailObfuscation &&
+        parsed.frameProtection &&
+        parsed.frameAncestors.length === 0;
     // An instance scope keeps its row even when empty: absence there means "never
     // configured" and re-applies the default packs, so deleting it would silently
     // undo an operator who had just switched every one of them off.
@@ -719,6 +779,8 @@ export async function setWafRule(
         sqlInjectionProtection: parsed.sqlInjectionProtection,
         xssProtection: parsed.xssProtection,
         emailObfuscation: parsed.emailObfuscation,
+        frameProtection: parsed.frameProtection,
+        frameAncestors: JSON.stringify(parsed.frameAncestors),
         presets: JSON.stringify(parsed.presets),
         rules: JSON.stringify(parsed.rules)
     };

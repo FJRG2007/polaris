@@ -12,17 +12,27 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { resolve4, loadCloudflareToken, resolveZoneForHostname, findDnsRecords, upsertARecord, pruneDnsRecords } =
-    vi.hoisted(() => ({
-        resolve4: vi.fn(),
-        loadCloudflareToken: vi.fn(),
-        resolveZoneForHostname: vi.fn(),
-        findDnsRecords: vi.fn(),
-        upsertARecord: vi.fn(),
-        pruneDnsRecords: vi.fn()
-    }));
+const {
+    resolve4,
+    loadCloudflareToken,
+    resolveZoneForHostname,
+    findDnsRecords,
+    upsertARecord,
+    pruneDnsRecords,
+    findDomain
+} = vi.hoisted(() => ({
+    findDomain: vi.fn(),
+    resolve4: vi.fn(),
+    loadCloudflareToken: vi.fn(),
+    resolveZoneForHostname: vi.fn(),
+    findDnsRecords: vi.fn(),
+    upsertARecord: vi.fn(),
+    pruneDnsRecords: vi.fn()
+}));
 
-vi.mock("@polaris/db", () => ({ prisma: { setting: { findUnique: async () => null } } }));
+vi.mock("@polaris/db", () => ({
+    prisma: { setting: { findUnique: async () => null }, domain: { findUnique: findDomain } }
+}));
 vi.mock("node:dns/promises", () => ({ resolve4 }));
 vi.mock("../../src/lib/network-service", () => ({ detectPublicIp: async () => "51.15.20.30" }));
 vi.mock("../../src/lib/domain-service", () => ({ setDomainConfig: vi.fn() }));
@@ -39,6 +49,7 @@ const { provisionHostnameDns } = await import("../../src/lib/domain-dns");
 describe("provisionHostnameDns", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        findDomain.mockResolvedValue(null);
         resolve4.mockRejectedValue(new Error("NXDOMAIN"));
         loadCloudflareToken.mockResolvedValue("cf-token");
         resolveZoneForHostname.mockResolvedValue({ id: "zone-1", name: "example.com" });
@@ -52,18 +63,33 @@ describe("provisionHostnameDns", () => {
             status: "created",
             ip: "51.15.20.30"
         });
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.example.com", "51.15.20.30");
+        expect(upsertARecord).toHaveBeenCalledWith(
+            "cf-token",
+            "zone-1",
+            "orphion.example.com",
+            "51.15.20.30"
+        );
     });
 
     it("creates it just the same on a different domain the token reaches", async () => {
         resolveZoneForHostname.mockResolvedValue({ id: "zone-2", name: "orphion.com" });
         expect((await provisionHostnameDns("orphion.com")).status).toBe("created");
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-2", "orphion.com", "51.15.20.30");
+        expect(upsertARecord).toHaveBeenCalledWith(
+            "cf-token",
+            "zone-2",
+            "orphion.com",
+            "51.15.20.30"
+        );
     });
 
     it("takes the hostname as typed, however it was capitalized or spaced", async () => {
         await provisionHostnameDns("  Orphion.EXAMPLE.com  ");
-        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-1", "orphion.example.com", "51.15.20.30");
+        expect(upsertARecord).toHaveBeenCalledWith(
+            "cf-token",
+            "zone-1",
+            "orphion.example.com",
+            "51.15.20.30"
+        );
     });
 
     it("asks Cloudflare nothing about a name that already answers here", async () => {
@@ -103,9 +129,50 @@ describe("provisionHostnameDns", () => {
     });
 
     it("reports why rather than throwing when the domain is not in the account", async () => {
-        resolveZoneForHostname.mockRejectedValue(new Error("orphion.com is not on a domain in this Cloudflare account."));
+        resolveZoneForHostname.mockRejectedValue(
+            new Error("orphion.com is not on a domain in this Cloudflare account.")
+        );
         const result = await provisionHostnameDns("orphion.com");
         expect(result.status).toBe("manual");
         expect(result.detail).toContain("not on a domain");
+    });
+
+    describe("for a service on another server", () => {
+        const onServer = (address: string, servedBy = "server") => ({
+            servedBy,
+            application: { target: { kind: "host", host: { name: "aws-1", address } } }
+        });
+
+        it("points the name at that server, never at this one", async () => {
+            // The control plane may be a home box that loses power; a name served by a
+            // cloud server must resolve to the cloud server.
+            findDomain.mockResolvedValue(onServer("54.0.0.10"));
+
+            expect(await provisionHostnameDns("api.example.com")).toEqual({
+                status: "created",
+                ip: "54.0.0.10"
+            });
+            expect(upsertARecord).toHaveBeenCalledWith(
+                "cf-token",
+                "zone-1",
+                "api.example.com",
+                "54.0.0.10"
+            );
+        });
+
+        it("hands the record back when that server has no public address", async () => {
+            findDomain.mockResolvedValue(onServer("10.0.1.5"));
+
+            const result = await provisionHostnameDns("api.example.com");
+
+            expect(result).toMatchObject({ status: "manual", ip: null });
+            expect(upsertARecord).not.toHaveBeenCalled();
+        });
+
+        it("points at this server only when the operator chose to route it through Polaris", async () => {
+            findDomain.mockResolvedValue(onServer("54.0.0.10", "polaris"));
+
+            expect((await provisionHostnameDns("api.example.com")).ip).toBe("51.15.20.30");
+        });
     });
 });
