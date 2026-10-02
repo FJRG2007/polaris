@@ -36,7 +36,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Deploy from a Docker Compose file in the repo | todo | P1 | `compose` build method is a no-op and not selectable |
 | Newer base image noticed | partial | P2 | `update-scan` job reports a moved tag digest or a branch it is behind; redeploy is a press, not automatic |
 | Smart fixes for failed deploys | done | P1 | likely cause read from the log, one-press fix and redeploy |
-| Build on another machine / locally | done | P1 | build machine per service; `polaris deploy --local` from the CLI |
+| Build on another machine / locally | done | P1 | build machine per service, or a runner pool followed by machine; `polaris deploy --local` from the CLI; build machine kept per deployment (`builtOn`) |
 | GitHub deployments and check runs | done | P1 | reported on the commit |
 
 ## 2. Sources & builders
@@ -110,7 +110,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 | Restart policies UI | todo | P2 | |
 | Scheduled jobs | done | P1 | Service > Cron |
 | One-off command | done | P2 | Service > Console |
-| Zero-downtime deploys | partial | P1 | swarm starts first and rolls back; compose changes over for a service with no published port or volume, every copy, on this host or on a server whose edge takes pushed routes; a published port, a volume, a compose file, a second host port or a label-only server edge are recreated |
+| Zero-downtime deploys | partial | P1 | swarm starts first and rolls back; compose starts the new release beside the old one, gates the switch on it passing its healthcheck and opening its port (`waitUntilListening`), then writes the edge to the new release and drains the old one - for a service with no published port, no second host port, not a compose file of the owner's own, on this host or a server whose edge takes pushed routes; a service with volumes opts in per-service (`overlapVolumes`) and still restarts in place once more after a volume was just added; a published port, a compose file, a second host port, a label-only server edge, or volumes left off restart in place, each reason shown on the service's Deploys section |
 
 ## 7. Databases
 
@@ -183,7 +183,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 
 ## Suggested order
 
-1. Zero-downtime for services with a published port or a volume.
+1. Zero-downtime for services with a published port.
 2. Pre-deploy command, then build cache reuse.
 3. Deploy from a Compose file in the repository.
 4. Target stage / build args fields, `.env` export, restart policy.
