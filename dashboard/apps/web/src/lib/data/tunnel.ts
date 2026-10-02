@@ -64,6 +64,22 @@ export const KEY_CHANGED = {
         `${server} answered with a different SSH key than the one Polaris has on record for it, so nothing was sent to it. Check that server under Servers.`
 } as const;
 
+/** The sentences a forward the SSH server turned down is said in. Matched back
+ *  to the catalog by `lib/data/words`. */
+export const FORWARD_REFUSED = {
+    prohibited: (server: string) =>
+        `${server} does not allow port forwarding for this SSH login, so the database cannot be reached through it. Allow TCP forwarding for that user in the server's SSH settings.`,
+    unreachable: (server: string, where: string) =>
+        `${server} could not reach the database at ${where}. Check that the database is running and listening on that address.`
+} as const;
+
+const tunnelFailed = (server: string) =>
+    `Polaris could not open the SSH tunnel through ${server}. Check that the server is up and that the login still works.`;
+
+/** ssh2's `reason` on a refused channel: RFC 4254's open failure codes. */
+const ADMINISTRATIVELY_PROHIBITED = 1;
+const CONNECT_FAILED = 2;
+
 /**
  * A host key the way OpenSSH prints one: "SHA256:" and the unpadded base64 of
  * the SHA-256 of the key blob. What a reader compares against `ssh-keygen -lf`
@@ -150,6 +166,14 @@ export async function connectTunnel(
     }
 }
 
+function forwardRefusal(error: unknown, server: string, host: string, port: number): TunnelError {
+    const reason = (error as { reason?: unknown } | null)?.reason;
+    if (reason === ADMINISTRATIVELY_PROHIBITED) return new TunnelError(FORWARD_REFUSED.prohibited(server));
+    if (reason === CONNECT_FAILED) return new TunnelError(FORWARD_REFUSED.unreachable(server, `${host}:${port}`));
+    console.error("databases: the SSH server did not forward to the database", error);
+    return new TunnelError(tunnelFailed(server));
+}
+
 export interface OpenTunnel {
     readonly host: "127.0.0.1";
     readonly port: number;
@@ -174,14 +198,16 @@ export async function openTunnel(
         // not "check the server is up", and the reader has something to do.
         if (error instanceof TunnelError) throw error;
         console.error("databases: the SSH tunnel did not open", error);
-        throw new TunnelError(
-            `Polaris could not open the SSH tunnel through ${tunnel.label}. Check that the server is up and that the login still works.`
-        );
+        throw new TunnelError(tunnelFailed(tunnel.label));
     }
     const endAll = () => {
         for (const client of clients) client.end();
     };
     try {
+        const channel = await deps.forward(clients[0]!, remoteHost, remotePort).catch((error: unknown) => {
+            throw forwardRefusal(error, tunnel.label, remoteHost, remotePort);
+        });
+        channel.close();
         const forward = await listenForward(clients[0]!, remoteHost, remotePort);
         return {
             host: forward.host,

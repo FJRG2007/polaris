@@ -55,6 +55,8 @@
         "loginUnreadable": "Polaris no puede leer el acceso guardado para {server}. Vuelve a añadir ese servidor en Servidores y guarda esta conexión.",
         "noHostKey": "Polaris no tiene ninguna clave registrada con la que comprobar {server}, así que no hará túnel a través de él. Quítalo en Servidores, añádelo de nuevo y guarda esta conexión.",
         "tunnelFailed": "Polaris no ha podido abrir el túnel SSH a través de {server}. Comprueba que el servidor está en marcha y que el acceso sigue funcionando.",
+        "forwardProhibited": "{server} no permite el reenvío de puertos para este acceso SSH, así que la base de datos no se puede alcanzar a través de él. Permite el reenvío TCP para ese usuario en la configuración SSH del servidor.",
+        "forwardUnreachable": "{server} no ha podido alcanzar la base de datos en {address}. Comprueba que la base de datos está en marcha y escucha en esa dirección.",
         "keyChanged": "{target} ha respondido con una clave SSH distinta de la fijada para esta conexión, así que no se le ha enviado nada. Si ese servidor se reconstruyó, comprueba la clave nueva en los ajustes de la conexión y acéptala allí.",
         "cannotBeEmpty": "{column} no puede estar vacío.",
         "fileTooLarge": "Ese archivo es demasiado grande.",
@@ -64,6 +66,7 @@
         "certIsKey": "Ese archivo contiene una clave privada. Aquí va el certificado.",
         "notACert": "Eso no es un certificado PEM.",
         "notAPemKey": "Eso no es una clave privada PEM.",
+        "pemKeyLocked": "Esta clave está protegida con una frase de paso. Guarda una copia sin ella y usa ese archivo.",
         "clientKeyMissing": "Añade la clave de este certificado.",
         "clientCertMissing": "Añade el certificado de esta clave.",
         "wrongPassphrase": "Esa frase no abre esta clave.",
@@ -75,6 +78,7 @@
         "noTls": "Este servidor de base de datos no acepta conexiones cifradas. Desactiva el cifrado para él o activa TLS en el servidor.",
         "noRoot": "El certificado del servidor lo firma una autoridad que el servidor no envía, así que no hay nada en lo que confiar la primera vez. Sube el certificado de esa autoridad.",
         "passwordAgain": "Escribe de nuevo la contraseña. La dirección cambió y una contraseña guardada solo se envía a la dirección para la que se guardó.",
+        "passwordAgainTls": "Escribe de nuevo la contraseña. El cifrado es ahora más débil, y una contraseña guardada solo se envía por una conexión tan segura como aquella para la que se guardó.",
         "sshSecretAgain": "Escribe de nuevo la contraseña o la clave SSH. El servidor SSH cambió y un acceso guardado solo se envía al servidor para el que se guardó.",
         "caMissing": "Sube el certificado de la autoridad que firmó el certificado del servidor.",
         "caInvalid": "No se ha podido leer ese archivo de certificado. Usa un archivo PEM con uno o más certificados.",
@@ -145,6 +149,7 @@
         "readOnlyHint": "Rechaza cualquier cosa que cambie la base de datos. Actívalo para una base de datos que solo vienes a leer.",
         "add": "Añadirla",
         "passwordAgain": "La dirección cambió; vuelve a escribir la contraseña.",
+        "passwordAgainTls": "El cifrado es ahora más débil; vuelve a escribir la contraseña.",
         "savedSecret": "Guardada",
         "tlsModes": {
             "disable": {

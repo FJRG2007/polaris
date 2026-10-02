@@ -270,7 +270,9 @@ export function ConnectionDialog({
         (connection.host ?? "") === host.trim() &&
         String(connection.port ?? "") === port.trim() &&
         sameTunnel(saved, ssh);
-    const passwordAgain = connection?.hasPassword === true && !sameDestination && password === "";
+    const weakerTls = savedTls !== null && schema.weakerTls(savedTls.mode, tlsMode);
+    const keepsSecrets = sameDestination && !weakerTls;
+    const passwordAgain = connection?.hasPassword === true && !keepsSecrets && password === "";
 
     // A stored SSH secret is only kept when the login still signs in the same
     // way, to the same server: anything else leaves nothing to keep.
@@ -338,7 +340,7 @@ export function ConnectionDialog({
         tlsMode !== "disable" &&
         clientAuth &&
         !clientCert &&
-        !(savedTls?.clientCertificate && sameDestination);
+        !(savedTls?.clientCertificate && keepsSecrets);
 
     const complete =
         Object.keys(issues).length === 0 &&
@@ -489,7 +491,11 @@ export function ConnectionDialog({
                             </div>
                             <Field
                                 label={t("dialog.password")}
-                                error={passwordAgain ? t("dialog.passwordAgain") : undefined}
+                                error={
+                                    passwordAgain
+                                        ? t(sameDestination ? "dialog.passwordAgainTls" : "dialog.passwordAgain")
+                                        : undefined
+                                }
                                 hint={connection?.hasPassword ? t("dialog.keepSaved") : undefined}
                             >
                                 <Input
@@ -581,7 +587,7 @@ export function ConnectionDialog({
                                                 value={clientCert}
                                                 onChange={setClientCert}
                                                 saved={
-                                                    sameDestination
+                                                    keepsSecrets
                                                         ? (savedTls?.clientCertificate?.subject ?? null)
                                                         : null
                                                 }

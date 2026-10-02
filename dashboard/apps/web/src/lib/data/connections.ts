@@ -62,6 +62,7 @@ import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { resolveEgress, EgressRefusal, type EgressScope } from "./egress";
 import { randomUUID, X509Certificate, createPrivateKey } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
     probeServerCertificate,
     summarize,
@@ -83,6 +84,7 @@ import {
 } from "@/lib/host-service";
 import {
     saveConnectionSchema,
+    weakerTls,
     type SaveConnectionInput,
     type SshAuthMethod,
     type TlsMode,
@@ -183,6 +185,8 @@ export class DataConnectionError extends Error {
 export const CONNECTION_REFUSALS = {
     passwordAgain:
         "Enter the password again. The address changed, and a saved password is only sent to the address it was saved for.",
+    passwordAgainTls:
+        "Enter the password again. The encryption is weaker now, and a saved password is only sent over a connection as safe as the one it was saved for.",
     sshSecretAgain:
         "Enter the SSH password or key again. The SSH server changed, and a saved login is only sent to the server it was saved for.",
     caMissing: "Upload the certificate of the authority that signed the server's certificate.",
@@ -526,9 +530,21 @@ function polarisAddress(): DataAddress | null {
         database,
         username: decodeURIComponent(url.username) || null,
         password: decodeURIComponent(url.password) || null,
-        tls: { ...NO_TLS, mode, name: url.hostname },
+        tls: { ...NO_TLS, mode, ca: mode.startsWith("verify") ? polarisAuthority(url) : null, name: url.hostname },
         readOnly: true
     };
+}
+
+/** The authority `DATABASE_URL` names, the way libpq (`sslrootcert`) or Prisma
+ *  (`sslcert`) is told it. Null leaves the public authorities. */
+function polarisAuthority(url: URL): string | null {
+    const file = url.searchParams.get("sslrootcert") || url.searchParams.get("sslcert");
+    if (!file || file === "system") return null;
+    try {
+        return readAuthorities(readFileSync(file, "utf8"));
+    } catch {
+        return null;
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -648,12 +664,17 @@ async function prepareConnection(
     const dialled = parsed.ssh ? null : await judged(parsed.host, scope);
 
     const sameDestination = existing !== null && sameRoute(existing, parsed, tunnel);
+    const weaker = existing !== null && weakerTls(legacyTlsMode(existing.tls, existing.tlsMode), parsed.tlsMode);
+    const keepsSecrets = sameDestination && !weaker;
     const previous = existing ? storedSecrets(existing, Boolean(parsed.password)) : {};
-    // A password is only ever sent to the address it was typed for.
-    if (!parsed.password && previous.password !== undefined && !sameDestination) {
-        throw new DataConnectionError(CONNECTION_REFUSALS.passwordAgain);
+    // A password is only ever sent to the address it was typed for, and over a
+    // channel at least as safe as the one it was typed for.
+    if (!parsed.password && previous.password !== undefined && !keepsSecrets) {
+        throw new DataConnectionError(
+            sameDestination ? CONNECTION_REFUSALS.passwordAgainTls : CONNECTION_REFUSALS.passwordAgain
+        );
     }
-    const stored = sameDestination ? previous : {};
+    const stored = keepsSecrets ? previous : {};
     const password = parsed.password ?? stored.password ?? null;
 
     const tls = await tlsColumns(parsed, existing, sameDestination, stored, tunnel, dialled);

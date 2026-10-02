@@ -77,6 +77,12 @@ export type SshAuthMethod = (typeof SSH_AUTH_METHODS)[number];
 export const TLS_MODES = ["disable", "require", "verify-ca", "verify-full"] as const;
 export type TlsMode = (typeof TLS_MODES)[number];
 
+/** Whether `next` protects the connection less than `saved` did. A stored
+ *  secret is only sent over a channel at least as safe as it was saved for. */
+export function weakerTls(saved: TlsMode, next: TlsMode): boolean {
+    return TLS_MODES.indexOf(next) < TLS_MODES.indexOf(saved);
+}
+
 /**
  * Where a verifying connection's trusted authority comes from: the public ones
  * every system trusts, a certificate uploaded here, or the server's own
@@ -285,6 +291,13 @@ export const saveConnectionSchema = z
                 path: ["tlsClientKey"],
                 // i18n-ignore said in the reader's words by lib/data/words
                 message: "That is not a PEM private key."
+            });
+        } else if (value.tlsClientKey && /ENCRYPTED/.test(value.tlsClientKey)) {
+            context.addIssue({
+                code: "custom",
+                path: ["tlsClientKey"],
+                // i18n-ignore said in the reader's words by lib/data/words
+                message: "This key is locked with a passphrase. Save a copy without one and use that file."
             });
         }
         // A certificate and its key are replaced together: one without the other

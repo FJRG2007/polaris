@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
     captureHostKey,
     connectTunnel,
+    FORWARD_REFUSED,
     openTunnel,
     presentedHostKey,
     sshFingerprint,
@@ -28,6 +29,7 @@ interface FakeClient {
 const opened: FakeClient[] = [];
 const forwarded: { host: string; port: number }[] = [];
 let refuse: string | null = null;
+let forwardFails: { reason?: number } | null = null;
 
 function client(name: string): FakeClient {
     const made: FakeClient = {
@@ -48,7 +50,8 @@ const deps = {
     },
     forward: (async (_client: unknown, host: string, port: number) => {
         forwarded.push({ host, port });
-        return { channel: `${host}:${port}` } as never;
+        if (forwardFails) throw Object.assign(new Error("(SSH) Channel open failure: open failed"), forwardFails);
+        return { channel: `${host}:${port}`, close() {} } as never;
     }) as never
 };
 
@@ -74,6 +77,7 @@ beforeEach(() => {
     opened.length = 0;
     forwarded.length = 0;
     refuse = null;
+    forwardFails = null;
 });
 
 describe("connectTunnel", () => {
@@ -117,6 +121,30 @@ describe("openTunnel", () => {
         await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(TunnelError);
         await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
             /ssh.example.com/
+        );
+        failed.mockRestore();
+    });
+
+    it("says when the SSH server will not forward for this login, and hangs up", async () => {
+        forwardFails = { reason: 1 };
+        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
+            FORWARD_REFUSED.prohibited("ssh.example.com")
+        );
+        expect(opened.every((entry) => entry.ended)).toBe(true);
+    });
+
+    it("says when nothing answers at the database's address on the SSH server", async () => {
+        forwardFails = { reason: 2 };
+        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
+            FORWARD_REFUSED.unreachable("ssh.example.com", "127.0.0.1:5432")
+        );
+    });
+
+    it("falls back to the general sentence for any other forwarding failure", async () => {
+        forwardFails = {};
+        const failed = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        await expect(openTunnel(direct, "127.0.0.1", 5432, deps)).rejects.toThrow(
+            /could not open the SSH tunnel through ssh.example.com/
         );
         failed.mockRestore();
     });

@@ -39,6 +39,7 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That file holds a private key. Use the certificate here.": "refusals.certIsKey",
     "That is not a PEM certificate.": "refusals.notACert",
     "That is not a PEM private key.": "refusals.notAPemKey",
+    "This key is locked with a passphrase. Save a copy without one and use that file.": "refusals.pemKeyLocked",
     "Add the key that goes with this certificate.": "refusals.clientKeyMissing",
     "Add the certificate that goes with this key.": "refusals.clientCertMissing",
     // Reading a private key.
@@ -57,6 +58,8 @@ const EXACT: Readonly<Record<string, Key>> = {
     "The server's certificate is signed by an authority it does not send, so there is nothing to trust on first use. Upload that authority's certificate instead.":
         "refusals.noRoot",
     // Saving and checking.
+    "Enter the password again. The encryption is weaker now, and a saved password is only sent over a connection as safe as the one it was saved for.":
+        "refusals.passwordAgainTls",
     "Enter the password again. The address changed, and a saved password is only sent to the address it was saved for.":
         "refusals.passwordAgain",
     "Enter the SSH password or key again. The SSH server changed, and a saved login is only sent to the server it was saved for.":
@@ -147,6 +150,16 @@ const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
         /^Polaris could not open the SSH tunnel through (.+)\. Check that the server is up and that the login still works\.$/,
         "refusals.tunnelFailed",
         ["server"]
+    ],
+    [
+        /^(.+) does not allow port forwarding for this SSH login, so the database cannot be reached through it\. Allow TCP forwarding for that user in the server's SSH settings\.$/,
+        "refusals.forwardProhibited",
+        ["server"]
+    ],
+    [
+        /^(.+) could not reach the database at (\S+)\. Check that the database is running and listening on that address\.$/,
+        "refusals.forwardUnreachable",
+        ["server", "address"]
     ],
     [
         /^(.+) answered with a different SSH key than the one pinned for this connection, so nothing was sent to it\. If that server was rebuilt, check the new key in the connection's settings and trust it there\.$/,

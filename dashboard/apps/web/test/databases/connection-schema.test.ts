@@ -3,13 +3,14 @@
  * schema, so what is asserted here is what both of them do.
  */
 
-import { describe, expect, it } from "vitest";
 import { utils as sshUtils } from "ssh2";
+import { describe, expect, it } from "vitest";
 import {
     connectionIssues,
     looksPublic,
     saveConnectionSchema,
     sshKeyShape,
+    weakerTls,
     type SaveConnectionInput
 } from "@/lib/data/connection-schema";
 
@@ -197,6 +198,25 @@ describe("what the form can tell from the text", () => {
         expect(issues.tlsClientKey).toBe("Add the key that goes with this certificate.");
     });
 
+    it("refuses a client key locked with a passphrase, since there is nowhere to give it", () => {
+        const locked = (key: string) =>
+            connectionIssues(
+                draft({
+                    tlsMode: "require",
+                    tlsClientAuth: true,
+                    tlsClientCert: "-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----",
+                    tlsClientKey: key
+                })
+            ).tlsClientKey;
+        expect(locked("-----BEGIN ENCRYPTED PRIVATE KEY-----\nx\n-----END ENCRYPTED PRIVATE KEY-----")).toMatch(
+            /locked with a passphrase/
+        );
+        expect(
+            locked("-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nx\n-----END RSA PRIVATE KEY-----")
+        ).toMatch(/locked with a passphrase/);
+        expect(locked("-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----")).toBeUndefined();
+    });
+
     it("refuses a field the form never sends", () => {
         expect(saveConnectionSchema.safeParse({ ...draft(), ownerId: "someone" }).success).toBe(false);
     });
@@ -214,5 +234,14 @@ describe("which hosts start on full verification", () => {
         expect(looksPublic("10.0.0.4")).toBe(false);
         expect(looksPublic("postgres")).toBe(false);
         expect(looksPublic("nas.local")).toBe(false);
+    });
+});
+
+describe("a weaker encryption mode", () => {
+    it("is any mode that checks less than the saved one", () => {
+        expect(weakerTls("verify-full", "require")).toBe(true);
+        expect(weakerTls("verify-ca", "disable")).toBe(true);
+        expect(weakerTls("require", "require")).toBe(false);
+        expect(weakerTls("require", "verify-full")).toBe(false);
     });
 });

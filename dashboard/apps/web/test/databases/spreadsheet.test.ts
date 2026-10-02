@@ -26,4 +26,13 @@ describe("spreadsheetSafe", () => {
         expect(spreadsheetSafe("alice@example.test")).toBe("alice@example.test");
         expect(spreadsheetSafe("42")).toBe("42");
     });
+
+    it("keeps a signed number a number", () => {
+        expect(spreadsheetSafe("-12.5")).toBe("-12.5");
+        expect(spreadsheetSafe("+34")).toBe("+34");
+        expect(spreadsheetSafe("-1e-3")).toBe("-1e-3");
+        expect(spreadsheetSafe("-.5")).toBe("-.5");
+        expect(spreadsheetSafe("-1-1")).toBe("'-1-1");
+        expect(spreadsheetSafe("-")).toBe("'-");
+    });
 });

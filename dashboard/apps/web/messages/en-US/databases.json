@@ -55,6 +55,8 @@
         "loginUnreadable": "Polaris cannot read the login stored for {server}. Add that server again under Servers, then save this connection.",
         "noHostKey": "Polaris has no key on record to check {server} against, so it will not tunnel through it. Remove it under Servers and add it again, then save this connection.",
         "tunnelFailed": "Polaris could not open the SSH tunnel through {server}. Check that the server is up and that the login still works.",
+        "forwardProhibited": "{server} does not allow port forwarding for this SSH login, so the database cannot be reached through it. Allow TCP forwarding for that user in the server's SSH settings.",
+        "forwardUnreachable": "{server} could not reach the database at {address}. Check that the database is running and listening on that address.",
         "keyChanged": "{target} answered with a different SSH key than the one pinned for this connection, so nothing was sent to it. If that server was rebuilt, check the new key in the connection's settings and trust it there.",
         "cannotBeEmpty": "{column} cannot be empty.",
         "fileTooLarge": "That file is too large.",
@@ -64,6 +66,7 @@
         "certIsKey": "That file holds a private key. Use the certificate here.",
         "notACert": "That is not a PEM certificate.",
         "notAPemKey": "That is not a PEM private key.",
+        "pemKeyLocked": "This key is locked with a passphrase. Save a copy without one and use that file.",
         "clientKeyMissing": "Add the key that goes with this certificate.",
         "clientCertMissing": "Add the certificate that goes with this key.",
         "wrongPassphrase": "That passphrase does not unlock this key.",
@@ -75,6 +78,7 @@
         "noTls": "This database server does not accept encrypted connections. Turn encryption off for it, or turn TLS on at the server.",
         "noRoot": "The server's certificate is signed by an authority it does not send, so there is nothing to trust on first use. Upload that authority's certificate instead.",
         "passwordAgain": "Enter the password again. The address changed, and a saved password is only sent to the address it was saved for.",
+        "passwordAgainTls": "Enter the password again. The encryption is weaker now, and a saved password is only sent over a connection as safe as the one it was saved for.",
         "sshSecretAgain": "Enter the SSH password or key again. The SSH server changed, and a saved login is only sent to the server it was saved for.",
         "caMissing": "Upload the certificate of the authority that signed the server's certificate.",
         "caInvalid": "That certificate file could not be read. Use a PEM file with one or more certificates.",
@@ -145,6 +149,7 @@
         "readOnlyHint": "Refuses anything that would change the database. Turn it on for a database you came here to read.",
         "add": "Add it",
         "passwordAgain": "The address changed, so enter the password again.",
+        "passwordAgainTls": "The encryption is weaker now, so enter the password again.",
         "savedSecret": "Saved",
         "tlsModes": {
             "disable": {

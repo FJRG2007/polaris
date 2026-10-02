@@ -80,7 +80,7 @@ describe("keys ssh2 reads as they are", () => {
     });
 
     it("refuses an OpenSSH key whose KDF would tie this server up", () => {
-        // Made with 16 rounds, then told it needs a million: the rounds live in
+        // Made with 16 rounds, then told it needs 101, one over the cap: the rounds live in
         // the clear header, which is all an attacker has to write.
         const pair = utils.generateKeyPairSync("ed25519", { passphrase: "p", cipher: "aes256-ctr", rounds: 16 });
         const body = Buffer.from(
@@ -90,7 +90,7 @@ describe("keys ssh2 reads as they are", () => {
         const at = body.indexOf(Buffer.from("bcrypt")) + "bcrypt".length;
         // kdfoptions: uint32 length, then the salt as a string, then the rounds.
         const saltLength = body.readUInt32BE(at + 4);
-        body.writeUInt32BE(1_000_000, at + 8 + saltLength);
+        body.writeUInt32BE(101, at + 8 + saltLength);
         const forged = `-----BEGIN OPENSSH PRIVATE KEY-----
 ${body.toString("base64")}
 -----END OPENSSH PRIVATE KEY-----`;

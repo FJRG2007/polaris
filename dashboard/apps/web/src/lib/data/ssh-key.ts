@@ -55,7 +55,7 @@ export const SSH_KEY_REFUSALS = {
 
 /** OpenSSH's default is 16 and `ssh-keygen -a 100` is the usual "stronger". A
  *  file is attacker-chosen input, and bcrypt rounds are CPU on this server. */
-const MAX_KDF_ROUNDS = 1024;
+const MAX_KDF_ROUNDS = 100;
 
 /**
  * Read a private key, converting it when ssh2 cannot read it as it is.
@@ -340,9 +340,10 @@ function ppkKeys(file: PpkFile, passphrase: string): { cipherKey: Buffer; iv: Bu
     if (
         !argon2 ||
         !["argon2id", "argon2i", "argon2d"].includes(flavour) ||
-        !(memory > 0 && memory <= 262_144) ||
-        !(passes > 0 && passes <= 64) ||
-        !(parallelism > 0 && parallelism <= 16)
+        !(memory > 0 && memory <= 65_536) ||
+        !(passes > 0 && passes <= 32) ||
+        !(memory * passes <= 262_144) ||
+        !(parallelism > 0 && parallelism <= 4)
     ) {
         throw new SshKeyError(SSH_KEY_REFUSALS.newPutty);
     }
