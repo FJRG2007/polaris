@@ -226,7 +226,7 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                         <p className="text-sm">{t("summary", { count: problems.length })}</p>
                         {view.canFix && fixable.length > 0 && (
                             <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setFixing(true)}>
-                                <Wrench className="size-4 shrink-0" aria-hidden /> {t("fix.review", { count: fixable.length })}
+                                <Wrench className="size-4 shrink-0" aria-hidden /> {t("fix.review")}
                             </Button>
                         )}
                     </div>

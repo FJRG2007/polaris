@@ -89,6 +89,14 @@ describe("planning fixes", () => {
         expect(automaticChanges(changes).map((change) => change.kind)).toEqual(["dnssec"]);
     });
 
+    it("leaves a null MX on a sending domain and a first CAA record to a person", () => {
+        const changes = plan({ facts: { mx: [], caa: [] } });
+        expect(changes.map((change) => change.code)).toEqual(["mxMissing", "caaMissing"]);
+        expect(automaticChanges(changes)).toEqual([]);
+        const parked = plan({ facts: { mx: [], apexTxt: [], dmarcTxt: [], dkim: [] } });
+        expect(automaticChanges(parked).map((change) => change.code)).toContain("parkedNullMx");
+    });
+
     it("fingerprints a change by what it shows, so a moved plan is refused", () => {
         const [change] = plan({ facts: { apexTxt: [] } });
         expect(fingerprint(change!)).toBe(fingerprint({ ...change! }));

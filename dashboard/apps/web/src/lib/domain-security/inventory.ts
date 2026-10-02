@@ -125,8 +125,20 @@ interface Draft {
     hostnames: KnownDomain["hostnames"][number][];
 }
 
-/** Every domain Polaris knows about, instance-wide. What an administrator sees. */
-export async function knownDomains(options: { resolveParents?: boolean } = {}): Promise<KnownDomain[]> {
+/**
+ * Every domain Polaris knows about, instance-wide. What an administrator sees.
+ * With `within`, only that domain and the ones under it are read - all a single
+ * domain's entry depends on, since a hostname is filed under the deepest known
+ * domain above it.
+ */
+export async function knownDomains(options: { resolveParents?: boolean; within?: string } = {}): Promise<KnownDomain[]> {
+    const within = options.within ? clean(options.within) : null;
+    const near = within
+        ? [
+              { equals: within, mode: "insensitive" as const },
+              { endsWith: `.${within}`, mode: "insensitive" as const }
+          ]
+        : null;
     const drafts = new Map<string, Draft>();
     const draft = (domain: string): Draft => {
         const name = clean(domain);
@@ -141,13 +153,13 @@ export async function knownDomains(options: { resolveParents?: boolean } = {}): 
     const [config, owned, servers, zones, hostnames] = await Promise.all([
         getDomainZones(),
         prisma.ownerDomain.findMany({
-            where: { verifiedAt: { not: null } },
+            where: { verifiedAt: { not: null }, ...(near ? { OR: near.map((domain) => ({ domain })) } : {}) },
             select: { id: true, domain: true, userId: true, orgId: true, dnsToken: true }
         }),
         prisma.mailServer.findMany({ where: { status: { in: ["ready", "down"] } } }),
         cloudflareZones(),
         prisma.domain.findMany({
-            where: { enabled: true, kind: { in: ["custom", "base", "random"] } },
+            where: { enabled: true, kind: { in: ["custom", "base", "random"] }, ...(near ? { OR: near.map((hostname) => ({ hostname })) } : {}) },
             select: { hostname: true, applicationId: true, certResolver: true },
             take: 500
         })
@@ -206,7 +218,7 @@ export async function knownDomains(options: { resolveParents?: boolean } = {}): 
     }
 
     return [...drafts.entries()]
-        .filter(([domain]) => domain.includes(".") && !core.isIpAddress(domain))
+        .filter(([domain]) => domain.includes(".") && !core.isIpAddress(domain) && (!within || under(domain, within)))
         .map(([domain, entry]) => ({
             domain,
             sources: [...entry.sources],
@@ -221,5 +233,5 @@ export async function knownDomains(options: { resolveParents?: boolean } = {}): 
 /** One known domain, or null when Polaris has no reason to know it. */
 export async function knownDomain(domain: string): Promise<KnownDomain | null> {
     const name = clean(domain);
-    return (await knownDomains()).find((entry) => entry.domain === name) ?? null;
+    return (await knownDomains({ within: name })).find((entry) => entry.domain === name) ?? null;
 }

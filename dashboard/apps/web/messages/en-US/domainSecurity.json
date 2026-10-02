@@ -41,7 +41,7 @@
     "nothingHere": "Nothing to fix here.",
     "passed": "{count, plural, one {# check passed} other {# checks passed}}",
     "fix": {
-        "review": "{count, plural, one {Review # fix} other {Review # fixes}}",
+        "review": "Review fixes",
         "title": "Fixes for {domain}",
         "intro": "Nothing changes until you apply. A record already published is shown next to what replaces it.",
         "none": "Polaris has nothing to change here. What is left is fixed at your registrar or on your server.",

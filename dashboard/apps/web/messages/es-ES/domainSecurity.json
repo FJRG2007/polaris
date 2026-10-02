@@ -41,7 +41,7 @@
     "nothingHere": "Nada que corregir aquí.",
     "passed": "{count, plural, one {# comprobación correcta} other {# comprobaciónes correctas}}",
     "fix": {
-        "review": "{count, plural, one {Revisar # arreglo} other {Revisar # arreglos}}",
+        "review": "Ver arreglos",
         "title": "Arreglos para {domain}",
         "intro": "Nada cambia hasta que apliques. Un registro ya publicado aparece junto a lo que lo sustituye.",
         "none": "Polaris no tiene nada que cambiar aquí. Lo que queda se arregla en tu registrador o en tu servidor.",

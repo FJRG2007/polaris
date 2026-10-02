@@ -33,7 +33,10 @@ vi.mock("@polaris/db", () => ({
         application: { findMany: vi.fn(async () => []) }
     }
 }));
-vi.mock("@/lib/domain-security/inventory", () => ({ knownDomains: vi.fn(async () => known) }));
+vi.mock("@/lib/domain-security/inventory", () => ({
+    knownDomains: vi.fn(async () => known),
+    knownDomain: vi.fn(async (name: string) => known.find((entry) => entry.domain === name) ?? null)
+}));
 vi.mock("@/lib/notifications/dispatch", () => ({
     notify: vi.fn(async (input: { userId: string; title: string; href?: string | null }) => {
         notified.push({ userId: input.userId, title: input.title, href: input.href });
@@ -135,7 +138,7 @@ describe("the daily pass", () => {
 
     it("fixes a dedicated domain on its own and says what it did", async () => {
         known = [domain({ sources: ["cloudflare"], zone: { id: ZONE_ID, name: "example.com" } })];
-        audits.set("example.com", { domain: "example.com", dedicated: true, dedicatedBy: "admin-1", checkedAt: null, report: null });
+        audits.set("example.com", { domain: "example.com", dedicated: true, dedicatedBy: "admin-1", dedicatedScope: "instance", checkedAt: null, report: null });
         const result = await service.runDomainSecuritySweep(emptyProbes());
         expect(result.fixed).toBeGreaterThan(0);
         expect(saved.map((entry) => `${entry.draft.type} ${entry.draft.name} ${entry.draft.content}`)).toEqual(
@@ -147,5 +150,31 @@ describe("the daily pass", () => {
         expect(cloudflare.enableZoneDnssec).toHaveBeenCalledWith("instance-token", ZONE_ID);
         expect(audits.get("example.com")?.lastAutoFix).toMatchObject({ applied: saved.length + 1, failed: 0 });
         expect(notified.map((entry) => entry.userId)).toEqual(["admin-1"]);
+    });
+
+    it("writes a dedicated domain only with the token of whoever dedicated it", async () => {
+        const both = { ownerDomain: { id: "d1", userId: "user-1", orgId: null, hasToken: true }, zone: { id: ZONE_ID, name: "example.com" } };
+        known = [domain({ sources: ["owner", "cloudflare"], ...both })];
+        await service.setDedicated({ userId: "user-1", isAdmin: false, owner: { kind: "user", id: "user-1" } }, "example.com", true);
+        expect(audits.get("example.com")).toMatchObject({ dedicated: true, dedicatedBy: "user-1", dedicatedScope: "owner" });
+        await service.runDomainSecuritySweep(emptyProbes());
+        expect(saved.length).toBeGreaterThan(0);
+        expect(saved.every((entry) => (entry.scope as { kind: string }).kind === "owner")).toBe(true);
+
+        saved.length = 0;
+        audits.clear();
+        await service.setDedicated({ userId: "admin-1", isAdmin: true, owner: null }, "example.com", true);
+        expect(audits.get("example.com")).toMatchObject({ dedicatedScope: "instance" });
+        await service.runDomainSecuritySweep(emptyProbes());
+        expect(saved.length).toBeGreaterThan(0);
+        expect(saved.every((entry) => (entry.scope as { kind: string }).kind === "instance")).toBe(true);
+    });
+
+    it("fixes nothing on a dedicated domain that does not say whose token to use", async () => {
+        known = [domain({ sources: ["cloudflare"], zone: { id: ZONE_ID, name: "example.com" } })];
+        audits.set("example.com", { domain: "example.com", dedicated: true, dedicatedBy: "admin-1", dedicatedScope: null, checkedAt: null, report: null });
+        const result = await service.runDomainSecuritySweep(emptyProbes());
+        expect(result.fixed).toBe(0);
+        expect(saved).toEqual([]);
     });
 });

@@ -28,7 +28,7 @@ import * as cf from "@/lib/integrations/cloudflare-api";
 import { openText } from "@/lib/tls/managed-certificates";
 import { orgPeopleHolding } from "@/lib/orgs/org-service";
 import { wordsFor } from "@/lib/notifications/notice-words";
-import { knownDomains, type KnownDomain } from "./inventory";
+import { knownDomain, knownDomains, type KnownDomain } from "./inventory";
 import { storedReport } from "@/lib/mail-server/dmarc-report";
 import { sendingSources, type SendingSource } from "./dmarc-sources";
 import { regressions, type Grade, type SecurityReport } from "./types";
@@ -73,33 +73,48 @@ function ownsRow(owner: DomainOwner, row: NonNullable<KnownDomain["ownerDomain"]
     return owner.kind === "user" ? row.userId === owner.id : row.orgId === owner.id;
 }
 
-/** How Polaris writes a known domain's zone, with nobody asking: the brought
- *  domain's own token first, then the instance's. */
-async function systemScope(known: KnownDomain): Promise<Pick<Access, "scope" | "signing">> {
-    if (known.ownerDomain?.hasToken) {
+/** Whose token writes a domain's zone: the brought domain's own, or the
+ *  instance's Cloudflare account. */
+type ScopeKind = "owner" | "instance";
+
+const NO_SCOPE: Pick<Access, "scope" | "signing"> = { scope: null, signing: null };
+
+/** How Polaris writes a known domain's zone with one token, never the other in
+ *  its place when that one cannot be used. */
+async function scopeWith(known: KnownDomain, kind: ScopeKind): Promise<Pick<Access, "scope" | "signing">> {
+    if (kind === "owner") {
+        if (!known.ownerDomain?.hasToken) return NO_SCOPE;
         const row = await prisma.ownerDomain.findUnique({ where: { id: known.ownerDomain.id }, select: { dnsToken: true } });
         const token = openText(row?.dnsToken ?? null);
-        if (token) {
-            const owner: DomainOwner = known.ownerDomain.orgId
-                ? { kind: "org", id: known.ownerDomain.orgId }
-                : { kind: "user", id: known.ownerDomain.userId ?? "" };
-            const zone = await cf.resolveZoneForHostname(token, known.domain).catch(() => null);
-            return {
-                scope: { kind: "owner", owner, domainId: known.ownerDomain.id },
-                signing: zone && zone.name === known.domain ? { token, zoneId: zone.id } : null
-            };
-        }
+        if (!token) return NO_SCOPE;
+        const owner: DomainOwner = known.ownerDomain.orgId
+            ? { kind: "org", id: known.ownerDomain.orgId }
+            : { kind: "user", id: known.ownerDomain.userId ?? "" };
+        const zone = await cf.resolveZoneForHostname(token, known.domain).catch(() => null);
+        return {
+            scope: { kind: "owner", owner, domainId: known.ownerDomain.id },
+            signing: zone && zone.name === known.domain ? { token, zoneId: zone.id } : null
+        };
     }
-    if (known.zone) {
-        const token = await loadCloudflareToken().catch(() => null);
-        if (token) {
-            return {
-                scope: { kind: "instance", zoneId: known.zone.id },
-                signing: known.zone.name === known.domain ? { token, zoneId: known.zone.id } : null
-            };
-        }
-    }
-    return { scope: null, signing: null };
+    if (!known.zone) return NO_SCOPE;
+    const token = await loadCloudflareToken().catch(() => null);
+    if (!token) return NO_SCOPE;
+    return {
+        scope: { kind: "instance", zoneId: known.zone.id },
+        signing: known.zone.name === known.domain ? { token, zoneId: known.zone.id } : null
+    };
+}
+
+/** How the daily pass reads a domain's zone for its audit: the brought domain's
+ *  own token first, then the instance's. Reading only - writes use the scope
+ *  that dedicated the domain. */
+async function readScope(known: KnownDomain): Promise<Pick<Access, "scope" | "signing">> {
+    const own = await scopeWith(known, "owner");
+    return own.scope ? own : scopeWith(known, "instance");
+}
+
+function scopeKindOf(value: string | null): ScopeKind | null {
+    return value === "owner" || value === "instance" ? value : null;
 }
 
 /**
@@ -107,19 +122,16 @@ async function systemScope(known: KnownDomain): Promise<Pick<Access, "scope" | "
  * there", so a name cannot be used to learn what Polaris knows.
  */
 async function accessFor(actor: DomainActor, domain: string): Promise<Access> {
-    const name = domain.trim().toLowerCase();
-    const known = (await knownDomains()).find((entry) => entry.domain === name);
+    const known = await knownDomain(domain);
     if (!known) throw new DomainSecurityError("errors.notFound");
     if (actor.owner) {
         if (!known.ownerDomain || !ownsRow(actor.owner, known.ownerDomain)) throw new DomainSecurityError("errors.notFound");
         // The owner's page writes with the owner's token, never the instance's.
-        if (!known.ownerDomain.hasToken) return { known, scope: null, signing: null };
-        const system = await systemScope({ ...known, zone: null });
-        return { known, ...system };
+        return { known, ...(await scopeWith(known, "owner")) };
     }
     if (!actor.isAdmin) throw new DomainSecurityError("errors.notFound");
     // The administrator's list writes with the instance's token only.
-    return { known, ...(await systemScope({ ...known, ownerDomain: null })) };
+    return { known, ...(await scopeWith(known, "instance")) };
 }
 
 async function zoneRecordsFor(scope: zones.DnsScope | null, domain: string): Promise<ZoneRecordLike[] | null> {
@@ -202,20 +214,26 @@ function autoFixOf(value: unknown): AutoFixSummary | null {
     return { at: body.at, applied: Number(body.applied) || 0, failed: Number(body.failed) || 0 };
 }
 
+/** How long a source's reverse name is remembered: a sender's name rarely moves,
+ *  and every panel read would otherwise ask again. */
+const REVERSE_TTL_MS = 6 * 60 * 60 * 1000;
+const reverseCache = new Map<string, { at: number; name: string | null }>();
+
+async function reverseName(ip: string): Promise<string | null> {
+    const cached = reverseCache.get(ip);
+    if (cached && Date.now() - cached.at < REVERSE_TTL_MS) return cached.name;
+    const name = (await publicResolver().reverse(ip).catch(() => [] as string[]))[0] ?? null;
+    if (reverseCache.size > 5000) reverseCache.clear();
+    reverseCache.set(ip, { at: Date.now(), name });
+    return name;
+}
+
 /** Each source's reverse name, a few at a time and each bounded by the resolver's
  *  own timeout - the name is what says "Google" where the address does not. */
 async function namedSources(sources: SendingSource[]): Promise<SendingSource[]> {
-    const resolver = publicResolver();
     const named: SendingSource[] = [];
     for (let start = 0; start < sources.length; start += 8) {
-        named.push(
-            ...(await Promise.all(
-                sources.slice(start, start + 8).map(async (source) => ({
-                    ...source,
-                    hostname: (await resolver.reverse(source.sourceIp).catch(() => [] as string[]))[0] ?? null
-                }))
-            ))
-        );
+        named.push(...(await Promise.all(sources.slice(start, start + 8).map(async (source) => ({ ...source, hostname: await reverseName(source.sourceIp) })))));
     }
     return named;
 }
@@ -422,10 +440,11 @@ export async function applyFor(
 export async function setDedicated(actor: DomainActor, domain: string, dedicated: boolean): Promise<DomainSecurityView> {
     const access = await accessFor(actor, domain);
     if (!access.scope) throw new DomainSecurityError("errors.cannotFix");
+    const by = { dedicatedBy: dedicated ? actor.userId : null, dedicatedScope: dedicated ? access.scope.kind : null };
     await prisma.domainSecurityAudit.upsert({
         where: { domain: access.known.domain },
-        create: { domain: access.known.domain, dedicated, dedicatedBy: dedicated ? actor.userId : null },
-        update: { dedicated, dedicatedBy: dedicated ? actor.userId : null }
+        create: { domain: access.known.domain, dedicated, ...by },
+        update: { dedicated, ...by }
     });
     return viewOf(access);
 }
@@ -467,15 +486,17 @@ async function tell(known: KnownDomain, worse: number, fixed: number): Promise<v
     }
 }
 
-/** The safe fixes for a domain handed to Polaris, made with nobody asking. */
-async function autoFix(known: KnownDomain, report: SecurityReport, dedicatedBy: string | null): Promise<AutoFixSummary | null> {
-    const system = await systemScope(known);
+/** The safe fixes for a domain handed to Polaris, made with nobody asking and
+ *  only with the token of whoever handed it over. */
+async function autoFix(known: KnownDomain, report: SecurityReport, dedicated: { by: string | null; scope: ScopeKind | null }): Promise<AutoFixSummary | null> {
+    if (!dedicated.scope) return null;
+    const system = await scopeWith(known, dedicated.scope);
     if (!system.scope) return null;
     const access: Access = { known, ...system };
     const changes = automaticChanges(await planWith(access, report, null));
     if (changes.length === 0) return null;
     const results: ChangeResult[] = [];
-    for (const change of changes) results.push(await carryOut(access, change, dedicatedBy));
+    for (const change of changes) results.push(await carryOut(access, change, dedicated.by));
     const summary = { at: new Date().toISOString(), applied: results.filter((result) => result.ok).length, failed: results.filter((result) => !result.ok).length };
     await prisma.domainSecurityAudit.update({ where: { domain: known.domain }, data: { lastAutoFix: summary as unknown as object } });
     return summary;
@@ -490,7 +511,7 @@ export async function runDomainSecuritySweep(probes?: Probes): Promise<{ audited
     if (known.length === 0) return { audited: 0, told: 0, fixed: 0 };
     const rows = await prisma.domainSecurityAudit.findMany({
         where: { domain: { in: known.map((entry) => entry.domain) } },
-        select: { domain: true, checkedAt: true, dedicated: true, dedicatedBy: true }
+        select: { domain: true, checkedAt: true, dedicated: true, dedicatedBy: true, dedicatedScope: true }
     });
     const byDomain = new Map(rows.map((row) => [row.domain, row]));
     const due = known
@@ -504,14 +525,14 @@ export async function runDomainSecuritySweep(probes?: Probes): Promise<{ audited
     let fixed = 0;
     for (const entry of due) {
         try {
-            const system = await systemScope(entry);
+            const system = await readScope(entry);
             const first = await audit(entry, system, probes);
             const previous = first.previous;
             let report = first.report;
             const row = byDomain.get(entry.domain);
             let applied = 0;
             if (row?.dedicated) {
-                const summary = await autoFix(entry, report, row.dedicatedBy);
+                const summary = await autoFix(entry, report, { by: row.dedicatedBy, scope: scopeKindOf(row.dedicatedScope) });
                 if (summary && summary.applied > 0) {
                     applied = summary.applied;
                     fixed += applied;

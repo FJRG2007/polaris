@@ -14,7 +14,8 @@
  *   person asks for that policy. A domain that sends no mail is locked down at
  *   reject from the start, which is what locking it down means.
  * - CAA is added to, never rewritten: a second issuer record allows Polaris's CA
- *   alongside whatever was allowed.
+ *   alongside whatever was allowed. A zone with no CAA at all gets one only when
+ *   a person approves it, since the first record narrows who may issue.
  */
 
 import { POLARIS_CA } from "./evaluate";
@@ -187,11 +188,16 @@ export function planChanges(input: PlanInput): PlannedChange[] {
     return changes;
 }
 
+/** Changes that can take something away the domain still uses, so a person
+ *  makes them: a null MX on a domain that sends mail gets its mail refused, and
+ *  a first CAA record stops every other CA from issuing under it. */
+const ASKED_FIRST: readonly FindingCode[] = ["mxMissing", "caaMissing"];
+
 /** The changes a domain handed to Polaris gets without asking: every one the
- *  plan makes on its own. A stricter DMARC policy is never in it, since the plan
- *  only makes that when somebody chose it. */
+ *  plan makes on its own that cannot take something away. A stricter DMARC
+ *  policy is never in it, since the plan only makes that when somebody chose it. */
 export function automaticChanges(changes: readonly PlannedChange[]): PlannedChange[] {
-    return changes.filter((change) => change.kind !== "edge");
+    return changes.filter((change) => change.kind !== "edge" && !ASKED_FIRST.includes(change.code));
 }
 
 /** A change written the way a preview and an approval both carry it, so an

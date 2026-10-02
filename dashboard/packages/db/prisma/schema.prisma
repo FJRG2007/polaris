@@ -5731,6 +5731,33 @@ model OrgRole {
     @@index([orgId])
 }
 
+// The last security audit of one domain Polaris knows about: an owner's domain,
+// the instance's own, a zone on the connected Cloudflare account, a mail
+// server's domain, or the parent of a hostname a service is deployed on. Keyed by
+// the domain rather than by any of those rows, because one domain can be several
+// of them at once and is audited once (see lib/domain-security).
+model DomainSecurityAudit {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    domain         String    @unique
+    // protected | fair | weak | exposed | unknown
+    grade          String    @default("unknown")
+    // The report as JSON: check codes and their parameters, never sentences, so
+    // it reads in whichever language opens it.
+    report         Json?
+    checkedAt      DateTime?
+    // Set by somebody who can fix the domain: it is used by Polaris alone, so the
+    // daily pass applies the safe fixes itself and says what it did.
+    dedicated      Boolean   @default(false)
+    dedicatedBy    String?   @db.Uuid
+    // Whose token the daily pass writes with, the one that dedicated it: owner
+    // (the brought domain's own) or instance (the connected Cloudflare account).
+    dedicatedScope String?
+    // What the last automatic pass changed, as JSON, for the screen.
+    lastAutoFix    Json?
+    createdAt      DateTime  @default(now())
+    updatedAt      DateTime  @updatedAt
+}
+
 // A domain somebody brought themselves, for their own deployed services.
 //
 // Exactly one of userId and orgId is set: a domain belongs to one person or to
@@ -5744,30 +5771,6 @@ model OrgRole {
 // proves traffic for it arrives here, which is what makes a minted hostname
 // actually answer. A domain with the first and not the second is understood but
 // not yet usable, and the screen says which is missing.
-// The last security audit of one domain Polaris knows about: an owner's domain,
-// the instance's own, a zone on the connected Cloudflare account, a mail
-// server's domain, or the parent of a hostname a service is deployed on. Keyed by
-// the domain rather than by any of those rows, because one domain can be several
-// of them at once and is audited once (see lib/domain-security).
-model DomainSecurityAudit {
-    id          String    @id @default(uuid(7)) @db.Uuid
-    domain      String    @unique
-    // protected | fair | weak | exposed | unknown
-    grade       String    @default("unknown")
-    // The report as JSON: check codes and their parameters, never sentences, so
-    // it reads in whichever language opens it.
-    report      Json?
-    checkedAt   DateTime?
-    // Set by somebody who can fix the domain: it is used by Polaris alone, so the
-    // daily pass applies the safe fixes itself and says what it did.
-    dedicated   Boolean   @default(false)
-    dedicatedBy String?   @db.Uuid
-    // What the last automatic pass changed, as JSON, for the screen.
-    lastAutoFix Json?
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
-}
-
 model OwnerDomain {
     id           String    @id @default(uuid(7)) @db.Uuid
     userId       String?   @db.Uuid
