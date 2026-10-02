@@ -40,14 +40,23 @@ import * as kinds from "../device-kinds";
 import { HomeError } from "../home-error";
 import * as kitchen from "./philips-kitchen";
 import { philipsMeasures } from "./philips-coap";
+import { englishPlaces } from "../../../messages";
 import * as air from "../integrations/air-matters";
 import * as airMatters from "./philips-air-matters";
 import * as cloud from "../integrations/philips-cloud";
 import { readAppSecret } from "../integrations/apk-secret";
+import * as regions from "../integrations/philips-regions";
 import { dropPairing, holdPairing, readPairing } from "../pairing-vault";
+import { PHILIPS_HOMEID_BROKEN } from "../integrations/philips-sentences";
 import { closeShadowLinks, shadowLink } from "../integrations/air-matters-link";
 import { cloudLink, closeCloudLinks, type CloudAuth } from "../integrations/philips-cloud-link";
-import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
+import {
+    DriverError,
+    type Credentials,
+    type DeviceDriver,
+    type DeviceSnapshot,
+    type PairingAsked
+} from "./contract";
 
 export const PHILIPS_CLOUD = "philips-cloud";
 
@@ -206,6 +215,13 @@ function toCredentials(email: string, session: cloud.PhilipsSession, userId: str
     };
 }
 
+/** The IoT region a connection's Versuni devices are in: the one stored when it
+ *  was made, or EU for one made before there was a choice - which is where
+ *  every one of those was. */
+function regionOf(credentials: Credentials): cloud.PhilipsRegion {
+    return cloud.storedPhilipsRegion(credentials);
+}
+
 /** Where the connection's Versuni devices are listed. A connection made before
  *  there was a choice read the IoT registry, and still does; one made where the
  *  Versuni side held nothing reads none of it. */
@@ -230,7 +246,11 @@ function hasAirMatters(credentials: Credentials): boolean {
 function versuniDevicesOf(credentials: Credentials): Promise<cloud.PhilipsCloudDevice[]> {
     const source = sourceOf(credentials);
     if (!source || !credentials.accessToken) return Promise.resolve([]);
-    return cloud.listPhilipsSource(sessionOf(credentials).accessToken, source);
+    return cloud.listPhilipsSource(
+        sessionOf(credentials).accessToken,
+        source,
+        regionOf(credentials)
+    );
 }
 
 /** What a device is, by the model it reports. */
@@ -279,20 +299,22 @@ async function authFor(
     fresh = false
 ): Promise<CloudAuth> {
     const session = sessionOf(credentials);
-    const userId = credentials.userId || (await cloud.philipsUserId(session.accessToken));
+    const region = regionOf(credentials);
+    const userId = credentials.userId || (await cloud.philipsUserId(session.accessToken, region));
     const account = accountOf(credentials);
     let known = signatures.get(account);
     if (fresh || !known || known.token !== session.accessToken) {
         known = {
             token: session.accessToken,
-            signature: await cloud.philipsSignature(session.accessToken)
+            signature: await cloud.philipsSignature(session.accessToken, region)
         };
         signatures.set(account, known);
     }
     return {
         accessToken: session.accessToken,
         signature: known.signature,
-        clientId: cloud.philipsClientId(userId, deviceId)
+        clientId: cloud.philipsClientId(userId, deviceId),
+        broker: region.broker
     };
 }
 
@@ -559,52 +581,104 @@ const pairingStateSchema = z.object({
 
 type PairingState = z.infer<typeof pairingStateSchema>;
 
-/** The Versuni part of a connection, as it is stored. */
+/** The Versuni part of a connection, as it is stored: the sign-in, where its
+ *  list is read, and the region it was found in. */
 function versuniCredentials(email: string, found: cloud.PhilipsFound): Credentials {
-    return { ...toCredentials(email, found.session, found.userId), source: found.source };
+    return {
+        ...toCredentials(email, found.session, found.userId),
+        source: found.source,
+        iotRegion: found.region.region,
+        iotApi: found.region.api,
+        iotBroker: found.region.broker
+    };
 }
 
-/** The refusal for an account with nothing on it anywhere. */
-function nothingFound(summary: string): never {
+/** The country a connection was made for: one Philips serves, or none. */
+function countryOf(fields: Credentials): string {
+    const code = (fields.country ?? "").trim().toUpperCase();
+    return regions.isPhilipsCountry(code) ? code : "";
+}
+
+/**
+ * The refusal for an account with nothing on it anywhere: which country's
+ * region was asked - every other one known was too - and what each list said,
+ * with what to do about a HomeID backend that failed. Written in English for
+ * the log and the account's history; the screen says it in the reader's
+ * language (`refusal-text.ts`).
+ */
+export function nothingFoundSentence(summary: string, asked: PairingAsked): string {
+    const country = asked.country
+        ? regions.philipsCountryName(asked.country, "en")
+        : englishPlaces("connections.philips-cloud.yourCountry");
+    const area = regions.philipsRegionWords(englishPlaces, asked.region);
+    const homeId = asked.homeIdBroken ? ` ${PHILIPS_HOMEID_BROKEN}` : "";
+    return `Polaris found no device on this Philips account. It asked Philips' servers for ${country} (${area}) and every other region it knows. What it saw: ${summary}. Check that the device is in a Philips app under this same email.${homeId}`;
+}
+
+function nothingFound(summary: string, asked: PairingAsked): never {
     console.warn(`places: a Philips account sign-in found nothing to drive (${summary})`);
-    throw new DriverError(
-        `Polaris found no device on this Philips account. What it saw: ${summary}. Check that the device is in a Philips app under this same email.`,
-        "refused"
-    );
+    throw new DriverError(nothingFoundSentence(summary, asked), "refused");
+}
+
+/** Where the devices were found, for the dialog to say, when it is not the
+ *  region the country's accounts are in. */
+function foundElsewhere(discovery: cloud.PhilipsDiscovery, country: string) {
+    const found = discovery.found?.region;
+    if (!found || found.api === discovery.asked.api) return {};
+    return { foundIn: { country, asked: discovery.asked.region, found: found.region } };
 }
 
 /** The step after the code: the sign-in held on the server, the found Versuni devices and
  *  what was seen, waiting for the app to be uploaded. */
-async function afterCode(email: string, state: PairingState & { code: string; vToken: string }) {
-    const { gigyaSession, session, uid } = await cloud.signInWithCode(
-        email,
-        state.code,
-        state.vToken
-    );
-    const found = await cloud.discoverPhilipsDevices(gigyaSession, session);
+async function afterCode(
+    email: string,
+    country: string,
+    state: PairingState & { code: string; vToken: string }
+) {
+    // Where the country's accounts are, asked while the code is checked.
+    const [{ gigyaSession, session, uid }, { region }] = await Promise.all([
+        cloud.signInWithCode(email, state.code, state.vToken),
+        cloud.philipsRegionFor(country)
+    ]);
+    const found = await cloud.discoverPhilipsDevices(gigyaSession, session, region);
     const summary = cloud.philipsLookupSummary(found.lookups);
+    const asked: PairingAsked = {
+        country,
+        region: found.asked.region,
+        homeIdBroken: found.homeIdBroken
+    };
     if (found.found && found.hasAir) {
         const unsupported = unsupportedModels(found.found.devices);
         return {
             done: true as const,
             credentials: versuniCredentials(email, found.found),
+            ...foundElsewhere(found, country),
             ...(unsupported.length > 0 ? { unsupported } : {})
         };
     }
     // Without the account's id there is no asking the third cloud.
     if (!uid) {
         if (found.found) {
-            return { done: true as const, credentials: versuniCredentials(email, found.found) };
+            return {
+                done: true as const,
+                credentials: versuniCredentials(email, found.found),
+                ...foundElsewhere(found, country)
+            };
         }
-        nothingFound(summary);
+        nothingFound(summary, asked);
     }
+    // Every region known has been asked by now: the app file is the last
+    // resort, and the step says so.
     const ticket = holdPairing(
         TICKET,
         {
             email,
             uid,
             versuni: found.found ? JSON.stringify(versuniCredentials(email, found.found)) : "",
-            summary
+            summary,
+            country,
+            region: asked.region,
+            homeIdBroken: asked.homeIdBroken ? "1" : ""
         },
         STEP_MS
     );
@@ -614,7 +688,8 @@ async function afterCode(email: string, state: PairingState & { code: string; vT
             step: "file" as const,
             state: { ticket },
             summary,
-            skippable: found.found !== null
+            skippable: found.found !== null,
+            asked
         }
     };
 }
@@ -649,7 +724,11 @@ async function afterFile(email: string, state: PairingState) {
     dropPairing(state.appSecret);
     if (devices.length === 0) {
         if (versuni) return { done: true as const, credentials: versuni };
-        nothingFound(seen);
+        nothingFound(seen, {
+            country: ticket.country ?? "",
+            region: ticket.region || cloud.PHILIPS_EU.region,
+            homeIdBroken: ticket.homeIdBroken === "1"
+        });
     }
     airTokens.set(email, token);
     airListed.set(email, devices);
@@ -681,7 +760,7 @@ export const philipsCloudDriver: DeviceDriver = {
             if (ticket) return afterFile(email, parsed.data);
             if (!vToken) throw new HomeError("That connection is missing its sign-in");
             if (!code) throw new HomeError("Enter the code from the email");
-            return afterCode(email, { ...parsed.data, code, vToken });
+            return afterCode(email, countryOf(fields), { ...parsed.data, code, vToken });
         },
 
         /** The app uploaded at the file step: the signing value read out of it,

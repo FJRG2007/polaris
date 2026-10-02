@@ -74,10 +74,13 @@ import { FoundUnits } from "./found-units";
 import { AddressInput } from "./address-input";
 import type { DiscoveredUnit } from "../../lib/drivers/contract";
 import type { PlacesTranslator } from "../../lib/i18n";
+import { philipsCountryGuess } from "../../lib/integrations/philips-regions";
+import type { PairingAsked, PairingFoundIn } from "../../lib/drivers/contract";
 
 const { runAction } = hostUi.runAction;
 const { IntegrationLogo } = hostUi.logos;
 const { QRCodeSVG } = hostUi.qrCode;
+const { useDisplayFormat } = hostUi.displayFormat;
 
 /** One attempt at pairing, as the server started it. */
 interface Pairing {
@@ -90,6 +93,8 @@ interface FileStep {
     readonly state: Record<string, string>;
     readonly summary: string;
     readonly skippable: boolean;
+    /** Where the attempt looked before asking for it. */
+    readonly asked?: PairingAsked;
 }
 
 /** What a poll answered, as far as finishing goes. */
@@ -98,8 +103,26 @@ interface PollAnswer {
     readonly waiting?: boolean;
     readonly next?: FileStep;
     readonly unsupported?: string[];
+    readonly foundIn?: PairingFoundIn;
     readonly devices?: DeviceView[];
     readonly accounts?: DeviceAccountView[];
+}
+
+/** The time zones and languages that say where the reader probably is, most
+ *  trusted first: the zone they chose in Polaris, this browser's zone, this
+ *  browser's languages, then the language they read Polaris in. */
+function whereabouts(chosenZone: string, locale: string) {
+    let browserZone: string | null = null;
+    try {
+        browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+    } catch {
+        browserZone = null;
+    }
+    const languages = typeof navigator === "undefined" ? [] : [...navigator.languages];
+    return {
+        timeZones: [chosenZone && chosenZone !== "auto" ? chosenZone : null, browserZone],
+        locales: [...languages, locale]
+    };
 }
 
 /** Send a file to the pairing's file step and answer the state it adds, or
@@ -292,6 +315,7 @@ export function ConnectDialog({
     onConnected: (result: Connected) => void;
 }) {
     const t = usePlacesT();
+    const format = useDisplayFormat();
     const brands = useMemo(() => registry.deviceBrands(), []);
     /** No make until one is picked from the list: the list is the first step. */
     const [brand, setBrand] = useState("");
@@ -320,6 +344,7 @@ export function ConnectDialog({
     const [finished, setFinished] = useState<{
         readonly result: Connected;
         readonly unsupported: readonly string[];
+        readonly foundIn?: PairingFoundIn;
     } | null>(null);
 
     const connectionId = reconnect ? reconnect.connection : chosen;
@@ -348,6 +373,23 @@ export function ConnectDialog({
                 : []
         );
     }, [reconnect]);
+
+    // A country is started on where the reader probably is, so it is a choice
+    // they check rather than one they have to make; one already given stays.
+    const zone = format.preferences.timeZone;
+    useEffect(() => {
+        const missing = (connection?.fields ?? []).filter(
+            (field) => field.countries === true && !fields[field.key]
+        );
+        if (missing.length === 0) return;
+        const guess = philipsCountryGuess(whereabouts(zone, t.locale));
+        if (!guess) return;
+        setFields((current) => {
+            const next = { ...current };
+            for (const field of missing) if (!next[field.key]) next[field.key] = guess;
+            return next;
+        });
+    }, [connection, fields, zone, t.locale]);
 
     // A closed dialog is waiting for nothing.
     useEffect(() => {
@@ -510,8 +552,12 @@ export function ConnectDialog({
         setFields({});
         setLabel("");
         const connected = { devices: result.devices ?? [], accounts: result.accounts ?? [] };
-        if (result.unsupported && result.unsupported.length > 0) {
-            setFinished({ result: connected, unsupported: result.unsupported });
+        if ((result.unsupported && result.unsupported.length > 0) || result.foundIn) {
+            setFinished({
+                result: connected,
+                unsupported: result.unsupported ?? [],
+                foundIn: result.foundIn
+            });
             return;
         }
         onConnected(connected);
@@ -649,12 +695,21 @@ export function ConnectDialog({
 
                 {finished ? (
                     <>
-                        <p role="status" className="text-sm text-muted-foreground">
-                            {t("connect.unsupported", {
-                                models: finished.unsupported.join(", "),
-                                count: finished.unsupported.length
-                            })}
-                        </p>
+                        <div role="status" className="flex flex-col gap-2">
+                            {finished.foundIn && connection && (
+                                <p className="text-sm text-muted-foreground">
+                                    {registry.foundInWords(t, connection, finished.foundIn)}
+                                </p>
+                            )}
+                            {finished.unsupported.length > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    {t("connect.unsupported", {
+                                        models: finished.unsupported.join(", "),
+                                        count: finished.unsupported.length
+                                    })}
+                                </p>
+                            )}
+                        </div>
                         <DialogFooter>
                             <Button
                                 onClick={() => {
@@ -902,8 +957,13 @@ export function ConnectDialog({
                                 <div className="flex flex-col gap-3">
                                     <p className="text-sm font-medium">{fileWords.title}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {fileWords.why(fileStep.summary)}
+                                        {fileWords.why(fileStep.summary, fileStep.asked)}
                                     </p>
+                                    {fileStep.asked?.homeIdBroken && fileWords.homeid && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {fileWords.homeid}
+                                        </p>
+                                    )}
                                     <label className="flex flex-col gap-1.5">
                                         <span className="text-xs text-muted-foreground">
                                             {fileWords.field}

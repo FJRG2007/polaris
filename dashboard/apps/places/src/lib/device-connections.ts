@@ -62,7 +62,9 @@ import type { PlacesTranslator } from "./i18n";
 import type { DeviceKind } from "./device-kinds";
 import { macIssue, parseMac } from "@polaris/core";
 import { TUYA_REGIONS } from "./integrations/tuya-regions";
+import * as philipsRegions from "./integrations/philips-regions";
 import { englishPlaces as en, type PlacesKey } from "../../messages";
+import type { PairingAsked, PairingFoundIn } from "./drivers/contract";
 
 /** One thing a connection has to be told. */
 export interface ConnectionField {
@@ -100,6 +102,12 @@ export interface ConnectionField {
     /** A fixed set to pick from, where there is one. */
     readonly choices?: readonly { readonly value: string; readonly label: string }[];
     readonly defaultValue?: string;
+    /**
+     * The choices are countries, by code: named in the reader's language
+     * rather than from the catalogs, and started on where the reader probably
+     * is (`philipsCountryGuess`) rather than on a fixed default.
+     */
+    readonly countries?: true;
 }
 
 /** Where a connection reaches from, which is the first thing anybody wants to
@@ -702,7 +710,20 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             en("connections.philips-cloud.steps.s1"),
             en("connections.philips-cloud.steps.s2")
         ],
+        // The country is what Philips' apps ask before anything else: it is
+        // how they find which of Versuni's regions holds the account
+        // (`integrations/philips-regions.ts`).
         fields: [
+            {
+                key: "country",
+                label: en("connections.philips-cloud.fields.country.label"),
+                hint: en("connections.philips-cloud.fields.country.hint"),
+                countries: true,
+                choices: philipsRegions.PHILIPS_COUNTRIES.map((code) => ({
+                    value: code,
+                    label: philipsRegions.philipsCountryName(code, "en")
+                }))
+            },
             {
                 key: "email",
                 label: en("connections.philips-cloud.fields.email.label"),
@@ -1099,6 +1120,32 @@ export function normalizeFields(
     return clean;
 }
 
+/** A country and a region, for a sentence that names where a cloud looked. */
+function whereWords(t: PlacesTranslator, country: string, region: string) {
+    return {
+        country: country
+            ? philipsRegions.philipsCountryName(country, t.locale)
+            : t("connections.philips-cloud.yourCountry"),
+        area: region ? philipsRegions.philipsRegionWords(t, region) : "-"
+    };
+}
+
+/** Where a pairing found the devices, when that was not where it looked
+ *  first: one sentence, or "" for a connection that never says it. */
+export function foundInWords(
+    t: PlacesTranslator,
+    connection: DeviceConnection,
+    found: PairingFoundIn
+): string {
+    const key = `connections.${connection.id}.foundIn`;
+    if (!t.has(key)) return "";
+    return t(key as PlacesKey, {
+        country: whereWords(t, found.country, found.asked).country,
+        asked: philipsRegions.philipsRegionWords(t, found.asked),
+        found: philipsRegions.philipsRegionWords(t, found.found)
+    });
+}
+
 /**
  * A connection's words in the reader's language. The data above carries the
  * English, for the server and for search; a screen draws these.
@@ -1125,10 +1172,16 @@ export function connectionWords(t: PlacesTranslator, connection: DeviceConnectio
         pairingFile: connection.pairing?.file
             ? {
                   title: say(`${base}.pairing.file.title`) ?? "",
-                  why: (summary: string) =>
+                  why: (summary: string, asked?: PairingAsked) =>
                       t.has(`${base}.pairing.file.why`)
-                          ? t(`${base}.pairing.file.why` as PlacesKey, { summary })
+                          ? t(`${base}.pairing.file.why` as PlacesKey, {
+                                summary,
+                                ...whereWords(t, asked?.country ?? "", asked?.region ?? "")
+                            })
                           : "",
+                  /** Said under `why` when the maker's own service failed on
+                   *  the account, with what fixes that on their side. */
+                  homeid: say(`${base}.pairing.file.homeid`) ?? "",
                   where: say(`${base}.pairing.file.where`) ?? "",
                   link: say(`${base}.pairing.file.link`) ?? "",
                   field: say(`${base}.pairing.file.field`) ?? "",
@@ -1152,9 +1205,16 @@ export function fieldWords(
         placeholder: field.placeholder
             ? (say(`${base}.placeholder`) ?? field.placeholder)
             : undefined,
-        choices: field.choices?.map((choice) => ({
-            value: choice.value,
-            label: say(`connections.regions.${choice.value}`) ?? choice.label
-        }))
+        choices: field.countries
+            ? field.choices
+                  ?.map((choice) => ({
+                      value: choice.value,
+                      label: philipsRegions.philipsCountryName(choice.value, t.locale)
+                  }))
+                  .sort((a, b) => a.label.localeCompare(b.label, t.locale))
+            : field.choices?.map((choice) => ({
+                  value: choice.value,
+                  label: say(`connections.regions.${choice.value}`) ?? choice.label
+              }))
     };
 }

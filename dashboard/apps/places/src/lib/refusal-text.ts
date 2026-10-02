@@ -16,7 +16,8 @@
  */
 
 import type { PlacesTranslator } from "./i18n";
-import type { PlacesKey } from "../../messages";
+import { englishPlaces, type PlacesKey } from "../../messages";
+import { philipsWhereInWords } from "./integrations/philips-regions";
 import { DEVICE_ACTION_VERBS, DEVICE_KIND_LABELS } from "./device-kinds";
 import {
     PHILIPS_GARBLED,
@@ -335,11 +336,17 @@ const ACTION_BY_VERB = new Map(
     Object.entries(DEVICE_ACTION_VERBS).map(([action, verb]) => [verb, action])
 );
 
-/** Sentences that carry values, by the shape of their English. */
+/** Sentences that carry values, by the shape of their English. `words` puts a
+ *  value written in English - a country, a part of the world - back into the
+ *  reader's language. */
 const SHAPED: readonly {
     readonly pattern: RegExp;
     readonly key: PlacesKey;
     readonly params: readonly string[];
+    readonly words?: (
+        t: PlacesTranslator,
+        values: Record<string, string>
+    ) => Record<string, string>;
 }[] = [
     { pattern: /^(.+) has to be connected again$/s, key: "refusals.reconnect", params: ["name"] },
     {
@@ -351,9 +358,14 @@ const SHAPED: readonly {
     },
     {
         pattern:
-            /^Polaris found no device on this Philips account\. What it saw: (.+)\. Check that the device is in a Philips app under this same email\.$/s,
+            /^Polaris found no device on this Philips account\. It asked Philips' servers for (.+) \((.+)\) and every other region it knows\. What it saw: (.+)\. Check that the device is in a Philips app under this same email\.( Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again\.)?$/s,
         key: "refusals.philipsCloudNothing",
-        params: ["summary"]
+        params: ["country", "area", "summary", "homeid"],
+        words: (t, values) => ({
+            ...values,
+            ...philipsWhereInWords(t, englishPlaces, values.country ?? "", values.area ?? ""),
+            homeid: values.homeid ? "yes" : "no"
+        })
     },
     {
         pattern:
@@ -478,13 +490,13 @@ export function placesRefusalText(t: PlacesTranslator, message: string): string 
         values.hasPlace = values.place ? "yes" : "no";
         return t(shaped, values);
     }
-    for (const { pattern, key: shaped, params } of SHAPED) {
+    for (const { pattern, key: shaped, params, words } of SHAPED) {
         const found = pattern.exec(message);
         if (!found) continue;
-        return t(
-            shaped,
-            Object.fromEntries(params.map((name, index) => [name, found[index + 1] ?? ""]))
+        const values: Record<string, string> = Object.fromEntries(
+            params.map((name, index) => [name, found[index + 1] ?? ""])
         );
+        return t(shaped, words ? words(t, values) : values);
     }
     return message;
 }

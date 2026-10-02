@@ -556,7 +556,7 @@
         "philipsCloudLinkRefused": "Philips' cloud would not let Polaris reach this device. Connect the account again.",
         "philipsCloudNotOnAccount": "That device is not on this Philips account.",
         "philipsCloudEnterCode": "Enter the code from the email",
-        "philipsCloudNothing": "Polaris found no device on this Philips account. What it saw: {summary}. Check that the device is in a Philips app under this same email.",
+        "philipsCloudNothing": "Polaris found no device on this Philips account. It asked Philips' servers for {country} ({area}) and every other region it knows. What it saw: {summary}. Check that the device is in a Philips app under this same email.{homeid, select, yes { Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again.} other {}}",
         "airMattersRefused": "Philips' fan and heater cloud refused the sign-in. Upload the Philips Air+ app again.",
         "apkNotAnApp": "That file is not an app file. Upload the Philips Air+ app as an .apk, .apkm or .xapk file.",
         "apkNoSecret": "Polaris could not find what it needs in that file. Upload the whole Philips Air+ app, not a split or language part of it.",
@@ -895,10 +895,14 @@
             "note": "Unofficial: Philips publishes no API for this, so it could stop working if Philips changes its cloud. It signs in with a code Philips emails you, and no password is kept. Purifier models it knows: AC0650, AC0651, AC1715, AC3221 and AC3360, and the CX3550 fan; others show their readings and power only. Kitchen appliances are shown, never started; an airfryer can be stopped. Fans and heaters need the Philips Air+ app file once. If a purifier is on the same network as Polaris, the local connection does not depend on Philips.",
             "steps": {
                 "s0": "Set the device up in its Philips app (Air+, HomeID or NutriU) and sign in there with your email.",
-                "s1": "Type that email and select Email me a code. Philips sends you a one-time code.",
+                "s1": "Pick your country, type that email and select Email me a code. Philips sends you a one-time code.",
                 "s2": "Type the code here. Polaris lists the devices on the account, and asks for the Philips Air+ app file if it needs it."
             },
             "fields": {
+                "country": {
+                    "label": "Country or region",
+                    "hint": "The one your Philips account is set up in. Philips keeps each country's devices in one region."
+                },
                 "email": {
                     "label": "Email",
                     "hint": "The one you sign in to the Philips app with.",
@@ -909,13 +913,28 @@
                 "prompt": "Philips has emailed a one-time code to that address. It can take a minute to arrive; check spam too.",
                 "file": {
                     "title": "Upload the Philips Air+ app file (.apk)",
-                    "why": "Philips' Air+ and HomeID lists hold no air device ({summary}). Fans, heaters and some purifiers are on a third Philips cloud, which only accepts sign-ins signed with a value Philips keeps inside its Air+ app. Polaris reads that value from the file without running it, keeps it encrypted with this connection and deletes the file.",
+                    "why": "Polaris asked Philips' servers for {country} ({area}) and every other region it knows, and no Air+ or HomeID list holds an air device ({summary}). Fans, heaters and some purifiers are on a third Philips cloud, which only accepts sign-ins signed with a value Philips keeps inside its Air+ app. Polaris reads that value from the file without running it, keeps it encrypted with this connection and deletes the file.",
+                    "homeid": "Philips' HomeID service failed on this account. If the device is in the HomeID app, removing it there and adding it again usually fixes that.",
                     "where": "Download it (com.philips.ph.homecare) from APKMirror in your browser; any version works.",
                     "link": "APKMirror",
                     "field": "Philips Air+ app file",
                     "skip": "Connect without it"
                 }
-            }
+            },
+            "foundIn": "Found on Philips' servers in {found}, not in {asked}, where accounts from {country} usually are. Polaris will keep using {found}.",
+            "areas": {
+                "eu": "Europe",
+                "us": "United States",
+                "ca": "Canada",
+                "mx": "Mexico",
+                "sa": "South America",
+                "ap": "Asia Pacific",
+                "cn": "China",
+                "me": "Middle East",
+                "il": "Israel",
+                "af": "Africa"
+            },
+            "yourCountry": "your country"
         },
         "notEmail": "Type a whole email address, like name@example.com.",
         "macShort": "A MAC address has 12 digits.",

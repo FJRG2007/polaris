@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { placesCatalogs } from "@polaris-app/places/messages";
 import * as registry from "@polaris-app/places/src/lib/device-connections";
 
 const NUKI_WEB = "nuki-web";
@@ -113,12 +114,16 @@ describe("a connection made by pairing", () => {
     it("asks for an emailed code where the maker sends one", () => {
         const philips = registry.deviceConnection("philips-cloud");
         expect(philips?.pairing?.kind).toBe("code");
-        const email = philips!.fields[0]!;
+        const email = philips!.fields.find((field) => field.key === "email")!;
         expect(registry.fieldIssue(email, "owner@")).not.toBeNull();
         expect(registry.fieldIssue(email, "owner@example.com")).toBeNull();
         expect(registry.fieldIssue(email, "")).toBeNull();
-        expect(registry.fieldsComplete(philips!, { email: "owner@example" })).toBe(false);
-        expect(registry.fieldsComplete(philips!, { email: " owner@example.com " })).toBe(true);
+        expect(registry.fieldsComplete(philips!, { country: "ES", email: "owner@example" })).toBe(
+            false
+        );
+        expect(
+            registry.fieldsComplete(philips!, { country: "ES", email: " owner@example.com " })
+        ).toBe(true);
         // A comma or space left over from a paste is another address to Philips.
         for (const slip of [
             "owner@example.com,",
@@ -127,12 +132,35 @@ describe("a connection made by pairing", () => {
             "owner@example..com"
         ]) {
             expect(registry.fieldIssue(email, slip)).not.toBeNull();
-            expect(registry.fieldsComplete(philips!, { email: slip })).toBe(false);
+            expect(registry.fieldsComplete(philips!, { country: "ES", email: slip })).toBe(false);
         }
         expect(registry.normalizeFields(philips!, { email: " Owner@Example.COM " }).email).toBe(
             "owner@example.com"
         );
         expect(registry.normalizeField(email, " Owner@Example.COM ")).toBe("owner@example.com");
+    });
+
+    it("asks a Philips account's country first, from the countries Philips serves", () => {
+        const philips = registry.deviceConnection("philips-cloud")!;
+        const country = philips.fields[0]!;
+        expect(country.key).toBe("country");
+        expect(country.countries).toBe(true);
+        expect(country.secret).toBeUndefined();
+        expect(registry.fieldIssue(country, "ES")).toBeNull();
+        expect(registry.fieldIssue(country, "JP")).toBe("Pick one of the listed options");
+        // No country, no code: the region decides where the devices are read.
+        expect(registry.fieldsComplete(philips, { email: "owner@example.com" })).toBe(false);
+        // Shown on a reconnect, like any address: it is not a secret.
+        expect(registry.shownFields(philips).map((field) => field.key)).toContain("country");
+        const es = placesCatalogs.translator("es-ES", "places");
+        const words = registry.fieldWords(es, philips, country);
+        expect(words.label).toBe("País o región");
+        expect(words.choices?.find((choice) => choice.value === "ES")?.label).toBe("España");
+        expect(words.choices?.map((choice) => choice.label)).toEqual(
+            [...(words.choices ?? [])]
+                .map((choice) => choice.label)
+                .sort((a, b) => a.localeCompare(b, "es-ES"))
+        );
     });
 
     it("keeps the typed Tuya project as a second way in", () => {

@@ -362,7 +362,7 @@ describe("signing in with an emailed code", () => {
             done: false,
             next: {
                 step: "file",
-                summary: "Air+: 0; HomeID: 0; HomeID app: 0",
+                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0",
                 skippable: false
             }
         });
@@ -382,7 +382,7 @@ describe("signing in with an emailed code", () => {
                 { vToken: "vt-1", code: "123456" }
             )
         ).rejects.toThrow(
-            "Polaris found no device on this Philips account. What it saw: Air+: 0; HomeID: 0; HomeID app: 0. Check that the device is in a Philips app under this same email."
+            "Polaris found no device on this Philips account. It asked Philips' servers for your country (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0. Check that the device is in a Philips app under this same email."
         );
     });
 
@@ -546,7 +546,7 @@ describe("going on to Philips' fan and heater cloud", () => {
                 { ...next.state, ...read }
             )
         ).rejects.toThrow(
-            "What it saw: Air+: 0; HomeID: 0; HomeID app: 0; Philips Air: 0. Check that the device is in a Philips app under this same email."
+            "What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Philips Air: 0. Check that the device is in a Philips app under this same email."
         );
     });
 
@@ -790,7 +790,10 @@ describe("finding the purifiers on an account", () => {
         const answer = await sign();
         expect(answer).toMatchObject({
             done: false,
-            next: { summary: "Air+: 0; HomeID: 0; HomeID app: 1 (HD9880/90)", skippable: true }
+            next: {
+                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 1 (HD9880/90)",
+                skippable: true
+            }
         });
         if (answer.done || !answer.next) throw new Error("no file step");
         const skipped = await driver.philipsCloudDriver.pair!.poll(
@@ -835,7 +838,7 @@ describe("finding the purifiers on an account", () => {
             done: false,
             next: {
                 summary:
-                    "Air+: 0; HomeID: HTTP 403; HomeID app: 1 (AC0850/11); HomeID account: HTTP 401/403",
+                    "Air+ (eu-west-1): 0; HomeID (eu-west-1): HTTP 403; HomeID app: 1 (AC0850/11); HomeID account (eu-west-1): HTTP 401/403",
                 skippable: false
             }
         });
@@ -864,7 +867,7 @@ describe("finding the purifiers on an account", () => {
             reply: () => jsonReply({ message: "Forbidden" }, 403)
         });
         await expect(sign()).rejects.toThrow(
-            "What it saw: Air+: 1 (HD9280/90); HomeID: 1 (HD9280/90); HomeID app: network; Air+ account: HTTP 401/403; HomeID account: HTTP 401/403."
+            "What it saw: Air+ (eu-west-1): 1 (HD9280/90); HomeID (eu-west-1): 1 (HD9280/90); HomeID app: network; Air+ account (eu-west-1): HTTP 401/403; HomeID account (eu-west-1): HTTP 401/403."
         );
         expect(logged).toHaveLength(1);
         const line = JSON.stringify(logged);
@@ -1293,5 +1296,296 @@ describe("the driver", () => {
                 "turn-on"
             )
         ).rejects.toThrow("That device is not on this Philips account.");
+    });
+});
+// --- the account's region -----------------------------------------------------------
+
+const regions = await import("@polaris-app/places/src/lib/integrations/philips-regions");
+
+/** A region the configuration service could answer, named so it reads as the
+ *  fixture it is. Only the EU one is real. */
+const FIXTURE_REGION = {
+    region: "us-east-1",
+    api: "prod.fixture-da.iot.versuni.com",
+    iot: "ats.prod.fixture-da.iot.versuni.com"
+};
+
+/** Versuni's configuration service, answering `answer` for every country. */
+function configuration(answer: (country: string) => Response) {
+    routes.unshift({
+        match: (url) =>
+            url.hostname === "prod.global-da.iot.versuni.com" && url.pathname === "/configuration",
+        reply: (url) => answer(url.searchParams.get("countryCode") ?? "")
+    });
+}
+
+/** The device list of one IoT host, ahead of the rest of the fake. */
+function hostDevices(host: string, devices: unknown[]) {
+    routes.unshift({
+        match: (url) => url.hostname === host && url.pathname.endsWith("/user/self/device"),
+        reply: () => jsonReply({ devices })
+    });
+}
+
+const configCalls = () =>
+    calls.filter((call) => call.url.hostname === "prod.global-da.iot.versuni.com");
+const deviceHosts = () =>
+    calls
+        .filter((call) => call.url.pathname.endsWith("/user/self/device"))
+        .map((call) => call.url.hostname);
+
+describe("the account's region", () => {
+    beforeEach(() => cloud.resetPhilipsRegions());
+
+    const signIn = (country: string) =>
+        driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com", country },
+            { vToken: "vt-1", code: "123456" }
+        );
+
+    it("asks Versuni which region the country is in, and reads the devices there", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        configuration(() => jsonReply(FIXTURE_REGION));
+        const answer = await signIn("US");
+        expect(configCalls().map((call) => call.url.searchParams.get("countryCode"))).toEqual([
+            "US"
+        ]);
+        expect(deviceHosts()).toEqual(["prod.fixture-da.iot.versuni.com"]);
+        expect(answer).toMatchObject({
+            done: true,
+            credentials: {
+                iotRegion: "us-east-1",
+                iotApi: "prod.fixture-da.iot.versuni.com",
+                iotBroker: "ats.prod.fixture-da.iot.versuni.com"
+            }
+        });
+        // Found where it was looked for: nothing to say about it.
+        expect(answer.done && "foundIn" in answer).toBe(false);
+    });
+
+    it("signs in at Gigya's one data centre whatever the country", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        configuration(() => jsonReply(FIXTURE_REGION));
+        await signIn("US");
+        const gigya = calls.filter((call) => call.url.pathname.includes("accounts."));
+        expect(gigya.length).toBeGreaterThan(0);
+        for (const call of gigya) expect(call.url.hostname).toBe("cdc.accounts.home.id");
+    });
+
+    it("uses EU when the configuration service is down, slow or unreadable", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        configuration(() => jsonReply({ message: "Internal Server Error" }, 500));
+        const answer = await signIn("ES");
+        expect(deviceHosts()).toEqual(["prod.eu-da.iot.versuni.com"]);
+        expect(answer).toMatchObject({
+            done: true,
+            credentials: { iotRegion: "eu-west-1", iotApi: "prod.eu-da.iot.versuni.com" }
+        });
+        expect(await cloud.philipsRegionFor("ES")).toMatchObject({ answered: false });
+    });
+
+    it("never sends a token to a host that is not one of Versuni's", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        configuration(() =>
+            jsonReply({
+                region: "us-east-1",
+                api: "api.elsewhere.example",
+                iot: "mqtt.elsewhere.example"
+            })
+        );
+        await signIn("US");
+        expect(calls.some((call) => call.url.hostname.endsWith("elsewhere.example"))).toBe(false);
+        expect(deviceHosts()).toEqual(["prod.eu-da.iot.versuni.com"]);
+        expect(
+            cloud.storedPhilipsRegion({
+                iotRegion: "us-east-1",
+                iotApi: "api.elsewhere.example",
+                iotBroker: "ats.prod.eu-da.iot.versuni.com"
+            })
+        ).toEqual(cloud.PHILIPS_EU);
+    });
+
+    it("does not ask for a country nobody picked", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        configuration(() => jsonReply(FIXTURE_REGION));
+        await driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com" },
+            { vToken: "vt-1", code: "123456" }
+        );
+        expect(configCalls()).toEqual([]);
+        expect(deviceHosts()).toEqual(["prod.eu-da.iot.versuni.com"]);
+    });
+
+    it("keeps a country's answer for hours, then asks again", async () => {
+        configuration(() => jsonReply(FIXTURE_REGION));
+        const start = 1_000_000;
+        await cloud.philipsRegionFor("US", () => start);
+        await cloud.philipsRegionFor("us", () => start + 60 * 60 * 1000);
+        expect(configCalls()).toHaveLength(1);
+        await cloud.philipsRegionFor("US", () => start + 7 * 60 * 60 * 1000);
+        expect(configCalls()).toHaveLength(2);
+    });
+
+    it("tries every other region when the country's holds nothing, and says where it found them", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        configuration(() => jsonReply(FIXTURE_REGION));
+        hostDevices("prod.fixture-da.iot.versuni.com", []);
+        const answer = await signIn("US");
+        expect(answer).toMatchObject({
+            done: true,
+            credentials: { iotRegion: "eu-west-1", iotApi: "prod.eu-da.iot.versuni.com" },
+            foundIn: { country: "US", asked: "us-east-1", found: "eu-west-1" }
+        });
+        // The account's id is asked where the devices were found.
+        const self = calls.find((call) => call.url.pathname.endsWith("/user/self"))!;
+        expect(self.url.hostname).toBe("prod.eu-da.iot.versuni.com");
+    });
+
+    it("asks the other regions side by side, not one after another", async () => {
+        philips({ airplusDevices: [] });
+        configuration(() => jsonReply(FIXTURE_REGION));
+        const asked: string[] = [];
+        let release!: () => void;
+        const held = new Promise<void>((resolve) => (release = resolve));
+        routes.unshift({
+            match: (url) =>
+                url.hostname === "prod.eu-da.iot.versuni.com" &&
+                url.pathname.endsWith("/user/self/device"),
+            reply: async (_url, init) => {
+                asked.push(new Headers(init.headers).get("authorization") ?? "");
+                // Neither EU answer arrives until both have been asked.
+                if (asked.length === 2) release();
+                await held;
+                return jsonReply({ devices: [] });
+            }
+        });
+        await signIn("US").catch(() => undefined);
+        expect(asked).toHaveLength(2);
+    });
+
+    it("names the region in what it saw, and asks for the app file only once every region was asked", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        configuration(() => jsonReply(FIXTURE_REGION));
+        const answer = await signIn("US");
+        expect(answer).toMatchObject({
+            done: false,
+            next: {
+                summary:
+                    "Air+ (us-east-1): 0; HomeID (us-east-1): 0; HomeID app: 0; Air+ (eu-west-1): 0; HomeID (eu-west-1): 0",
+                asked: { country: "US", region: "us-east-1", homeIdBroken: false }
+            }
+        });
+        expect(new Set(deviceHosts())).toEqual(
+            new Set(["prod.fixture-da.iot.versuni.com", "prod.eu-da.iot.versuni.com"])
+        );
+    });
+
+    it("says the HomeID backend failed, and what fixes that, when it answers a server error", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        routes.unshift({
+            match: (url) => url.pathname === "/api/user/self/profile",
+            reply: () => jsonReply({ message: "Internal Server Error" }, 500)
+        });
+        const answer = await signIn("ES");
+        expect(answer).toMatchObject({
+            done: false,
+            next: {
+                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: HTTP 500",
+                asked: { country: "ES", region: "eu-west-1", homeIdBroken: true }
+            }
+        });
+    });
+
+    it("refuses with the country and region asked when there is no id for the third cloud", async () => {
+        philips({ homeIdApp: { appliances: [] }, uid: null });
+        await expect(signIn("ES")).rejects.toThrow(
+            "Polaris found no device on this Philips account. It asked Philips' servers for Spain (Europe) and every other region it knows."
+        );
+    });
+
+    it("asks at most a few other regions, never the one already asked", async () => {
+        const answers: Record<string, typeof FIXTURE_REGION> = {};
+        for (const [index, country] of ["US", "CA", "BR", "AU", "SG", "IN"].entries()) {
+            answers[country] = {
+                region: `us-east-${index + 1}`,
+                api: `prod.fixture${index}-da.iot.versuni.com`,
+                iot: `ats.prod.fixture${index}-da.iot.versuni.com`
+            };
+        }
+        configuration((country) => jsonReply(answers[country]));
+        for (const country of Object.keys(answers)) await cloud.philipsRegionFor(country);
+        const asked = (await cloud.philipsRegionFor("US")).region;
+        const others = cloud.otherPhilipsRegions([asked]);
+        expect(others.length).toBeLessThanOrEqual(4);
+        expect(others[0]).toEqual(cloud.PHILIPS_EU);
+        expect(others.some((region) => region.api === asked.api)).toBe(false);
+        expect(new Set(others.map((region) => region.api)).size).toBe(others.length);
+    });
+
+    it("reads a stored region's devices and broker on every sync, and EU for a connection made before", async () => {
+        const stored = {
+            email: "owner@example.com",
+            accessToken: "access-1",
+            refreshToken: "refresh-good",
+            expiresAt: String(Date.now() + 60 * 60 * 1000),
+            client: "airplus",
+            userId: "0123456789abcdef0123456789abcdef"
+        };
+        philips({ airplusDevices: [PURIFIER] });
+        unit({ Status: {}, filtRd: {}, Config: { ctn: "AC0651/10" } });
+        await driver.philipsCloudDriver.list({
+            ...stored,
+            email: "region@example.com",
+            iotRegion: FIXTURE_REGION.region,
+            iotApi: FIXTURE_REGION.api,
+            iotBroker: FIXTURE_REGION.iot
+        });
+        expect(deviceHosts()).toEqual(["prod.fixture-da.iot.versuni.com"]);
+        expect(broker.clients[0]!.url).toBe("wss://ats.prod.fixture-da.iot.versuni.com:443/mqtt");
+
+        calls = [];
+        link.resetCloudLinks();
+        broker.clients = [];
+        await driver.philipsCloudDriver.list({ ...stored, email: "before@example.com" });
+        expect(deviceHosts()).toEqual(["prod.eu-da.iot.versuni.com"]);
+        expect(broker.clients[0]!.url).toBe(link.PHILIPS_MQTT_URL);
+    }, 20_000);
+});
+
+describe("guessing the country", () => {
+    it("trusts a time zone Philips gives a country first", () => {
+        expect(
+            regions.philipsCountryGuess({ timeZones: ["Europe/Madrid"], locales: ["en-US"] })
+        ).toBe("ES");
+        expect(
+            regions.philipsCountryGuess({ timeZones: [null, "Europe/Berlin"], locales: [] })
+        ).toBe("DE");
+    });
+
+    it("goes by the language's region where the zone names no country", () => {
+        expect(
+            regions.philipsCountryGuess({
+                timeZones: ["America/Chicago", "UTC"],
+                locales: ["en-US", "es-ES"]
+            })
+        ).toBe("US");
+        expect(regions.philipsCountryGuess({ timeZones: [], locales: ["fr", "nl-NL"] })).toBe("NL");
+    });
+
+    it("guesses nothing rather than something wrong", () => {
+        expect(
+            regions.philipsCountryGuess({
+                timeZones: ["Antarctica/Troll", ""],
+                locales: ["fr", "not a tag", "ja-JP"]
+            })
+        ).toBe("");
+    });
+
+    it("offers only the countries Philips' own apps offer", () => {
+        expect(regions.PHILIPS_COUNTRIES).toHaveLength(79);
+        expect(regions.isPhilipsCountry("ES")).toBe(true);
+        expect(regions.isPhilipsCountry("JP")).toBe(false);
+        expect(regions.philipsArea("eu-west-1")).toBe("eu");
+        expect(regions.philipsArea("xx-north-9")).toBe("other");
     });
 });
