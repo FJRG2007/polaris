@@ -108,6 +108,7 @@ vi.mock("@/lib/deploy/private-names", () => ({
     privateNameOf: () => "",
     answeringLabels: async () => [],
     stageNames: async () => undefined,
+    carryLiveNames: async () => undefined,
     promoteStagedNames: async () => undefined,
     prepareDeployNames: async () => ({
         enabled: false,

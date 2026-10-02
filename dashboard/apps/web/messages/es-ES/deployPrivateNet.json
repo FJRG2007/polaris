@@ -79,6 +79,7 @@
         "missing": "Ese servicio ya no existe.",
         "sameProject": "Los dos servicios están en este proyecto: ya se llaman por nombre.",
         "otherServer": "Los dos servicios están en servidores distintos, y los nombres privados no los cruzan.",
-        "unreachable": "Su servidor no ha respondido, así que el enlace sigue abierto. Inténtalo cuando esté en línea."
+        "unreachable": "Su servidor no ha respondido, así que el enlace sigue abierto. Inténtalo cuando esté en línea.",
+        "tooMany": "Uno de los dos servicios ya tiene todos los enlaces a otros proyectos que admite. Quita uno antes."
     }
 }

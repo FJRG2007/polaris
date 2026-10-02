@@ -79,6 +79,7 @@
         "missing": "That service is no longer there.",
         "sameProject": "Both services are in this project: they already reach each other by name.",
         "otherServer": "The two services run on different servers, which private names cannot cross.",
-        "unreachable": "Their server did not answer, so the link is still open. Try again once it is online."
+        "unreachable": "Their server did not answer, so the link is still open. Try again once it is online.",
+        "tooMany": "One of the two services already has as many links to other projects as it can take. Remove one first."
     }
 }

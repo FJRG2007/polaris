@@ -591,7 +591,6 @@ pub fn valid_project(name: &str) -> bool {
         && name.bytes().next().is_some_and(|b| b != b'-')
 }
 
-/// Docker object name: starts alphanumeric, then `[a-z0-9_.-]`, max 64.
 /// The most aliases one service may answer to on one network.
 const MAX_NETWORK_ALIASES: usize = 32;
 
@@ -611,6 +610,7 @@ pub fn valid_dns_name(name: &str) -> bool {
         })
 }
 
+/// Docker object name: starts alphanumeric, then `[a-z0-9_.-]`, max 64.
 pub fn valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     match chars.next() {

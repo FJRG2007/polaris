@@ -30,12 +30,27 @@ let envVars: {
 let environments: unknown[] = [];
 const updates: { table: string; id: string; privateNetwork: string }[] = [];
 
+/** Something saved by someone else between a read and the write made from it. */
+let beforeWrite: (() => void) | undefined;
+
 function updater(table: string, rows: () => Row[]) {
-    return async ({ where, data }: { where: { id: string }; data: { privateNetwork: string } }) => {
+    return async ({
+        where,
+        data
+    }: {
+        where: { id: string; privateNetwork: string };
+        data: { privateNetwork: string };
+    }) => {
+        const interleaved = beforeWrite;
+        beforeWrite = undefined;
+        interleaved?.();
+        const row = rows().find(
+            (one) => one.id === where.id && one.privateNetwork === where.privateNetwork
+        );
+        if (!row) return { count: 0 };
         updates.push({ table, id: where.id, privateNetwork: data.privateNetwork });
-        const row = rows().find((one) => one.id === where.id);
-        if (row) row.privateNetwork = data.privateNetwork;
-        return row;
+        row.privateNetwork = data.privateNetwork;
+        return { count: 1 };
     };
 }
 
@@ -54,13 +69,13 @@ vi.mock("@polaris/db", () => ({
             findMany: inEnvironment(() => applications),
             findUnique: async ({ where }: { where: { id: string } }) =>
                 applications.find((row) => row.id === where.id) ?? null,
-            update: updater("application", () => applications)
+            updateMany: updater("application", () => applications)
         },
         managedDatabase: {
             findMany: inEnvironment(() => databases),
             findUnique: async ({ where }: { where: { id: string } }) =>
                 databases.find((row) => row.id === where.id) ?? null,
-            update: updater("database", () => databases)
+            updateMany: updater("database", () => databases)
         },
         privateLink: {
             deleteMany: async ({ where }: { where: { id: string } }) => {
@@ -524,6 +539,34 @@ describe("a release's names", () => {
         const stored = names.parsePrivateNetwork(app().privateNetwork);
         expect(stored.live?.deploymentId).toBe("dep-1");
         expect(stored.pending?.deploymentId).toBe("dep-2");
+    });
+
+    it("stay live across a scale step in place, which carries them to its own deployment", async () => {
+        await names.stageNames("a1", ["api.polaris.internal", "api"], "dep-1");
+        await names.promoteStagedNames("a1", "dep-1");
+        await names.carryLiveNames("a1", "dep-1", "dep-2");
+        await names.promoteStagedNames("a1", "dep-2");
+        expect(names.parsePrivateNetwork(app().privateNetwork).live).toEqual({
+            deploymentId: "dep-2",
+            names: ["api.polaris.internal", "api"]
+        });
+        expect(
+            names.referencedDomain({ ...app(), currentDeploymentId: "dep-2", target: LOCAL }, container)
+        ).toBe("api.polaris.internal");
+    });
+
+    it("are recorded without undoing a rename saved at the same moment", async () => {
+        await names.stageNames("a1", ["api.polaris.internal", "api"], "dep-1");
+        const renamed = JSON.stringify({ ...JSON.parse(app().privateNetwork), name: "backend" });
+        // The rename lands between the promotion's read and its write.
+        beforeWrite = () => {
+            app().privateNetwork = renamed;
+        };
+        await names.promoteStagedNames("a1", "dep-1");
+        const stored = names.parsePrivateNetwork(app().privateNetwork);
+        expect(stored.name).toBe("backend");
+        expect(stored.live?.deploymentId).toBe("dep-1");
+        expect(stored.pending).toBeUndefined();
     });
 });
 

@@ -42,6 +42,7 @@ import { challengeActive, floodedServices } from "./deploy/edge-state";
 import { hasTunnel, networksForService } from "./deploy/service-networks";
 import {
     answeringLabels,
+    carryLiveNames,
     namesOn,
     prepareDeployNames,
     privateNameOf,
@@ -3238,8 +3239,9 @@ export async function deployApplication(
     }
     // The names this release carries are held until it is promoted - only then do
     // they count as live (see `promoteRelease`). A scale step in place adds copies
-    // to the release already serving, which keeps what it was recorded with.
-    if (liveNames && !scaled?.cutover) await stageNames(applicationId, liveNames, deployment.id);
+    // to the release already serving, and carries the names it is live with.
+    if (scaled?.cutover) await carryLiveNames(applicationId, scaled.id, deployment.id);
+    else if (liveNames) await stageNames(applicationId, liveNames, deployment.id);
     // Every release is kept under a name of its own so it can be run again later
     // exactly as it was; a rollback runs one of those instead of making one. The
     // build also goes at the commit it names, when there is one - the branch head

@@ -230,18 +230,10 @@ export async function prepareDeployNames(input: {
         serviceId: input.id
     });
     const links = await prisma.privateLink.findMany({
-        where:
-            input.kind === "application"
-                ? {
-                      OR: [
-                          { sourceId: input.id },
-                          { targetKind: "application", targetId: input.id }
-                      ]
-                  }
-                : { targetKind: "database", targetId: input.id },
+        where: linksOf(input.kind, input.id),
         select: { id: true, targetKind: true, targetId: true, sourceId: true },
         orderBy: { createdAt: "asc" },
-        take: 64
+        take: CROSS_LINKS_MAX
     });
     const networkAliases: Record<string, string[]> =
         labels.length > 0 ? { [own]: namesFor(labels[0]!, labels.slice(1)) } : {};
@@ -272,31 +264,22 @@ export async function recordLiveNames(
     kind: PrivateKind,
     id: string,
     names: readonly string[],
-    deploymentId?: string,
-    /** What is stored, when the caller has just read it. */
-    current?: StoredPrivateNetwork
+    deploymentId?: string
 ): Promise<void> {
-    let stored = current;
-    if (!stored) {
-        const row =
-            kind === "application"
-                ? await prisma.application.findUnique({
-                      where: { id },
-                      select: { privateNetwork: true }
-                  })
-                : await prisma.managedDatabase.findUnique({
-                      where: { id },
-                      select: { privateNetwork: true }
-                  });
-        if (!row) return;
-        stored = parsePrivateNetwork(row.privateNetwork);
-    }
+    await changeStored(kind, id, (stored) => withLive(stored, names, deploymentId));
+}
+
+function withLive(
+    stored: StoredPrivateNetwork,
+    names: readonly string[],
+    deploymentId?: string
+): StoredPrivateNetwork {
     const now = Date.now();
-    await persist(kind, id, {
+    return {
         ...stored,
         former: stored.former.filter((entry) => Date.parse(entry.until) > now),
         live: { ...(deploymentId ? { deploymentId } : {}), names: [...names] }
-    });
+    };
 }
 
 /**
@@ -306,13 +289,27 @@ export async function recordLiveNames(
  * promoted. `promoteStagedNames` moves them over once it is the one serving.
  */
 export async function stageNames(applicationId: string, names: readonly string[], deploymentId: string): Promise<void> {
-    const row = await prisma.application.findUnique({
-        where: { id: applicationId },
-        select: { privateNetwork: true }
-    });
-    if (!row) return;
-    const stored = parsePrivateNetwork(row.privateNetwork);
-    await persist("application", applicationId, { ...stored, pending: { deploymentId, names: [...names] } });
+    await changeStored("application", applicationId, (stored) => ({
+        ...stored,
+        pending: { deploymentId, names: [...names] }
+    }));
+}
+
+/**
+ * A scale step in place adds copies to the release already serving, under a
+ * deployment of its own that is promoted in turn: it carries the names that
+ * release is live with, so they stay live once the step is the one serving.
+ */
+export async function carryLiveNames(
+    applicationId: string,
+    fromDeploymentId: string,
+    deploymentId: string
+): Promise<void> {
+    await changeStored("application", applicationId, (stored) =>
+        stored.live?.deploymentId === fromDeploymentId
+            ? { ...stored, pending: { deploymentId, names: [...stored.live.names] } }
+            : null
+    );
 }
 
 /**
@@ -321,15 +318,11 @@ export async function stageNames(applicationId: string, names: readonly string[]
  * redeploy still on its way - is left as it is.
  */
 export async function promoteStagedNames(applicationId: string, deploymentId: string): Promise<void> {
-    const row = await prisma.application.findUnique({
-        where: { id: applicationId },
-        select: { privateNetwork: true }
+    await changeStored("application", applicationId, (stored) => {
+        if (stored.pending?.deploymentId !== deploymentId) return null;
+        const { pending, ...rest } = stored;
+        return withLive(rest, pending.names, deploymentId);
     });
-    if (!row) return;
-    const stored = parsePrivateNetwork(row.privateNetwork);
-    if (stored.pending?.deploymentId !== deploymentId) return;
-    const { pending, ...rest } = stored;
-    await recordLiveNames("application", applicationId, pending.names, deploymentId, rest);
 }
 
 /**
@@ -405,11 +398,37 @@ export function contestedLabels(own: Claimant, others: readonly Claimant[]): Map
     return contested;
 }
 
-async function persist(kind: PrivateKind, id: string, stored: StoredPrivateNetwork): Promise<void> {
-    const data = { privateNetwork: serialize(stored) };
-    if (kind === "application") await prisma.application.update({ where: { id }, data });
-    else await prisma.managedDatabase.update({ where: { id }, data });
+/**
+ * Change what is stored from what is there now. A deploy and a screen can both
+ * be saving it, so the write only lands on the value it was made from, and is
+ * made again from a fresh read otherwise - neither undoes the other. A change
+ * that answers null writes nothing.
+ */
+async function changeStored(
+    kind: PrivateKind,
+    id: string,
+    change: (stored: StoredPrivateNetwork) => StoredPrivateNetwork | null
+): Promise<void> {
+    for (let attempt = 0; attempt < STORE_ATTEMPTS; attempt++) {
+        const row =
+            kind === "application"
+                ? await prisma.application.findUnique({ where: { id }, select: { privateNetwork: true } })
+                : await prisma.managedDatabase.findUnique({ where: { id }, select: { privateNetwork: true } });
+        if (!row) return;
+        const next = change(parsePrivateNetwork(row.privateNetwork));
+        if (!next) return;
+        const where = { id, privateNetwork: row.privateNetwork };
+        const data = { privateNetwork: serialize(next) };
+        const { count } =
+            kind === "application"
+                ? await prisma.application.updateMany({ where, data })
+                : await prisma.managedDatabase.updateMany({ where, data });
+        if (count > 0) return;
+    }
+    throw new Error("The private names kept changing while they were being saved");
 }
+
+const STORE_ATTEMPTS = 8;
 
 /**
  * The value `POLARIS_PRIVATE_DOMAIN` takes for a service that is referenced:
@@ -529,22 +548,24 @@ export async function renamePrivateName(
     const check = await checkPrivateName(kind, id, service.environmentId, raw);
     if (check.problem) throw new PrivateNameRefusal(check.problem);
     if (check.takenBy) throw new PrivateNameRefusal("taken", check.takenBy);
-    const stored = parsePrivateNetwork(service.privateNetwork);
-    const previous = stored.name ?? core.defaultPrivateName(service.slug);
-    if (previous === check.name) throw new PrivateNameRefusal("unchanged");
     const until = new Date(Date.now() + core.FORMER_NAME_GRACE_DAYS * 86_400_000).toISOString();
-    await persist(kind, id, {
-        ...stored,
-        name: check.name,
-        // The new name stops being a former one or an extra one; the old one
-        // becomes a former name, keeping the later of two dates if it already was.
-        aliases: stored.aliases.filter((alias) => alias !== check.name),
-        former: [
-            ...stored.former.filter(
-                (entry) => entry.name !== check.name && entry.name !== previous
-            ),
-            { name: previous, until }
-        ]
+    let previous = "";
+    await changeStored(kind, id, (stored) => {
+        previous = stored.name ?? core.defaultPrivateName(service.slug);
+        if (previous === check.name) throw new PrivateNameRefusal("unchanged");
+        return {
+            ...stored,
+            name: check.name,
+            // The new name stops being a former one or an extra one; the old one
+            // becomes a former name, keeping the later of two dates if it already was.
+            aliases: stored.aliases.filter((alias) => alias !== check.name),
+            former: [
+                ...stored.former.filter(
+                    (entry) => entry.name !== check.name && entry.name !== previous
+                ),
+                { name: previous, until }
+            ]
+        };
     });
     return { name: check.name, previous };
 }
@@ -557,21 +578,24 @@ export async function setPrivateAliases(
 ): Promise<string[]> {
     if (raw.length > core.PRIVATE_ALIASES_MAX) throw new PrivateNameRefusal("tooMany");
     const service = await loadService(kind, id);
-    const stored = parsePrivateNetwork(service.privateNetwork);
-    const own = stored.name ?? core.defaultPrivateName(service.slug);
     const others = (await environmentLabels(service.environmentId)).filter(
         (one) => !(one.kind === kind && one.id === id)
     );
-    const aliases: string[] = [];
+    const wanted: string[] = [];
     for (const entry of raw) {
         const name = core.normalizePrivateName(entry);
         const problem = core.privateNameProblem(name);
         if (problem) throw new PrivateNameRefusal(problem);
         const owner = others.find((one) => one.labels.includes(name));
         if (owner) throw new PrivateNameRefusal("taken", owner.label);
-        if (name !== own && !aliases.includes(name)) aliases.push(name);
+        if (!wanted.includes(name)) wanted.push(name);
     }
-    await persist(kind, id, { ...stored, aliases });
+    let aliases: string[] = [];
+    await changeStored(kind, id, (stored) => {
+        const own = stored.name ?? core.defaultPrivateName(service.slug);
+        aliases = wanted.filter((name) => name !== own);
+        return { ...stored, aliases };
+    });
     return aliases;
 }
 
@@ -879,18 +903,25 @@ export async function privateNetworkView(
     };
 }
 
+/** The most links between projects one service can be on. */
+const CROSS_LINKS_MAX = 64;
+
+/** The links between projects a service is on, from either side. */
+function linksOf(kind: PrivateKind, id: string) {
+    return kind === "application"
+        ? { OR: [{ sourceId: id }, { targetKind: "application", targetId: id }] }
+        : { targetKind: "database", targetId: id };
+}
+
 /** The links between projects one service is on, with what the other side is. */
 async function crossLinksOf(
     kind: PrivateKind,
     id: string
 ): Promise<(Omit<CrossLinkView, "sameServer"> & { serverId: string })[]> {
     const links = await prisma.privateLink.findMany({
-        where:
-            kind === "application"
-                ? { OR: [{ sourceId: id }, { targetKind: "application", targetId: id }] }
-                : { targetKind: "database", targetId: id },
+        where: linksOf(kind, id),
         orderBy: { createdAt: "asc" },
-        take: 64
+        take: CROSS_LINKS_MAX
     });
     if (links.length === 0) return [];
     const appIds = [
@@ -1035,6 +1066,14 @@ export async function addCrossLink(
     if (target.environment.projectId === source.environment.projectId)
         throw new PrivateLinkRefusal("sameProject");
     if (target.targetId !== source.targetId) throw new PrivateLinkRefusal("otherServer");
+    const key = { targetKind: kind, targetId: id, sourceId };
+    if (!(await prisma.privateLink.findUnique({ where: { targetKind_targetId_sourceId: key } }))) {
+        const counts = await Promise.all([
+            prisma.privateLink.count({ where: linksOf(kind, id) }),
+            prisma.privateLink.count({ where: linksOf("application", sourceId) })
+        ]);
+        if (counts.some((count) => count >= CROSS_LINKS_MAX)) throw new PrivateLinkRefusal("tooMany");
+    }
     await prisma.privateLink.upsert({
         where: { targetKind_targetId_sourceId: { targetKind: kind, targetId: id, sourceId } },
         create: { targetKind: kind, targetId: id, sourceId, createdById: userId },
@@ -1087,7 +1126,7 @@ export async function revokeCrossLink(link: {
 
 /** Why a link was refused, for the action to word. */
 export class PrivateLinkRefusal extends Error {
-    constructor(readonly reason: "missing" | "sameProject" | "otherServer" | "unreachable") {
+    constructor(readonly reason: "missing" | "sameProject" | "otherServer" | "unreachable" | "tooMany") {
         super(reason);
     }
 }
