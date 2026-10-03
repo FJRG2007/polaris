@@ -61,6 +61,9 @@ export const DUEL_MAX = 16;
 /** Seconds a player sent back is shielded, and cannot strike either. */
 export const SHIELD_SECONDS = 5;
 
+const DUEL_RIM = "minecraft:polished_andesite";
+const DUEL_LIGHT = "minecraft:sea_lantern";
+
 export const FLOOR_BLOCKS = [
     "minecraft:red_stained_glass",
     "minecraft:white_stained_glass",
@@ -68,7 +71,7 @@ export const FLOOR_BLOCKS = [
 ] as const;
 
 /** Every kind of block the arena is built of. */
-export const DUEL_BLOCKS = ["minecraft:barrier", ...FLOOR_BLOCKS];
+export const DUEL_BLOCKS = ["minecraft:barrier", DUEL_RIM, DUEL_LIGHT, ...FLOOR_BLOCKS];
 
 export function duelBox(center: { x: number; z: number }, floorY: number): Box {
     return {
@@ -92,7 +95,27 @@ export function duelFills(box: Box): { box: Box; block: string }[] {
         box: { x1: box.x1 + 1, y1: box.y1 + 1, z1, x2: box.x2 - 1, y2: box.y1 + 1, z2 },
         block
     });
+    // Put in before the barrier walls, which then fill round them: a stone rim
+    // at the floor's height all round, and a post of light three high at each
+    // corner - the walls that were invisible read as an arena.
+    const rimY = box.y1 + 1;
+    const post = (x: number, z: number) => ({
+        box: { x1: x, z1: z, x2: x, z2: z, y1: rimY, y2: rimY + 2 },
+        block: DUEL_LIGHT
+    });
+    const rim = (x1: number, z1: number, x2: number, z2: number) => ({
+        box: { x1, z1, x2, z2, y1: rimY, y2: rimY },
+        block: DUEL_RIM
+    });
     return [
+        post(box.x1, box.z1),
+        post(box.x2, box.z1),
+        post(box.x1, box.z2),
+        post(box.x2, box.z2),
+        rim(box.x1 + 1, box.z1, box.x2 - 1, box.z1),
+        rim(box.x1 + 1, box.z2, box.x2 - 1, box.z2),
+        rim(box.x1, box.z1 + 1, box.x1, box.z2 - 1),
+        rim(box.x2, box.z1 + 1, box.x2, box.z2 - 1),
         { box: { ...box, y2: box.y1 }, block: barrier },
         { box: { ...box, y1: box.y2 }, block: barrier },
         { box: { ...box, x2: box.x1 }, block: barrier },

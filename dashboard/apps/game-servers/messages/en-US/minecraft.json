@@ -2119,6 +2119,13 @@
                 "shovel": "Shovels: dig the snow",
                 "decay": "Vanishing floor",
                 "snowballs": "Snowballs: knock them off"
+            },
+            "course": {
+                "random": "A different one each time",
+                "classic": "Classic",
+                "frost": "Frost (slippery ice)",
+                "jungle": "Jungle (vines)",
+                "nether": "Nether"
             }
         },
         "place": {
@@ -2177,7 +2184,8 @@
         "bossTrophyHint": "A Nether Star named after the boss, with a glint and its difficulty, on top of the prizes. Only when the boss is defeated.",
         "wavesWinner": "How the winner is decided",
         "roundMinutes": "Minutes a round",
-        "howItIsPlayed": "How it is played"
+        "howItIsPlayed": "How it is played",
+        "courseLook": "Look"
     },
     "moderation": {
         "announcements": {

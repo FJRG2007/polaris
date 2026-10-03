@@ -23,6 +23,8 @@ export const FLOOR: Box["block"] = "minecraft:snow_block";
 /** What snow somebody stood on becomes in the decay game, just before it goes. */
 export const WARN: Box["block"] = "minecraft:red_concrete";
 const NET: Box["block"] = "minecraft:white_stained_glass";
+/** A light on each corner of every floor's wall, so the arena reads from afar. */
+const CORNER_LIGHT: Box["block"] = "minecraft:sea_lantern";
 /** Each floor's wall its own color, so a player knows which floor they are on. */
 const WALLS: readonly Box["block"][] = [
     "minecraft:light_blue_stained_glass",
@@ -94,12 +96,25 @@ export function arena(
     // The lowest first: what stands higher is built over what is already there.
     [...floors].reverse().forEach((at, index) => {
         const block = WALLS[(LAYERS - 1 - index) % WALLS.length]!;
+        const light = (cx: number, cz: number): Box => ({
+            x1: cx,
+            y1: at + WALL_HEIGHT + 1,
+            z1: cz,
+            x2: cx,
+            y2: at + WALL_HEIGHT + 1,
+            z2: cz,
+            block: CORNER_LIGHT
+        });
         boxes.push(
             { x1: x - r, y1: at, z1: z - r, x2: x + r, y2: at, z2: z + r, block: FLOOR },
             wall(x - outer, z - outer, x + outer, z - outer, at, block),
             wall(x - outer, z + outer, x + outer, z + outer, at, block),
             wall(x - outer, z - r, x - outer, z + r, at, block),
-            wall(x + outer, z - r, x + outer, z + r, at, block)
+            wall(x + outer, z - r, x + outer, z + r, at, block),
+            light(x - outer, z - outer),
+            light(x + outer, z - outer),
+            light(x - outer, z + outer),
+            light(x + outer, z + outer)
         );
     });
     return {

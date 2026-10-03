@@ -115,8 +115,12 @@ export const TOOL = "minecraft:stick";
 /** Every item a kit can be, for taking it back. */
 export const KIT_IDS = [...ALL_KIT_BLOCKS, TOOL];
 
+/** The frame round the plots: no material's kit has either, so no brush breaks them. */
+const CURB = "minecraft:polished_andesite";
+const LIGHT = "minecraft:glowstone";
+
 /** Every kind of block that is ever on the platform. */
-export const PLATFORM_BLOCKS = ["minecraft:barrier", FLOOR, ...ALL_KIT_BLOCKS];
+export const PLATFORM_BLOCKS = ["minecraft:barrier", FLOOR, CURB, LIGHT, ...ALL_KIT_BLOCKS];
 
 /** How many plots one platform has at most. */
 export const MAX_PLOTS = 12;
@@ -181,7 +185,23 @@ export function platformFills(
 ): { box: Box; block: string }[] {
     const barrier = "minecraft:barrier";
     const { cols, rows } = grid(count);
+    // Put in before the barrier, which then fills round them: at the plots'
+    // floor level, a stone curb along every line between plots and a light
+    // where two lines meet - what was an invisible wall reads as a frame.
+    const lines = (z: boolean) =>
+        Array.from({ length: (z ? rows : cols) + 1 }, (_, index) =>
+            (z ? box.z1 : box.x1) + index * pitch(size)
+        );
+    const decor: { box: Box; block: string }[] = [];
+    for (const x of lines(false))
+        for (const z of lines(true))
+            decor.push({ box: { x1: x, x2: x, z1: z, z2: z, y1: box.y1 + 1, y2: box.y1 + 1 }, block: LIGHT });
+    for (const x of lines(false))
+        decor.push({ box: { ...box, x1: x, x2: x, y1: box.y1 + 1, y2: box.y1 + 1 }, block: CURB });
+    for (const z of lines(true))
+        decor.push({ box: { ...box, z1: z, z2: z, y1: box.y1 + 1, y2: box.y1 + 1 }, block: CURB });
     const fills: { box: Box; block: string }[] = [
+        ...decor,
         { box: { ...box, y2: box.y1 }, block: barrier },
         { box: { ...box, y1: box.y2 }, block: barrier }
     ];

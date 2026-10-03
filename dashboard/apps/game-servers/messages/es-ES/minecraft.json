@@ -2119,6 +2119,13 @@
                 "shovel": "Palas: rompe la nieve",
                 "decay": "Suelo fugaz",
                 "snowballs": "Bolas: tíralos abajo"
+            },
+            "course": {
+                "random": "Distinto cada vez",
+                "classic": "Clásico",
+                "frost": "Hielo (resbala)",
+                "jungle": "Selva (lianas)",
+                "nether": "Nether"
             }
         },
         "place": {
@@ -2177,7 +2184,8 @@
         "bossTrophyHint": "Una estrella del Nether con el nombre del jefe, brillo y su dificultad, además de los premios. Solo si el jefe cae.",
         "wavesWinner": "Cómo se decide el ganador",
         "roundMinutes": "Minutos por ronda",
-        "howItIsPlayed": "Cómo se juega"
+        "howItIsPlayed": "Cómo se juega",
+        "courseLook": "Aspecto"
     },
     "moderation": {
         "announcements": {

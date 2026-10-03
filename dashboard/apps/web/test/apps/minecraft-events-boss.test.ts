@@ -460,7 +460,8 @@ describe("the sky arena", () => {
             expect(box.y2).toBeLessThanOrEqual(volume.y2);
             expect(box.z1).toBeGreaterThanOrEqual(volume.z1);
             expect(box.z2).toBeLessThanOrEqual(volume.z2);
-            expect(box.block).toMatch(/_stained_glass$/);
+            // Glass, and a pillar of light at each corner.
+            expect(box.block).toMatch(/_stained_glass$|^minecraft:sea_lantern$/);
             expect(stage.ARENA_BLOCKS).toContain(box.block);
         }
         // Floor, four walls and a roof: every block of the shell, no block twice.

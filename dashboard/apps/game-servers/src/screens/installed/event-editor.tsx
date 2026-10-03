@@ -62,6 +62,16 @@ export const LOOT_LABELS: Readonly<
     "ancient-city": "editor.labels.loot.ancient-city"
 };
 
+const THEME_LABELS: Readonly<
+    Record<"random" | (typeof catalog.PARKOUR_THEMES)[number], GameKey<"minecraft">>
+> = {
+    random: "editor.labels.course.random",
+    classic: "editor.labels.course.classic",
+    frost: "editor.labels.course.frost",
+    jungle: "editor.labels.course.jungle",
+    nether: "editor.labels.course.nether"
+};
+
 const SPLEEF_LABELS: Readonly<
     Record<"random" | (typeof catalog.SPLEEF_VARIANTS)[number], GameKey<"minecraft">>
 > = {
@@ -866,6 +876,16 @@ function OptionsFields({
                             }
                             options={options(t, DIFFICULTY_LABELS)}
                             aria-label={t("editor.difficulty")}
+                        />
+                    </Field>
+                    <Field label={t("editor.courseLook")}>
+                        <Select
+                            value={value.theme}
+                            onValueChange={(theme) =>
+                                onChange({ ...value, theme: theme as typeof value.theme })
+                            }
+                            options={options(t, THEME_LABELS)}
+                            aria-label={t("editor.courseLook")}
                         />
                     </Field>
                 </>

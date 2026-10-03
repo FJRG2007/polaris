@@ -19,6 +19,43 @@ import { IN_ARENA, type Spot } from "./arena";
 
 /** The platform's block: plain, cheap, and nothing the sea has. */
 export const PLATFORM_BLOCK = "minecraft:smooth_stone";
+/** The platform's edge, its corners, and the circle drawn on it. */
+export const EDGE_BLOCK = "minecraft:polished_andesite";
+export const CORNER_BLOCK = "minecraft:sea_lantern";
+export const RING_BLOCK = "minecraft:yellow_concrete";
+/** Every block the platform is built of, for taking it down. */
+export const PLATFORM_BLOCKS = [PLATFORM_BLOCK, EDGE_BLOCK, CORNER_BLOCK, RING_BLOCK] as const;
+
+/**
+ * The platform's look, put in before its plain floor fills round it: its
+ * edge in polished stone with a light at each corner, and the circle drawn
+ * in yellow, a block wide, where it ends. Only on the floor's own layer.
+ */
+export function platformDecor(place: Point, radius: number): { box: Box; block: string }[] {
+    const half = radius + MARGIN;
+    const { x, y, z } = place;
+    const one = (bx: number, bz: number, block: string) => ({
+        box: { x1: bx, y1: y, z1: bz, x2: bx, y2: y, z2: bz },
+        block
+    });
+    const out: { box: Box; block: string }[] = [
+        one(x - half, z - half, CORNER_BLOCK),
+        one(x + half, z - half, CORNER_BLOCK),
+        one(x - half, z + half, CORNER_BLOCK),
+        one(x + half, z + half, CORNER_BLOCK),
+        { box: { x1: x - half + 1, y1: y, z1: z - half, x2: x + half - 1, y2: y, z2: z - half }, block: EDGE_BLOCK },
+        { box: { x1: x - half + 1, y1: y, z1: z + half, x2: x + half - 1, y2: y, z2: z + half }, block: EDGE_BLOCK },
+        { box: { x1: x - half, y1: y, z1: z - half + 1, x2: x - half, y2: y, z2: z + half - 1 }, block: EDGE_BLOCK },
+        { box: { x1: x + half, y1: y, z1: z - half + 1, x2: x + half, y2: y, z2: z + half - 1 }, block: EDGE_BLOCK }
+    ];
+    // The ring: every block whose middle is within half a block of the circle.
+    for (let dx = -radius; dx <= radius; dx += 1)
+        for (let dz = -radius; dz <= radius; dz += 1) {
+            const away = Math.hypot(dx, dz);
+            if (Math.abs(away - radius) <= 0.5) out.push(one(x + dx, z + dz, RING_BLOCK));
+        }
+    return out;
+}
 
 /** Floor beyond the circle's edge, all round: room to be pushed out onto. */
 export const MARGIN = 3;

@@ -58,6 +58,21 @@ export const ARENA_BLOCKS = [
     "minecraft:red_concrete",
     "minecraft:orange_concrete",
     "minecraft:slime_block",
+    "minecraft:magenta_concrete",
+    "minecraft:packed_ice",
+    "minecraft:blue_ice",
+    "minecraft:jungle_planks",
+    "minecraft:jungle_log",
+    "minecraft:mossy_stone_bricks",
+    "minecraft:nether_bricks",
+    "minecraft:red_nether_bricks",
+    "minecraft:quartz_block",
+    "minecraft:sea_lantern",
+    "minecraft:glowstone",
+    "minecraft:ladder[facing=west]",
+    "minecraft:ladder[facing=east]",
+    "minecraft:vine[east=true]",
+    "minecraft:vine[west=true]",
     "minecraft:snow_block"
 ] as const;
 
