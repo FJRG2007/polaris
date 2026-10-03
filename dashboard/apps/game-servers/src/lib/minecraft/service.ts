@@ -36,7 +36,7 @@ import {
     withoutPending
 } from "./prelogin";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
-import { readCrashLoop, readRestartWatch } from "../games-health";
+import { readCrashLoop, readRestartWatch, resumeAfterCrashLoop } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
 import { broadcastArgv, consoleBroadcastArgv, sayArgv } from "./broadcast";
@@ -813,7 +813,9 @@ export async function getServerStatus(
     ]);
     return {
         edition: install.edition,
-        running: install.running,
+        // A container that is up is a running server, even one recorded as
+        // stopped for a loop it has since got out of.
+        running: install.running || live.containerRunning === true,
         containerRunning: live.containerRunning ?? (usage ? usage.state === "running" : null),
         answering: live.answering,
         players: live.players,
@@ -876,11 +878,23 @@ async function readLivePlayers(
     ownerId: string
 ): Promise<MinecraftPlayers> {
     const empty: parse.PlayerList = { online: 0, max: 0, players: [] };
-    if (!install.running) {
+    const halted = readCrashLoop(install.config ?? null);
+    // A server Polaris stopped for looping may have been brought back some other
+    // way since - repaired by hand, started from the machine - and is then not
+    // stopped, whatever the record says. Only those are inspected: a server that
+    // is simply off is not asked anything.
+    const back =
+        !install.running && halted?.stoppedByPolaris
+            ? await readAppContainerRuntime(
+                  install.applicationId,
+                  ownerId,
+                  containerOf(install)
+              ).catch(() => null)
+            : null;
+    if (!install.running && back?.status !== "running") {
         // A server Polaris stopped because it could not start is stopped for a
         // reason worth carrying: by now the container is not restarting any more,
         // so this record is the only thing left that knows why it is off.
-        const halted = readCrashLoop(install.config ?? null);
         return {
             answering: false,
             players: empty,
@@ -889,11 +903,9 @@ async function readLivePlayers(
             crashLoop: halted
         };
     }
-    const runtime = await readAppContainerRuntime(
-        install.applicationId,
-        ownerId,
-        containerOf(install)
-    );
+    const runtime =
+        back ??
+        (await readAppContainerRuntime(install.applicationId, ownerId, containerOf(install)));
     const state = runtime?.status ?? null;
     // A container being restarted over and over is the one state that looks
     // exactly like a server that is merely slow to boot, and the one nobody can
@@ -949,6 +961,16 @@ async function readLivePlayers(
                 containerRunning,
                 crashLoop: null
             };
+        }
+        // It answered, so the loop it was once stopped for is over: the record
+        // goes, and a stop that was Polaris's is taken back, here rather than a
+        // health pass later - a server with people on it is not "stopped".
+        if (halted) {
+            await resumeAfterCrashLoop(
+                install.installedAppId,
+                install.applicationId,
+                "answering"
+            ).catch(() => false);
         }
         return { answering: true, players, message: null, containerRunning, crashLoop: null };
     } catch (caught) {

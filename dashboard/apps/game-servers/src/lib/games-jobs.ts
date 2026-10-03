@@ -166,26 +166,36 @@ async function runWorldBackups(): Promise<{
 async function runGameHealth(): Promise<{
     checked: number;
     stopped: number;
+    resumed: number;
     memoryRaised: number;
+    loadersPinned: number;
 }> {
     const { sweepCrashLoops } = await import("./games-health");
     // Beside it rather than inside it: one answers "is this server failing to
     // start", the other "has this server outgrown what it was given", and a
     // server can be perfectly healthy and still be out of memory.
     const { sweepMemoryPlans } = await import("./games-memory");
+    // And "will this server's next start depend on a repository answering": a
+    // mod loader left on "latest" asks for it on every start.
+    const { sweepLoaderPins } = await import("./minecraft/loader-pin-service");
     let checked = 0;
     let stopped = 0;
+    let resumed = 0;
     let memoryRaised = 0;
+    let loadersPinned = 0;
     for (const ownerId of await ownersWithApps()) {
         const swept = await sweepCrashLoops(ownerId).catch(() => null);
         if (swept) {
             checked += swept.checked;
             stopped += swept.stopped;
+            resumed += swept.resumed;
         }
         const memory = await sweepMemoryPlans(ownerId).catch(() => null);
         if (memory) memoryRaised += memory.raised;
+        const pins = await sweepLoaderPins(ownerId).catch(() => null);
+        if (pins) loadersPinned += pins.pinned;
     }
-    return { checked, stopped, memoryRaised };
+    return { checked, stopped, resumed, memoryRaised, loadersPinned };
 }
 
 async function runInventories(): Promise<{ servers: number; snapshots: number; applied: number }> {

@@ -269,7 +269,13 @@
         "couldNotSendTheInventory": "Could not send the inventory",
         "thatIsNotAWaiting": "That is not a waiting action on this server",
         "couldNotCancelThat": "Could not cancel that",
-        "noInventoryAnswer": "The server did not answer with an inventory: {said}"
+        "noInventoryAnswer": "The server did not answer with an inventory: {said}",
+        "noInstalledLoader": "There is no installed version to hold this server at, so it still has to download its loader. Try again once the loader's repository answers.",
+        "heldLoaderNotInstalled": "This server is held at {loader} {version}, which is not the version installed, so a start has to download it. Try again once {loader}'s repository answers.",
+        "couldNotPinTheLoader": "Could not hold the loader at the installed version",
+        "loaderNotHeld": "This server's loader is not held at a version",
+        "couldNotUpdateTheLoader": "Could not update the loader",
+        "couldNotReadTheLoader": "Could not read the loader"
     },
     "world": {
         "world": "World",
@@ -1037,7 +1043,9 @@
         "setupLeft": "{name}: what is left to do",
         "pluginDocs": "The plugin's own instructions",
         "mapBuiltBy": "Built by {author}, for Minecraft {version}.",
-        "manageNamed": "Manage {name}"
+        "manageNamed": "Manage {name}",
+        "pinAndStart": "Pin the installed version and start",
+        "loaderPinned": "Pinned {loader} {version}. The server is starting."
     },
     "joinPassword": {
         "restartOntoPolarisLogin": "Restart onto Polaris login?",
@@ -2283,5 +2291,25 @@
             "lastWarning": "One more and you will be removed for {minutes} min.",
             "timeoutReason": "Removed for {minutes} min for breaking the chat rules."
         }
+    },
+    "loader": {
+        "title": "Mod loader",
+        "pinned": "Pinned",
+        "held": "{loader} {version}",
+        "heldHint": "Every start runs this version without asking {loader}'s repository.",
+        "following": "{loader}, newest version",
+        "followingHint": "Each start asks {loader}'s repository for the newest version. Polaris pins the installed one once the server is up.",
+        "releaseHint": "Minecraft is set to the newest release, so there is no single {loader} version to pin. Choose a release under Settings to pin it.",
+        "custom": "{loader} from your own installer",
+        "customHint": "The installer is yours, so there is nothing to pin.",
+        "updating": "The next start installs the newest {loader}, and Polaris pins it again once the server is up.",
+        "update": "Update loader",
+        "confirmTitle": "Update {loader}?",
+        "confirmBody": "The server downloads the newest {loader} from its repository on its next start. If that repository is down or answers in a format this server cannot read, the server will not start until it recovers. Mods built for {version} may not load on the new version.",
+        "confirmRestartEmpty": "It restarts now.",
+        "updateAndRestart": "Update and restart",
+        "updateOnly": "Update loader",
+        "updateQueued": "The newest {loader} installs the next time the server starts.",
+        "updateStarted": "The server is restarting with the newest {loader}."
     }
 }

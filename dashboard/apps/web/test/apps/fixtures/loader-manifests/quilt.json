@@ -1,0 +1,7 @@
+{
+    "@type": "me.itzg.helpers.quilt.QuiltManifest",
+    "timestamp": "2026-09-14T10:02:11.482Z",
+    "files": ["quilt-server-1.21.4-0.27.1-launcher.jar"],
+    "minecraftVersion": "1.21.4",
+    "loaderVersion": "0.27.1"
+}

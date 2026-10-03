@@ -1,0 +1,7 @@
+{
+    "@type": "me.itzg.helpers.fabric.FabricManifest",
+    "timestamp": "2026-09-14T10:02:11.482Z",
+    "files": ["fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar"],
+    "launcherPath": "/data/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar",
+    "origin": { "@type": "versions", "game": "1.21.4", "loader": "0.16.10", "installer": "1.0.1" }
+}

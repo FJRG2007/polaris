@@ -111,6 +111,8 @@
         "restarted": "{who} restarted it",
         "started": "{who} started it",
         "stopped": "{who} stopped it",
+        "stoppedUnasked": "{who} stopped it: it was running although it was set to stopped",
+        "resumed": "{who} set it back to running: it was stopped for failing to start and is up again",
         "tornDown": "{who} tore down the running deployment",
         "duplicated": "{who} duplicated it",
         "variableNamed": "{who} changed the {name} variable",

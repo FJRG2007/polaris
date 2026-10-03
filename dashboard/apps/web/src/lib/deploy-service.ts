@@ -29,6 +29,8 @@ import { balancedOver, copiesOf } from "./deploy/replicas";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
 import { releaseImageFor } from "./app-extensions/registry";
+import { findApp } from "@/lib/apps/catalog";
+import { speaksHttp } from "@/lib/deploy/portless";
 import { noteAppDeleted } from "@/lib/deploy/host-resources";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
@@ -2384,6 +2386,23 @@ export { hostPortForApp } from "@/lib/deploy/host-port";
  * built without a release, and carried into the one built with it (`cutover`), so
  * the two plans cannot disagree and another server's edge is asked about once.
  */
+/** The protocol a catalogue app declares for its main port, for a service
+ *  installed from the catalogue; undefined for anything else, and without a
+ *  query for a service whose source already rules the forwarder out. */
+async function declaredProtocol(
+    applicationId: string,
+    source: Record<string, unknown>
+): Promise<"http" | "tcp" | "udp" | undefined> {
+    if (!speaksHttp(source, undefined)) return undefined;
+    const install = await prisma.installedApp
+        .findFirst({
+            where: { applicationId, status: { not: "removed" } },
+            select: { catalogId: true }
+        })
+        .catch(() => null);
+    return install ? findApp(install.catalogId)?.template?.ports?.[0]?.protocol : undefined;
+}
+
 async function buildAppPlan(
     applicationId: string,
     ownerId: string,
@@ -2739,6 +2758,14 @@ async function buildAppPlan(
         names: names.enabled,
         crossLinks: names.crossLinks
     });
+    // The port-80 forwarder only beside a service that speaks HTTP: never a game
+    // server, a database or anything else whose port is a protocol of its own
+    // (see `deploy/portless.ts`). The catalogue is asked only when the source
+    // has not already answered.
+    const forwards =
+        names.enabled &&
+        app.target.runtime === "compose" &&
+        speaksHttp(source, await declaredProtocol(app.id, source));
     // Something sends visitors to it, so it counts as up only once it accepts
     // connections on its port - that is the moment the edge is moved onto it.
     const planned: AppDeployPlan = {
@@ -2748,7 +2775,7 @@ async function buildAppPlan(
         ...(names.enabled
             ? {
                   networkAliases: { ...plan.networkAliases, ...names.networkAliases },
-                  ...(app.target.runtime === "compose" ? { forwardPort: containerPort } : {})
+                  ...(forwards ? { forwardPort: containerPort } : {})
               }
             : {})
     };

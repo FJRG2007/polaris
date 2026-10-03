@@ -20,6 +20,15 @@
  * restart does, so a server whose release moved is on the right runtime the next
  * time it starts. Only the tags Polaris chooses are rewritten; an image somebody
  * pinned by hand is left as it is.
+ *
+ * The rolling tags are kept on purpose rather than a release tag
+ * (`2026.9.2-java21`). The outage that made this question come up - NeoForge's
+ * repository changing its metadata format under the image's helper - is fixed
+ * upstream by a newer helper, which only ever arrives through a newer image; a
+ * frozen tag would have kept every server on the broken helper until a Polaris
+ * release moved it. What a start must not depend on is the network, and that is
+ * handled where it is decided: the loader is held at its installed version
+ * (`loader-pin.ts`), so a start installs nothing.
  */
 
 export const MINECRAFT_IMAGE = "itzg/minecraft-server";

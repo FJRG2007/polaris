@@ -93,6 +93,11 @@ export const gameServersExtension: AppExtension = {
     afterStart: async (installedAppId) =>
         (await import("./games-health")).clearCrashLoop(installedAppId),
 
+    // A server this app stopped for looping, found running: somebody brought it
+    // back, so it is running again rather than stopped a second time.
+    adoptsRunningService: async (ownerId, applicationId) =>
+        (await import("./games-health")).adoptsRunningService(ownerId, applicationId),
+
     adopt: async (ownerId) => (await import("./game-install")).adoptGameServersApp(ownerId),
 
     relayChatMessage: async (message) =>

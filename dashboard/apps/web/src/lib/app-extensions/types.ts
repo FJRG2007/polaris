@@ -97,6 +97,14 @@ export interface AppExtension {
     /** When one of its installs is started by hand. */
     readonly afterStart?: (installedAppId: string) => Promise<void>;
 
+    /**
+     * A container was found running under one of its services that is recorded
+     * as stopped. True when the app takes the service as running again - its own
+     * guard stopped it, and somebody has since brought it up - and has recorded
+     * that, so the container is left alone rather than stopped.
+     */
+    readonly adoptsRunningService?: (ownerId: string, applicationId: string) => Promise<boolean>;
+
     /** Fold older install rows into the app's own, when a screen that lists
      *  installs is opened. */
     readonly adopt?: (ownerId: string) => Promise<unknown>;

@@ -127,6 +127,21 @@ export async function afterInstallStarts(installedAppId: string): Promise<void> 
     for (const extension of extensions()) await extension.afterStart?.(installedAppId);
 }
 
+/** Whether an app takes a service recorded as stopped, found running, as running
+ *  again. An app that fails to answer is a no. */
+export async function adoptsRunningService(
+    ownerId: string,
+    applicationId: string
+): Promise<boolean> {
+    for (const extension of extensions()) {
+        const adopted = await extension
+            .adoptsRunningService?.(ownerId, applicationId)
+            .catch(() => false);
+        if (adopted) return true;
+    }
+    return false;
+}
+
 /** Hand a claimed invite's link to the app it belongs to. One app failing does
  *  not stop another, and none of them can fail the account being created. */
 export async function claimAppLink(
