@@ -138,7 +138,7 @@ export function SettingsLayout({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
             <nav
                 aria-label={t("kit.sections")}
-                className="sticky top-0 z-10 -mx-5 -mt-3 border-b border-border/60 bg-elevated px-5 py-2 sm:mx-0 sm:mt-0 sm:w-44 sm:shrink-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-2"
+                className="sticky -top-4 z-10 -mx-5 -mt-4 sm:top-0 border-b border-border bg-background px-5 py-2 sm:mx-0 sm:mt-0 sm:w-44 sm:shrink-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-2"
             >
                 <ul ref={nav} className="no-scrollbar flex gap-1 overflow-x-auto sm:flex-col sm:overflow-visible">
                     {sections.map((section) => {

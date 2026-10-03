@@ -294,7 +294,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
             </div>
 
             {customOpen && (
-                <div className="flex flex-wrap items-end gap-2 rounded-md border border-border/60 p-3">
+                <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                         {t("auditFeed.from")}
                         <input
@@ -366,7 +366,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             <button
                                 type="button"
                                 onClick={() => breakdown.open({ from, to })}
-                                className="flex items-center justify-between gap-2 rounded-b-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                className="flex items-center justify-between gap-2 rounded-b-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 {breakdown.label}
                                 <ChevronRight className="size-3.5 shrink-0" />

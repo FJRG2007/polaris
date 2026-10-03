@@ -603,5 +603,15 @@
         "move": "Mover",
         "disableNamed": "Desactivar {name}",
         "enableNamed": "Activar {name}"
+    },
+    "tabIntro": {
+        "deployments": "Cada build del servicio, de la más reciente a la más antigua. Revierte o redespliega desde aquí.",
+        "variables": "Valores que el servicio lee de su entorno. Los secretos siguen ocultos hasta mostrarlos.",
+        "metrics": "Lo que usa el servicio ahora y a lo largo del tiempo.",
+        "console": "Una terminal dentro del contenedor en marcha.",
+        "files": "Los archivos dentro del contenedor en marcha.",
+        "volumes": "Almacenamiento que sobrevive a un despliegue, montado en el contenedor.",
+        "cron": "Comandos que el servicio ejecuta según un horario, dentro de su contenedor.",
+        "notes": "Notas para quien se ocupe de este servicio después."
     }
 }

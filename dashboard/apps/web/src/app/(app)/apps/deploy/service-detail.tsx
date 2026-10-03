@@ -13,6 +13,7 @@ import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
 import { VolumesTab } from "./volumes-panel";
 import { SettingsTab } from "./service-settings";
+import { SettingsSection } from "./settings-kit";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { relativeTime } from "@/lib/relative-time";
@@ -32,7 +33,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { TabAttentionDot, tabAttention } from "./attention-dot";
 import { DesktopServiceActions } from "@/components/desktop-app";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { describeServiceEvent, unresolvedSetupFailure } from "./service-history";
 import { DeployStepSegments, DeployStepper, useDeploySteps } from "./deploy-stepper";
@@ -48,6 +49,7 @@ import {
 import {
     Badge,
     Button,
+    Card,
     cn,
     ConfirmDeleteDialog,
     Dialog,
@@ -65,7 +67,16 @@ import {
     Select
 } from "@polaris/ui";
 import {
+    Activity,
     ArrowUpRight,
+    Braces,
+    Clock,
+    FolderOpen,
+    HardDrive,
+    MessageSquare,
+    Rocket,
+    SquareTerminal,
+    type LucideIcon,
     Bell,
     BellOff,
     ChartColumn,
@@ -204,7 +215,7 @@ export function ServiceDetail({
                         : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
                 )}
             >
-                <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+                <div className="flex items-center gap-3 border-b border-border px-5 py-4">
                     <ServiceIcon
                         kind={serviceKindOf(app.sourceType)}
                         className="size-5 shrink-0 text-foreground"
@@ -243,7 +254,7 @@ export function ServiceDetail({
                     </div>
                 </div>
 
-                <ScrollRow className="no-scrollbar flex items-center gap-1 border-b border-border/60 px-5 text-sm">
+                <ScrollRow className="no-scrollbar flex items-center gap-1 border-b border-border px-5 text-sm">
                     {tabs.map((name) => (
                         <button
                             key={name}
@@ -285,20 +296,27 @@ export function ServiceDetail({
                     })}
                 </ScrollRow>
 
-                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-3">
-                    {tab === "Deployments" && <DeploymentsTab app={app} onChanged={onChanged} />}
-                    {tab === "Variables" && <VariablesTab app={app} />}
-                    {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
-                    {tab === "Console" && (
-                        <TerminalPanel
-                            target={{ kind: "container", applicationId: app.id }}
-                            label={app.containerRef}
-                        />
+                {/* The body is the page ground, so the cards on it rise off it the way
+                    they do everywhere else - a card on the dialog's own raised tone
+                    read as a hole. */}
+                <div className="flex-1 overflow-y-auto overscroll-contain bg-background px-5 py-4">
+                    {tab !== "Settings" && (
+                        <TabFrame tab={tab} id={app.id}>
+                            {tab === "Deployments" && <DeploymentsTab app={app} onChanged={onChanged} />}
+                            {tab === "Variables" && <VariablesTab app={app} />}
+                            {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
+                            {tab === "Console" && (
+                                <TerminalPanel
+                                    target={{ kind: "container", applicationId: app.id }}
+                                    label={app.containerRef}
+                                />
+                            )}
+                            {tab === "Files" && <FilesPanel applicationId={app.id} />}
+                            {tab === "Volumes" && <VolumesTab app={app} />}
+                            {tab === "Cron" && <CronPanel applicationId={app.id} />}
+                            {tab === "Notes" && <NotesTab applicationId={app.id} />}
+                        </TabFrame>
                     )}
-                    {tab === "Files" && <FilesPanel applicationId={app.id} />}
-                    {tab === "Volumes" && <VolumesTab app={app} />}
-                    {tab === "Cron" && <CronPanel applicationId={app.id} />}
-                    {tab === "Notes" && <NotesTab applicationId={app.id} />}
                     {tab === "Settings" && (
                         <SettingsTab
                             app={app}
@@ -310,6 +328,32 @@ export function ServiceDetail({
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** Each tab's heading: what it is and what it is for, in one line. */
+const TAB_FRAME: Record<Exclude<Tab, "Settings">, { icon: LucideIcon; intro: NamespaceKey<"deployService">; card: boolean }> = {
+    // Tabs whose content is already drawn as cards or as a full-bleed tool are not
+    // put in another one; a card inside a card is a box for its own sake.
+    Deployments: { icon: Rocket, intro: "tabIntro.deployments", card: false },
+    Variables: { icon: Braces, intro: "tabIntro.variables", card: true },
+    Metrics: { icon: Activity, intro: "tabIntro.metrics", card: false },
+    Console: { icon: SquareTerminal, intro: "tabIntro.console", card: false },
+    Files: { icon: FolderOpen, intro: "tabIntro.files", card: false },
+    Volumes: { icon: HardDrive, intro: "tabIntro.volumes", card: false },
+    Cron: { icon: Clock, intro: "tabIntro.cron", card: false },
+    Notes: { icon: MessageSquare, intro: "tabIntro.notes", card: true }
+};
+
+/** A tab drawn in the same shape as the Settings sections: icon, title, one
+ *  line, and the content on one card. */
+function TabFrame({ tab, id, children }: { tab: Exclude<Tab, "Settings">; id: string; children: ReactNode }) {
+    const t = useTranslations("deployService");
+    const frame = TAB_FRAME[tab];
+    return (
+        <SettingsSection id={`tab-${tab.toLowerCase()}-${id}`} icon={frame.icon} title={t(TAB_LABEL[tab])} intro={t(frame.intro)}>
+            {frame.card ? <Card className="min-w-0 px-4 py-3">{children}</Card> : children}
+        </SettingsSection>
     );
 }
 
@@ -926,7 +970,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     "flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-muted-foreground/40",
                                                     failed
                                                         ? "border-danger-edge bg-danger-soft"
-                                                        : "border-border/60"
+                                                        : "border-border"
                                                 )}
                                             >
                                                 <StateBadge deployment={deployment} />
@@ -1270,7 +1314,7 @@ function DeploymentLogsView({
                 )}
             </div>
 
-            <ScrollRow className="no-scrollbar flex items-center gap-3 border-b border-border/60 text-sm">
+            <ScrollRow className="no-scrollbar flex items-center gap-3 border-b border-border text-sm">
                 {CATS.map((name) => (
                     <button
                         key={name}
@@ -1397,7 +1441,7 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
         [t("details.domain"), (primaryDomain(app.domains) ?? app.domains[0])?.hostname ?? "-"]
     ];
     return (
-        <div className="flex flex-col divide-y divide-border/40 text-sm">
+        <div className="flex flex-col divide-y divide-border text-sm">
             {rows.map(([label, value]) => (
                 <div key={label} className="flex gap-4 py-2">
                     <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
@@ -1856,10 +1900,10 @@ function HttpLogsView({
                     <Empty text={all.length > 0 ? t("http.noMatch") : t("http.empty")} />
                 )
             ) : (
-                <div className="max-h-[26rem] overflow-auto overscroll-contain rounded-md border border-border/60">
+                <div className="max-h-[26rem] overflow-auto overscroll-contain rounded-md border border-border">
                     <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-card text-muted-foreground">
-                            <tr className="border-b border-border/60 text-left">
+                            <tr className="border-b border-border text-left">
                                 <th className="whitespace-nowrap px-3 py-2 font-medium">
                                     {t("http.time")}
                                 </th>
@@ -1872,7 +1916,7 @@ function HttpLogsView({
                                 <th className="px-3 py-2 font-medium">{t("http.userAgent")}</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border/40">
+                        <tbody className="divide-y divide-border">
                             {shown.map((entry, index) => (
                                 <tr key={index} className="hover:bg-muted/40">
                                     <td
@@ -2003,7 +2047,7 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
                                 : undefined
                         }
                     />
-                    <div className="rounded-lg border border-border/60 p-4 text-sm sm:col-span-2">
+                    <div className="rounded-lg border border-border p-4 text-sm sm:col-span-2">
                         {t.rich("metrics.state", {
                             state: data.state,
                             strong: (chunks) => (
@@ -2114,7 +2158,7 @@ function Meter({
     const pct = typeof value === "number" ? Math.max(0, Math.min(100, value)) : 0;
     const display = typeof value === "number" ? percent(value) : "-";
     return (
-        <div className="rounded-lg border border-border/60 p-4">
+        <div className="rounded-lg border border-border p-4">
             <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="font-medium">{label}</span>
                 <span className="text-muted-foreground">

@@ -186,7 +186,7 @@ export function PrivateNetworkPanel({
                 <div
                     className={cn(
                         "flex flex-col gap-2 rounded-md p-3",
-                        embedded ? "bg-surface" : "border border-border/60"
+                        embedded ? "bg-surface" : "border border-border"
                     )}
                 >
                     <Skeleton className="h-5 w-64 max-w-full" />
@@ -272,7 +272,7 @@ function PanelBody({
             <div
                 className={cn(
                     "flex flex-col gap-2 rounded-md p-3",
-                    embedded ? "bg-surface" : "border border-border/60"
+                    embedded ? "bg-surface" : "border border-border"
                 )}
             >
                 {editing ? (

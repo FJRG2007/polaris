@@ -133,14 +133,14 @@ export function FilesPanel({
                 </div>
             </div>
             {error && <p className="text-xs text-danger">{error}</p>}
-            <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border/60">
+            <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border">
                 {entries.length === 0 && !busy && (
                     <p className="p-3 text-xs text-muted-foreground">{t("files.empty")}</p>
                 )}
                 {entries.map((entry) => (
                     <div
                         key={entry.name}
-                        className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 last:border-0"
+                        className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5 last:border-0"
                     >
                         <button
                             className="flex items-center gap-2 text-sm hover:underline disabled:no-underline"

@@ -189,10 +189,8 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
     return (
         <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <p className="text-sm font-medium">{t("cron.title")}</p>
-                    <p className="text-xs text-muted-foreground">{t("cron.intro")}</p>
-                </div>
+                {/* The tab's own heading says what this is; this one only names the list. */}
+                <p className="text-sm font-medium">{t("cron.title")}</p>
                 {manage && !draft && (
                     <Button size="sm" onClick={() => setDraft(emptyDraft())}>
                         <Plus className="size-4" /> {t("cron.newJob")}
@@ -228,7 +226,7 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
             ) : (
                 <ul className="flex flex-col gap-2">
                     {crons.map((cron) => (
-                        <li key={cron.id} className="rounded-lg border border-border/60">
+                        <li key={cron.id} className="rounded-lg border border-border">
                             <div className="flex flex-wrap items-center gap-3 p-3">
                                 <button
                                     type="button"
@@ -396,7 +394,7 @@ function CronForm({
     }
 
     return (
-        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-surface p-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
             <p className="text-sm font-medium">{draft.id ? t("cron.editJob") : t("cron.newJob")}</p>
             <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">
@@ -544,16 +542,16 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
 
     if (runs === null) {
         return (
-            <div className="flex justify-center border-t border-border/60 py-4 text-muted-foreground">
+            <div className="flex justify-center border-t border-border py-4 text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
             </div>
         );
     }
     if (runs.length === 0) {
-        return <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">{t("cron.notRunYet")}</p>;
+        return <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">{t("cron.notRunYet")}</p>;
     }
     return (
-        <ul className="divide-y divide-border/40 border-t border-border/60">
+        <ul className="divide-y divide-border border-t border-border">
             {runs.map((run) => {
                 const took =
                     run.finishedAt !== null

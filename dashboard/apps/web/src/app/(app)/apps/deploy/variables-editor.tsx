@@ -271,7 +271,7 @@ export function VariablesEditor({
             )}
 
             {rawOpen && (
-                <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
+                <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                     <span className="text-xs font-medium text-muted-foreground">
                         {t("variables.rawHint")}
                     </span>
@@ -323,7 +323,7 @@ export function VariablesEditor({
                     {draft.added.map((item) => (
                         <li
                             key={item.tempId}
-                            className="flex flex-col gap-2 border-b border-border/40 py-2.5 sm:flex-row sm:items-start sm:gap-3"
+                            className="flex flex-col gap-2 border-b border-border py-2.5 sm:flex-row sm:items-start sm:gap-3"
                         >
                             <div className="flex min-w-0 flex-col gap-1 sm:w-56 sm:shrink-0">
                                 <Input
@@ -385,7 +385,7 @@ export function VariablesEditor({
                         return (
                             <li
                                 key={row.id}
-                                className="group flex flex-col gap-2 border-b border-border/40 py-2.5 sm:flex-row sm:items-center sm:gap-3"
+                                className="group flex flex-col gap-2 border-b border-border py-2.5 sm:flex-row sm:items-center sm:gap-3"
                             >
                                 <div className="flex min-w-0 flex-col gap-1 sm:w-56 sm:shrink-0">
                                     <span className="flex min-w-0 items-center gap-1.5">
