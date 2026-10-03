@@ -29,7 +29,12 @@ export { SizeField, type SizeFieldProps } from "./components/size-field";
 export { Textarea, type TextareaProps } from "./components/textarea";
 export { Badge, statusChipClass, type BadgeProps } from "./components/badge";
 export { CopyButton } from "./components/copy-button";
-export { ENGLISH_UI_STRINGS, UiStringsProvider, useUiStrings, type UiStrings } from "./lib/ui-strings";
+export {
+    ENGLISH_UI_STRINGS,
+    UiStringsProvider,
+    useUiStrings,
+    type UiStrings
+} from "./lib/ui-strings";
 export {
     DnsRecordTable,
     type DnsRecordRow,
@@ -79,6 +84,11 @@ export * from "./components/dropdown-menu";
 export * from "./components/context-menu";
 export * from "./components/dialog";
 export * from "./shell/capabilities";
-export { AppSwitcher, type AppSwitcherStrings, type PolarisApp } from "./shell/app-switcher";
+export {
+    AppSwitcher,
+    type AppSwitcherSection,
+    type AppSwitcherStrings,
+    type PolarisApp
+} from "./shell/app-switcher";
 export { MobileNav } from "./shell/mobile-nav";
 export { AppShell, PolarisMark, PageHeader, PAGE_FILL, PAGE_BLEED } from "./shell/app-shell";

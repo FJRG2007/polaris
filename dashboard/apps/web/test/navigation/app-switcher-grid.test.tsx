@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 
 /**
- * The switcher opened: a grid of icons and names, the top row above the rest,
- * and a star that pins an app without closing the menu.
+ * The switcher opened: a grid of icons and names under their headings, a search
+ * that narrows it, arrow keys that walk it as a grid, a star that pins an app
+ * without closing the menu, and favorites that move with Alt and an arrow.
  */
 
-import { AppSwitcher } from "@polaris/ui";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Gamepad2, HardDrive, MessageCircle } from "lucide-react";
+import { AppSwitcher, DropdownMenuItem, type AppSwitcherSection } from "@polaris/ui";
 import { cleanup, render, screen, within } from "@testing-library/react";
 
 afterEach(cleanup);
@@ -34,31 +35,58 @@ const APPS = [
         label: "Game servers",
         description: "Servers",
         icon: Gamepad2,
-        href: "/apps/games"
+        href: "/apps/games",
+        keywords: ["Juegos"]
     }
 ];
 
+/** Thirty-two apps on six shelves, for the grid's geometry. */
+const MANY = Array.from({ length: 32 }, (_, at) => ({
+    id: `app-${at + 1}`,
+    label: `App ${at + 1}`,
+    icon: HardDrive,
+    href: `/app-${at + 1}`
+}));
+const MANY_SECTIONS: AppSwitcherSection[] = [
+    {
+        key: "favorites",
+        label: "Favorites",
+        ids: ["app-1", "app-2", "app-3", "app-4"],
+        arrangeable: true
+    },
+    { key: "work", label: "Work", ids: MANY.slice(4, 18).map((app) => app.id) },
+    { key: "tools", label: "Tools", ids: MANY.slice(18).map((app) => app.id) }
+];
+
+const tile = (id: string) => document.querySelector<HTMLElement>(`[data-launcher-tile="${id}"]`);
+
+async function openMenu(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+    await user.click(screen.getByRole("button", { name }));
+    return screen.findByRole("menu");
+}
+
 describe("the app switcher grid", () => {
-    it("shows the top row first, every app once, and no descriptions", async () => {
+    it("draws its sections in order under their headings, every app once, with no descriptions", async () => {
         const user = userEvent.setup();
         render(
             <AppSwitcher
                 apps={APPS}
                 currentAppId="drive"
-                featured={["games"]}
-                featuredLabel="Favorites"
+                sections={[
+                    { key: "favorites", label: "Favorites", ids: ["games"] },
+                    { key: "work", label: "Work", ids: ["drive", "chat"] }
+                ]}
                 pinned={["games"]}
                 onTogglePin={() => undefined}
             />
         );
-        await user.click(screen.getByRole("button", { name: /drive/i }));
-        const menu = await screen.findByRole("menu");
+        const menu = await openMenu(user, /drive/i);
         const links = within(menu)
             .getAllByRole("menuitem")
             .filter((item) => item.tagName === "A");
         expect(links.map((link) => link.textContent)).toEqual(["Game servers", "Drive", "3Chat"]);
         expect(within(menu).getByText("Favorites")).toBeTruthy();
-        expect(within(menu).getByText("More apps")).toBeTruthy();
+        expect(within(menu).getByText("Work")).toBeTruthy();
         expect(menu.textContent).not.toContain("Files across every NAS");
         expect(
             within(menu).getByRole("menuitem", { name: "Remove Game servers from favorites" })
@@ -68,12 +96,199 @@ describe("the app switcher grid", () => {
     it("pins an app from its star and keeps the menu open", async () => {
         const user = userEvent.setup();
         const onTogglePin = vi.fn();
-        render(
-            <AppSwitcher apps={APPS} currentAppId="drive" featured={[]} onTogglePin={onTogglePin} />
-        );
-        await user.click(screen.getByRole("button", { name: /drive/i }));
+        render(<AppSwitcher apps={APPS} currentAppId="drive" onTogglePin={onTogglePin} />);
+        await openMenu(user, /drive/i);
         await user.click(await screen.findByRole("menuitem", { name: "Add Chat to favorites" }));
         expect(onTogglePin).toHaveBeenCalledWith("chat");
         expect(screen.getByRole("menu")).toBeTruthy();
+    });
+});
+
+describe("searching the app switcher", () => {
+    it("takes the keyboard as it opens and narrows every app to the ones that match", async () => {
+        const user = userEvent.setup();
+        render(<AppSwitcher apps={APPS} currentAppId="drive" />);
+        await openMenu(user, /drive/i);
+        const field = await screen.findByRole("textbox", { name: "Search apps" });
+        await vi.waitFor(() => expect(document.activeElement).toBe(field));
+        await user.type(field, "chat");
+        expect(tile("chat")).toBeTruthy();
+        expect(tile("drive")).toBeNull();
+        expect(tile("games")).toBeNull();
+    });
+
+    it("finds an app by a keyword it is never drawn with", async () => {
+        const user = userEvent.setup();
+        render(<AppSwitcher apps={APPS} currentAppId="drive" />);
+        await openMenu(user, /drive/i);
+        await user.type(await screen.findByRole("textbox", { name: "Search apps" }), "juegos");
+        expect(tile("games")).toBeTruthy();
+        expect(tile("drive")).toBeNull();
+    });
+
+    it("forgives a typo in a name but answers nothing for a word no app carries", async () => {
+        const user = userEvent.setup();
+        render(<AppSwitcher apps={APPS} currentAppId="drive" />);
+        await openMenu(user, /drive/i);
+        const field = await screen.findByRole("textbox", { name: "Search apps" });
+        await user.type(field, "drvie");
+        expect(tile("drive")).toBeTruthy();
+        await user.clear(field);
+        await user.type(field, "spreadsheet");
+        expect(document.querySelectorAll("[data-launcher-tile]")).toHaveLength(0);
+        expect(screen.getByText("No app matches spreadsheet")).toBeTruthy();
+    });
+});
+
+describe("walking the app switcher with the keyboard", () => {
+    it("moves along the grid, a row at a time, and across a heading at the same column", async () => {
+        const user = userEvent.setup();
+        render(<AppSwitcher apps={MANY} currentAppId="app-1" sections={MANY_SECTIONS} />);
+        await openMenu(user, /app 1/i);
+        await user.keyboard("{ArrowDown}");
+        expect(document.activeElement).toBe(tile("app-1"));
+        await user.keyboard("{ArrowRight}");
+        expect(document.activeElement).toBe(tile("app-2"));
+        // Favorites run app-1..3 on the first row and app-4 alone on the second.
+        await user.keyboard("{ArrowDown}");
+        expect(document.activeElement).toBe(tile("app-4"));
+        // Out of the favorites into Work, same column as far as it goes.
+        await user.keyboard("{ArrowDown}");
+        expect(document.activeElement).toBe(tile("app-5"));
+        await user.keyboard("{ArrowRight}{ArrowDown}");
+        expect(document.activeElement).toBe(tile("app-9"));
+        await user.keyboard("{End}");
+        expect(document.activeElement).toBe(tile("app-32"));
+        await user.keyboard("{Home}{ArrowUp}");
+        expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Search apps" }));
+    });
+
+    it("reaches each app's star with tab", async () => {
+        const user = userEvent.setup();
+        render(
+            <AppSwitcher
+                apps={APPS}
+                currentAppId="drive"
+                sections={[{ key: "all", label: "", ids: ["drive", "chat", "games"] }]}
+                onTogglePin={() => undefined}
+            />
+        );
+        await openMenu(user, /drive/i);
+        await user.keyboard("{ArrowDown}");
+        expect(document.activeElement).toBe(tile("drive"));
+        await user.keyboard("{Tab}");
+        expect(document.activeElement?.getAttribute("aria-label")).toBe("Add Drive to favorites");
+        await user.keyboard("{Tab}");
+        expect(document.activeElement).toBe(tile("chat"));
+    });
+
+    it("skips a star that is not drawn, so tab never stalls on a tile", async () => {
+        const user = userEvent.setup();
+        render(
+            <AppSwitcher
+                apps={APPS}
+                currentAppId="drive"
+                sections={[{ key: "all", label: "", ids: ["drive", "chat", "games"] }]}
+                onTogglePin={() => undefined}
+            />
+        );
+        await openMenu(user, /drive/i);
+        for (const star of document.querySelectorAll<HTMLElement>('[aria-label$="to favorites"]')) {
+            star.style.display = "none";
+        }
+        await user.keyboard("{ArrowDown}");
+        expect(document.activeElement).toBe(tile("drive"));
+        await user.keyboard("{Tab}");
+        expect(document.activeElement).toBe(tile("chat"));
+    });
+
+    it("goes on to the options under the grid from the last row and the last tab stop", async () => {
+        const user = userEvent.setup();
+        render(
+            <AppSwitcher
+                apps={MANY}
+                currentAppId="app-1"
+                sections={MANY_SECTIONS}
+                footer={<DropdownMenuItem>Arrange favorites</DropdownMenuItem>}
+            />
+        );
+        await openMenu(user, /app 1/i);
+        const arrange = screen.getByRole("menuitem", { name: "Arrange favorites" });
+        await user.keyboard("{ArrowDown}{End}{ArrowDown}");
+        expect(document.activeElement).toBe(arrange);
+        await user.keyboard("{ArrowUp}");
+        tile("app-32")?.focus();
+        await user.keyboard("{Tab}");
+        expect(document.activeElement).toBe(arrange);
+    });
+
+    it("moves a favorite with Alt and an arrow, says where it went, and keeps it focused", async () => {
+        const user = userEvent.setup();
+        const onArrange = vi.fn();
+        render(
+            <AppSwitcher
+                apps={MANY}
+                currentAppId="app-1"
+                sections={MANY_SECTIONS}
+                onArrange={onArrange}
+            />
+        );
+        await openMenu(user, /app 1/i);
+        await user.keyboard("{ArrowDown}{Alt>}{ArrowRight}{/Alt}");
+        expect(onArrange).toHaveBeenCalledWith(["app-2", "app-1", "app-3", "app-4"]);
+        expect(document.activeElement).toBe(tile("app-1"));
+        expect(screen.getByText("App 1 moved to position 2 of 4")).toBeTruthy();
+    });
+
+    it("advertises every move a favorite makes", async () => {
+        const user = userEvent.setup();
+        render(
+            <AppSwitcher
+                apps={MANY}
+                currentAppId="app-1"
+                sections={MANY_SECTIONS}
+                onArrange={() => undefined}
+            />
+        );
+        await openMenu(user, /app 1/i);
+        expect(tile("app-1")?.getAttribute("aria-keyshortcuts")).toBe(
+            "Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown"
+        );
+    });
+
+    it("does not move an app that is not a favorite, nor one already at the end", async () => {
+        const user = userEvent.setup();
+        const onArrange = vi.fn();
+        render(
+            <AppSwitcher
+                apps={MANY}
+                currentAppId="app-1"
+                sections={MANY_SECTIONS}
+                onArrange={onArrange}
+            />
+        );
+        await openMenu(user, /app 1/i);
+        await user.keyboard("{ArrowDown}{Alt>}{ArrowLeft}{/Alt}");
+        await user.keyboard("{ArrowDown}{ArrowDown}{Alt>}{ArrowRight}{/Alt}");
+        expect(onArrange).not.toHaveBeenCalled();
+    });
+});
+
+describe("opening the app switcher on a touch screen", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("leaves the search unfocused when the menu is opened from elsewhere", async () => {
+        vi.stubGlobal("matchMedia", (query: string) => ({
+            matches: query === "(pointer: coarse)",
+            media: query,
+            addEventListener() {},
+            removeEventListener() {}
+        }));
+        render(
+            <AppSwitcher apps={APPS} currentAppId="drive" open onOpenChange={() => undefined} />
+        );
+        const field = await screen.findByRole("textbox", { name: "Search apps" });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(document.activeElement).not.toBe(field);
     });
 });

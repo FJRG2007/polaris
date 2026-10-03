@@ -104,12 +104,32 @@ import {
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
+/**
+ * The shelves the app menu sorts apps onto once there are too many to scan as
+ * one grid - the way an app store, Launchpad's folders or Slack's directory
+ * group theirs. Declared once, in the order they are drawn, and named in
+ * English like every other label here (`nav.labels` translates them).
+ */
+export const APP_CATEGORIES = [
+    { id: "work", label: "Work" }, // i18n-ignore
+    { id: "communication", label: "Communication" }, // i18n-ignore
+    { id: "home", label: "Home" }, // i18n-ignore
+    { id: "infrastructure", label: "Infrastructure" }, // i18n-ignore
+    { id: "games", label: "Games" }, // i18n-ignore
+    { id: "tools", label: "Tools" } // i18n-ignore
+] as const;
+
+export type AppCategory = (typeof APP_CATEGORIES)[number]["id"];
+
 export interface AppEntry {
     id: string;
     label: string;
     description: string;
     icon: LucideIcon;
     href: string;
+    /** The shelf the app menu files this under. Required, so an app added
+     *  without one fails to compile rather than landing on no shelf at all. */
+    category: AppCategory;
     locked?: boolean;
     /** The capability that opens this app. An account that does not hold it does
      *  not see the app in the switcher, is not offered its screens in search, and
@@ -158,6 +178,7 @@ export const OVERVIEW_APP_ID = "overview";
 export const POLARIS_APPS: AppEntry[] = [
     {
         id: OVERVIEW_APP_ID,
+        category: "work",
         label: "Overview", // i18n-ignore
         description: "Your services, usage and shortcuts at a glance", // i18n-ignore
         icon: LayoutDashboard,
@@ -171,6 +192,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "drive",
+        category: "work",
         label: "Drive", // i18n-ignore
         description: "Files across every NAS", // i18n-ignore
         icon: HardDrive,
@@ -179,6 +201,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "vault",
+        category: "tools",
         label: "Vault", // i18n-ignore
         description: "Passwords, keys and secrets, encrypted in your browser", // i18n-ignore
         icon: KeyRound,
@@ -187,6 +210,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "apps",
+        category: "infrastructure",
         label: "Apps", // i18n-ignore
         description: "Install & run apps: deploys, servers, assistants", // i18n-ignore
         icon: LayoutGrid,
@@ -211,6 +235,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * of those installs to rename a word on screen.
          */
         id: "home",
+        category: "home",
         label: "Places", // i18n-ignore
         description:
             "Your places, the cameras in them and the doors of them - what they saw, and what to do about it", // i18n-ignore
@@ -233,6 +258,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * converts nothing should not carry a menu entry for converting things.
          */
         id: "tools",
+        category: "tools",
         label: "Tools", // i18n-ignore
         description:
             "Convert, resize, optimize, trim and translate - the small jobs, on your own machine", // i18n-ignore
@@ -252,6 +278,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * the installed apps, and links to them are in people's bookmarks.
          */
         id: "games",
+        category: "games",
         label: "Game servers", // i18n-ignore
         description: "Minecraft, ARK and FiveM servers on your own machines", // i18n-ignore
         icon: Gamepad2,
@@ -261,6 +288,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "tasks",
+        category: "work",
         label: "Tasks", // i18n-ignore
         description: "Plan and track work: spaces, lists, boards & goals", // i18n-ignore
         icon: SquareCheckBig,
@@ -269,6 +297,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "chat",
+        category: "communication",
         label: "Chat", // i18n-ignore
         description: "Channels, direct messages and calls with the people here", // i18n-ignore
         icon: MessageCircle,
@@ -287,6 +316,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * second-class version of the other.
          */
         id: "mail",
+        category: "communication",
         label: "Mail", // i18n-ignore
         description: "Your mailboxes, read and answered here", // i18n-ignore
         icon: Mail,
@@ -301,6 +331,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * anything in carries no menu entry for it.
          */
         id: "calendar",
+        category: "work",
         label: "Calendar", // i18n-ignore
         description: "Your calendars and the ones you link, in one place", // i18n-ignore
         icon: CalendarDays,
@@ -310,6 +341,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "notes",
+        category: "work",
         label: "Notes", // i18n-ignore
         description: "Write things down, nested the way a notebook is", // i18n-ignore
         icon: NotebookPen,
@@ -330,6 +362,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * reason.
          */
         id: "office",
+        category: "work",
         label: "Office", // i18n-ignore
         description: "Documents, spreadsheets, slides and diagrams, written together", // i18n-ignore
         icon: FileStack,
@@ -338,6 +371,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "watch",
+        category: "infrastructure",
         label: "Watch", // i18n-ignore
         description: "Alarms on app health, spikes and outages", // i18n-ignore
         icon: Activity,
@@ -346,6 +380,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "admin",
+        category: "infrastructure",
         label: "Management", // i18n-ignore
         description: "Users, access, domains & updates", // i18n-ignore
         icon: SlidersHorizontal,
@@ -360,6 +395,7 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         id: "account",
+        category: "tools",
         label: "My account", // i18n-ignore
         description: "Profile, security & API keys", // i18n-ignore
         icon: UserCog,

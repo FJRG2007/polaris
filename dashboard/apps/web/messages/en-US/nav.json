@@ -5,12 +5,20 @@
     "switcher": {
         "favorites": "Favorites",
         "recent": "Recent",
-        "suggested": "Suggested",
         "moreApps": "More apps",
-        "allApps": "Polaris apps",
         "pin": "Add {app} to favorites",
         "unpin": "Remove {app} from favorites",
-        "saveFailed": "Your favorites could not be saved. Try again in a moment."
+        "saveFailed": "Your favorites could not be saved. Try again in a moment.",
+        "search": "Search apps",
+        "noMatch": "No app matches {query}",
+        "moved": "{app} moved to position {position} of {total}",
+        "arrange": "Arrange favorites",
+        "arrangeHint": "Favorites open first in the app menu and are the apps the Overview lists.",
+        "noFavorites": "No favorites yet. Add one below.",
+        "otherApps": "Other apps",
+        "moveEarlier": "Move {app} earlier",
+        "moveLater": "Move {app} later",
+        "marketplace": "Find more apps"
     },
     "waiting": {
         "unread": "{count, plural, one {# unread message} other {# unread messages}}",
@@ -280,7 +288,11 @@
         "Who gets in": "Who gets in",
         "World": "World",
         "Developers": "Developers",
-        "Connectivity": "Connectivity"
+        "Connectivity": "Connectivity",
+        "Work": "Work",
+        "Home": "Home",
+        "Infrastructure": "Infrastructure",
+        "Games": "Games"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",
