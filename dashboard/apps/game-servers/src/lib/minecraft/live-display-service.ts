@@ -22,7 +22,7 @@ import { renderSidebar } from "./sidebar-render";
 import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
 import {
     editionOf,
-    onlinePlayers,
+    shownPlayers,
     onlineRoster,
     openServerContainer,
     withServerContainer,
@@ -370,7 +370,7 @@ async function contextFor(
     }
     const needsList = texts.some((text) => readsPlayerList(text));
     const players = needsList
-        ? await onlinePlayers(loop.ownerId, installedAppId).catch(() => null)
+        ? await shownPlayers(loop.ownerId, installedAppId).catch(() => null)
         : null;
     // Asked of the running server only when a text reads its log or everybody's
     // level; the rest is Polaris's own and costs the server nothing.

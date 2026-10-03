@@ -55,6 +55,7 @@ import { editionOf, type ServerContainer } from "../service";
 import { chosenLanguage as chosenEventsLanguage, readEventsConfig } from "../events/catalog";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 import { keyedTurns } from "../../turns";
+import { onArrival } from "../login-arrivals";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -466,6 +467,28 @@ function wake(ownerId: string, installedAppId: string, enabled: boolean): void {
     }
     if (loops.has(installedAppId)) void tick(installedAppId);
 }
+
+/**
+ * How long after Polaris says yes to a password the player is let in: the mod
+ * hears the answer and lets them go on the server's next tick. Read before
+ * then, they would still be left out of what is shown (`prelogin.ts`).
+ */
+const ARRIVAL_DELAY_MS = 1_500;
+
+/**
+ * A player just logged in: their challenges are read and shown now, rather
+ * than on the loop's next read up to twenty seconds later. Only for a server
+ * whose loop is running - one without challenges on has nothing to show.
+ */
+onArrival((installedAppId) => {
+    if (!loops.has(installedAppId)) return;
+    setTimeout(() => {
+        const loop = loops.get(installedAppId);
+        if (!loop) return;
+        loop.lastRead = 0;
+        void tick(installedAppId);
+    }, ARRIVAL_DELAY_MS).unref?.();
+});
 
 async function stopLoop(installedAppId: string): Promise<void> {
     const loop = loops.get(installedAppId);
