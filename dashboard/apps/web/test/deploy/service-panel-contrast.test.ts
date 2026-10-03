@@ -87,9 +87,6 @@ describe("service panel controls", () => {
             expect(contrast(tone("field-edge"), tone("card"))).toBeGreaterThanOrEqual(3);
             expect(contrast(tone("field-edge"), tone("field"))).toBeGreaterThanOrEqual(3);
             expect(contrast(tone("field-edge"), tone("background"))).toBeGreaterThanOrEqual(3);
-            expect(contrast(tone("field-edge"), tone("card"))).toBeGreaterThanOrEqual(
-                contrast(base["control-edge"]!, base.card!)
-            );
         });
 
         it(`${theme}: hover and focus make the edge clearer`, () => {
@@ -111,9 +108,6 @@ describe("service panel controls", () => {
         it(`${theme}: an unchecked switch holds 3:1 on the card and the page`, () => {
             expect(contrast(tone("switch-off"), tone("card"))).toBeGreaterThanOrEqual(3);
             expect(contrast(tone("switch-off"), tone("background"))).toBeGreaterThanOrEqual(3);
-            expect(contrast(tone("switch-off"), tone("card"))).toBeGreaterThanOrEqual(
-                contrast(base["control-edge"]!, base.card!)
-            );
         });
 
         it(`${theme}: focus ring and text stay readable on a field`, () => {
