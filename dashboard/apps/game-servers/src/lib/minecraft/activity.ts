@@ -54,6 +54,31 @@ export async function lookAt(
     return seen;
 }
 
+/**
+ * The fighting an event did itself, forgotten once it is over.
+ *
+ * A duel, a boss or a wave raises the same count of damage dealt that a fight
+ * out in the world does, so everybody who had just played one read as in a
+ * fight for the next minute and a half - and the next event was refused with
+ * "in a fight" for players standing at home doing nothing. Looked at once more
+ * here, so the count is caught up with what the event dealt and only a blow
+ * struck after it counts, and then the event's own players are taken out of
+ * any fight that look saw.
+ */
+export async function forgetEventFights(
+    installedAppId: string,
+    server: ServerContainer,
+    names: readonly string[]
+): Promise<void> {
+    const seen = await lookAt(installedAppId, server);
+    const played = new Set(names.map((name) => name.toLowerCase()));
+    const next = new Map(seen);
+    for (const [key, one] of seen) {
+        if (played.has(key) && one.fightingAt !== null) next.set(key, { ...one, fightingAt: null });
+    }
+    activity.set(installedAppId, next);
+}
+
 /** The same, unless somebody looked a moment ago. */
 export async function lookIfDue(
     installedAppId: string,

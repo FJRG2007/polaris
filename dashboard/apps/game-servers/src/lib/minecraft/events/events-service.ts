@@ -3739,6 +3739,12 @@ async function finish(
             // them and before the rules they held are put back.
             await bringBack(server);
             await server.sayAll([...lines, ...cleanupOf(run)]);
+            // What they dealt in it is not a fight the next event should wait out.
+            await playing
+                .forgetEventFights(installedAppId, server, run.participants)
+                .catch((error: unknown) =>
+                    console.warn("polaris: forgetting an event's fights failed", String(error))
+                );
         } else {
             // The server was not answering: clean up when it is back, so a
             // chest, a boss or a loaded chunk is not left in the world for good.

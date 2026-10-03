@@ -3781,6 +3781,23 @@ describe("where the players are, and what they are doing", () => {
         expect(started.started).toBe(1);
     });
 
+    it("forgets the fighting an event did itself once it is over, and counts the next blow", async () => {
+        world.online = ["Ana"];
+        const fighting = () => playing.seenOn(SERVER)?.get("ana")?.fightingAt ?? null;
+        await playing.lookAt(SERVER, fakeServer());
+        world.dealt = { Ana: 40 };
+        await playing.lookAt(SERVER, fakeServer());
+        expect(fighting()).not.toBeNull();
+        // The rest of the event's blows, then its end.
+        world.dealt = { Ana: 90 };
+        await playing.forgetEventFights(SERVER, fakeServer(), ["Ana"]);
+        expect(fighting()).toBeNull();
+        // A blow after the event is a fight again.
+        world.dealt = { Ana: 95 };
+        await playing.lookAt(SERVER, fakeServer());
+        expect(fighting()).not.toBeNull();
+    });
+
     it("does not take damage taken alone for a fight", async () => {
         setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
         world.hurt = { Ana: 40 };
@@ -7100,6 +7117,8 @@ describe("a team duel", () => {
         expect(after.history[0]).toMatchObject({ outcome: "finished" });
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
         expect(world.sent).toContain("give Ana minecraft:diamond 5");
+        // What Ana dealt in the duel does not hold the next event up as a fight.
+        expect(playing.seenOn(SERVER)?.get("ana")?.fightingAt ?? null).toBeNull();
         // Back exactly where each stood, their kit - only it - taken back.
         for (const one of run.entrants) {
             expect(world.sent).toContain(
