@@ -259,7 +259,8 @@
         "settings": "Ajustes del calendario",
         "shortcuts": "Atajos de teclado",
         "today": "Hoy",
-        "todayHint": "Ir a hoy",
+        "todayHint": "Ir a hoy, {day}",
+        "todayShown": "Hoy ya está a la vista",
         "trash": "Papelera",
         "view": "Vista",
         "time": "Alarmas, temporizadores y reloj"
@@ -295,12 +296,21 @@
         "title": "Nueva tarea"
     },
     "popover": {
+        "bookingHint": "La gente reserva una hora en esta franja, cada semana, desde una página que compartes.",
         "chooseCalendar": "Elige antes un calendario",
         "edit": "Editar",
+        "kind": "Qué crear",
+        "kindBooking": "Reservas",
+        "kindEvent": "Evento",
+        "kindTask": "Tarea",
         "more": "Más detalles",
+        "nameFirst": "Añade antes un título",
+        "newBooking": "Página de reservas",
         "newTitle": "Nuevo evento",
         "noWritable": "Ninguno de tus calendarios admite eventos. Crea uno en el panel lateral.",
-        "open": "Abrir"
+        "open": "Abrir",
+        "openInTasks": "Crear la tarea y abrirla en Tareas",
+        "setUpBooking": "Crear página"
     },
     "printPage": {
         "badRange": "El último día es anterior al primero.",
@@ -457,7 +467,7 @@
         "defaultView": "Abrir en",
         "defaultViewHint": "Cambia al cambiar de vista.",
         "description": "Cómo se ve tu calendario y con qué empiezan los eventos nuevos.",
-        "dimPast": "Atenuar lo pasado",
+        "dimPast": "Atenuar días y eventos pasados",
         "display": "Vista",
         "endAfterStart": "El fin debe ser posterior al inicio.",
         "eventLimit": "Eventos por día en el mes",

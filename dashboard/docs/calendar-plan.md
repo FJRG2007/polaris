@@ -296,7 +296,7 @@ Status: `pending`, `done (<verification>)`, `blocked(<reason>)`,
 `deferred(<reason>)`. Update one line at a time.
 
 Verification shorthand used below: **T** = `vitest --maxWorkers=2 test/calendar`
-green (45 files, 568 tests at the last run); **C** = `tsc --noEmit -p .` in
+green (51 files, 621 tests at the last run); **C** = `tsc --noEmit -p .` in
 `apps/calendar` clean (its program includes `apps/web/src`, the app and
 `apps/web/test/calendar`); **B** = the app bundler exits 0 and
 `test/app-bundles` + `test/build` are green; **W** = exercised in a real
@@ -389,4 +389,10 @@ and es-ES.
 - [x] U74 App-host header slot + sub-minute scheduler tick for an installed app's jobs (`lib/app-extensions/{registry,types}.ts`, `lib/cron/scheduler.ts`, `components/app-host/client.tsx`) - done (T: test/build/app-host-contract, 318 tests). Generic to any app, not Calendar-specific - Calendar is its first user.
 - [x] U75 Clock commands from search: "timer 10m", "alarm 7:30", "stopwatch" (`parseClockCommand` in `@polaris/core`, `command-palette.tsx`, `search-rows.tsx`) - done (T: packages/core/test/clock-commands.test.ts, 7 tests; en-US + es-ES)
 - [x] U76 i18n `time.json` en-US + es-ES; monthly repeat's day/weekday/weekend option labels fixed (`rule.json`, both locales) - done (T: test/i18n, 2052 tests incl. lengths)
+
+### Quick-create switch and time orientation (Google parity)
+
+- [x] U77 Quick-create switch - the grid's new-item card offers Event, Task and Booking page (Google's own three) through a `SegmentedControl` - Task drops out once the account turns out to have no task lists at all, and the choice falls back to Event; a task is made through the same creation `new-task-dialog.tsx` already used for "New task due here" (`useTaskCreation`, `TaskListField`, shared by both), and a booking page carries the card's title and the picked time as its day and hours (`screens/booking/model.ts`'s `seedOf`/`seededDraft`) into `/calendar/booking/new` - done (T: screens/quick-create, screens/booking-seed)
+- [x] U78 Time orientation (Google's own drawing) - today is a filled circle wherever a day is named (grid header, month grid, `MiniMonth`), a live red line crosses today at the current minute with the time on the axis and scrolls into view on open and on "Today" (`time.nowScrollTime`), days and hours already gone are dimmed, weekends are tinted (`time.weekendDays`), the time grid's corner names the display zone (`time.zoneOffsetLabel`), and "Today" disables itself with a reason once today is already the visible range (`time.showsToday`) - done (T: screens/orientation, screens/grid-paint, screens/calendar-screen)
+- [x] U79 Event colour states (Google's own fills) - an event the reader takes part in is filled with its colour, one not yet answered or answered "maybe" is outlined over a tint, a declined or cancelled one is outlined over stripes, and a past one is the same, faded toward the theme's card colour (`grid-events.ts`'s `paintFor`); the ink is picked against every fill and stripe it sits on for 4.5:1 contrast or better (`ui-color.ts`'s `inkFor`, `contrast`, the same WCAG 2.x formula `packages/ui/test/token-contrast.test.ts` checks the design tokens with) - done (T: screens/grid-paint)
 - [ ] U64 CalDAV server for phones and desktop clients - deferred(phase 2, the one item the brief allowed: a WebDAV/CalDAV server with per-user app passwords is a project of its own)

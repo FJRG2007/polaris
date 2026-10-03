@@ -2,7 +2,8 @@
 
 /**
  * A small month to jump with: the sidebar's, and the header's date picker.
- * Arrow keys move the day, Page Up/Down the month, Enter opens it.
+ * Arrow keys move the day, Page Up/Down the month, Enter opens it. Today is a
+ * filled circle, as on the grid; the day chosen is ringed.
  */
 
 import * as time from "./time";
@@ -152,12 +153,14 @@ export function MiniMonth({
                                         })}
                                         onClick={() => onPick(day)}
                                         className={cn(
-                                            "flex h-6 w-full items-center justify-center rounded transition-colors duration-fast hover:bg-card-hover",
+                                            "mx-auto flex size-6 items-center justify-center rounded-full transition-colors duration-fast hover:bg-card-hover",
                                             !inMonth && "text-foreground-subtle",
+                                            // Today is filled, as on the grid; the day
+                                            // chosen is ringed, and both when they meet.
                                             day === today &&
-                                                "font-semibold text-foreground underline decoration-2 underline-offset-2",
+                                                "bg-primary font-semibold text-primary-foreground hover:bg-primary",
                                             day === value &&
-                                                "bg-foreground text-background hover:bg-foreground"
+                                                "ring-2 ring-inset ring-foreground font-semibold"
                                         )}
                                     >
                                         {Number(day.slice(8))}

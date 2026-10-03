@@ -3,6 +3,7 @@
 /** Small pieces the calendar's screens share. */
 
 import { linkify } from "./editor-model";
+import { hexOfHslChannels } from "./ui-color";
 import { cn, Dialog, DialogFloating, DialogTitle } from "@polaris/ui";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
@@ -15,6 +16,40 @@ export function ColorDot({ color, className }: { color: string; className?: stri
             style={{ backgroundColor: color }}
         />
     );
+}
+
+function readCard(fallback: string): string {
+    try {
+        const channels = getComputedStyle(document.documentElement).getPropertyValue("--card");
+        return hexOfHslChannels(channels) ?? fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+/**
+ * The card colour of the theme on screen, as hex, for colours that are mixed
+ * toward the page (a faded event). Read again when the theme changes - a class
+ * on the document, or the machine turning light or dark under "system".
+ */
+export function useCardColor(fallback: string): string {
+    const [card, setCard] = useState(fallback);
+    useEffect(() => {
+        const update = () => setCard(readCard(fallback));
+        update();
+        const observer = new MutationObserver(update);
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["class", "style", "data-theme"]
+        });
+        const scheme = window.matchMedia?.("(prefers-color-scheme: light)");
+        scheme?.addEventListener?.("change", update);
+        return () => {
+            observer.disconnect();
+            scheme?.removeEventListener?.("change", update);
+        };
+    }, [fallback]);
+    return card;
 }
 
 /** The current instant, moved on every `intervalMs`. */

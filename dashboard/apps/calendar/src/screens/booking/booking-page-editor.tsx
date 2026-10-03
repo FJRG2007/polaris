@@ -18,6 +18,7 @@ import { FieldRow, GroupHeading } from "../ui";
 import { BookingsList } from "./bookings-list";
 import * as actions from "../../actions/booking";
 import { hostUi } from "@polaris/app-host/client";
+import { BookingOffNote } from "./booking-off-note";
 import { QuestionsEditor } from "./questions-editor";
 import { StatusNote, useIssueText } from "../public/kit";
 import { AvailabilityEditor } from "./availability-editor";
@@ -26,7 +27,6 @@ import { cacheKey, unwrap, useCachedRead } from "../cached-read";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { bookingPageInputSchema } from "../../lib/scheduling-schemas";
 import { ArrowLeft, CopyPlus, ExternalLink, Trash2 } from "lucide-react";
-import { BookingOffNote } from "./booking-off-note";
 import {
     bookingUrl,
     forgetBookingPages,
@@ -34,7 +34,15 @@ import {
     useCalendarList,
     useLinkBase
 } from "./reads";
-import { draftOf, inputOf, newDraft, writableCalendars, type BookingDraft } from "./model";
+import {
+    draftOf,
+    inputOf,
+    newDraft,
+    seededDraft,
+    writableCalendars,
+    type BookingDraft,
+    type BookingSeed
+} from "./model";
 import {
     Button,
     Checkbox,
@@ -103,7 +111,14 @@ function NumberInput({
     );
 }
 
-export function BookingPageEditor({ pageId }: { pageId: string | null }) {
+export function BookingPageEditor({
+    pageId,
+    seed = null
+}: {
+    pageId: string | null;
+    /** What a new page starts from, when the calendar's card opened it. */
+    seed?: BookingSeed | null;
+}) {
     const t = useCalendarT();
     const router = useRouter();
     const issueText = useIssueText();
@@ -136,11 +151,12 @@ export function BookingPageEditor({ pageId }: { pageId: string | null }) {
             setDraft(loaded);
         } else if (!pageId && calendars.data) {
             const first = writableCalendars(calendars.data)[0];
-            const fresh = newDraft(browserZone(), first?.id ?? "");
+            const blank = newDraft(browserZone(), first?.id ?? "");
+            const fresh = seed ? seededDraft(blank, seed) : blank;
             setBaseline(fresh);
             setDraft(fresh);
         }
-    }, [draft, pageId, page.data, calendars.data]);
+    }, [draft, pageId, page.data, calendars.data, seed]);
 
     const problems = useMemo(
         () => (draft ? problemsOf(draft) : new Map<string, { message: string }[]>()),
