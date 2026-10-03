@@ -128,7 +128,8 @@ export async function findLocalPath(hostId: string, ownerId: string): Promise<Lo
     // is still at it. Answering "already reached directly" from the address
     // alone is what made this useless in the one case it exists for - a server
     // whose lease moved is recorded at a local address that reaches nothing.
-    if (alreadyLocal(connection.address, near)) return { kind: "already", address: connection.address };
+    if (alreadyLocal(connection.address, near))
+        return { kind: "already", address: connection.address };
 
     const candidates = localCandidates(reported, near);
     for (const address of candidates) {

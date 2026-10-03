@@ -170,7 +170,9 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             // silence is not an answer.
             if (parsed.data.kind === "silenced") {
                 setSilenced((current) =>
-                    current.includes(parsed.data.meetingId) ? current : [...current, parsed.data.meetingId]
+                    current.includes(parsed.data.meetingId)
+                        ? current
+                        : [...current, parsed.data.meetingId]
                 );
                 return;
             }
@@ -256,7 +258,8 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     );
 
     const forget = useCallback(
-        (meetingId: string) => setMissed((current) => current.filter((one) => one.meetingId !== meetingId)),
+        (meetingId: string) =>
+            setMissed((current) => current.filter((one) => one.meetingId !== meetingId)),
         []
     );
 
@@ -419,7 +422,8 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * opened halfway through does not join in, and it is remembered here so that
      * a re-render deciding to ring the same call again asks nobody a second time.
      */
-    const sounding = showing.find((entry) => !silenced.includes(entry.meetingId))?.meetingId ?? null;
+    const sounding =
+        showing.find((entry) => !silenced.includes(entry.meetingId))?.meetingId ?? null;
     /**
      * Which tab of this device answers for a call: its sound AND its notice.
      *
@@ -524,7 +528,9 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         }
 
         const live = new Set(
-            showing.filter((entry) => !silenced.includes(entry.meetingId)).map((entry) => entry.meetingId)
+            showing
+                .filter((entry) => !silenced.includes(entry.meetingId))
+                .map((entry) => entry.meetingId)
         );
         for (const [meetingId, notice] of notices.current) {
             if (live.has(meetingId)) continue;
@@ -574,7 +580,10 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                     className="pointer-events-auto flex w-72 flex-col gap-3 rounded-lg border border-border bg-elevated p-3 shadow-modal"
                 >
                     <span className="flex items-center gap-2.5">
-                        <Avatar size={36} person={{ id: entry.userId, name: entry.name || t("calls.somebody") }} />
+                        <Avatar
+                            size={36}
+                            person={{ id: entry.userId, name: entry.name || t("calls.somebody") }}
+                        />
                         <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium">
                                 {entry.name || t("calls.somebody")}
@@ -605,7 +614,10 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                     ) : index === 0 && standing === "denied" ? (
                         <span className="text-xs text-muted-foreground">
                             {t("calls.blocked")}{" "}
-                            <Link className="text-primary hover:underline" href="/account/notifications">
+                            <Link
+                                className="text-primary hover:underline"
+                                href="/account/notifications"
+                            >
                                 {t("calls.whatToDo")}
                             </Link>
                         </span>

@@ -146,7 +146,12 @@ export function CallElsewhere() {
                         <Phone className="size-4" />
                         {moving ? t("elsewhere.moving") : t("elsewhere.moveItHere")}
                     </Button>
-                    <Button size="sm" variant="secondary" aria-label={t("elsewhere.leaveIt")} onClick={dismiss}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        aria-label={t("elsewhere.leaveIt")}
+                        onClick={dismiss}
+                    >
                         <PhoneOff className="size-4" />
                     </Button>
                 </span>

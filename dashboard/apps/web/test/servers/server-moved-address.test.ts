@@ -170,7 +170,10 @@ describe("a machine that is already reached directly", () => {
         recorded = "192.168.1.99";
         answersAtRecorded = true;
 
-        expect(await findLocalPath(HOST, ADA)).toEqual({ kind: "already", address: "192.168.1.99" });
+        expect(await findLocalPath(HOST, ADA)).toEqual({
+            kind: "already",
+            address: "192.168.1.99"
+        });
         expect(probed).toEqual([]);
     });
 

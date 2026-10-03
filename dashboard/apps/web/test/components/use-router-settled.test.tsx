@@ -16,7 +16,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let pathname = "/tasks/l/gone";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
-const { routerSettled, STREAMED_REDIRECT_MARKER, useRouterSettled } = await import("@/components/use-router-settled");
+const { routerSettled, STREAMED_REDIRECT_MARKER, useRouterSettled } = await import(
+    "@/components/use-router-settled"
+);
 
 function streamRedirect(): void {
     const meta = document.createElement("meta");

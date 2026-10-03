@@ -22,7 +22,13 @@ import { UiStringsProvider, type UiStrings } from "@polaris/ui";
 import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { setActionFailureText } from "@/lib/run-action";
 import { useRouterSettled } from "@/components/use-router-settled";
-import { createTranslator, DEFAULT_LOCALE, negotiateLocale, type Locale, type Namespaces } from "@polaris/core";
+import {
+    createTranslator,
+    DEFAULT_LOCALE,
+    negotiateLocale,
+    type Locale,
+    type Namespaces
+} from "@polaris/core";
 
 interface I18nState {
     readonly locale: Locale;
@@ -131,7 +137,8 @@ export function LocaleSync({ locale, signedIn }: { locale: Locale; signedIn: boo
         writeLocaleCookie(preferred);
         // Only when the cookie took: with cookies refused, the server would draw
         // the same page again and this would ask again, for ever.
-        if (preferred !== locale && readLocaleCookie(document.cookie) === preferred) router.refresh();
+        if (preferred !== locale && readLocaleCookie(document.cookie) === preferred)
+            router.refresh();
     }, [locale, signedIn, router, settled]);
     return null;
 }
@@ -140,7 +147,13 @@ export function LocaleSync({ locale, signedIn }: { locale: Locale; signedIn: boo
  * More namespaces for the screens below, on top of the ones above. Rendered by
  * the `<Messages>` server component rather than directly.
  */
-export function MessagesProvider({ messages, children }: { messages: Namespaces; children: ReactNode }) {
+export function MessagesProvider({
+    messages,
+    children
+}: {
+    messages: Namespaces;
+    children: ReactNode;
+}) {
     const parent = useContext(I18nContext);
     const value = useMemo(
         () => ({

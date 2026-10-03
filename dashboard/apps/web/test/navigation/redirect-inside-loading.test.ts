@@ -57,8 +57,14 @@ function forwardsUnconditionally(source: string, file: string): boolean {
         if (!modifiers.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) continue;
         return statement.body.statements.some((own) => {
             if (!ts.isExpressionStatement(own)) return false;
-            const call = ts.isAwaitExpression(own.expression) ? own.expression.expression : own.expression;
-            return ts.isCallExpression(call) && ts.isIdentifier(call.expression) && FORWARDS.has(call.expression.text);
+            const call = ts.isAwaitExpression(own.expression)
+                ? own.expression.expression
+                : own.expression;
+            return (
+                ts.isCallExpression(call) &&
+                ts.isIdentifier(call.expression) &&
+                FORWARDS.has(call.expression.text)
+            );
         });
     }
     return false;

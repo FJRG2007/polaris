@@ -186,10 +186,16 @@ export async function joinAsGuestAction(
     input: unknown
 ): Promise<{ meetingId?: string; admission?: string; error?: string }> {
     const parsed = guestJoinSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.didNotWork") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.didNotWork")
+        };
 
     const result = await guard(() => meetings.joinAsGuest(parsed.data.token, parsed.data.name));
-    if (result.error || !result.value) return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
+    if (result.error || !result.value)
+        return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
     const seat = result.value;
     if (seat.guestKey) {
@@ -412,7 +418,11 @@ export async function createMeetingAction(
 
     const parsed = newMeetingSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notCreated") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notCreated")
+        };
     }
 
     const result = await guard(() =>
@@ -484,7 +494,8 @@ export async function inviteToMeetingAction(
     const result = await guard(() =>
         meetings.inviteToMeeting({ id: user.id }, parsed.data.meetingId, parsed.data.userIds)
     );
-    if (result.error || !result.value) return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
+    if (result.error || !result.value)
+        return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
     for (const userId of result.value.invited) {
         // Written for whoever is invited, who reads it later, in their language.
@@ -492,7 +503,10 @@ export async function inviteToMeetingAction(
         await createNotification({
             userId,
             type: "chat.meeting.invited",
-            title: words("meetingNotice.invitedTitle", { name: user.name, meeting: result.value.title }),
+            title: words("meetingNotice.invitedTitle", {
+                name: user.name,
+                meeting: result.value.title
+            }),
             body: words("meetingNotice.invitedBody"),
             href: `/chat/meetings/${parsed.data.meetingId}`
         });
@@ -607,7 +621,11 @@ const pollSchema = z.object({
 export async function pollInMeetingAction(input: unknown): Promise<{ error?: string }> {
     const parsed = pollSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notAsked") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notAsked")
+        };
 
     const seat = await resolveSeat(parsed.data.meetingId);
     if (!seat) return { error: (await getTranslations("chat"))("errors.youAreNotInMeeting") };
