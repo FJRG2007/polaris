@@ -14,10 +14,17 @@ import type { ClockSound } from "../../lib/clock/model";
 
 const RING_LIMIT_MS = 3 * 60_000;
 
-type Note = { readonly at: number; readonly frequency: number; readonly length: number; readonly type: OscillatorType };
+type Note = {
+    readonly at: number;
+    readonly frequency: number;
+    readonly length: number;
+    readonly type: OscillatorType;
+};
 
 /** One phrase of each sound, and how long before it repeats, in seconds. */
-const PHRASES: Readonly<Record<ClockSound, { readonly notes: readonly Note[]; readonly every: number }>> = {
+const PHRASES: Readonly<
+    Record<ClockSound, { readonly notes: readonly Note[]; readonly every: number }>
+> = {
     chime: {
         notes: [
             { at: 0, frequency: 880, length: 0.35, type: "sine" },
@@ -33,11 +40,21 @@ const PHRASES: Readonly<Record<ClockSound, { readonly notes: readonly Note[]; re
         every: 1.8
     },
     beep: {
-        notes: [0, 0.25, 0.5].map((at) => ({ at, frequency: 1000, length: 0.12, type: "square" as const })),
+        notes: [0, 0.25, 0.5].map((at) => ({
+            at,
+            frequency: 1000,
+            length: 0.12,
+            type: "square" as const
+        })),
         every: 1.4
     },
     digital: {
-        notes: [0, 0.14, 0.28, 0.42].map((at) => ({ at, frequency: 2048, length: 0.07, type: "square" as const })),
+        notes: [0, 0.14, 0.28, 0.42].map((at) => ({
+            at,
+            frequency: 2048,
+            length: 0.07,
+            type: "square" as const
+        })),
         every: 1
     },
     gentle: {
@@ -54,7 +71,8 @@ let context: AudioContext | null = null;
 function audio(): AudioContext | null {
     if (typeof window === "undefined") return null;
     const Context =
-        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Context) return null;
     context ??= new Context();
     // A context made before any click starts suspended; a ring after one has been
@@ -63,7 +81,12 @@ function audio(): AudioContext | null {
     return context;
 }
 
-function play(ctx: AudioContext, phrase: (typeof PHRASES)[ClockSound], start: number, loudness: number): void {
+function play(
+    ctx: AudioContext,
+    phrase: (typeof PHRASES)[ClockSound],
+    start: number,
+    loudness: number
+): void {
     for (const note of phrase.notes) {
         const oscillator = ctx.createOscillator();
         const gain = ctx.createGain();

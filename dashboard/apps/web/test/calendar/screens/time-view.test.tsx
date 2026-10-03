@@ -72,7 +72,16 @@ const snapshot: ClockSnapshot = {
             endsAt: null,
             remainingMs: 12 * 60_000,
             firedAt: null,
-            pomodoro: { focus: 25, short: 5, long: 15, rounds: 4, auto: true, phase: "focus", round: 2, done: 1 }
+            pomodoro: {
+                focus: 25,
+                short: 5,
+                long: 15,
+                rounds: 4,
+                auto: true,
+                phase: "focus",
+                round: 2,
+                done: 1
+            }
         }
     ],
     stopwatch: {
@@ -123,10 +132,20 @@ async function settle(): Promise<void> {
 beforeEach(() => {
     tab = "alarms";
     replaced.length = 0;
-    preferences = { ...DEFAULT_PREFERENCES, timezone: "America/New_York", worldClock: ["Europe/Madrid", "Asia/Tokyo"] };
+    preferences = {
+        ...DEFAULT_PREFERENCES,
+        timezone: "America/New_York",
+        worldClock: ["Europe/Madrid", "Asia/Tokyo"]
+    };
     vi.stubGlobal(
         "fetch",
-        vi.fn(async () => new Response(JSON.stringify(snapshot), { status: 200, headers: { "content-type": "application/json" } }))
+        vi.fn(
+            async () =>
+                new Response(JSON.stringify(snapshot), {
+                    status: 200,
+                    headers: { "content-type": "application/json" }
+                })
+        )
     );
 });
 

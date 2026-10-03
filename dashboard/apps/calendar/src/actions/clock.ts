@@ -84,7 +84,9 @@ const focusSchema = z.object({
 export async function startFocusAction(input: unknown): Promise<Snapshot> {
     const parsed = focusSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
-    return answer((userId) => clock.startFocus(userId, parsed.data.config, parsed.data.label.trim()));
+    return answer((userId) =>
+        clock.startFocus(userId, parsed.data.config, parsed.data.label.trim())
+    );
 }
 
 const timerChangeSchema = z.object({

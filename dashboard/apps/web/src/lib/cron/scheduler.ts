@@ -69,7 +69,12 @@ const STUCK_AFTER_MS = 30 * 60 * 1000;
  * job due every tick was only ever due on every other one, and a minute-grained
  * schedule quietly ran every two.
  */
-export function due(everyMs: number, last: number | undefined, now: number, tickMs: number): boolean {
+export function due(
+    everyMs: number,
+    last: number | undefined,
+    now: number,
+    tickMs: number
+): boolean {
     return last === undefined || now - last >= everyMs - tickMs / 2;
 }
 
@@ -94,7 +99,9 @@ async function run(job: ScheduledJob): Promise<unknown> {
     const now = Date.now();
     if (since !== undefined && now - since < STUCK_AFTER_MS) return null;
     if (since !== undefined) {
-        console.error(`polaris: the ${job.key} pass has been running for ${Math.round((now - since) / 60_000)}m; starting another`);
+        console.error(
+            `polaris: the ${job.key} pass has been running for ${Math.round((now - since) / 60_000)}m; starting another`
+        );
     }
     startedAt.set(job.key, now);
     try {
@@ -157,10 +164,7 @@ export function startScheduledWork(): void {
     // more than that.
     const own = SCHEDULED_JOBS.filter((job) => job.everyMs < TICK_MS).map((job) => job.everyMs);
     const quickMs = Math.max(QUICK_TICK_FLOOR_MS, Math.min(APP_QUICK_MS, ...own));
-    const quickTick = ticker(
-        () => scheduledJobs().filter((job) => job.everyMs < TICK_MS),
-        quickMs
-    );
+    const quickTick = ticker(() => scheduledJobs().filter((job) => job.everyMs < TICK_MS), quickMs);
     setTimeout(() => {
         quickTick();
         setInterval(quickTick, quickMs).unref?.();

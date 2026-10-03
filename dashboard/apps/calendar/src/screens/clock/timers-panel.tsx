@@ -16,7 +16,17 @@ import { hostUi } from "@polaris/app-host/client";
 import * as clockActions from "../../actions/clock";
 import { mutate, useServerNow, type ClockRead } from "./store";
 import { Button, cn, EmptyState, Input, Skeleton, Switch, useToast } from "@polaris/ui";
-import { Brain, Pause, Play, Plus, RotateCcw, Settings2, SkipForward, Timer, Trash2 } from "lucide-react";
+import {
+    Brain,
+    Pause,
+    Play,
+    Plus,
+    RotateCcw,
+    Settings2,
+    SkipForward,
+    Timer,
+    Trash2
+} from "lucide-react";
 
 const PRESET_MINUTES = [1, 3, 5, 10, 15, 30, 60] as const;
 
@@ -53,7 +63,10 @@ export function TimersPanel({
     const create = (input: model.TimerInput) =>
         mutate(clock, () => clockActions.createTimerAction(input), null, failed);
 
-    const change = (timer: model.TimerView, change: "start" | "pause" | "reset" | "addMinute" | "skip" | "delete") =>
+    const change = (
+        timer: model.TimerView,
+        change: "start" | "pause" | "reset" | "addMinute" | "skip" | "delete"
+    ) =>
         void mutate(
             clock,
             () => clockActions.changeTimerAction({ id: timer.id, change }),
@@ -62,7 +75,9 @@ export function TimersPanel({
                 timers:
                     change === "delete"
                         ? snapshot.timers.filter((entry) => entry.id !== timer.id)
-                        : snapshot.timers.map((entry) => (entry.id === timer.id ? optimistic(entry, change, now) : entry))
+                        : snapshot.timers.map((entry) =>
+                              entry.id === timer.id ? optimistic(entry, change, now) : entry
+                          )
             }),
             failed
         );
@@ -86,7 +101,11 @@ export function TimersPanel({
                     }
                 />
             </div>
-            {full ? <p className="text-xs text-muted-foreground">{t("time.timers.full", { max: model.MAX_TIMERS })}</p> : null}
+            {full ? (
+                <p className="text-xs text-muted-foreground">
+                    {t("time.timers.full", { max: model.MAX_TIMERS })}
+                </p>
+            ) : null}
 
             {timers === null ? (
                 clock.error ? (
@@ -104,11 +123,20 @@ export function TimersPanel({
                     </div>
                 )
             ) : timers.length === 0 ? (
-                <EmptyState icon={<Timer />} title={t("time.timers.emptyTitle")} description={t("time.timers.emptyBody")} />
+                <EmptyState
+                    icon={<Timer />}
+                    title={t("time.timers.emptyTitle")}
+                    description={t("time.timers.emptyBody")}
+                />
             ) : (
                 <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {timers.map((timer) => (
-                        <TimerCard key={timer.id} timer={timer} now={now} onChange={(kind) => change(timer, kind)} />
+                        <TimerCard
+                            key={timer.id}
+                            timer={timer}
+                            now={now}
+                            onChange={(kind) => change(timer, kind)}
+                        />
                     ))}
                 </ul>
             )}
@@ -125,15 +153,34 @@ function optimistic(
     const state = model.timerState(timer);
     const left = model.timerRemaining(timer, now);
     if (change === "start" && state !== "running")
-        return { ...timer, endsAt: new Date(now + left).toISOString(), remainingMs: null, firedAt: null };
-    if (change === "pause" && state === "running") return { ...timer, endsAt: null, remainingMs: left };
-    if (change === "reset" && !timer.pomodoro) return { ...timer, endsAt: null, remainingMs: null, firedAt: null };
+        return {
+            ...timer,
+            endsAt: new Date(now + left).toISOString(),
+            remainingMs: null,
+            firedAt: null
+        };
+    if (change === "pause" && state === "running")
+        return { ...timer, endsAt: null, remainingMs: left };
+    if (change === "reset" && !timer.pomodoro)
+        return { ...timer, endsAt: null, remainingMs: null, firedAt: null };
     if (change === "addMinute") {
-        if (state === "running") return { ...timer, endsAt: new Date(new Date(timer.endsAt!).getTime() + 60_000).toISOString() };
+        if (state === "running")
+            return {
+                ...timer,
+                endsAt: new Date(new Date(timer.endsAt!).getTime() + 60_000).toISOString()
+            };
         if (state === "paused") return { ...timer, remainingMs: timer.remainingMs! + 60_000 };
         if (state === "rung")
-            return { ...timer, endsAt: new Date(now + 60_000).toISOString(), firedAt: null, remainingMs: null };
-        return { ...timer, durationMs: Math.min(timer.durationMs + 60_000, model.CLOCK_TIMER_MAX_MS) };
+            return {
+                ...timer,
+                endsAt: new Date(now + 60_000).toISOString(),
+                firedAt: null,
+                remainingMs: null
+            };
+        return {
+            ...timer,
+            durationMs: Math.min(timer.durationMs + 60_000, model.CLOCK_TIMER_MAX_MS)
+        };
     }
     return timer;
 }
@@ -156,7 +203,9 @@ function TimerCard({
     const done = state === "rung" || (state === "running" && left <= 0);
     const title =
         timer.label ||
-        (cycle ? t(`time.focus.phase.${cycle.phase}`) : t("time.timers.untitled", { length: lengthText(timer.durationMs, t) }));
+        (cycle
+            ? t(`time.focus.phase.${cycle.phase}`)
+            : t("time.timers.untitled", { length: lengthText(timer.durationMs, t) }));
 
     return (
         <li
@@ -241,7 +290,11 @@ function TimerCard({
                 ) : (
                     <Button size="sm" onClick={() => onChange(done ? "reset" : "start")}>
                         {done ? <RotateCcw /> : <Play />}
-                        {done ? t("time.timers.restart") : state === "paused" ? t("time.resume") : t("time.start")}
+                        {done
+                            ? t("time.timers.restart")
+                            : state === "paused"
+                              ? t("time.resume")
+                              : t("time.start")}
                     </Button>
                 )}
                 <Button size="sm" variant="outline" onClick={() => onChange("addMinute")}>
@@ -314,7 +367,12 @@ function NewTimer({
                 inputMode="numeric"
                 value={parts[key]}
                 aria-invalid={partInvalid(number(parts[key] || "0"), max) || undefined}
-                onChange={(event) => setParts({ ...parts, [key]: event.target.value.replace(/[^\d]/g, "").slice(0, 3) })}
+                onChange={(event) =>
+                    setParts({
+                        ...parts,
+                        [key]: event.target.value.replace(/[^\d]/g, "").slice(0, 3)
+                    })
+                }
                 onFocus={(event) => event.currentTarget.select()}
                 className="text-center text-lg tabular-nums"
             />
@@ -336,7 +394,11 @@ function NewTimer({
                 {field("seconds", 59, t("time.timers.secondsField"))}
             </div>
             {tooLong ? <p className="text-xs text-danger">{t("time.timers.tooLong")}</p> : null}
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("time.timers.presets")}>
+            <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label={t("time.timers.presets")}
+            >
                 {PRESET_MINUTES.map((preset) => (
                     <Button
                         key={preset}
@@ -344,8 +406,17 @@ function NewTimer({
                         size="xs"
                         variant="outline"
                         disabled={disabled || busy}
-                        title={t("time.timers.startPreset", { length: lengthText(preset * 60_000, t) })}
-                        onClick={() => void start({ label: label.trim(), durationMs: preset * 60_000, sound, start: true })}
+                        title={t("time.timers.startPreset", {
+                            length: lengthText(preset * 60_000, t)
+                        })}
+                        onClick={() =>
+                            void start({
+                                label: label.trim(),
+                                durationMs: preset * 60_000,
+                                sound,
+                                start: true
+                            })
+                        }
                     >
                         {t("time.minutesShort", { count: preset })}
                     </Button>
@@ -358,7 +429,14 @@ function NewTimer({
                         variant="ghost"
                         disabled={disabled || busy}
                         title={t("time.timers.recent")}
-                        onClick={() => void start({ label: label.trim(), durationMs: length, sound, start: true })}
+                        onClick={() =>
+                            void start({
+                                label: label.trim(),
+                                durationMs: length,
+                                sound,
+                                start: true
+                            })
+                        }
                     >
                         {model.formatClockMs(length)}
                     </Button>
@@ -376,7 +454,11 @@ function NewTimer({
                 </label>
                 <SoundField value={sound} onChange={setSound} />
             </div>
-            <Button type="submit" className="self-start" aria-disabled={!check.success || disabled || busy}>
+            <Button
+                type="submit"
+                className="self-start"
+                aria-disabled={!check.success || disabled || busy}
+            >
                 <Play />
                 {t("time.start")}
             </Button>
@@ -412,7 +494,8 @@ function FocusCard({
         auto
     });
     const changed =
-        parsed.success && JSON.stringify(parsed.data) !== JSON.stringify(model.pomodoroConfigSchema.parse(config));
+        parsed.success &&
+        JSON.stringify(parsed.data) !== JSON.stringify(model.pomodoroConfigSchema.parse(config));
     const field = (key: keyof typeof draft, text: string, max: number, min = 1) => {
         const value = Number(draft[key]);
         const bad = !/^\d+$/.test(draft[key]) || value < min || value > max;
@@ -425,7 +508,12 @@ function FocusCard({
                     inputMode="numeric"
                     value={draft[key]}
                     aria-invalid={bad || undefined}
-                    onChange={(event) => setDraft({ ...draft, [key]: event.target.value.replace(/[^\d]/g, "").slice(0, 3) })}
+                    onChange={(event) =>
+                        setDraft({
+                            ...draft,
+                            [key]: event.target.value.replace(/[^\d]/g, "").slice(0, 3)
+                        })
+                    }
                     className="tabular-nums"
                 />
             </label>
@@ -436,7 +524,9 @@ function FocusCard({
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
             <div className="flex items-center gap-2">
                 <Brain aria-hidden className="size-4 text-muted-foreground" />
-                <p className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">{t("time.focus.title")}</p>
+                <p className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">
+                    {t("time.focus.title")}
+                </p>
                 <Button
                     size="icon-sm"
                     variant="ghost"
@@ -465,7 +555,11 @@ function FocusCard({
                         {field("rounds", t("time.focus.rounds"), 12, 2)}
                     </div>
                     <label className="flex items-center gap-2 text-[0.8125rem]">
-                        <Switch checked={auto} onChange={setAuto} aria-label={t("time.focus.auto")} />
+                        <Switch
+                            checked={auto}
+                            onChange={setAuto}
+                            aria-label={t("time.focus.auto")}
+                        />
                         <span>{t("time.focus.auto")}</span>
                     </label>
                     <Button

@@ -78,4 +78,3 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ error: t("errors.generic") }, { status: 500 });
     }
 }
-

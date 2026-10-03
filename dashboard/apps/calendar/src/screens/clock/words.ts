@@ -19,7 +19,12 @@ export function wallTimeText(time: string, locale: string, hour12: boolean): str
 }
 
 /** An instant's time of day in a zone. */
-export function instantTimeText(at: Date | number, locale: string, zone: string, hour12: boolean): string {
+export function instantTimeText(
+    at: Date | number,
+    locale: string,
+    zone: string,
+    hour12: boolean
+): string {
     return new Intl.DateTimeFormat(locale, {
         hour: "numeric",
         minute: "2-digit",
@@ -29,7 +34,11 @@ export function instantTimeText(at: Date | number, locale: string, zone: string,
 }
 
 /** The short name of a weekday, 0 = Sunday. */
-export function weekdayName(weekday: number, locale: string, style: "short" | "narrow" | "long" = "short"): string {
+export function weekdayName(
+    weekday: number,
+    locale: string,
+    style: "short" | "narrow" | "long" = "short"
+): string {
     // 7 January 2024 was a Sunday.
     return new Intl.DateTimeFormat(locale, { weekday: style, timeZone: "UTC" }).format(
         new Date(Date.UTC(2024, 0, 7 + weekday, 12))
@@ -42,7 +51,12 @@ export function weekOrder(firstDay: number): number[] {
 }
 
 /** "Every day", "Weekdays", "Mon, Wed, Fri" or "Once". */
-export function repeatText(days: number, t: CalendarTranslator, locale: string, firstDay: number): string {
+export function repeatText(
+    days: number,
+    t: CalendarTranslator,
+    locale: string,
+    firstDay: number
+): string {
     if (days === 0) return t("time.alarms.once");
     if (days === EVERY_DAY) return t("time.alarms.everyDay");
     if (days === WEEKDAYS) return t("time.alarms.weekdays");
@@ -78,5 +92,9 @@ export function offsetDifferenceText(minutes: number, t: CalendarTranslator): st
 
 /** "Yesterday", "Today" or "Tomorrow" for a day difference of -1, 0 or 1. */
 export function dayWord(difference: number, t: CalendarTranslator): string {
-    return difference < 0 ? t("time.world.yesterday") : difference > 0 ? t("time.world.tomorrow") : t("time.world.today");
+    return difference < 0
+        ? t("time.world.yesterday")
+        : difference > 0
+          ? t("time.world.tomorrow")
+          : t("time.world.today");
 }

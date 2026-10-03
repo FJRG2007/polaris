@@ -10,7 +10,14 @@
 
 import * as core from "@polaris/core";
 import { ZONE_COUNTRIES, ZONE_LINKS } from "../../engine/zone-countries";
-import { addDays, instantToWall, listZones, parseWall, wallToInstant, zoneOffsetMinutes } from "../../engine";
+import {
+    addDays,
+    instantToWall,
+    listZones,
+    parseWall,
+    wallToInstant,
+    zoneOffsetMinutes
+} from "../../engine";
 
 export interface CityOption {
     readonly zone: string;
@@ -40,7 +47,12 @@ export function cityOf(zone: string): string {
     return lastSegment(ZONE_LINKS[zone] ?? zone);
 }
 
-function zonePart(zone: string, at: Date, locale: string, style: Intl.DateTimeFormatOptions["timeZoneName"]): string {
+function zonePart(
+    zone: string,
+    at: Date,
+    locale: string,
+    style: Intl.DateTimeFormatOptions["timeZoneName"]
+): string {
     try {
         return (
             new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: style })
@@ -89,7 +101,8 @@ export function cityOptions(locale: string, now: Date): CityOption[] {
             city: cityOf(zone),
             country,
             note,
-            zoneName: zonePart(zone, now, locale, "longGeneric") || zonePart(zone, now, locale, "long"),
+            zoneName:
+                zonePart(zone, now, locale, "longGeneric") || zonePart(zone, now, locale, "long"),
             abbreviation: zonePart(zone, now, locale, "short"),
             offset: `GMT${offsetText(zoneOffsetMinutes(now, zone))}`
         };
@@ -122,7 +135,11 @@ const FIELDS: readonly core.SearchField<CityOption>[] = [
 ];
 
 /** The cities matching what was typed, best first. */
-export function searchCities(options: readonly CityOption[], query: string, limit = 50): CityOption[] {
+export function searchCities(
+    options: readonly CityOption[],
+    query: string,
+    limit = 50
+): CityOption[] {
     return core.searchItems(options, query, FIELDS, { limit });
 }
 
@@ -197,7 +214,10 @@ export function hourKind(
 }
 
 /** The weekday (0 = Sunday) and minutes after midnight an instant reads as in a city. */
-export function wallClock(at: Date, zone: string): { weekday: number; minutes: number; day: string } {
+export function wallClock(
+    at: Date,
+    zone: string
+): { weekday: number; minutes: number; day: string } {
     const wall = instantToWall(at, zone);
     const date = new Date(Date.UTC(wall.year, wall.month - 1, wall.day));
     return {

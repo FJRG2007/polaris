@@ -5,7 +5,11 @@ const MIN = 60_000;
 
 describe("parseClockCommand", () => {
     it("reads a timer in every way people write a length", () => {
-        expect(parseClockCommand("timer 10m")).toEqual({ kind: "timer", durationMs: 10 * MIN, label: "" });
+        expect(parseClockCommand("timer 10m")).toEqual({
+            kind: "timer",
+            durationMs: 10 * MIN,
+            label: ""
+        });
         expect(parseClockCommand("timer 10 min")).toMatchObject({ durationMs: 10 * MIN });
         expect(parseClockCommand("timer 1h30m")).toMatchObject({ durationMs: 90 * MIN });
         expect(parseClockCommand("timer 1h 30m")).toMatchObject({ durationMs: 90 * MIN });
@@ -18,9 +22,19 @@ describe("parseClockCommand", () => {
     });
 
     it("keeps what follows the length as the label", () => {
-        expect(parseClockCommand("timer 4m tea")).toEqual({ kind: "timer", durationMs: 4 * MIN, label: "tea" });
-        expect(parseClockCommand("timer 10 pasta   water")).toMatchObject({ durationMs: 10 * MIN, label: "pasta water" });
-        expect(parseClockCommand("temporizador 5 min huevos")).toMatchObject({ durationMs: 5 * MIN, label: "huevos" });
+        expect(parseClockCommand("timer 4m tea")).toEqual({
+            kind: "timer",
+            durationMs: 4 * MIN,
+            label: "tea"
+        });
+        expect(parseClockCommand("timer 10 pasta   water")).toMatchObject({
+            durationMs: 10 * MIN,
+            label: "pasta water"
+        });
+        expect(parseClockCommand("temporizador 5 min huevos")).toMatchObject({
+            durationMs: 5 * MIN,
+            label: "huevos"
+        });
     });
 
     it("refuses a timer it cannot read or could not show", () => {
@@ -29,16 +43,32 @@ describe("parseClockCommand", () => {
         expect(parseClockCommand("timer 0s")).toBeNull();
         expect(parseClockCommand("timer 1h 30")).toBeNull();
         expect(parseClockCommand("timer 100h")).toBeNull();
-        expect(parseClockCommand("timer 99h59m59s")).toMatchObject({ durationMs: CLOCK_TIMER_MAX_MS });
+        expect(parseClockCommand("timer 99h59m59s")).toMatchObject({
+            durationMs: CLOCK_TIMER_MAX_MS
+        });
     });
 
     it("reads an alarm in 24-hour and 12-hour clocks", () => {
-        expect(parseClockCommand("alarm 7:30")).toEqual({ kind: "alarm", hour: 7, minute: 30, label: "" });
-        expect(parseClockCommand("alarm 19:05 gym")).toEqual({ kind: "alarm", hour: 19, minute: 5, label: "gym" });
+        expect(parseClockCommand("alarm 7:30")).toEqual({
+            kind: "alarm",
+            hour: 7,
+            minute: 30,
+            label: ""
+        });
+        expect(parseClockCommand("alarm 19:05 gym")).toEqual({
+            kind: "alarm",
+            hour: 19,
+            minute: 5,
+            label: "gym"
+        });
         expect(parseClockCommand("alarm 7pm")).toMatchObject({ hour: 19, minute: 0 });
         expect(parseClockCommand("alarm 12am")).toMatchObject({ hour: 0, minute: 0 });
         expect(parseClockCommand("alarm 12:15 p.m.")).toMatchObject({ hour: 12, minute: 15 });
-        expect(parseClockCommand("alarma 7.30 despertar")).toMatchObject({ hour: 7, minute: 30, label: "despertar" });
+        expect(parseClockCommand("alarma 7.30 despertar")).toMatchObject({
+            hour: 7,
+            minute: 30,
+            label: "despertar"
+        });
     });
 
     it("refuses an alarm that is not a time of day", () => {

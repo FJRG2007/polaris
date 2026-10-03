@@ -80,7 +80,8 @@ async function claim(key: string): Promise<boolean> {
             const rang = (raw ? JSON.parse(raw) : {}) as Record<string, number>;
             if (rang[key]) return false;
             const now = Date.now();
-            for (const [old, at] of Object.entries(rang)) if (now - at > 86_400_000) delete rang[old];
+            for (const [old, at] of Object.entries(rang))
+                if (now - at > 86_400_000) delete rang[old];
             rang[key] = now;
             window.localStorage.setItem(RANG_KEY, JSON.stringify(rang));
             return true;
@@ -122,12 +123,20 @@ export function useRinger(clock: ClockRead): Ringer {
                 heard.current.add(ring.key);
                 if (now - local > LATE_MS) continue;
                 void claim(ring.key).then((mine) => {
-                    if (mine) setRings((current) => (current.some((entry) => entry.key === ring.key) ? current : [...current, ring]));
+                    if (mine)
+                        setRings((current) =>
+                            current.some((entry) => entry.key === ring.key)
+                                ? current
+                                : [...current, ring]
+                        );
                 });
             } else soonest = Math.min(soonest, local);
         }
         if (soonest === Infinity) return;
-        const timer = window.setTimeout(() => setTurn((value) => value + 1), Math.min(soonest - now, LONGEST_WAIT_MS));
+        const timer = window.setTimeout(
+            () => setTurn((value) => value + 1),
+            Math.min(soonest - now, LONGEST_WAIT_MS)
+        );
         return () => window.clearTimeout(timer);
     }, [snapshot, skew, turn, clock.allowed]);
 
@@ -145,9 +154,13 @@ export function useRinger(clock: ClockRead): Ringer {
         return playRing(first.sound);
     }, [first]);
 
-    const done = useCallback((ring: Ring) => setRings((current) => current.filter((entry) => entry.key !== ring.key)), []);
+    const done = useCallback(
+        (ring: Ring) => setRings((current) => current.filter((entry) => entry.key !== ring.key)),
+        []
+    );
     const failed = useCallback(
-        (message: string) => toast.show({ key: "calendar-time", title: message || t("screen.failed") }),
+        (message: string) =>
+            toast.show({ key: "calendar-time", title: message || t("screen.failed") }),
         [toast, t]
     );
 
@@ -158,7 +171,11 @@ export function useRinger(clock: ClockRead): Ringer {
                 clock,
                 () =>
                     ring.kind === "alarm"
-                        ? clockActions.changeAlarmAction({ id: ring.id, change: "dismiss", due: ring.due })
+                        ? clockActions.changeAlarmAction({
+                              id: ring.id,
+                              change: "dismiss",
+                              due: ring.due
+                          })
                         : clockActions.changeTimerAction({ id: ring.id, change: "dismiss" }),
                 null,
                 failed
@@ -170,7 +187,12 @@ export function useRinger(clock: ClockRead): Ringer {
     const snooze = useCallback(
         (ring: Ring) => {
             done(ring);
-            void mutate(clock, () => clockActions.changeAlarmAction({ id: ring.id, change: "snooze" }), null, failed);
+            void mutate(
+                clock,
+                () => clockActions.changeAlarmAction({ id: ring.id, change: "snooze" }),
+                null,
+                failed
+            );
         },
         [clock, done, failed]
     );
@@ -186,7 +208,12 @@ export function useRinger(clock: ClockRead): Ringer {
                     failed
                 );
                 if (stopped)
-                    await mutate(clock, () => clockActions.changeTimerAction({ id: ring.id, change: "addMinute" }), null, failed);
+                    await mutate(
+                        clock,
+                        () => clockActions.changeTimerAction({ id: ring.id, change: "addMinute" }),
+                        null,
+                        failed
+                    );
             })();
         },
         [clock, done, failed]
@@ -229,13 +256,20 @@ export function RingDialog({ ringer }: { ringer: Ringer }) {
                     </p>
                     {next ? (
                         <p className="text-[0.8125rem] text-muted-foreground">
-                            {t(next.phase === "focus" ? "time.notify.nextFocus" : "time.notify.nextBreak", {
-                                minutes: next[next.phase]
-                            })}
+                            {t(
+                                next.phase === "focus"
+                                    ? "time.notify.nextFocus"
+                                    : "time.notify.nextBreak",
+                                {
+                                    minutes: next[next.phase]
+                                }
+                            )}
                         </p>
                     ) : null}
                     {ringer.rings.length > 1 ? (
-                        <p className="text-xs text-muted-foreground">{t("time.ring.more", { count: ringer.rings.length - 1 })}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("time.ring.more", { count: ringer.rings.length - 1 })}
+                        </p>
                     ) : null}
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">

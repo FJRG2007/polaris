@@ -39,11 +39,7 @@ export function toggleDay(days: number, weekday: number): number {
 }
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
-const label = z
-    .string()
-    .max(200)
-    .transform(cleanText)
-    .pipe(z.string().max(CLOCK_LABEL_MAX));
+const label = z.string().max(200).transform(cleanText).pipe(z.string().max(CLOCK_LABEL_MAX));
 const zone = z.string().trim().min(1).max(64).refine(isKnownZone);
 
 export const alarmInputSchema = z.object({
@@ -217,7 +213,9 @@ export interface StopwatchFields {
 
 /** The stopwatch's reading at `now`. */
 export function stopwatchElapsed(watch: StopwatchFields, now: number): number {
-    return watch.elapsedMs + (watch.startedAt === null ? 0 : Math.max(0, now - ms(watch.startedAt)));
+    return (
+        watch.elapsedMs + (watch.startedAt === null ? 0 : Math.max(0, now - ms(watch.startedAt)))
+    );
 }
 
 /** Each lap's own length from the running totals stored for them. */
@@ -244,7 +242,8 @@ export function formatClockMs(value: number, options: { hundredths?: boolean } =
     const minutes = Math.floor((total % 3_600_000) / 60_000);
     const seconds = Math.floor((total % 60_000) / 1000);
     const pad = (part: number) => String(part).padStart(2, "0");
-    const head = hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+    const head =
+        hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
     return options.hundredths ? `${head}.${pad(Math.floor((total % 1000) / 10))}` : head;
 }
 

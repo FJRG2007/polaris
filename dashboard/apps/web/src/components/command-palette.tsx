@@ -402,7 +402,8 @@ export function CommandPalette({
     // "timer 10m", "alarm 7:30", "stopwatch": Calendar's Time area, for whoever
     // has Calendar. Read here to offer the row; the route reads it again.
     const clockCommand = useMemo(
-        () => (scope || !fromKey(appKey).includes("calendar") ? null : core.parseClockCommand(query)),
+        () =>
+            scope || !fromKey(appKey).includes("calendar") ? null : core.parseClockCommand(query),
         [scope, query, appKey]
     );
 
@@ -477,11 +478,30 @@ export function CommandPalette({
             }));
 
         const clock: Row[] = clockCommand
-            ? [{ kind: "clock", id: `clock:${clockCommand.kind}`, group: t("search.actions"), command: clockCommand }]
+            ? [
+                  {
+                      kind: "clock",
+                      id: `clock:${clockCommand.kind}`,
+                      group: t("search.actions"),
+                      command: clockCommand
+                  }
+              ]
             : [];
 
         return [...clock, ...remembered, ...commands, ...found];
-    }, [recentRows, suggestions, scope, hits, trimmed, query, pool, navigation, t, navLabel, clockCommand]);
+    }, [
+        recentRows,
+        suggestions,
+        scope,
+        hits,
+        trimmed,
+        query,
+        pool,
+        navigation,
+        t,
+        navLabel,
+        clockCommand
+    ]);
 
     const groups = useMemo(() => groupRows(rows), [rows]);
     /** Rows that are an answer rather than a memory or a command. */
@@ -538,7 +558,10 @@ export function CommandPalette({
             .catch((caught: unknown) =>
                 toast.show({
                     key: "search-clock",
-                    title: caught instanceof Error && caught.message ? caught.message : t("search.clock.failed")
+                    title:
+                        caught instanceof Error && caught.message
+                            ? caught.message
+                            : t("search.clock.failed")
                 })
             );
     }
@@ -813,7 +836,11 @@ export function CommandPalette({
                                                         key={row.id}
                                                         id={rowElementId(row)}
                                                         command={row.command}
-                                                        text={clockCommandText(row.command, t, locale)}
+                                                        text={clockCommandText(
+                                                            row.command,
+                                                            t,
+                                                            locale
+                                                        )}
                                                         selected={selected}
                                                         onSelect={select}
                                                         onHover={hover}

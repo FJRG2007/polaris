@@ -213,7 +213,8 @@ export function parseCalendarPath(path: readonly string[]): CalendarRoute {
         return { view: null, date: null, objectId: second.toLowerCase(), newAt: null };
     if (first === "new" && second && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/.test(second)) {
         const at = new Date(second);
-        if (!Number.isNaN(at.getTime())) return { view: null, date: null, objectId: null, newAt: at };
+        if (!Number.isNaN(at.getTime()))
+            return { view: null, date: null, objectId: null, newAt: at };
     }
     const view = (VIEWS as readonly string[]).includes(first ?? "")
         ? (first as CalendarViewName)

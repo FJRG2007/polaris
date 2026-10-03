@@ -39,10 +39,17 @@ function useReading(watch: model.StopwatchView | null, skew: number): number {
 }
 
 /** The laps as CSV: number, lap time, total, in milliseconds and as read. */
-export function lapsCsv(laps: readonly number[], headers: readonly [string, string, string]): string {
+export function lapsCsv(
+    laps: readonly number[],
+    headers: readonly [string, string, string]
+): string {
     const splits = model.lapSplits(laps);
     const rows = laps.map((total, index) =>
-        [index + 1, model.formatClockMs(splits[index]!, { hundredths: true }), model.formatClockMs(total, { hundredths: true })].join(",")
+        [
+            index + 1,
+            model.formatClockMs(splits[index]!, { hundredths: true }),
+            model.formatClockMs(total, { hundredths: true })
+        ].join(",")
     );
     const lines = [headers.join(","), ...rows, ""];
     return lines.join("\n");
@@ -60,7 +67,8 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
     const current = reading - (laps[laps.length - 1] ?? 0);
     const fastest = laps.length >= 2 ? Math.min(...splits) : null;
     const slowest = laps.length >= 2 ? Math.max(...splits) : null;
-    const failed = (message: string) => toast.show({ key: "calendar-time", title: message || t("screen.failed") });
+    const failed = (message: string) =>
+        toast.show({ key: "calendar-time", title: message || t("screen.failed") });
 
     const change = (kind: Change) => {
         const at = Date.now() + clock.skew;
@@ -88,20 +96,30 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
         const onKey = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement | null;
             if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-            if (target?.closest("input, textarea, select, [contenteditable='true'], [role='dialog'], button, [role='menu']")) return;
+            if (
+                target?.closest(
+                    "input, textarea, select, [contenteditable='true'], [role='dialog'], button, [role='menu']"
+                )
+            )
+                return;
             if (!watch) return;
             const key = event.key.toLowerCase();
             if (key === " ") {
                 event.preventDefault();
                 change(running ? "pause" : "start");
             } else if (key === "l" && running) change("lap");
-            else if (key === "r" && !running && (watch.elapsedMs > 0 || laps.length > 0)) change("reset");
+            else if (key === "r" && !running && (watch.elapsedMs > 0 || laps.length > 0))
+                change("reset");
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     });
 
-    const headers: [string, string, string] = [t("time.stopwatch.lap"), t("time.stopwatch.lapTime"), t("time.stopwatch.total")];
+    const headers: [string, string, string] = [
+        t("time.stopwatch.lap"),
+        t("time.stopwatch.lapTime"),
+        t("time.stopwatch.total")
+    ];
 
     const copy = async () => {
         const text = laps
@@ -132,12 +150,19 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
     };
 
     return (
-        <section aria-label={t("time.tabs.stopwatch")} className="mx-auto flex w-full max-w-xl flex-col gap-4">
+        <section
+            aria-label={t("time.tabs.stopwatch")}
+            className="mx-auto flex w-full max-w-xl flex-col gap-4"
+        >
             <div className="flex flex-col items-center gap-4 rounded-lg border border-border bg-card px-4 py-8">
                 {watch === null && !clock.error ? (
                     <Skeleton className="h-14 w-64" />
                 ) : (
-                    <p className="text-5xl font-semibold tabular-nums tracking-tight sm:text-6xl" role="timer" aria-live="off">
+                    <p
+                        className="text-5xl font-semibold tabular-nums tracking-tight sm:text-6xl"
+                        role="timer"
+                        aria-live="off"
+                    >
                         {model.formatClockMs(reading, { hundredths: true })}
                     </p>
                 )}
@@ -152,11 +177,19 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                 <div className="flex flex-wrap items-center justify-center gap-2">
                     {running ? (
                         <>
-                            <Button variant="outline" onClick={() => change("lap")} title={t("time.stopwatch.lapKey")} disabled={laps.length >= model.MAX_LAPS}>
+                            <Button
+                                variant="outline"
+                                onClick={() => change("lap")}
+                                title={t("time.stopwatch.lapKey")}
+                                disabled={laps.length >= model.MAX_LAPS}
+                            >
                                 <Flag />
                                 {t("time.stopwatch.lap")}
                             </Button>
-                            <Button onClick={() => change("pause")} title={t("time.stopwatch.spaceKey")}>
+                            <Button
+                                onClick={() => change("pause")}
+                                title={t("time.stopwatch.spaceKey")}
+                            >
                                 <Pause />
                                 {t("time.pause")}
                             </Button>
@@ -172,7 +205,11 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                                 <RotateCcw />
                                 {t("time.reset")}
                             </Button>
-                            <Button onClick={() => change("start")} disabled={!watch} title={t("time.stopwatch.spaceKey")}>
+                            <Button
+                                onClick={() => change("start")}
+                                disabled={!watch}
+                                title={t("time.stopwatch.spaceKey")}
+                            >
                                 <Play />
                                 {watch && watch.elapsedMs > 0 ? t("time.resume") : t("time.start")}
                             </Button>
@@ -187,10 +224,22 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                         <p className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">
                             {t("time.stopwatch.laps", { count: laps.length })}
                         </p>
-                        <Button size="icon-sm" variant="ghost" aria-label={t("time.stopwatch.copy")} title={t("time.stopwatch.copy")} onClick={() => void copy()}>
+                        <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={t("time.stopwatch.copy")}
+                            title={t("time.stopwatch.copy")}
+                            onClick={() => void copy()}
+                        >
                             <Copy />
                         </Button>
-                        <Button size="icon-sm" variant="ghost" aria-label={t("time.stopwatch.export")} title={t("time.stopwatch.export")} onClick={exportCsv}>
+                        <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={t("time.stopwatch.export")}
+                            title={t("time.stopwatch.export")}
+                            onClick={exportCsv}
+                        >
                             <Download />
                         </Button>
                     </div>
@@ -207,20 +256,32 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                                 {running ? (
                                     <tr className="border-b border-border text-muted-foreground">
                                         <td className="px-3 py-1.5">{laps.length + 1}</td>
-                                        <td className="px-3 py-1.5 text-right">{model.formatClockMs(current, { hundredths: true })}</td>
-                                        <td className="px-3 py-1.5 text-right">{model.formatClockMs(reading, { hundredths: true })}</td>
+                                        <td className="px-3 py-1.5 text-right">
+                                            {model.formatClockMs(current, { hundredths: true })}
+                                        </td>
+                                        <td className="px-3 py-1.5 text-right">
+                                            {model.formatClockMs(reading, { hundredths: true })}
+                                        </td>
                                     </tr>
                                 ) : null}
                                 {laps
-                                    .map((total, index) => ({ total, index, split: splits[index]! }))
+                                    .map((total, index) => ({
+                                        total,
+                                        index,
+                                        split: splits[index]!
+                                    }))
                                     .reverse()
                                     .map(({ total, index, split }) => (
-                                        <tr key={index} className="border-b border-border last:border-0">
+                                        <tr
+                                            key={index}
+                                            className="border-b border-border last:border-0"
+                                        >
                                             <td className="px-3 py-1.5">{index + 1}</td>
                                             <td
                                                 className={cn(
                                                     "px-3 py-1.5 text-right",
-                                                    split === fastest && "font-medium text-success-ink",
+                                                    split === fastest &&
+                                                        "font-medium text-success-ink",
                                                     split === slowest && "font-medium text-danger"
                                                 )}
                                                 title={
@@ -233,7 +294,9 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
                                             >
                                                 {model.formatClockMs(split, { hundredths: true })}
                                             </td>
-                                            <td className="px-3 py-1.5 text-right">{model.formatClockMs(total, { hundredths: true })}</td>
+                                            <td className="px-3 py-1.5 text-right">
+                                                {model.formatClockMs(total, { hundredths: true })}
+                                            </td>
                                         </tr>
                                     ))}
                             </tbody>

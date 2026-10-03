@@ -110,7 +110,10 @@ async function refusal(userId: string, key: Parameters<CalendarTranslator>[0]): 
 
 /** Everything one person has in the Time area: at most a few dozen rows, in
  *  three indexed reads side by side. */
-export async function clockSnapshot(userId: string, now = new Date()): Promise<model.ClockSnapshot> {
+export async function clockSnapshot(
+    userId: string,
+    now = new Date()
+): Promise<model.ClockSnapshot> {
     const [alarms, timers, watch] = await Promise.all([
         prisma.clockAlarm.findMany({
             where: { userId },
@@ -192,7 +195,11 @@ export async function setAlarmEnabled(
     if (!alarm) return refusal(userId, "time.errors.gone");
     await prisma.clockAlarm.updateMany({
         where: { id, userId },
-        data: { enabled, snoozed: false, nextFireAt: enabled ? model.nextAlarmFire(alarm, now) : null }
+        data: {
+            enabled,
+            snoozed: false,
+            nextFireAt: enabled ? model.nextAlarmFire(alarm, now) : null
+        }
     });
 }
 
@@ -206,11 +213,17 @@ export async function deleteAlarm(userId: string, id: string): Promise<void> {
  * whether this call moved it - false when the scheduler or another tab already
  * had.
  */
-async function passRing(alarm: AlarmRow & { userId?: string }, due: Date, now: Date): Promise<boolean> {
+async function passRing(
+    alarm: AlarmRow & { userId?: string },
+    due: Date,
+    now: Date
+): Promise<boolean> {
     const once = alarm.days === 0;
     // A one-off is done once it has rung, unless the ring being passed is not
     // its own time but a snooze of it, which also ends it.
-    const next = once ? null : model.nextAlarmFire(alarm, new Date(Math.max(now.getTime(), due.getTime())));
+    const next = once
+        ? null
+        : model.nextAlarmFire(alarm, new Date(Math.max(now.getTime(), due.getTime())));
     const claimed = await prisma.clockAlarm.updateMany({
         where: { id: alarm.id, nextFireAt: due },
         data: { nextFireAt: next, snoozed: false, enabled: next !== null }
@@ -219,7 +232,10 @@ async function passRing(alarm: AlarmRow & { userId?: string }, due: Date, now: D
 }
 
 async function ownAlarm(userId: string, id: string): Promise<AlarmRow> {
-    const alarm = await prisma.clockAlarm.findFirst({ where: { id, userId }, select: ALARM_SELECT });
+    const alarm = await prisma.clockAlarm.findFirst({
+        where: { id, userId },
+        select: ALARM_SELECT
+    });
     if (!alarm) return refusal(userId, "time.errors.gone");
     return alarm;
 }
@@ -261,7 +277,10 @@ export async function snoozeAlarm(userId: string, id: string, now = new Date()):
 // Timers
 
 async function ownTimer(userId: string, id: string): Promise<TimerRow> {
-    const timer = await prisma.clockTimer.findFirst({ where: { id, userId }, select: TIMER_SELECT });
+    const timer = await prisma.clockTimer.findFirst({
+        where: { id, userId },
+        select: TIMER_SELECT
+    });
     if (!timer) return refusal(userId, "time.errors.gone");
     return timer;
 }
@@ -271,7 +290,11 @@ async function roomForTimer(userId: string): Promise<void> {
         await refusal(userId, "time.errors.tooManyTimers");
 }
 
-export async function createTimer(userId: string, input: model.TimerInput, now = new Date()): Promise<string> {
+export async function createTimer(
+    userId: string,
+    input: model.TimerInput,
+    now = new Date()
+): Promise<string> {
     await roomForTimer(userId);
     const row = await prisma.clockTimer.create({
         data: {
@@ -355,11 +378,13 @@ export async function changeTimer(
               }
             : { endsAt: null, remainingMs: null, firedAt: null };
     } else if (change === "addMinute") {
-        if (state === "running") data = { endsAt: new Date(new Date(timer.endsAt!).getTime() + 60_000) };
+        if (state === "running")
+            data = { endsAt: new Date(new Date(timer.endsAt!).getTime() + 60_000) };
         else if (state === "paused") data = { remainingMs: timer.remainingMs! + 60_000 };
         // A rung timer counts down one more minute, the way a phone's "+1:00" on
         // the ringing screen does.
-        else if (state === "rung") data = { endsAt: new Date(at + 60_000), firedAt: null, remainingMs: null };
+        else if (state === "rung")
+            data = { endsAt: new Date(at + 60_000), firedAt: null, remainingMs: null };
         else data = { durationMs: Math.min(timer.durationMs + 60_000, model.CLOCK_TIMER_MAX_MS) };
     } else {
         const cycle = model.readPomodoro(timer.pomodoro);
@@ -375,7 +400,11 @@ export async function deleteTimer(userId: string, id: string): Promise<void> {
 
 /** A focus cycle moved to its next phase at `from`: counting already when it
  *  runs by itself (or was running), waiting for Start otherwise. */
-function phaseAdvance(cycle: model.PomodoroState, from: Date, run: boolean): Partial<Omit<TimerRow, "id">> {
+function phaseAdvance(
+    cycle: model.PomodoroState,
+    from: Date,
+    run: boolean
+): Partial<Omit<TimerRow, "id">> {
     const next = model.nextPhase(cycle);
     const length = model.phaseMs(next, next.phase);
     return run
@@ -512,7 +541,9 @@ export async function fireDueClocks(now = new Date()): Promise<{ rung: number; l
         await tell(
             alarm.userId,
             (t, locale) => ({
-                title: alarm.label || (alarm.snoozed ? t("time.notify.snoozed") : t("time.notify.alarm")),
+                title:
+                    alarm.label ||
+                    (alarm.snoozed ? t("time.notify.snoozed") : t("time.notify.alarm")),
                 body: t("time.notify.alarmBody", { time: clockTime(locale, alarm.zone, due) })
             }),
             "alarms"
@@ -544,9 +575,12 @@ export async function fireDueClocks(now = new Date()): Promise<{ rung: number; l
                 const next = model.nextPhase(cycle);
                 return {
                     title: t(`time.notify.phaseDone.${cycle.phase}`),
-                    body: t(next.phase === "focus" ? "time.notify.nextFocus" : "time.notify.nextBreak", {
-                        minutes: next[next.phase]
-                    })
+                    body: t(
+                        next.phase === "focus" ? "time.notify.nextFocus" : "time.notify.nextBreak",
+                        {
+                            minutes: next[next.phase]
+                        }
+                    )
                 };
             },
             "timers"

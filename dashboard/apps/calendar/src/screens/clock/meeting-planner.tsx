@@ -89,13 +89,20 @@ export function MeetingPlanner({
 
     const kindOf = (at: Date, cityZone: string) => {
         const clock = cities.wallClock(at, cityZone);
-        return cities.hourKind(clock.weekday, clock.minutes, cityZone === zone ? workingHours : undefined);
+        return cities.hourKind(
+            clock.weekday,
+            clock.minutes,
+            cityZone === zone ? workingHours : undefined
+        );
     };
 
     return (
         <section aria-labelledby="calendar-time-planner" className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
-                <h2 id="calendar-time-planner" className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">
+                <h2
+                    id="calendar-time-planner"
+                    className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium"
+                >
                     {t("time.planner.title")}
                 </h2>
                 <div className="flex items-center gap-1">
@@ -146,25 +153,42 @@ export function MeetingPlanner({
                         <table className="w-max min-w-full border-collapse text-xs tabular-nums">
                             <tbody>
                                 {rows.map((cityZone) => (
-                                    <tr key={cityZone} className="border-b border-border last:border-0">
+                                    <tr
+                                        key={cityZone}
+                                        className="border-b border-border last:border-0"
+                                    >
                                         <th
                                             scope="row"
                                             className="sticky left-0 z-10 w-32 max-w-32 bg-card px-2 py-1.5 text-left normal-case tracking-normal"
                                         >
-                                            <span className="block truncate text-[0.8125rem] font-medium text-foreground" title={cityZone}>
+                                            <span
+                                                className="block truncate text-[0.8125rem] font-medium text-foreground"
+                                                title={cityZone}
+                                            >
                                                 {cities.cityOf(cityZone)}
                                             </span>
                                             <span className="block truncate font-normal text-foreground-subtle">
                                                 {cityZone === zone
                                                     ? t("time.planner.you")
-                                                    : words.offsetDifferenceText(cities.offsetBetween(cityZone, zone, chosenAt), t)}
+                                                    : words.offsetDifferenceText(
+                                                          cities.offsetBetween(
+                                                              cityZone,
+                                                              zone,
+                                                              chosenAt
+                                                          ),
+                                                          t
+                                                      )}
                                             </span>
                                         </th>
                                         {hours.map((at, index) => {
                                             const clock = cities.wallClock(at, cityZone);
                                             const midnight = clock.minutes < 60;
                                             return (
-                                                <td key={at.getTime()} className="p-0.5" data-hour={index}>
+                                                <td
+                                                    key={at.getTime()}
+                                                    className="p-0.5"
+                                                    data-hour={index}
+                                                >
                                                     <button
                                                         type="button"
                                                         tabIndex={-1}
@@ -174,7 +198,8 @@ export function MeetingPlanner({
                                                         className={cn(
                                                             "flex h-9 w-10 flex-col items-center justify-center rounded leading-none",
                                                             KIND_CLASS[kindOf(at, cityZone)],
-                                                            index === chosen && "ring-2 ring-primary",
+                                                            index === chosen &&
+                                                                "ring-2 ring-primary",
                                                             index === nowHour && "font-semibold"
                                                         )}
                                                     >
@@ -197,7 +222,10 @@ export function MeetingPlanner({
                             </tbody>
                         </table>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" aria-hidden>
+                    <div
+                        className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground"
+                        aria-hidden
+                    >
                         <span className="flex items-center gap-1.5">
                             <span className={cn("size-3 rounded-sm", KIND_CLASS.work)} />
                             {t("time.planner.work")}
@@ -217,7 +245,10 @@ export function MeetingPlanner({
                             {rows.map((cityZone) => {
                                 const day = cities.dayDifference(cityZone, zone, chosenAt);
                                 return (
-                                    <li key={cityZone} className="flex items-baseline gap-2 text-[0.8125rem]">
+                                    <li
+                                        key={cityZone}
+                                        className="flex items-baseline gap-2 text-[0.8125rem]"
+                                    >
                                         <span className="min-w-0 flex-1 truncate" title={cityZone}>
                                             {cities.cityOf(cityZone)}
                                         </span>
@@ -231,13 +262,22 @@ export function MeetingPlanner({
                                             }).format(chosenAt)}
                                         </span>
                                         <span className="w-20 text-right font-medium tabular-nums">
-                                            {words.instantTimeText(chosenAt, locale, cityZone, hour12)}
+                                            {words.instantTimeText(
+                                                chosenAt,
+                                                locale,
+                                                cityZone,
+                                                hour12
+                                            )}
                                         </span>
                                     </li>
                                 );
                             })}
                         </ul>
-                        <Button size="sm" className="self-start" onClick={() => router.push(cities.newEventPath(chosenAt))}>
+                        <Button
+                            size="sm"
+                            className="self-start"
+                            onClick={() => router.push(cities.newEventPath(chosenAt))}
+                        >
                             <CalendarPlus />
                             {t("time.planner.createEvent")}
                         </Button>

@@ -58,7 +58,8 @@ export function WorldPanel({
         void onCities(next).catch((caught: unknown) =>
             toast.show({
                 key: "calendar-time",
-                title: caught instanceof Error && caught.message ? caught.message : t("screen.failed")
+                title:
+                    caught instanceof Error && caught.message ? caught.message : t("screen.failed")
             })
         );
 
@@ -79,7 +80,9 @@ export function WorldPanel({
                     {words.instantTimeText(now, locale, zone, hour12)}
                 </p>
                 <p className="truncate text-[0.8125rem] text-muted-foreground" title={zone}>
-                    {new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: zone }).format(now)}
+                    {new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: zone }).format(
+                        now
+                    )}
                     {" · "}
                     {home ? [home.city, home.zoneName].filter(Boolean).join(" · ") : zone}
                 </p>
@@ -87,9 +90,17 @@ export function WorldPanel({
 
             <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
-                    <h2 className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">{t("time.world.cities")}</h2>
+                    <h2 className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium">
+                        {t("time.world.cities")}
+                    </h2>
                     {saved.length < WORLD_CLOCK_MAX ? (
-                        <Button size="sm" variant="outline" onClick={() => setAdding(!adding)} disabled={!ready} aria-expanded={adding}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setAdding(!adding)}
+                            disabled={!ready}
+                            aria-expanded={adding}
+                        >
                             <Plus />
                             {t("time.world.add")}
                         </Button>
@@ -104,7 +115,8 @@ export function WorldPanel({
                             placeholder={t("time.world.searchHint")}
                             onChange={(picked) => {
                                 setAdding(false);
-                                if (picked && !saved.includes(picked) && picked !== zone) save([...saved, picked]);
+                                if (picked && !saved.includes(picked) && picked !== zone)
+                                    save([...saved, picked]);
                             }}
                         />
                     </div>
@@ -142,9 +154,15 @@ export function WorldPanel({
                             const day = cities.dayDifference(cityZone, zone, now);
                             const change = cities.nextClockChange(cityZone, now);
                             return (
-                                <li key={cityZone} className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+                                <li
+                                    key={cityZone}
+                                    className="flex items-center gap-3 px-3 py-2.5 sm:px-4"
+                                >
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-[0.875rem] font-medium" title={cityZone}>
+                                        <p
+                                            className="truncate text-[0.875rem] font-medium"
+                                            title={cityZone}
+                                        >
                                             {name}
                                             {option?.country ? (
                                                 <span className="font-normal text-muted-foreground">{`, ${option.country}`}</span>
@@ -153,8 +171,13 @@ export function WorldPanel({
                                         <p className="truncate text-xs text-muted-foreground">
                                             {words.dayWord(day, t)}
                                             {", "}
-                                            {words.offsetDifferenceText(cities.offsetBetween(cityZone, zone, now), t)}
-                                            {option?.abbreviation ? ` · ${option.abbreviation}` : null}
+                                            {words.offsetDifferenceText(
+                                                cities.offsetBetween(cityZone, zone, now),
+                                                t
+                                            )}
+                                            {option?.abbreviation
+                                                ? ` · ${option.abbreviation}`
+                                                : null}
                                         </p>
                                         {change ? (
                                             <p className="truncate text-xs text-warning-ink">
@@ -169,10 +192,17 @@ export function WorldPanel({
                                             </p>
                                         ) : null}
                                     </div>
-                                    <p className="shrink-0 text-2xl font-semibold tabular-nums tracking-tight">{time}</p>
+                                    <p className="shrink-0 text-2xl font-semibold tabular-nums tracking-tight">
+                                        {time}
+                                    </p>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button size="icon-sm" variant="ghost" aria-label={t("time.more")} title={t("time.more")}>
+                                            <Button
+                                                size="icon-sm"
+                                                variant="ghost"
+                                                aria-label={t("time.more")}
+                                                title={t("time.more")}
+                                            >
                                                 <MoreHorizontal />
                                             </Button>
                                         </DropdownMenuTrigger>
@@ -189,7 +219,13 @@ export function WorldPanel({
                                                     {t("time.world.moveDown")}
                                                 </DropdownMenuItem>
                                             ) : null}
-                                            <DropdownMenuItem onSelect={() => save(saved.filter((entry) => entry !== cityZone))}>
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    save(
+                                                        saved.filter((entry) => entry !== cityZone)
+                                                    )
+                                                }
+                                            >
                                                 <Trash2 />
                                                 {t("time.world.remove")}
                                             </DropdownMenuItem>

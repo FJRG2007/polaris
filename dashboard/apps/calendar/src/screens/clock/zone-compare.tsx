@@ -41,14 +41,19 @@ export function ZoneComparison({
     const locale = hostUi.i18nProvider.useLocale();
     const format = hostUi.displayFormat.useDisplayFormat();
     const hour12 = format.preferences.clock === "12h";
-    const shown = [...new Set([...(eventZone && eventZone !== zone ? [eventZone] : []), ...preferences.worldClock])].filter(
-        (entry) => entry !== zone
-    );
+    const shown = [
+        ...new Set([
+            ...(eventZone && eventZone !== zone ? [eventZone] : []),
+            ...preferences.worldClock
+        ])
+    ].filter((entry) => entry !== zone);
     if (shown.length === 0) return null;
 
     return (
         <div className="flex w-full flex-col gap-1 rounded-md border border-border bg-surface px-3 py-2">
-            <p className="truncate text-xs font-medium text-muted-foreground">{t("time.compare.title")}</p>
+            <p className="truncate text-xs font-medium text-muted-foreground">
+                {t("time.compare.title")}
+            </p>
             <ul className="flex flex-col gap-0.5">
                 {shown.map((cityZone) => {
                     const clock = cities.wallClock(start, cityZone);
@@ -67,11 +72,18 @@ export function ZoneComparison({
                     }
                     return (
                         <li key={cityZone} className="flex items-center gap-2 text-xs">
-                            <span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[kind])} />
+                            <span
+                                aria-hidden
+                                className={cn("size-2 shrink-0 rounded-full", DOT[kind])}
+                            />
                             <span className="min-w-0 flex-1 truncate" title={cityZone}>
                                 {cities.cityOf(cityZone)}
                             </span>
-                            {day !== 0 ? <span className="text-foreground-subtle">{words.dayWord(day, t)}</span> : null}
+                            {day !== 0 ? (
+                                <span className="text-foreground-subtle">
+                                    {words.dayWord(day, t)}
+                                </span>
+                            ) : null}
                             <span className="tabular-nums">{range}</span>
                             <span className="sr-only">{t(`time.planner.${kind}`)}</span>
                         </li>

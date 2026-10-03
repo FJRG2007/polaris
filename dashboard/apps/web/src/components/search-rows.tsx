@@ -126,22 +126,34 @@ export function clockCommandText(
             timeZone: "UTC"
         }).format(new Date(Date.UTC(2024, 0, 1, command.hour, command.minute)));
         const said = t("search.clock.alarm", { time });
-        return command.label ? t("search.clock.labelled", { action: said, label: command.label }) : said;
+        return command.label
+            ? t("search.clock.labelled", { action: said, label: command.label })
+            : said;
     }
     const seconds = Math.round(command.durationMs / 1000);
     const length = [
-        Math.floor(seconds / 3600) ? t("search.clock.hours", { count: Math.floor(seconds / 3600) }) : "",
-        Math.floor((seconds % 3600) / 60) ? t("search.clock.minutes", { count: Math.floor((seconds % 3600) / 60) }) : "",
+        Math.floor(seconds / 3600)
+            ? t("search.clock.hours", { count: Math.floor(seconds / 3600) })
+            : "",
+        Math.floor((seconds % 3600) / 60)
+            ? t("search.clock.minutes", { count: Math.floor((seconds % 3600) / 60) })
+            : "",
         seconds % 60 ? t("search.clock.seconds", { count: seconds % 60 }) : ""
     ]
         .filter(Boolean)
         .join(" ");
     const said = t("search.clock.timer", { length });
-    return command.label ? t("search.clock.labelled", { action: said, label: command.label }) : said;
+    return command.label
+        ? t("search.clock.labelled", { action: said, label: command.label })
+        : said;
 }
 
 /** A typed "timer 10m", "alarm 7:30" or "stopwatch", ready to run. */
-export function ClockRow({ text, command, ...row }: RowProps & { text: string; command: ClockCommand }) {
+export function ClockRow({
+    text,
+    command,
+    ...row
+}: RowProps & { text: string; command: ClockCommand }) {
     const Icon = command.kind === "alarm" ? AlarmClock : command.kind === "timer" ? Timer : Watch;
     return (
         <Row {...row} label={text}>
@@ -151,7 +163,10 @@ export function ClockRow({ text, command, ...row }: RowProps & { text: string; c
                     {text}
                 </span>
             </span>
-            <CornerDownLeft className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <CornerDownLeft
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+            />
         </Row>
     );
 }

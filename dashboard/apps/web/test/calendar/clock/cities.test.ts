@@ -37,8 +37,12 @@ describe("finding a city", () => {
     });
 
     it("finds a zone by the older name of its city", () => {
-        expect(zonesFor("calcutta")).toEqual(expect.arrayContaining([expect.stringMatching(/Asia\/(Kolkata|Calcutta)/)]));
-        expect(zonesFor("kolkata")).toEqual(expect.arrayContaining([expect.stringMatching(/Asia\/(Kolkata|Calcutta)/)]));
+        expect(zonesFor("calcutta")).toEqual(
+            expect.arrayContaining([expect.stringMatching(/Asia\/(Kolkata|Calcutta)/)])
+        );
+        expect(zonesFor("kolkata")).toEqual(
+            expect.arrayContaining([expect.stringMatching(/Asia\/(Kolkata|Calcutta)/)])
+        );
     });
 
     it("finds a zone by its offset", () => {
@@ -86,10 +90,14 @@ describe("comparing a city with the reader's", () => {
         expect(cities.hoursOfDay("2026-03-29", "Europe/Madrid")).toHaveLength(23);
         expect(cities.hoursOfDay("2026-10-25", "Europe/Madrid")).toHaveLength(25);
         expect(cities.hoursOfDay("2026-10-02", "Europe/Madrid")).toHaveLength(24);
-        expect(cities.hoursOfDay("2026-10-02", "Europe/Madrid")[0]?.toISOString()).toBe("2026-10-01T22:00:00.000Z");
+        expect(cities.hoursOfDay("2026-10-02", "Europe/Madrid")[0]?.toISOString()).toBe(
+            "2026-10-01T22:00:00.000Z"
+        );
     });
 
     it("hands the planner's time to the calendar as a path it reads back", () => {
-        expect(cities.newEventPath(new Date("2026-10-02T14:00:00Z"))).toBe("/calendar/new/2026-10-02T14:00Z");
+        expect(cities.newEventPath(new Date("2026-10-02T14:00:00Z"))).toBe(
+            "/calendar/new/2026-10-02T14:00Z"
+        );
     });
 });

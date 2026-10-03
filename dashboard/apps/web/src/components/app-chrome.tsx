@@ -282,7 +282,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                 mark={
                                                                     <Link
                                                                         href="/home"
-                                                                        aria-label={t("shell.overview")}
+                                                                        aria-label={t(
+                                                                            "shell.overview"
+                                                                        )}
                                                                         className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                                     >
                                                                         <PolarisMark nameClassName="hidden sm:inline" />

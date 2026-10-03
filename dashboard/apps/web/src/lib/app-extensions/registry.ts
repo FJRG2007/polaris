@@ -371,7 +371,10 @@ export function headerSlots(appIds: readonly string[]): AppSlot[] {
             const slot = extension.headerSlot();
             if (slot) slots.push(withBundleSlot(slot));
         } catch (caught) {
-            console.error(`polaris: ${extension.id} could not say what it draws in the header:`, caught);
+            console.error(
+                `polaris: ${extension.id} could not say what it draws in the header:`,
+                caught
+            );
         }
     }
     return slots;

@@ -14,7 +14,15 @@ import * as model from "../../lib/clock/model";
 import { hostUi } from "@polaris/app-host/client";
 import * as clockActions from "../../actions/clock";
 import { mutate, useServerNow, type ClockRead } from "./store";
-import { AlarmClock, MoreHorizontal, Pencil, Plus, SkipForward, Trash2, Volume2 } from "lucide-react";
+import {
+    AlarmClock,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    SkipForward,
+    Trash2,
+    Volume2
+} from "lucide-react";
 import {
     Button,
     cn,
@@ -45,7 +53,15 @@ const NEW_ALARM: Draft = {
     enabled: true
 };
 
-export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: string; hour12: boolean }) {
+export function AlarmsPanel({
+    clock,
+    zone,
+    hour12
+}: {
+    clock: ClockRead;
+    zone: string;
+    hour12: boolean;
+}) {
     const t = useCalendarT();
     const toast = useToast();
     const locale = hostUi.i18nProvider.useLocale();
@@ -54,7 +70,8 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
     const [draft, setDraft] = useState<Draft | null>(null);
     const now = useServerNow(clock.skew, 30_000);
     const alarms = clock.snapshot?.alarms ?? null;
-    const failed = (message: string) => toast.show({ key: "calendar-time", title: message || t("screen.failed") });
+    const failed = (message: string) =>
+        toast.show({ key: "calendar-time", title: message || t("screen.failed") });
 
     const change = (
         alarm: model.AlarmView,
@@ -91,7 +108,11 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
                 <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={zone}>
                     {t("time.alarms.zone", { zone })}
                 </p>
-                <Button size="sm" onClick={() => setDraft(NEW_ALARM)} disabled={alarms !== null && alarms.length >= model.MAX_ALARMS}>
+                <Button
+                    size="sm"
+                    onClick={() => setDraft(NEW_ALARM)}
+                    disabled={alarms !== null && alarms.length >= model.MAX_ALARMS}
+                >
                     <Plus />
                     {t("time.alarms.add")}
                 </Button>
@@ -129,7 +150,10 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
                     {alarms.map((alarm) => {
                         const next = alarm.nextFireAt ? new Date(alarm.nextFireAt).getTime() : null;
                         return (
-                            <li key={alarm.id} className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+                            <li
+                                key={alarm.id}
+                                className="flex items-center gap-3 px-3 py-2.5 sm:px-4"
+                            >
                                 <button
                                     type="button"
                                     className="flex min-w-0 flex-1 flex-col items-start text-left"
@@ -149,8 +173,15 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
                                     <span className="w-full truncate text-xs text-muted-foreground">
                                         {[
                                             alarm.label,
-                                            words.repeatText(alarm.days, t, locale, format.weekStartsOn),
-                                            alarm.zone !== zone ? alarm.zone.replace(/_/g, " ") : null
+                                            words.repeatText(
+                                                alarm.days,
+                                                t,
+                                                locale,
+                                                format.weekStartsOn
+                                            ),
+                                            alarm.zone !== zone
+                                                ? alarm.zone.replace(/_/g, " ")
+                                                : null
                                         ]
                                             .filter(Boolean)
                                             .join(" · ")}
@@ -159,7 +190,12 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
                                         <span className="text-xs text-foreground-subtle">
                                             {alarm.snoozed
                                                 ? t("time.alarms.snoozedUntil", {
-                                                      time: words.instantTimeText(next, locale, zone, hour12)
+                                                      time: words.instantTimeText(
+                                                          next,
+                                                          locale,
+                                                          zone,
+                                                          hour12
+                                                      )
                                                   })
                                                 : t("time.alarms.ringsIn", {
                                                       length: words.lengthText(next - now, t)
@@ -173,14 +209,20 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
                                         time: words.wallTimeText(alarm.time, locale, hour12)
                                     })}
                                     onChange={(enabled) =>
-                                        change(alarm, { id: alarm.id, change: "enable", enabled }, (entry) => ({
-                                            ...entry,
-                                            enabled,
-                                            snoozed: false,
-                                            nextFireAt: enabled
-                                                ? model.nextAlarmFire(entry, new Date(now)).toISOString()
-                                                : null
-                                        }))
+                                        change(
+                                            alarm,
+                                            { id: alarm.id, change: "enable", enabled },
+                                            (entry) => ({
+                                                ...entry,
+                                                enabled,
+                                                snoozed: false,
+                                                nextFireAt: enabled
+                                                    ? model
+                                                          .nextAlarmFire(entry, new Date(now))
+                                                          .toISOString()
+                                                    : null
+                                            })
+                                        )
                                     }
                                 />
                                 <DropdownMenu>
@@ -202,13 +244,20 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
                                         {alarm.enabled && alarm.days !== 0 && next !== null ? (
                                             <DropdownMenuItem
                                                 onSelect={() =>
-                                                    change(alarm, { id: alarm.id, change: "skip" }, (entry) => ({
-                                                        ...entry,
-                                                        snoozed: false,
-                                                        nextFireAt: model
-                                                            .nextAlarmFire(entry, new Date(next))
-                                                            .toISOString()
-                                                    }))
+                                                    change(
+                                                        alarm,
+                                                        { id: alarm.id, change: "skip" },
+                                                        (entry) => ({
+                                                            ...entry,
+                                                            snoozed: false,
+                                                            nextFireAt: model
+                                                                .nextAlarmFire(
+                                                                    entry,
+                                                                    new Date(next)
+                                                                )
+                                                                .toISOString()
+                                                        })
+                                                    )
                                                 }
                                             >
                                                 <SkipForward />
@@ -244,7 +293,8 @@ export function AlarmsPanel({ clock, zone, hour12 }: { clock: ClockRead; zone: s
                     onSave={async (input) => {
                         const ok = await mutate(
                             clock,
-                            () => clockActions.saveAlarmAction({ id: draft.id, alarm: input, zone }),
+                            () =>
+                                clockActions.saveAlarmAction({ id: draft.id, alarm: input, zone }),
                             null,
                             failed
                         );
@@ -300,7 +350,9 @@ function AlarmDialog({
     return (
         <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
             <DialogContent className="max-w-md">
-                <DialogTitle>{draft.id ? t("time.alarms.editTitle") : t("time.alarms.newTitle")}</DialogTitle>
+                <DialogTitle>
+                    {draft.id ? t("time.alarms.editTitle") : t("time.alarms.newTitle")}
+                </DialogTitle>
                 <form
                     className="flex flex-col gap-4"
                     onSubmit={async (event) => {
@@ -338,7 +390,12 @@ function AlarmDialog({
                                         type="button"
                                         aria-pressed={on}
                                         title={words.weekdayName(weekday, locale, "long")}
-                                        onClick={() => setForm({ ...form, days: model.toggleDay(form.days, weekday) })}
+                                        onClick={() =>
+                                            setForm({
+                                                ...form,
+                                                days: model.toggleDay(form.days, weekday)
+                                            })
+                                        }
                                         className={cn(
                                             "flex size-9 items-center justify-center rounded-full border text-xs font-medium transition-colors",
                                             on
@@ -386,13 +443,18 @@ function AlarmDialog({
                     </label>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <SoundField value={form.sound} onChange={(sound) => setForm({ ...form, sound })} />
+                        <SoundField
+                            value={form.sound}
+                            onChange={(sound) => setForm({ ...form, sound })}
+                        />
                         <div className="flex flex-col gap-1 text-[0.8125rem]">
                             <span>{t("time.alarms.snooze")}</span>
                             <Select
                                 aria-label={t("time.alarms.snooze")}
                                 value={String(form.snoozeMinutes)}
-                                onValueChange={(value) => setForm({ ...form, snoozeMinutes: Number(value) })}
+                                onValueChange={(value) =>
+                                    setForm({ ...form, snoozeMinutes: Number(value) })
+                                }
                                 options={model.SNOOZE_MINUTES.map((minutes) => ({
                                     value: String(minutes),
                                     label: t("time.minutes", { count: minutes })
@@ -403,7 +465,12 @@ function AlarmDialog({
 
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                         {onDelete ? (
-                            <Button type="button" variant="ghost" onClick={onDelete} disabled={busy}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={onDelete}
+                                disabled={busy}
+                            >
                                 <Trash2 />
                                 {t("time.delete")}
                             </Button>
@@ -427,7 +494,13 @@ function AlarmDialog({
 }
 
 /** The sound a ring makes, with a button to hear it. */
-export function SoundField({ value, onChange }: { value: model.ClockSound; onChange: (sound: model.ClockSound) => void }) {
+export function SoundField({
+    value,
+    onChange
+}: {
+    value: model.ClockSound;
+    onChange: (sound: model.ClockSound) => void;
+}) {
     const t = useCalendarT();
     return (
         <div className="flex flex-col gap-1 text-[0.8125rem]">
@@ -438,7 +511,10 @@ export function SoundField({ value, onChange }: { value: model.ClockSound; onCha
                     aria-label={t("time.sound")}
                     value={value}
                     onValueChange={(next) => onChange(next as model.ClockSound)}
-                    options={model.CLOCK_SOUNDS.map((sound) => ({ value: sound, label: t(`time.sounds.${sound}`) }))}
+                    options={model.CLOCK_SOUNDS.map((sound) => ({
+                        value: sound,
+                        label: t(`time.sounds.${sound}`)
+                    }))}
                 />
                 <Button
                     type="button"
