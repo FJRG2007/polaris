@@ -115,6 +115,8 @@ interface World {
     /** Parkour and spleef: who carries the arena tag, and where each of them is. */
     inside: Set<string>;
     at: Record<string, [number, number, number]>;
+    /** Who a teleport leaves where they were: stuck loading the world. */
+    stuck: string[];
     /** Game modes by name: 0 survival, 1 creative, 2 adventure. */
     modes: Record<string, number>;
     /** Something already stands in the air over every site. */
@@ -247,6 +249,7 @@ const world: World = {
     nearMeteor: false,
     inside: new Set(),
     at: {},
+    stuck: [],
     modes: {},
     skyTaken: false,
     properties: "pvp=true\ndifficulty=normal\n",
@@ -748,6 +751,18 @@ function answer(sent: string): string {
     }
     const filled = fillAnswer(line);
     if (filled !== null) return filled;
+    // Onto whatever is highest under the point - here, the floor six under it.
+    const landed =
+        /^execute in minecraft:overworld positioned (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) positioned over motion_blocking_no_leaves run tp (\w+) ~ ~ ~/.exec(
+            line
+        );
+    if (landed) {
+        const name = landed[4] as string;
+        if (!world.online.includes(name)) return "No entity was found";
+        if (!world.stuck.includes(name))
+            world.at[name] = [Number(landed[1]), Number(landed[2]) - 6, Number(landed[3])];
+        return `Teleported ${name}`;
+    }
     const moved = /^execute in (\S+) run tp (\w+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(line);
     if (moved) {
         const name = moved[2] as string;
@@ -1624,6 +1639,9 @@ const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/
 const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/plan");
 const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
 const hill = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill");
+const hillService = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service"
+);
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 
 /** What a player reads of a command's text: the words of its JSON, without the
@@ -1740,6 +1758,7 @@ beforeEach(() => {
     world.nearMeteor = false;
     world.inside = new Set();
     world.at = {};
+    world.stuck = [];
     world.modes = {};
     world.skyTaken = false;
     world.properties = "pvp=true\ndifficulty=normal\n";
@@ -6400,6 +6419,114 @@ describe("a king of the hill", () => {
         expect(world.sent).toContain("gamerule keepInventory false");
         expect(state().arenaLeftovers).toEqual([]);
         keptTheRules();
+    });
+
+    it("with fists only: counts nothing until everybody stands on the platform, then says Go", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([fists()]);
+        await joinAndStart("hill");
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        const entered = world.sent.findIndex((line) => / run tp Ben ~ ~ ~ /.test(line));
+        const go = world.sent.findIndex((line) => line.includes(" title ") && line.includes("Go!"));
+        expect(entered).toBeGreaterThan(-1);
+        // Nothing counted before the start, and the start after everybody is in.
+        expect(go).toBeGreaterThan(entered);
+        expect(
+            world.sent
+                .slice(0, go)
+                .some((line) => line.includes("scoreboard players add @s pe_score"))
+        ).toBe(false);
+        // Each put back on their own spot at the start: nobody closer for being first.
+        expect(world.sent.slice(go - 10, go).some((line) => / run tp Ana ~ ~ ~ /.test(line))).toBe(
+            true
+        );
+        expect(world.sent.some((line) => line.includes("Started without"))).toBe(false);
+        // Brought up to it, nobody is told where it floats.
+        expect(world.sent.some((line) => line.includes("The circle is at"))).toBe(false);
+        // The clock starts at the "Go!", with the whole of its time ahead.
+        expect(run.endsAt - run.readyAt!).toBe(3 * 60_000);
+    });
+
+    it("with fists only: starts without whoever is not up when the wait runs out, and says so", async () => {
+        world.online = ["Ana", "Ben"];
+        world.stuck = ["Ben"];
+        setUp([fists()]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(30_000);
+        // Up to the moment Ben is sent up, a little at a time.
+        for (
+            let tick = 0;
+            tick < 200 && !world.sent.some((line) => / run tp Ben ~ ~ ~ /.test(line));
+            tick += 1
+        )
+            await play(250);
+        const entered = Date.now();
+        expect(state().run!.readyAt).toBeNull();
+        await play(hillService.ARRIVAL_MS - 4_000);
+        // Still waiting: nothing counted, and those up told so.
+        expect(state().run!.readyAt).toBeNull();
+        expect(world.sent.some((line) => line.includes("scoreboard players add @s pe_score"))).toBe(
+            false
+        );
+        expect(world.sent.some((line) => line.includes("Waiting for everybody"))).toBe(true);
+        await play(8_000);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        // Sent up within the last look before `entered`.
+        expect(run.readyAt! - entered).toBeGreaterThanOrEqual(hillService.ARRIVAL_MS - 250);
+        expect(world.sent.some((line) => line.includes("Started without waiting longer for"))).toBe(
+            true
+        );
+        expect(world.sent.some((line) => line.includes(" title ") && line.includes("Go!"))).toBe(
+            true
+        );
+    });
+
+    it("with fists only: brings back whoever falls off while the rest are waited for", async () => {
+        world.online = ["Ana", "Ben"];
+        world.stuck = ["Ben"];
+        setUp([fists()]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(30_000);
+        for (
+            let tick = 0;
+            tick < 200 && !world.sent.some((line) => / run tp Ben ~ ~ ~ /.test(line));
+            tick += 1
+        )
+            await play(250);
+        await play(3_000);
+        expect(state().run!.readyAt).toBeNull();
+        const up = world.at.Ana!;
+        world.at.Ana = [up[0], up[1] - 15, up[2]];
+        const fell = world.sent.length;
+        await play(2_000);
+        expect(world.sent.slice(fell).some((line) => / run tp Ana ~ ~ ~ /.test(line))).toBe(true);
+        expect(world.at.Ana![1]).toBe(up[1]);
+        expect(state().run!.readyAt).toBeNull();
+        await play(hillService.ARRIVAL_MS);
+        expect(state().run!.readyAt).not.toBeNull();
+        const without = world.sent.find((line) =>
+            line.includes("Started without waiting longer for")
+        );
+        expect(without).toContain("Ben");
+        expect(without).not.toContain("Ana");
     });
 
     it("with no untouched ground for the circle, stands on a platform of its own over the sea, taken away after", async () => {

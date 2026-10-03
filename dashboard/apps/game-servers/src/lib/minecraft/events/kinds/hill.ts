@@ -157,6 +157,40 @@ export function enterLines(name: string, spot: Spot, overGround: boolean): strin
     return [`tag ${name} add ${IN_ARENA}`, tp, `gamemode adventure ${name}`];
 }
 
+/**
+ * Whether somebody stands on the platform: over its floor, at the circle's own
+ * height - a jump allowed - rather than still on the way in, or under it.
+ */
+export function onPlatform(
+    at: { x: number; y: number; z: number },
+    place: Point,
+    radius: number
+): boolean {
+    const half = radius + MARGIN;
+    return (
+        at.y >= place.y - 0.5 &&
+        at.y <= place.y + 1.5 &&
+        at.x >= place.x - half &&
+        at.x < place.x + half + 1 &&
+        at.z >= place.z - half &&
+        at.z < place.z + half + 1
+    );
+}
+
+/** Who of `names` is not on the platform yet - not on, or not there. */
+export function notArrived(
+    names: readonly string[],
+    where: readonly { name: string; x: number; y: number; z: number }[],
+    place: Point,
+    radius: number
+): string[] {
+    const here = new Map(where.map((one) => [one.name.toLowerCase(), one]));
+    return names.filter((name) => {
+        const at = here.get(name.toLowerCase());
+        return !at || !onPlatform(at, place, radius);
+    });
+}
+
 /** Knocked right off - into the sea, down a slope, far out: time to come back. */
 export function strayed(
     at: { x: number; y: number; z: number },
@@ -199,8 +233,6 @@ export function protectLines(
         `effect give ${who} minecraft:water_breathing 10 0 true`
     ];
     if (!point || radius === undefined) return lines;
-    const reach = radius + MARGIN + 64;
-    const under = `x=${point.x - reach},y=${point.y - 128},z=${point.z - reach},dx=${2 * reach},dy=127,dz=${2 * reach}`;
     const inside = `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[tag=${IN_ARENA},distance=..${radius}]`;
     return [
         ...lines,
@@ -208,6 +240,13 @@ export function protectLines(
         `effect give @a[tag=${IN_ARENA},scores={${HEALTH_SCORE}=${DRAIN_FLOOR + 1}..}] minecraft:poison 3 1 true`,
         `${inside} run effect clear @s minecraft:poison`,
         `${inside} run effect give @s minecraft:regeneration 3 1 true`,
-        `execute in minecraft:overworld run effect give @a[tag=${IN_ARENA},${under}] minecraft:slow_falling 3 0 true`
+        catchLine(point, radius)
     ];
+}
+
+/** Whoever has fallen under the platform floats down instead of dropping. */
+export function catchLine(point: { x: number; y: number; z: number }, radius: number): string {
+    const reach = radius + MARGIN + 64;
+    const under = `x=${point.x - reach},y=${point.y - 128},z=${point.z - reach},dx=${2 * reach},dy=127,dz=${2 * reach}`;
+    return `execute in minecraft:overworld run effect give @a[tag=${IN_ARENA},${under}] minecraft:slow_falling 3 0 true`;
 }
