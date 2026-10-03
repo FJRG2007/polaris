@@ -2565,6 +2565,79 @@ describe("trivia", () => {
         expect(after.history[0]?.note).toBe("All rounds played");
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ben", score: 1 }]);
     });
+
+    it("asks true or false with buttons, takes a click or a typed letter once, and gives a tie to the faster", async () => {
+        const quiz = {
+            ...newPreset("trivia", "quiz"),
+            options: {
+                rounds: 3,
+                seconds: 15,
+                mode: "questions" as const,
+                questions: [
+                    { question: "Creepers run away from cats.", answers: ["true"] },
+                    { question: "Ghasts live in the End.", answers: ["falso"] },
+                    { question: "Sheep can be dyed.", answers: ["v"] }
+                ]
+            }
+        };
+        setUp([quiz]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "quiz",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(4_100);
+        // A [True] and a [False] under it, each pressing this round's own value.
+        const buttons = world.sent.find(
+            (line) => line.startsWith("tellraw @a") && line.includes("[True]")
+        );
+        expect(buttons).toContain(`/trigger pe_join set ${commands.truthValue(0, true)}`);
+        expect(buttons).toContain(`/trigger pe_join set ${commands.truthValue(0, false)}`);
+        expect(buttons).toContain("[False]");
+        expect(world.sent).toContain("scoreboard players enable @a pe_join");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title @a actionbar") &&
+                    line.includes("True or false") &&
+                    line.includes("t/f")
+            )
+        ).toBe(true);
+        // Ben's first answer is wrong: his second is no answer at all.
+        chat(["Ben", "f"], ["Ben", "t"]);
+        await play(2_100);
+        expect(state().run?.points).toEqual({});
+        expect(state().run?.triviaOut).toEqual(["Ben"]);
+        // Ana clicks [True].
+        world.pressed = { Ana: commands.truthValue(0, true) };
+        await play(2_100);
+        expect(state().run?.points).toEqual({ Ana: 1 });
+        expect(state().run?.answerMs.Ana).toBeGreaterThan(0);
+        // The next round, false, answered at once in Spanish by Ben.
+        for (let tries = 0; tries < 10 && state().run?.round !== 1; tries += 1) await play(1_000);
+        expect(state().run?.roundEndsAt).not.toBeNull();
+        expect(state().run?.triviaOut).toEqual([]);
+        chat(["Ben", "Falso"]);
+        await play(2_100);
+        expect(state().run?.points).toEqual({ Ana: 1, Ben: 1 });
+        expect(state().run!.answerMs.Ben!).toBeLessThan(state().run!.answerMs.Ana!);
+        // The third: a button left from the first round answers nothing.
+        for (let tries = 0; tries < 10 && state().run?.round !== 2; tries += 1) await play(1_000);
+        world.pressed = { Ana: commands.truthValue(0, true) };
+        await play(2_100);
+        expect(state().run?.points).toEqual({ Ana: 1, Ben: 1 });
+        expect(state().run?.triviaOut).toEqual([]);
+        await play(15_000 + 10_000);
+        const after = state();
+        expect(after.run).toBeNull();
+        // One round each: Ben answered his faster, so he is first, not tied.
+        expect(after.history[0]?.podium).toEqual([
+            { place: 1, name: "Ben", score: 1 },
+            { place: 2, name: "Ana", score: 1 }
+        ]);
+    });
 });
 
 /** A world boss fought on the land, always The Warlord, on Normal: the

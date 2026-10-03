@@ -429,9 +429,56 @@ export function roundTitle(round: number, rounds: number, language: Language): s
  *  left to the action bar, which is wider. */
 export const SUBTITLE_MAX = 48;
 
+/** What a round asks: a question, a word to unscramble, or whether a sentence
+ *  is true or false. */
+export type RoundKind = "question" | "scramble" | "truth";
+
+/** The two words of a true-or-false round, ahead of the sentence. */
+function truthLead(language: Language): string {
+    return language === "es" ? "Verdadero o falso" : "True or false";
+}
+
+/** A true-or-false round in the chat: the sentence to judge. */
+export function truthLine(
+    round: number,
+    rounds: number,
+    statement: string,
+    language: Language
+): string {
+    return `${WARN}${truthLead(language)} ${mark(`${round}/${rounds}`, WARN)}: ${REASON}${statement}`;
+}
+
+/** The line under a true-or-false round: a button for each, and the letters
+ *  that answer as well as a click. */
+export function truthButtonsText(language: Language): {
+    lead: string;
+    yes: { label: string; hover: string };
+    no: { label: string; hover: string };
+} {
+    return language === "es"
+        ? {
+              lead: `${WARN}Pulsa o escribe ${mark("v", WARN)} o ${mark("f", WARN)}:`,
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              yes: { label: "[Verdadero]", hover: "Responder verdadero" },
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              no: { label: "[Falso]", hover: "Responder falso" }
+          }
+        : {
+              lead: `${WARN}Click or type ${mark("t", WARN)} or ${mark("f", WARN)}:`,
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              yes: { label: "[True]", hover: "Answer true" },
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              no: { label: "[False]", hover: "Answer false" }
+          };
+}
+
 /** Under the title: the question itself when it fits, or where to read it. */
-export function roundSubtitle(asked: string, scramble: boolean, language: Language): string {
-    if (scramble) return language === "es" ? `&fOrdena: &e${asked}` : `&fUnscramble: &e${asked}`;
+export function roundSubtitle(asked: string, kind: RoundKind, language: Language): string {
+    if (kind === "scramble")
+        return language === "es" ? `&fOrdena: &e${asked}` : `&fUnscramble: &e${asked}`;
+    if (kind === "truth" && asked.length <= SUBTITLE_MAX)
+        return `&f${asked} &e(${language === "es" ? "v/f" : "t/f"})`;
+    if (kind === "truth") return `&e${truthLead(language)}`;
     if (asked.length <= SUBTITLE_MAX) return `&f${asked}`;
     return language === "es"
         ? "&7La pregunta, sobre tu barra"
@@ -441,16 +488,26 @@ export function roundSubtitle(asked: string, scramble: boolean, language: Langua
 /** Above the hotbar for as long as the round is open, with the time left. */
 export function roundBar(
     asked: string,
-    scramble: boolean,
+    kind: RoundKind,
     secondsLeft: number,
     language: Language
 ): string {
-    const prompt = scramble
-        ? language === "es"
-            ? `&fOrdena: &e${asked}`
-            : `&fUnscramble: &e${asked}`
-        : `&f${asked}`;
-    const reply = language === "es" ? "responde en el chat" : "answer in the chat";
+    const prompt =
+        kind === "scramble"
+            ? language === "es"
+                ? `&fOrdena: &e${asked}`
+                : `&fUnscramble: &e${asked}`
+            : kind === "truth"
+              ? `&e${truthLead(language)}: &f${asked}`
+              : `&f${asked}`;
+    const reply =
+        kind === "truth"
+            ? language === "es"
+                ? "pulsa o escribe v/f"
+                : "click or type t/f"
+            : language === "es"
+              ? "responde en el chat"
+              : "answer in the chat";
     return `${prompt} &7- ${reply} (${Math.max(0, Math.ceil(secondsLeft))} s)`;
 }
 

@@ -143,6 +143,12 @@ export const runSchema = z.object({
     lastWaveAt: z.number().default(0),
     /** Trivia: when the last round closed, for the breath before the next. */
     closedAt: z.number().default(0),
+    /** Trivia: by name, how long each took to answer the rounds they took,
+     *  added up in milliseconds - what breaks a tie on points (`plan.podium`). */
+    answerMs: z.record(z.number().nonnegative()).default({}),
+    /** Trivia: who already answered the open true-or-false round wrong, and so
+     *  has no second try at it. Emptied as each round is asked. */
+    triviaOut: z.array(z.string()).default([]),
     /** Somebody pressed Cancel; the loop ends it on its next tick. */
     cancelled: z.boolean().default(false),
     /** Game rules the event changed, and what each was before, so they are put

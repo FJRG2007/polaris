@@ -581,9 +581,11 @@ async function currentStandings(
     run: stored.EventRun
 ): Promise<{ name: string; score: number }[]> {
     if (run.preset.kind === "trivia" || run.preset.kind === "treasure-hunt") {
+        // In the order the podium will have them: a tie on rounds won to
+        // whoever answered faster.
         return Object.entries(run.points)
-            .map(([name, score]) => ({ name, score }))
-            .sort((left, right) => right.score - left.score);
+            .sort(plan.ranking(run.preset.kind === "trivia" ? run.answerMs : undefined))
+            .map(([name, score]) => ({ name, score }));
     }
     if (catalog.playsOnStage(run.preset)) return stageService.standings(run).slice(0, 10);
     if (catalog.playsInArena(run.preset)) return arenaService.standings(run);
@@ -724,6 +726,8 @@ export async function startEvent(input: {
         decidedBy: null,
         lastWaveAt: 0,
         closedAt: 0,
+        answerMs: {},
+        triviaOut: [],
         cancelled: false,
         finishing: false,
         gamerules: {},
@@ -2699,7 +2703,7 @@ async function rareCatchTick(
 function roundIn(
     run: stored.EventRun,
     language: catalog.Language
-): { kind: "question" | "scramble"; asked: string; accepted: string[] } {
+): { kind: messages.RoundKind; asked: string; accepted: string[]; truth: boolean | null } {
     const options = run.preset.options as catalog.EventOptions<"trivia">;
     const questions = [
         ...options.questions,
@@ -2713,11 +2717,26 @@ function roundIn(
         return {
             kind: "scramble",
             asked: trivia.scramble(word, trivia.seeded(`${run.id}-${run.round}`)),
-            accepted: [word]
+            accepted: [word],
+            truth: null
         };
     }
     const question = questions[run.round % questions.length]!;
-    return { kind: "question", asked: question.question, accepted: [...question.answers] };
+    const truth = trivia.truthOf(question);
+    if (truth !== null) {
+        return {
+            kind: "truth",
+            asked: question.question,
+            accepted: trivia.truthAnswers(truth, language),
+            truth
+        };
+    }
+    return {
+        kind: "question",
+        asked: question.question,
+        accepted: [...question.answers],
+        truth: null
+    };
 }
 
 /** The bank's questions a trivia game asked, remembered so the next games ask
@@ -2749,7 +2768,14 @@ async function rememberAsked(installedAppId: string, run: stored.EventRun): Prom
 function roundOf(
     run: stored.EventRun,
     language: speech.Speech
-): { kind: "question" | "scramble"; asked: string; answer: string; accepted: string[] } {
+): {
+    kind: messages.RoundKind;
+    asked: string;
+    answer: string;
+    accepted: string[];
+    /** A true-or-false round's right answer; null for any other round. */
+    truth: boolean | null;
+} {
     const each = Object.fromEntries(
         speech.LANGUAGES.map((one) => [one, roundIn(run, one)])
     ) as Record<catalog.Language, ReturnType<typeof roundIn>>;
@@ -2766,7 +2792,8 @@ function roundOf(
         kind: first.kind,
         asked: pick((one) => one.asked),
         answer: pick((one) => one.accepted[0] ?? ""),
-        accepted: [...new Set(speech.LANGUAGES.flatMap((one) => each[one].accepted))]
+        accepted: [...new Set(speech.LANGUAGES.flatMap((one) => each[one].accepted))],
+        truth: first.truth
     };
 }
 
@@ -2786,26 +2813,39 @@ async function triviaTick(
             return null;
         const round = loop.run.round + 1;
         if (round >= options.rounds) return "All rounds played";
-        loop.run = { ...loop.run, round, roundEndsAt: now + options.seconds * 1000 };
+        loop.run = {
+            ...loop.run,
+            round,
+            roundEndsAt: now + options.seconds * 1000,
+            triviaOut: []
+        };
         loop.logFrom = await containerFileSize(server, LOG_FILE);
         const asked = roundOf(loop.run, language);
-        const scramble = asked.kind === "scramble";
+        const line =
+            asked.kind === "scramble"
+                ? messages.scrambleLine(round + 1, options.rounds, asked.asked, language)
+                : asked.kind === "truth"
+                  ? messages.truthLine(round + 1, options.rounds, asked.asked, language)
+                  : messages.questionLine(round + 1, options.rounds, asked.asked, language);
         // On screen as well as in the chat, where a line scrolls away under the
         // answers: a title as it is asked, then the action bar until it closes.
         lines.push(
             ...commands.titleCommands(
                 messages.roundTitle(round + 1, options.rounds, language),
-                messages.roundSubtitle(asked.asked, scramble, language)
+                messages.roundSubtitle(asked.asked, asked.kind, language)
             ),
-            `title @a actionbar ${commands.text(messages.roundBar(asked.asked, scramble, options.seconds, language))}`,
-            commands.say(
-                messages.tag(language) +
-                    (scramble
-                        ? messages.scrambleLine(round + 1, options.rounds, asked.asked, language)
-                        : messages.questionLine(round + 1, options.rounds, asked.asked, language))
-            ),
+            `title @a actionbar ${commands.text(messages.roundBar(asked.asked, asked.kind, options.seconds, language))}`,
+            commands.say(messages.tag(language) + line),
             commands.sound(commands.SOUNDS.tick)
         );
+        if (asked.kind === "truth") {
+            // A [True] and a [False] to click, besides typing either.
+            const buttons = messages.truthButtonsText(language);
+            lines.push(
+                ...commands.joinTriggerLines(),
+                commands.truthButtons(round, buttons.lead, buttons.yes, buttons.no)
+            );
+        }
         await persist(installedAppId, loop);
         return null;
     }
@@ -2828,10 +2868,36 @@ async function triviaTick(
                   size
               ).catch(() => null);
     if (size !== null) loop.logFrom = size;
-    const winner = said ? firstRight(said, asked.accepted) : null;
+    let winner: string | null = null;
+    if (asked.truth !== null) {
+        // A [True] or [False] pressed reads as having typed it, after what was
+        // typed in the same stretch: the presses carry no time of their own.
+        const pressed = [...(await readPresses(server)).entries()]
+            .map(([name, value]) => commands.truthPressedLine(name, value, loop.run.round))
+            .filter((line): line is string => line !== null);
+        const judged = truthRound(
+            [said ?? "", ...pressed].join("\n"),
+            asked.truth,
+            loop.run.triviaOut
+        );
+        winner = judged.winner;
+        if (judged.out.length !== loop.run.triviaOut.length) {
+            loop.run = { ...loop.run, triviaOut: judged.out };
+            if (!winner) await persist(installedAppId, loop);
+        }
+    } else {
+        winner = said ? firstRight(said, asked.accepted) : null;
+    }
     if (winner) {
         const points = { ...loop.run.points, [winner]: (loop.run.points[winner] ?? 0) + 1 };
-        loop.run = { ...loop.run, points, roundEndsAt: null, closedAt: now };
+        // How long the winner took, from the round being asked to the answer
+        // being read - added to theirs, for a tie on points (`plan.podium`).
+        const askedAt = (loop.run.roundEndsAt ?? now) - options.seconds * 1000;
+        const answerMs = {
+            ...loop.run.answerMs,
+            [winner]: (loop.run.answerMs[winner] ?? 0) + Math.max(0, now - askedAt)
+        };
+        loop.run = { ...loop.run, points, answerMs, roundEndsAt: null, closedAt: now };
         lines.push(
             commands.setScore(winner, points[winner] ?? 1),
             ...commands.titleCommands(
@@ -2860,7 +2926,7 @@ async function triviaTick(
         `title @a actionbar ${commands.text(
             messages.roundBar(
                 asked.asked,
-                asked.kind === "scramble",
+                asked.kind,
                 ((loop.run.roundEndsAt ?? now) - now) / 1000,
                 language
             )
@@ -2883,6 +2949,31 @@ export function firstRight(log: string, accepted: readonly string[]): string | n
         if (trivia.answers(match[2] as string, accepted)) return match[1] as string;
     }
     return null;
+}
+
+/**
+ * A true-or-false round's answers in a stretch of log, oldest first. Only a
+ * player's first answer counts - with two to pick from, a second try is no try
+ * at all - so whoever says the wrong one is out of the round, and the first to
+ * say the right one while still in it takes it. `out` is who was out already;
+ * anything said that is neither answer changes nothing.
+ */
+export function truthRound(
+    log: string,
+    truth: boolean,
+    out: readonly string[]
+): { winner: string | null; out: string[] } {
+    const gone = new Set(out.map((name) => name.toLowerCase()));
+    const left = [...out];
+    for (const match of log.matchAll(commands.CHAT_LINE)) {
+        const name = match[1] as string;
+        const said = trivia.truthSaid(match[2] as string);
+        if (said === null || gone.has(name.toLowerCase())) continue;
+        if (said === truth) return { winner: name, out: left };
+        gone.add(name.toLowerCase());
+        left.push(name);
+    }
+    return { winner: null, out: left };
 }
 
 // ------------------------------------------------------------------ horde defense
@@ -3309,14 +3400,19 @@ async function newChat(server: ServerContainer, loop: Loop): Promise<string | nu
     const said = await newLog(server, loop);
     if (!catalog.takesJoiners(loop.run.preset)) return said;
     // A [Join] or [Leave] pressed in the chat reads as having typed it.
-    const pressed = [
-        ...commands.readScores(await server.say([commands.READ_JOIN_TRIGGER])).entries()
-    ]
+    const pressed = [...(await readPresses(server)).entries()]
         .map(([name, value]) => commands.pressedLine(name, value))
         .filter((line): line is string => line !== null);
-    await server.sayAll([commands.RESET_JOIN_TRIGGER, ...commands.joinTriggerLines()]);
     if (pressed.length === 0) return said;
     return `${said ?? ""}${said && !said.endsWith("\n") ? "\n" : ""}${pressed.join("\n")}\n`;
+}
+
+/** The buttons pressed in the chat since the last look, by name, taken back
+ *  and offered again for the next press. */
+async function readPresses(server: ServerContainer): Promise<Map<string, number>> {
+    const pressed = commands.readScores(await server.say([commands.READ_JOIN_TRIGGER]));
+    await server.sayAll([commands.RESET_JOIN_TRIGGER, ...commands.joinTriggerLines()]);
+    return pressed;
 }
 
 async function newLog(server: ServerContainer, loop: Loop): Promise<string | null> {
@@ -3474,7 +3570,13 @@ async function finish(
             placed =
                 preset.kind === "world-boss"
                     ? bossService.podiumOf(run, scores, disqualified, minimum)
-                    : plan.podium(scores, disqualified, minimum);
+                    : plan.podium(
+                          scores,
+                          disqualified,
+                          minimum,
+                          // A tie on rounds won goes to whoever answered faster.
+                          preset.kind === "trivia" ? run.answerMs : undefined
+                      );
             // Taking part is reaching the minimum too - one zombie is not taking part
             // in a hunt. A blood moon's is surviving it with a kill, and a horde
             // defense's holding the point, which are their own bars.

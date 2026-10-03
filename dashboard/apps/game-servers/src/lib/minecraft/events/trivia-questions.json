@@ -5861,5 +5861,941 @@
             "question": "Desde la 1.18, ¿cuál es el nivel Y más alto donde puedes poner un bloque en el mundo normal?",
             "answers": ["319"]
         }
+    },
+    {
+        "id": "truth-001",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Creeper",
+        "en": {
+            "question": "Creepers run away from cats.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los creepers huyen de los gatos.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-002",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Enderman",
+        "en": {
+            "question": "Water hurts endermen.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "El agua hace daño a los enderman.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-003",
+        "category": "mechanics",
+        "source": "https://minecraft.wiki/w/Bed",
+        "en": {
+            "question": "You can sleep in a bed in the Nether.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Puedes dormir en una cama en el Nether.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-004",
+        "category": "blocks",
+        "source": "https://minecraft.wiki/w/Obsidian",
+        "en": {
+            "question": "An iron pickaxe can mine obsidian.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Un pico de hierro puede picar obsidiana.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-005",
+        "category": "crafting",
+        "source": "https://minecraft.wiki/w/Clock",
+        "en": {
+            "question": "A clock is crafted with gold ingots.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "El reloj se fabrica con lingotes de oro.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-006",
+        "category": "crafting",
+        "source": "https://minecraft.wiki/w/Compass",
+        "en": {
+            "question": "A compass is crafted with diamonds.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "La brújula se fabrica con diamantes.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-007",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Skeleton",
+        "en": {
+            "question": "Skeletons burn in sunlight.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los esqueletos arden a la luz del sol.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-008",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Zombie_Villager",
+        "en": {
+            "question": "A zombie villager can be cured with a splash potion of weakness and a golden apple.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un aldeano zombi se puede curar con una poción arrojadiza de debilidad y una manzana de oro.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-009",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Ender_Dragon",
+        "en": {
+            "question": "The Ender Dragon lives in the Nether.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "El dragón del End vive en el Nether.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-010",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Wither",
+        "en": {
+            "question": "Wither skeleton skulls are used to summon the Wither.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Las calaveras de esqueleto del Wither se usan para invocar al Wither.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-011",
+        "category": "world",
+        "source": "https://minecraft.wiki/w/Water",
+        "en": {
+            "question": "Water poured from a bucket in the Nether evaporates.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "El agua que vacías de un cubo en el Nether se evapora.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-012",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Iron_Golem",
+        "en": {
+            "question": "Iron golems attack villagers.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Los gólems de hierro atacan a los aldeanos.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-013",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Pig",
+        "en": {
+            "question": "A saddled pig can be steered with a carrot on a stick.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un cerdo ensillado se puede dirigir con una caña con zanahoria.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-014",
+        "category": "crafting",
+        "source": "https://minecraft.wiki/w/Netherite_Ingot",
+        "en": {
+            "question": "A netherite ingot is made from netherite scrap and gold ingots.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un lingote de netherita se hace con fragmentos de netherita y lingotes de oro.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-015",
+        "category": "enchanting",
+        "source": "https://minecraft.wiki/w/Mending",
+        "en": {
+            "question": "Mending repairs an item with experience orbs.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Reparación arregla un objeto con orbes de experiencia.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-016",
+        "category": "enchanting",
+        "source": "https://minecraft.wiki/w/Infinity",
+        "en": {
+            "question": "A bow can have both Infinity and Mending.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Un arco puede tener Infinidad y Reparación a la vez.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-017",
+        "category": "redstone",
+        "source": "https://minecraft.wiki/w/Redstone_Torch",
+        "en": {
+            "question": "A redstone torch turns off when the block it is on is powered.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una antorcha de redstone se apaga cuando el bloque en el que está recibe energía.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-018",
+        "category": "redstone",
+        "source": "https://minecraft.wiki/w/Piston",
+        "en": {
+            "question": "A piston can push obsidian.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Un pistón puede empujar obsidiana.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-019",
+        "category": "redstone",
+        "source": "https://minecraft.wiki/w/Observer",
+        "en": {
+            "question": "An observer sends a pulse when the block in front of it changes.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un observador emite un pulso cuando cambia el bloque que tiene delante.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-020",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Blaze",
+        "en": {
+            "question": "Blazes drop blaze rods.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los blazes sueltan varas de blaze.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-021",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Ghast",
+        "en": {
+            "question": "Ghasts live in the End.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Los ghasts viven en el End.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-022",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Shulker",
+        "en": {
+            "question": "A shulker's bullet makes you levitate.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "El proyectil de un shulker te hace levitar.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-023",
+        "category": "world",
+        "source": "https://minecraft.wiki/w/Elytra",
+        "en": {
+            "question": "Elytra are found in End cities.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los élitros se encuentran en las ciudades del End.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-024",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Villager",
+        "en": {
+            "question": "A villager struck by lightning turns into a witch.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un aldeano alcanzado por un rayo se convierte en bruja.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-025",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Pig",
+        "en": {
+            "question": "A pig struck by lightning turns into a zombified piglin.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un cerdo alcanzado por un rayo se convierte en un piglin zombificado.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-026",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Milk_Bucket",
+        "en": {
+            "question": "Chickens can be milked with a bucket.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Las gallinas se pueden ordeñar con un cubo.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-027",
+        "category": "enchanting",
+        "source": "https://minecraft.wiki/w/Enchanting_Table",
+        "en": {
+            "question": "An enchanting table needs bookshelves around it to offer level 30 enchantments.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una mesa de encantamientos necesita librerías alrededor para ofrecer encantamientos de nivel 30.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-028",
+        "category": "enchanting",
+        "source": "https://minecraft.wiki/w/Lapis_Lazuli",
+        "en": {
+            "question": "Enchanting at an enchanting table uses lapis lazuli.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Encantar en una mesa de encantamientos gasta lapislázuli.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-029",
+        "category": "blocks",
+        "source": "https://minecraft.wiki/w/Sand",
+        "en": {
+            "question": "Sand falls when there is nothing under it.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "La arena cae cuando no tiene nada debajo.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-030",
+        "category": "blocks",
+        "source": "https://minecraft.wiki/w/Gravel",
+        "en": {
+            "question": "Mining gravel can drop flint.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Picar grava puede soltar pedernal.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-031",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Spider",
+        "en": {
+            "question": "Spiders attack you on sight in daylight.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Las arañas te atacan nada más verte a plena luz del día.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-032",
+        "category": "mechanics",
+        "source": "https://minecraft.wiki/w/Totem_of_Undying",
+        "en": {
+            "question": "A totem of undying held in your hand saves you from dying.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un tótem de la inmortalidad en la mano te salva de morir.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-033",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Evoker",
+        "en": {
+            "question": "Evokers drop a totem of undying.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los invocadores sueltan un tótem de la inmortalidad.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-034",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Warden",
+        "en": {
+            "question": "The warden is blind.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "El warden es ciego.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-035",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Bee",
+        "en": {
+            "question": "A bee dies some time after it stings.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una abeja muere poco después de picar.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-036",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Snow_Golem",
+        "en": {
+            "question": "Snow golems take damage in the desert.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los gólems de nieve reciben daño en el desierto.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-037",
+        "category": "world",
+        "source": "https://minecraft.wiki/w/Lava",
+        "en": {
+            "question": "Lava flows faster in the Nether than in the Overworld.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "La lava fluye más rápido en el Nether que en el mundo normal.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-038",
+        "category": "blocks",
+        "source": "https://minecraft.wiki/w/Diamond_Ore",
+        "en": {
+            "question": "A stone pickaxe can mine diamond ore.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Un pico de piedra puede picar mena de diamante.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-039",
+        "category": "mechanics",
+        "source": "https://minecraft.wiki/w/Netherite",
+        "en": {
+            "question": "Netherite items burn up in lava.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Los objetos de netherita se queman en la lava.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-040",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Axolotl",
+        "en": {
+            "question": "An axolotl can be carried in a bucket of water.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un ajolote se puede llevar en un cubo de agua.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-041",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Cat",
+        "en": {
+            "question": "Phantoms stay away from cats.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los fantasmas se alejan de los gatos.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-042",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Phantom",
+        "en": {
+            "question": "Phantoms come for players who have not slept for three nights or more.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los fantasmas aparecen a los jugadores que llevan tres noches o más sin dormir.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-043",
+        "category": "blocks",
+        "source": "https://minecraft.wiki/w/Glass",
+        "en": {
+            "question": "Mining glass without Silk Touch gives you the glass back.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Picar cristal sin Toque de seda te devuelve el cristal.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-044",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Enderman",
+        "en": {
+            "question": "Endermen can pick up any block.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Los enderman pueden coger cualquier bloque.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-045",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Piglin",
+        "en": {
+            "question": "Piglins attack you even while you wear a piece of gold armor.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Los piglins te atacan aunque lleves una pieza de armadura de oro.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-046",
+        "category": "world",
+        "source": "https://minecraft.wiki/w/Chorus_Plant",
+        "en": {
+            "question": "Chorus plants grow naturally in the Overworld.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Las plantas de chorus crecen de forma natural en el mundo normal.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-047",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Snow_Golem",
+        "en": {
+            "question": "A snow golem is built from iron blocks.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Un gólem de nieve se construye con bloques de hierro.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-048",
+        "category": "blocks",
+        "source": "https://minecraft.wiki/w/Cake",
+        "en": {
+            "question": "A cake can be picked back up after you place it.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Una tarta se puede recoger después de colocarla.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-049",
+        "category": "blocks",
+        "source": "https://minecraft.wiki/w/Sugar_Cane",
+        "en": {
+            "question": "Sugar cane can be planted on stone.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "La caña de azúcar se puede plantar sobre piedra.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-050",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Turtle",
+        "en": {
+            "question": "Turtles lay their eggs on sand.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Las tortugas ponen sus huevos en la arena.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-051",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Dolphin",
+        "en": {
+            "question": "Swimming near dolphins can give you Dolphin's Grace.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Nadar cerca de los delfines puede darte Gracia de delfín.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-052",
+        "category": "redstone",
+        "source": "https://minecraft.wiki/w/Hopper",
+        "en": {
+            "question": "A hopper pulls items out of a chest above it.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una tolva saca objetos de un cofre que tiene encima.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-053",
+        "category": "mechanics",
+        "source": "https://minecraft.wiki/w/Fishing",
+        "en": {
+            "question": "Fishing can catch an enchanted book.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Pescando puedes sacar un libro encantado.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-054",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Villager",
+        "en": {
+            "question": "A villager needs a job site block to take a profession.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un aldeano necesita un bloque de trabajo para tener una profesión.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-055",
+        "category": "mechanics",
+        "source": "https://minecraft.wiki/w/Bed",
+        "en": {
+            "question": "A bed explodes when you try to sleep in it in the End.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una cama explota si intentas dormir en ella en el End.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-056",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Sheep",
+        "en": {
+            "question": "Sheep can be dyed.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Las ovejas se pueden teñir.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-057",
+        "category": "mechanics",
+        "source": "https://minecraft.wiki/w/Ender_Pearl",
+        "en": {
+            "question": "A thrown ender pearl teleports you where it lands.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una perla de ender lanzada te teletransporta a donde cae.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-058",
+        "category": "versions",
+        "source": "https://minecraft.wiki/w/The_Nether",
+        "en": {
+            "question": "The Nether was first added in the Nether Update (1.16).",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "El Nether se añadió por primera vez en la Nether Update (1.16).",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-059",
+        "category": "versions",
+        "source": "https://minecraft.wiki/w/Warden",
+        "en": {
+            "question": "The warden was added in The Wild Update (1.19).",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "El warden se añadió en The Wild Update (1.19).",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-060",
+        "category": "versions",
+        "source": "https://minecraft.wiki/w/Netherite",
+        "en": {
+            "question": "Netherite was added in the Nether Update (1.16).",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "La netherita se añadió en la Nether Update (1.16).",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-061",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Cow",
+        "en": {
+            "question": "Shearing a cow gives you leather.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Esquilar una vaca te da cuero.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-062",
+        "category": "crafting",
+        "source": "https://minecraft.wiki/w/Crafting_Table",
+        "en": {
+            "question": "A crafting table is made from four planks.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una mesa de trabajo se hace con cuatro tablones.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-063",
+        "category": "crafting",
+        "source": "https://minecraft.wiki/w/Torch",
+        "en": {
+            "question": "A torch is crafted from a stick and coal or charcoal.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una antorcha se fabrica con un palo y carbón o carbón vegetal.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-064",
+        "category": "crafting",
+        "source": "https://minecraft.wiki/w/Furnace",
+        "en": {
+            "question": "A furnace is crafted from eight cobblestone.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un horno se fabrica con ocho bloques de roca.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-065",
+        "category": "world",
+        "source": "https://minecraft.wiki/w/Diamond_Ore",
+        "en": {
+            "question": "Diamond ore generates in the Nether.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "La mena de diamante se genera en el Nether.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-066",
+        "category": "world",
+        "source": "https://minecraft.wiki/w/Ancient_Debris",
+        "en": {
+            "question": "Ancient debris is found in the Nether.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Los escombros ancestrales se encuentran en el Nether.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-067",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Zombie",
+        "en": {
+            "question": "On Hard difficulty, zombies can break wooden doors.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "En dificultad difícil, los zombis pueden romper puertas de madera.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-068",
+        "category": "redstone",
+        "source": "https://minecraft.wiki/w/Redstone_Dust",
+        "en": {
+            "question": "A redstone signal through dust reaches up to 15 blocks.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Una señal de redstone por el polvo llega hasta 15 bloques.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-069",
+        "category": "mechanics",
+        "source": "https://minecraft.wiki/w/Hunger",
+        "en": {
+            "question": "Sprinting makes you hungry faster than walking.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Esprintar te da hambre más rápido que caminar.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-070",
+        "category": "enchanting",
+        "source": "https://minecraft.wiki/w/Silk_Touch",
+        "en": {
+            "question": "A pickaxe can have both Silk Touch and Fortune.",
+            "answers": ["false"]
+        },
+        "es": {
+            "question": "Un pico puede tener Toque de seda y Fortuna a la vez.",
+            "answers": ["falso"]
+        }
+    },
+    {
+        "id": "truth-071",
+        "category": "crafting",
+        "source": "https://minecraft.wiki/w/Bread",
+        "en": {
+            "question": "Bread is crafted from three wheat.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "El pan se fabrica con tres de trigo.",
+            "answers": ["verdadero"]
+        }
+    },
+    {
+        "id": "truth-072",
+        "category": "mobs",
+        "source": "https://minecraft.wiki/w/Enderman",
+        "en": {
+            "question": "An enderman gets angry when you look at its face.",
+            "answers": ["true"]
+        },
+        "es": {
+            "question": "Un enderman se enfada cuando le miras a la cara.",
+            "answers": ["verdadero"]
+        }
     }
 ]

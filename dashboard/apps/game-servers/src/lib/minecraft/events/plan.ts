@@ -480,25 +480,50 @@ export interface Placed {
 }
 
 /**
+ * Who goes first of two: the higher score, then - when `took` is given - the
+ * one who took less time over it, then the name, so the order is the same
+ * every time it is worked out. A name missing from `took` counts as slowest.
+ */
+export function ranking(
+    took?: Readonly<Record<string, number>>
+): (left: readonly [string, number], right: readonly [string, number]) => number {
+    const time = (name: string) => took?.[name] ?? Number.MAX_SAFE_INTEGER;
+    return (left, right) =>
+        right[1] - left[1] || time(left[0]) - time(right[0]) || left[0].localeCompare(right[0]);
+}
+
+/**
  * The top three by score, ties sharing a place (two firsts, then a third).
  * Nobody with nothing to show stands on it, and nobody disqualified does.
+ *
+ * `took` breaks a tie on score: a trivia game passes how long each player took
+ * to answer the rounds they won, added up (`EventRun.answerMs`). Tied on
+ * points, they took the same number of rounds, so the least time added up is
+ * also the fastest on average - and only the same score in the same time
+ * still shares a place.
  */
 export function podium(
     scores: ReadonlyMap<string, number>,
     disqualified: ReadonlySet<string>,
     /** The least that ranks at all - see `minScoreOf`. */
-    minScore = 1
+    minScore = 1,
+    took?: Readonly<Record<string, number>>
 ): Placed[] {
     const ranked = [...scores.entries()]
         .filter(
             ([name, score]) =>
                 score >= Math.max(1, minScore) && !disqualified.has(name.toLowerCase())
         )
-        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+        .sort(ranking(took));
+    const time = (name: string) => took?.[name] ?? Number.MAX_SAFE_INTEGER;
     const placed: Placed[] = [];
     ranked.forEach(([name, score], index) => {
         const previous = placed[index - 1];
-        const place = previous && previous.score === score ? previous.place : index + 1;
+        const tied =
+            previous !== undefined &&
+            previous.score === score &&
+            (took === undefined || time(previous.name) === time(name));
+        const place = tied ? previous.place : index + 1;
         if (place <= 3) placed.push({ place, name, score });
     });
     return placed;

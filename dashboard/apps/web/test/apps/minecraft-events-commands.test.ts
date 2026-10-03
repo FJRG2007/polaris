@@ -30,7 +30,8 @@ import * as meteors from "@polaris-app/game-servers/src/lib/minecraft/events/kin
 import {
     atLeast,
     chatLines,
-    firstRight
+    firstRight,
+    truthRound
 } from "@polaris-app/game-servers/src/lib/minecraft/events/events-service";
 
 const preset = <K extends catalog.EventKind>(
@@ -406,6 +407,95 @@ describe("trivia", () => {
         expect(firstRight(log, ["zombie"])).toBeNull();
     });
 
+    it("takes true or false typed in either language, as a word or its letter", () => {
+        for (const typed of ["t", "T", " true ", "TRUE!", "v", "V", "verdadero", "Verdadero."])
+            expect(trivia.truthSaid(typed)).toBe(true);
+        for (const typed of ["f", "F", "false", "False", "falso", " FALSO "])
+            expect(trivia.truthSaid(typed)).toBe(false);
+        for (const typed of ["", "fs", "trues", "verdad", "yes", "si", "tf", "true false", "x"])
+            expect(trivia.truthSaid(typed)).toBeNull();
+    });
+
+    it("asks a question answered true or false as a true-or-false one, the operator's too", () => {
+        expect(trivia.truthOf({ question: "Sheep can be dyed.", answers: ["Verdadero"] })).toBe(
+            true
+        );
+        expect(
+            trivia.truthOf({ question: "Ghasts live in the End.", answers: ["false", "f"] })
+        ).toBe(false);
+        expect(trivia.truthOf({ question: "Either?", answers: ["true", "false"] })).toBeNull();
+        expect(trivia.truthOf({ question: "Which mob?", answers: ["creeper"] })).toBeNull();
+        expect(trivia.truthAnswers(true, "es")[0]).toBe("verdadero");
+        expect(trivia.truthAnswers(false, "en")[0]).toBe("false");
+    });
+
+    const said = (...lines: [string, string][]) =>
+        lines
+            .map(([name, text]) => `[20:00:01] [Server thread/INFO]: <${name}> ${text}`)
+            .join("\n");
+
+    it("gives a true-or-false round to the first right answer, typed in any of its forms", () => {
+        for (const typed of ["t", "true", "v", "verdadero", "TRUE", "Verdadero!"])
+            expect(truthRound(said(["Ana", typed]), true, []).winner).toBe("Ana");
+        for (const typed of ["f", "false", "falso", "F", "Falso."])
+            expect(truthRound(said(["Ana", typed]), false, []).winner).toBe("Ana");
+        // Chatter is no answer, and changes nothing.
+        expect(truthRound(said(["Ana", "hmm"], ["Ana", "trues"]), true, [])).toEqual({
+            winner: null,
+            out: []
+        });
+    });
+
+    it("counts only a player's first true-or-false answer, across reads of the log", () => {
+        const first = truthRound(said(["Ana", "f"], ["Ana", "t"], ["Ben", "maybe"]), true, []);
+        expect(first).toEqual({ winner: null, out: ["Ana"] });
+        // Still out the next time the log is read, however it is written.
+        expect(truthRound(said(["ana", "verdadero"], ["Ben", "v"]), true, first.out)).toEqual({
+            winner: "Ben",
+            out: ["Ana"]
+        });
+    });
+
+    it("reads a [True] or [False] click of this round as the answer, and none of another", () => {
+        const line = commands.truthButtons(
+            2,
+            "&eClick or type t or f:",
+            { label: "[True]", hover: "Answer true" },
+            { label: "[False]", hover: "Answer false" }
+        );
+        expect(line.startsWith("tellraw @a ")).toBe(true);
+        // Both spellings of the click, as the join buttons write them.
+        const yes = commands.truthValue(2, true);
+        const no = commands.truthValue(2, false);
+        expect(line).toContain(
+            `"clickEvent":{"action":"run_command","value":"/trigger pe_join set ${yes}"}`
+        );
+        expect(line).toContain(
+            `"click_event":{"action":"run_command","command":"/trigger pe_join set ${no}"}`
+        );
+        // Never one of the join buttons' values, nor another round's.
+        const values = [0, 1, 2, 14].flatMap((round) => [
+            commands.truthValue(round, true),
+            commands.truthValue(round, false)
+        ]);
+        expect(new Set(values).size).toBe(values.length);
+        for (const value of values)
+            expect([
+                commands.JOIN_VALUE,
+                commands.LEAVE_VALUE,
+                commands.DONE_VALUE,
+                commands.UNDO_VALUE
+            ]).not.toContain(value);
+        const pressedYes = commands.truthPressedLine("Ana", yes, 2);
+        const pressedNo = commands.truthPressedLine("Ana", no, 2);
+        expect(truthRound(pressedYes!, true, []).winner).toBe("Ana");
+        expect(truthRound(pressedNo!, true, [])).toEqual({ winner: null, out: ["Ana"] });
+        expect(commands.truthPressedLine("Ana", commands.truthValue(1, true), 2)).toBeNull();
+        expect(commands.truthPressedLine("Ana", commands.JOIN_VALUE, 2)).toBeNull();
+        // A join press never reads as an answer either.
+        expect(commands.pressedLine("Ana", yes)).toBeNull();
+    });
+
     it("never hands a word back unscrambled", () => {
         for (let seed = 0; seed < 50; seed += 1) {
             expect(trivia.scramble("diamond", trivia.seeded(`s${seed}`))).not.toBe("DIAMOND");
@@ -453,6 +543,15 @@ describe("trivia", () => {
         }
         for (const one of trivia.BANK) {
             expect(one.source).toMatch(/^https:\/\/minecraft\.wiki\/w\/[^\s]+$/);
+            // A true-or-false one is a sentence to judge, the same either way.
+            const truth = trivia.truthOf(one.en);
+            expect(trivia.truthOf(one.es)).toBe(truth);
+            expect(truth !== null).toBe(one.id.startsWith("truth-"));
+            if (truth !== null) {
+                expect(one.en.question).toMatch(/^[A-Z].*\.$/);
+                expect(one.es.question).toMatch(/^[A-ZÁÉÍÓÚÑ].*\.$/);
+                continue;
+            }
             expect(one.en.question.endsWith("?")).toBe(true);
             expect(one.es.question).toMatch(/^¿.*\?$|\?$/);
             expect(one.en.answers.length).toBeGreaterThan(0);
@@ -466,7 +565,8 @@ describe("trivia", () => {
     });
 
     it("asks nothing but Minecraft by default, in a new trivia event and in one saved before", () => {
-        const offTopic = /capital of|planet|guitar|piano|ocean on earth|chemical symbol|olympic|painted/i;
+        const offTopic =
+            /capital of|planet|guitar|piano|ocean on earth|chemical symbol|olympic|painted/i;
         for (const one of trivia.BANK) expect(one.en.question).not.toMatch(offTopic);
         const made = catalog.newPreset("trivia", "t");
         const saved = catalog.presetSchema.parse({

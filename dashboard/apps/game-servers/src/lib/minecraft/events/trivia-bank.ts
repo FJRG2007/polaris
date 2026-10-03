@@ -40,7 +40,9 @@ export interface BankQuestion {
  * versions, advancements and mechanics, each answer checked on the Minecraft
  * Wiki for Java Edition 1.21. Each is the same question in every language, so
  * players reading different languages are asked the same thing in the same
- * round, and the game's own names are accepted in either language.
+ * round, and the game's own names are accepted in either language. Those
+ * answered `true` or `false` (`verdadero`, `falso`) are a sentence to judge,
+ * asked as a true-or-false round (`truthOf`).
  */
 export const BANK: readonly BankQuestion[] = bank as BankQuestion[];
 
@@ -184,6 +186,53 @@ export function answers(said: string, accepted: readonly string[]): boolean {
         const plural = (word: string) => [word, `${word}s`, `${word}es`];
         return plural(right).includes(typed) || plural(typed).includes(right);
     });
+}
+
+// ------------------------------------------------------------------ true or false
+
+/**
+ * Every way of answering a true-or-false round, by language: the word and its
+ * first letter. A round accepts every language's, since each reader is asked
+ * the same thing - and they never clash: `f` is false in both, and `t` and `v`
+ * are only ever true.
+ */
+export const TRUTH_WORDS: Readonly<
+    Record<Language, Readonly<Record<"true" | "false", readonly string[]>>>
+> = {
+    en: { true: ["true", "t"], false: ["false", "f"] },
+    es: { true: ["verdadero", "v"], false: ["falso", "f"] }
+};
+
+/** What something said in the chat answers to a true-or-false round: true,
+ *  false, or null when it is neither - compared whole, never as a plural or a
+ *  part, so `fs` or `true story` is no answer. */
+export function truthSaid(said: string): boolean | null {
+    const typed = normalizeAnswer(said);
+    if (!typed) return null;
+    const saidAs = (side: "true" | "false") =>
+        Object.values(TRUTH_WORDS).some((words) => words[side].includes(typed));
+    if (saidAs("true")) return true;
+    if (saidAs("false")) return false;
+    return null;
+}
+
+/**
+ * Whether a question is a true-or-false one, and which: every answer it
+ * accepts is a way of saying the same one of the two. The bank's are written
+ * that way (`true`, `verdadero`), and so is an operator's own question
+ * answered `true` or `falso` - each then asked with buttons to click.
+ */
+export function truthOf(question: TriviaQuestion): boolean | null {
+    const said = question.answers.map(truthSaid);
+    const first = said[0];
+    if (first === undefined || first === null) return null;
+    return said.every((one) => one === first) ? first : null;
+}
+
+/** The answers a true-or-false round accepts in one language, the word first:
+ *  it is what the round says the answer was. */
+export function truthAnswers(truth: boolean, language: Language): string[] {
+    return [...TRUTH_WORDS[language][truth ? "true" : "false"]];
 }
 
 /**

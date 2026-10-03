@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import * as plan from "@polaris-app/game-servers/src/lib/minecraft/events/plan";
 import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/catalog";
+import * as stored from "@polaris-app/game-servers/src/lib/minecraft/events/state";
 import { gameMessageIn } from "@polaris-app/game-servers/src/lib/game-message";
 
 /** What a carried sentence says to an English reader. */
@@ -371,6 +372,62 @@ describe("the podium and the prizes", () => {
             { place: 1, name: "Ana", score: 10 },
             { place: 1, name: "Ben", score: 10 },
             { place: 3, name: "Cai", score: 7 }
+        ]);
+    });
+
+    it("breaks a tie on score by who took less time, when the time is given", () => {
+        const scores = new Map([
+            ["Ana", 3],
+            ["Ben", 3],
+            ["Cai", 3],
+            ["Dan", 5]
+        ]);
+        const placed = plan.podium(scores, new Set(), 1, { Ana: 9_000, Ben: 4_000, Cai: 6_000 });
+        expect(placed).toEqual([
+            { place: 1, name: "Dan", score: 5 },
+            { place: 2, name: "Ben", score: 3 },
+            { place: 3, name: "Cai", score: 3 }
+        ]);
+        // The same score in the same time still shares the place, and a name
+        // with no time counts as slowest.
+        expect(plan.podium(scores, new Set(), 1, { Ana: 4_000, Ben: 4_000, Dan: 1 })).toEqual([
+            { place: 1, name: "Dan", score: 5 },
+            { place: 2, name: "Ana", score: 3 },
+            { place: 2, name: "Ben", score: 3 }
+        ]);
+        // The same order every time, whatever order the scores came in.
+        const reversed = new Map([...scores.entries()].reverse());
+        expect(plan.podium(reversed, new Set(), 1, { Ana: 9_000, Ben: 4_000, Cai: 6_000 })).toEqual(
+            placed
+        );
+        expect(
+            [...scores.entries()]
+                .sort(plan.ranking({ Ana: 9_000, Ben: 4_000, Cai: 6_000 }))
+                .map(([name]) => name)
+        ).toEqual(["Dan", "Ben", "Cai", "Ana"]);
+    });
+
+    it("reads a trivia game saved before answer times were kept, with none yet", () => {
+        const saved = stored.runSchema.parse({
+            id: "run-1",
+            trigger: "manual",
+            startedBy: null,
+            preset: catalog.newPreset("trivia", "quiz"),
+            phase: "running",
+            createdAt: 0,
+            startsAt: 0,
+            endsAt: 1,
+            round: 2,
+            points: { Ana: 1, Ben: 1 }
+        });
+        expect(saved.answerMs).toEqual({});
+        expect(saved.triviaOut).toEqual([]);
+        // With no times at all, a tie on points still shares the place.
+        expect(
+            plan.podium(new Map(Object.entries(saved.points)), new Set(), 1, saved.answerMs)
+        ).toEqual([
+            { place: 1, name: "Ana", score: 1 },
+            { place: 1, name: "Ben", score: 1 }
         ]);
     });
 

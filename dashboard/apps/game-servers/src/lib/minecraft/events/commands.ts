@@ -2077,6 +2077,39 @@ export function pressedLine(name: string, value: number): string | null {
     return word ? `[00:00:00] [Server thread/INFO]: <${name}> ${word}` : null;
 }
 
+/**
+ * A trivia round's [True] and [False] press the same trigger with a value of
+ * that round's own, past the join buttons': a button left in the chat from an
+ * earlier round answers nothing in this one.
+ */
+const TRUTH_VALUE_BASE = 10;
+
+export function truthValue(round: number, truth: boolean): number {
+    return TRUTH_VALUE_BASE + round * 2 + (truth ? 0 : 1);
+}
+
+/** The [True] and [False] line of a true-or-false round. */
+export function truthButtons(
+    round: number,
+    lead: string,
+    yes: { label: string; hover: string },
+    no: { label: string; hover: string }
+): string {
+    return buttonsLine("@a", lead, [
+        { ...yes, color: "green", value: truthValue(round, true) },
+        { ...no, color: "red", value: truthValue(round, false) }
+    ]);
+}
+
+/** A chat line in the server log's own shape for a [True] or [False] pressed
+ *  in round `round`, read as having typed it; null for any other press. */
+export function truthPressedLine(name: string, value: number, round: number): string | null {
+    if (value === truthValue(round, true)) return `[00:00:00] [Server thread/INFO]: <${name}> true`;
+    if (value === truthValue(round, false))
+        return `[00:00:00] [Server thread/INFO]: <${name}> false`;
+    return null;
+}
+
 export function cleanup(
     preset: EventPreset,
     place: { x: number; y: number; z: number } | null,
