@@ -389,10 +389,10 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
             required: true,
             group: "config"
         },
-        // i18n-ignore: the default folder is named after the product
         {
             name: "rootFolderName",
             label: "connection.fields.folderName",
+            // i18n-ignore: the default folder is named after the product
             placeholder: "Polaris",
             group: "config"
         }
@@ -406,10 +406,10 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
             required: true,
             group: "config"
         },
-        // i18n-ignore: the default folder is named after the product
         {
             name: "rootFolderName",
             label: "connection.fields.folderName",
+            // i18n-ignore: the default folder is named after the product
             placeholder: "Polaris",
             group: "config"
         }
