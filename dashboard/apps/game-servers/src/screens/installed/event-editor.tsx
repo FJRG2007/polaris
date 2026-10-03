@@ -62,6 +62,15 @@ export const LOOT_LABELS: Readonly<
     "ancient-city": "editor.labels.loot.ancient-city"
 };
 
+const SPLEEF_LABELS: Readonly<
+    Record<"random" | (typeof catalog.SPLEEF_VARIANTS)[number], GameKey<"minecraft">>
+> = {
+    random: "editor.labels.spleef.random",
+    shovel: "editor.labels.spleef.shovel",
+    decay: "editor.labels.spleef.decay",
+    snowballs: "editor.labels.spleef.snowballs"
+};
+
 const INTENSITY_LABELS: Readonly<
     Record<(typeof catalog.INTENSITIES)[number], GameKey<"minecraft">>
 > = {
@@ -909,6 +918,16 @@ function OptionsFields({
                             />
                         </Field>
                     </div>
+                    <Field label={t("editor.howItIsPlayed")}>
+                        <Select
+                            value={value.variant}
+                            onValueChange={(variant) =>
+                                onChange({ ...value, variant: variant as typeof value.variant })
+                            }
+                            options={options(t, SPLEEF_LABELS)}
+                            aria-label={t("editor.howItIsPlayed")}
+                        />
+                    </Field>
                 </>
             );
         }

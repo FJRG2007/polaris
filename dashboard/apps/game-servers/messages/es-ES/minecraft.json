@@ -2113,6 +2113,12 @@
             "wavesWinner": {
                 "kills": "Más muertes",
                 "damage": "Más daño"
+            },
+            "spleef": {
+                "random": "Distinto cada vez",
+                "shovel": "Palas: rompe la nieve",
+                "decay": "Suelo fugaz",
+                "snowballs": "Bolas: tíralos abajo"
             }
         },
         "place": {
@@ -2146,8 +2152,6 @@
         "materialHint": "Se sortea en cada ronda, sin repetir uno de una ronda anterior, y se anuncia al empezarla. Solo cuenta lo que se reúna durante la ronda.",
         "theCatch": "La captura",
         "catchHint": "Un tesoro concreto sale más o menos una vez cada 120 capturas, cualquiera de ellos una vez cada 25 - en aguas abiertas, más a menudo con Suerte marina. Dale 20 minutos o más.",
-        "chests": "Cofres",
-        "1To10": "1 a 10",
         "howFarOut": "Distancia (bloques)",
         "howFarOutHint": "De 50 a 1000, desde los jugadores",
         "perKill": "Extra por mob matado",
@@ -2172,7 +2176,8 @@
         "bossTrophy": "Trofeo para el ganador",
         "bossTrophyHint": "Una estrella del Nether con el nombre del jefe, brillo y su dificultad, además de los premios. Solo si el jefe cae.",
         "wavesWinner": "Cómo se decide el ganador",
-        "roundMinutes": "Minutos por ronda"
+        "roundMinutes": "Minutos por ronda",
+        "howItIsPlayed": "Cómo se juega"
     },
     "moderation": {
         "announcements": {

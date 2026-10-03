@@ -693,6 +693,8 @@ export async function startEvent(input: {
         startsAt: now + countdown,
         endsAt: now + countdown + catalog.runMinutes(preset) * 60_000,
         participants: [...seen.values()].map((one) => one.name),
+        triviaSkip:
+            preset.kind === "trivia" ? stored.readEventState(row.config).triviaSeen : [],
         place: null,
         target: null,
         placeTries: 0,
@@ -745,11 +747,11 @@ export async function startEvent(input: {
         boss: null
     } satisfies stored.EventRun;
 
-    const stored = await updateEventState(input.installedAppId, (state) => {
+    const written = await updateEventState(input.installedAppId, (state) => {
         if (state.run) throw new Error(refused("anotherOn"));
         return { ...state, run, waiting: null };
     });
-    if (!stored) throw new Error(refused("noServer"));
+    if (!written) throw new Error(refused("noServer"));
     startLoop(row.ownerId, input.installedAppId, run, config.settings);
     return run;
 }
@@ -2375,7 +2377,7 @@ async function hideTreasure(
             false,
             {
                 nearHome: true,
-                bearing: hunt.chestBearing(loop.run.id, index, options.chests),
+                bearing: hunt.chestBearing(loop.run.id, index, hunt.TREASURES),
                 ...(loop.run.origin ? { walkFrom: loop.run.origin } : {})
             }
         );
@@ -2441,7 +2443,7 @@ async function hideTreasure(
             place: null,
             target: null,
             placeTries: loop.placeFloor,
-            hidden: loop.run.chests.length >= options.chests
+            hidden: loop.run.chests.length >= hunt.TREASURES
         };
         await persist(installedAppId, loop);
     }
@@ -2471,7 +2473,7 @@ async function settlePendingChest(
         ...loop.run,
         place: null,
         target: null,
-        hidden: loop.run.chests.length >= options.chests
+        hidden: loop.run.chests.length >= hunt.TREASURES
     };
     await persist(installedAppId, loop);
 }
@@ -2583,12 +2585,11 @@ function roundIn(
     language: catalog.Language
 ): { kind: "question" | "scramble"; asked: string; accepted: string[] } {
     const options = run.preset.options as catalog.EventOptions<"trivia">;
-    const random = trivia.seeded(run.id);
     const questions = [
         ...options.questions,
-        ...trivia.shuffled(trivia.QUESTIONS[language], random)
+        ...trivia.ordered(run.id, run.triviaSkip).map((one) => one[language])
     ];
-    const words = trivia.shuffled(trivia.WORDS[language], random);
+    const words = trivia.shuffled(trivia.WORDS[language], trivia.seeded(run.id));
     const scrambleRound =
         options.mode === "scramble" || (options.mode === "mixed" && run.round % 2 === 1);
     if (scrambleRound) {
@@ -2601,6 +2602,27 @@ function roundIn(
     }
     const question = questions[run.round % questions.length]!;
     return { kind: "question", asked: question.question, accepted: [...question.answers] };
+}
+
+/** The bank's questions a trivia game asked, remembered so the next games ask
+ *  others first. */
+async function rememberAsked(installedAppId: string, run: stored.EventRun): Promise<void> {
+    const options = run.preset.options as catalog.EventOptions<"trivia">;
+    const bank = trivia.ordered(run.id, run.triviaSkip);
+    const asked: string[] = [];
+    for (let round = 0; round <= run.round; round += 1) {
+        const scrambleRound =
+            options.mode === "scramble" || (options.mode === "mixed" && round % 2 === 1);
+        const index = round - options.questions.length;
+        if (!scrambleRound && index >= 0 && index < bank.length) asked.push(bank[index]!.id);
+    }
+    if (asked.length === 0) return;
+    await updateEventState(installedAppId, (state) => ({
+        ...state,
+        triviaSeen: trivia.remembered(state.triviaSeen, asked)
+    })).catch((error: unknown) =>
+        console.warn("polaris: remembering trivia questions failed", installedAppId, String(error))
+    );
 }
 
 /**
@@ -3261,6 +3283,7 @@ async function finish(
         console.warn("polaris: marking an event finished failed", installedAppId, String(error))
     );
     const { preset } = run;
+    if (preset.kind === "trivia") await rememberAsked(installedAppId, run);
     const language = loop.language;
     const info = catalog.KIND_INFO[preset.kind];
     let placed: plan.Placed[] = [];

@@ -321,7 +321,7 @@ function EventExplained({
     if (preset.kind === "treasure-hunt") {
         const options = preset.options as catalog.EventOptions<"treasure-hunt">;
         facts.push(
-            t("events.facts.chestsHidden", { count: options.chests, distance: options.distance }),
+            t("events.facts.chestsHidden", { count: 1, distance: options.distance }),
             t("events.facts.clues"),
             t("events.facts.chestsCleared")
         );

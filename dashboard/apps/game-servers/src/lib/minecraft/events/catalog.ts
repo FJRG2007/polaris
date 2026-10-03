@@ -122,6 +122,8 @@ export const HUNT_TARGETS = [
     "spider",
     "enderman"
 ] as const;
+/** The ways a spleef is played: shovels, floors that vanish underfoot, snowballs. */
+export const SPLEEF_VARIANTS = ["shovel", "decay", "snowballs"] as const;
 export const LOOT_TABLES = ["treasure", "dungeon", "bastion", "end-city", "ancient-city"] as const;
 export const BOSS_KINDS = [
     "wither-skeleton",
@@ -310,9 +312,15 @@ export const optionsSchemas = {
             .min(1, problem("atLeast", { count: 1 }))
             .max(10, problem("atMost", { count: 10 }))
             .default(5),
-        /** How far from the players the chests are hidden, at most. */
-        distance: z.number().int().min(50).max(1000).default(300),
-        loot: z.enum(LOOT_TABLES).default("dungeon")
+        /** How far from the players the treasure is hidden, at most. */
+        distance: z
+            .number()
+            .int()
+            .min(50, problem("atLeast", { count: 50 }))
+            .max(1000, problem("atMost", { count: 1000 }))
+            .default(300),
+        /** A bastion's treasure room by default: the richest table there is. */
+        loot: z.enum(LOOT_TABLES).default("bastion")
     }),
     gathering: z.object({
         /** Drawn at the start of each round, from the list, when `random`. */
@@ -427,7 +435,9 @@ export const optionsSchemas = {
             .int()
             .min(25, problem("atLeast", { count: 25 }))
             .max(40, problem("atMost", { count: 40 }))
-            .default(30)
+            .default(30),
+        /** How it is played (`kinds/spleef`): drawn for each run, or always one way. */
+        variant: z.enum(["random", ...SPLEEF_VARIANTS]).default("random")
     }),
     "team-duel": z.object({
         /** The arena is built in the air above ground found here. */
@@ -894,8 +904,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "build-battle": EPIC
 };
 
-/** A king of the hill's length: a few minutes of pushing is plenty. */
-export const HILL_MINUTES = 4;
+/** A king of the hill's length: three minutes of pushing is plenty. */
+export const HILL_MINUTES = 3;
 
 /**
  * How long each kind runs when it is made, in minutes: what fits it. A trivia
@@ -941,7 +951,11 @@ export function oldDefaultMinutes(kind: EventKind): number {
 export function migratePreset(entry: unknown): unknown {
     if (typeof entry !== "object" || entry === null) return entry;
     const raw = entry as { kind?: unknown; minutes?: unknown; options?: unknown };
-    if (raw.kind !== "king-of-the-hill" || raw.minutes !== 10) return entry;
+    if (raw.kind !== "king-of-the-hill") return entry;
+    // Four was the length every hill started with until it was shortened to
+    // three: nobody's choice either.
+    if (raw.minutes === 4) return { ...raw, minutes: HILL_MINUTES };
+    if (raw.minutes !== 10) return entry;
     const options = raw.options;
     if (typeof options === "object" && options !== null && "fistsOnly" in options) return entry;
     return { ...raw, minutes: HILL_MINUTES };

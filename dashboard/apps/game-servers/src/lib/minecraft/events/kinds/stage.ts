@@ -53,6 +53,9 @@ export const ARENA_BLOCKS = [
     "minecraft:light_weighted_pressure_plate",
     "minecraft:white_stained_glass",
     "minecraft:light_blue_stained_glass",
+    "minecraft:lime_stained_glass",
+    "minecraft:yellow_stained_glass",
+    "minecraft:red_concrete",
     "minecraft:snow_block"
 ] as const;
 
@@ -464,7 +467,7 @@ export function returned(output: string): boolean {
  */
 export function afterReturnLines(saved: Saved, items: Flavour["items"], note: string): string[] {
     return [
-        clearMarked(saved.name, items),
+        ...clearMarked(saved.name, items),
         `gamemode ${saved.mode} ${saved.name}`,
         `tag ${saved.name} remove ${IN_ARENA}`,
         protect(saved.name),
@@ -486,8 +489,25 @@ export function markedShovel(name: string, items: Flavour["items"]): string {
 }
 
 /** Only what the event handed out, by its marker: never anything of the player's. */
-export function clearMarked(name: string, items: Flavour["items"]): string {
+export function clearMarked(name: string, items: Flavour["items"]): string[] {
     return items === "components"
-        ? `clear ${name} *[minecraft:custom_data={polaris_event:1b}]`
-        : `clear ${name} minecraft:iron_shovel{polaris_event:1b}`;
+        ? [`clear ${name} *[minecraft:custom_data={polaris_event:1b}]`]
+        : [
+              `clear ${name} minecraft:iron_shovel{polaris_event:1b}`,
+              `clear ${name} minecraft:snowball{polaris_event:1b}`
+          ];
+}
+
+/** The spleef snowballs, marked like the shovel, topped up to `count`: the
+ *  marked ones taken first, so a player never holds more than that. */
+export function markedSnowballs(name: string, items: Flavour["items"], count: number): string[] {
+    return items === "components"
+        ? [
+              `clear ${name} minecraft:snowball[minecraft:custom_data={polaris_event:1b}]`,
+              `give ${name} minecraft:snowball[minecraft:custom_data={polaris_event:1b}] ${count}`
+          ]
+        : [
+              `clear ${name} minecraft:snowball{polaris_event:1b}`,
+              `give ${name} minecraft:snowball{polaris_event:1b} ${count}`
+          ];
 }

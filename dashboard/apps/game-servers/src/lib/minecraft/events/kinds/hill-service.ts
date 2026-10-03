@@ -20,7 +20,8 @@ import { EventStopped, type KindContext } from "./arena-service";
 const messages = speech.spoken(written);
 const hillMessages = speech.spoken(said);
 
-const NO_PLACE = "No open air was found for it near the players";
+const NO_AIR = "No open air was found for it near the players";
+const NO_GROUND = "No dry ground was found for it near the players";
 
 /** Ticks a platform's chunks are waited for before its site is given up. */
 const LOAD_WAITS = 5;
@@ -32,25 +33,38 @@ function optionsOf(run: stored.EventRun): catalog.EventOptions<"king-of-the-hill
 }
 
 /**
- * The circle's place, over a few ticks: a platform floating `hill.LIFT` over
- * the highest thing under it - a build, a tree, the sea - built into air proven
- * empty, like every other arena. Answers whether it is ready. Throws once
- * nowhere would do.
+ * The circle's place, over a few ticks. Played with fists only (the default):
+ * a platform floating `hill.LIFT` over the highest thing under it - a build, a
+ * tree, the sea - built into air proven empty, like every other arena. Walked
+ * to: the world's own ground, or a platform on the sea. Answers whether it is
+ * ready. Throws once nowhere would do.
  */
 export async function raiseHill(ctx: KindContext): Promise<boolean> {
     const run = ctx.run;
-    const { radius, place } = optionsOf(run);
+    const { radius, place, fistsOnly } = optionsOf(run);
     if (run.place && run.arena) return true;
+    // Walked to rather than brought to: on the ground where there is any, and
+    // over the sea at sea level where there is not - a hill in the sky could
+    // not be walked to.
+    if (!fistsOnly && !run.overSea) {
+        const found = await ctx.findPlace(place, hill.DISTANCE, radius, "ground", true);
+        if (found === null) return false;
+        if (found !== "failed") {
+            ctx.run = { ...ctx.run, arena: { box: hill.bounds(found, radius), blocks: [] } };
+            await ctx.persist();
+            await announce(ctx, found);
+            return true;
+        }
+        ctx.run = { ...ctx.run, overSea: true, placeTries: 0, target: null, place: null };
+        await ctx.persist();
+        await ctx.server.sayAll([commands.CLEAR_MARK]);
+        return false;
+    }
     if (!run.place) {
-        const found = await ctx.findPlace(
-            place,
-            hill.DISTANCE,
-            radius + hill.MARGIN,
-            "air",
-            true,
-            hill.LIFT
-        );
-        if (found === "failed") throw new EventStopped(NO_PLACE);
+        const found = fistsOnly
+            ? await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "air", true, hill.LIFT)
+            : await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "open", true);
+        if (found === "failed") throw new EventStopped(fistsOnly ? NO_AIR : NO_GROUND);
         return false;
     }
     return buildPlatform(ctx, run.place, radius);
@@ -227,7 +241,7 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
     const spots = entrySpotsFor(run);
     const room = hill.bounds(place, radius);
     lines.push(
-        ...hill.protectLines(),
+        ...hill.protectLines(place, radius),
         ...commands.hillTick(place, radius, seconds, arena.IN_ARENA),
         ...arena.keepThrown(room),
         ...commands.hostilesOut(room)

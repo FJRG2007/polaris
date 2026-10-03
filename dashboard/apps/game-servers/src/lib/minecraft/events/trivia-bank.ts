@@ -7,270 +7,54 @@
  * punctuation never decide a round.
  */
 
+import bank from "./trivia-questions.json";
 import type { Language, TriviaQuestion } from "./catalog";
 
+/** One question of the bank, in every language, and what it is about. */
+export interface BankQuestion {
+    /** Stable: kept in a server's list of what was asked lately. */
+    readonly id: string;
+    readonly category: string;
+    readonly en: TriviaQuestion;
+    readonly es: TriviaQuestion;
+}
+
+/**
+ * Every built-in question, kept as data (`trivia-questions.json`): Minecraft's
+ * mobs, items and world, and general knowledge - geography, science, history,
+ * numbers. Each is the same question in every language, so players reading
+ * different languages are asked the same thing in the same round.
+ */
+export const BANK: readonly BankQuestion[] = bank as BankQuestion[];
+
+/** The bank in one language, in its own order. */
 export const QUESTIONS: Readonly<Record<Language, readonly TriviaQuestion[]>> = {
-    en: [
-        {
-            question: "How many blocks of obsidian make the smallest Nether portal frame?",
-            answers: ["10", "ten"]
-        },
-        {
-            question: "What do you need to mine obsidian?",
-            answers: ["diamond pickaxe", "netherite pickaxe", "diamond pick"]
-        },
-        {
-            question: "Which mob drops gunpowder when killed and explodes when near you?",
-            answers: ["creeper"]
-        },
-        {
-            question: "What item do you throw to find a stronghold?",
-            answers: ["eye of ender", "ender eye", "eyes of ender"]
-        },
-        { question: "How many ender eyes fill a complete End portal?", answers: ["12", "twelve"] },
-        {
-            question: "What is the name of the boss in the End?",
-            answers: ["ender dragon", "the ender dragon", "dragon"]
-        },
-        {
-            question: "Which ore is only found in mountain biomes in the Overworld?",
-            answers: ["emerald", "emerald ore"]
-        },
-        { question: "What do you feed a wolf to tame it?", answers: ["bone", "bones"] },
-        { question: "What block do you need to brew potions?", answers: ["brewing stand"] },
-        {
-            question: "What is the maximum stack size of most items?",
-            answers: ["64", "sixty four", "sixty-four"]
-        },
-        {
-            question: "Which mob can pick up blocks and teleport?",
-            answers: ["enderman", "endermen"]
-        },
-        {
-            question:
-                "What do you combine with a diamond tool at a smithing table to make netherite?",
-            answers: ["netherite ingot", "netherite ingots"]
-        },
-        { question: "How many wool blocks does it take to craft a bed?", answers: ["3", "three"] },
-        {
-            question: "What does a piglin want in exchange for bartering?",
-            answers: ["gold", "gold ingot", "gold ingots"]
-        },
-        {
-            question: "Which fuel lasts the longest in a furnace?",
-            answers: ["lava bucket", "bucket of lava", "lava"]
-        },
-        {
-            question: "What mob do you need to kill to get a trident?",
-            answers: ["drowned", "a drowned"]
-        },
-        { question: "What do you use to shear a sheep?", answers: ["shears"] },
-        {
-            question: "What item lets you breathe underwater for longer when worn on the head?",
-            answers: ["turtle shell", "turtle helmet"]
-        },
-        {
-            question: "How many ingots make a full set of iron armor?",
-            answers: ["24", "twenty four", "twenty-four"]
-        },
-        {
-            question: "What is the rarest ore in the Nether?",
-            answers: ["ancient debris", "debris"]
-        },
-        {
-            question: "Which boss is summoned with soul sand and wither skeleton skulls?",
-            answers: ["wither", "the wither"]
-        },
-        { question: "What tool breaks wool the fastest?", answers: ["shears"] },
-        { question: "What do you need to catch a fish?", answers: ["fishing rod", "rod"] },
-        {
-            question: "Which dimension has no day and night cycle and floating islands?",
-            answers: ["the end", "end"]
-        },
-        {
-            question: "What block makes a beacon work when placed beneath it in a pyramid?",
-            answers: [
-                "iron block",
-                "gold block",
-                "diamond block",
-                "emerald block",
-                "netherite block"
-            ]
-        },
-        { question: "What do villagers use as currency?", answers: ["emerald", "emeralds"] },
-        {
-            question: "Which mob turns into a witch when struck by lightning?",
-            answers: ["villager", "villagers"]
-        },
-        { question: "What block do you right-click to skip the night?", answers: ["bed"] },
-        {
-            question: "Which item is dropped by blazes and powers brewing stands?",
-            answers: ["blaze rod", "blaze rods", "blaze powder"]
-        },
-        {
-            question: "What is the name of the hostile mob that only spawns in the deep dark?",
-            answers: ["warden", "the warden"]
-        },
-        { question: "How many hearts does a player have at full health?", answers: ["10", "ten"] },
-        {
-            question: "What food restores the most hunger?",
-            answers: ["rabbit stew", "suspicious stew", "cake", "golden carrot"]
-        },
-        {
-            question: "What block is crafted from 9 diamonds?",
-            answers: ["diamond block", "block of diamond"]
-        },
-        {
-            question: "What does a totem of undying do?",
-            answers: ["saves you from death", "prevents death", "revives you", "saves you"]
-        },
-        { question: "Which mob drops ender pearls?", answers: ["enderman", "endermen"] },
-        {
-            question:
-                "What is the name of the flying mob that spawns when you do not sleep for days?",
-            answers: ["phantom", "phantoms"]
-        },
-        {
-            question: "What do you use to tame a horse besides riding it?",
-            answers: ["golden apple", "golden carrot", "sugar", "apple", "wheat", "hay bale"]
-        },
-        {
-            question: "What block grows on sand next to water and can be crafted into sugar?",
-            answers: ["sugar cane", "sugarcane"]
-        },
-        {
-            question:
-                "For every block traveled in the Nether, how many do you cover in the Overworld?",
-            answers: ["8", "eight"]
-        },
-        {
-            question: "What material are the strongest tools in the game made of?",
-            answers: ["netherite"]
-        }
-    ],
-    es: [
-        {
-            question:
-                "¿Cuántos bloques de obsidiana tiene el marco de portal al Nether más pequeño?",
-            answers: ["10", "diez"]
-        },
-        {
-            question: "¿Qué necesitas para picar obsidiana?",
-            answers: ["pico de diamante", "pico de netherita"]
-        },
-        { question: "¿Qué mob explota cerca de ti y suelta pólvora?", answers: ["creeper"] },
-        {
-            question: "¿Qué objeto lanzas para encontrar una fortaleza?",
-            answers: ["ojo de ender", "ojos de ender", "ojo del end"]
-        },
-        {
-            question: "¿Cuántos ojos de ender llenan un portal del End completo?",
-            answers: ["12", "doce"]
-        },
-        {
-            question: "¿Cómo se llama el jefe del End?",
-            answers: ["dragon del end", "ender dragon", "dragon", "el dragon del end"]
-        },
-        {
-            question: "¿Qué mena solo aparece en los biomas de montaña del mundo normal?",
-            answers: ["esmeralda", "mena de esmeralda"]
-        },
-        { question: "¿Qué le das a un lobo para domesticarlo?", answers: ["hueso", "huesos"] },
-        {
-            question: "¿Qué bloque necesitas para hacer pociones?",
-            answers: ["soporte para pociones", "destilador"]
-        },
-        {
-            question: "¿Cuál es el tamaño máximo de pila de la mayoría de objetos?",
-            answers: ["64", "sesenta y cuatro"]
-        },
-        {
-            question: "¿Qué mob coge bloques y se teletransporta?",
-            answers: ["enderman", "endermans"]
-        },
-        {
-            question:
-                "¿Qué combinas con una herramienta de diamante en la mesa de herrería para hacerla de netherita?",
-            answers: ["lingote de netherita", "lingotes de netherita"]
-        },
-        {
-            question: "¿Cuántos bloques de lana hacen falta para fabricar una cama?",
-            answers: ["3", "tres"]
-        },
-        {
-            question: "¿Qué quieren los piglins a cambio de hacer trueques?",
-            answers: ["oro", "lingote de oro", "lingotes de oro"]
-        },
-        { question: "¿Qué combustible dura más en un horno?", answers: ["cubo de lava", "lava"] },
-        {
-            question: "¿Qué mob hay que matar para conseguir un tridente?",
-            answers: ["ahogado", "ahogados", "drowned"]
-        },
-        { question: "¿Con qué esquilas a una oveja?", answers: ["tijeras"] },
-        {
-            question: "¿Qué casco te deja respirar más tiempo bajo el agua?",
-            answers: ["caparazon de tortuga", "casco de tortuga"]
-        },
-        {
-            question: "¿Cuántos lingotes hacen una armadura de hierro completa?",
-            answers: ["24", "veinticuatro"]
-        },
-        {
-            question: "¿Cuál es la mena más rara del Nether?",
-            answers: ["escombros ancestrales", "restos ancestrales", "ancient debris"]
-        },
-        {
-            question: "¿Qué jefe se invoca con arena de almas y cráneos de esqueleto wither?",
-            answers: ["wither", "el wither"]
-        },
-        { question: "¿Con qué pescas un pez?", answers: ["caña de pescar", "caña"] },
-        {
-            question: "¿Qué dimensión no tiene día ni noche y tiene islas flotantes?",
-            answers: ["el end", "end"]
-        },
-        { question: "¿Qué usan los aldeanos como moneda?", answers: ["esmeralda", "esmeraldas"] },
-        {
-            question: "¿Qué mob se convierte en bruja si le cae un rayo?",
-            answers: ["aldeano", "aldeanos"]
-        },
-        { question: "¿Qué bloque usas para saltarte la noche?", answers: ["cama"] },
-        {
-            question: "¿Qué sueltan los blazes que sirve para el soporte de pociones?",
-            answers: ["vara de blaze", "varas de blaze", "polvo de blaze"]
-        },
-        {
-            question: "¿Cómo se llama el mob hostil que aparece en la oscuridad profunda?",
-            answers: ["warden", "el warden", "guardian"]
-        },
-        {
-            question: "¿Cuántos corazones tiene un jugador con la vida llena?",
-            answers: ["10", "diez"]
-        },
-        { question: "¿Qué bloque se fabrica con 9 diamantes?", answers: ["bloque de diamante"] },
-        {
-            question: "¿Qué hace un tótem de la inmortalidad?",
-            answers: ["te salva de morir", "evita la muerte", "te revive", "te salva"]
-        },
-        { question: "¿Qué mob suelta perlas de ender?", answers: ["enderman", "endermans"] },
-        {
-            question: "¿Cómo se llama el mob volador que aparece si no duermes en días?",
-            answers: ["phantom", "phantoms", "fantasma", "fantasmas"]
-        },
-        {
-            question: "¿Qué planta crece en la arena junto al agua y da azúcar?",
-            answers: ["caña de azucar", "cañas de azucar"]
-        },
-        {
-            question:
-                "Por cada bloque que recorres en el Nether, ¿cuántos recorres en el mundo normal?",
-            answers: ["8", "ocho"]
-        },
-        {
-            question: "¿De qué material son las herramientas más fuertes del juego?",
-            answers: ["netherita"]
-        }
-    ]
+    en: BANK.map((one) => one.en),
+    es: BANK.map((one) => one.es)
 };
+
+/** How many questions a server remembers having asked, so the next games ask
+ *  others first. */
+export const RECENT_KEPT = 160;
+
+/**
+ * The order one game asks the bank in: shuffled for the game, and those the
+ * server has not asked lately first - so nothing repeats inside a game, and
+ * nothing asked in the last few games comes back while there are others.
+ * The same for the same game, so a restart mid-game asks the same next.
+ */
+export function ordered(runId: string, recent: readonly string[]): BankQuestion[] {
+    const all = shuffled(BANK, seeded(`${runId}-bank`));
+    const seen = new Set(recent);
+    return [...all.filter((one) => !seen.has(one.id)), ...all.filter((one) => seen.has(one.id))];
+}
+
+/** What a server remembers after a game that asked `asked`: the newest last,
+ *  the oldest let go past `RECENT_KEPT`. */
+export function remembered(recent: readonly string[], asked: readonly string[]): string[] {
+    const fresh = new Set(asked);
+    return [...recent.filter((one) => !fresh.has(one)), ...asked].slice(-RECENT_KEPT);
+}
 
 /** Words for a scramble round: Minecraft things, long enough to be a puzzle. */
 export const WORDS: Readonly<Record<Language, readonly string[]>> = {

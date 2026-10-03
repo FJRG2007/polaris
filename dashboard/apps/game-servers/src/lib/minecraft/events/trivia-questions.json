@@ -1,0 +1,3994 @@
+[
+  {
+    "id": "mobs-001",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops gunpowder and explodes when near you?",
+      "answers": [
+        "creeper"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob explota cerca de ti y suelta pólvora?",
+      "answers": [
+        "creeper"
+      ]
+    }
+  },
+  {
+    "id": "mobs-002",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob can pick up blocks and teleport?",
+      "answers": [
+        "enderman",
+        "endermen"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob coge bloques y se teletransporta?",
+      "answers": [
+        "enderman",
+        "endermans"
+      ]
+    }
+  },
+  {
+    "id": "mobs-003",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops ender pearls?",
+      "answers": [
+        "enderman",
+        "endermen"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta perlas de ender?",
+      "answers": [
+        "enderman",
+        "endermans"
+      ]
+    }
+  },
+  {
+    "id": "mobs-004",
+    "category": "mobs",
+    "en": {
+      "question": "What do you feed a wolf to tame it?",
+      "answers": [
+        "bone",
+        "bones"
+      ]
+    },
+    "es": {
+      "question": "¿Qué le das a un lobo para domesticarlo?",
+      "answers": [
+        "hueso",
+        "huesos"
+      ]
+    }
+  },
+  {
+    "id": "mobs-005",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob turns into a witch when struck by lightning?",
+      "answers": [
+        "villager",
+        "villagers"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob se convierte en bruja si le cae un rayo?",
+      "answers": [
+        "aldeano",
+        "aldeanos"
+      ]
+    }
+  },
+  {
+    "id": "mobs-006",
+    "category": "mobs",
+    "en": {
+      "question": "What is the hostile mob that spawns in the deep dark?",
+      "answers": [
+        "warden",
+        "the warden"
+      ]
+    },
+    "es": {
+      "question": "¿Cómo se llama el mob hostil que aparece en la oscuridad profunda?",
+      "answers": [
+        "warden",
+        "el warden"
+      ]
+    }
+  },
+  {
+    "id": "mobs-007",
+    "category": "mobs",
+    "en": {
+      "question": "What flying mob appears when you have not slept for days?",
+      "answers": [
+        "phantom",
+        "phantoms"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob volador aparece si no duermes en días?",
+      "answers": [
+        "phantom",
+        "phantoms"
+      ]
+    }
+  },
+  {
+    "id": "mobs-008",
+    "category": "mobs",
+    "en": {
+      "question": "Which boss is summoned with soul sand and wither skeleton skulls?",
+      "answers": [
+        "wither",
+        "the wither"
+      ]
+    },
+    "es": {
+      "question": "¿Qué jefe se invoca con arena de almas y cráneos de esqueleto wither?",
+      "answers": [
+        "wither",
+        "el wither"
+      ]
+    }
+  },
+  {
+    "id": "mobs-009",
+    "category": "mobs",
+    "en": {
+      "question": "What is the name of the boss in the End?",
+      "answers": [
+        "ender dragon",
+        "the ender dragon",
+        "dragon"
+      ]
+    },
+    "es": {
+      "question": "¿Cómo se llama el jefe del End?",
+      "answers": [
+        "dragon del end",
+        "ender dragon",
+        "dragon",
+        "el dragon del end"
+      ]
+    }
+  },
+  {
+    "id": "mobs-010",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob must you kill to get a trident?",
+      "answers": [
+        "drowned",
+        "a drowned"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob hay que matar para conseguir un tridente?",
+      "answers": [
+        "ahogado",
+        "ahogados",
+        "drowned"
+      ]
+    }
+  },
+  {
+    "id": "mobs-011",
+    "category": "mobs",
+    "en": {
+      "question": "What do piglins want in exchange for bartering?",
+      "answers": [
+        "gold",
+        "gold ingot",
+        "gold ingots"
+      ]
+    },
+    "es": {
+      "question": "¿Qué quieren los piglins a cambio de hacer trueques?",
+      "answers": [
+        "oro",
+        "lingote de oro",
+        "lingotes de oro"
+      ]
+    }
+  },
+  {
+    "id": "mobs-012",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops blaze rods?",
+      "answers": [
+        "blaze",
+        "blazes"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta varas de blaze?",
+      "answers": [
+        "blaze",
+        "blazes"
+      ]
+    }
+  },
+  {
+    "id": "mobs-013",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob shoots fireballs and cries in the Nether?",
+      "answers": [
+        "ghast",
+        "ghasts"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob lanza bolas de fuego y llora en el Nether?",
+      "answers": [
+        "ghast",
+        "ghasts"
+      ]
+    }
+  },
+  {
+    "id": "mobs-014",
+    "category": "mobs",
+    "en": {
+      "question": "What do you feed a cat to tame it?",
+      "answers": [
+        "raw fish",
+        "fish",
+        "raw cod",
+        "raw salmon",
+        "cod",
+        "salmon"
+      ]
+    },
+    "es": {
+      "question": "¿Qué le das a un gato para domesticarlo?",
+      "answers": [
+        "pescado crudo",
+        "pescado",
+        "bacalao",
+        "salmon",
+        "bacalao crudo",
+        "salmon crudo"
+      ]
+    }
+  },
+  {
+    "id": "mobs-015",
+    "category": "mobs",
+    "en": {
+      "question": "What do you use to milk a cow?",
+      "answers": [
+        "bucket",
+        "a bucket"
+      ]
+    },
+    "es": {
+      "question": "¿Con qué ordeñas una vaca?",
+      "answers": [
+        "cubo",
+        "un cubo"
+      ]
+    }
+  },
+  {
+    "id": "mobs-016",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob is afraid of cats and ocelots?",
+      "answers": [
+        "creeper",
+        "creepers"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob huye de los gatos y los ocelotes?",
+      "answers": [
+        "creeper",
+        "creepers"
+      ]
+    }
+  },
+  {
+    "id": "mobs-017",
+    "category": "mobs",
+    "en": {
+      "question": "What item does a chicken lay?",
+      "answers": [
+        "egg",
+        "eggs"
+      ]
+    },
+    "es": {
+      "question": "¿Qué pone una gallina?",
+      "answers": [
+        "huevo",
+        "huevos"
+      ]
+    }
+  },
+  {
+    "id": "mobs-018",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops slimeballs?",
+      "answers": [
+        "slime",
+        "slimes"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta bolas de slime?",
+      "answers": [
+        "slime",
+        "slimes"
+      ]
+    }
+  },
+  {
+    "id": "mobs-019",
+    "category": "mobs",
+    "en": {
+      "question": "Which golem protects villages?",
+      "answers": [
+        "iron golem",
+        "iron golems"
+      ]
+    },
+    "es": {
+      "question": "¿Qué gólem protege las aldeas?",
+      "answers": [
+        "golem de hierro",
+        "golems de hierro"
+      ]
+    }
+  },
+  {
+    "id": "mobs-020",
+    "category": "mobs",
+    "en": {
+      "question": "What block do you place on top of iron blocks to build an iron golem?",
+      "answers": [
+        "carved pumpkin",
+        "pumpkin",
+        "jack o lantern"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque pones sobre bloques de hierro para crear un gólem de hierro?",
+      "answers": [
+        "calabaza tallada",
+        "calabaza",
+        "calabaza de halloween"
+      ]
+    }
+  },
+  {
+    "id": "mobs-021",
+    "category": "mobs",
+    "en": {
+      "question": "Which hostile pig-like mob lives in crimson forests?",
+      "answers": [
+        "hoglin",
+        "hoglins"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob parecido a un cerdo hostil vive en los bosques carmesí?",
+      "answers": [
+        "hoglin",
+        "hoglins"
+      ]
+    }
+  },
+  {
+    "id": "mobs-022",
+    "category": "mobs",
+    "en": {
+      "question": "What do you feed a parrot to tame it?",
+      "answers": [
+        "seeds",
+        "wheat seeds",
+        "seed"
+      ]
+    },
+    "es": {
+      "question": "¿Qué le das a un loro para domesticarlo?",
+      "answers": [
+        "semillas",
+        "semillas de trigo",
+        "semilla"
+      ]
+    }
+  },
+  {
+    "id": "mobs-023",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops ink sacs?",
+      "answers": [
+        "squid",
+        "squids"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta bolsas de tinta?",
+      "answers": [
+        "calamar",
+        "calamares"
+      ]
+    }
+  },
+  {
+    "id": "mobs-024",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops glow ink sacs?",
+      "answers": [
+        "glow squid",
+        "glow squids"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta bolsas de tinta luminosa?",
+      "answers": [
+        "calamar luminoso",
+        "calamares luminosos"
+      ]
+    }
+  },
+  {
+    "id": "mobs-025",
+    "category": "mobs",
+    "en": {
+      "question": "What mob carries a crossbow and raids villages?",
+      "answers": [
+        "pillager",
+        "pillagers"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob lleva ballesta y asalta aldeas?",
+      "answers": [
+        "saqueador",
+        "saqueadores",
+        "pillager"
+      ]
+    }
+  },
+  {
+    "id": "mobs-026",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops the totem of undying?",
+      "answers": [
+        "evoker",
+        "evokers"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta el tótem de la inmortalidad?",
+      "answers": [
+        "evocador",
+        "evocadores",
+        "evoker"
+      ]
+    }
+  },
+  {
+    "id": "mobs-027",
+    "category": "mobs",
+    "en": {
+      "question": "Which ocean mob guards ocean monuments and drops wet sponges?",
+      "answers": [
+        "elder guardian",
+        "elder guardians"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob guarda los monumentos oceánicos y suelta esponjas mojadas?",
+      "answers": [
+        "guardian anciano",
+        "guardianes ancianos"
+      ]
+    }
+  },
+  {
+    "id": "mobs-028",
+    "category": "mobs",
+    "en": {
+      "question": "What do you use to breed cows?",
+      "answers": [
+        "wheat"
+      ]
+    },
+    "es": {
+      "question": "¿Qué usas para criar vacas?",
+      "answers": [
+        "trigo"
+      ]
+    }
+  },
+  {
+    "id": "mobs-029",
+    "category": "mobs",
+    "en": {
+      "question": "What do you use to breed pigs?",
+      "answers": [
+        "carrot",
+        "carrots",
+        "potato",
+        "potatoes",
+        "beetroot",
+        "beetroots"
+      ]
+    },
+    "es": {
+      "question": "¿Qué usas para criar cerdos?",
+      "answers": [
+        "zanahoria",
+        "zanahorias",
+        "patata",
+        "patatas",
+        "remolacha",
+        "remolachas"
+      ]
+    }
+  },
+  {
+    "id": "mobs-030",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob can you ride on lava in the Nether?",
+      "answers": [
+        "strider",
+        "striders"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob puedes montar sobre la lava del Nether?",
+      "answers": [
+        "lavagante",
+        "strider",
+        "striders"
+      ]
+    }
+  },
+  {
+    "id": "mobs-031",
+    "category": "mobs",
+    "en": {
+      "question": "What does a strider need on a stick to be steered?",
+      "answers": [
+        "warped fungus",
+        "warped fungus on a stick"
+      ]
+    },
+    "es": {
+      "question": "¿Qué necesita un lavagante en un palo para dirigirlo?",
+      "answers": [
+        "hongo distorsionado",
+        "hongo distorsionado en un palo"
+      ]
+    }
+  },
+  {
+    "id": "mobs-032",
+    "category": "mobs",
+    "en": {
+      "question": "Which small mob gives you items it finds and loves note blocks?",
+      "answers": [
+        "allay",
+        "allays"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob pequeño te trae objetos y adora los bloques musicales?",
+      "answers": [
+        "allay",
+        "allays"
+      ]
+    }
+  },
+  {
+    "id": "mobs-033",
+    "category": "mobs",
+    "en": {
+      "question": "Which zombie can you cure with weakness and a golden apple?",
+      "answers": [
+        "zombie villager"
+      ]
+    },
+    "es": {
+      "question": "¿Qué zombi puedes curar con debilidad y una manzana dorada?",
+      "answers": [
+        "aldeano zombi",
+        "aldeano zombie"
+      ]
+    }
+  },
+  {
+    "id": "mobs-034",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob makes bees angry if you take honey without a campfire?",
+      "answers": [
+        "bee",
+        "bees"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob se enfada si coges miel sin una fogata debajo?",
+      "answers": [
+        "abeja",
+        "abejas"
+      ]
+    }
+  },
+  {
+    "id": "mobs-035",
+    "category": "mobs",
+    "en": {
+      "question": "How many heads does the Wither have?",
+      "answers": [
+        "3",
+        "three"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas cabezas tiene el Wither?",
+      "answers": [
+        "3",
+        "tres"
+      ]
+    }
+  },
+  {
+    "id": "mobs-036",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob spits at you and can carry chests?",
+      "answers": [
+        "llama",
+        "llamas"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob te escupe y puede llevar cofres?",
+      "answers": [
+        "llama",
+        "llamas"
+      ]
+    }
+  },
+  {
+    "id": "mobs-037",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops shulker shells?",
+      "answers": [
+        "shulker",
+        "shulkers"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta caparazones de shulker?",
+      "answers": [
+        "shulker",
+        "shulkers"
+      ]
+    }
+  },
+  {
+    "id": "mobs-038",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob makes you levitate when it hits you?",
+      "answers": [
+        "shulker",
+        "shulkers"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob te hace levitar cuando te golpea?",
+      "answers": [
+        "shulker",
+        "shulkers"
+      ]
+    }
+  },
+  {
+    "id": "mobs-039",
+    "category": "mobs",
+    "en": {
+      "question": "What mob is the frog's tadpole form?",
+      "answers": [
+        "tadpole",
+        "tadpoles"
+      ]
+    },
+    "es": {
+      "question": "¿Cómo se llama la cría de la rana?",
+      "answers": [
+        "renacuajo",
+        "renacuajos"
+      ]
+    }
+  },
+  {
+    "id": "mobs-040",
+    "category": "mobs",
+    "en": {
+      "question": "Which mob drops rabbit's foot sometimes?",
+      "answers": [
+        "rabbit",
+        "rabbits"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mob suelta a veces una pata de conejo?",
+      "answers": [
+        "conejo",
+        "conejos"
+      ]
+    }
+  },
+  {
+    "id": "items-041",
+    "category": "items",
+    "en": {
+      "question": "What do you need to mine obsidian?",
+      "answers": [
+        "diamond pickaxe",
+        "netherite pickaxe",
+        "diamond pick"
+      ]
+    },
+    "es": {
+      "question": "¿Qué necesitas para picar obsidiana?",
+      "answers": [
+        "pico de diamante",
+        "pico de netherita"
+      ]
+    }
+  },
+  {
+    "id": "items-042",
+    "category": "items",
+    "en": {
+      "question": "What item do you throw to find a stronghold?",
+      "answers": [
+        "eye of ender",
+        "ender eye",
+        "eyes of ender"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto lanzas para encontrar una fortaleza?",
+      "answers": [
+        "ojo de ender",
+        "ojos de ender",
+        "ojo del end"
+      ]
+    }
+  },
+  {
+    "id": "items-043",
+    "category": "items",
+    "en": {
+      "question": "What block do you need to brew potions?",
+      "answers": [
+        "brewing stand"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque necesitas para hacer pociones?",
+      "answers": [
+        "soporte para pociones",
+        "destilador"
+      ]
+    }
+  },
+  {
+    "id": "items-044",
+    "category": "items",
+    "en": {
+      "question": "What is the largest stack size of most items?",
+      "answers": [
+        "64",
+        "sixty four",
+        "sixty-four"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el tamaño máximo de pila de la mayoría de objetos?",
+      "answers": [
+        "64",
+        "sesenta y cuatro"
+      ]
+    }
+  },
+  {
+    "id": "items-045",
+    "category": "items",
+    "en": {
+      "question": "What do you combine with a diamond tool at a smithing table to make it netherite?",
+      "answers": [
+        "netherite ingot",
+        "netherite ingots"
+      ]
+    },
+    "es": {
+      "question": "¿Qué combinas con una herramienta de diamante en la mesa de herrería para hacerla de netherita?",
+      "answers": [
+        "lingote de netherita",
+        "lingotes de netherita"
+      ]
+    }
+  },
+  {
+    "id": "items-046",
+    "category": "items",
+    "en": {
+      "question": "How many wool blocks does it take to craft a bed?",
+      "answers": [
+        "3",
+        "three"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos bloques de lana hacen falta para una cama?",
+      "answers": [
+        "3",
+        "tres"
+      ]
+    }
+  },
+  {
+    "id": "items-047",
+    "category": "items",
+    "en": {
+      "question": "Which fuel lasts the longest in a furnace?",
+      "answers": [
+        "lava bucket",
+        "bucket of lava",
+        "lava"
+      ]
+    },
+    "es": {
+      "question": "¿Qué combustible dura más en un horno?",
+      "answers": [
+        "cubo de lava",
+        "lava"
+      ]
+    }
+  },
+  {
+    "id": "items-048",
+    "category": "items",
+    "en": {
+      "question": "What do you use to shear a sheep?",
+      "answers": [
+        "shears"
+      ]
+    },
+    "es": {
+      "question": "¿Con qué esquilas a una oveja?",
+      "answers": [
+        "tijeras"
+      ]
+    }
+  },
+  {
+    "id": "items-049",
+    "category": "items",
+    "en": {
+      "question": "What helmet lets you breathe underwater for longer?",
+      "answers": [
+        "turtle shell",
+        "turtle helmet"
+      ]
+    },
+    "es": {
+      "question": "¿Qué casco te deja respirar más tiempo bajo el agua?",
+      "answers": [
+        "caparazon de tortuga",
+        "casco de tortuga"
+      ]
+    }
+  },
+  {
+    "id": "items-050",
+    "category": "items",
+    "en": {
+      "question": "How many ingots make a full set of iron armor?",
+      "answers": [
+        "24",
+        "twenty four",
+        "twenty-four"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos lingotes hacen una armadura de hierro completa?",
+      "answers": [
+        "24",
+        "veinticuatro"
+      ]
+    }
+  },
+  {
+    "id": "items-051",
+    "category": "items",
+    "en": {
+      "question": "What do you need to catch a fish?",
+      "answers": [
+        "fishing rod",
+        "rod"
+      ]
+    },
+    "es": {
+      "question": "¿Con qué pescas un pez?",
+      "answers": [
+        "caña de pescar",
+        "caña"
+      ]
+    }
+  },
+  {
+    "id": "items-052",
+    "category": "items",
+    "en": {
+      "question": "What do villagers use as currency?",
+      "answers": [
+        "emerald",
+        "emeralds"
+      ]
+    },
+    "es": {
+      "question": "¿Qué usan los aldeanos como moneda?",
+      "answers": [
+        "esmeralda",
+        "esmeraldas"
+      ]
+    }
+  },
+  {
+    "id": "items-053",
+    "category": "items",
+    "en": {
+      "question": "What block do you right-click to skip the night?",
+      "answers": [
+        "bed"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque usas para saltarte la noche?",
+      "answers": [
+        "cama"
+      ]
+    }
+  },
+  {
+    "id": "items-054",
+    "category": "items",
+    "en": {
+      "question": "What block is crafted from 9 diamonds?",
+      "answers": [
+        "diamond block",
+        "block of diamond"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque se fabrica con 9 diamantes?",
+      "answers": [
+        "bloque de diamante"
+      ]
+    }
+  },
+  {
+    "id": "items-055",
+    "category": "items",
+    "en": {
+      "question": "What is the strongest tool material in the game?",
+      "answers": [
+        "netherite"
+      ]
+    },
+    "es": {
+      "question": "¿De qué material son las herramientas más fuertes del juego?",
+      "answers": [
+        "netherita"
+      ]
+    }
+  },
+  {
+    "id": "items-056",
+    "category": "items",
+    "en": {
+      "question": "How many planks does one log make?",
+      "answers": [
+        "4",
+        "four"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos tablones da un tronco?",
+      "answers": [
+        "4",
+        "cuatro"
+      ]
+    }
+  },
+  {
+    "id": "items-057",
+    "category": "items",
+    "en": {
+      "question": "How many sticks do two planks make?",
+      "answers": [
+        "4",
+        "four"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos palos dan dos tablones?",
+      "answers": [
+        "4",
+        "cuatro"
+      ]
+    }
+  },
+  {
+    "id": "items-058",
+    "category": "items",
+    "en": {
+      "question": "What do you craft with 8 cobblestone in a ring?",
+      "answers": [
+        "furnace"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fabricas con 8 de roca en círculo?",
+      "answers": [
+        "horno"
+      ]
+    }
+  },
+  {
+    "id": "items-059",
+    "category": "items",
+    "en": {
+      "question": "What do you craft with 8 planks in a ring?",
+      "answers": [
+        "chest"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fabricas con 8 tablones en círculo?",
+      "answers": [
+        "cofre"
+      ]
+    }
+  },
+  {
+    "id": "items-060",
+    "category": "items",
+    "en": {
+      "question": "What is crafted from 4 planks in a square?",
+      "answers": [
+        "crafting table",
+        "workbench"
+      ]
+    },
+    "es": {
+      "question": "¿Qué se fabrica con 4 tablones en cuadrado?",
+      "answers": [
+        "mesa de trabajo",
+        "mesa de crafteo"
+      ]
+    }
+  },
+  {
+    "id": "items-061",
+    "category": "items",
+    "en": {
+      "question": "What do you get by smelting sand?",
+      "answers": [
+        "glass"
+      ]
+    },
+    "es": {
+      "question": "¿Qué obtienes al fundir arena?",
+      "answers": [
+        "cristal",
+        "vidrio"
+      ]
+    }
+  },
+  {
+    "id": "items-062",
+    "category": "items",
+    "en": {
+      "question": "What do you get by smelting cobblestone?",
+      "answers": [
+        "stone",
+        "smooth stone"
+      ]
+    },
+    "es": {
+      "question": "¿Qué obtienes al fundir roca?",
+      "answers": [
+        "piedra"
+      ]
+    }
+  },
+  {
+    "id": "items-063",
+    "category": "items",
+    "en": {
+      "question": "What do you get by smelting clay balls?",
+      "answers": [
+        "brick",
+        "bricks"
+      ]
+    },
+    "es": {
+      "question": "¿Qué obtienes al fundir bolas de arcilla?",
+      "answers": [
+        "ladrillo",
+        "ladrillos"
+      ]
+    }
+  },
+  {
+    "id": "items-064",
+    "category": "items",
+    "en": {
+      "question": "What do you get by smelting a log?",
+      "answers": [
+        "charcoal"
+      ]
+    },
+    "es": {
+      "question": "¿Qué obtienes al fundir un tronco?",
+      "answers": [
+        "carbon vegetal"
+      ]
+    }
+  },
+  {
+    "id": "items-065",
+    "category": "items",
+    "en": {
+      "question": "Which item shows the way to your spawn point?",
+      "answers": [
+        "compass"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto señala tu punto de aparición?",
+      "answers": [
+        "brujula"
+      ]
+    }
+  },
+  {
+    "id": "items-066",
+    "category": "items",
+    "en": {
+      "question": "Which item tells the time of day?",
+      "answers": [
+        "clock"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto te dice la hora del día?",
+      "answers": [
+        "reloj"
+      ]
+    }
+  },
+  {
+    "id": "items-067",
+    "category": "items",
+    "en": {
+      "question": "What do you craft from 3 paper and 1 leather?",
+      "answers": [
+        "book"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fabricas con 3 papeles y 1 cuero?",
+      "answers": [
+        "libro"
+      ]
+    }
+  },
+  {
+    "id": "items-068",
+    "category": "items",
+    "en": {
+      "question": "What do you make paper from?",
+      "answers": [
+        "sugar cane",
+        "sugarcane"
+      ]
+    },
+    "es": {
+      "question": "¿Con qué se hace el papel?",
+      "answers": [
+        "caña de azucar"
+      ]
+    }
+  },
+  {
+    "id": "items-069",
+    "category": "items",
+    "en": {
+      "question": "What item lets you glide through the air?",
+      "answers": [
+        "elytra"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto te deja planear por el aire?",
+      "answers": [
+        "elitros",
+        "elytra"
+      ]
+    }
+  },
+  {
+    "id": "items-070",
+    "category": "items",
+    "en": {
+      "question": "Where do you find elytra?",
+      "answers": [
+        "end city",
+        "end ship",
+        "end cities",
+        "end ships"
+      ]
+    },
+    "es": {
+      "question": "¿Dónde encuentras los élitros?",
+      "answers": [
+        "ciudad del end",
+        "barco del end"
+      ]
+    }
+  },
+  {
+    "id": "items-071",
+    "category": "items",
+    "en": {
+      "question": "What item keeps you from dying once?",
+      "answers": [
+        "totem of undying",
+        "totem"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto evita que mueras una vez?",
+      "answers": [
+        "totem de la inmortalidad",
+        "totem"
+      ]
+    }
+  },
+  {
+    "id": "items-072",
+    "category": "items",
+    "en": {
+      "question": "Which block gives off light and is found in the Nether ceiling?",
+      "answers": [
+        "glowstone"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque da luz y cuelga del techo del Nether?",
+      "answers": [
+        "piedra luminosa",
+        "glowstone"
+      ]
+    }
+  },
+  {
+    "id": "items-073",
+    "category": "items",
+    "en": {
+      "question": "Which bow enchantment means you never use up arrows?",
+      "answers": [
+        "infinity"
+      ]
+    },
+    "es": {
+      "question": "¿Qué encantamiento hace que el arco no gaste flechas?",
+      "answers": [
+        "infinidad"
+      ]
+    }
+  },
+  {
+    "id": "items-074",
+    "category": "items",
+    "en": {
+      "question": "Which enchantment lets you mine a block and keep it as it is?",
+      "answers": [
+        "silk touch"
+      ]
+    },
+    "es": {
+      "question": "¿Qué encantamiento te deja picar un bloque y quedártelo tal cual?",
+      "answers": [
+        "toque de seda"
+      ]
+    }
+  },
+  {
+    "id": "items-075",
+    "category": "items",
+    "en": {
+      "question": "Which enchantment gives more drops from ores?",
+      "answers": [
+        "fortune"
+      ]
+    },
+    "es": {
+      "question": "¿Qué encantamiento da más botín de las menas?",
+      "answers": [
+        "fortuna"
+      ]
+    }
+  },
+  {
+    "id": "items-076",
+    "category": "items",
+    "en": {
+      "question": "Which enchantment repairs your gear with experience?",
+      "answers": [
+        "mending"
+      ]
+    },
+    "es": {
+      "question": "¿Qué encantamiento repara tu equipo con experiencia?",
+      "answers": [
+        "reparacion",
+        "mending"
+      ]
+    }
+  },
+  {
+    "id": "items-077",
+    "category": "items",
+    "en": {
+      "question": "Which enchantment lets you walk faster on soul sand?",
+      "answers": [
+        "soul speed"
+      ]
+    },
+    "es": {
+      "question": "¿Qué encantamiento te deja andar más rápido sobre arena de almas?",
+      "answers": [
+        "velocidad de almas"
+      ]
+    }
+  },
+  {
+    "id": "items-078",
+    "category": "items",
+    "en": {
+      "question": "Which block do you need to enchant items with levels?",
+      "answers": [
+        "enchanting table",
+        "enchantment table"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque necesitas para encantar objetos con niveles?",
+      "answers": [
+        "mesa de encantamientos"
+      ]
+    }
+  },
+  {
+    "id": "items-079",
+    "category": "items",
+    "en": {
+      "question": "How many bookshelves give the strongest enchantments?",
+      "answers": [
+        "15",
+        "fifteen"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas librerías dan los encantamientos más fuertes?",
+      "answers": [
+        "15",
+        "quince"
+      ]
+    }
+  },
+  {
+    "id": "items-080",
+    "category": "items",
+    "en": {
+      "question": "What do you need to repair an iron sword at an anvil?",
+      "answers": [
+        "iron ingot",
+        "iron ingots",
+        "iron"
+      ]
+    },
+    "es": {
+      "question": "¿Qué necesitas para reparar una espada de hierro en el yunque?",
+      "answers": [
+        "lingote de hierro",
+        "lingotes de hierro",
+        "hierro"
+      ]
+    }
+  },
+  {
+    "id": "items-081",
+    "category": "items",
+    "en": {
+      "question": "What item do you use to light a Nether portal?",
+      "answers": [
+        "flint and steel",
+        "fire charge"
+      ]
+    },
+    "es": {
+      "question": "¿Con qué enciendes un portal al Nether?",
+      "answers": [
+        "mechero",
+        "pedernal y acero",
+        "carga de fuego"
+      ]
+    }
+  },
+  {
+    "id": "items-082",
+    "category": "items",
+    "en": {
+      "question": "Which crop do you need to make bread?",
+      "answers": [
+        "wheat"
+      ]
+    },
+    "es": {
+      "question": "¿Qué cultivo necesitas para hacer pan?",
+      "answers": [
+        "trigo"
+      ]
+    }
+  },
+  {
+    "id": "items-083",
+    "category": "items",
+    "en": {
+      "question": "How many wheat make one bread?",
+      "answers": [
+        "3",
+        "three"
+      ]
+    },
+    "es": {
+      "question": "¿Cuánto trigo hace falta para un pan?",
+      "answers": [
+        "3",
+        "tres"
+      ]
+    }
+  },
+  {
+    "id": "items-084",
+    "category": "items",
+    "en": {
+      "question": "Which potion lets you see in the dark?",
+      "answers": [
+        "night vision",
+        "potion of night vision"
+      ]
+    },
+    "es": {
+      "question": "¿Qué poción te deja ver en la oscuridad?",
+      "answers": [
+        "vision nocturna",
+        "pocion de vision nocturna"
+      ]
+    }
+  },
+  {
+    "id": "items-085",
+    "category": "items",
+    "en": {
+      "question": "What ingredient makes a potion splash?",
+      "answers": [
+        "gunpowder"
+      ]
+    },
+    "es": {
+      "question": "¿Qué ingrediente convierte una poción en arrojadiza?",
+      "answers": [
+        "polvora"
+      ]
+    }
+  },
+  {
+    "id": "items-086",
+    "category": "items",
+    "en": {
+      "question": "What do you add to an awkward potion to make healing?",
+      "answers": [
+        "glistering melon",
+        "glistering melon slice",
+        "golden melon"
+      ]
+    },
+    "es": {
+      "question": "¿Qué añades a una poción rara para hacerla de curación?",
+      "answers": [
+        "sandia reluciente",
+        "rodaja de sandia reluciente"
+      ]
+    }
+  },
+  {
+    "id": "items-087",
+    "category": "items",
+    "en": {
+      "question": "Which item lets you breathe underwater as a potion ingredient?",
+      "answers": [
+        "pufferfish"
+      ]
+    },
+    "es": {
+      "question": "¿Qué ingrediente da la poción de respiración acuática?",
+      "answers": [
+        "pez globo"
+      ]
+    }
+  },
+  {
+    "id": "items-088",
+    "category": "items",
+    "en": {
+      "question": "What base ingredient makes an awkward potion?",
+      "answers": [
+        "nether wart"
+      ]
+    },
+    "es": {
+      "question": "¿Qué ingrediente base hace una poción rara?",
+      "answers": [
+        "verruga del nether"
+      ]
+    }
+  },
+  {
+    "id": "items-089",
+    "category": "items",
+    "en": {
+      "question": "Which block stops pistons from pushing it?",
+      "answers": [
+        "obsidian",
+        "bedrock"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque no pueden empujar los pistones?",
+      "answers": [
+        "obsidiana",
+        "roca madre"
+      ]
+    }
+  },
+  {
+    "id": "items-090",
+    "category": "items",
+    "en": {
+      "question": "Which dust powers redstone circuits?",
+      "answers": [
+        "redstone",
+        "redstone dust"
+      ]
+    },
+    "es": {
+      "question": "¿Qué polvo alimenta los circuitos?",
+      "answers": [
+        "redstone",
+        "polvo de redstone"
+      ]
+    }
+  },
+  {
+    "id": "items-091",
+    "category": "items",
+    "en": {
+      "question": "What block makes a piston sticky?",
+      "answers": [
+        "slimeball",
+        "slime ball",
+        "slime"
+      ]
+    },
+    "es": {
+      "question": "¿Qué añades a un pistón para hacerlo pegajoso?",
+      "answers": [
+        "bola de slime",
+        "slime"
+      ]
+    }
+  },
+  {
+    "id": "items-092",
+    "category": "items",
+    "en": {
+      "question": "Which block makes you bounce when you land on it?",
+      "answers": [
+        "slime block",
+        "slime"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque te hace rebotar al caer encima?",
+      "answers": [
+        "bloque de slime",
+        "slime"
+      ]
+    }
+  },
+  {
+    "id": "items-093",
+    "category": "items",
+    "en": {
+      "question": "Which block saves you from fall damage completely?",
+      "answers": [
+        "water",
+        "slime block",
+        "powder snow"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque te salva de cualquier caída?",
+      "answers": [
+        "agua",
+        "bloque de slime",
+        "nieve polvo"
+      ]
+    }
+  },
+  {
+    "id": "items-094",
+    "category": "items",
+    "en": {
+      "question": "What is used to make a beacon besides glass and obsidian?",
+      "answers": [
+        "nether star"
+      ]
+    },
+    "es": {
+      "question": "¿Qué se usa para un faro además de cristal y obsidiana?",
+      "answers": [
+        "estrella del nether"
+      ]
+    }
+  },
+  {
+    "id": "items-095",
+    "category": "items",
+    "en": {
+      "question": "Which boss drops the nether star?",
+      "answers": [
+        "wither",
+        "the wither"
+      ]
+    },
+    "es": {
+      "question": "¿Qué jefe suelta la estrella del Nether?",
+      "answers": [
+        "wither",
+        "el wither"
+      ]
+    }
+  },
+  {
+    "id": "items-096",
+    "category": "items",
+    "en": {
+      "question": "What item do you use to name a mob?",
+      "answers": [
+        "name tag"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto usas para ponerle nombre a un mob?",
+      "answers": [
+        "etiqueta",
+        "etiqueta de nombre"
+      ]
+    }
+  },
+  {
+    "id": "items-097",
+    "category": "items",
+    "en": {
+      "question": "What item leads a mob on a rope?",
+      "answers": [
+        "lead",
+        "leash"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto lleva a un mob con una cuerda?",
+      "answers": [
+        "rienda",
+        "correa"
+      ]
+    }
+  },
+  {
+    "id": "items-098",
+    "category": "items",
+    "en": {
+      "question": "What item lets you see a map of the area?",
+      "answers": [
+        "map"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto te muestra un plano de la zona?",
+      "answers": [
+        "mapa"
+      ]
+    }
+  },
+  {
+    "id": "items-099",
+    "category": "items",
+    "en": {
+      "question": "Which block can store items and keep them when broken?",
+      "answers": [
+        "shulker box"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque guarda objetos y los conserva al romperlo?",
+      "answers": [
+        "caja de shulker"
+      ]
+    }
+  },
+  {
+    "id": "items-100",
+    "category": "items",
+    "en": {
+      "question": "Which chest shares its contents across all its copies?",
+      "answers": [
+        "ender chest"
+      ]
+    },
+    "es": {
+      "question": "¿Qué cofre comparte su contenido entre todas sus copias?",
+      "answers": [
+        "cofre de ender"
+      ]
+    }
+  },
+  {
+    "id": "items-101",
+    "category": "items",
+    "en": {
+      "question": "Which tool tills dirt into farmland?",
+      "answers": [
+        "hoe"
+      ]
+    },
+    "es": {
+      "question": "¿Qué herramienta ara la tierra?",
+      "answers": [
+        "azada"
+      ]
+    }
+  },
+  {
+    "id": "items-102",
+    "category": "items",
+    "en": {
+      "question": "Which tool strips logs?",
+      "answers": [
+        "axe"
+      ]
+    },
+    "es": {
+      "question": "¿Qué herramienta descorteza los troncos?",
+      "answers": [
+        "hacha"
+      ]
+    }
+  },
+  {
+    "id": "items-103",
+    "category": "items",
+    "en": {
+      "question": "What item do you throw to teleport?",
+      "answers": [
+        "ender pearl",
+        "pearl"
+      ]
+    },
+    "es": {
+      "question": "¿Qué objeto lanzas para teletransportarte?",
+      "answers": [
+        "perla de ender",
+        "perla"
+      ]
+    }
+  },
+  {
+    "id": "items-104",
+    "category": "items",
+    "en": {
+      "question": "What armor piece can be made of leather, iron, gold, diamond, netherite and turtle shell?",
+      "answers": [
+        "helmet"
+      ]
+    },
+    "es": {
+      "question": "¿Qué pieza de armadura existe de cuero, hierro, oro, diamante, netherita y tortuga?",
+      "answers": [
+        "casco"
+      ]
+    }
+  },
+  {
+    "id": "items-105",
+    "category": "items",
+    "en": {
+      "question": "What food restores the most hunger points in one bite?",
+      "answers": [
+        "rabbit stew",
+        "suspicious stew",
+        "golden carrot",
+        "cake"
+      ]
+    },
+    "es": {
+      "question": "¿Qué comida devuelve más hambre de un bocado?",
+      "answers": [
+        "estofado de conejo",
+        "zanahoria dorada",
+        "estofado sospechoso",
+        "tarta"
+      ]
+    }
+  },
+  {
+    "id": "items-106",
+    "category": "items",
+    "en": {
+      "question": "What do you craft from 3 wheat, 2 sugar, 1 egg and 3 milk buckets?",
+      "answers": [
+        "cake"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fabricas con 3 de trigo, 2 de azúcar, 1 huevo y 3 cubos de leche?",
+      "answers": [
+        "tarta",
+        "pastel"
+      ]
+    }
+  },
+  {
+    "id": "items-107",
+    "category": "items",
+    "en": {
+      "question": "What does milk cure?",
+      "answers": [
+        "effects",
+        "status effects",
+        "potion effects",
+        "poison"
+      ]
+    },
+    "es": {
+      "question": "¿Qué quita la leche?",
+      "answers": [
+        "efectos",
+        "los efectos",
+        "veneno"
+      ]
+    }
+  },
+  {
+    "id": "items-108",
+    "category": "items",
+    "en": {
+      "question": "What is a golden apple made of besides the apple?",
+      "answers": [
+        "gold ingots",
+        "gold ingot",
+        "gold"
+      ]
+    },
+    "es": {
+      "question": "¿Con qué se hace una manzana dorada además de la manzana?",
+      "answers": [
+        "lingotes de oro",
+        "oro"
+      ]
+    }
+  },
+  {
+    "id": "world-109",
+    "category": "world",
+    "en": {
+      "question": "How many obsidian blocks make the smallest Nether portal frame?",
+      "answers": [
+        "10",
+        "ten"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos bloques de obsidiana tiene el marco de portal más pequeño?",
+      "answers": [
+        "10",
+        "diez"
+      ]
+    }
+  },
+  {
+    "id": "world-110",
+    "category": "world",
+    "en": {
+      "question": "How many ender eyes fill a complete End portal?",
+      "answers": [
+        "12",
+        "twelve"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos ojos de ender llenan un portal del End?",
+      "answers": [
+        "12",
+        "doce"
+      ]
+    }
+  },
+  {
+    "id": "world-111",
+    "category": "world",
+    "en": {
+      "question": "Which ore is only found in mountain biomes in the Overworld?",
+      "answers": [
+        "emerald",
+        "emerald ore"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mena solo aparece en los biomas de montaña del mundo normal?",
+      "answers": [
+        "esmeralda",
+        "mena de esmeralda"
+      ]
+    }
+  },
+  {
+    "id": "world-112",
+    "category": "world",
+    "en": {
+      "question": "What is the rarest ore in the Nether?",
+      "answers": [
+        "ancient debris",
+        "debris"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la mena más rara del Nether?",
+      "answers": [
+        "escombros ancestrales",
+        "restos ancestrales",
+        "ancient debris"
+      ]
+    }
+  },
+  {
+    "id": "world-113",
+    "category": "world",
+    "en": {
+      "question": "Which dimension has no day and night and floating islands?",
+      "answers": [
+        "the end",
+        "end"
+      ]
+    },
+    "es": {
+      "question": "¿Qué dimensión no tiene día ni noche y tiene islas flotantes?",
+      "answers": [
+        "el end",
+        "end"
+      ]
+    }
+  },
+  {
+    "id": "world-114",
+    "category": "world",
+    "en": {
+      "question": "For every block traveled in the Nether, how many do you cover in the Overworld?",
+      "answers": [
+        "8",
+        "eight"
+      ]
+    },
+    "es": {
+      "question": "Por cada bloque en el Nether, ¿cuántos recorres en el mundo normal?",
+      "answers": [
+        "8",
+        "ocho"
+      ]
+    }
+  },
+  {
+    "id": "world-115",
+    "category": "world",
+    "en": {
+      "question": "How many hearts does a player have at full health?",
+      "answers": [
+        "10",
+        "ten"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos corazones tiene un jugador con la vida llena?",
+      "answers": [
+        "10",
+        "diez"
+      ]
+    }
+  },
+  {
+    "id": "world-116",
+    "category": "world",
+    "en": {
+      "question": "What is the unbreakable block at the bottom of the world?",
+      "answers": [
+        "bedrock"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque irrompible hay en el fondo del mundo?",
+      "answers": [
+        "roca madre",
+        "bedrock"
+      ]
+    }
+  },
+  {
+    "id": "world-117",
+    "category": "world",
+    "en": {
+      "question": "In which structure do you find the End portal?",
+      "answers": [
+        "stronghold",
+        "a stronghold"
+      ]
+    },
+    "es": {
+      "question": "¿En qué estructura está el portal del End?",
+      "answers": [
+        "fortaleza",
+        "una fortaleza"
+      ]
+    }
+  },
+  {
+    "id": "world-118",
+    "category": "world",
+    "en": {
+      "question": "Which Nether structure has blazes and wither skeletons?",
+      "answers": [
+        "nether fortress",
+        "fortress"
+      ]
+    },
+    "es": {
+      "question": "¿Qué estructura del Nether tiene blazes y esqueletos wither?",
+      "answers": [
+        "fortaleza del nether",
+        "fortaleza"
+      ]
+    }
+  },
+  {
+    "id": "world-119",
+    "category": "world",
+    "en": {
+      "question": "Which structure in the Nether is full of piglins and gold?",
+      "answers": [
+        "bastion",
+        "bastion remnant"
+      ]
+    },
+    "es": {
+      "question": "¿Qué estructura del Nether está llena de piglins y oro?",
+      "answers": [
+        "bastion",
+        "restos de bastion"
+      ]
+    }
+  },
+  {
+    "id": "world-120",
+    "category": "world",
+    "en": {
+      "question": "Which biome is covered in mycelium and has mooshrooms?",
+      "answers": [
+        "mushroom fields",
+        "mushroom island",
+        "mushroom"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bioma está cubierto de micelio y tiene champiñacas?",
+      "answers": [
+        "campos de champiñones",
+        "isla champiñon",
+        "champiñones"
+      ]
+    }
+  },
+  {
+    "id": "world-121",
+    "category": "world",
+    "en": {
+      "question": "Which liquid turns into obsidian when water flows onto its source?",
+      "answers": [
+        "lava"
+      ]
+    },
+    "es": {
+      "question": "¿Qué líquido se vuelve obsidiana si el agua cae sobre su fuente?",
+      "answers": [
+        "lava"
+      ]
+    }
+  },
+  {
+    "id": "world-122",
+    "category": "world",
+    "en": {
+      "question": "What does water flowing onto flowing lava make?",
+      "answers": [
+        "cobblestone"
+      ]
+    },
+    "es": {
+      "question": "¿Qué crea el agua al tocar lava que fluye?",
+      "answers": [
+        "roca",
+        "piedra labrada"
+      ]
+    }
+  },
+  {
+    "id": "world-123",
+    "category": "world",
+    "en": {
+      "question": "Which block do you dig to find clay in rivers?",
+      "answers": [
+        "clay"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque gris encuentras en el fondo de los ríos y da arcilla?",
+      "answers": [
+        "arcilla"
+      ]
+    }
+  },
+  {
+    "id": "world-124",
+    "category": "world",
+    "en": {
+      "question": "How long is a full Minecraft day in real minutes?",
+      "answers": [
+        "20",
+        "twenty",
+        "20 minutes"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos minutos reales dura un día completo de Minecraft?",
+      "answers": [
+        "20",
+        "veinte",
+        "20 minutos"
+      ]
+    }
+  },
+  {
+    "id": "world-125",
+    "category": "world",
+    "en": {
+      "question": "What is the lowest Y level of the Overworld since 1.18?",
+      "answers": [
+        "-64",
+        "minus 64",
+        "negative 64"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el nivel Y más bajo del mundo normal desde la 1.18?",
+      "answers": [
+        "-64",
+        "menos 64"
+      ]
+    }
+  },
+  {
+    "id": "world-126",
+    "category": "world",
+    "en": {
+      "question": "Which biome has ice spikes?",
+      "answers": [
+        "ice spikes"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bioma tiene picos de hielo?",
+      "answers": [
+        "picos de hielo"
+      ]
+    }
+  },
+  {
+    "id": "world-127",
+    "category": "world",
+    "en": {
+      "question": "Which structure in the ocean holds guardians?",
+      "answers": [
+        "ocean monument",
+        "monument"
+      ]
+    },
+    "es": {
+      "question": "¿En qué estructura del océano viven los guardianes?",
+      "answers": [
+        "monumento oceanico",
+        "monumento"
+      ]
+    }
+  },
+  {
+    "id": "world-128",
+    "category": "world",
+    "en": {
+      "question": "Which structure hides a chest with TNT under a pressure plate?",
+      "answers": [
+        "desert temple",
+        "desert pyramid",
+        "pyramid"
+      ]
+    },
+    "es": {
+      "question": "¿Qué estructura esconde un cofre con dinamita bajo una placa de presión?",
+      "answers": [
+        "templo del desierto",
+        "piramide del desierto",
+        "piramide"
+      ]
+    }
+  },
+  {
+    "id": "world-129",
+    "category": "world",
+    "en": {
+      "question": "Which structure has sculk and the warden?",
+      "answers": [
+        "ancient city"
+      ]
+    },
+    "es": {
+      "question": "¿Qué estructura tiene sculk y al warden?",
+      "answers": [
+        "ciudad antigua"
+      ]
+    }
+  },
+  {
+    "id": "world-130",
+    "category": "world",
+    "en": {
+      "question": "Which block spreads in the deep dark when something dies near a catalyst?",
+      "answers": [
+        "sculk"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bloque se extiende en la oscuridad profunda cuando algo muere cerca de un catalizador?",
+      "answers": [
+        "sculk"
+      ]
+    }
+  },
+  {
+    "id": "world-131",
+    "category": "world",
+    "en": {
+      "question": "Which mountain biome has goats and powder snow?",
+      "answers": [
+        "snowy slopes",
+        "frozen peaks",
+        "grove",
+        "jagged peaks"
+      ]
+    },
+    "es": {
+      "question": "¿Qué bioma de montaña tiene cabras y nieve polvo?",
+      "answers": [
+        "laderas nevadas",
+        "picos helados",
+        "arboleda",
+        "picos dentados"
+      ]
+    }
+  },
+  {
+    "id": "world-132",
+    "category": "world",
+    "en": {
+      "question": "Which tree grows in the jungle and can be 2 by 2?",
+      "answers": [
+        "jungle tree",
+        "jungle"
+      ]
+    },
+    "es": {
+      "question": "¿Qué árbol crece en la selva y puede ser de 2 por 2?",
+      "answers": [
+        "jungla",
+        "arbol de la jungla",
+        "arbol de jungla"
+      ]
+    }
+  },
+  {
+    "id": "world-133",
+    "category": "world",
+    "en": {
+      "question": "Which tree has pink leaves and petals?",
+      "answers": [
+        "cherry",
+        "cherry tree",
+        "cherry blossom"
+      ]
+    },
+    "es": {
+      "question": "¿Qué árbol tiene hojas y pétalos rosas?",
+      "answers": [
+        "cerezo"
+      ]
+    }
+  },
+  {
+    "id": "world-134",
+    "category": "world",
+    "en": {
+      "question": "What block is a Nether portal frame made of?",
+      "answers": [
+        "obsidian"
+      ]
+    },
+    "es": {
+      "question": "¿De qué material es el marco de un portal al Nether?",
+      "answers": [
+        "obsidiana"
+      ]
+    }
+  },
+  {
+    "id": "world-135",
+    "category": "world",
+    "en": {
+      "question": "In which dimension do beds explode?",
+      "answers": [
+        "nether",
+        "the nether",
+        "end",
+        "the end"
+      ]
+    },
+    "es": {
+      "question": "¿En qué dimensión explotan las camas?",
+      "answers": [
+        "nether",
+        "el nether",
+        "end",
+        "el end"
+      ]
+    }
+  },
+  {
+    "id": "world-136",
+    "category": "world",
+    "en": {
+      "question": "What weather lets charged creepers appear?",
+      "answers": [
+        "thunderstorm",
+        "thunder",
+        "storm"
+      ]
+    },
+    "es": {
+      "question": "¿Con qué tiempo aparecen los creepers cargados?",
+      "answers": [
+        "tormenta",
+        "tormenta electrica"
+      ]
+    }
+  },
+  {
+    "id": "world-137",
+    "category": "world",
+    "en": {
+      "question": "What does a respawn anchor need to be charged?",
+      "answers": [
+        "glowstone"
+      ]
+    },
+    "es": {
+      "question": "¿Qué necesita un nexo de reaparición para cargarse?",
+      "answers": [
+        "piedra luminosa",
+        "glowstone"
+      ]
+    }
+  },
+  {
+    "id": "geography-138",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of France?",
+      "answers": [
+        "paris"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Francia?",
+      "answers": [
+        "paris"
+      ]
+    }
+  },
+  {
+    "id": "geography-139",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Japan?",
+      "answers": [
+        "tokyo"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Japón?",
+      "answers": [
+        "tokio",
+        "tokyo"
+      ]
+    }
+  },
+  {
+    "id": "geography-140",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Italy?",
+      "answers": [
+        "rome"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Italia?",
+      "answers": [
+        "roma"
+      ]
+    }
+  },
+  {
+    "id": "geography-141",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Germany?",
+      "answers": [
+        "berlin"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Alemania?",
+      "answers": [
+        "berlin"
+      ]
+    }
+  },
+  {
+    "id": "geography-142",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Portugal?",
+      "answers": [
+        "lisbon"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Portugal?",
+      "answers": [
+        "lisboa"
+      ]
+    }
+  },
+  {
+    "id": "geography-143",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Mexico?",
+      "answers": [
+        "mexico city"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de México?",
+      "answers": [
+        "ciudad de mexico",
+        "mexico"
+      ]
+    }
+  },
+  {
+    "id": "geography-144",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Argentina?",
+      "answers": [
+        "buenos aires"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Argentina?",
+      "answers": [
+        "buenos aires"
+      ]
+    }
+  },
+  {
+    "id": "geography-145",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Canada?",
+      "answers": [
+        "ottawa"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Canadá?",
+      "answers": [
+        "ottawa"
+      ]
+    }
+  },
+  {
+    "id": "geography-146",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Australia?",
+      "answers": [
+        "canberra"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Australia?",
+      "answers": [
+        "canberra"
+      ]
+    }
+  },
+  {
+    "id": "geography-147",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Egypt?",
+      "answers": [
+        "cairo"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Egipto?",
+      "answers": [
+        "el cairo",
+        "cairo"
+      ]
+    }
+  },
+  {
+    "id": "geography-148",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Peru?",
+      "answers": [
+        "lima"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Perú?",
+      "answers": [
+        "lima"
+      ]
+    }
+  },
+  {
+    "id": "geography-149",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Colombia?",
+      "answers": [
+        "bogota"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Colombia?",
+      "answers": [
+        "bogota"
+      ]
+    }
+  },
+  {
+    "id": "geography-150",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Chile?",
+      "answers": [
+        "santiago"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de Chile?",
+      "answers": [
+        "santiago",
+        "santiago de chile"
+      ]
+    }
+  },
+  {
+    "id": "geography-151",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of the United Kingdom?",
+      "answers": [
+        "london"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital del Reino Unido?",
+      "answers": [
+        "londres"
+      ]
+    }
+  },
+  {
+    "id": "geography-152",
+    "category": "geography",
+    "en": {
+      "question": "What is the capital of Spain?",
+      "answers": [
+        "madrid"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la capital de España?",
+      "answers": [
+        "madrid"
+      ]
+    }
+  },
+  {
+    "id": "geography-153",
+    "category": "geography",
+    "en": {
+      "question": "What is the largest ocean on Earth?",
+      "answers": [
+        "pacific",
+        "pacific ocean"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el océano más grande de la Tierra?",
+      "answers": [
+        "pacifico",
+        "oceano pacifico"
+      ]
+    }
+  },
+  {
+    "id": "geography-154",
+    "category": "geography",
+    "en": {
+      "question": "What is the largest continent?",
+      "answers": [
+        "asia"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el continente más grande?",
+      "answers": [
+        "asia"
+      ]
+    }
+  },
+  {
+    "id": "geography-155",
+    "category": "geography",
+    "en": {
+      "question": "What is the longest river in South America?",
+      "answers": [
+        "amazon",
+        "amazon river"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el río más largo de Sudamérica?",
+      "answers": [
+        "amazonas",
+        "rio amazonas"
+      ]
+    }
+  },
+  {
+    "id": "geography-156",
+    "category": "geography",
+    "en": {
+      "question": "What is the highest mountain on Earth?",
+      "answers": [
+        "everest",
+        "mount everest"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la montaña más alta de la Tierra?",
+      "answers": [
+        "everest",
+        "monte everest"
+      ]
+    }
+  },
+  {
+    "id": "geography-157",
+    "category": "geography",
+    "en": {
+      "question": "Which desert is the largest hot desert?",
+      "answers": [
+        "sahara"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el desierto cálido más grande?",
+      "answers": [
+        "sahara"
+      ]
+    }
+  },
+  {
+    "id": "geography-158",
+    "category": "geography",
+    "en": {
+      "question": "How many continents are there?",
+      "answers": [
+        "7",
+        "seven"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos continentes hay?",
+      "answers": [
+        "7",
+        "siete"
+      ]
+    }
+  },
+  {
+    "id": "geography-159",
+    "category": "geography",
+    "en": {
+      "question": "Which country has the most people?",
+      "answers": [
+        "india",
+        "china"
+      ]
+    },
+    "es": {
+      "question": "¿Qué país tiene más habitantes?",
+      "answers": [
+        "india",
+        "china"
+      ]
+    }
+  },
+  {
+    "id": "geography-160",
+    "category": "geography",
+    "en": {
+      "question": "Which country is shaped like a boot?",
+      "answers": [
+        "italy"
+      ]
+    },
+    "es": {
+      "question": "¿Qué país tiene forma de bota?",
+      "answers": [
+        "italia"
+      ]
+    }
+  },
+  {
+    "id": "geography-161",
+    "category": "geography",
+    "en": {
+      "question": "Which sea lies between Europe and Africa?",
+      "answers": [
+        "mediterranean",
+        "mediterranean sea"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mar está entre Europa y África?",
+      "answers": [
+        "mediterraneo",
+        "mar mediterraneo"
+      ]
+    }
+  },
+  {
+    "id": "geography-162",
+    "category": "geography",
+    "en": {
+      "question": "In which country are the pyramids of Giza?",
+      "answers": [
+        "egypt"
+      ]
+    },
+    "es": {
+      "question": "¿En qué país están las pirámides de Guiza?",
+      "answers": [
+        "egipto"
+      ]
+    }
+  },
+  {
+    "id": "geography-163",
+    "category": "geography",
+    "en": {
+      "question": "In which city is the Eiffel Tower?",
+      "answers": [
+        "paris"
+      ]
+    },
+    "es": {
+      "question": "¿En qué ciudad está la Torre Eiffel?",
+      "answers": [
+        "paris"
+      ]
+    }
+  },
+  {
+    "id": "geography-164",
+    "category": "geography",
+    "en": {
+      "question": "Which is the largest country by area?",
+      "answers": [
+        "russia"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el país más grande por superficie?",
+      "answers": [
+        "rusia"
+      ]
+    }
+  },
+  {
+    "id": "geography-165",
+    "category": "geography",
+    "en": {
+      "question": "What is the smallest country in the world?",
+      "answers": [
+        "vatican",
+        "vatican city"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el país más pequeño del mundo?",
+      "answers": [
+        "vaticano",
+        "ciudad del vaticano"
+      ]
+    }
+  },
+  {
+    "id": "science-166",
+    "category": "science",
+    "en": {
+      "question": "What planet is known as the red planet?",
+      "answers": [
+        "mars"
+      ]
+    },
+    "es": {
+      "question": "¿Qué planeta se conoce como el planeta rojo?",
+      "answers": [
+        "marte"
+      ]
+    }
+  },
+  {
+    "id": "science-167",
+    "category": "science",
+    "en": {
+      "question": "What is the largest planet in the solar system?",
+      "answers": [
+        "jupiter"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el planeta más grande del sistema solar?",
+      "answers": [
+        "jupiter"
+      ]
+    }
+  },
+  {
+    "id": "science-168",
+    "category": "science",
+    "en": {
+      "question": "What planet is closest to the Sun?",
+      "answers": [
+        "mercury"
+      ]
+    },
+    "es": {
+      "question": "¿Qué planeta está más cerca del Sol?",
+      "answers": [
+        "mercurio"
+      ]
+    }
+  },
+  {
+    "id": "science-169",
+    "category": "science",
+    "en": {
+      "question": "How many planets are in the solar system?",
+      "answers": [
+        "8",
+        "eight"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos planetas tiene el sistema solar?",
+      "answers": [
+        "8",
+        "ocho"
+      ]
+    }
+  },
+  {
+    "id": "science-170",
+    "category": "science",
+    "en": {
+      "question": "What gas do plants take in to make food?",
+      "answers": [
+        "carbon dioxide",
+        "co2"
+      ]
+    },
+    "es": {
+      "question": "¿Qué gas toman las plantas para fabricar su alimento?",
+      "answers": [
+        "dioxido de carbono",
+        "co2"
+      ]
+    }
+  },
+  {
+    "id": "science-171",
+    "category": "science",
+    "en": {
+      "question": "What gas do we need to breathe?",
+      "answers": [
+        "oxygen",
+        "o2"
+      ]
+    },
+    "es": {
+      "question": "¿Qué gas necesitamos para respirar?",
+      "answers": [
+        "oxigeno",
+        "o2"
+      ]
+    }
+  },
+  {
+    "id": "science-172",
+    "category": "science",
+    "en": {
+      "question": "What is H2O better known as?",
+      "answers": [
+        "water"
+      ]
+    },
+    "es": {
+      "question": "¿Cómo se conoce más el H2O?",
+      "answers": [
+        "agua"
+      ]
+    }
+  },
+  {
+    "id": "science-173",
+    "category": "science",
+    "en": {
+      "question": "At how many degrees Celsius does water boil at sea level?",
+      "answers": [
+        "100",
+        "one hundred"
+      ]
+    },
+    "es": {
+      "question": "¿A cuántos grados Celsius hierve el agua al nivel del mar?",
+      "answers": [
+        "100",
+        "cien"
+      ]
+    }
+  },
+  {
+    "id": "science-174",
+    "category": "science",
+    "en": {
+      "question": "At how many degrees Celsius does water freeze?",
+      "answers": [
+        "0",
+        "zero"
+      ]
+    },
+    "es": {
+      "question": "¿A cuántos grados Celsius se congela el agua?",
+      "answers": [
+        "0",
+        "cero"
+      ]
+    }
+  },
+  {
+    "id": "science-175",
+    "category": "science",
+    "en": {
+      "question": "What is the chemical symbol for gold?",
+      "answers": [
+        "au"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el símbolo químico del oro?",
+      "answers": [
+        "au"
+      ]
+    }
+  },
+  {
+    "id": "science-176",
+    "category": "science",
+    "en": {
+      "question": "What is the chemical symbol for iron?",
+      "answers": [
+        "fe"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el símbolo químico del hierro?",
+      "answers": [
+        "fe"
+      ]
+    }
+  },
+  {
+    "id": "science-177",
+    "category": "science",
+    "en": {
+      "question": "How many legs does a spider have?",
+      "answers": [
+        "8",
+        "eight"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas patas tiene una araña?",
+      "answers": [
+        "8",
+        "ocho"
+      ]
+    }
+  },
+  {
+    "id": "science-178",
+    "category": "science",
+    "en": {
+      "question": "How many legs does an insect have?",
+      "answers": [
+        "6",
+        "six"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas patas tiene un insecto?",
+      "answers": [
+        "6",
+        "seis"
+      ]
+    }
+  },
+  {
+    "id": "science-179",
+    "category": "science",
+    "en": {
+      "question": "What is the largest animal on Earth?",
+      "answers": [
+        "blue whale",
+        "whale"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el animal más grande de la Tierra?",
+      "answers": [
+        "ballena azul",
+        "ballena"
+      ]
+    }
+  },
+  {
+    "id": "science-180",
+    "category": "science",
+    "en": {
+      "question": "What is the fastest land animal?",
+      "answers": [
+        "cheetah"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el animal terrestre más rápido?",
+      "answers": [
+        "guepardo",
+        "chita"
+      ]
+    }
+  },
+  {
+    "id": "science-181",
+    "category": "science",
+    "en": {
+      "question": "What organ pumps blood around the body?",
+      "answers": [
+        "heart",
+        "the heart"
+      ]
+    },
+    "es": {
+      "question": "¿Qué órgano bombea la sangre por el cuerpo?",
+      "answers": [
+        "corazon",
+        "el corazon"
+      ]
+    }
+  },
+  {
+    "id": "science-182",
+    "category": "science",
+    "en": {
+      "question": "How many bones does an adult human have?",
+      "answers": [
+        "206"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos huesos tiene un humano adulto?",
+      "answers": [
+        "206"
+      ]
+    }
+  },
+  {
+    "id": "science-183",
+    "category": "science",
+    "en": {
+      "question": "What force keeps us on the ground?",
+      "answers": [
+        "gravity"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fuerza nos mantiene en el suelo?",
+      "answers": [
+        "gravedad"
+      ]
+    }
+  },
+  {
+    "id": "science-184",
+    "category": "science",
+    "en": {
+      "question": "What is the hardest natural material?",
+      "answers": [
+        "diamond"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el material natural más duro?",
+      "answers": [
+        "diamante"
+      ]
+    }
+  },
+  {
+    "id": "science-185",
+    "category": "science",
+    "en": {
+      "question": "What do bees make?",
+      "answers": [
+        "honey"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fabrican las abejas?",
+      "answers": [
+        "miel"
+      ]
+    }
+  },
+  {
+    "id": "science-186",
+    "category": "science",
+    "en": {
+      "question": "What star is at the center of our solar system?",
+      "answers": [
+        "sun",
+        "the sun"
+      ]
+    },
+    "es": {
+      "question": "¿Qué estrella está en el centro de nuestro sistema solar?",
+      "answers": [
+        "sol",
+        "el sol"
+      ]
+    }
+  },
+  {
+    "id": "science-187",
+    "category": "science",
+    "en": {
+      "question": "What is the natural satellite of the Earth?",
+      "answers": [
+        "moon",
+        "the moon"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es el satélite natural de la Tierra?",
+      "answers": [
+        "luna",
+        "la luna"
+      ]
+    }
+  },
+  {
+    "id": "science-188",
+    "category": "science",
+    "en": {
+      "question": "Which planet has the most famous rings?",
+      "answers": [
+        "saturn"
+      ]
+    },
+    "es": {
+      "question": "¿Qué planeta tiene los anillos más famosos?",
+      "answers": [
+        "saturno"
+      ]
+    }
+  },
+  {
+    "id": "science-189",
+    "category": "science",
+    "en": {
+      "question": "What is frozen water called?",
+      "answers": [
+        "ice"
+      ]
+    },
+    "es": {
+      "question": "¿Cómo se llama el agua congelada?",
+      "answers": [
+        "hielo"
+      ]
+    }
+  },
+  {
+    "id": "science-190",
+    "category": "science",
+    "en": {
+      "question": "What do caterpillars turn into?",
+      "answers": [
+        "butterfly",
+        "butterflies",
+        "moth",
+        "moths"
+      ]
+    },
+    "es": {
+      "question": "¿En qué se convierten las orugas?",
+      "answers": [
+        "mariposa",
+        "mariposas",
+        "polilla",
+        "polillas"
+      ]
+    }
+  },
+  {
+    "id": "science-191",
+    "category": "science",
+    "en": {
+      "question": "Which mammal can truly fly?",
+      "answers": [
+        "bat",
+        "bats"
+      ]
+    },
+    "es": {
+      "question": "¿Qué mamífero puede volar de verdad?",
+      "answers": [
+        "murcielago",
+        "murcielagos"
+      ]
+    }
+  },
+  {
+    "id": "science-192",
+    "category": "science",
+    "en": {
+      "question": "How many hours does the Earth take to turn once?",
+      "answers": [
+        "24",
+        "twenty four",
+        "twenty-four"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas horas tarda la Tierra en girar sobre sí misma?",
+      "answers": [
+        "24",
+        "veinticuatro"
+      ]
+    }
+  },
+  {
+    "id": "science-193",
+    "category": "science",
+    "en": {
+      "question": "What color do you get mixing blue and yellow?",
+      "answers": [
+        "green"
+      ]
+    },
+    "es": {
+      "question": "¿Qué color sale de mezclar azul y amarillo?",
+      "answers": [
+        "verde"
+      ]
+    }
+  },
+  {
+    "id": "science-194",
+    "category": "science",
+    "en": {
+      "question": "What color do you get mixing red and white?",
+      "answers": [
+        "pink"
+      ]
+    },
+    "es": {
+      "question": "¿Qué color sale de mezclar rojo y blanco?",
+      "answers": [
+        "rosa"
+      ]
+    }
+  },
+  {
+    "id": "history-195",
+    "category": "history",
+    "en": {
+      "question": "In which year did humans first land on the Moon?",
+      "answers": [
+        "1969"
+      ]
+    },
+    "es": {
+      "question": "¿En qué año pisó el ser humano la Luna por primera vez?",
+      "answers": [
+        "1969"
+      ]
+    }
+  },
+  {
+    "id": "history-196",
+    "category": "history",
+    "en": {
+      "question": "Who painted the Mona Lisa?",
+      "answers": [
+        "leonardo da vinci",
+        "da vinci",
+        "leonardo"
+      ]
+    },
+    "es": {
+      "question": "¿Quién pintó la Mona Lisa?",
+      "answers": [
+        "leonardo da vinci",
+        "da vinci",
+        "leonardo"
+      ]
+    }
+  },
+  {
+    "id": "history-197",
+    "category": "history",
+    "en": {
+      "question": "Which ship sank in 1912 after hitting an iceberg?",
+      "answers": [
+        "titanic",
+        "the titanic"
+      ]
+    },
+    "es": {
+      "question": "¿Qué barco se hundió en 1912 tras chocar con un iceberg?",
+      "answers": [
+        "titanic",
+        "el titanic"
+      ]
+    }
+  },
+  {
+    "id": "history-198",
+    "category": "history",
+    "en": {
+      "question": "Who wrote Don Quixote?",
+      "answers": [
+        "cervantes",
+        "miguel de cervantes"
+      ]
+    },
+    "es": {
+      "question": "¿Quién escribió Don Quijote?",
+      "answers": [
+        "cervantes",
+        "miguel de cervantes"
+      ]
+    }
+  },
+  {
+    "id": "history-199",
+    "category": "history",
+    "en": {
+      "question": "Who wrote Romeo and Juliet?",
+      "answers": [
+        "shakespeare",
+        "william shakespeare"
+      ]
+    },
+    "es": {
+      "question": "¿Quién escribió Romeo y Julieta?",
+      "answers": [
+        "shakespeare",
+        "william shakespeare"
+      ]
+    }
+  },
+  {
+    "id": "history-200",
+    "category": "history",
+    "en": {
+      "question": "Which ancient people built Machu Picchu?",
+      "answers": [
+        "inca",
+        "incas",
+        "the incas"
+      ]
+    },
+    "es": {
+      "question": "¿Qué pueblo antiguo construyó Machu Picchu?",
+      "answers": [
+        "inca",
+        "incas",
+        "los incas"
+      ]
+    }
+  },
+  {
+    "id": "history-201",
+    "category": "history",
+    "en": {
+      "question": "In which country did the Olympic Games begin?",
+      "answers": [
+        "greece"
+      ]
+    },
+    "es": {
+      "question": "¿En qué país nacieron los Juegos Olímpicos?",
+      "answers": [
+        "grecia"
+      ]
+    }
+  },
+  {
+    "id": "history-202",
+    "category": "history",
+    "en": {
+      "question": "Which explorer reached the Americas in 1492?",
+      "answers": [
+        "columbus",
+        "christopher columbus"
+      ]
+    },
+    "es": {
+      "question": "¿Qué explorador llegó a América en 1492?",
+      "answers": [
+        "colon",
+        "cristobal colon"
+      ]
+    }
+  },
+  {
+    "id": "history-203",
+    "category": "history",
+    "en": {
+      "question": "Which wall in China can be seen as the longest built structure?",
+      "answers": [
+        "great wall",
+        "the great wall",
+        "great wall of china"
+      ]
+    },
+    "es": {
+      "question": "¿Qué muralla de China es la construcción más larga?",
+      "answers": [
+        "gran muralla",
+        "la gran muralla",
+        "gran muralla china"
+      ]
+    }
+  },
+  {
+    "id": "history-204",
+    "category": "history",
+    "en": {
+      "question": "Who developed the theory of relativity?",
+      "answers": [
+        "einstein",
+        "albert einstein"
+      ]
+    },
+    "es": {
+      "question": "¿Quién formuló la teoría de la relatividad?",
+      "answers": [
+        "einstein",
+        "albert einstein"
+      ]
+    }
+  },
+  {
+    "id": "history-205",
+    "category": "history",
+    "en": {
+      "question": "How many players are on a football (soccer) team on the field?",
+      "answers": [
+        "11",
+        "eleven"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos jugadores tiene un equipo de fútbol en el campo?",
+      "answers": [
+        "11",
+        "once"
+      ]
+    }
+  },
+  {
+    "id": "history-206",
+    "category": "history",
+    "en": {
+      "question": "How many rings are on the Olympic flag?",
+      "answers": [
+        "5",
+        "five"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos aros tiene la bandera olímpica?",
+      "answers": [
+        "5",
+        "cinco"
+      ]
+    }
+  },
+  {
+    "id": "history-207",
+    "category": "history",
+    "en": {
+      "question": "How many strings does a standard guitar have?",
+      "answers": [
+        "6",
+        "six"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas cuerdas tiene una guitarra normal?",
+      "answers": [
+        "6",
+        "seis"
+      ]
+    }
+  },
+  {
+    "id": "history-208",
+    "category": "history",
+    "en": {
+      "question": "How many keys does a standard piano have?",
+      "answers": [
+        "88",
+        "eighty eight",
+        "eighty-eight"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas teclas tiene un piano estándar?",
+      "answers": [
+        "88",
+        "ochenta y ocho"
+      ]
+    }
+  },
+  {
+    "id": "general-209",
+    "category": "general",
+    "en": {
+      "question": "How many days are in a leap year?",
+      "answers": [
+        "366"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos días tiene un año bisiesto?",
+      "answers": [
+        "366"
+      ]
+    }
+  },
+  {
+    "id": "general-210",
+    "category": "general",
+    "en": {
+      "question": "How many minutes are in an hour?",
+      "answers": [
+        "60",
+        "sixty"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos minutos tiene una hora?",
+      "answers": [
+        "60",
+        "sesenta"
+      ]
+    }
+  },
+  {
+    "id": "general-211",
+    "category": "general",
+    "en": {
+      "question": "How many sides does a hexagon have?",
+      "answers": [
+        "6",
+        "six"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos lados tiene un hexágono?",
+      "answers": [
+        "6",
+        "seis"
+      ]
+    }
+  },
+  {
+    "id": "general-212",
+    "category": "general",
+    "en": {
+      "question": "How many sides does an octagon have?",
+      "answers": [
+        "8",
+        "eight"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos lados tiene un octógono?",
+      "answers": [
+        "8",
+        "ocho"
+      ]
+    }
+  },
+  {
+    "id": "general-213",
+    "category": "general",
+    "en": {
+      "question": "What is 12 times 12?",
+      "answers": [
+        "144"
+      ]
+    },
+    "es": {
+      "question": "¿Cuánto es 12 por 12?",
+      "answers": [
+        "144"
+      ]
+    }
+  },
+  {
+    "id": "general-214",
+    "category": "general",
+    "en": {
+      "question": "What is 7 times 8?",
+      "answers": [
+        "56"
+      ]
+    },
+    "es": {
+      "question": "¿Cuánto es 7 por 8?",
+      "answers": [
+        "56"
+      ]
+    }
+  },
+  {
+    "id": "general-215",
+    "category": "general",
+    "en": {
+      "question": "What is the square root of 81?",
+      "answers": [
+        "9",
+        "nine"
+      ]
+    },
+    "es": {
+      "question": "¿Cuál es la raíz cuadrada de 81?",
+      "answers": [
+        "9",
+        "nueve"
+      ]
+    }
+  },
+  {
+    "id": "general-216",
+    "category": "general",
+    "en": {
+      "question": "How many months have 31 days?",
+      "answers": [
+        "7",
+        "seven"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos meses tienen 31 días?",
+      "answers": [
+        "7",
+        "siete"
+      ]
+    }
+  },
+  {
+    "id": "general-217",
+    "category": "general",
+    "en": {
+      "question": "How many colors are in a rainbow?",
+      "answers": [
+        "7",
+        "seven"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos colores tiene el arcoíris?",
+      "answers": [
+        "7",
+        "siete"
+      ]
+    }
+  },
+  {
+    "id": "general-218",
+    "category": "general",
+    "en": {
+      "question": "How many zeros are in one million?",
+      "answers": [
+        "6",
+        "six"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos ceros tiene un millón?",
+      "answers": [
+        "6",
+        "seis"
+      ]
+    }
+  },
+  {
+    "id": "general-219",
+    "category": "general",
+    "en": {
+      "question": "What is half of 250?",
+      "answers": [
+        "125"
+      ]
+    },
+    "es": {
+      "question": "¿Cuánto es la mitad de 250?",
+      "answers": [
+        "125"
+      ]
+    }
+  },
+  {
+    "id": "general-220",
+    "category": "general",
+    "en": {
+      "question": "How many seconds are in a minute?",
+      "answers": [
+        "60",
+        "sixty"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántos segundos tiene un minuto?",
+      "answers": [
+        "60",
+        "sesenta"
+      ]
+    }
+  },
+  {
+    "id": "general-221",
+    "category": "general",
+    "en": {
+      "question": "How many weeks are in a year?",
+      "answers": [
+        "52",
+        "fifty two",
+        "fifty-two"
+      ]
+    },
+    "es": {
+      "question": "¿Cuántas semanas tiene un año?",
+      "answers": [
+        "52",
+        "cincuenta y dos"
+      ]
+    }
+  },
+  {
+    "id": "general-222",
+    "category": "general",
+    "en": {
+      "question": "What is the opposite of north?",
+      "answers": [
+        "south"
+      ]
+    },
+    "es": {
+      "question": "¿Qué es lo opuesto al norte?",
+      "answers": [
+        "sur"
+      ]
+    }
+  },
+  {
+    "id": "general-223",
+    "category": "general",
+    "en": {
+      "question": "What fruit is used to make guacamole?",
+      "answers": [
+        "avocado",
+        "avocados"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fruta se usa para el guacamole?",
+      "answers": [
+        "aguacate",
+        "aguacates",
+        "palta"
+      ]
+    }
+  },
+  {
+    "id": "general-224",
+    "category": "general",
+    "en": {
+      "question": "Which fruit has its seeds on the outside?",
+      "answers": [
+        "strawberry",
+        "strawberries"
+      ]
+    },
+    "es": {
+      "question": "¿Qué fruta tiene las semillas por fuera?",
+      "answers": [
+        "fresa",
+        "fresas",
+        "frutilla"
+      ]
+    }
+  },
+  {
+    "id": "general-225",
+    "category": "general",
+    "en": {
+      "question": "Which animal is known as the king of the jungle?",
+      "answers": [
+        "lion"
+      ]
+    },
+    "es": {
+      "question": "¿Qué animal es conocido como el rey de la selva?",
+      "answers": [
+        "leon"
+      ]
+    }
+  },
+  {
+    "id": "general-226",
+    "category": "general",
+    "en": {
+      "question": "Which bird is a symbol of peace?",
+      "answers": [
+        "dove",
+        "white dove",
+        "pigeon"
+      ]
+    },
+    "es": {
+      "question": "¿Qué ave es símbolo de la paz?",
+      "answers": [
+        "paloma",
+        "paloma blanca"
+      ]
+    }
+  }
+]

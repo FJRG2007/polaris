@@ -1,6 +1,6 @@
 "use client";
 
-/** A treasure hunt's settings: how many chests, how far out, what is in them. */
+/** A treasure hunt's settings: how far out its one treasure is, and what is in it. */
 
 import { Input, Select } from "@polaris/ui";
 import type * as catalog from "../../lib/minecraft/events/catalog";
@@ -22,21 +22,6 @@ export function TreasureHuntOptions({
     return (
         <>
             <div className="grid grid-cols-2 gap-3">
-                <Field
-                    label={t("editor.chests")}
-                    hint={t("editor.1To10")}
-                    problem={problemAt(issues, "options", "chests")}
-                >
-                    <Input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={Number.isFinite(value.chests) ? value.chests : ""}
-                        onChange={(event) =>
-                            onChange({ ...value, chests: numberOf(event.target.value) })
-                        }
-                    />
-                </Field>
                 <Field
                     label={t("editor.howFarOut")}
                     hint={t("editor.howFarOutHint")}

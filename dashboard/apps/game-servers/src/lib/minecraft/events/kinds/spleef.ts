@@ -1,28 +1,62 @@
 /**
- * A spleef arena: a square floor of snow high over a site, a glass wall round
- * it three blocks high so nobody walks off the edge, and a glass net four blocks
- * under it that catches whoever falls through - who is then out, and sent back
- * to where they were. No lava anywhere: falling through the floor is the lava.
+ * A spleef arena, floating high over a site: several floors of snow stacked one
+ * under the other (as Fall Guys' Hex-A-Gone stacks its layers), each walled in
+ * glass three blocks high so nobody walks off an edge, and a glass net under the
+ * lowest that catches whoever falls through it - who is then out, and sent back
+ * to where they were. No lava anywhere: falling through the last floor is the
+ * lava.
+ *
+ * Each run plays one of three ways, drawn for it (`variantFor`):
+ * - shovel: everybody has a shovel that breaks the snow and nothing else;
+ * - decay: no tools - the snow a player stands on turns red, and is gone on the
+ *   next look, so standing still is falling;
+ * - snowballs: the floors hold, and snowballs knock the others off them.
+ *
+ * Built only into air, taken out only where its own blocks still are.
  */
 
-import type { EventOptions } from "../catalog";
+import { SPLEEF_VARIANTS, type EventOptions } from "../catalog";
 import type { Box, Spot, Volume } from "./stage";
+import { seeded, shuffled } from "../trivia-bank";
 
-const WALL: Box["block"] = "minecraft:light_blue_stained_glass";
-const NET: Box["block"] = "minecraft:white_stained_glass";
 export const FLOOR: Box["block"] = "minecraft:snow_block";
-/** How far under the floor the net is. */
+/** What snow somebody stood on becomes in the decay game, just before it goes. */
+export const WARN: Box["block"] = "minecraft:red_concrete";
+const NET: Box["block"] = "minecraft:white_stained_glass";
+/** Each floor's wall its own color, so a player knows which floor they are on. */
+const WALLS: readonly Box["block"][] = [
+    "minecraft:light_blue_stained_glass",
+    "minecraft:lime_stained_glass",
+    "minecraft:yellow_stained_glass"
+];
+/** How many floors. */
+export const LAYERS = 3;
+/** How far under each floor the next one is. */
+export const LAYER_GAP = 7;
+/** How far under the lowest floor the net is. */
 const NET_DROP = 4;
 const WALL_HEIGHT = 3;
-/** Room above the floor for jumping about. */
+/** Room above the top floor for jumping about. */
 const HEADROOM = 5;
 
+export const VARIANTS = SPLEEF_VARIANTS;
+export type Variant = (typeof VARIANTS)[number];
+
+/** How a run plays: the operator's choice, or drawn for it - the same for the
+ *  same run, so a restart does not change it. */
+export function variantFor(runId: string, chosen: Variant | "random" = "random"): Variant {
+    if (chosen !== "random") return chosen;
+    return shuffled(VARIANTS, seeded(`${runId}-spleef`))[0] as Variant;
+}
+
 export interface Arena {
-    /** The floor's height: a player standing on it has their feet one above. */
+    /** The top floor's height: a player standing on it has their feet one above. */
     readonly floor: number;
+    /** Every floor's height, top first. */
+    readonly floors: readonly number[];
     readonly center: { readonly x: number; readonly z: number };
     readonly size: number;
-    /** What is built, in order: the net, the floor, the walls. */
+    /** What is built, in order: the net, then each floor with its walls, lowest first. */
     readonly boxes: readonly Box[];
     readonly volume: Volume;
     readonly reach: number;
@@ -36,39 +70,47 @@ export function arena(
     const r = options.size;
     const { x, z } = site;
     const outer = r + 1;
-    const wall = (x1: number, z1: number, x2: number, z2: number): Box => ({
-        x1,
-        y1: y + 1,
-        z1,
-        x2,
-        y2: y + WALL_HEIGHT,
-        z2,
-        block: WALL
-    });
+    const floors = Array.from({ length: LAYERS }, (_, index) => y - index * LAYER_GAP);
+    const bottom = floors[floors.length - 1]!;
+    const wall = (
+        x1: number,
+        z1: number,
+        x2: number,
+        z2: number,
+        at: number,
+        block: Box["block"]
+    ): Box => ({ x1, y1: at + 1, z1, x2, y2: at + WALL_HEIGHT, z2, block });
     const boxes: Box[] = [
         {
             x1: x - outer,
-            y1: y - NET_DROP,
+            y1: bottom - NET_DROP,
             z1: z - outer,
             x2: x + outer,
-            y2: y - NET_DROP,
+            y2: bottom - NET_DROP,
             z2: z + outer,
             block: NET
-        },
-        { x1: x - r, y1: y, z1: z - r, x2: x + r, y2: y, z2: z + r, block: FLOOR },
-        wall(x - outer, z - outer, x + outer, z - outer),
-        wall(x - outer, z + outer, x + outer, z + outer),
-        wall(x - outer, z - r, x - outer, z + r),
-        wall(x + outer, z - r, x + outer, z + r)
+        }
     ];
+    // The lowest first: what stands higher is built over what is already there.
+    [...floors].reverse().forEach((at, index) => {
+        const block = WALLS[(LAYERS - 1 - index) % WALLS.length]!;
+        boxes.push(
+            { x1: x - r, y1: at, z1: z - r, x2: x + r, y2: at, z2: z + r, block: FLOOR },
+            wall(x - outer, z - outer, x + outer, z - outer, at, block),
+            wall(x - outer, z + outer, x + outer, z + outer, at, block),
+            wall(x - outer, z - r, x - outer, z + r, at, block),
+            wall(x + outer, z - r, x + outer, z + r, at, block)
+        );
+    });
     return {
         floor: y,
+        floors,
         center: { x, z },
         size: r,
         boxes,
         volume: {
             x1: x - outer,
-            y1: y - NET_DROP,
+            y1: bottom - NET_DROP,
             z1: z - outer,
             x2: x + outer,
             y2: y + HEADROOM,
@@ -80,7 +122,7 @@ export function arena(
 
 /**
  * Where each of `count` players starts: spread evenly round a ring inside the
- * floor, facing the middle, on top of the snow.
+ * top floor, facing the middle, on top of the snow.
  */
 export function spots(arena: Arena, count: number): Spot[] {
     const ring = Math.max(1, Math.round(arena.size * 0.6));
@@ -98,7 +140,44 @@ export function spots(arena: Arena, count: number): Spot[] {
     });
 }
 
-/** Fell through: below the top of the floor. */
+/** Fell through the last floor: below the top of the lowest one. */
 export function fell(arena: Arena, y: number): boolean {
-    return y < arena.floor + 0.5;
+    const bottom = arena.floors?.[arena.floors.length - 1] ?? arena.floor;
+    return y < bottom + 0.5;
 }
+
+/** Every floor as a box of the decay game's red snow: what it may leave behind,
+ *  taken out with the rest. */
+export function warnBoxes(arena: Arena): Box[] {
+    const r = arena.size;
+    const { x, z } = arena.center;
+    return (arena.floors ?? [arena.floor]).map((at) => ({
+        x1: x - r,
+        y1: at,
+        z1: z - r,
+        x2: x + r,
+        y2: at,
+        z2: z + r,
+        block: WARN
+    }));
+}
+
+/**
+ * One look of the decay game: the red snow of the last look gone, and the snow
+ * under each player still in it turned red - only inside the arena's own
+ * floors, only where it is still the arena's snow.
+ */
+export function decayLines(arena: Arena, inArena: string): string[] {
+    const r = arena.size;
+    const { x, z } = arena.center;
+    return [
+        ...(arena.floors ?? [arena.floor]).map(
+            (at) =>
+                `execute in minecraft:overworld run fill ${x - r} ${at} ${z - r} ${x + r} ${at} ${z + r} minecraft:air replace ${WARN}`
+        ),
+        `execute in minecraft:overworld as @a[tag=${inArena}] at @s if block ~ ~-1 ~ ${FLOOR} if entity @s[x=${x - r},dx=${2 * r},z=${z - r},dz=${2 * r},y=${arena.floors?.at(-1) ?? arena.floor},dy=${arena.floor - (arena.floors?.at(-1) ?? arena.floor) + 2}] run setblock ~ ~-1 ~ ${WARN}`
+    ];
+}
+
+/** How many snowballs a player is topped up to in the snowball game. */
+export const SNOWBALLS = 16;

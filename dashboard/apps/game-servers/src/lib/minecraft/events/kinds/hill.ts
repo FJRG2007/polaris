@@ -1,19 +1,14 @@
 /**
- * A king of the hill's commands: where its circle goes, the platform of its own
- * it stands on when there is no untouched ground for it, and - with "fists
- * only" - how the players brought to it are kept from harm.
- *
- * The circle wants a patch of the world's own ground as wide as itself. On a
- * small island there is none: a house, a farm, trees. Then it is put on a
- * platform over open water, one layer of one block, built only into air that was
- * proven empty and taken away again - only that block, only inside its own box -
- * so nothing of the island is ever touched.
+ * A king of the hill's commands: the platform it floats on - `LIFT` over the
+ * highest thing under it, built only into air proven empty and taken away
+ * again, only that block, only inside its own box - and how the players brought
+ * to it are kept from harm.
  *
  * With "fists only" players join, their things are kept (`stash`) and they
- * come in empty-handed, in adventure mode. Nobody can die: Resistance V takes
- * every hurt a fall, lava, drowning or a punch can do, fire resistance and water
- * breathing besides, food keeps them fed, and whoever is knocked right off is
- * brought back to the edge of the hill. Knockback is all that is left, so
+ * come in empty-handed, in adventure mode. Off the circle the hill wears them
+ * down (Poison, which never kills); in it, it mends them (Regeneration).
+ * Whoever is knocked off is brought back to the edge before they land, the
+ * fire and the water cannot hurt them, and a fist's knockback is left whole:
  * pushing is how the circle is won. keepInventory is held for all of it.
  *
  * Pure; the loop is `hill-service.ts`.
@@ -129,16 +124,29 @@ export function strayed(
 }
 
 /**
- * Nothing can kill them, for a moment past each look: Resistance V is every hurt
- * a fall, a fight, lava or drowning does; the fire and the water besides; fed, so
- * hunger - which Resistance does not stop - cannot either.
+ * The hill wears down whoever is off it and mends whoever holds it, for a
+ * moment past each look: Poison, which never takes the last half heart, on
+ * every entrant, and for those inside the circle the Poison taken off again
+ * and Regeneration instead. Resistance II softens a punch without making
+ * anybody untouchable, the fire and the water are kept off, and a fist's
+ * knockback is left whole - pushing is how the circle is won.
  */
-export function protectLines(): string[] {
+export function protectLines(
+    point?: { x: number; y: number; z: number },
+    radius?: number
+): string[] {
     const who = `@a[tag=${IN_ARENA}]`;
-    return [
-        `effect give ${who} minecraft:resistance 10 4 true`,
+    const lines = [
+        `effect give ${who} minecraft:resistance 10 1 true`,
         `effect give ${who} minecraft:fire_resistance 10 0 true`,
-        `effect give ${who} minecraft:water_breathing 10 0 true`,
-        `effect give ${who} minecraft:saturation 10 0 true`
+        `effect give ${who} minecraft:water_breathing 10 0 true`
+    ];
+    if (!point || radius === undefined) return lines;
+    const inside = `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[tag=${IN_ARENA},distance=..${radius}]`;
+    return [
+        ...lines,
+        `effect give ${who} minecraft:poison 3 1 true`,
+        `${inside} run effect clear @s minecraft:poison`,
+        `${inside} run effect give @s minecraft:regeneration 3 1 true`
     ];
 }

@@ -420,7 +420,7 @@ async function admit(
             `title ${one.name} times 5 50 15`,
             layout.kind === "parkour"
                 ? `title ${one.name} subtitle ${commands.text(messages.parkourSubtitle(loop.language))}`
-                : `title ${one.name} subtitle ${commands.text(messages.spleefReadySubtitle(loop.language))}`,
+                : `title ${one.name} subtitle ${commands.text(messages.spleefReadySubtitle(spleef.variantFor(loop.run.id, (loop.run.preset.options as catalog.EventOptions<"spleef">).variant), loop.language))}`,
             `title ${one.name} title ${commands.text(
                 layout.kind === "parkour"
                     ? messages.goTitle(loop.language)
@@ -537,7 +537,7 @@ async function returnOne(
     const say = (line: string) => server.say([line]);
     if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return giveBack();
     // The event's items off, then home, then - there - their own game mode.
-    await server.sayAll([stage.clearMarked(saved.name, items)]);
+    await server.sayAll(stage.clearMarked(saved.name, items));
     if (!stage.returned(await server.say([stage.returnLine(saved)]))) return false;
     await server.sayAll(
         stage.afterReturnLines(
@@ -805,19 +805,33 @@ async function spleefTick(
     let dirty = false;
 
     const current = state(loop);
+    const variant = spleef.variantFor(loop.run.id, (loop.run.preset.options as catalog.EventOptions<"spleef">).variant);
     if (!current.armed && current.goAt !== null && now >= current.goAt) {
         const { items } = await tools.flavour();
+        // The decay game's red snow is the arena's too: written down before any
+        // is made, so whatever ends it takes it out with the rest.
+        if (variant === "decay") change(loop, { boxes: [...current.boxes, ...spleef.warnBoxes(floor)] });
         for (const racer of current.racers) {
             if (racer.outAt !== null) continue;
-            await handShovel(server, tools, racer.name, items);
+            if (variant === "shovel") await handShovel(server, tools, racer.name, items);
+            if (variant === "snowballs")
+                lines.push(...stage.markedSnowballs(racer.name, items, spleef.SNOWBALLS));
             lines.push(
                 `title ${racer.name} subtitle ${commands.text(" ")}`,
-                `title ${racer.name} title ${commands.text(messages.spleefGo(language))}`,
+                `title ${racer.name} title ${commands.text(messages.spleefGo(variant, language))}`,
                 soundFor(racer.name, commands.SOUNDS.start)
             );
         }
         change(loop, { armed: true });
         dirty = true;
+    } else if (current.armed && variant === "decay") {
+        lines.push(...spleef.decayLines(floor, stage.IN_ARENA));
+    } else if (current.armed && variant === "snowballs" && Math.floor(now / 1000) % 10 < 2) {
+        // Topped up every ten seconds or so: nobody runs out for long.
+        const { items } = await tools.flavour();
+        for (const racer of current.racers)
+            if (racer.outAt === null)
+                lines.push(...stage.markedSnowballs(racer.name, items, spleef.SNOWBALLS));
     }
 
     const out: string[] = [];
@@ -856,7 +870,7 @@ async function spleefTick(
             commands.actionbarFor(
                 racer.name,
                 state(loop).armed
-                    ? messages.spleefBar(standing.length, language)
+                    ? messages.spleefBar(standing.length, variant, language)
                     : messages.spleefReadyTitle(language)
             )
         );

@@ -94,3 +94,20 @@ left out.
   (`boss.effectiveHealth`). Above the game's cap of 1024 the rest is carried as
   Resistance levels (`boss.splitHealth`). A fighter who arrives mid-fight raises
   it, keeping the share already lost (`boss.rescaled`).
+- **Spleef** is three floors of snow stacked `LAYER_GAP` apart, each walled in
+  its own color, a net under the lowest; a player is out only through the
+  lowest. Each run is played one way, chosen or drawn: shovels (break the
+  snow), a vanishing floor (the snow underfoot turns red, then goes on the
+  next look - Fall Guys' Hex-A-Gone), or snowballs (knock the others off).
+- **King of the hill** with fists only is a platform floating `hill.LIFT` over
+  whatever is under it. Off the circle Poison wears a player down (it never
+  kills); in it Regeneration mends them; a punch keeps its knockback. Three
+  minutes. Walked to (fists only off), it stays on the ground.
+- **Treasure hunt** hides one treasure, a bastion's treasure room by default,
+  under a column of light, with every player's action bar giving its distance
+  and direction for the whole hunt.
+- **Trivia** draws from `trivia-questions.json`: over two hundred questions,
+  each in English and Spanish, by category (mobs, items, world, geography,
+  science, history, general). Nothing repeats inside a game, and the
+  questions asked in the last games (`RECENT_KEPT`) come after all the others.
+

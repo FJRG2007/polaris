@@ -997,13 +997,26 @@ export function spleefReadyTitle(language: Language): string {
     return language === "es" ? "&ePrepárate" : "&eGet ready";
 }
 
-export function spleefReadySubtitle(language: Language): string {
+export function spleefReadySubtitle(
+    variant: "shovel" | "decay" | "snowballs",
+    language: Language
+): string {
+    if (variant === "decay")
+        return language === "es"
+            ? "&fLa nieve que pisas desaparece: no te pares"
+            : "&fThe snow you stand on vanishes: keep moving";
+    if (variant === "snowballs")
+        return language === "es"
+            ? "&fTira a los demás con bolas de nieve"
+            : "&fKnock the others off with snowballs";
     return language === "es"
         ? "&fRompe la nieve bajo los demás"
         : "&fBreak the snow under the others";
 }
 
-export function spleefGo(language: Language): string {
+export function spleefGo(variant: "shovel" | "decay" | "snowballs", language: Language): string {
+    if (variant === "decay") return language === "es" ? "&a&l¡Corre!" : "&a&lRun!";
+    if (variant === "snowballs") return language === "es" ? "&a&l¡Fuego!" : "&a&lThrow!";
     return language === "es" ? "&a&l¡A cavar!" : "&a&lDig!";
 }
 
@@ -1017,10 +1030,18 @@ export function spleefOutTitle(language: Language): string {
     return language === "es" ? "&cHas caído" : "&cYou are out";
 }
 
-export function spleefBar(left: number, language: Language): string {
+export function spleefBar(
+    left: number,
+    variant: "shovel" | "decay" | "snowballs",
+    language: Language
+): string {
+    if (variant === "decay")
+        return language === "es"
+            ? `&eQuedan &f${left} &7- sigue moviéndote`
+            : `&f${left} &eleft &7- keep moving`;
     return language === "es"
-        ? `&eQuedan &f${left} &7- no pises donde no hay nieve`
-        : `&f${left} &eleft &7- stay on the snow`;
+        ? `&eQuedan &f${left} &7- no te caigas al piso de abajo`
+        : `&f${left} &eleft &7- do not drop to the floor below`;
 }
 
 export function lastStanding(name: string, language: Language): string {

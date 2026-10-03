@@ -2113,6 +2113,12 @@
             "wavesWinner": {
                 "kills": "Most kills",
                 "damage": "Most damage"
+            },
+            "spleef": {
+                "random": "A different way each time",
+                "shovel": "Shovels: dig the snow",
+                "decay": "Vanishing floor",
+                "snowballs": "Snowballs: knock them off"
             }
         },
         "place": {
@@ -2146,8 +2152,6 @@
         "materialHint": "Drawn anew for each round, never one an earlier round had, and announced as the round starts. Only what is gathered during the round counts.",
         "theCatch": "The catch",
         "catchHint": "One treasure comes up about once in 120 catches, any of them about once in 25 - in open water, more often with Luck of the Sea. Give it 20 minutes or more.",
-        "chests": "Chests",
-        "1To10": "1 to 10",
         "howFarOut": "How far out (blocks)",
         "howFarOutHint": "50 to 1000, from the players",
         "perKill": "Extra per mob killed",
@@ -2172,7 +2176,8 @@
         "bossTrophy": "Trophy for the winner",
         "bossTrophyHint": "A Nether Star named after the boss, with a glint and its difficulty, on top of the prizes. Only when the boss is defeated.",
         "wavesWinner": "How the winner is decided",
-        "roundMinutes": "Minutes a round"
+        "roundMinutes": "Minutes a round",
+        "howItIsPlayed": "How it is played"
     },
     "moderation": {
         "announcements": {
