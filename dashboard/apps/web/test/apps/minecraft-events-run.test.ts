@@ -1681,6 +1681,7 @@ const commands = await import("@polaris-app/game-servers/src/lib/minecraft/event
 const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/events/messages");
 const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/plan");
 const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
+const boss = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/boss");
 const hill = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill");
 const hillService = await import(
     "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service"
@@ -2935,9 +2936,14 @@ describe("a world boss fight", () => {
                 )
             )
         ).toBe(true);
-        // Its place is the beam, on the ground under it.
-        expect(run.place).toMatchObject({ x: origin.x, z: origin.z });
-        expect(run.place!.y).toBeLessThan(origin.y);
+        // Its place is where it stands; the beam is on the ground of its own
+        // column, by the players, stepped into anywhere round it.
+        expect(run.place).toEqual({ x: origin.x, y: origin.y + 1, z: origin.z });
+        const lift = run.boss!.lift!;
+        expect(lift.y).toBe(70);
+        expect(lift.y).toBeLessThan(origin.y);
+        expect(run.boss?.direct).toBe(false);
+        expect(world.sent).toContain(boss.inLift(lift));
 
         world.lift = ["Ana"];
         await play(2_100);
@@ -2966,6 +2972,52 @@ describe("a world boss fight", () => {
         expect(sent).toContain("gamemode survival Ana");
         expect(sent).toContain("tag Ana remove pe_in");
         expect(state().stageLeftovers).toEqual([]);
+        expect(state().history[0]?.outcome).toBe("cancelled");
+    });
+});
+
+describe("a sky arena with no open ground for its beam", () => {
+    it("takes everybody up once instead of making them climb, and puts them back", async () => {
+        // Every column round the players is somebody's build.
+        world.built = true;
+        setUp([groundBoss("boss", 10, { arena: true })]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(12_100);
+        const run = state().run!;
+        expect(run.boss?.standing).toBe(true);
+        expect(run.boss?.lift).toBeNull();
+        expect(run.boss?.direct).toBe(true);
+        expect(world.sent.some((line) => line.includes("You are being taken up now"))).toBe(true);
+        // Never pointed at a beam that is not there.
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("awaits in a sky arena over") ||
+                    line.includes("Walk into the beam of light:")
+            )
+        ).toBe(false);
+
+        world.lift = ["Ana"];
+        await play(2_100);
+        expect(world.sent).toContain("tag Ana add pe_in");
+        expect(state().run?.boss?.taken).toEqual(["ana"]);
+        expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana"]);
+        const admitted = world.sent.filter((line) => line === "tag Ana add pe_in").length;
+        await play(2_100);
+        // Taken once: never pulled up twice.
+        expect(world.sent.filter((line) => line === "tag Ana add pe_in")).toHaveLength(admitted);
+        world.lift = [];
+
+        await events.cancelEvent("owner", SERVER);
+        await play(6_100);
+        expect(world.sent).toContain("gamemode survival Ana");
+        expect(world.sent).toContain("tag Ana remove pe_in");
         expect(state().history[0]?.outcome).toBe("cancelled");
     });
 });

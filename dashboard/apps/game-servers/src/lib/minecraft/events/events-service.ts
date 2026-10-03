@@ -26,6 +26,7 @@ import * as written from "./messages";
 import * as waves from "./kinds/waves";
 import * as commands from "./commands";
 import * as stage from "./kinds/stage";
+import * as entry from "./kinds/beam-entry";
 import * as playing from "../activity";
 import * as delivery from "../delivery";
 import * as trivia from "./trivia-bank";
@@ -1746,6 +1747,75 @@ async function footprintTop(
     }
 }
 
+/**
+ * Where the beam up to something in the sky stands (`beam-entry.ts`), looked
+ * for ring by ring outward from where the players are: every column of a ring
+ * read at once by a marker on its own ground, then which of them stand on
+ * something somebody built, on water or lava, or on a tree - the same reading
+ * a place's ground is judged by (`judgeAtOnce`). The best spots of a ring are
+ * checked for a walk there from the players before the next ring is read.
+ *
+ * Nothing is loaded for it: the players' own chunks are, and with nobody in
+ * the Overworld the arena's column is held. A column not loaded is not known,
+ * and nothing is put next to it.
+ */
+async function findEntry(
+    loop: Loop,
+    server: ServerContainer,
+    near: { x: number; z: number }
+): Promise<stored.Point | "none" | "unknown"> {
+    // Too old for the heightmap the markers come down by (before 1.19.4).
+    if (!(await serverAtLeast(server, [1, 19, 4]))) return "none";
+    const players = commands.readWhere(await server.say([commands.IN_OVERWORLD]));
+    const center = hunt.centerOf(players) ?? near;
+    const key = (one: { x: number; z: number }) => `${one.x},${one.z}`;
+    let read = false;
+    for (const ring of entry.ENTRY_RINGS) {
+        const columns = entry.entryColumns(center, ring);
+        try {
+            await server.sayAll(commands.sampleLines(columns));
+            const down = commands.samplesIn(await server.say([commands.READ_SAMPLES]));
+            if (down.length === 0) continue;
+            read = true;
+            const built = await builtAtOnce(loop, server);
+            // Builds cannot be told from the world's ground here: nowhere is safe.
+            if (built === null) return "none";
+            const of = async (lines: readonly string[]) => {
+                const found = new Set<string>();
+                for (const line of lines)
+                    for (const one of commands.samplesIn(await server.say([line])))
+                        found.add(key(one));
+                return found;
+            };
+            const wet =
+                built.size > 0
+                    ? await of([commands.SAMPLES_ON_WATER, commands.SAMPLES_ON_LAVA])
+                    : new Set<string>();
+            const trees = built.size > 0 ? await of(commands.SAMPLES_ON_TREES) : new Set<string>();
+            const at = new Map(down.map((one) => [key(one), one]));
+            const judged = columns.map((column): entry.EntryColumn => {
+                const ground = at.get(key(column));
+                const id = key(column);
+                const kind = !built.has(id)
+                    ? "ground"
+                    : wet.has(id)
+                      ? "wet"
+                      : trees.has(id)
+                        ? "tree"
+                        : "built";
+                return { x: column.x, z: column.z, y: ground ? ground.y : null, kind };
+            });
+            const ranked = entry.rankEntries(center, judged, ring.step);
+            for (const spot of ranked.slice(0, entry.WALK_CHECKS)) {
+                if (await canWalk(server, center, spot.point)) return spot.point;
+            }
+        } finally {
+            await server.sayAll([commands.CLEAR_SAMPLES]);
+        }
+    }
+    return read ? "none" : "unknown";
+}
+
 /** Whether a place can be walked to from a point (`commands.walkable`), judged
  *  by markers along the way, all summoned and read at once. */
 async function canWalk(
@@ -2136,6 +2206,7 @@ function kindContext(
                 }
             );
         },
+        findEntry: (near) => findEntry(loop, server, near),
         giveUpPlace: (point, why) =>
             retryPlace(installedAppId, loop, server, point, nearHomeLast, why),
         chat: () => chatSince(loop, server),

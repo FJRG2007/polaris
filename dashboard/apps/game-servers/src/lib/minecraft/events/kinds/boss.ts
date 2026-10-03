@@ -34,6 +34,7 @@
 
 import { z } from "zod";
 import * as stage from "./stage";
+import * as entry from "./beam-entry";
 import * as plan from "../plan";
 import * as catalog from "../catalog";
 import * as speech from "../../speech";
@@ -366,8 +367,15 @@ export const bossStateSchema = z.object({
     /** The second phase's minions have been summoned; the shield holds while any lives. */
     shielded: z.boolean().default(false),
     broken: z.boolean().default(false),
-    /** Where the beam up to the arena stands, on the ground. */
+    /** Where the beam up to the arena stands, on the ground of its own column
+     *  (`beam-entry.ts`). */
     lift: pointSchema.nullable().default(null),
+    /** No open ground for a beam was found near the players: everybody in the
+     *  Overworld is taken up once instead, and put back at the end. */
+    direct: z.boolean().default(false),
+    /** Who has been taken up that way, in lower case: never pulled up again
+     *  after they left. */
+    taken: z.array(z.string()).default([]),
     /** Summoned and standing. */
     standing: z.boolean().default(false),
     /** How many of what it drops (`BossProfile.drops`), unnamed, each fighter
@@ -489,21 +497,24 @@ export function insideArena(origin: Point, at: Point): boolean {
 }
 
 /** The beam up to the arena: a tall, dense column of light from the ground to
- *  the arena, seen from far off, and a glow round its foot where to step in. */
+ *  the arena, seen from far off, and a glow over the whole of where stepping
+ *  in counts (`beam-entry.ts`). */
 export function liftBeam(lift: Point): string[] {
     const x = lift.x + 0.5;
     const z = lift.z + 0.5;
     const half = (ARENA_HEIGHT + ARENA_ROOM) / 2;
+    const spread = entry.ENTRY_RADIUS * 0.6;
     return [
         `${WORLD} particle minecraft:end_rod ${x} ${lift.y + half} ${z} 0.15 ${half} 0.15 0.005 240 force`,
-        `${WORLD} particle minecraft:glow ${x} ${lift.y + 1} ${z} 0.8 0.6 0.8 0 30 force`
+        `${WORLD} particle minecraft:glow ${x} ${lift.y + 1} ${z} ${spread} 0.6 ${spread} 0 40 force`
     ];
 }
 
-/** Who is standing in the beam and not up yet. */
-export function inLift(lift: Point): string {
-    return `execute in minecraft:overworld positioned ${lift.x + 0.5} ${lift.y + 0.5} ${lift.z + 0.5} as @a[distance=..2.5,tag=!${stage.IN_ARENA},gamemode=!creative,gamemode=!spectator] run data get entity @s Pos`;
-}
+/** Who is standing in the beam and not up yet (`beam-entry.inEntry`). */
+export const inLift = entry.inEntry;
+
+/** Everybody in the Overworld not up yet, for a fight with no beam (`direct`). */
+export const NOT_UP = `execute in minecraft:overworld as @a[distance=0..,tag=!${stage.IN_ARENA},gamemode=!creative,gamemode=!spectator] run data get entity @s Pos`;
 
 /** Up into the arena: tagged as inside first, then moved, then in adventure
  *  mode, where nothing can be broken or placed. */

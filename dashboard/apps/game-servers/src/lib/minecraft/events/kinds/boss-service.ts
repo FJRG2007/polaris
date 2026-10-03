@@ -79,6 +79,8 @@ interface Memory {
     still: number;
     alone: boolean;
     waits: number;
+    /** Ticks the ground round the players has been waited for, for the beam. */
+    entryWaits: number;
     /** When everybody not up yet was last told where the beam is. */
     remindedAt: number;
 }
@@ -97,6 +99,7 @@ function memoryOf(runId: string): Memory {
             still: 0,
             alone: false,
             waits: 0,
+            entryWaits: 0,
             remindedAt: 0
         };
         memories.set(runId, memory);
@@ -334,7 +337,7 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
             await ctx.giveUpPlace(found);
             return;
         }
-        await announce(ctx, found, false);
+        await announce(ctx, found, "land");
         return;
     }
 
@@ -361,7 +364,6 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
         // The boss is not standing until the arena is up: the place stays
         // open, and its column held, until then.
         changeStage(ctx, { origin: { x: ground.x, y, z: ground.z }, area, waits: 0 });
-        change(ctx, { lift: { x: ground.x, y: ground.y, z: ground.z } });
         ctx.run = { ...ctx.run, place: null };
         await ctx.persist();
         lines.push(stage.holdArea(area), commands.CLEAR_MARK);
@@ -370,6 +372,7 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
 
     const current = stageOf(ctx);
     if (!current.built) {
+        if (!(await placeEntry(ctx, memory, origin))) return;
         if (!(await provedEmpty(ctx, memory))) return;
         const boxes = boss.arenaBoxes(origin);
         // Written down first, then built - into air only.
@@ -390,10 +393,36 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
     if (!(await summon(ctx, memory, boss.arenaCenter(origin), []))) {
         throw new stageService.CalledOff("The boss could not be summoned in its arena");
     }
-    const lift = stateOf(ctx).lift ?? { x: origin.x, y: origin.y - boss.ARENA_HEIGHT, z: origin.z };
-    ctx.run = { ...ctx.run, place: lift };
+    // Its place is where it stands, in the arena: the beam's own column is
+    // never held or let go of, so a chunk somebody else keeps loaded stays so.
+    const lift = stateOf(ctx).lift;
+    ctx.run = { ...ctx.run, place: { x: origin.x, y: origin.y + 1, z: origin.z } };
     await ctx.persist();
-    await announce(ctx, lift, true);
+    await announce(ctx, lift ?? origin, lift ? "beam" : "direct");
+}
+
+/**
+ * Where the beam up stands, chosen before the arena goes up (`beam-entry.ts`):
+ * on open, flat ground near the players, at the height of its own column. With
+ * nowhere like that - everybody at home among their builds, a server too old
+ * to read the ground at once - nobody is made to climb to a beam: everybody is
+ * taken up instead (`direct`). Answers false while the ground is waited for.
+ */
+async function placeEntry(
+    ctx: KindContext,
+    memory: Memory,
+    origin: stored.Point
+): Promise<boolean> {
+    const state = stateOf(ctx);
+    if (state.lift || state.direct) return true;
+    const found = await ctx.findEntry({ x: origin.x, z: origin.z });
+    if (found === "unknown" && memory.entryWaits < LOAD_WAITS) {
+        memory.entryWaits += 1;
+        return false;
+    }
+    change(ctx, typeof found === "object" ? { lift: found } : { direct: true, taken: [] });
+    await ctx.persist();
+    return true;
 }
 
 /**
@@ -431,14 +460,14 @@ async function provedEmpty(ctx: KindContext, memory: Memory): Promise<boolean> {
     // it needs held, for the end of the event to take out.
     if (!cleared) throw new stageService.CalledOff("The air its arena needs could not be checked");
     // Not empty - a tree, a hill, something of somebody's: somewhere else.
+    // The beam stays where it was found: it was chosen by the players, not by
+    // the arena's site.
     const area = stageOf(ctx).area;
-    const lift = stateOf(ctx).lift;
     changeStage(ctx, { origin: null, area: null, waits: 0 });
-    change(ctx, { lift: null });
     memory.waits = 0;
     await ctx.persist();
     if (area) await ctx.server.sayAll([stage.releaseArea(area)]);
-    if (lift) await ctx.giveUpPlace(lift);
+    await ctx.giveUpPlace({ x: origin.x, y: origin.y - boss.ARENA_HEIGHT, z: origin.z });
     return false;
 }
 
@@ -505,25 +534,31 @@ async function summon(
     return true;
 }
 
-async function announce(ctx: KindContext, where: stored.Point, arena: boolean): Promise<void> {
+/** How the fight is reached: on the land, by the beam up to its arena, or
+ *  taken up to it with no beam to walk into. */
+type Reached = "land" | "beam" | "direct";
+
+async function announce(ctx: KindContext, where: stored.Point, how: Reached): Promise<void> {
     const state = stateOf(ctx);
     const language = ctx.language;
     const name = say.bossName(state.kind, language);
+    const said = {
+        land: () => messages.bossAppeared(name, where.x, where.y, where.z, language),
+        beam: () => say.inArena(name, where.x, where.y, where.z, language),
+        direct: () => say.takenUp(name, language)
+    }[how]();
     await ctx.server.sayAll([
-        commands.say(
-            messages.tag(language) +
-                (arena
-                    ? say.inArena(name, where.x, where.y, where.z, language)
-                    : messages.bossAppeared(name, where.x, where.y, where.z, language))
-        ),
+        commands.say(messages.tag(language) + said),
         // On everybody's screen too, where the beam up is: a line in the chat
         // scrolls away, and nobody knew to walk into the light.
-        ...(arena
+        ...(how === "beam"
             ? commands.titleCommands(
                   `&c${name}`,
                   say.beamSubtitle(where.x, where.y, where.z, language)
               )
-            : []),
+            : how === "direct"
+              ? commands.titleCommands(`&c${name}`, say.takenUpSubtitle(language))
+              : []),
         commands.sound(commands.SOUNDS.boss)
     ]);
     memoryOf(ctx.run.id).remindedAt = ctx.now;
@@ -806,6 +841,14 @@ async function arenaTick(
             .readWhere(await server.say([boss.inLift(lift)]))
             .map((one) => one.name);
         if (stepping.length > 0) await admit(ctx, origin, stepping, lines);
+    } else if (state.direct) {
+        // No beam: everybody in the Overworld taken up, once each.
+        const taken = new Set(state.taken);
+        const fresh = commands
+            .readWhere(await server.say([boss.NOT_UP]))
+            .map((one) => one.name)
+            .filter((name) => !taken.has(lower(name)));
+        if (fresh.length > 0) await admit(ctx, origin, fresh, lines);
     }
     const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
     const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
@@ -816,7 +859,8 @@ async function arenaTick(
         const kept = saved.find((each) => lower(each.name) === lower(one.name));
         if (!kept) continue;
         if (boss.leftArena(origin, one, dimensions.get(one.name))) {
-            lines.push(...boss.letGoLines(kept, messages.tag(language) + say.leftArena(language)));
+            const note = state.lift ? say.leftArena(language) : say.leftArenaForGood(language);
+            lines.push(...boss.letGoLines(kept, messages.tag(language) + note));
             saved = saved.filter((each) => each !== kept);
             changed = true;
             continue;
@@ -859,6 +903,11 @@ async function admit(
     if (fresh.length === 0) return;
     const all = [...current.saved, ...fresh];
     changeStage(ctx, { saved: all });
+    // Taken up with no beam: never pulled up again once they leave.
+    if (stateOf(ctx).direct) {
+        const taken = new Set([...stateOf(ctx).taken, ...fresh.map((one) => lower(one.name))]);
+        change(ctx, { taken: [...taken] });
+    }
     // What they carry of what the boss drops anyway: theirs, never taken back.
     const drops = boss.BOSSES[stateOf(ctx).kind].drops;
     if (drops && (await versionOf(ctx, memoryOf(ctx.run.id))).components) {

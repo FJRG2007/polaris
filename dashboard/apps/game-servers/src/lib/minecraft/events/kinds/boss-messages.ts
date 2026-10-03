@@ -46,6 +46,18 @@ export function inArena(boss: string, x: number, y: number, z: number, language:
         : `&c${boss}&f awaits in a sky arena over &eX ${x} Y ${y} Z ${z}&f. Walk into the beam of light to go up.`;
 }
 
+/** The arena is ready and there is no beam to walk into: everybody is taken up. */
+export function takenUp(boss: string, language: Language): string {
+    return language === "es"
+        ? `&c${boss}&f espera en una arena en el cielo. Te subimos ahora.`
+        : `&c${boss}&f awaits in a sky arena. You are being taken up now.`;
+}
+
+/** The subtitle when everybody is taken up, under the boss's name. */
+export function takenUpSubtitle(language: Language): string {
+    return language === "es" ? "&eTe subimos a la arena" : "&eTaking you up to the arena";
+}
+
 /** The subtitle when the arena is ready, under the boss's name: where the beam up is. */
 export function beamSubtitle(x: number, y: number, z: number, language: Language): string {
     return language === "es"
@@ -97,6 +109,11 @@ export function leftArena(language: Language): string {
     return language === "es"
         ? "&7Has salido de la arena. El haz de luz te vuelve a subir."
         : "&7You left the arena. The beam of light takes you back up.";
+}
+
+/** The same when there is no beam to go back up by. */
+export function leftArenaForGood(language: Language): string {
+    return language === "es" ? "&7Has salido de la arena." : "&7You left the arena.";
 }
 
 export function phaseTitle(phase: 2 | 3, language: Language): string {

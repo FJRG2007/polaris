@@ -1032,6 +1032,8 @@ export const SAMPLES_ON_TREES = ["#minecraft:leaves", "#minecraft:logs"].map(
         `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ ${tag} run data get entity @s Pos`
 );
 export const SAMPLES_ON_WATER = `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ minecraft:water run data get entity @s Pos`;
+/** The markers standing on lava, which the heightmap counts as ground too. */
+export const SAMPLES_ON_LAVA = `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ minecraft:lava run data get entity @s Pos`;
 
 /** The columns out of a read of the markers, by where each was summoned. */
 export function samplesIn(output: string): { x: number; y: number; z: number }[] {
