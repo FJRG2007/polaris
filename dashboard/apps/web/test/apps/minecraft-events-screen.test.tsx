@@ -327,7 +327,9 @@ describe("the treasure hunt, gathering, rare catch and experience boost", () => 
         await waitFor(() => expect(screen.getByLabelText("Edit Treasure hunt")).toBeTruthy());
         fireEvent.click(screen.getByLabelText("Edit Treasure hunt"));
         expect(screen.queryByLabelText(/^Chests/)).toBeNull();
-        fireEvent.change(await screen.findByLabelText(/^How far out/), { target: { value: "2000" } });
+        fireEvent.change(await screen.findByLabelText(/^How far out/), {
+            target: { value: "2000" }
+        });
         await waitFor(() => expect(screen.getAllByText("At most 1000").length).toBeGreaterThan(0));
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
     });

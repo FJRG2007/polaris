@@ -438,7 +438,15 @@ describe("trivia", () => {
         expect(trivia.BANK.length).toBeGreaterThanOrEqual(200);
         expect(new Set(trivia.BANK.map((one) => one.id)).size).toBe(trivia.BANK.length);
         const categories = new Set(trivia.BANK.map((one) => one.category));
-        for (const wanted of ["mobs", "items", "world", "geography", "science", "history", "general"])
+        for (const wanted of [
+            "mobs",
+            "items",
+            "world",
+            "geography",
+            "science",
+            "history",
+            "general"
+        ])
             expect(categories).toContain(wanted);
         for (const one of trivia.BANK) {
             expect(one.en.question.endsWith("?")).toBe(true);
@@ -454,7 +462,9 @@ describe("trivia", () => {
     it("never repeats a question inside a game, and asks what was not asked lately first", () => {
         const game = trivia.ordered("event-1", []);
         expect(new Set(game.map((one) => one.id)).size).toBe(trivia.BANK.length);
-        expect(trivia.ordered("event-1", []).map((one) => one.id)).toEqual(game.map((one) => one.id));
+        expect(trivia.ordered("event-1", []).map((one) => one.id)).toEqual(
+            game.map((one) => one.id)
+        );
         const recent = game.slice(0, 20).map((one) => one.id);
         const next = trivia.ordered("event-2", recent);
         const firstOnes = next.slice(0, trivia.BANK.length - recent.length).map((one) => one.id);
@@ -1851,7 +1861,9 @@ describe("a spleef floor", () => {
     });
 
     it("plays one of three ways, the same after a restart, and the decay game only eats its own snow", () => {
-        const drawn = new Set(Array.from({ length: 40 }, (_, index) => spleef.variantFor(`r${index}`)));
+        const drawn = new Set(
+            Array.from({ length: 40 }, (_, index) => spleef.variantFor(`r${index}`))
+        );
         expect([...drawn].sort()).toEqual([...spleef.VARIANTS].sort());
         expect(spleef.variantFor("r1")).toBe(spleef.variantFor("r1"));
         const floor = spleef.arena(
@@ -2640,11 +2652,16 @@ describe("the world an event holds", () => {
             "weather clear 660",
             "weather clear 660s"
         ]);
-        expect(commands.worldRules(needs)).toEqual([["doDaylightCycle", "advance_time"], ["doWeatherCycle", "advance_weather"]]);
+        expect(commands.worldRules(needs)).toEqual([
+            ["doDaylightCycle", "advance_time"],
+            ["doWeatherCycle", "advance_weather"]
+        ]);
     });
 
     it("turns phantoms off with a held day", () => {
-        expect(commands.worldRules(catalog.worldNeeds({ kind: "spleef" })).flat()).toContain("doInsomnia");
+        expect(commands.worldRules(catalog.worldNeeds({ kind: "spleef" })).flat()).toContain(
+            "doInsomnia"
+        );
     });
 
     it("puts the time back at the end, and leaves alone an event that never held it", () => {
@@ -2661,7 +2678,9 @@ describe("the top of a footprint, for what is built in the air", () => {
         const xs = [...new Set(columns.map((one) => one.x))].sort((a, b) => a - b);
         expect(xs[0]).toBe(90);
         expect(xs.at(-1)).toBe(110);
-        expect(xs.every((x, index) => index === 0 || x - xs[index - 1]! <= commands.TOP_STEP)).toBe(true);
+        expect(xs.every((x, index) => index === 0 || x - xs[index - 1]! <= commands.TOP_STEP)).toBe(
+            true
+        );
         expect(columns).toHaveLength(xs.length * xs.length);
     });
 
@@ -2715,7 +2734,9 @@ describe("a parkour course's traps", () => {
         const there = parkour.blinkLines(course, 1_000);
         expect(there.every((line) => line.endsWith(" minecraft:orange_concrete keep"))).toBe(true);
         const gone = parkour.blinkLines(course, parkour.BLINK_MS - 500);
-        expect(gone.every((line) => line.endsWith(" minecraft:air replace minecraft:orange_concrete"))).toBe(true);
+        expect(
+            gone.every((line) => line.endsWith(" minecraft:air replace minecraft:orange_concrete"))
+        ).toBe(true);
         expect(there).toHaveLength(course.vanishing.length);
     });
 });

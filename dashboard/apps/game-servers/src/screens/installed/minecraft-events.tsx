@@ -654,7 +654,9 @@ export function MinecraftEvents({
     }
 
     /** What the last press of Run a random event left out, and why. */
-    const [skipped, setSkipped] = useState<{ presetId: string; name: string; reason: string }[] | null>(null);
+    const [skipped, setSkipped] = useState<
+        { presetId: string; name: string; reason: string }[] | null
+    >(null);
 
     function runRandom(): void {
         setError(null);
@@ -878,34 +880,42 @@ export function MinecraftEvents({
                             dateTime={(at) => display.dateTime(at)}
                         />
                     )}
-                    {view && !view.run && canManage && settings && settings.random.pool.length > 0 && (
-                        <div className="flex flex-col gap-2">
-                            <div>
-                                <ui.Button
-                                    variant="secondary"
-                                    size="sm"
-                                    disabled={pending || dirty}
-                                    title={dirty ? t("events.saveFirst") : undefined}
-                                    onClick={runRandom}
-                                >
-                                    <Dices className="size-4" />
-                                    {t("events.runRandom")}
-                                </ui.Button>
+                    {view &&
+                        !view.run &&
+                        canManage &&
+                        settings &&
+                        settings.random.pool.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                                <div>
+                                    <ui.Button
+                                        variant="secondary"
+                                        size="sm"
+                                        disabled={pending || dirty}
+                                        title={dirty ? t("events.saveFirst") : undefined}
+                                        onClick={runRandom}
+                                    >
+                                        <Dices className="size-4" />
+                                        {t("events.runRandom")}
+                                    </ui.Button>
+                                </div>
+                                {skipped && skipped.length > 0 && (
+                                    <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                                        {skipped.map((one) => (
+                                            <li
+                                                key={one.presetId}
+                                                className="min-w-0 truncate"
+                                                title={schemaText(one.reason) ?? ""}
+                                            >
+                                                {t("events.skippedOne", {
+                                                    name: one.name,
+                                                    reason: lowerFirst(schemaText(one.reason) ?? "")
+                                                })}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
-                            {skipped && skipped.length > 0 && (
-                                <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-                                    {skipped.map((one) => (
-                                        <li key={one.presetId} className="min-w-0 truncate" title={schemaText(one.reason) ?? ""}>
-                                            {t("events.skippedOne", {
-                                                name: one.name,
-                                                reason: lowerFirst(schemaText(one.reason) ?? "")
-                                            })}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    )}
+                        )}
                 </ui.CardBody>
             </ui.Card>
 
@@ -1227,7 +1237,9 @@ export function MinecraftEvents({
                                         />
                                         <label className="flex items-center gap-3 text-sm">
                                             <ui.Switch
-                                                checked={settings.random.from === settings.random.to}
+                                                checked={
+                                                    settings.random.from === settings.random.to
+                                                }
                                                 disabled={locked}
                                                 aria-label={t("events.anyTimeOfDay")}
                                                 onChange={(on) =>
@@ -1242,34 +1254,38 @@ export function MinecraftEvents({
                                         </label>
                                         <div className="grid gap-3 sm:grid-cols-4">
                                             {settings.random.from !== settings.random.to && (
-                                            <>
-                                            <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">
-                                                    {t("events.from")}
-                                                </span>
-                                                <ui.Input
-                                                    type="time"
-                                                    value={settings.random.from}
-                                                    disabled={locked}
-                                                    onChange={(event) =>
-                                                        changeRandom({ from: event.target.value })
-                                                    }
-                                                />
-                                            </label>
-                                            <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">
-                                                    {t("events.until")}
-                                                </span>
-                                                <ui.Input
-                                                    type="time"
-                                                    value={settings.random.to}
-                                                    disabled={locked}
-                                                    onChange={(event) =>
-                                                        changeRandom({ to: event.target.value })
-                                                    }
-                                                />
-                                            </label>
-                                            </>
+                                                <>
+                                                    <label className="flex flex-col gap-1 text-sm">
+                                                        <span className="font-medium">
+                                                            {t("events.from")}
+                                                        </span>
+                                                        <ui.Input
+                                                            type="time"
+                                                            value={settings.random.from}
+                                                            disabled={locked}
+                                                            onChange={(event) =>
+                                                                changeRandom({
+                                                                    from: event.target.value
+                                                                })
+                                                            }
+                                                        />
+                                                    </label>
+                                                    <label className="flex flex-col gap-1 text-sm">
+                                                        <span className="font-medium">
+                                                            {t("events.until")}
+                                                        </span>
+                                                        <ui.Input
+                                                            type="time"
+                                                            value={settings.random.to}
+                                                            disabled={locked}
+                                                            onChange={(event) =>
+                                                                changeRandom({
+                                                                    to: event.target.value
+                                                                })
+                                                            }
+                                                        />
+                                                    </label>
+                                                </>
                                             )}
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
@@ -1333,8 +1349,13 @@ export function MinecraftEvents({
                                                                     .map(
                                                                         (one) =>
                                                                             settings.random.pool.find(
-                                                                                (entry) => entry.presetId === one.id
-                                                                            ) ?? { presetId: one.id, weight: 1 }
+                                                                                (entry) =>
+                                                                                    entry.presetId ===
+                                                                                    one.id
+                                                                            ) ?? {
+                                                                                presetId: one.id,
+                                                                                weight: 1
+                                                                            }
                                                                     )
                                                             })
                                                         }
@@ -1344,7 +1365,10 @@ export function MinecraftEvents({
                                                     <ui.Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        disabled={locked || settings.random.pool.length === 0}
+                                                        disabled={
+                                                            locked ||
+                                                            settings.random.pool.length === 0
+                                                        }
                                                         onClick={() => changeRandom({ pool: [] })}
                                                     >
                                                         {t("events.drawNone")}

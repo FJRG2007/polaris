@@ -477,7 +477,10 @@ export async function runRandomNow(input: {
     // The next drawn one a gap after this one, as if the draw had picked it.
     await updateEventState(input.installedAppId, (current) => ({
         ...current,
-        nextRandomAt: now + catalog.runMinutes(chosen) * 60_000 + plan.nextGap(settings.settings, Math.random),
+        nextRandomAt:
+            now +
+            catalog.runMinutes(chosen) * 60_000 +
+            plan.nextGap(settings.settings, Math.random),
         waiting: null,
         short: false,
         readySince: null
@@ -696,8 +699,7 @@ export async function startEvent(input: {
         startsAt: now + countdown,
         endsAt: now + countdown + catalog.runMinutes(preset) * 60_000,
         participants: [...seen.values()].map((one) => one.name),
-        triviaSkip:
-            preset.kind === "trivia" ? stored.readEventState(row.config).triviaSeen : [],
+        triviaSkip: preset.kind === "trivia" ? stored.readEventState(row.config).triviaSeen : [],
         place: null,
         target: null,
         placeTries: 0,
@@ -1663,8 +1665,7 @@ async function findPlace(
             : dropped;
     // Across the water from where the players are: they live on an island, and
     // nothing further out will do - the next try comes in at once.
-    const walkable =
-        air || !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
+    const walkable = air || !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
     if (!walkable && how.nearHome)
         loop.run = { ...loop.run, placeTries: Math.max(loop.run.placeTries, NEAR_AFTER - 1) };
     const refused: search.PlaceRefusal | null =
@@ -4015,7 +4016,6 @@ async function sample(
 
 // ------------------------------------------------------------------ the sweep
 
-
 /**
  * When the sweep last looked at each server's draw. Kept in this process rather
  * than written down: it changes every minute, and what it is for - the screen
@@ -4110,7 +4110,10 @@ async function sweepOne(
             drawChecks.set(installedAppId, now);
             const down = gameMessage("minecraft", "events.waiting.serverDown");
             if (state.waiting !== down)
-                await updateEventState(installedAppId, (current) => ({ ...current, waiting: down }));
+                await updateEventState(installedAppId, (current) => ({
+                    ...current,
+                    waiting: down
+                }));
         }
         return false;
     }

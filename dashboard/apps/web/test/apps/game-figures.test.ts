@@ -105,9 +105,8 @@ describe("a score on the side panel", () => {
         expect(commands.scoreShownAs("Ana", "pe_score", figures.formatDuration(150_000))).toBe(
             'scoreboard players display numberformat Ana pe_score fixed {"text":"2.5 min"}'
         );
-        expect(commands.scoreShownAs("Ana", "pe_score", figures.formatDuration(150_000, "es"))).toBe(
-            'scoreboard players display numberformat Ana pe_score fixed {"text":"2,5 min"}'
-        );
+        expect(
+            commands.scoreShownAs("Ana", "pe_score", figures.formatDuration(150_000, "es"))
+        ).toBe('scoreboard players display numberformat Ana pe_score fixed {"text":"2,5 min"}');
     });
 });
-

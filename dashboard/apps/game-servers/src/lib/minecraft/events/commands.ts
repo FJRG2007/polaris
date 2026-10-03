@@ -16,7 +16,13 @@ import * as speech from "../speech";
 import { stripFormatting } from "../parse";
 import { duelTeardown } from "./kinds/team-duel";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
-import { worldNeeds, type EventKind, type EventOptions, type EventPreset, type WorldNeeds } from "./catalog";
+import {
+    worldNeeds,
+    type EventKind,
+    type EventOptions,
+    type EventPreset,
+    type WorldNeeds
+} from "./catalog";
 
 export const SCORE = "pe_score";
 export const SUM = "pe_sum";
@@ -970,7 +976,10 @@ export function footprintColumns(
 
 /** A marker on top of every column of a footprint, the old ones taken away first. */
 export function topLines(columns: readonly { x: number; z: number }[]): string[] {
-    return [`kill @e[tag=${SAMPLE_TAG}]`, ...columns.map((one) => summonOnTop(one.x, one.z, SAMPLE_TAG))];
+    return [
+        `kill @e[tag=${SAMPLE_TAG}]`,
+        ...columns.map((one) => summonOnTop(one.x, one.z, SAMPLE_TAG))
+    ];
 }
 
 /** The highest of the tops read, or null when none was. */

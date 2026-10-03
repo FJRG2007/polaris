@@ -74,7 +74,10 @@ export function PlayerRecordPanel({
         <div className="space-y-2">
             {seen && history && (
                 <div className="grid grid-cols-2 gap-2">
-                    <Figure label={t("history.played")} value={playedFor(t, history.playedMs, locale)} />
+                    <Figure
+                        label={t("history.played")}
+                        value={playedFor(t, history.playedMs, locale)}
+                    />
                     <Figure label={t("history.visits")} value={count(history.visits)} />
                     <Figure
                         label={t("history.firstSeen")}

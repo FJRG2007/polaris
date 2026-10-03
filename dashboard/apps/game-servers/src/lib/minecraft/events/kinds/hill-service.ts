@@ -61,7 +61,14 @@ export async function raiseHill(ctx: KindContext): Promise<boolean> {
     }
     if (!run.place) {
         const found = fistsOnly
-            ? await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "air", true, hill.LIFT)
+            ? await ctx.findPlace(
+                  place,
+                  hill.DISTANCE,
+                  radius + hill.MARGIN,
+                  "air",
+                  true,
+                  hill.LIFT
+              )
             : await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "open", true);
         if (found === "failed")
             throw new EventStopped(fistsOnly ? search.NO_AIR : search.NO_GROUND);
@@ -294,7 +301,11 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
             const shown = Object.entries(points)
                 .filter(([name, score]) => run.points?.[name] !== score)
                 .map(([name, score]) =>
-                    commands.scoreShownAs(name, commands.SCORE, formatDuration(score * 1000, ctx.home))
+                    commands.scoreShownAs(
+                        name,
+                        commands.SCORE,
+                        formatDuration(score * 1000, ctx.home)
+                    )
                 );
             if (shown.length > 0) await ctx.server.sayAll(shown);
         }

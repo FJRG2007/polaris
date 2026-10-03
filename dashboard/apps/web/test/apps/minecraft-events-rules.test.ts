@@ -303,7 +303,12 @@ describe("the random draw", () => {
 
     it("waits one more look once the players it was short of come, so a join is not landed on", () => {
         const due = at("20:00");
-        const short = plan.decideRandom({ ...base, active: 1, nextRandomAt: due, now: at("20:30") });
+        const short = plan.decideRandom({
+            ...base,
+            active: 1,
+            nextRandomAt: due,
+            now: at("20:30")
+        });
         expect(short.short).toBe(true);
         const first = plan.decideRandom({ ...base, ...short, nextRandomAt: due, now: at("21:00") });
         expect(first.start).toBeNull();
@@ -579,7 +584,10 @@ describe("what each event needs of the world", () => {
     });
 
     it("holds clear weather on a build and night for a horde", () => {
-        expect(catalog.worldNeeds({ kind: "build-battle" })).toEqual({ time: "day", weather: "clear" });
+        expect(catalog.worldNeeds({ kind: "build-battle" })).toEqual({
+            time: "day",
+            weather: "clear"
+        });
         expect(catalog.worldNeeds({ kind: "waves" })).toEqual({ time: "night", weather: "clear" });
         expect(catalog.worldNeeds({ kind: "mob-hunt" }).time).toBe("night");
     });

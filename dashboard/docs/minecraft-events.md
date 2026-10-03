@@ -40,26 +40,26 @@ Each kind declares the time of day and the weather it needs in
 `catalog.WORLD_NEEDS`. A new kind must add its entry; the test in
 `test/apps/minecraft-events-rules.test.ts` fails for one that does not.
 
-| Need | Why | What is held |
-|---|---|---|
-| Day | Builds and arenas can be seen; nothing spawns on them; no phantoms | `doDaylightCycle`/`advance_time` and `doInsomnia`/`spawn_phantoms` off, time set to 6000 |
-| Night | The mobs it is about come out and do not burn (Horde defense, Mob hunt) | `doDaylightCycle`/`advance_time` off, time set to 18000 |
-| Clear | No lightning on an arena, no thunderstorm mid-round (Build battle) | `doWeatherCycle`/`advance_weather` off, `weather clear` for the event's length |
-| Rain | A blood moon's own storm (rain, never thunder) | as above, `weather rain` |
+| Need  | Why                                                                     | What is held                                                                             |
+| ----- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Day   | Builds and arenas can be seen; nothing spawns on them; no phantoms      | `doDaylightCycle`/`advance_time` and `doInsomnia`/`spawn_phantoms` off, time set to 6000 |
+| Night | The mobs it is about come out and do not burn (Horde defense, Mob hunt) | `doDaylightCycle`/`advance_time` off, time set to 18000                                  |
+| Clear | No lightning on an arena, no thunderstorm mid-round (Build battle)      | `doWeatherCycle`/`advance_weather` off, `weather clear` for the event's length           |
+| Rain  | A blood moon's own storm (rain, never thunder)                          | as above, `weather rain`                                                                 |
 
 When the event ends the rules go back to what they were and the time of day is
 set back to what it was when it started; the weather turns again from there.
 Kinds that need neither (Mining rush, Fishing, Trivia, Happy hour, XP boost,
 Rare catch) leave the world alone.
 
-| Kind | Time | Weather |
-|---|---|---|
-| Build battle, Spleef, Parkour, King of the hill, Team duel | day | clear |
-| Treasure hunt, Supply drop, Explorer, Gathering | day | clear |
-| Horde defense, Mob hunt, Meteor shower | night | clear |
-| Blood moon | night | rain |
-| World boss | - | clear |
-| Mining rush, Fishing, Trivia, Happy hour, XP boost, Rare catch | - | - |
+| Kind                                                           | Time  | Weather |
+| -------------------------------------------------------------- | ----- | ------- |
+| Build battle, Spleef, Parkour, King of the hill, Team duel     | day   | clear   |
+| Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
+| Horde defense, Mob hunt, Meteor shower                         | night | clear   |
+| Blood moon                                                     | night | rain    |
+| World boss                                                     | -     | clear   |
+| Mining rush, Fishing, Trivia, Happy hour, XP boost, Rare catch | -     | -       |
 
 ## The random draw
 

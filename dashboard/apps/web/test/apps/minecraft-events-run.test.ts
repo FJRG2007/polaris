@@ -3898,7 +3898,9 @@ describe("a treasure hunt", () => {
         const chest = run.chests[0]!;
         expect(world.chests).toEqual([at(chest)]);
         // The richest table by default.
-        expect(world.sent.some((line) => line.includes("minecraft:chests/bastion_treasure"))).toBe(true);
+        expect(world.sent.some((line) => line.includes("minecraft:chests/bastion_treasure"))).toBe(
+            true
+        );
         expect(world.sent).toContain(
             `execute in minecraft:overworld run forceload add ${chest.x} ${chest.z}`
         );
@@ -5257,7 +5259,11 @@ describe("an event built in the air", () => {
         expect(state().run?.stage?.built).toBe(true);
         expect(state().run?.placeFrom?.near).toBe("Ana");
         // Ben is brought in from the Nether, his things kept for him like anybody's.
-        expect(state().run?.stage?.saved.map((one) => one.name).sort()).toEqual(["Ana", "Ben"]);
+        expect(
+            state()
+                .run?.stage?.saved.map((one) => one.name)
+                .sort()
+        ).toEqual(["Ana", "Ben"]);
         expect(
             world.sent.some((line) => /^execute in minecraft:overworld run tp Ben /.test(line))
         ).toBe(true);
@@ -5373,13 +5379,17 @@ describe("spleef", () => {
         expect(world.sent.some((line) => line.includes("iron_shovel"))).toBe(false);
         expect(run.stage?.boxes.some((box) => box.block === spleef.WARN)).toBe(true);
         expect(
-            world.sent.some((line) =>
-                line.includes(`if block ~ ~-1 ~ ${spleef.FLOOR}`) && line.endsWith(`run setblock ~ ~-1 ~ ${spleef.WARN}`)
+            world.sent.some(
+                (line) =>
+                    line.includes(`if block ~ ~-1 ~ ${spleef.FLOOR}`) &&
+                    line.endsWith(`run setblock ~ ~-1 ~ ${spleef.WARN}`)
             )
         ).toBe(true);
         await events.cancelEvent("owner", SERVER);
         await play(4_200);
-        expect(world.sent.some((line) => line.endsWith(`minecraft:air replace ${spleef.WARN}`))).toBe(true);
+        expect(
+            world.sent.some((line) => line.endsWith(`minecraft:air replace ${spleef.WARN}`))
+        ).toBe(true);
         expect(state().stageLeftovers).toEqual([]);
     });
 
@@ -5654,10 +5664,10 @@ async function joinAndStart(presetId: string, joiners = ["Ana", "Ben"]): Promise
     // give time to type join.
     expect(state().run!.startsAt - state().run!.createdAt).toBe(catalog.JOIN_SECONDS * 1000);
     await play(2_100);
-    chat(
-        ...joiners.map((name): [string, string] => [name, name === "Ben" ? "unirse" : "join"]),
-        ["Dee", "hello"]
-    );
+    chat(...joiners.map((name): [string, string] => [name, name === "Ben" ? "unirse" : "join"]), [
+        "Dee",
+        "hello"
+    ]);
     await play(30_000);
     expect(state().run?.joined).toEqual(joiners);
     await play(20_000);
@@ -6321,7 +6331,11 @@ describe("a king of the hill", () => {
             "effect give @a[tag=pe_arena,scores={pe_khp=7..}] minecraft:poison 3 1 true"
         );
         expect(
-            world.sent.some((line) => line.includes("minecraft:slow_falling 3 0 true") && line.includes("@a[tag=pe_arena,x="))
+            world.sent.some(
+                (line) =>
+                    line.includes("minecraft:slow_falling 3 0 true") &&
+                    line.includes("@a[tag=pe_arena,x=")
+            )
         ).toBe(true);
         const place0 = state().run!.place!;
         expect(world.sent).toContain(

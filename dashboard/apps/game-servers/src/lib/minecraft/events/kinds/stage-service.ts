@@ -806,12 +806,16 @@ async function spleefTick(
     let dirty = false;
 
     const current = state(loop);
-    const variant = spleef.variantFor(loop.run.id, (loop.run.preset.options as catalog.EventOptions<"spleef">).variant);
+    const variant = spleef.variantFor(
+        loop.run.id,
+        (loop.run.preset.options as catalog.EventOptions<"spleef">).variant
+    );
     if (!current.armed && current.goAt !== null && now >= current.goAt) {
         const { items } = await tools.flavour();
         // The decay game's red snow is the arena's too: written down before any
         // is made, so whatever ends it takes it out with the rest.
-        if (variant === "decay") change(loop, { boxes: [...current.boxes, ...spleef.warnBoxes(floor)] });
+        if (variant === "decay")
+            change(loop, { boxes: [...current.boxes, ...spleef.warnBoxes(floor)] });
         for (const racer of current.racers) {
             if (racer.outAt !== null) continue;
             if (variant === "shovel") await handShovel(server, tools, racer.name, items);

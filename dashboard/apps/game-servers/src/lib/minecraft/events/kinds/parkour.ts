@@ -235,9 +235,7 @@ export const GONE_MS = 2_000;
 export function blinkLines(course: Course, now: number): string[] {
     if (course.vanishing.length === 0) return [];
     const gone = now % BLINK_MS >= BLINK_MS - GONE_MS;
-    return course.vanishing.map((box) =>
-        gone ? removeBox(box) : buildBox(box)
-    );
+    return course.vanishing.map((box) => (gone ? removeBox(box) : buildBox(box)));
 }
 
 function buildBox(box: Box): string {

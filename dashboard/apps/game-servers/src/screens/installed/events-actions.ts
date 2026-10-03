@@ -89,9 +89,12 @@ export async function startEventAction(input: z.input<typeof startSchema>): Prom
 }
 
 /** Draw an event now from the pool: what was picked, and why the rest were not. */
-export async function runRandomAction(
-    installedAppId: string
-): Promise<Answer & { picked?: string | null; skipped?: { presetId: string; name: string; reason: string }[] }> {
+export async function runRandomAction(installedAppId: string): Promise<
+    Answer & {
+        picked?: string | null;
+        skipped?: { presetId: string; name: string; reason: string }[];
+    }
+> {
     const t = await gameWords("minecraft");
     const parsed = serverId.safeParse(installedAppId);
     if (!parsed.success) return { error: t("events.errors.noServer") };
