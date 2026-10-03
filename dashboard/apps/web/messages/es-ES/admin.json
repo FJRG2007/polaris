@@ -1339,6 +1339,28 @@
             "configure": "Configurar",
             "setUp": "Preparar"
         },
+        "googleApis": {
+            "title": "APIs de Google",
+            "lead": "Cada una tiene que estar activada en el proyecto de Google Cloud de este cliente.",
+            "check": "Comprobar",
+            "open": "Abrir en Google Cloud",
+            "turnOn": "Activar",
+            "state": {
+                "enabled": "Activada",
+                "disabled": "Desactivada",
+                "unknown": "Sin comprobar"
+            },
+            "usedFor": {
+                "calendar": "Calendarios",
+                "drive": "Copias en Drive"
+            },
+            "disabledIn": "Desactivada en el proyecto {project}. Actívala y vuelve a comprobar.",
+            "disabledHint": "Desactivada en el proyecto de este cliente. Actívala y vuelve a comprobar.",
+            "unknownHint": {
+                "calendar": "Se comprueba cuando alguien vincula Google para calendarios.",
+                "drive": "Se comprueba cuando alguien vincula Google Drive para copias."
+            }
+        },
         "proven": {
             "done": "Ya se ha conectado una cuenta a través de esta aplicación, así que se ofrece a todo el mundo aquí.",
             "title": "Aún sin comprobar",

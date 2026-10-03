@@ -16,7 +16,8 @@
 import { z } from "zod";
 import * as bridge from "./bridge";
 import type * as types from "../../engine/types";
-import { errorFor, readJson, retryAfter, send, type Fetcher } from "./http";
+import { readGraphApiError } from "@polaris/core";
+import { errorForProblem, readJson, send, type Fetcher } from "./http";
 import type { CalendarProvider, ChangeSet, RemoteCalendar, RemoteObject } from "./provider";
 import {
     SyncAuthError,
@@ -242,30 +243,25 @@ const InstancesPage = z.object({
     "@odata.nextLink": z.string().optional()
 });
 
-const ErrorBody = z.object({
-    error: z.object({ code: z.string().nullish(), message: z.string().nullish() })
-});
-
 const GONE_CODES = new Set(["syncstatenotfound", "resyncrequired", "syncstateinvalid"]);
 
 /** The sync error for a failed Graph response, read from its error body. */
 async function graphError(response: Response): Promise<Error> {
-    let code = "";
-    let message = "";
+    let body: unknown = null;
     try {
-        const parsed = ErrorBody.safeParse(await readJson(response));
-        if (parsed.success) {
-            code = parsed.data.error.code ?? "";
-            message = parsed.data.error.message ?? "";
-        }
+        body = await readJson(response);
     } catch {
         // The status alone still decides.
     }
+    const code =
+        body && typeof body === "object" && "error" in body
+            ? String((body as { error?: { code?: unknown } }).error?.code ?? "")
+            : "";
     if (response.status === 410 || GONE_CODES.has(code.toLowerCase()))
         return new SyncGoneError("Microsoft discarded the sync state", response.status);
-    if (response.status === 429)
-        return new SyncUnreachableError("Microsoft asked to slow down", 429, retryAfter(response));
-    return errorFor(response, message);
+    return errorForProblem(response, readGraphApiError(response.status, body), {
+        name: "Microsoft"
+    });
 }
 
 async function tokenFrom(accessToken: () => Promise<string>): Promise<string> {

@@ -266,6 +266,7 @@ export const host = {
         calendarLinkUrl: async (provider: string) =>
             `/account/connections/new?provider=${provider}&scope=calendar`,
         calendarLinkAvailable: async (provider: "google" | "microsoft") => fake.linkReady[provider],
+        googleClientProject: async () => null,
         taskListsFor: async () => (fake.taskLists ? [...fake.taskLists] : null),
         createDueTask: async (
             actor: { id: string },

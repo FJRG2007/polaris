@@ -25,7 +25,12 @@ import * as engine from "@polaris-app/calendar/src/engine";
 import * as objects from "@polaris-app/calendar/src/lib/objects";
 import * as syncEngine from "@polaris-app/calendar/src/lib/sync-engine";
 import { createFakeProvider, type FakeProvider } from "../fixtures/fake-provider";
-import { SyncAuthError, SyncUnreachableError } from "@polaris-app/calendar/src/lib/sync/errors";
+import {
+    SyncAuthError,
+    SyncConsentError,
+    SyncSetupError,
+    SyncUnreachableError
+} from "@polaris-app/calendar/src/lib/sync/errors";
 
 const ZONE = "Europe/Madrid";
 
@@ -290,6 +295,84 @@ describe("calendar sync engine", () => {
         expect(fake.notices[0]?.body).toBe(world.en("sync.failedAuth"));
         expect((db.byId("calendarSource", sourceId)?.nextSyncAt as Date).getTime()).toBe(
             world.NOW.getTime() + 60 * 60_000
+        );
+    });
+
+    const SETUP = {
+        provider: "google" as const,
+        service: "calendar-json.googleapis.com",
+        project: "100000000001",
+        activationUrl:
+            "https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=100000000001"
+    };
+    const minutes = (n: number) => world.NOW.getTime() + n * 60_000;
+    const apiState = () =>
+        JSON.parse(fake.settings.get("google-api.calendar") ?? "null") as Record<string, unknown>;
+
+    it("waits on a switched-off API instead of asking to reconnect, and retries by itself", async () => {
+        await firstPull();
+        remote.failOn("list", new SyncSetupError("Google needs an API switched on", 403, SETUP));
+        await syncEngine.syncSource(sourceId);
+        const row = db.byId("calendarSource", sourceId)!;
+        expect(row.status).toBe("setup");
+        expect((row.nextSyncAt as Date).getTime()).toBe(minutes(2));
+        expect(apiState()).toMatchObject({
+            state: "disabled",
+            project: "100000000001",
+            activationUrl: SETUP.activationUrl,
+            since: world.NOW.toISOString()
+        });
+        expect(fake.notices.map((notice) => notice.body)).toEqual([world.en("sync.failedSetup")]);
+
+        // The longer it stays off, the less often it is asked - an hour at most.
+        vi.setSystemTime(new Date(minutes(40)));
+        await syncEngine.syncSource(sourceId, new Date(minutes(40)));
+        expect((db.byId("calendarSource", sourceId)?.nextSyncAt as Date).getTime()).toBe(
+            minutes(40 + 20)
+        );
+        vi.setSystemTime(new Date(minutes(600)));
+        await syncEngine.syncSource(sourceId, new Date(minutes(600)));
+        expect((db.byId("calendarSource", sourceId)?.nextSyncAt as Date).getTime()).toBe(
+            minutes(600 + 60)
+        );
+        expect(fake.notices).toHaveLength(1);
+    });
+
+    it("clears the wait once Google answers, and makes every other waiting account due", async () => {
+        await firstPull();
+        const other = db.insert("calendarSource", {
+            userId: alice.id,
+            kind: "google",
+            label: "second@gmail.example",
+            connectionId: "018f2b7a-0000-7000-8000-00000000c0df",
+            status: "setup",
+            nextSyncAt: new Date(minutes(60))
+        }).id as string;
+        remote.failOn("list", new SyncSetupError("Google needs an API switched on", 403, SETUP));
+        await syncEngine.syncSource(sourceId);
+        remote.failOn("list", null);
+        vi.setSystemTime(new Date(minutes(5)));
+        await syncEngine.syncSource(sourceId, new Date(minutes(5)));
+        expect(db.byId("calendarSource", sourceId)).toMatchObject({
+            status: "ok",
+            lastError: null
+        });
+        expect(apiState()).toMatchObject({ state: "enabled", project: null, activationUrl: null });
+        expect((db.byId("calendarSource", other)?.nextSyncAt as Date).getTime()).toBe(minutes(5));
+    });
+
+    it("asks for calendar permission when the grant lacks it, and slows down when asked to", async () => {
+        await firstPull();
+        remote.failOn("list", new SyncConsentError("Google needs more permission", 403));
+        await syncEngine.syncSource(sourceId);
+        expect(db.byId("calendarSource", sourceId)?.status).toBe("consent");
+        expect(fake.notices.map((notice) => notice.body)).toEqual([world.en("sync.failedConsent")]);
+
+        remote.failOn("list", new SyncUnreachableError("Google asked to slow down", 429, 300));
+        await syncEngine.syncSource(sourceId);
+        expect(db.byId("calendarSource", sourceId)?.status).toBe("unreachable");
+        expect((db.byId("calendarSource", sourceId)?.nextSyncAt as Date).getTime()).toBe(
+            minutes(5)
         );
     });
 

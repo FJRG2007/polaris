@@ -21,6 +21,7 @@ import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import {
     use,
     useMemo,
+    useEffect,
     useState,
     Suspense,
     useContext,
@@ -29,6 +30,7 @@ import {
     type ComponentType
 } from "react";
 import type { ConnectionFailure } from "@/lib/connections/attention";
+import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
 import { isTunnelToken, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
 import {
     CheckCircle2,
@@ -420,6 +422,130 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
                 <ExternalLink className="size-3 shrink-0" />
             </a>
         </div>
+    );
+}
+
+/**
+ * Whether each Google API Polaris calls is switched on in this client's Cloud
+ * project. Asked here, where the one person who can switch it on is looking,
+ * instead of found by somebody whose calendar never fills. Checked once when
+ * the dialog opens, from an answer at most ten minutes old; "Check again" asks
+ * Google now.
+ */
+function GoogleApisHealth() {
+    const t = useTranslations("admin");
+    const [apis, setApis] = useState<GoogleApiHealth[] | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [checking, setChecking] = useState(false);
+
+    async function load(force: boolean): Promise<void> {
+        setChecking(true);
+        setError(null);
+        const result = await runAction(
+            () => integrationActions.googleApiHealthAction(force),
+            setError
+        );
+        if (result) setApis(result.apis);
+        setChecking(false);
+    }
+
+    // Checked once, when the dialog opens; "Check again" is the reader's.
+    useEffect(() => {
+        void load(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+                <span className="min-w-0">
+                    <span className="block font-medium">{t("integrations.googleApis.title")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                        {t("integrations.googleApis.lead")}
+                    </span>
+                </span>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={checking}
+                    onClick={() => void load(true)}
+                >
+                    <RefreshCw className={cn("size-3.5", checking && "animate-spin")} />
+                    {t("integrations.googleApis.check")}
+                </Button>
+            </div>
+            {error ? <p className="text-xs text-danger">{error}</p> : null}
+            {apis === null ? (
+                <div className="flex flex-col gap-2" aria-hidden>
+                    <Skeleton className="h-9 w-full" />
+                    <Skeleton className="h-9 w-full" />
+                </div>
+            ) : (
+                <ul className="flex flex-col divide-y divide-border">
+                    {apis.map((api) => (
+                        <GoogleApiRow key={api.id} api={api} />
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+function GoogleApiRow({ api }: { api: GoogleApiHealth }) {
+    const t = useTranslations("admin");
+    const chip = {
+        enabled: "border-success-edge bg-success-soft text-success-ink",
+        disabled: "border-danger-edge bg-danger-soft text-danger-ink",
+        unknown: "border-border bg-muted/40 text-muted-foreground"
+    }[api.state];
+    const Icon =
+        api.state === "enabled" ? CheckCircle2 : api.state === "disabled" ? TriangleAlert : Circle;
+    const hint =
+        api.state === "disabled"
+            ? api.project
+                ? t("integrations.googleApis.disabledIn", { project: api.project })
+                : t("integrations.googleApis.disabledHint")
+            : api.state === "unknown"
+              ? t(`integrations.googleApis.unknownHint.${api.id}`)
+              : null;
+    const usedFor = t(`integrations.googleApis.usedFor.${api.id}`);
+    return (
+        <li className="flex flex-col gap-1 py-2 first:pt-0 last:pb-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="min-w-0 flex-1 basis-40">
+                    <span
+                        className="block truncate font-medium"
+                        title={`${api.title} - ${api.service}`}
+                    >
+                        {api.title}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground" title={usedFor}>
+                        {usedFor}
+                    </span>
+                </span>
+                <span
+                    className={cn(
+                        "inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]",
+                        chip
+                    )}
+                >
+                    <Icon className="size-3" aria-hidden />
+                    {t(`integrations.googleApis.state.${api.state}`)}
+                </span>
+                <a
+                    href={api.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                    {api.state === "disabled"
+                        ? t("integrations.googleApis.turnOn")
+                        : t("integrations.googleApis.open")}
+                    <ExternalLink className="size-3 shrink-0" />
+                </a>
+            </div>
+            {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+        </li>
     );
 }
 
@@ -1275,6 +1401,8 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                     {card.hasSecret && card.proven !== undefined ? (
                         <ProvenState slug={card.slug} name={app.name} proven={card.proven} />
                     ) : null}
+
+                    {card.slug === "google" && card.hasSecret ? <GoogleApisHealth /> : null}
 
                     <ConnectionPolicy card={card} slug={card.slug} name={app.name} />
 

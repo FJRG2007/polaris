@@ -213,6 +213,21 @@ describe("where a link is sent", () => {
         ]);
     });
 
+    it("brings a calendar link back to the Calendar's accounts screen", async () => {
+        const response = await finishConnectionCallback(
+            new Request(`${REGISTERED}/api/connections/google/callback?code=code-1&state=state-1`, {
+                headers: {
+                    host: "polaris.example.com",
+                    cookie: `polaris_connection_state=${encodeURIComponent(JSON.stringify({ provider: "google", mode: "calendar", state: "state-1" }))}`
+                }
+            }),
+            "google"
+        );
+        const location = new URL(response.headers.get("location") ?? "", REGISTERED);
+        expect(location.pathname).toBe("/calendar/settings/accounts");
+        expect(location.searchParams.get("provider")).toBe("google");
+    });
+
     it("sends a sign-in to the same address a link goes to, which is the one registered", async () => {
         await startConnectionSignIn(
             arriving("/api/connections/google/signin", "polaris.example.com"),

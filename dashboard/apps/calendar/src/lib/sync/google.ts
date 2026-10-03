@@ -15,11 +15,21 @@
 import { z } from "zod";
 import * as bridge from "./bridge";
 import type * as types from "../../engine/types";
-import { errorFor, readJson, retryAfter, send, type Fetcher } from "./http";
+import { GOOGLE_APIS, readGoogleApiError } from "@polaris/core";
+import { errorForProblem, readJson, send, type Fetcher } from "./http";
 import type { CalendarProvider, ChangeSet, RemoteCalendar, RemoteObject } from "./provider";
-import { SyncAuthError, SyncError, SyncRefusedError, SyncUnreachableError } from "./errors";
+import {
+    SyncAuthError,
+    SyncError,
+    SyncRefusedError,
+    SyncSetupError,
+    SyncUnreachableError
+} from "./errors";
 
 export const GOOGLE_API = "https://www.googleapis.com/calendar/v3";
+
+/** The Cloud API this client calls, as Google names it. */
+const CALENDAR_API = GOOGLE_APIS.find((api) => api.id === "calendar")!;
 
 const EventDateTime = z.object({
     date: z.string().optional(),
@@ -119,45 +129,23 @@ const CalendarListPage = z.object({
 
 const Colors = z.object({ event: z.record(z.object({ background: z.string() })).optional() });
 
-const ErrorBody = z.object({
-    error: z.object({
-        message: z.string().optional(),
-        errors: z.array(z.object({ reason: z.string().optional() })).optional(),
-        status: z.string().optional()
-    })
-});
-
-/** Reasons Google gives on a 403 that mean "slow down", not "not allowed". */
-const RATE_REASONS = new Set(["rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"]);
-
-/** Reasons on a 403 that mean the grant itself is not enough: connect again. */
-const AUTH_REASONS = new Set([
-    "insufficientPermissions",
-    "authError",
-    "forbidden",
-    "accessNotConfigured"
-]);
-
 /** The sync error for a failed Google response, read from its error body. */
 async function googleError(response: Response): Promise<Error> {
-    let reason = "";
-    let message = "";
+    let body: unknown = null;
     try {
-        const parsed = ErrorBody.safeParse(await readJson(response));
-        if (parsed.success) {
-            reason = parsed.data.error.errors?.[0]?.reason ?? "";
-            message = parsed.data.error.message ?? "";
-        }
+        body = await readJson(response);
     } catch {
         // An unreadable error body still has a status.
     }
-    const status = response.status;
-    if (status === 429 || (status === 403 && RATE_REASONS.has(reason))) {
-        return new SyncUnreachableError("Google asked to slow down", status, retryAfter(response));
-    }
-    if (status === 403 && reason && !AUTH_REASONS.has(reason))
-        return new SyncRefusedError(`Google refused the request: ${message || reason}`, status);
-    return errorFor(response, message);
+    return errorForProblem(response, readGoogleApiError(response.status, body), {
+        name: "Google",
+        setup: (problem) => ({
+            provider: "google",
+            service: problem.service ?? CALENDAR_API.service,
+            project: problem.project,
+            activationUrl: problem.activationUrl
+        })
+    });
 }
 
 /** Maps the access-token callback's own failure onto the sync errors. */
@@ -514,7 +502,7 @@ export function createGoogleProvider(input: {
                 ])
             );
         } catch (error) {
-            if (error instanceof SyncAuthError) throw error;
+            if (error instanceof SyncAuthError || error instanceof SyncSetupError) throw error;
             palette = new Map();
         }
         return palette;

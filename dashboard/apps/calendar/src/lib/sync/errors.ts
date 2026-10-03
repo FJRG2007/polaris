@@ -3,10 +3,11 @@
  * acts on differently.
  *
  * The kind decides the reaction: an auth error marks the account as needing to
- * be connected again, a conflict keeps the local edit aside, a gone token starts
- * a full resync, an unreachable server is retried later. So every client maps
- * its protocol's failures onto exactly these, and nothing else is thrown out of
- * this module on purpose.
+ * be connected again (a consent error, as needing the missing permission), a
+ * setup error as waiting on whoever runs the provider project, a conflict keeps
+ * the local edit aside, a gone token starts a full resync, an unreachable server
+ * is retried later. So every client maps its protocol's failures onto exactly
+ * these, and nothing else is thrown out of this module on purpose.
  *
  * Messages are short and never carry a credential, a URL with a password in it
  * or more than a sliver of a response body: they end up in logs and, through the
@@ -39,6 +40,38 @@ export abstract class SyncError extends Error {
 
 /** The credentials were refused (401/403, an OAuth `invalid_grant`). */
 export class SyncAuthError extends SyncError {}
+
+/**
+ * The grant works but lacks a permission the call needs (Google's
+ * `insufficientPermissions`, Graph's `ErrorAccessDenied`). Authorizing again for
+ * calendars fixes it, so it is an auth error with its own name.
+ */
+export class SyncConsentError extends SyncAuthError {}
+
+/** Where the provider says the missing switch is. */
+export interface ProviderSetup {
+    readonly provider: "google";
+    /** The API's service name, e.g. `calendar-json.googleapis.com`. */
+    readonly service: string;
+    /** The project it is off in, as the provider named it. */
+    readonly project: string | null;
+    /** The provider's own link that turns it on. */
+    readonly activationUrl: string | null;
+}
+
+/**
+ * The API is switched off in the provider project the OAuth client belongs to
+ * (Google's `SERVICE_DISABLED`). Connecting again cannot fix it: only whoever
+ * runs that project can, and the sync retries by itself until they have.
+ */
+export class SyncSetupError extends SyncError {
+    readonly setup: ProviderSetup;
+
+    constructor(message: string, status: number | null, setup: ProviderSetup) {
+        super(message, status);
+        this.setup = setup;
+    }
+}
 
 /** The object changed on the server since it was read (412). */
 export class SyncConflictError extends SyncError {

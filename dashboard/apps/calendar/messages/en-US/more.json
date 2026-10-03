@@ -33,6 +33,7 @@
         },
         "calendarCount": "{count, plural, one {# calendar} other {# calendars}}",
         "cancel": "Cancel",
+        "consentHint": "Polaris was not allowed to read this calendar. Connect again and allow calendar access.",
         "feed": {
             "add": "Subscribe",
             "added": "Subscribed. Its events appear as they arrive.",
@@ -107,12 +108,20 @@
         "replaceAddress": "New address for {name}",
         "retry": "Try again",
         "save": "Save",
+        "setup": {
+            "admin": "Google Calendar API is turned off in the Google Cloud project Polaris signs in with. Turn it on, then Polaris retries by itself.",
+            "member": "Your administrator needs to finish setting up Google for calendars.",
+            "open": "Turn on in Google Cloud",
+            "project": "Project {project}"
+        },
         "sourcesEmpty": "Nothing linked yet. Add an account, a CalDAV server or a subscription below.",
         "sourcesTitle": "Your sources",
         "status": {
             "auth": "Needs reconnecting",
+            "consent": "Needs permission",
             "error": "Sync failed",
             "ok": "Up to date",
+            "setup": "Needs setup",
             "unreachable": "Unreachable"
         },
         "subscriptionsOff": "Subscribing to calendars by address is switched off on this Polaris.",

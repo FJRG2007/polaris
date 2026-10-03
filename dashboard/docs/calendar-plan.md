@@ -296,7 +296,7 @@ and es-ES.
 
 - [x] U28 Connection flow `scope=calendar` - done
 - [x] U29-U32, U34 Sync clients - done (T against fake Google/CalDAV/Graph/ICS servers; recurrence lines read from the VEVENT only, not the VTIMEZONE beside it)
-- [x] U33 Sync engine - done (T: sync-engine, sources). Not verified against real Google, iCloud or Microsoft accounts (none available).
+- [x] U33 Sync engine - done (T: sync-engine, sources). Not verified against real Google, iCloud or Microsoft accounts (none available). A provider's refusal is read from its body, not only its status, into `auth`/`consent`/`setup`/`rate` (`packages/core/src/provider-api-errors.ts`), so a Google API switched off in the Cloud project or a grant missing a scope is told apart from a credentials failure and is never offered a reconnect that cannot fix it - see `docs/bugs/google-api-disabled-looked-like-a-broken-login.md`.
 
 ### Delivery
 
@@ -337,6 +337,6 @@ and es-ES.
 - [x] U61 tsc - done (C)
 - [x] U62 bundler + contract tests - done (B)
 - [x] U63 Browser pass - done (W)
-- [x] U67 Linking is findable - done (T: screens/accounts-entry; W): Accounts is the first section of Calendar settings; the sidebar's "Add a calendar" lists Google, Microsoft, CalDAV, subscribe by URL, holidays, import and create; a first-use tip until linked or closed (`dismissedHints`); a provider whose OAuth client is not set up says so - administrators are linked to `/admin/integrations?configure=<provider>`, which opens that setup, everybody else is told to ask one
+- [x] U67 Linking is findable - done (T: screens/accounts-entry; W): Accounts is the first section of Calendar settings; the sidebar's "Add a calendar" lists Google, Microsoft, CalDAV, subscribe by URL, holidays, import and create; a first-use tip until linked or closed (`dismissedHints`); a provider whose OAuth client is not set up says so - administrators are linked to `/admin/integrations?configure=<provider>`, which opens that setup, everybody else is told to ask one; a linked Google account whose Calendar API is switched off in that client's Cloud project reads the same way - an administrator gets the project and a direct activation link, on the account and on a **Google APIs** panel on `/admin/integrations`, everybody else is told to ask one, and reconnecting is never offered since it cannot fix it
 - [x] U68 Grid context menu - done (T: screens/grid-menu, server/objects; W): right-click, long press, the menu key or Shift+F10 on a time, a day, the all-day row or an event; new event / all-day / task due here / paste / go to day; open, edit, duplicate, copy (Ctrl/Cmd+C), move to calendar, color, respond, download, delete; a range selected first is the range it creates over; arrows step between day cells, Enter creates on the focused day, Ctrl/Cmd+V pastes there
 - [ ] U64 CalDAV server for phones and desktop clients - deferred(phase 2, the one item the brief allowed: a WebDAV/CalDAV server with per-user app passwords is a project of its own)
