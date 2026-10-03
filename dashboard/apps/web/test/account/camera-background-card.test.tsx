@@ -164,3 +164,23 @@ describe("the camera preview", () => {
         expect(asked).toHaveLength(0);
     });
 });
+
+describe("the microphone test", () => {
+    it("reads the call's own microphone in a call rather than opening it a second time", async () => {
+        call = { session: true, track: null };
+        render(<DevicesView />, { wrapper: MessagesWrapper });
+
+        await act(async () => void screen.getByRole("button", { name: "Test it" }).click());
+
+        // A second capture of the microphone the call holds, stopped again when
+        // the screen is left, is what took a voice out of its call.
+        expect(opened).toHaveLength(0);
+        expect(screen.getByText(/this is the microphone it is sending/)).toBeTruthy();
+    });
+
+    it("opens the microphone to test it when there is no call", async () => {
+        render(<DevicesView />, { wrapper: MessagesWrapper });
+        await act(async () => void screen.getByRole("button", { name: "Test it" }).click());
+        expect(opened).toHaveLength(1);
+    });
+});

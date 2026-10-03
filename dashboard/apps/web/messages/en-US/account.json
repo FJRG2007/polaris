@@ -475,6 +475,7 @@
             "namesHint": "The names only appear once a microphone has been allowed once, which the test does.",
             "level": "Level",
             "saySomething": "Say something. The bars should move.",
+            "inCall": "You are in a call, so this is the microphone it is sending. Changes here apply to it straight away.",
             "watchBars": "Talk and watch the bars. If they stay dark, press Test it.",
             "noise": "Background noise",
             "unfiltered": "It could not start, so you are going out unfiltered: {problem}",

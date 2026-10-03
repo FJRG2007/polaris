@@ -475,6 +475,7 @@
             "namesHint": "Los nombres solo aparecen cuando se ha permitido un micrófono una vez, y la prueba lo hace.",
             "level": "Nivel",
             "saySomething": "Di algo. Las barras deberían moverse.",
+            "inCall": "Estás en una llamada: este es el micrófono que está enviando. Lo que cambies aquí se aplica al momento.",
             "watchBars": "Habla y mira las barras. Si se quedan apagadas, pulsa Probarlo.",
             "noise": "Ruido de fondo",
             "unfiltered": "No se ha podido iniciar, así que se te oye sin filtrar: {problem}",

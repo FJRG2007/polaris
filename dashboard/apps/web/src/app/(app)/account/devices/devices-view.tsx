@@ -124,6 +124,17 @@ function MicrophoneCard({
         ? (held.call.localStream?.getAudioTracks()[0] ?? null)
         : null;
     const inCall = held?.session ? (held.call.outgoing ?? inCallDevice) : null;
+    /**
+     * The call, while there is one, as the owner of this microphone.
+     *
+     * Nothing here opens the device a second time while a call holds it: a
+     * second capture of the same microphone, stopped again when this screen is
+     * left, is what took somebody's voice out of the call they were in - the
+     * room stopped hearing them the moment they came to check their settings.
+     * So the test reads the call's own microphone, and a device or noise level
+     * picked here goes through the call, which applies it to what it sends.
+     */
+    const call = held?.session ? held.call : null;
     const rawForGate = showThreshold && !gateHearsFiltered;
 
     const stop = useCallback(() => {
@@ -174,6 +185,11 @@ function MicrophoneCard({
     const start = async () => {
         setError("");
         setFilterState(null);
+        // The meter is already reading the call's microphone: nothing to open.
+        if (call) {
+            setTesting(true);
+            return;
+        }
         try {
             // The same constraints a call opens with, so what is measured here
             // is what the room will hear. A test through a different chain is a
@@ -237,7 +253,9 @@ function MicrophoneCard({
                     {t("devices.whichOne")}
                     <Select
                         value={chosenId ?? ""}
-                        onValueChange={(value) => choose(value)}
+                        onValueChange={(value) =>
+                            call ? call.chooseMicrophone(value) : choose(value)
+                        }
                         aria-label={t("devices.mic.title")}
                         options={
                             devices.length > 0
@@ -263,12 +281,17 @@ function MicrophoneCard({
                                 ? (tested ?? inCallDevice)
                                 : (filterState?.track ?? tested ?? inCall)
                         }
-                        listen
+                        // Never a second capture of a microphone a call holds.
+                        listen={!call}
                         deviceId={chosenId}
                         threshold={showThreshold ? threshold : undefined}
                     />
                     <span className="text-xs text-muted-foreground">
-                        {testing ? t("devices.mic.saySomething") : t("devices.mic.watchBars")}
+                        {call
+                            ? t("devices.mic.inCall")
+                            : testing
+                              ? t("devices.mic.saySomething")
+                              : t("devices.mic.watchBars")}
                     </span>
                 </div>
 
@@ -276,7 +299,11 @@ function MicrophoneCard({
                     {t("devices.mic.noise")}
                     <Select
                         value={cleanup}
-                        onValueChange={(value) => setCleanup(value as typeof cleanup)}
+                        onValueChange={(value) =>
+                            call
+                                ? call.setCleanMic(value as typeof cleanup)
+                                : setCleanup(value as typeof cleanup)
+                        }
                         aria-label={t("devices.mic.noise")}
                         options={NOISE_LEVELS.map((entry) => ({
                             value: entry.value,
@@ -299,6 +326,13 @@ function MicrophoneCard({
                             {filterState.using === "gain"
                                 ? t("devices.mic.runningNoModel")
                                 : t("devices.mic.running", { model: filterState.using })}
+                        </span>
+                    ) : call?.micFilter ? (
+                        // In a call, what the call's own filter is running.
+                        <span className="text-xs text-success">
+                            {call.micFilter === "gain"
+                                ? t("devices.mic.runningNoModel")
+                                : t("devices.mic.running", { model: call.micFilter })}
                         </span>
                     ) : null}
                 </label>
@@ -493,7 +527,12 @@ function CameraCard() {
                     {t("devices.whichOne")}
                     <Select
                         value={chosenId ?? ""}
-                        onValueChange={(value) => choose(value || null)}
+                        // In a call, through the call: it swaps the camera it
+                        // is sending rather than only remembering the choice.
+                        onValueChange={(value) => {
+                            if (held?.session && value) held.call.chooseCamera(value);
+                            choose(value || null);
+                        }}
                         aria-label={t("devices.camera.title")}
                         options={
                             devices.length > 0
