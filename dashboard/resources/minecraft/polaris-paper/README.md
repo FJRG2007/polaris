@@ -29,6 +29,12 @@ were the moment they log in. Unlike the NeoForge mod, other players' chat does
 not reach them either, since Paper hands a plugin the recipient list to filter
 rather than a signed chain a client would disconnect over a gap in.
 
+A player who logs in under a name linked to a Polaris account is welcomed by
+that account's first or display name, in that account's language ("Logged in.
+Welcome back, Javier!"); nobody else, and nobody registering for the first
+time, gets more than the plugin's own "Logged in. Welcome back!" or "Password
+set. Welcome!".
+
 ## Configuration
 
 The same four variables as the mod, written by Polaris when the server's

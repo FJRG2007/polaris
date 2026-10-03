@@ -30,6 +30,12 @@ were the moment they log in - a bar handed to everybody while they waited is
 not handed out again, so it would otherwise never reach them. Other players'
 chat still reaches them.
 
+A player who logs in under a name linked to a Polaris account is welcomed by
+that account's first or display name, in that account's language ("Logged in.
+Welcome back, Javier!"); nobody else, and nobody registering for the first
+time, gets more than the mod's own "Logged in. Welcome back!" or "Password set.
+Welcome!".
+
 ## Anti-xray
 
 The mod also sends every ore no player could see as the rock around it, so an

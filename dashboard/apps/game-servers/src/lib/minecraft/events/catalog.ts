@@ -1094,16 +1094,6 @@ export function defaultEventsConfig(language: Language = "en"): EventsConfig {
 }
 
 /**
- * The stored settings, whole.
- *
- * A preset that no longer reads whole - a value a later version no longer
- * allows - keeps every part that still reads and has the rest set back to its
- * kind's defaults (`repairPreset`); only one of a kind this version does not
- * know is left out. A server that has
- * none gets one of each kind, named in `language`, so the screen opens on something
- * to run.
- */
-/**
  * The language the operator chose for what players read, or null when none was
  * ever chosen - the server then speaks its owner's (`speech-service`).
  */
@@ -1116,6 +1106,16 @@ export function chosenLanguage(config: Record<string, unknown>): Language | null
     return LANGUAGES.includes(language as Language) ? (language as Language) : null;
 }
 
+/**
+ * The stored settings, whole.
+ *
+ * A preset that no longer reads whole - a value a later version no longer
+ * allows - keeps every part that still reads and has the rest set back to its
+ * kind's defaults (`repairPreset`); only one of a kind this version does not
+ * know is left out. A server that has
+ * none gets one of each kind, named in `language`, so the screen opens on something
+ * to run.
+ */
 export function readEventsConfig(
     config: Record<string, unknown>,
     timezone = "UTC",
