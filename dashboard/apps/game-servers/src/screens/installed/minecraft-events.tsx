@@ -919,6 +919,22 @@ export function MinecraftEvents({
                 </ui.CardBody>
             </ui.Card>
 
+            {/* Saved events whose settings could not be read: set back, and said. */}
+            {view && (view.repaired?.length ?? 0) > 0 && (
+                <div
+                    role="status"
+                    className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+                >
+                    <p className="font-medium">{t("events.repairedTitle")}</p>
+                    <ul className="mt-1 text-muted-foreground">
+                        {view.repaired.map((one) => (
+                            <li key={one.name}>
+                                {t("events.repairedOne", { name: one.name, count: one.count })}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             {/* The events this server has. */}
             <ui.Card>
                 <ui.CardBody className="flex flex-col gap-3">

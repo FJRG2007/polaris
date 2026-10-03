@@ -426,6 +426,9 @@ export interface EventsView {
      *  nobody has looked yet. */
     readonly players: { readonly online: number; readonly active: number } | null;
     readonly refusal: string | null;
+    /** Saved events with settings that could not be read, set back to their
+     *  defaults, and how many settings each. */
+    readonly repaired: readonly { readonly name: string; readonly count: number }[];
 }
 
 /** The last event the draw started: the one on now, or the newest kept. */
@@ -539,6 +542,9 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
                   active: plan.activePlayers(seen, config.settings.afkMinutes, Date.now()).length
               }
             : null,
+        repaired: catalog
+            .repairedPresets(row.config)
+            .map((one) => ({ name: one.name, count: one.reset.length })),
         refusal:
             editionOf(row.catalogId) === "bedrock"
                 ? "Events run on Java servers; Bedrock has no scoreboard statistics or boss bars to play them with"

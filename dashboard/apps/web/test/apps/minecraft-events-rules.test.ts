@@ -715,3 +715,39 @@ describe("fights and worlds", () => {
         ).toHaveLength(1);
     });
 });
+
+describe("a saved event that no longer reads whole", () => {
+    it("keeps every part that reads and sets the rest back, rather than vanishing", () => {
+        const fishing = catalog.newPreset("fishing", "fish");
+        const saved = { ...fishing, name: "Lake day", minutes: 2 };
+        const repaired = catalog.repairPreset(saved);
+        expect(repaired?.preset.name).toBe("Lake day");
+        expect(repaired?.preset.minutes).toBe(fishing.minutes);
+        expect(repaired?.reset).toEqual(["minutes"]);
+        const config = {
+            [catalog.EVENTS_KEY]: {
+                settings: {
+                    ...settings(),
+                    random: { ...settings().random, enabled: true, pool: [{ presetId: "fish", weight: 1 }] }
+                },
+                presets: [saved],
+                schedules: []
+            }
+        };
+        // Still in the list and the draw, and said.
+        const read = catalog.readEventsConfig(config);
+        expect(read.presets.map((one) => one.id)).toEqual(["fish"]);
+        expect(read.settings.random.pool.map((one) => one.presetId)).toEqual(["fish"]);
+        expect(catalog.repairedPresets(config)).toEqual([
+            { id: "fish", name: "Lake day", reset: ["minutes"] }
+        ]);
+    });
+
+    it("leaves out only what is not an event of a kind this version knows", () => {
+        expect(catalog.repairPreset({ kind: "no-such-kind", id: "x" })).toBeNull();
+        expect(catalog.repairPreset("nonsense")).toBeNull();
+        const fine = catalog.newPreset("trivia", "q");
+        expect(catalog.repairPreset(fine)?.reset).toEqual([]);
+    });
+});
+

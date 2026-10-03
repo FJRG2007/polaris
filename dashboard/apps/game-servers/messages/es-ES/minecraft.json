@@ -1950,7 +1950,9 @@
         "drawNotChecked": "Sorteo sin revisar desde que arrancó Polaris.",
         "anyTimeOfDay": "A cualquier hora",
         "drawAll": "Todos",
-        "drawNone": "Ninguno"
+        "drawNone": "Ninguno",
+        "repairedTitle": "Algunos eventos tenían ajustes que Polaris no pudo leer",
+        "repairedOne": "{name}: {count, plural, one {# ajuste vuelve} other {# ajustes vuelven}} al valor por defecto. Revísalo y guarda."
     },
     "editor": {
         "where": "Dónde",

@@ -977,6 +977,57 @@ export function newPreset(kind: EventKind, id: string, name = KIND_NAMES[kind].e
     };
 }
 
+/**
+ * A saved event as it can still be read: whole when it reads, otherwise every
+ * part of it that still reads on top of its kind's defaults, and the parts
+ * that had to be set back (`minutes`, `options.size`). Null for what is not an
+ * event of a kind this version knows.
+ */
+export function repairPreset(entry: unknown): { preset: EventPreset; reset: string[] } | null {
+    const whole = presetSchema.safeParse(entry);
+    if (whole.success) return { preset: whole.data, reset: [] };
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return null;
+    const raw = entry as Record<string, unknown>;
+    if (!EVENT_KINDS.includes(raw.kind as EventKind)) return null;
+    const kind = raw.kind as EventKind;
+    const id = typeof raw.id === "string" && raw.id.length > 0 ? raw.id.slice(0, 64) : `${kind}-saved`;
+    let current: Record<string, unknown> = { ...newPreset(kind, id) };
+    const reset: string[] = [];
+    const reads = (candidate: Record<string, unknown>) => presetSchema.safeParse(candidate).success;
+    for (const [key, value] of Object.entries(raw)) {
+        if (key === "kind" || key === "options" || key === "id") continue;
+        const next = { ...current, [key]: value };
+        if (reads(next)) current = next;
+        else reset.push(key);
+    }
+    if (typeof raw.options === "object" && raw.options !== null && !Array.isArray(raw.options)) {
+        for (const [key, value] of Object.entries(raw.options)) {
+            const options = { ...(current.options as Record<string, unknown>), [key]: value };
+            const next = { ...current, options };
+            if (reads(next)) current = next;
+            else reset.push(`options.${key}`);
+        }
+    }
+    const final = presetSchema.safeParse(current);
+    return final.success ? { preset: final.data, reset } : null;
+}
+
+/** The saved events that had parts set back to their defaults, by name - for
+ *  the screen to say so. */
+export function repairedPresets(
+    config: Record<string, unknown>
+): { id: string; name: string; reset: string[] }[] {
+    const raw = config[EVENTS_KEY];
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return [];
+    const presets = (raw as { presets?: unknown }).presets;
+    return (Array.isArray(presets) ? presets : []).flatMap((entry) => {
+        const repaired = repairPreset(migratePreset(entry));
+        return repaired && repaired.reset.length > 0
+            ? [{ id: repaired.preset.id, name: repaired.preset.name, reset: repaired.reset }]
+            : [];
+    });
+}
+
 /** The name the first events gave a horde defense. */
 const BRITISH_HORDE_NAME = "Horde defence";
 
@@ -1028,8 +1079,10 @@ export function defaultEventsConfig(language: Language = "en"): EventsConfig {
 /**
  * The stored settings, whole.
  *
- * A preset that no longer reads - a kind this version dropped, a field written
- * by hand - is left out rather than failing the whole list, and a server that has
+ * A preset that no longer reads whole - a value a later version no longer
+ * allows - keeps every part that still reads and has the rest set back to its
+ * kind's defaults (`repairPreset`); only one of a kind this version does not
+ * know is left out. A server that has
  * none gets one of each kind, named in `language`, so the screen opens on something
  * to run.
  */
@@ -1062,9 +1115,12 @@ export function readEventsConfig(
     const presets = (Array.isArray(value.presets) ? value.presets : []).flatMap((entry) => {
         // A king of the hill's own length first (`migratePreset`), then every
         // kind's defaults, which leave a king of the hill's length to it.
-        const parsed = presetSchema.safeParse(migratePreset(entry));
-        if (!parsed.success) return [];
-        return [old ? toKindDefaults(parsed.data) : parsed.data];
+        // One that no longer reads whole keeps every part that does, the rest
+        // back to its kind's defaults (`repairPreset`), rather than vanishing
+        // from the list and the draw with nothing to say so.
+        const repaired = repairPreset(migratePreset(entry));
+        if (!repaired) return [];
+        return [old ? toKindDefaults(repaired.preset) : repaired.preset];
     });
     const ids = new Set(presets.map((preset) => preset.id));
     const schedules = (Array.isArray(value.schedules) ? value.schedules : []).flatMap((entry) => {
