@@ -17,6 +17,7 @@ import { z } from "zod";
 import * as login from "../../../../../../lib/minecraft/polaris-login";
 import * as service from "../../../../../../lib/minecraft/polaris-login-service";
 import { arrived } from "../../../../../../lib/minecraft/login-arrivals";
+import { welcomeFor } from "../../../../../../lib/minecraft/login-welcome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,7 +135,10 @@ export async function POST(
                 );
                 if (!created) return reply(409, { error: "registered" });
                 arrived(server.installedAppId, body.data.player);
-                return reply(200, { ok: true });
+                // By the name of the Polaris account the player is, when there is one
+                // that agrees; the mod keeps its own line when this is absent.
+                const welcome = await welcomeFor(server, body.data.player, "register");
+                return reply(200, welcome ? { ok: true, welcome } : { ok: true });
             }
             case "login": {
                 const body = BODIES.login.safeParse(json);
@@ -150,8 +154,10 @@ export async function POST(
                     body.data.player,
                     body.data.password
                 );
-                if (result.kind === "ok") arrived(server.installedAppId, body.data.player);
-                return refused(result);
+                if (result.kind !== "ok") return refused(result);
+                arrived(server.installedAppId, body.data.player);
+                const welcome = await welcomeFor(server, body.data.player, "login");
+                return reply(200, welcome ? { ok: true, welcome } : { ok: true });
             }
             case "password": {
                 const body = BODIES.password.safeParse(json);

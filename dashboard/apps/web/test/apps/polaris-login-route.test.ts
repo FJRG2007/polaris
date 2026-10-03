@@ -126,6 +126,11 @@ const switchedOn = [
 const env = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("@/lib/env-var-service", () => ({ listEnvVars: env.list, setEnvVars: vi.fn() }));
 
+const greeting = vi.hoisted(() => ({ value: null as string | null }));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/login-welcome", () => ({
+    welcomeFor: vi.fn(async () => greeting.value)
+}));
+
 const route = await import(
     "@polaris-app/game-servers/src/routes/api/minecraft/login/[id]/[action]/route"
 );
@@ -227,6 +232,19 @@ describe("registering and logging in", () => {
         expect(arrived).toEqual([`${SERVER}:Steve`]);
         await ask("login", { player: "Steve", password: "correct horse" });
         expect(arrived).toEqual([`${SERVER}:Steve`, `${SERVER}:Steve`]);
+    });
+
+    it("greets by name when Polaris knows who the player is, and says nothing extra when not", async () => {
+        greeting.value = null;
+        const plain = await ask("register", { player: "Steve", password: "correct horse" });
+        expect(await plain.json()).toEqual({ ok: true });
+        greeting.value = "Logged in. Welcome back, Javier!";
+        const named = await ask("login", { player: "Steve", password: "correct horse" });
+        expect(await named.json()).toEqual({ ok: true, welcome: "Logged in. Welcome back, Javier!" });
+        // A wrong password is never greeted.
+        const wrong = await ask("login", { player: "Steve", password: "wrong horse" });
+        expect(await wrong.json()).toEqual({ error: "wrong-password" });
+        greeting.value = null;
     });
 
     it("never stores the password itself", async () => {
