@@ -121,7 +121,12 @@ left out.
   climb hung after the column and taken down before it - and moving platforms
   that swap between two places a step apart every three seconds. Each course
   has one of four looks (classic, frost on slippery packed ice, jungle with
-  vines, nether), drawn or chosen, with a light under every checkpoint.
+  vines, nether), drawn or chosen, with a light under every checkpoint. A
+  course already standing when an update adds a new layout (`parkour.DESIGN`,
+  written onto the stage when it is built) keeps the layout it was built
+  with - no climb, moving platform or checkpoint light appears on a course
+  that was placed without them, so a race running across the update is never
+  changed under the players mid-run.
 
 ## How the floating maps look
 
@@ -136,4 +141,3 @@ Everything below is part of the arena's own boxes: built into air with
 | Build battle | a stone curb between plots and glowstone where the lines meet, at floor level |
 | Team duel | a stone rim round the floor and a post of light at each corner |
 | Boss sky arena | glass, with a pillar of sea lantern at each corner |
-
