@@ -121,7 +121,12 @@ describe("a Philips Air+ account", () => {
         fireEvent.change(box, { target: { value: "111 111" } });
         fireEvent.click(screen.getByRole("button", { name: "Connect" }));
         expect(await screen.findByRole("alert")).toBeTruthy();
-        expect(polled[0]!.state).toEqual({ vToken: "vt-1", code: "111111" });
+        // The address the code went to rides along, for a refusal to list.
+        expect(polled[0]!.state).toEqual({
+            vToken: "vt-1",
+            code: "111111",
+            tried: "owner@example.com"
+        });
         expect(screen.getByRole("textbox", { name: "Code from the email" })).toBeTruthy();
 
         pollAnswer = { devices: [{ id: "d1" }], accounts: [] };
@@ -148,6 +153,30 @@ describe("a Philips Air+ account", () => {
         expect(onConnected).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole("button", { name: "Done" }));
         expect(onConnected).toHaveBeenCalledWith({ devices: [{ id: "d1" }], accounts: [] });
+    });
+
+    it("sends every address tried, so an empty account's refusal can list them", async () => {
+        drawn();
+        fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
+            target: { value: "owner@example.com" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+        let box = await screen.findByRole("textbox", { name: "Code from the email" });
+        pollAnswer = { error: "That account has no devices." };
+        fireEvent.change(box, { target: { value: "123456" } });
+        fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+        await screen.findByRole("alert");
+
+        fireEvent.click(screen.getByRole("button", { name: "Back" }));
+        fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
+            target: { value: "work@example.com" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
+        box = await screen.findByRole("textbox", { name: "Code from the email" });
+        fireEvent.change(box, { target: { value: "654321" } });
+        fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+        await waitFor(() => expect(polled).toHaveLength(2));
+        expect(polled[1]!.state.tried).toBe("owner@example.com,work@example.com");
     });
 
     it("sends a new code on request", async () => {

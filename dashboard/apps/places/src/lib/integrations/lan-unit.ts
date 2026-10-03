@@ -13,6 +13,7 @@
 import { isIP } from "node:net";
 import { deviceHost } from "./lan-http";
 import { host } from "@polaris/app-host";
+import { isLocalAddress } from "@polaris/core";
 import { HomeError } from "../home-error";
 import { lookup } from "node:dns/promises";
 import { hostsInCidr } from "../discovery";
@@ -41,4 +42,27 @@ export async function unitAddressOf(typed: string): Promise<string> {
 export async function subnetTargets(): Promise<string[]> {
     const own = await host.hostAddress.getHostLanIp().catch(() => null);
     return own ? hostsInCidr(`${own}/24`).filter((address) => address !== own) : [];
+}
+
+/** The /24 an IPv4 address is on, written as a network ("192.168.1.0/24"), or
+ *  null for anything that is not an IPv4 address. */
+export function networkOf(address: string): string | null {
+    if (isIP(address) !== 4) return null;
+    return `${address.split(".").slice(0, 3).join(".")}.0/24`;
+}
+
+/** This server's own network, the one a scan looks through, or null where its
+ *  address on the LAN is not known (the limited edition has no host daemon). */
+export async function ownNetwork(): Promise<string | null> {
+    const own = await host.hostAddress.getHostLanIp().catch(() => null);
+    return own ? networkOf(own) : null;
+}
+
+/** Every other address on the /24 an address is on: where a unit that was on
+ *  another network than Polaris's is looked for after it moves. Only in the
+ *  private ranges a home network is built from: a unit typed with a public
+ *  address is never a reason to knock on its neighbours. */
+export function subnetAround(address: string): string[] {
+    const network = isLocalAddress(address) ? networkOf(address) : null;
+    return network ? hostsInCidr(network).filter((entry) => entry !== address) : [];
 }

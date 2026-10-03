@@ -656,7 +656,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     // Philips air purifiers and humidifiers. Local stays the recommended way in:
     // it covers every model Home Assistant's Philips integration lists, needs no
     // account, and keeps working when Philips' servers do not. Units are found
-    // on the network, or at an address; nothing is paired and no key is kept.
+    // on the network, or at an address - including one on another network the
+    // router routes to; nothing is paired and no key is kept.
     {
         id: "philips-coap",
         brand: "Philips",
@@ -696,7 +697,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     // on another network, and for the models whose firmware has no local
     // control. Second, not recommended: Philips publishes no API for it, so it
     // is the less reliable of the two over time, and it covers only the units
-    // the community integrations have mapped (AC0650, AC0651, AC1715, AC3221).
+    // the community integrations have mapped (AC0650, AC0651, AC1715, AC3221,
+    // AC4220, AC4221).
     {
         id: "philips-cloud",
         brand: "Philips",

@@ -556,6 +556,8 @@
         "philipsCloudLinkRefused": "Philips' cloud would not let Polaris reach this device. Connect the account again.",
         "philipsCloudNotOnAccount": "That device is not on this Philips account.",
         "philipsCloudEnterCode": "Enter the code from the email",
+        "philipsCloudEmpty": "Polaris signed in to Philips as {email}, and that account has no devices. It asked Philips' servers for {country} ({area}) and every other region it knows. What it saw: {summary}. Sign in with the same email you use in the Air+ app. Emails tried: {emails}.{homeid, select, yes { Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again.} other {}}",
+        "philipsOtherNetwork": "Nothing answered at {address}, which is on a different network from Polaris ({network}). Your router has to let the two networks reach each other, and a guest Wi-Fi usually does not. Put the purifier on the same Wi-Fi as Polaris, or connect it with a Philips account instead.",
         "philipsCloudNothing": "Polaris found no device on this Philips account. It asked Philips' servers for {country} ({area}) and every other region it knows. What it saw: {summary}. Check that the device is in a Philips app under this same email.{homeid, select, yes { Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again.} other {}}",
         "airMattersRefused": "Philips' fan and heater cloud refused the sign-in. Upload the Philips Air+ app again.",
         "apkNotAnApp": "That file is not an app file. Upload the Philips Air+ app as an .apk, .apkm or .xapk file.",
@@ -876,7 +878,7 @@
         "philips-coap": {
             "label": "Philips Air+ (local network)",
             "summary": "The air purifiers and humidifiers you use with the Philips Air+ app, straight over your network. No account, nothing through the cloud.",
-            "note": "Polaris finds the units on your network and reads them the way Home Assistant does. They have to be set up in the Philips Air+ app first, and on the same network as Polaris. Some newer firmware switches local control off; such a unit may work through a Philips Air+ account instead, and Polaris says so.",
+            "note": "Polaris finds the units on your network and reads them the way Home Assistant does. They have to be set up in the Philips Air+ app first, on the same network as Polaris or on one your router connects to it. Some newer firmware switches local control off; such a unit may work through a Philips Air+ account instead, and Polaris says so.",
             "steps": {
                 "s0": "Set the purifier up in the Philips Air+ app, on the same Wi-Fi network as Polaris.",
                 "s1": "Select Connect. Leave the address empty to look for every unit, or type one to add just that unit."
@@ -884,7 +886,7 @@
             "fields": {
                 "host": {
                     "label": "Unit address",
-                    "hint": "Optional. Empty looks for every unit on this network; your router lists each unit's address among its connected devices.",
+                    "hint": "Optional. Empty looks for every unit on this network; your router lists each unit's address among its connected devices. A unit on another network is only found by its address.",
                     "placeholder": "192.168.1.40"
                 }
             }
@@ -892,7 +894,7 @@
         "philips-cloud": {
             "label": "Philips account",
             "summary": "The air purifiers, fans and kitchen appliances on your Philips account, through Philips' cloud like its apps. Works from any network.",
-            "note": "Unofficial: Philips publishes no API for this, so it could stop working if Philips changes its cloud. It signs in with a code Philips emails you, and no password is kept. Purifier models it knows: AC0650, AC0651, AC1715, AC3221 and AC3360, and the CX3550 fan; others show their readings and power only. Kitchen appliances are shown, never started; an airfryer can be stopped. Fans and heaters need the Philips Air+ app file once. If a purifier is on the same network as Polaris, the local connection does not depend on Philips.",
+            "note": "Unofficial: Philips publishes no API for this, so it could stop working if Philips changes its cloud. It signs in with a code Philips emails you, and no password is kept. Purifier models it knows: AC0650, AC0651, AC1715, AC3221, AC3360, AC4220 and AC4221, and the CX3550 fan; others show their readings and power only. Kitchen appliances are shown, never started; an airfryer can be stopped. Fans and heaters need the Philips Air+ app file once. If a purifier is on the same network as Polaris, the local connection does not depend on Philips.",
             "steps": {
                 "s0": "Set the device up in its Philips app (Air+, HomeID or NutriU) and sign in there with your email.",
                 "s1": "Pick your country, type that email and select Email me a code. Philips sends you a one-time code.",
@@ -1373,7 +1375,9 @@
                 "childLock": "Child lock",
                 "light": "Display light",
                 "humidify": "Humidify",
-                "oscillate": "Oscillation"
+                "oscillate": "Oscillation",
+                "beep": "Button beep",
+                "autoPlus": "Auto+"
             },
             "filters": {
                 "pre": "Pre-filter",
@@ -1390,6 +1394,7 @@
             "measures": {
                 "pm25": "PM2.5",
                 "allergen": "Allergen index",
+                "gas": "Gas level",
                 "humidity": "Humidity",
                 "temperature": "Temperature"
             },
@@ -1509,7 +1514,8 @@
             "filters": "Filters",
             "lifePercent": "{percent}% left",
             "lifeHours": "{hours} h left",
-            "quality": "Air quality"
+            "quality": "Air quality",
+            "byGas": "{quality}, gas {level}"
         },
         "appliance": {
             "type": "Appliance",

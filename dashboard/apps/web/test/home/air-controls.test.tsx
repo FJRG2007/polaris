@@ -164,6 +164,34 @@ describe("an air purifier's row", () => {
         expect(screen.getAllByText("Good")).toHaveLength(1);
     });
 
+    it("says when the gas level gave the verdict, so Poor beside little dust reads right", async () => {
+        await drawn([purifier({ air: { ...AIR, readings: { pm25: 1, gas: 3 } } })]);
+        expect(screen.getByText("1 µg/m³")).toBeTruthy();
+        expect(screen.getByText("Poor, gas L3")).toBeTruthy();
+    });
+
+    it("offers the 4200's beep and Auto+ switches in the panel, and sends Auto+ as one", async () => {
+        const dialog = await opened(
+            purifier({
+                air: {
+                    ...AIR,
+                    options: { childLock: false, light: true, beep: true, autoPlus: true },
+                    readings: { pm25: 1, gas: 1 }
+                }
+            })
+        );
+        expect(within(dialog).getByText("Gas level")).toBeTruthy();
+        expect(within(dialog).getByText("L1")).toBeTruthy();
+        expect(within(dialog).getByRole("switch", { name: /^Button beep/ })).toBeTruthy();
+        fireEvent.click(within(dialog).getByRole("switch", { name: /^Auto\+/ }));
+        await waitFor(() => expect(pressed).toHaveLength(1));
+        expect(pressed[0]).toEqual([
+            "air-1",
+            "set-option",
+            { action: "set-option", option: "autoPlus", on: false }
+        ]);
+    });
+
     it("is off limits, saying why, when it is not answering", async () => {
         await drawn([purifier({ online: false, state: "unknown" })]);
         const mode = screen.getByRole("combobox", {

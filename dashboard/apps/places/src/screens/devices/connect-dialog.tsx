@@ -336,6 +336,9 @@ export function ConnectDialog({
     const [expired, setExpired] = useState(false);
     /** The code typed for a pairing that is emailed one. */
     const [code, setCode] = useState("");
+    /** The addresses a code was sent to while this dialog is open, so an
+     *  account that turns out empty can be told apart from the others tried. */
+    const [triedEmails, setTriedEmails] = useState<readonly string[]>([]);
     /** The file the attempt asked for after its code, and the one chosen. */
     const [fileStep, setFileStep] = useState<FileStep | null>(null);
     const [chosenFile, setChosenFile] = useState<File | null>(null);
@@ -400,6 +403,7 @@ export function ConnectDialog({
         setPairing(null);
         setExpired(false);
         setCode("");
+        setTriedEmails([]);
         setFinished(null);
         setFileStep(null);
         setChosenFile(null);
@@ -527,6 +531,12 @@ export function ConnectDialog({
         setCode("");
         setFileStep(null);
         setChosenFile(null);
+        const email = (fields.email ?? "").trim().toLowerCase();
+        if (connection.pairing?.kind === "code" && email) {
+            setTriedEmails((current) =>
+                current.includes(email) ? current : [...current, email].slice(-5)
+            );
+        }
         setPairing({ state: result.state, qr: result.qr });
     };
 
@@ -632,7 +642,7 @@ export function ConnectDialog({
                     connection: connection.id,
                     label,
                     fields,
-                    state: { ...pairing.state, code: typed },
+                    state: { ...pairing.state, code: typed, tried: triedEmails.join(",") },
                     accountId: reconnect?.id
                 }),
             setError

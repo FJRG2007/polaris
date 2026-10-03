@@ -167,7 +167,18 @@ const M_AC1715: PhilipsModel = {
     nudge: null
 };
 
-/** AC2210, AC2221, AC3210, AC3220, AC3221, AC4220, AC4221 */
+/**
+ * AC2210, AC2221, AC3210, AC3220, AC3221, AC4220, AC4221.
+ *
+ * The 4200 series (PureProtect Pro 4200: AC4220, and the AC4221 that is the
+ * same unit in another colour) is this family in kongo09/philips-airpurifier-coap
+ * too (`philips.py` at 964ef214, line 1612: `PhilipsAC4220(PhilipsAC22xx)`, and
+ * line 1618 `PhilipsAC4221(PhilipsAC4220)`), with the same presets, speeds, light
+ * and switches (lines 799-853). What sets it apart is a gas sensor (`D03122`),
+ * read like every other measure (`drivers/philips-coap.ts`). The values were
+ * captured from an AC4221/11 in that repository's issue #160, one per preset and
+ * speed.
+ */
 const M_AC2210: PhilipsModel = {
     generation: "gen3",
     presets: {
@@ -761,6 +772,20 @@ export const PHILIPS_LIGHTS: Readonly<Record<string, { on: Value; off: Value }>>
     D0312D: { on: 100, off: 0 },
     aqil: { on: 100, off: 0 },
     uil: { on: "1", off: "0" }
+};
+
+/**
+ * The other switches of `SWITCH_TYPES` Places offers, by key: whether the
+ * buttons beep, and Auto+ (the Air+ app's learning Auto, "Auto+ AI"). From
+ * kongo09/philips-airpurifier-coap `const.py` at 964ef214, lines 851-866
+ * (`NEW2_BEEP` 100 and 0, `NEW2_AUTO_PLUS_AI` 1 and 0); the 4200's own status
+ * holds both (issue #160: `D03130` 100, `D03180` 1 with Auto+ on and 0 off).
+ */
+export const PHILIPS_SWITCHES: Readonly<
+    Record<string, { option: "beep" | "autoPlus"; on: Value; off: Value }>
+> = {
+    D03130: { option: "beep", on: 100, off: 0 },
+    D03180: { option: "autoPlus", on: 1, off: 0 }
 };
 
 /** `SWITCH_TYPES`, the child lock's two keys: on and off. */
