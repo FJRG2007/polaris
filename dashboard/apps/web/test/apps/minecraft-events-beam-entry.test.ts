@@ -161,3 +161,64 @@ describe("where the beam goes", () => {
         expect(best?.point).toEqual({ x: 0, y: 64, z: 0 });
     });
 });
+
+describe("the entry read block by block", () => {
+    const spot = { x: 10, y: 64, z: 10 };
+    const box = (
+        y: (x: number, z: number) => number | null,
+        kind: (x: number, z: number) => Kind = () => "ground"
+    ) =>
+        entry
+            .entryBox(spot)
+            .map((one) => ({ ...one, y: y(one.x, one.z), kind: kind(one.x, one.z) }));
+
+    it("is every column round the beam, a block apart", () => {
+        const columns = entry.entryBox(spot);
+        expect(columns).toHaveLength((2 * entry.ENTRY_RADIUS + 1) ** 2);
+        expect(columns).toContainEqual({ x: 8, z: 12 });
+    });
+
+    it("holds on open ground with a step or two in it", () => {
+        expect(
+            entry.entryHolds(
+                spot,
+                box((x) => (x > 10 ? 66 : 64))
+            )
+        ).toBe(true);
+    });
+
+    it("fails on a trunk between the columns the ring read, a pool, a rise, or a column not read", () => {
+        // A trunk at an odd column, which a ring two blocks apart steps over.
+        expect(
+            entry.entryHolds(
+                spot,
+                box(
+                    () => 64,
+                    (x, z) => (x === 11 && z === 9 ? "tree" : "ground")
+                )
+            )
+        ).toBe(false);
+        expect(
+            entry.entryHolds(
+                spot,
+                box(
+                    () => 64,
+                    (x, z) => (x === 9 && z === 11 ? "wet" : "ground")
+                )
+            )
+        ).toBe(false);
+        expect(
+            entry.entryHolds(
+                spot,
+                box((x, z) => (x === 12 && z === 12 ? 72 : 64))
+            )
+        ).toBe(false);
+        expect(
+            entry.entryHolds(
+                spot,
+                box((x, z) => (x === 8 && z === 8 ? null : 64))
+            )
+        ).toBe(false);
+        expect(entry.entryHolds(spot, box(() => 64).slice(1))).toBe(false);
+    });
+});

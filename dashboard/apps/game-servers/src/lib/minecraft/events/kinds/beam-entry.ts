@@ -41,8 +41,9 @@ export const ENTRY_RINGS: readonly { readonly half: number; readonly step: numbe
     { half: 24, step: 3 }
 ];
 
-/** How many of the best spots are checked for a walk there before a ring is given up. */
-export const WALK_CHECKS = 3;
+/** How many of the best spots are checked, block by block and for a walk
+ *  there, before a ring is given up. */
+export const WALK_CHECKS = 5;
 
 /** Every column of a ring's square, `step` apart, the players' center among them. */
 export function entryColumns(
@@ -121,6 +122,37 @@ export function rankEntries(
     return spots.sort(
         (a, b) => a.score - b.score || a.point.x - b.point.x || a.point.z - b.point.z
     );
+}
+
+/**
+ * Every column of where stepping in counts, one block apart: a ring is read
+ * every few blocks, and a tree's trunk or a post one block wide can stand
+ * between two of its columns.
+ */
+export function entryBox(point: Column2): Column2[] {
+    const columns: Column2[] = [];
+    for (let dx = -ENTRY_RADIUS; dx <= ENTRY_RADIUS; dx += 1)
+        for (let dz = -ENTRY_RADIUS; dz <= ENTRY_RADIUS; dz += 1)
+            columns.push({ x: point.x + dx, z: point.z + dz });
+    return columns;
+}
+
+/**
+ * Whether the whole of where stepping in counts, read block by block
+ * (`entryBox`), is the world's own dry ground within `FLAT_SPREAD` of the
+ * beam's own: no trunk, no post, no pool, nothing not read.
+ */
+export function entryHolds(point: Point, columns: readonly EntryColumn[]): boolean {
+    const at = new Map(columns.map((one) => [`${one.x},${one.z}`, one]));
+    return entryBox(point).every((column) => {
+        const one = at.get(`${column.x},${column.z}`);
+        return (
+            one !== undefined &&
+            one.kind === "ground" &&
+            one.y !== null &&
+            Math.abs(one.y - point.y) <= FLAT_SPREAD
+        );
+    });
 }
 
 /**
