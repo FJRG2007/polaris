@@ -64,7 +64,7 @@ export interface AnnouncementsState {
 }
 
 /** The world folder's name, when it is one a path can carry. */
-async function levelOf(server: ServerContainer): Promise<string | null> {
+export async function levelOf(server: ServerContainer): Promise<string | null> {
     const text = await readContainerFile(server, `${DATA_DIR}/server.properties`).catch(() => null);
     const name = text ? parseProperties(text)["level-name"] : undefined;
     const level = name && name.length > 0 ? name : "world";

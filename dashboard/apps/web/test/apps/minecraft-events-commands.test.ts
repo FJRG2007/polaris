@@ -24,6 +24,7 @@ import * as waves from "@polaris-app/game-servers/src/lib/minecraft/events/kinds
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
 import * as chunks from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/chunks";
 import * as spleef from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef";
+import * as snowballPack from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack";
 import * as parkour from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour";
 import * as meteors from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-shower";
 import {
@@ -1917,6 +1918,97 @@ describe("a spleef floor", () => {
         expect(stage.ARENA_BLOCKS).toContain(spleef.WARN);
     });
 
+    it("in the snowball game, ships a data pack that breaks only the arena's snow a snowball is about to hit", () => {
+        const files = snowballPack.packFiles();
+        const meta = JSON.parse(files.get("pack.mcmeta")!) as { pack: Record<string, unknown> };
+        // From 1.13 to the newest: the old field, the 1.20.2 range and the 1.21.9 pair agree.
+        expect(meta.pack).toMatchObject({
+            pack_format: 4,
+            supported_formats: [4, 1000],
+            min_format: 4,
+            max_format: 1000
+        });
+        // Both spellings of the function folders, the same functions in each.
+        for (const folder of ["functions", "function"]) {
+            expect(JSON.parse(files.get(`data/minecraft/tags/${folder}/tick.json`)!)).toEqual({
+                values: ["polaris:spleef/tick"]
+            });
+            for (const name of ["tick", "ball", "step", "probe", "hit"])
+                expect(files.get(`data/polaris/${folder}/spleef/${name}.mcfunction`)).toBe(
+                    files.get(`data/polaris/functions/spleef/${name}.mcfunction`)
+                );
+        }
+        const fn = (name: string) => files.get(`data/polaris/function/spleef/${name}.mcfunction`)!;
+        // Off unless switched on, and only snowballs in the overworld.
+        expect(fn("tick")).toBe(
+            "execute if score #on polaris_spleef matches 1 in minecraft:overworld as @e[type=minecraft:snowball,distance=0..] run function polaris:spleef/ball\n"
+        );
+        // A point is tried only inside the box, and only the arena's snow is broken.
+        expect(fn("step")).toContain(
+            "if score #cy polaris_spleef >= #y1 polaris_spleef if score #cy polaris_spleef <= #y2 polaris_spleef"
+        );
+        expect(fn("probe")).toContain(
+            `if block ~ ~ ~ ${spleef.FLOOR} run function polaris:spleef/hit`
+        );
+        expect(fn("hit").split("\n")).toEqual([
+            "setblock ~ ~ ~ minecraft:air",
+            "playsound minecraft:block.snow.break block @a ~ ~ ~ 1 1",
+            "scoreboard players set #hit polaris_spleef 1",
+            "kill @s",
+            ""
+        ]);
+        // No line in any function is longer than a command may be, and none is a reload.
+        for (const [path, content] of files)
+            if (path.endsWith(".mcfunction"))
+                for (const line of content.split("\n")) {
+                    expect(line.length).toBeLessThan(32_500);
+                    expect(line).not.toMatch(/^(minecraft:)?reload\b/);
+                }
+    });
+
+    it("arms the snowball pack for one arena's box, and only that arena's end switches it off", () => {
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size: 5, height: 30 },
+            { x: -3, z: 40 },
+            100
+        );
+        const lines = snowballPack.armLines(floor);
+        const bottom = floor.floors.at(-1)!;
+        // Every floor, edge to edge, in 64ths of a block; the switch goes on last.
+        expect(lines).toContain(`scoreboard players set #x1 polaris_spleef ${(-3 - 5) * 64}`);
+        expect(lines).toContain(
+            `scoreboard players set #x2 polaris_spleef ${(-3 + 5 + 1) * 64 - 1}`
+        );
+        expect(lines).toContain(`scoreboard players set #y1 polaris_spleef ${bottom * 64}`);
+        expect(lines).toContain(`scoreboard players set #y2 polaris_spleef ${101 * 64 - 1}`);
+        expect(lines).toContain(`scoreboard players set #z1 polaris_spleef ${35 * 64}`);
+        expect(lines).toContain(`scoreboard players set #z2 polaris_spleef ${46 * 64 - 1}`);
+        expect(lines.at(-1)).toBe("scoreboard players set #on polaris_spleef 1");
+        expect(lines.indexOf("scoreboard players set #on polaris_spleef 0")).toBeLessThan(
+            lines.findIndex((line) => line.startsWith("scoreboard players set #x1"))
+        );
+        expect(lines.find((line) => line.includes("summon"))).toContain(
+            'summon minecraft:armor_stand -2.5 102 40.5 {Tags:["polaris_spleef_probe"]'
+        );
+        // Stopped only while the switch is still this arena's.
+        const ours = `if score #x1 polaris_spleef matches ${-8 * 64} if score #y1 polaris_spleef matches ${bottom * 64} if score #z1 polaris_spleef matches ${35 * 64}`;
+        expect(snowballPack.stopLines(floor.boxes)).toEqual([
+            `execute ${ours} run kill @e[type=minecraft:armor_stand,tag=polaris_spleef_probe]`,
+            `execute ${ours} run scoreboard players set #on polaris_spleef 0`
+        ]);
+        // Nothing for an arena with no snow.
+        expect(
+            snowballPack.stopLines(floor.boxes.filter((box) => box.block !== spleef.FLOOR))
+        ).toEqual([]);
+        expect(
+            snowballPack.packEnabled(
+                "There are 2 data pack(s) enabled: [vanilla (built-in)], [file/polaris-events (world)]"
+            )
+        ).toBe(true);
+        expect(
+            snowballPack.packEnabled("There are 1 data pack(s) enabled: [vanilla (built-in)]")
+        ).toBe(false);
+    });
     it("spreads players over the snow, never onto a wall", () => {
         const floor = spleef.arena(
             { place: { mode: "players" }, size: 5, height: 30 },

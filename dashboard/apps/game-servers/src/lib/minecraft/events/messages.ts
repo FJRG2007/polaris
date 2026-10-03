@@ -1005,8 +1005,8 @@ export function spleefReadySubtitle(
             : "&fThe snow you stand on vanishes: keep moving";
     if (variant === "snowballs")
         return language === "es"
-            ? "&fTira a los demás con bolas de nieve"
-            : "&fKnock the others off with snowballs";
+            ? "&fLas bolas rompen la nieve que tocan"
+            : "&fSnowballs break the snow they hit";
     return language === "es"
         ? "&fRompe la nieve bajo los demás"
         : "&fBreak the snow under the others";

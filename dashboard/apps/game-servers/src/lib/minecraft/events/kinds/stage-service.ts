@@ -11,6 +11,8 @@
 
 import * as stage from "./stage";
 import * as spleef from "./spleef";
+import * as snowballPack from "./snowball-pack";
+import * as snowballPackService from "./snowball-pack-service";
 import * as parkour from "./parkour";
 import * as stash from "./stash";
 import * as stashService from "./stash-service";
@@ -34,6 +36,8 @@ export interface StageLoop {
     run: EventRun;
     /** Every language: each line is split for its readers on the way out. */
     readonly language: speech.Speech;
+    /** Whether the snowball pack is on, once it has been looked at this run. */
+    snowballPack?: boolean;
 }
 
 export interface StageTools {
@@ -816,6 +820,16 @@ async function spleefTick(
         loop.run.id,
         (loop.run.preset.options as catalog.EventOptions<"spleef">).variant
     );
+    // Snowballs break the floor through a data pack, put on while everybody is
+    // still getting ready: taking it in pauses the game for a moment.
+    if (!current.armed && variant === "snowballs" && loop.snowballPack === undefined) {
+        loop.snowballPack = await snowballPackService.ensurePack(server).catch((error) => {
+            console.warn("polaris: the snowball pack could not be put on", String(error));
+            return false;
+        });
+        if (!loop.snowballPack)
+            console.warn("polaris: the snowball pack is not on", server.installedAppId);
+    }
     if (!current.armed && current.goAt !== null && now >= current.goAt) {
         const { items } = await tools.flavour();
         // The decay game's red snow is the arena's too: written down before any
@@ -833,6 +847,7 @@ async function spleefTick(
                 soundFor(racer.name, commands.SOUNDS.start)
             );
         }
+        if (variant === "snowballs") lines.push(...snowballPack.armLines(floor));
         change(loop, { armed: true });
         dirty = true;
     } else if (current.armed && variant === "decay") {
@@ -889,6 +904,7 @@ async function spleefTick(
     if (dirty) await tools.persist();
     if (!state(loop).armed || standing.length > 1) return null;
     const winner = standing[0];
+    if (variant === "snowballs") lines.push(...snowballPack.stopLines(floor.boxes));
     if (!winner) {
         lines.push(commands.say(messages.tag(language) + messages.nobodyStanding(language)));
         return "Nobody was left standing";
@@ -948,7 +964,11 @@ export async function settle(
     let boxes = leftover.boxes;
     let area = leftover.area;
     if (boxes.length > 0) {
-        if (area) await server.sayAll([stage.holdArea(area)]);
+        // Snowballs stop breaking a spleef floor before it goes: nothing for
+        // any other arena, or for a spleef whose game already ended.
+        const stop = snowballPack.stopLines(boxes);
+        if (area || stop.length > 0)
+            await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
         // Whatever is still standing on it - a pet, a mob - floats down
         // rather than falls when it goes.
         const bounds = stage.boundsOf(boxes);

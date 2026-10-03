@@ -10,7 +10,7 @@
  * - shovel: everybody has a shovel that breaks the snow and nothing else;
  * - decay: no tools - the snow a player stands on turns red, and is gone on the
  *   next look, so standing still is falling;
- * - snowballs: the floors hold, and snowballs knock the others off them.
+ * - snowballs: a snowball breaks the snow it hits (`snowball-pack.ts`).
  *
  * Built only into air, taken out only where its own blocks still are.
  */

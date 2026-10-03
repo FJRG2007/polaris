@@ -123,6 +123,12 @@ interface World {
     skyTaken: boolean;
     /** The server's settings file, or null when it cannot be read. */
     properties: string | null;
+    /** Files written into the container, by path, and every write in order. */
+    files: Map<string, string>;
+    writes: string[];
+    /** The data packs the game has found in the folder, and the ones it has on. */
+    packsFound: Set<string>;
+    packsOn: Set<string>;
     /** How many blocks that are not air any box an arena would take holds. */
     solidCount: number;
     /** A protected area: blocks put down do not stay. */
@@ -253,6 +259,10 @@ const world: World = {
     modes: {},
     skyTaken: false,
     properties: "pvp=true\ndifficulty=normal\n",
+    files: new Map(),
+    writes: [],
+    packsFound: new Set(),
+    packsOn: new Set(),
     solidCount: 0,
     refuseBlocks: false,
     hp: {},
@@ -649,6 +659,28 @@ const ESSENTIALS =
 function answer(sent: string): string {
     world.sent.push(sent);
     let line = sent;
+    // A data pack is found once the folder is looked at again, and on once enabled.
+    if (line === "datapack list available") {
+        for (const path of world.files.keys()) {
+            const pack = /\/datapacks\/([^/]+)\/pack\.mcmeta$/.exec(path)?.[1];
+            if (pack) world.packsFound.add(`file/${pack}`);
+        }
+        return "";
+    }
+    if (line === "datapack list enabled")
+        return `There are ${world.packsOn.size + 1} data pack(s) enabled: [vanilla (built-in)]${[
+            ...world.packsOn
+        ]
+            .map((id) => `, [${id} (world)]`)
+            .join("")}`;
+    const toggled = /^datapack (enable|disable) "([^"]+)"$/.exec(line);
+    if (toggled) {
+        const id = toggled[2]!;
+        if (toggled[1] === "disable") return world.packsOn.delete(id) ? "Disabled" : "Not enabled";
+        if (!world.packsFound.has(id)) return `Unknown data pack '${id}'`;
+        world.packsOn.add(id);
+        return "Enabled";
+    }
     if (line === "execute as @a[scores={pe_join=1..}] run scoreboard players get @s pe_join")
         return Object.entries(world.pressed)
             .filter(([name]) => world.online.includes(name))
@@ -1610,6 +1642,17 @@ vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
         world.log.slice(from, to),
     readContainerFile: async (_server: unknown, path: string) =>
         path.endsWith("server.properties") ? world.properties : null,
+    readContainerFiles: async (_server: unknown, paths: readonly string[]) =>
+        new Map(
+            paths.flatMap((path) => {
+                const content = world.files.get(path);
+                return content === undefined ? [] : [[path, content] as const];
+            })
+        ),
+    writeContainerFile: async (_server: unknown, path: string, content: string) => {
+        world.writes.push(path);
+        world.files.set(path, content);
+    },
     containerFileSize: async () => world.log.length
 }));
 
@@ -1762,6 +1805,10 @@ beforeEach(() => {
     world.modes = {};
     world.skyTaken = false;
     world.properties = "pvp=true\ndifficulty=normal\n";
+    world.files = new Map();
+    world.writes = [];
+    world.packsFound = new Set();
+    world.packsOn = new Set();
     world.solidCount = 0;
     world.refuseBlocks = false;
     world.hp = {};
@@ -4892,6 +4939,9 @@ describe("a meteor shower", () => {
 
 const parkour = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour");
 const spleef = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef");
+const snowballPack = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack"
+);
 
 /** Players typing in the chat, as the server log records it. */
 function chat(...said: [string, string][]): void {
@@ -5451,6 +5501,60 @@ describe("spleef", () => {
         await events.cancelEvent("owner", SERVER);
         await play(4_200);
         expect(world.sent).toContain("clear Ana *[minecraft:custom_data={polaris_event:1b}]");
+    });
+
+    it("in the snowball game, puts the data pack on before the throwing starts, arms it for the arena, and switches it off at the end", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([floor("snowballs")]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        await play(8_000);
+        const run = state().run!;
+        const arenaAt = spleef.arena(
+            floor("snowballs").options,
+            run.stage!.origin!,
+            run.stage!.origin!.y
+        );
+        const root = `/data/world/datapacks/${snowballPack.PACK_DIR}`;
+        // Every file of the pack, in the world the settings name.
+        expect([...world.files.keys()].sort()).toEqual(
+            [...snowballPack.packFiles().keys()].map((path) => `${root}/${path}`).sort()
+        );
+        expect(world.packsOn.has(snowballPack.PACK_ID)).toBe(true);
+        // Taken in with /datapack, never with a bare /reload (Bukkit's, on Paper).
+        expect(world.sent.some((line) => /^(minecraft:)?reload\b/.test(line))).toBe(false);
+        // On before the snowballs are handed out, and armed for this arena.
+        const enabledAt = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        const givenAt = world.sent.findIndex((line) =>
+            line.startsWith("give Ana minecraft:snowball")
+        );
+        expect(enabledAt).toBeGreaterThan(-1);
+        expect(enabledAt).toBeLessThan(givenAt);
+        for (const line of snowballPack.armLines(arenaAt)) expect(world.sent).toContain(line);
+
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of snowballPack.stopLines(arenaAt.boxes))
+            expect(world.sent).toContain(line);
+        expect(state().stageLeftovers).toEqual([]);
+
+        // The next game finds the pack as it was: nothing written, nothing reloaded.
+        world.writes = [];
+        const enables = world.sent.filter((line) => line.startsWith("datapack enable")).length;
+        setUp([floor("snowballs")]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        expect(
+            world.sent.filter((line) => line.startsWith("give Ana minecraft:snowball")).length
+        ).toBeGreaterThan(1);
+        expect(world.writes).toEqual([]);
+        expect(world.sent.filter((line) => line.startsWith("datapack enable")).length).toBe(
+            enables
+        );
     });
 
     it("is called off before anything is built when too few join, and moves nobody", async () => {
