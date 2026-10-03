@@ -22,7 +22,7 @@ import { DatabaseManageDialog } from "./database-panel";
 import { RepoConfigPreview } from "./repo-config-preview";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { dbEngineOptions } from "@/components/db-engine-select";
-import { isLocalDomain, primaryDomain } from "./domain-rank";
+import { isLocalDomain, isTunnelEntry, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
 import { runStateTone, type ServiceRunState } from "@/lib/deploy/run-state";
@@ -2008,23 +2008,31 @@ function DomainDialog({
                                             <Globe className="size-3 shrink-0" /> {domain.hostname}
                                         </span>
                                     )}
-                                    <Switch
-                                        checked={domain.enabled}
-                                        onChange={(next) =>
-                                            startTransition(async () => {
-                                                await deployActions.setDomainEnabledAction(
-                                                    domain.id,
-                                                    next
-                                                );
-                                                onChanged();
-                                            })
-                                        }
-                                        aria-label={
-                                            domain.enabled
-                                                ? t("view.domainDialog.disable")
-                                                : t("view.domainDialog.enable")
-                                        }
-                                    />
+                                    {/* A tunnel's name has no domain row to switch: it is
+                                        turned off from the service's Settings, with its tunnel. */}
+                                    {isTunnelEntry(domain) ? (
+                                        <Badge variant="neutral" className="shrink-0">
+                                            {t("view.domainDialog.tunnel")}
+                                        </Badge>
+                                    ) : (
+                                        <Switch
+                                            checked={domain.enabled}
+                                            onChange={(next) =>
+                                                startTransition(async () => {
+                                                    await deployActions.setDomainEnabledAction(
+                                                        domain.id,
+                                                        next
+                                                    );
+                                                    onChanged();
+                                                })
+                                            }
+                                            aria-label={
+                                                domain.enabled
+                                                    ? t("view.domainDialog.disable")
+                                                    : t("view.domainDialog.enable")
+                                            }
+                                        />
+                                    )}
                                 </div>
                             ))}
                         </div>

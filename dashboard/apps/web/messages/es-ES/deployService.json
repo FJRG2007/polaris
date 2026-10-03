@@ -280,8 +280,6 @@
         "checking": "Comprobando...",
         "domainDisabled": "Dominio desactivado - sin servir",
         "local": "local",
-        "disableDomain": "Desactivar dominio",
-        "enableDomain": "Activar dominio",
         "removeDomain": "Quitar dominio",
         "addADomain": "Añadir dominio",
         "addADomainIntro": "Elige cómo exponer este servicio - un subdominio gratuito, tu propio dominio con Let's Encrypt o un túnel de Cloudflare o ngrok que no necesita DNS ni redirección de puertos.",
@@ -319,7 +317,16 @@
         "releases": "Versiones",
         "keepReleases": "Conservar despliegues anteriores",
         "keepReleasesHint": "Mantén en marcha las últimas versiones, cada una en su propia dirección, mientras la dirección de este servicio sigue en la más reciente. Un servicio con un volumen o en otro servidor conserva el historial pero no los contenedores.",
-        "save": "Guardar ajustes"
+        "containerPortShort": "El puerto en el que escucha la app dentro del contenedor. Vacío lo detecta de la imagen.",
+        "portInvalid": "Escribe un puerto del 1 al 65535.",
+        "sourceShort": "Desde qué parte del repositorio se construye.",
+        "buildShort": "Se detectan en el repositorio. Rellena uno solo para cambiarlo.",
+        "autoDeployShort": "Despliega cada push a la rama, filtrado por commit o ruta.",
+        "watchPathsShort": "Un glob por línea, ! para excluir. Vacío es cualquier cambio.",
+        "keepReleasesShort": "Las versiones anteriores siguen activas, cada una en su dirección.",
+        "disableDomainNamed": "Desactivar {hostname}",
+        "enableDomainNamed": "Activar {hostname}",
+        "removeDomainNamed": "Quitar {hostname}"
     },
     "exposureHint": {
         "zoneBase": "Un nombre directamente en {host}, con un certificado de Let's Encrypt. Este no está cubierto por un comodín, así que necesita su propio registro DNS - Polaris lo crea si el dominio está en tu cuenta de Cloudflare conectada y, si no, te dice qué registro añadir. Para un nombre en otro dominio, elige Dominio personalizado.",
@@ -346,13 +353,11 @@
         "saving": " Guardando..."
     },
     "moveOut": {
-        "title": "En otro sitio",
         "heading": "Llevarlo a Vercel o Railway",
         "body": "Lo compilan y lo sirven desde el mismo repositorio; las variables van con él y sigue en el tablero de este proyecto. Aquí no se borra nada - se detiene, y un botón lo vuelve a iniciar.",
         "button": "Moverlo"
     },
     "danger": {
-        "title": "Peligro",
         "deleteService": "Borrar servicio",
         "queued": "Ya está en cola. Despliega los cambios pendientes para llevarlo a cabo o descártalo desde el aviso.",
         "hint": "Elimina el contenedor, sus dominios, sus variables y el historial de despliegues.",
@@ -362,7 +367,6 @@
         "deleteTitle": "Borrar servicio"
     },
     "server": {
-        "title": "Servidor",
         "label": "Dónde se ejecuta",
         "hint": "Mueve el servicio a otro servidor conectado. Conecta más en Servidores. Al cambiarlo se detiene el contenedor actual en el servidor anterior; vuelve a desplegar para levantarlo en el nuevo.",
         "moveTo": "Mover a {server}",
@@ -372,7 +376,6 @@
         "checkSettings": "Revisa estos ajustes",
         "unreadable": "No se pudo leer cómo escala este servicio",
         "savedRedeploying": "Guardado. El servicio se está reiniciando con los ajustes nuevos.",
-        "saved": "Guardado.",
         "title": "Escalado",
         "copies": "Copias",
         "copiesHint": "Cuántas copias del servicio se ejecutan a la vez, hasta {max}. El borde reparte las peticiones entre ellas.",
@@ -386,7 +389,6 @@
         "cpuOnly": "Solo CPU",
         "sleep": "Dormir cuando nadie visita",
         "sleepHint": "Detiene el servicio tras un rato sin visitas y lo arranca con la siguiente. El primer visitante ve una página que dice que se está despertando durante los pocos segundos que tarda.",
-        "asleep": " Ahora está dormido.",
         "sleepAfter": "Tras (minutos sin visitas)",
         "resources": "Recursos por copia",
         "cpus": "CPU (núcleos)",
@@ -398,7 +400,11 @@
         "healthPath": "Ruta de salud",
         "healthPathHint": "Se consulta a cada copia cada 10 segundos. La que deja de responder se aparta hasta que vuelve a responder. En blanco = sin comprobación.",
         "emailShield": "Con más de una copia, el borde reparte entre ellas por sí mismo, así que las direcciones de correo de sus páginas no se ocultan a los scrapers.",
-        "save": "Guardar"
+        "balancing": "Reparto de carga",
+        "balancingShort": "Cómo reparte el borde a los visitantes entre las copias.",
+        "autoscaleShort": "Añade y quita copias según la CPU o el tráfico.",
+        "sleepShort": "Lo para cuando nadie lo visita y lo despierta en la siguiente visita.",
+        "asleepNow": "Dormido"
     },
     "cdn": {
         "emptiedPath": "Se vació {path}.",
@@ -504,14 +510,16 @@
         "networkAliases": "Nombres en esa red",
         "addNetwork": "Añadir red",
         "removeNetwork": "Quitar red",
-        "saveNetworks": "Guardar",
         "issue": {
             "networkName": "Letras, números, puntos, guiones y _",
             "networkReserved": "Esa red es de Docker o de Polaris",
             "networkAlias": "Nombres con letras, números y guiones",
             "networkTwice": "Cada red una sola vez",
             "networkTooMany": "Hasta 8 redes y 8 nombres cada una"
-        }
+        },
+        "networksShort": "Redes Docker del servidor a las que se une en el próximo despliegue.",
+        "nameMissing": "Cada red necesita un nombre.",
+        "noNetworks": "Solo la red de su proyecto."
     },
     "publicNet": {
         "title": "Red pública",
@@ -557,10 +565,55 @@
         "tcpAdd": "Añadir proxy TCP",
         "tcpTo": "TCP a :{port}",
         "tcpRemove": "Quitar proxy TCP",
+        "alsoTunnel": "También túnel",
+        "alsoTunnelHint": "Un túnel también sirve este nombre. Quita esta entrada para dejar solo el túnel.",
         "tcpForward": "Detrás de un router: redirige TCP {ports} a {lan} para que respondan desde fuera de tu red.",
         "tcpApply": "El cambio se aplica la próxima vez que arranque el servicio.",
         "tcpApplyNow": "Redesplegar ya",
         "privateLink": "Red privada entre servicios",
         "certUnknown": "No se pudo leer el certificado desde aquí. Se mostrará cuando la dirección responda a este servidor."
+    },
+    "kit": {
+        "sections": "Secciones",
+        "learnMore": "Saber más",
+        "save": "Guardar",
+        "saved": "Guardado",
+        "unsaved": "Sin guardar",
+        "noChanges": "Sin cambios",
+        "discard": "Descartar",
+        "retry": "Reintentar",
+        "networkingIntro": "Dónde responde el servicio, dentro del proyecto y en internet.",
+        "source": "Código y despliegue",
+        "sourceIntro": "De dónde sale el código y cuándo sale una versión nueva.",
+        "scalingIntro": "Cuántas copias corren, qué puede usar cada una y cuándo duerme.",
+        "advanced": "Avanzado",
+        "advancedIntro": "Dónde corre y se construye, y llevarlo a otro proveedor.",
+        "danger": "Zona de riesgo",
+        "dangerIntro": "Acciones que no se pueden deshacer.",
+        "on": "Activado",
+        "off": "Desactivado",
+        "directAddress": "Dirección directa",
+        "addADomainShort": "Un subdominio gratis, tu propio dominio o un túnel.",
+        "added": "Añadido",
+        "manageDomains": "Tus dominios",
+        "hostname": "Dominio",
+        "down": "Caído",
+        "removeDomainTitle": "¿Quitar {hostname}?",
+        "removeDomainBody": "Deja de responder al momento. Puedes volver a añadirlo después.",
+        "moveOutShort": "Conserva sus variables y sigue en este tablero. No se borra nada.",
+        "serverShort": "Moverlo para el contenedor aquí; despliega para arrancarlo allí.",
+        "move": "Mover",
+        "disableNamed": "Desactivar {name}",
+        "enableNamed": "Activar {name}"
+    },
+    "tabIntro": {
+        "deployments": "Cada build del servicio, de la más reciente a la más antigua. Revierte o redespliega desde aquí.",
+        "variables": "Valores que el servicio lee de su entorno. Los secretos siguen ocultos hasta mostrarlos.",
+        "metrics": "Lo que usa el servicio ahora y a lo largo del tiempo.",
+        "console": "Una terminal dentro del contenedor en marcha.",
+        "files": "Los archivos dentro del contenedor en marcha.",
+        "volumes": "Almacenamiento que sobrevive a un despliegue, montado en el contenedor.",
+        "cron": "Comandos que el servicio ejecuta según un horario, dentro de su contenedor.",
+        "notes": "Notas para quien se ocupe de este servicio después."
     }
 }

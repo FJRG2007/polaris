@@ -26,8 +26,6 @@
             "replacePath": "Rewrite the path by pattern"
         },
         "checkValues": "Check the values",
-        "loading": "Loading the edge settings",
-        "saved": "Saved. The edge is using it now.",
         "opening": "Opening the port. The service is redeploying.",
         "closing": "Closing the port. The service is redeploying.",
         "savedShort": "Saved.",
@@ -92,9 +90,9 @@
         "removeRewrite": "Remove this rewrite",
         "addRedirect": "Add a redirect",
         "addRewrite": "Add a rewrite",
-        "saving": "Saving...",
-        "save": "Save",
-        "discard": "Discard"
+        "browserCheckShort": "Browsers solve a quick check that flooding scripts cannot skip.",
+        "open": "Open",
+        "closed": "Closed"
     },
     "variables": {
         "hiddenValue": "Hidden value",

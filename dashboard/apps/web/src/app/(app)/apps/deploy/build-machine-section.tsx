@@ -5,7 +5,8 @@
  * save is refused; the next deploy builds there.
  */
 
-import { Select } from "@polaris/ui";
+import { Badge, Select } from "@polaris/ui";
+import { SettingsCard, useSavedFlash } from "./settings-kit";
 import { useEffect, useState } from "react";
 import type { BuildMachineView } from "@/lib/deploy/build-machine";
 import { buildMachineAction, setBuildMachineAction } from "./source-actions";
@@ -15,6 +16,7 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
     const t = useTranslations("deployService");
     const [view, setView] = useState<BuildMachineView | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [saved, markSaved] = useSavedFlash();
 
     useEffect(() => {
         let active = true;
@@ -38,24 +40,25 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
         if (result.error) {
             setView(before);
             setError(result.error);
-        }
+        } else markSaved();
     }
 
     return (
-        <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">{t("buildMachine.title")}</h3>
-            <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
-                <Select
-                    value={view.value}
-                    onValueChange={(value) => void choose(value)}
-                    options={view.options.map((option) => ({ value: option.value, label: option.label }))}
-                    aria-label={t("buildMachine.title")}
-                />
-                <span className="text-xs text-muted-foreground">
-                    {t("buildMachine.hint")}
-                </span>
-                {error && <p className="text-sm text-danger">{error}</p>}
-            </div>
-        </section>
+        <SettingsCard
+            title={t("buildMachine.title")}
+            description={t("buildMachine.hint")}
+            badge={saved ? <Badge variant="success">{t("kit.saved")}</Badge> : undefined}
+        >
+            <Select
+                value={view.value}
+                onValueChange={(value) => void choose(value)}
+                options={view.options.map((option) => ({
+                    value: option.value,
+                    label: option.label
+                }))}
+                aria-label={t("buildMachine.title")}
+            />
+            {error && <p className="text-xs text-danger-ink">{error}</p>}
+        </SettingsCard>
     );
 }

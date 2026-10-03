@@ -58,8 +58,14 @@
        elevated panel of a dialog. */
     --muted: 225 10% 14%;
     --field: 225 11% 7%;
-    --border: 225 10% 16%;
-    --border-strong: 225 10% 24%;
+    --border: 225 10% 22%;
+    --border-strong: 225 10% 30%;
+    /* The edge of something you operate - a field, a select, a checkbox, an
+       unchecked switch. WCAG 1.4.11 asks 3:1 for the boundary that identifies a
+       control, against everything it sits on: the page, a card and a dialog.
+       `border` is a section's hairline and is kept quiet on purpose; this one is
+       not, because a field nobody can see the edge of reads as a label. */
+    --control-edge: 225 9% 46%;
     --ring: 258 88% 66%;
 
     /* Accent. One violet, used sparingly; `accent` is its warmer neighbour, for
@@ -138,8 +144,9 @@
 
     --muted: 225 20% 94%;
     --field: 225 20% 95%;
-    --border: 225 16% 89%;
-    --border-strong: 225 16% 78%;
+    --border: 225 16% 84%;
+    --border-strong: 225 16% 72%;
+    --control-edge: 225 10% 54%;
     --ring: 258 78% 56%;
 
     --primary: 258 78% 55%;
@@ -197,8 +204,9 @@
 
         --muted: 225 20% 94%;
         --field: 225 20% 95%;
-        --border: 225 16% 89%;
-        --border-strong: 225 16% 78%;
+        --border: 225 16% 84%;
+        --border-strong: 225 16% 72%;
+        --control-edge: 225 10% 54%;
         --ring: 258 78% 56%;
 
         --primary: 258 78% 55%;
@@ -254,8 +262,9 @@
 
     --muted: 225 12% 12%;
     --field: 225 13% 5%;
-    --border: 225 12% 13%;
-    --border-strong: 225 12% 21%;
+    --border: 225 12% 20%;
+    --border-strong: 225 12% 28%;
+    --control-edge: 225 9% 44%;
 }
 
 /*
@@ -282,8 +291,9 @@
 
     --muted: 220 4% 16%;
     --field: 220 4% 9%;
-    --border: 220 4% 18%;
-    --border-strong: 220 4% 27%;
+    --border: 220 4% 23%;
+    --border-strong: 220 4% 32%;
+    --control-edge: 220 4% 46%;
 }
 
 * {

@@ -71,7 +71,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
             </div>
 
             {showAdd && (
-                <div className="rounded-md border border-border/60 p-3">
+                <div className="rounded-md border border-border p-3">
                     <VolumeForm
                         applicationId={app.id}
                         onSaved={() => {
@@ -84,7 +84,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
             )}
 
             {editVolume && (
-                <div className="rounded-md border border-border/60 p-3">
+                <div className="rounded-md border border-border p-3">
                     <p className="mb-2 text-xs font-medium text-muted-foreground">
                         {t("volumes.editing", { name: editVolume.name })}
                     </p>
@@ -102,14 +102,14 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
 
             {error && <p className="text-xs text-danger">{error}</p>}
 
-            <div className="overflow-hidden rounded-md border border-border/60">
+            <div className="overflow-hidden rounded-md border border-border">
                 {items && items.length === 0 && (
                     <p className="p-3 text-xs text-muted-foreground">{t("volumes.empty")}</p>
                 )}
                 {items?.map((volume) => (
                     <div
                         key={volume.id}
-                        className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2 last:border-0"
+                        className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 last:border-0"
                     >
                         <div className="flex min-w-0 items-center gap-2">
                             {volume.kind === "nas" ? (
@@ -143,7 +143,12 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                     <Settings2 className="size-4" />
                                 </Button>
                             )}
-                            <Button asChild variant="ghost" size="sm" title={t("volumes.viewInDrive")}>
+                            <Button
+                                asChild
+                                variant="ghost"
+                                size="sm"
+                                title={t("volumes.viewInDrive")}
+                            >
                                 <Link href={volumeDriveHref(app.id, volume)}>
                                     <HardDrive className="size-4" />
                                 </Link>

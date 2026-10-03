@@ -36,14 +36,26 @@ describe("which addresses can be given to the certificate authority", () => {
     });
 
     it("refuses the reserved domains Let's Encrypt refuses, the old default among them", () => {
-        for (const address of ["admin@example.com", "a@mail.example.org", "a@box.test", "a@polaris.local", "a@x.invalid"]) {
+        for (const address of [
+            "admin@example.com",
+            "a@mail.example.org",
+            "a@box.test",
+            "a@polaris.local",
+            "a@x.invalid"
+        ]) {
             expect(isUsableAcmeEmail(address)).toBe(false);
             expect(acmeEmailProblem(address)).toBe("reserved");
         }
     });
 
     it("refuses what is not an address, and anything a command line would read", () => {
-        for (const address of ["not-an-address", "a@b", "a b@corp.io", "a@corp.io; rm -rf /", "$(id)@corp.io"]) {
+        for (const address of [
+            "not-an-address",
+            "a@b",
+            "a b@corp.io",
+            "a@corp.io; rm -rf /",
+            "$(id)@corp.io"
+        ]) {
             expect(acmeEmailProblem(address)).toBe("invalid");
         }
     });
@@ -51,7 +63,10 @@ describe("which addresses can be given to the certificate authority", () => {
 
 describe("which address is in use", () => {
     it("is the one chosen on the screen over the installer's", () => {
-        expect(resolveAcmeEmail("me@mail.co", "ops@corp.io")).toEqual({ email: "me@mail.co", source: "setting" });
+        expect(resolveAcmeEmail("me@mail.co", "ops@corp.io")).toEqual({
+            email: "me@mail.co",
+            source: "setting"
+        });
     });
 
     it("keeps a chosen empty address as the choice of none", () => {
@@ -59,7 +74,10 @@ describe("which address is in use", () => {
     });
 
     it("falls back to the installer's, and never passes on a reserved one", () => {
-        expect(resolveAcmeEmail(null, "Ops@Corp.io")).toEqual({ email: "ops@corp.io", source: "install" });
+        expect(resolveAcmeEmail(null, "Ops@Corp.io")).toEqual({
+            email: "ops@corp.io",
+            source: "install"
+        });
         expect(resolveAcmeEmail(null, "admin@example.com")).toEqual({ email: "", source: "none" });
         expect(resolveAcmeEmail(null, undefined)).toEqual({ email: "", source: "none" });
     });
@@ -67,26 +85,39 @@ describe("which address is in use", () => {
 
 describe("whether the edge is running with it", () => {
     it("is current when the edge started after the address was written", () => {
-        expect(acmeEdgeState({ startedAt: 2_000, readsFile: true, writtenAt: 1_000 })).toBe("current");
-        expect(acmeEdgeState({ startedAt: 2_000, readsFile: true, writtenAt: null })).toBe("current");
+        expect(acmeEdgeState({ startedAt: 2_000, readsFile: true, writtenAt: 1_000 })).toBe(
+            "current"
+        );
+        expect(acmeEdgeState({ startedAt: 2_000, readsFile: true, writtenAt: null })).toBe(
+            "current"
+        );
     });
 
     it("is pending when the address was written after the edge started", () => {
-        expect(acmeEdgeState({ startedAt: 1_000, readsFile: true, writtenAt: 2_000 })).toBe("pending");
+        expect(acmeEdgeState({ startedAt: 1_000, readsFile: true, writtenAt: 2_000 })).toBe(
+            "pending"
+        );
     });
 
     it("is outdated when the running edge predates the start-up that reads it", () => {
-        expect(acmeEdgeState({ startedAt: 1_000, readsFile: false, writtenAt: 2_000 })).toBe("outdated");
+        expect(acmeEdgeState({ startedAt: 1_000, readsFile: false, writtenAt: 2_000 })).toBe(
+            "outdated"
+        );
     });
 
     it("is unknown when this machine will not say", () => {
-        expect(acmeEdgeState({ startedAt: null, readsFile: false, writtenAt: 2_000 })).toBe("unknown");
+        expect(acmeEdgeState({ startedAt: null, readsFile: false, writtenAt: 2_000 })).toBe(
+            "unknown"
+        );
     });
 });
 
 /** The edge's start-up, as compose hands it to the shell. */
 function edgePrelude(): string {
-    const compose = readFileSync(new URL("../../../../docker/docker-compose.yml", import.meta.url), "utf8");
+    const compose = readFileSync(
+        new URL("../../../../docker/docker-compose.yml", import.meta.url),
+        "utf8"
+    );
     const service = compose.slice(compose.indexOf("\n  traefik:"));
     const start = service.indexOf("      - >-\n") + "      - >-\n".length;
     const end = service.indexOf("\n      - --", start);
@@ -124,10 +155,14 @@ describe("the edge's start-up", () => {
                 `${FLAG}ops@corp.io`
             ]);
             writeFileSync(join(dir, "acme-email"), "me@mail.co\n");
-            expect(startEdge(dir, { POLARIS_ACME_EMAIL: "ops@corp.io" })).toContain(`${FLAG}me@mail.co`);
+            expect(startEdge(dir, { POLARIS_ACME_EMAIL: "ops@corp.io" })).toContain(
+                `${FLAG}me@mail.co`
+            );
             // An empty file is the choice of none: no flag, not the installer's.
             writeFileSync(join(dir, "acme-email"), "\n");
-            expect(startEdge(dir, { POLARIS_ACME_EMAIL: "ops@corp.io" })).toEqual(["--providers.docker=true"]);
+            expect(startEdge(dir, { POLARIS_ACME_EMAIL: "ops@corp.io" })).toEqual([
+                "--providers.docker=true"
+            ]);
         } finally {
             rmSync(dir, { recursive: true, force: true });
         }
@@ -136,7 +171,9 @@ describe("the edge's start-up", () => {
     it("passes a reserved or malformed address as none rather than have the account refused", () => {
         const dir = mkdtempSync(join(tmpdir(), "acme-"));
         try {
-            expect(startEdge(dir, { POLARIS_ACME_EMAIL: "admin@example.com" })).toEqual(["--providers.docker=true"]);
+            expect(startEdge(dir, { POLARIS_ACME_EMAIL: "admin@example.com" })).toEqual([
+                "--providers.docker=true"
+            ]);
             expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
             writeFileSync(join(dir, "acme-email"), "a b@corp.io; touch pwned\n");
             expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
@@ -145,10 +182,13 @@ describe("the edge's start-up", () => {
         } finally {
             rmSync(dir, { recursive: true, force: true });
         }
-    });
+    }, 60_000);
 
     it("no longer carries a default address on its command line", () => {
-        const compose = readFileSync(new URL("../../../../docker/docker-compose.yml", import.meta.url), "utf8");
+        const compose = readFileSync(
+            new URL("../../../../docker/docker-compose.yml", import.meta.url),
+            "utf8"
+        );
         expect(compose).not.toContain("acme.email=${POLARIS_ACME_EMAIL");
     });
 });

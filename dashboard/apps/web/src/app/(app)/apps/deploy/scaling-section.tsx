@@ -10,8 +10,9 @@
  */
 
 import * as core from "@polaris/core";
-import { Loader2 } from "lucide-react";
-import { Button, Input, Switch } from "@polaris/ui";
+import { Badge, Input, Switch } from "@polaris/ui";
+import { sameSettings, withFields } from "./settings-form";
+import { CardError, CardSkeleton, LearnMore, SaveBar, SettingsCard } from "./settings-kit";
 import { describeServiceEvent } from "./service-history";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -95,6 +96,15 @@ function parse(draft: Draft, t: NamespaceTranslator<"deployService">) {
 /** How old a kept copy may be and still paint the first frame. */
 const SNAPSHOT_MAX_AGE_MS = 24 * 3_600_000;
 
+/** The cards the scaling settings are split into, and the fields each saves. */
+type ScalingCard = "copies" | "sleep" | "resources" | "balancing";
+const CARD_KEYS: Record<ScalingCard, readonly (keyof Draft)[]> = {
+    copies: ["replicas", "autoscale", "min", "max", "cpuPercent", "requestsPerCopy"],
+    sleep: ["sleeps", "sleepAfter"],
+    resources: ["cpus", "memoryMb"],
+    balancing: ["sticky", "healthPath"]
+};
+
 export function ScalingSection({
     applicationId,
     onChanged
@@ -105,8 +115,14 @@ export function ScalingSection({
     const t = useTranslations("deployService");
     const [view, setView] = useState<ServiceScalingView | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
+    // The settings as last stored: every save sends the whole set, so a card
+    // sends its own fields over these and never a neighbour's unsaved edit.
+    const [base, setBase] = useState<Draft | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [note, setNote] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Partial<Record<ScalingCard, string | null>>>({});
+    const [notes, setNotes] = useState<Partial<Record<ScalingCard, string | null>>>({});
+    const [pendingCard, setPendingCard] = useState<ScalingCard | null>(null);
+    const [flash, setFlash] = useState<ScalingCard | null>(null);
     const [pending, startTransition] = useTransition();
 
     // The settings as this tab last read them paint at once, read-only: every
@@ -120,6 +136,7 @@ export function ScalingSection({
         if (answered.current === applicationId) return;
         setView(snapshot.value);
         setDraft(draftOf(snapshot.value));
+        setBase(draftOf(snapshot.value));
         setKept(true);
     });
 
@@ -133,6 +150,7 @@ export function ScalingSection({
                 writeSnapshot(cacheKey, fresh);
                 setView((current) => (current ? mergeUnchanged(current, fresh) : fresh));
                 setDraft(draftOf(fresh));
+                setBase(draftOf(fresh));
                 setKept(false);
             } else setError(result.error ?? t("scaling.unreadable"));
         });
@@ -141,71 +159,109 @@ export function ScalingSection({
         };
     }, [applicationId, cacheKey]);
 
-    const checked = useMemo(() => (draft ? parse(draft, t) : null), [draft, t]);
+    useEffect(() => {
+        if (!flash) return;
+        const timer = setTimeout(() => setFlash(null), 3000);
+        return () => clearTimeout(timer);
+    }, [flash]);
+
     const set = (patch: Partial<Draft>) =>
         setDraft((current) => (current ? { ...current, ...patch } : current));
     const copies = Number(draft?.autoscale ? draft.max : draft?.replicas) || 1;
+    const checks = useMemo(() => {
+        if (!draft || !base) return null;
+        const out = {} as Record<ScalingCard, ReturnType<typeof parse>>;
+        for (const card of Object.keys(CARD_KEYS) as ScalingCard[]) {
+            out[card] = parse(withFields(base, draft, CARD_KEYS[card]), t);
+        }
+        return out;
+    }, [draft, base, t]);
 
-    function save() {
-        if (kept || !checked?.input) return;
-        const input = checked.input;
-        setError(null);
-        setNote(null);
+    // A failed read shows only why, as it did before anything was kept.
+    if (!draft || !view || !base || !checks || (kept && error)) {
+        return error ? (
+            <CardError title={t("scaling.copies")} message={error} />
+        ) : (
+            <>
+                <CardSkeleton title={t("scaling.copies")} />
+                <CardSkeleton title={t("scaling.sleep")} rows={1} />
+                <CardSkeleton title={t("scaling.resources")} rows={1} />
+                <CardSkeleton title={t("scaling.balancing")} rows={1} />
+            </>
+        );
+    }
+
+    function save(card: ScalingCard) {
+        if (kept || !draft || !base || pendingCard !== null) return;
+        const next = withFields(base, draft, CARD_KEYS[card]);
+        const input = parse(next, t).input;
+        if (!input) return;
+        setErrors((current) => ({ ...current, [card]: null }));
+        setNotes((current) => ({ ...current, [card]: null }));
+        setPendingCard(card);
         startTransition(async () => {
             const result = await saveServiceScalingAction(applicationId, input);
+            setPendingCard(null);
             if (result.error) {
-                setError(result.error);
+                setErrors((current) => ({ ...current, [card]: result.error ?? null }));
                 return;
             }
             // The kept copy is the settings before this save; the next visit reads
             // the saved ones instead of painting the old ones first.
             dropSnapshots(cacheKey);
-            setNote(
-                result.redeployed
-                    ? t("scaling.savedRedeploying")
-                    : t("scaling.saved")
-            );
+            setBase(next);
+            setFlash(card);
+            if (result.redeployed) {
+                setNotes((current) => ({ ...current, [card]: t("scaling.savedRedeploying") }));
+            }
             onChanged();
         });
     }
 
-    return (
-        <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">{t("scaling.title")}</h3>
-            {/* A failed read shows only why, as it did before anything was kept. */}
-            {!draft || !view || (kept && error) ? (
-                error ? (
-                    <p className="text-sm text-danger">{error}</p>
-                ) : (
-                    <div className="h-40 animate-pulse rounded-md border border-border bg-muted/40" />
-                )
-            ) : (
-                <fieldset
-                    disabled={kept}
-                    className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-3 text-sm"
-                >
-                    {view.single && <p className="text-xs text-muted-foreground">{view.single}</p>}
-                    <label className="flex flex-col gap-1">
-                        <span className="font-medium">{t("scaling.copies")}</span>
-                        <Input
-                            type="number"
-                            min={1}
-                            max={core.REPLICAS_MAX}
-                            value={draft.replicas}
-                            disabled={view.single !== null || draft.autoscale}
-                            onChange={(event) => set({ replicas: event.target.value })}
-                            className="w-28"
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            {t("scaling.copiesHint", { max: core.REPLICAS_MAX })}
-                        </span>
-                    </label>
+    const dirty = (card: ScalingCard) =>
+        !sameSettings(
+            CARD_KEYS[card].map((key) => draft[key]),
+            CARD_KEYS[card].map((key) => base[key])
+        );
+    const bar = (card: ScalingCard) => (
+        <SaveBar
+            dirty={dirty(card) && !kept}
+            pending={pending && pendingCard === card}
+            busy={pendingCard !== null}
+            justSaved={flash === card}
+            invalid={checks[card].problem}
+            error={errors[card]}
+            onSave={() => save(card)}
+            onDiscard={() => setDraft(withFields(draft, base, CARD_KEYS[card]))}
+        />
+    );
+    const note = (card: ScalingCard) =>
+        notes[card] ? <p className="text-xs text-muted-foreground">{notes[card]}</p> : null;
 
-                    <div className="flex items-start justify-between gap-3">
-                        <span>
-                            <span className="font-medium">{t("scaling.autoscale")}</span>
+    return (
+        <>
+            <SettingsCard
+                title={t("scaling.copies")}
+                description={t("scaling.copiesHint", { max: core.REPLICAS_MAX })}
+                footer={bar("copies")}
+            >
+                <fieldset disabled={kept} className="flex min-w-0 flex-col gap-3">
+                    {view.single && <p className="text-xs text-muted-foreground">{view.single}</p>}
+                    <Input
+                        type="number"
+                        min={1}
+                        max={core.REPLICAS_MAX}
+                        value={draft.replicas}
+                        disabled={view.single !== null || draft.autoscale}
+                        onChange={(event) => set({ replicas: event.target.value })}
+                        aria-label={t("scaling.copies")}
+                        className="w-28"
+                    />
+                    <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
+                        <span className="min-w-0">
+                            <span className="text-xs font-medium">{t("scaling.autoscale")}</span>
                             <span className="block text-xs text-muted-foreground">
-                                {t("scaling.autoscaleHint", { minutes: core.AUTOSCALE_IDLE_AFTER })}
+                                {t("scaling.autoscaleShort")}
                                 {view.engine === "swarm" && t("scaling.notOnSwarm")}
                             </span>
                         </span>
@@ -219,7 +275,9 @@ export function ScalingSection({
                     {draft.autoscale && (
                         <div className="flex flex-wrap gap-3">
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("scaling.fewest")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("scaling.fewest")}
+                                </span>
                                 <Input
                                     type="number"
                                     min={1}
@@ -230,7 +288,9 @@ export function ScalingSection({
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("scaling.most")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("scaling.most")}
+                                </span>
                                 <Input
                                     type="number"
                                     min={1}
@@ -287,76 +347,100 @@ export function ScalingSection({
                             </span>
                         </p>
                     )}
+                    <LearnMore>
+                        {t("scaling.autoscaleHint", { minutes: core.AUTOSCALE_IDLE_AFTER })}
+                    </LearnMore>
+                    {note("copies")}
+                </fieldset>
+            </SettingsCard>
 
-                    <div className="flex items-start justify-between gap-3">
-                        <span>
-                            <span className="font-medium">{t("scaling.sleep")}</span>
-                            <span className="block text-xs text-muted-foreground">
-                                {t("scaling.sleepHint")}
-                                {view.asleep && t("scaling.asleep")}
-                                {view.sleepBlocked && ` ${view.sleepBlocked}`}
-                            </span>
-                        </span>
-                        <Switch
-                            checked={draft.sleeps}
-                            onChange={(value) => set({ sleeps: value })}
-                            disabled={view.sleepBlocked !== null && !draft.sleeps}
-                            aria-label={t("scaling.sleep")}
-                        />
-                    </div>
-                    {draft.sleeps && (
-                        <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
-                                {t("scaling.sleepAfter")}
-                            </span>
-                            <Input
-                                type="number"
-                                min={core.SLEEP_AFTER_MIN_MINUTES}
-                                max={core.SLEEP_AFTER_MAX_MINUTES}
-                                value={draft.sleepAfter}
-                                onChange={(event) => set({ sleepAfter: event.target.value })}
-                                className="w-28"
-                            />
-                        </label>
-                    )}
-
-                    <div className="flex flex-col gap-1">
-                        <span className="font-medium">{t("scaling.resources")}</span>
-                        <div className="flex flex-wrap gap-3">
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("scaling.cpus")}</span>
-                                <Input
-                                    type="number"
-                                    min={0.05}
-                                    step={0.05}
-                                    value={draft.cpus}
-                                    onChange={(event) => set({ cpus: event.target.value })}
-                                    placeholder={t("scaling.noLimit")}
-                                    className="w-28"
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("scaling.memory")}</span>
-                                <Input
-                                    type="number"
-                                    min={16}
-                                    step={64}
-                                    value={draft.memoryMb}
-                                    onChange={(event) => set({ memoryMb: event.target.value })}
-                                    placeholder={t("scaling.noLimit")}
-                                    className="w-28"
-                                />
-                            </label>
-                        </div>
+            <SettingsCard
+                title={t("scaling.sleep")}
+                description={t("scaling.sleepShort")}
+                badge={
+                    view.asleep ? (
+                        <Badge variant="neutral">{t("scaling.asleepNow")}</Badge>
+                    ) : undefined
+                }
+                learnMore={t("scaling.sleepHint")}
+                actions={
+                    <Switch
+                        checked={draft.sleeps}
+                        onChange={(value) => set({ sleeps: value })}
+                        disabled={kept || (view.sleepBlocked !== null && !draft.sleeps)}
+                        aria-label={t("scaling.sleep")}
+                    />
+                }
+                footer={bar("sleep")}
+            >
+                {view.sleepBlocked && (
+                    <p className="text-xs text-warning-ink">{view.sleepBlocked}</p>
+                )}
+                {draft.sleeps && (
+                    <label className="flex flex-col gap-1">
                         <span className="text-xs text-muted-foreground">
-                            {t("scaling.resourcesHint")}
+                            {t("scaling.sleepAfter")}
                         </span>
-                    </div>
+                        <Input
+                            type="number"
+                            min={core.SLEEP_AFTER_MIN_MINUTES}
+                            max={core.SLEEP_AFTER_MAX_MINUTES}
+                            value={draft.sleepAfter}
+                            disabled={kept}
+                            onChange={(event) => set({ sleepAfter: event.target.value })}
+                            className="w-28"
+                        />
+                    </label>
+                )}
+                {note("sleep")}
+            </SettingsCard>
 
-                    <div className="flex items-start justify-between gap-3">
-                        <span>
-                            <span className="font-medium">{t("scaling.sticky")}</span>
-                            <span className="block text-xs text-muted-foreground">{t("scaling.stickyHint")}</span>
+            <SettingsCard
+                title={t("scaling.resources")}
+                description={t("scaling.resourcesHint")}
+                footer={bar("resources")}
+            >
+                <fieldset disabled={kept} className="flex flex-wrap gap-3">
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">{t("scaling.cpus")}</span>
+                        <Input
+                            type="number"
+                            min={0.05}
+                            step={0.05}
+                            value={draft.cpus}
+                            onChange={(event) => set({ cpus: event.target.value })}
+                            placeholder={t("scaling.noLimit")}
+                            className="w-28"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">{t("scaling.memory")}</span>
+                        <Input
+                            type="number"
+                            min={16}
+                            step={64}
+                            value={draft.memoryMb}
+                            onChange={(event) => set({ memoryMb: event.target.value })}
+                            placeholder={t("scaling.noLimit")}
+                            className="w-28"
+                        />
+                    </label>
+                </fieldset>
+                {note("resources")}
+            </SettingsCard>
+
+            <SettingsCard
+                title={t("scaling.balancing")}
+                description={t("scaling.balancingShort")}
+                footer={bar("balancing")}
+            >
+                <fieldset disabled={kept} className="flex min-w-0 flex-col gap-3">
+                    <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
+                        <span className="min-w-0">
+                            <span className="text-xs font-medium">{t("scaling.sticky")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("scaling.stickyHint")}
+                            </span>
                         </span>
                         <Switch
                             checked={draft.sticky}
@@ -365,7 +449,7 @@ export function ScalingSection({
                         />
                     </div>
                     <label className="flex flex-col gap-1">
-                        <span className="font-medium">{t("scaling.healthPath")}</span>
+                        <span className="text-xs font-medium">{t("scaling.healthPath")}</span>
                         <Input
                             value={draft.healthPath}
                             onChange={(event) => set({ healthPath: event.target.value })}
@@ -374,28 +458,18 @@ export function ScalingSection({
                             autoCapitalize="none"
                             autoCorrect="off"
                             spellCheck={false}
-                            className="max-w-xs"
+                            className="max-w-xs font-mono"
                         />
                         <span className="text-xs text-muted-foreground">
                             {t("scaling.healthPathHint")}
                         </span>
                     </label>
                     {copies > 1 && (
-                        <p className="text-xs text-muted-foreground">
-                            {t("scaling.emailShield")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("scaling.emailShield")}</p>
                     )}
-
-                    {checked?.problem && <p className="text-xs text-danger">{checked.problem}</p>}
-                    {error && <p className="text-sm text-danger">{error}</p>}
-                    {note && <p className="text-xs text-muted-foreground">{note}</p>}
-                    <div className="flex justify-end">
-                        <Button onClick={save} disabled={pending || kept || !checked?.input}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} {t("scaling.save")}
-                        </Button>
-                    </div>
+                    {note("balancing")}
                 </fieldset>
-            )}
-        </section>
+            </SettingsCard>
+        </>
     );
 }

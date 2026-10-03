@@ -280,8 +280,6 @@
         "checking": "Checking...",
         "domainDisabled": "Domain disabled - not serving",
         "local": "local",
-        "disableDomain": "Disable domain",
-        "enableDomain": "Enable domain",
         "removeDomain": "Remove domain",
         "addADomain": "Add a domain",
         "addADomainIntro": "Pick how to expose this service - a free subdomain, your own domain with Let's Encrypt, or a Cloudflare/ngrok tunnel that needs no DNS or port-forwarding.",
@@ -319,7 +317,16 @@
         "releases": "Releases",
         "keepReleases": "Keep previous deployments",
         "keepReleasesHint": "Keep the last few versions running, each on its own address, while this service's own address stays on the newest. A service with a volume or on another server keeps the history but not the containers.",
-        "save": "Save settings"
+        "containerPortShort": "The port the app listens on inside its container. Blank detects it from the image.",
+        "portInvalid": "Enter a port from 1 to 65535.",
+        "sourceShort": "Where in the repository this service builds from.",
+        "buildShort": "Detected from the repository. Fill one in only to override it.",
+        "autoDeployShort": "Deploy each push to the branch, filtered by commit or path.",
+        "watchPathsShort": "One glob per line, ! to exclude. Blank means any change.",
+        "keepReleasesShort": "Earlier versions keep running, each on its own address.",
+        "disableDomainNamed": "Turn off {hostname}",
+        "enableDomainNamed": "Turn on {hostname}",
+        "removeDomainNamed": "Remove {hostname}"
     },
     "exposureHint": {
         "zoneBase": "A hostname straight on {host}, with a Let's Encrypt certificate. This one is not covered by a wildcard, so it needs its own DNS record - Polaris writes it when the domain sits in your connected Cloudflare account, and otherwise tells you the record to add. For a name on a different domain, pick Custom domain.",
@@ -346,13 +353,11 @@
         "saving": " Saving..."
     },
     "moveOut": {
-        "title": "Somewhere else",
         "heading": "Move it to Vercel or Railway",
         "body": "They build and serve it from the same repository; the variables go with it, and it stays on this project's board. Nothing here is deleted - it is stopped, and one button starts it again.",
         "button": "Move it"
     },
     "danger": {
-        "title": "Danger",
         "deleteService": "Delete service",
         "queued": "Already queued. Deploy the pending changes to carry it out, or discard it from the banner.",
         "hint": "Removes the container, its domains, variables and deploy history.",
@@ -362,7 +367,6 @@
         "deleteTitle": "Delete service"
     },
     "server": {
-        "title": "Server",
         "label": "Where this service runs",
         "hint": "Move the service to another connected server. Connect more under Servers. Changing this stops the current container on the old server; redeploy to bring it up on the new one.",
         "moveTo": "Move to {server}",
@@ -372,7 +376,6 @@
         "checkSettings": "Check these settings",
         "unreadable": "Could not read how this service is scaled",
         "savedRedeploying": "Saved. The service is being started again with the new settings.",
-        "saved": "Saved.",
         "title": "Scaling",
         "copies": "Copies",
         "copiesHint": "How many copies of the service run at once, up to {max}. The edge spreads requests over them.",
@@ -386,7 +389,6 @@
         "cpuOnly": "CPU only",
         "sleep": "Sleep when nobody visits",
         "sleepHint": "Stop the service after a stretch with no visits, and start it on the next one. The first visitor sees a page saying it is waking up for the few seconds that takes.",
-        "asleep": " It is asleep now.",
         "sleepAfter": "After (minutes without a visit)",
         "resources": "Resources per copy",
         "cpus": "CPU (cores)",
@@ -398,7 +400,11 @@
         "healthPath": "Health check path",
         "healthPathHint": "Asked of every copy every 10 seconds. One that stops answering is left out until it answers again. Blank = no check.",
         "emailShield": "With more than one copy the edge balances between them itself, so email addresses in its pages are not hidden from scrapers.",
-        "save": "Save scaling"
+        "balancing": "Load balancing",
+        "balancingShort": "How the edge spreads visitors over the copies.",
+        "autoscaleShort": "Adds and removes copies to follow CPU or traffic.",
+        "sleepShort": "Stops it when nobody visits and wakes it on the next visit.",
+        "asleepNow": "Asleep"
     },
     "cdn": {
         "emptiedPath": "Emptied {path}.",
@@ -504,14 +510,16 @@
         "networkAliases": "Names on that network",
         "addNetwork": "Add network",
         "removeNetwork": "Remove network",
-        "saveNetworks": "Save",
         "issue": {
             "networkName": "Letters, digits, dots, dashes and underscores",
             "networkReserved": "That network belongs to Docker or Polaris",
             "networkAlias": "Names are letters, digits and dashes",
             "networkTwice": "Each network once",
             "networkTooMany": "Up to 8 networks and 8 names each"
-        }
+        },
+        "networksShort": "Docker networks on the server it joins on its next deploy.",
+        "nameMissing": "Every network needs a name.",
+        "noNetworks": "Only its project's own network."
     },
     "publicNet": {
         "title": "Public Networking",
@@ -557,10 +565,55 @@
         "tcpAdd": "Add TCP proxy",
         "tcpTo": "TCP to :{port}",
         "tcpRemove": "Remove TCP proxy",
+        "alsoTunnel": "Also a tunnel",
+        "alsoTunnelHint": "A tunnel serves this name too. Remove this entry to keep only the tunnel.",
         "tcpForward": "Behind a router: forward TCP {ports} to {lan} for these to answer from outside your network.",
         "tcpApply": "The change takes effect when the service is next started.",
         "tcpApplyNow": "Redeploy now",
         "privateLink": "Private networking between services",
         "certUnknown": "The certificate could not be read from here. It shows once the address answers this server."
+    },
+    "kit": {
+        "sections": "Settings sections",
+        "learnMore": "Learn more",
+        "save": "Save",
+        "saved": "Saved",
+        "unsaved": "Unsaved changes",
+        "noChanges": "No changes",
+        "discard": "Discard",
+        "retry": "Try again",
+        "networkingIntro": "Where the service answers, inside the project and on the internet.",
+        "source": "Source & deploys",
+        "sourceIntro": "Where the code comes from and when a new version goes out.",
+        "scalingIntro": "How many copies run, what each may use, and when it sleeps.",
+        "advanced": "Advanced",
+        "advancedIntro": "Where it runs and builds, and moving it to another provider.",
+        "danger": "Danger zone",
+        "dangerIntro": "Actions that cannot be undone.",
+        "on": "Enabled",
+        "off": "Disabled",
+        "directAddress": "Direct address",
+        "addADomainShort": "A free subdomain, your own domain, or a tunnel.",
+        "added": "Added",
+        "manageDomains": "Your domains",
+        "hostname": "Hostname",
+        "down": "Down",
+        "removeDomainTitle": "Remove {hostname}?",
+        "removeDomainBody": "It stops answering at once. You can add it again later.",
+        "moveOutShort": "It keeps its variables and stays on this board. Nothing is deleted.",
+        "serverShort": "Moving it stops the container here; redeploy to start it there.",
+        "move": "Move",
+        "disableNamed": "Turn off {name}",
+        "enableNamed": "Turn on {name}"
+    },
+    "tabIntro": {
+        "deployments": "Every build of this service, newest first. Roll back or redeploy from here.",
+        "variables": "Values the service reads from its environment. Secrets stay hidden until revealed.",
+        "metrics": "What the service uses now and over time.",
+        "console": "A shell inside the running container.",
+        "files": "The files inside the running container.",
+        "volumes": "Storage that outlives a deploy, mounted into the container.",
+        "cron": "Commands this service runs on a schedule, inside its own container.",
+        "notes": "Notes for whoever looks after this service next."
     }
 }

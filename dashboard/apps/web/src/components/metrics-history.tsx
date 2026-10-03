@@ -44,7 +44,9 @@ import {
 
 type Point = ConsumptionPoint;
 
-type Window = { kind: "preset"; preset: RangePreset } | { kind: "custom"; from: number; to: number };
+type Window =
+    | { kind: "preset"; preset: RangePreset }
+    | { kind: "custom"; from: number; to: number };
 
 function queryFor(window: Window): string {
     if (window.kind === "preset") return `range=${window.preset}`;
@@ -63,7 +65,9 @@ function queryFor(window: Window): string {
 const KEPT_MAX_AGE_MS = 24 * 3_600_000;
 
 function keptWindowLimit(window: Window): number {
-    return window.kind === "custom" ? KEPT_MAX_AGE_MS : Math.min(KEPT_MAX_AGE_MS, RANGE_PRESETS[window.preset] / 4);
+    return window.kind === "custom"
+        ? KEPT_MAX_AGE_MS
+        : Math.min(KEPT_MAX_AGE_MS, RANGE_PRESETS[window.preset] / 4);
 }
 
 /** "YYYY-MM-DDTHH:mm" in local time, for a datetime-local input default. */
@@ -119,7 +123,10 @@ export function MetricsHistory<T extends { t: number } = Point>({
             const controller = new AbortController();
             const at = Date.now();
             lastLoad.current = at;
-            void fetch(`${endpoint}${separator}${queryFor(window)}`, { cache: "no-store", signal: controller.signal })
+            void fetch(`${endpoint}${separator}${queryFor(window)}`, {
+                cache: "no-store",
+                signal: controller.signal
+            })
                 .then((res) => (res.ok ? res.json() : null))
                 .then((body) => {
                     const fetched = (body?.points ?? []) as T[];
@@ -245,7 +252,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
     // would not say which day it belongs to.
     const stampOf = useCallback(
         (at: number): string =>
-            to - from > 36 * 3_600_000 ? `${display.date(at)} ${display.time(at)}` : display.time(at),
+            to - from > 36 * 3_600_000
+                ? `${display.date(at)} ${display.time(at)}`
+                : display.time(at),
         [display, from, to]
     );
 
@@ -264,7 +273,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             }}
                             className={cn(
                                 "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                active
+                                    ? "bg-primary text-primary-foreground"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             )}
                         >
                             {preset}
@@ -276,7 +287,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     onClick={() => setCustomOpen((value) => !value)}
                     className={cn(
                         "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                        window.kind === "custom" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        window.kind === "custom"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                 >
                     {t("metrics.custom")}
@@ -284,17 +297,24 @@ export function MetricsHistory<T extends { t: number } = Point>({
                 {!loading && (
                     <span className="ml-auto text-xs text-muted-foreground">
                         {points && points.length > 0
-                            ? t(pushed && window.kind === "preset" ? "metrics.pointsLive" : "metrics.points", {
-                                  count: points.length
-                              })
+                            ? t(
+                                  pushed && window.kind === "preset"
+                                      ? "metrics.pointsLive"
+                                      : "metrics.points",
+                                  {
+                                      count: points.length
+                                  }
+                              )
                             : ""}
                     </span>
                 )}
-                {loading && <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />}
+                {loading && (
+                    <Loader2 className="ml-auto size-3.5 animate-spin text-muted-foreground" />
+                )}
             </div>
 
             {customOpen && (
-                <div className="flex flex-wrap items-end gap-2 rounded-md border border-border/60 p-3">
+                <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                         {t("auditFeed.from")}
                         <input
@@ -325,7 +345,9 @@ export function MetricsHistory<T extends { t: number } = Point>({
                     const chart = (
                         <TimeSeriesChart
                             key={metric.key}
-                            label={LABEL_KEYS[metric.key] ? t(LABEL_KEYS[metric.key]!) : metric.label}
+                            label={
+                                LABEL_KEYS[metric.key] ? t(LABEL_KEYS[metric.key]!) : metric.label
+                            }
                             points={(points ?? []).map<TimePoint>((point) => {
                                 const part = metric.share?.(point) ?? null;
                                 return {
@@ -345,7 +367,8 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             tone={metric.tone}
                             format={
                                 metric.key === "players"
-                                    ? (value: number) => t("metrics.players", { count: Math.round(value) })
+                                    ? (value: number) =>
+                                          t("metrics.players", { count: Math.round(value) })
                                     : metric.format
                             }
                             formatTime={stampOf}
@@ -366,7 +389,7 @@ export function MetricsHistory<T extends { t: number } = Point>({
                             <button
                                 type="button"
                                 onClick={() => breakdown.open({ from, to })}
-                                className="flex items-center justify-between gap-2 rounded-b-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                className="flex items-center justify-between gap-2 rounded-b-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 {breakdown.label}
                                 <ChevronRight className="size-3.5 shrink-0" />
