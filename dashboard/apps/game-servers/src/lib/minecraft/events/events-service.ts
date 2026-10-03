@@ -1453,6 +1453,19 @@ async function begin(
                 "The server would not say whether it keeps inventories, so the duel could not promise nobody loses anything"
             );
         }
+        // No healing on a full belly in a duel: what the rule was written down
+        // with keepInventory, and put back with it.
+        if (preset.kind === "team-duel") {
+            for (const rule of duel.NATURAL_REGENERATION) {
+                const value =
+                    loop.run.gamerules[rule] ??
+                    commands.readRuleValue(await server.say([commands.readRule(rule)]));
+                if (value === null) continue;
+                before[rule] = value;
+                lines.push(commands.setRule(rule, "false"));
+                break;
+            }
+        }
         loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
         await persist(installedAppId, loop);
     }

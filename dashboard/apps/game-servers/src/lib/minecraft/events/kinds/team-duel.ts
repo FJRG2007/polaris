@@ -13,6 +13,11 @@
  * possible, so `keepInventory` is on for exactly as long as it lasts, and put
  * back to what the server had after: a death keeps everything, items and levels.
  *
+ * Nobody heals on their own in it either. Everybody is kept fed so they can
+ * sprint, and a full belly mends half a heart every half second - a fight
+ * nobody could ever finish - so `naturalRegeneration` is off for as long as the
+ * duel lasts, and put back the same way.
+ *
  * Pure; the loop is `arena-service.ts`.
  */
 
@@ -46,6 +51,9 @@ export function shieldLow(downHearts: number): string {
 
 /** The game rule that keeps inventories through a death, under each name it has had. */
 export const KEEP_INVENTORY = ["keepInventory", "keep_inventory"] as const;
+
+/** The game rule that heals a fed player over time, under each name it has had. */
+export const NATURAL_REGENERATION = ["naturalRegeneration", "natural_health_regeneration"] as const;
 
 /** Half its width and length, and its height, floor and roof included. */
 const HALF_X = 8;
@@ -144,9 +152,12 @@ const SWORDS: Readonly<Record<EventOptions<"team-duel">["kit"], string>> = {
     iron: "minecraft:iron_sword"
 };
 
+/** What goes in the off hand rather than the bag: nobody should have to put it there. */
+export const OFFHAND_ITEM = "minecraft:shield";
+
 /** The same for everybody: a sword and a shield. */
 export function duelKit(kit: EventOptions<"team-duel">["kit"]): string[] {
-    return [SWORDS[kit], "minecraft:shield"];
+    return [SWORDS[kit], OFFHAND_ITEM];
 }
 
 /** The teams, friendly fire off, and the counts the loop reads. */
@@ -190,13 +201,13 @@ export function joinTeam(name: string, side: number): string {
     return `execute if entity @a[name=${name},team=] run team join ${TEAMS[side]} ${name}`;
 }
 
-/** Out of the fight: back to their side, healed, and shielded - unable to be
- *  hurt, or to hurt anybody - for a few seconds. */
+/** Out of the fight: back to their side, healed whole at once - nothing heals
+ *  them over time in here - and shielded, unable to be hurt or to hurt anybody,
+ *  for a few seconds. */
 export function sendBack(name: string, spot: Spot): string[] {
     return [
         `execute in minecraft:overworld run tp ${name} ${spot.x + 0.5} ${spot.y} ${spot.z + 0.5} ${spot.yaw} 0`,
-        `effect give ${name} minecraft:instant_health 1 1 true`,
-        `effect give ${name} minecraft:regeneration ${SHIELD_SECONDS} 1 true`,
+        `effect give ${name} minecraft:instant_health 1 3 true`,
         `effect give ${name} minecraft:resistance ${SHIELD_SECONDS} 4 true`,
         `effect give ${name} minecraft:weakness ${SHIELD_SECONDS} 4 true`
     ];

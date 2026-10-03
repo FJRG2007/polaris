@@ -475,6 +475,13 @@ function componentsOf(list: string): string {
     return `{${parts.join(", ")}}`;
 }
 
+/** How many stacks in a bag are the player's own, and not the event's marked kit. */
+function ownStacks(bag: Map<number, Stack>): number {
+    return [...bag.values()].filter(
+        (stack) => !`${stack.id}${stack.components ?? ""}`.includes("polaris_event")
+    ).length;
+}
+
 /** `hotbar.3`, `armor.head` and the rest, as the inventory numbers them. */
 function slotNumber(name: string): number | null {
     const hotbar = /^hotbar\.(\d+)$/.exec(name);
@@ -823,9 +830,19 @@ function answer(sent: string): string {
         if (!itemReadable(cleared[2]!))
             return refuse(line, "Expected whitespace to end one argument, but found trailing data");
         if (cleared[1]!.startsWith("@a[tag=pe_probe]")) return "No player was found";
-        return world.online.includes(cleared[1]!)
-            ? `Removed 1 item(s) from player ${cleared[1]}`
-            : "No player was found";
+        if (!world.online.includes(cleared[1]!)) return "No player was found";
+        // What was put in a slot by `item replace` is taken out of it again: by
+        // id, and only a marked stack when the marker is asked for.
+        const bag = world.inv[cleared[1]!];
+        const id = /^[^[{]+/.exec(cleared[2]!)![0];
+        const marked = cleared[2]!.includes("polaris_event");
+        for (const [slot, stack] of bag ?? []) {
+            if (id !== "*" && /^[^[{]+/.exec(stack.id)![0] !== id) continue;
+            if (marked && !`${stack.id}${stack.components ?? ""}`.includes("polaris_event"))
+                continue;
+            bag!.delete(slot);
+        }
+        return `Removed 1 item(s) from player ${cleared[1]}`;
     }
     const filled = fillAnswer(line);
     if (filled !== null) return filled;
@@ -1054,6 +1071,14 @@ function answer(sent: string): string {
         return world.lift
             .map((name) => `${name} has the following entity data: [300.5d, 64.0d, 2.5d]`)
             .join("\n");
+    }
+    if (
+        line === "gamerule naturalRegeneration" ||
+        line === "gamerule natural_health_regeneration"
+    ) {
+        return world.renamedRules === (line === "gamerule natural_health_regeneration")
+            ? `Gamerule ${line.slice(9)} is currently set to: true`
+            : "Unknown or incomplete command, see below for error";
     }
     if (line === "gamerule keepInventory") {
         return world.keepInventory === "unknown"
@@ -5316,7 +5341,9 @@ describe("a parkour race", () => {
         expect(state().run!.readyAt).toBeNull();
         await play(arrival.ARRIVAL_MS + 8_000);
         expect(state().run!.readyAt).not.toBeNull();
-        const without = world.sent.find((line) => line.includes("Started without waiting longer for"));
+        const without = world.sent.find((line) =>
+            line.includes("Started without waiting longer for")
+        );
         expect(without).toContain("Ben");
         expect(without).not.toContain("Ana");
     });
@@ -6071,8 +6098,8 @@ describe("players' own things through an arena", () => {
         await joinAndStart("duel");
         const run = state().run!;
         // Everything off them, and kept - experience too.
-        expect(world.inv.Ana!.size).toBe(0);
-        expect(world.inv.Ben!.size).toBe(0);
+        expect(ownStacks(world.inv.Ana!)).toBe(0);
+        expect(ownStacks(world.inv.Ben!)).toBe(0);
         expect(world.levels.Ana).toBe(0);
         expect(world.points.Ana).toBe(0);
         const anaStash = run.entrants.find((one) => one.name === "Ana")!.stash!;
@@ -6237,7 +6264,7 @@ describe("players' own things through an arena", () => {
         expect(world.drops.size).toBe(0);
         expect(
             world.sent.some((line) =>
-                /^item replace entity Ana \S+ with minecraft:(?!air)/.test(line)
+                /^item replace entity Ana \S+ with minecraft:(?!air)(?!.*polaris_event)/.test(line)
             )
         ).toBe(false);
     });
@@ -6263,7 +6290,7 @@ describe("players' own things through an arena", () => {
         expect(owed).toHaveLength(1);
         expect(owed[0]!.entrants.map((one) => one.name)).toEqual(["Ben"]);
         expect(owed[0]!.entrants[0]!.stash?.kept).toHaveLength(5);
-        expect(world.inv.Ben!.size).toBe(0);
+        expect(ownStacks(world.inv.Ben!)).toBe(0);
         expect(stashRows.size).toBe(1);
         // Back on: the sweep gives it all back.
         world.online = ["Ana", "Ben"];
@@ -6283,6 +6310,8 @@ describe("players' own things through an arena", () => {
         const stashService = await import(
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
         );
+        // The kit off first, as an end takes it before anything is given back.
+        await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // A give-back that ran to the end once...
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -6422,7 +6451,7 @@ describe("players' own things through an arena", () => {
         world.inv = { Ana: copyOf(armor), Ben: new Map() };
         setUp([duelOf()]);
         await joinAndStart("duel");
-        expect(world.inv.Ana!.size).toBe(0);
+        expect(ownStacks(world.inv.Ana!)).toBe(0);
         await play(3 * 60_000 + 10_000);
         expect(state().run).toBeNull();
         expect(world.inv.Ana).toEqual(armor);
@@ -6576,6 +6605,8 @@ describe("players' own things through an arena", () => {
         await joinAndStart("duel");
         expect(world.inv.Ana).toEqual(ana);
         expect(world.sent.some((line) => line.includes("item replace"))).toBe(false);
+        // The shield beside the rest, where the off hand may not be free.
+        expect(world.sent.some((line) => line.startsWith("give Ana minecraft:shield{"))).toBe(true);
         expect(state().run!.entrants.every((one) => one.stash === null)).toBe(true);
     });
 });
@@ -6968,6 +6999,12 @@ describe("a team duel", () => {
         expect(world.sent).toContain("team modify pe_blue friendlyFire false");
         // Nobody loses what they carry, even to a death.
         expect(world.sent).toContain("gamerule keepInventory true");
+        // Nobody heals on a full belly, and the shield is already in the off hand.
+        expect(world.sent).toContain("gamerule naturalRegeneration false");
+        expect(world.sent).toContain(
+            "item replace entity Ana weapon.offhand with minecraft:shield[minecraft:custom_data={polaris_event:1b}] 1"
+        );
+        expect(world.sent.some((line) => line.startsWith("give Ana minecraft:shield"))).toBe(false);
 
         // In the arena; Ben is brought low right after Ana strikes.
         // (Pulled in until now, so shielded a few seconds more.)
@@ -7009,12 +7046,31 @@ describe("a team duel", () => {
         expect(world.sent.filter((line) => line.startsWith("gamerule keepInventory")).at(-1)).toBe(
             "gamerule keepInventory false"
         );
+        expect(
+            world.sent.filter((line) => line.startsWith("gamerule naturalRegeneration")).at(-1)
+        ).toBe("gamerule naturalRegeneration true");
         expect(world.sent).toContain("team remove pe_red");
         expect(world.sent).toContain(
             `execute in minecraft:overworld run forceload remove ${box.x1} ${box.z1} ${box.x2} ${box.z2}`
         );
         expect(after.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("turns healing on a full belly off under its 1.21.11 name, and puts it back after", async () => {
+        world.online = ["Ana", "Ben"];
+        world.renamedRules = true;
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        expect(world.sent).toContain("gamerule natural_health_regeneration false");
+        expect(world.sent).not.toContain("gamerule naturalRegeneration false");
+        await play(3 * 60_000 + 10_000);
+        expect(state().run).toBeNull();
+        expect(
+            world.sent
+                .filter((line) => line.startsWith("gamerule natural_health_regeneration "))
+                .at(-1)
+        ).toBe("gamerule natural_health_regeneration true");
     });
 
     it("refuses to start on a server with PvP blocked, and says where to allow it", async () => {

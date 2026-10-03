@@ -550,7 +550,9 @@ async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
         // Handed out first and only then written down: a restart in between
         // hands the kit out again (marked, and taken back at the end) rather
         // than starting a fight with nothing in anybody's hands.
-        await ctx.server.sayAll(goLines(ctx.run, language));
+        // The shield straight into the off hand where the bag was emptied on
+        // the way in (`stashOne`, from 1.17); before that, beside what they carry.
+        await ctx.server.sayAll(goLines(ctx.run, language, await ctx.atLeast([1, 17])));
         ctx.run = { ...ctx.run, ...started };
         await ctx.persist();
     }
@@ -561,8 +563,9 @@ async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
 }
 
 /** "Go!" in a duel or a build battle: everybody on their own spot, the kit in
- *  their hands, and what to do on their screen. */
-function goLines(run: stored.EventRun, language: speech.Speech): string[] {
+ *  their hands - the shield in the off hand, when `offhand` - and what to do
+ *  on their screen. */
+function goLines(run: stored.EventRun, language: speech.Speech, offhand: boolean): string[] {
     const spots = spotsOf(run);
     const marker = run.marker!;
     const out: string[] = [];
@@ -571,7 +574,11 @@ function goLines(run: stored.EventRun, language: speech.Speech): string[] {
         for (const one of run.entrants)
             out.push(
                 arena.moveTo(one.name, spots.get(lower(one.name))!),
-                ...run.kit.map((id) => arena.giveMarked(one.name, id, 1, marker)),
+                ...run.kit.map((id) =>
+                    offhand && id === duel.OFFHAND_ITEM
+                        ? arena.equipMarked(one.name, "weapon.offhand", id, marker)
+                        : arena.giveMarked(one.name, id, 1, marker)
+                ),
                 ...arena.titleTo(
                     one.name,
                     messages.duelEnterTitle(one.side, language),

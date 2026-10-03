@@ -187,6 +187,12 @@ export function giveMarked(
     return `give ${name} ${marked(id, marker, extras)} ${count}`;
 }
 
+/** A marked item put straight into one slot (`weapon.offhand`), from 1.17. Only
+ *  where that slot was emptied first: whatever is in it is replaced. */
+export function equipMarked(name: string, slot: string, id: string, marker: Marker): string {
+    return `item replace entity ${name} ${slot} with ${marked(id, marker)} 1`;
+}
+
 /** The kit taken back from one player: only items carrying the marker. */
 export function clearMarked(name: string, id: string, marker: Marker): string {
     return marker === "components"
