@@ -16,6 +16,15 @@ export const CLOCK_TIMER_MAX_MS = (99 * 3600 + 59 * 60 + 59) * 1000;
 /** How long a label typed after the time may be. */
 export const CLOCK_LABEL_MAX = 60;
 
+/** Raised on the window when a tab changed the person's clocks. */
+export const CLOCK_CHANGED_EVENT = "polaris:clock-changed";
+
+/** The broadcast channel that tells this browser's other tabs the same. */
+export const CLOCK_CHANNEL = "polaris-clock";
+
+/** Where a tab keeps the last clock snapshot it read. */
+export const CLOCK_SNAPSHOT_KEY = "calendar.clock";
+
 export type ClockCommand =
     | { readonly kind: "timer"; readonly durationMs: number; readonly label: string }
     | {

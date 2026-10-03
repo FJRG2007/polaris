@@ -359,7 +359,8 @@ export async function changeTimer(
         else if (state === "paused") data = { remainingMs: timer.remainingMs! + 60_000 };
         // A rung timer counts down one more minute, the way a phone's "+1:00" on
         // the ringing screen does.
-        else data = { endsAt: new Date(at + 60_000), firedAt: null, remainingMs: null };
+        else if (state === "rung") data = { endsAt: new Date(at + 60_000), firedAt: null, remainingMs: null };
+        else data = { durationMs: Math.min(timer.durationMs + 60_000, model.CLOCK_TIMER_MAX_MS) };
     } else {
         const cycle = model.readPomodoro(timer.pomodoro);
         if (!cycle) return;

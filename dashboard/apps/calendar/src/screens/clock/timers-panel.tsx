@@ -131,7 +131,9 @@ function optimistic(
     if (change === "addMinute") {
         if (state === "running") return { ...timer, endsAt: new Date(new Date(timer.endsAt!).getTime() + 60_000).toISOString() };
         if (state === "paused") return { ...timer, remainingMs: timer.remainingMs! + 60_000 };
-        return { ...timer, endsAt: new Date(now + 60_000).toISOString(), firedAt: null, remainingMs: null };
+        if (state === "rung")
+            return { ...timer, endsAt: new Date(now + 60_000).toISOString(), firedAt: null, remainingMs: null };
+        return { ...timer, durationMs: Math.min(timer.durationMs + 60_000, model.CLOCK_TIMER_MAX_MS) };
     }
     return timer;
 }

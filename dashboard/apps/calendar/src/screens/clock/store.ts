@@ -15,14 +15,15 @@
  */
 
 import { hostUi } from "@polaris/app-host/client";
+import { CLOCK_CHANNEL, CLOCK_CHANGED_EVENT, CLOCK_SNAPSHOT_KEY } from "@polaris/core";
 import type { ClockSnapshot } from "../../lib/clock/model";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Raised on the window when this tab changed something, or heard another did. */
-export const CLOCK_CHANGED = "polaris:clock-changed";
+export const CLOCK_CHANGED = CLOCK_CHANGED_EVENT;
 
-const CHANNEL = "polaris-clock";
-const KEY = "calendar.clock";
+const CHANNEL = CLOCK_CHANNEL;
+const KEY = CLOCK_SNAPSHOT_KEY;
 /** A kept snapshot younger than this is shown and not asked for again. */
 const FRESH_MS = 30_000;
 
@@ -85,10 +86,10 @@ function skewOf(snapshot: ClockSnapshot | null, readAt: number): number {
 
 /**
  * The person's alarms, timers and stopwatch, painted from what this tab kept
- * and read again when stale, when another screen changed them, when the window
- * comes back into view, and every `pollMs` while `polling` says so.
+ * and read again when stale, when another screen changed them, and when the
+ * window comes back into view.
  */
-export function useClock(options: { polling?: boolean; pollMs?: number } = {}): ClockRead {
+export function useClock(): ClockRead {
     const kept = useRef<Kept | null>(typeof window === "undefined" ? null : readKept());
     const [state, setState] = useState<{
         snapshot: ClockSnapshot | null;
@@ -164,16 +165,6 @@ export function useClock(options: { polling?: boolean; pollMs?: number } = {}): 
             inFlight.current?.abort();
         };
     }, [load]);
-
-    const polling = options.polling ?? false;
-    const pollMs = options.pollMs ?? 60_000;
-    useEffect(() => {
-        if (!polling) return;
-        const timer = window.setInterval(() => {
-            if (document.visibilityState === "visible") load();
-        }, pollMs);
-        return () => window.clearInterval(timer);
-    }, [polling, pollMs, load]);
 
     const replace = useCallback((snapshot: ClockSnapshot) => {
         setState((previous) => ({ ...previous, snapshot }));

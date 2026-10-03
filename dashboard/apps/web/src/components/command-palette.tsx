@@ -22,6 +22,7 @@
 import * as core from "@polaris/core";
 import { Loader2, Search, X } from "lucide-react";
 import * as recentStore from "@/lib/search/recent";
+import { dropSnapshots } from "@/lib/snapshot-cache";
 import { PlainNames } from "@/components/person-name";
 import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
@@ -519,9 +520,10 @@ export function CommandPalette({
                 const body = (await response.json().catch(() => ({}))) as { error?: string };
                 if (!response.ok) throw new Error(body.error || t("search.clock.failed"));
                 // The header's indicator and any open Time screen read again.
-                window.dispatchEvent(new CustomEvent("polaris:clock-changed"));
+                dropSnapshots(core.CLOCK_SNAPSHOT_KEY);
+                window.dispatchEvent(new CustomEvent(core.CLOCK_CHANGED_EVENT));
                 if (typeof BroadcastChannel !== "undefined") {
-                    const channel = new BroadcastChannel("polaris-clock");
+                    const channel = new BroadcastChannel(core.CLOCK_CHANNEL);
                     channel.postMessage("changed");
                     channel.close();
                 }

@@ -7,6 +7,7 @@
 
 import { z } from "zod";
 import * as core from "@polaris/core";
+import * as model from "../../../../../lib/clock/model";
 import * as clock from "../../../../../lib/clock/service";
 import { apiCalendarUser } from "../../../../../lib/access";
 import { CalendarRefusal } from "../../../../../lib/errors";
@@ -38,24 +39,27 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ error: t("time.errors.notACommand") }, { status: 400 });
     try {
         if (command.kind === "timer") {
-            await clock.createTimer(user.id, {
-                label: command.label,
-                durationMs: command.durationMs,
-                sound: "chime",
-                start: true
-            });
+            await clock.createTimer(
+                user.id,
+                model.timerInputSchema.parse({
+                    label: command.label,
+                    durationMs: command.durationMs,
+                    sound: "chime",
+                    start: true
+                })
+            );
         } else if (command.kind === "alarm") {
             await clock.saveAlarm(
                 user.id,
                 null,
-                {
+                model.alarmInputSchema.parse({
                     time: `${pad(command.hour)}:${pad(command.minute)}`,
                     days: 0,
                     label: command.label,
                     sound: "chime",
                     snoozeMinutes: 10,
                     enabled: true
-                },
+                }),
                 parsed.data.zone
             );
         } else {
@@ -66,6 +70,8 @@ export async function POST(request: Request): Promise<Response> {
             { headers: { "cache-control": "no-store" } }
         );
     } catch (caught) {
+        if (caught instanceof z.ZodError)
+            return Response.json({ error: t("time.errors.notACommand") }, { status: 400 });
         if (caught instanceof CalendarRefusal)
             return Response.json({ error: caught.message }, { status: 409 });
         console.error("polaris: a clock could not be started from search:", caught);

@@ -216,6 +216,18 @@ describe("the Time area on the server", () => {
             expect(db.rows("clockTimer")[0]).toMatchObject({ endsAt: null, remainingMs: null, firedAt: null });
         });
 
+        it("lengthens a timer that has not started, and runs a rung one for a minute", async () => {
+            const id = await clock.createTimer(alice.id, { label: "", durationMs: 25 * 60_000, sound: "chime", start: false }, world.NOW);
+            await clock.changeTimer(alice.id, id, "addMinute", world.NOW);
+            expect(db.rows("clockTimer")[0]).toMatchObject({ durationMs: 26 * 60_000, endsAt: null, remainingMs: null });
+            await clock.changeTimer(alice.id, id, "start", world.NOW);
+            await clock.fireDueClocks(at("2026-10-01T08:26:01Z"));
+            expect(db.rows("clockTimer")[0]!.firedAt).not.toBeNull();
+            await clock.changeTimer(alice.id, id, "addMinute", at("2026-10-01T08:30:00Z"));
+            expect(db.rows("clockTimer")[0]).toMatchObject({ durationMs: 26 * 60_000, firedAt: null, remainingMs: null });
+            expect((db.rows("clockTimer")[0]!.endsAt as Date).toISOString()).toBe("2026-10-01T08:31:00.000Z");
+        });
+
         it("says nothing about a timer a tab already stopped", async () => {
             const id = await clock.createTimer(alice.id, { label: "", durationMs: 60_000, sound: "chime", start: true }, world.NOW);
             await clock.dismissTimer(alice.id, id, at("2026-10-01T08:01:01Z"));
@@ -313,6 +325,14 @@ describe("the Time area on the server", () => {
             expect(db.rows("clockAlarm")[0]).toMatchObject({ time: "19:30", days: 0, zone: "America/New_York" });
             expect((await post({ command: "stopwatch", zone: ZONE })).status).toBe(200);
             expect(db.rows("clockStopwatch")[0]!.startedAt).not.toBeNull();
+        });
+
+        it("cleans a typed label the way the forms do", async () => {
+            signIn(alice);
+            expect((await post({ command: "timer 10m tea ​time", zone: ZONE })).status).toBe(200);
+            expect(db.rows("clockTimer")[0]!.label).toBe("tea time");
+            expect((await post({ command: "alarm 7:30 wakeup", zone: ZONE })).status).toBe(200);
+            expect(db.rows("clockAlarm")[0]!.label).toBe("wake up");
         });
 
         it("refuses a line it does not read, a zone nobody has, and another site", async () => {
