@@ -8,6 +8,7 @@
 
 import { formatDuration } from "../../../figures";
 import * as hill from "./hill";
+import * as arrival from "./arrival";
 import * as arena from "./arena";
 import * as catalog from "../catalog";
 import * as speech from "../../speech";
@@ -243,108 +244,68 @@ export function enterLines(
 }
 
 /**
- * How long everybody is waited for on the platform before it starts anyway:
- * one player stuck loading the world, or gone, cannot hold the rest for ever.
+ * How long everybody is waited for on the platform before it starts anyway -
+ * the same wait every event that brings its players in has (`arrival`).
  */
-export const ARRIVAL_MS = 20_000;
+export const ARRIVAL_MS = arrival.ARRIVAL_MS;
 
-/** Since when each run, everybody sent up, has waited for them to be on it,
- *  and who has been seen on it since. Lost on a restart, which brings
- *  everybody in again and waits afresh. */
-const arriving = new Map<string, { since: number; arrived: Set<string> }>();
-
-/** Everybody sent up: nothing is counted until they all stand on it. */
-export function awaitArrivals(runId: string, now: number): void {
-    arriving.set(runId, { since: now, arrived: new Set() });
-}
-
-export function awaitingArrivals(runId: string): boolean {
-    return arriving.has(runId);
-}
-
-/** The wait let go of, with the run: ended before everybody was up. */
-export function forgetArrivals(runId: string): void {
-    arriving.delete(runId);
+/** Whether somebody stands on the platform: over its floor, at its height. */
+export function onHill(run: stored.EventRun, at: { x: number; y: number; z: number }): boolean {
+    return hill.onPlatform(at, run.place!, optionsOf(run).radius);
 }
 
 /**
- * One tick while everybody is brought up: nobody hurt, nothing counted, and -
- * once all of them stand on the platform, or the wait runs out - the start:
- * each put back on their own spot round the circle, so nobody who was up
- * first is any closer to it, the clock started, and "Go!".
+ * The hill while everybody is brought up: nobody hurt, nothing counted, and
+ * whoever is up already and was knocked off put back on their own spot.
  */
-export async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
+export async function holdLines(
+    ctx: KindContext,
+    where: readonly { name: string; x: number; y: number; z: number }[],
+    arrived: (name: string) => boolean
+): Promise<string[]> {
     const run = ctx.run;
     const place = run.place!;
     const { radius } = optionsOf(run);
-    const names = run.entrants.map((one) => one.name);
-    const where = commands.readWhere(await ctx.server.say([commands.IN_OVERWORLD]));
-    const wait = arriving.get(run.id) ?? { since: ctx.now, arrived: new Set<string>() };
-    for (const name of names)
-        if (hill.notArrived([name], where, place, radius).length === 0)
-            wait.arrived.add(name.toLowerCase());
-    const missing = names.filter((name) => !wait.arrived.has(name.toLowerCase()));
-    lines.push(
+    const lines = [
         ...hill.protectLines(),
         hill.catchLine(place, radius),
         ...arena.keepThrown(hill.bounds(place, radius))
-    );
+    ];
     const spots = entrySpotsFor(run);
     const overGround = await ctx.atLeast([1, 19, 4]);
     const here = new Map(where.map((one) => [one.name.toLowerCase(), one]));
     for (const one of run.entrants) {
         const at = here.get(one.name.toLowerCase());
-        if (!at || !wait.arrived.has(one.name.toLowerCase())) continue;
-        if (hill.strayed(at, place, radius))
-            lines.push(
-                ...hill
-                    .enterLines(one.name, spots[one.side % spots.length]!, overGround)
-                    .filter((line) => line.includes(" tp "))
-            );
-    }
-    if (missing.length > 0 && ctx.now - wait.since < ARRIVAL_MS) {
-        lines.push(
-            arena.actionbarTo(
-                `@a[tag=${arena.IN_ARENA}]`,
-                hillMessages.waitingForAll(
-                    names.length - missing.length,
-                    names.length,
-                    ctx.language
-                )
-            )
-        );
-        return;
-    }
-    arriving.delete(run.id);
-    ctx.run = {
-        ...run,
-        readyAt: ctx.now,
-        startsAt: ctx.now,
-        endsAt: ctx.now + run.preset.minutes * 60_000
-    };
-    await ctx.persist();
-    for (const one of run.entrants)
+        if (!at || !arrived(one.name) || !hill.strayed(at, place, radius)) continue;
         lines.push(
             ...hill
                 .enterLines(one.name, spots[one.side % spots.length]!, overGround)
                 .filter((line) => line.includes(" tp "))
         );
-    lines.push(
+    }
+    return lines;
+}
+
+/**
+ * "Go!" on the hill: each put back on their own spot round the circle, so
+ * nobody who was up first is any closer to it.
+ */
+export async function goLines(ctx: KindContext): Promise<string[]> {
+    const run = ctx.run;
+    const spots = entrySpotsFor(run);
+    const overGround = await ctx.atLeast([1, 19, 4]);
+    return [
+        ...run.entrants.flatMap((one) =>
+            hill
+                .enterLines(one.name, spots[one.side % spots.length]!, overGround)
+                .filter((line) => line.includes(" tp "))
+        ),
         ...arena.titleTo(
             `@a[tag=${arena.IN_ARENA}]`,
             hillMessages.goTitle(ctx.language),
             hillMessages.goSubtitle(ctx.language)
-        ),
-        ...(missing.length > 0
-            ? [
-                  commands.say(
-                      messages.tag(ctx.language) +
-                          hillMessages.startedWithout(missing, ctx.language)
-                  )
-              ]
-            : []),
-        commands.sound(commands.SOUNDS.start)
-    );
+        )
+    ];
 }
 
 /**

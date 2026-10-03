@@ -938,6 +938,30 @@ export function goTitle(language: Language): string {
     return language === "es" ? "&a&l¡Ya!" : "&a&lGo!";
 }
 
+/** Above the hotbar of whoever is in while the rest are still brought in. */
+export function waitingForAll(arrived: number, total: number, language: Language): string {
+    return language === "es"
+        ? `${WARN}Esperando a todos: ${mark(`${arrived}/${total}`, WARN)}`
+        : `${WARN}Waiting for everybody: ${mark(`${arrived}/${total}`, WARN)}`;
+}
+
+/** Said when the wait ran out before everybody was in. */
+export function startedWithout(names: readonly string[], language: Language): string {
+    return language === "es"
+        ? `${WARN}Empieza sin esperar más a: ${REASON}${names.join(", ")}`
+        : `${WARN}Started without waiting longer for: ${REASON}${names.join(", ")}`;
+}
+
+/** Under the countdown's numbers. */
+export function getReady(language: Language): string {
+    return language === "es" ? "&fPrepárate" : "&fGet ready";
+}
+
+/** One second of the countdown before "Go!". */
+export function countdownNumber(left: number): string {
+    return `&e&l${left}`;
+}
+
 export function parkourSubtitle(language: Language): string {
     return language === "es" ? "&fLlega a la meta dorada" : "&fMake it to the golden finish";
 }

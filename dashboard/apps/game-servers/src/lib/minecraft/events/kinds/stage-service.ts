@@ -15,6 +15,7 @@ import * as snowballPack from "./snowball-pack";
 import * as snowballPackService from "./snowball-pack-service";
 import * as parkour from "./parkour";
 import * as stash from "./stash";
+import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
 import * as catalog from "../catalog";
 import * as commands from "../commands";
@@ -67,8 +68,6 @@ const LOAD_WAITS = 3;
 const LEAST_HEIGHT = 20;
 /** How far outside the volume somebody can wander before they count as gone. */
 const STRAY = 16;
-/** The pause on the spleef floor before the shovels are handed out. */
-const READY_MS = 6_000;
 
 function state(loop: StageLoop): stage.StageState {
     return loop.run.stage ?? stage.EMPTY_STAGE;
@@ -218,6 +217,8 @@ export async function stageTick(
     const layout = built(loop.run);
     if (!layout) return null;
     lines.push(stage.floatDown(layout.volume, 10), ...commands.hostilesOut(layout.volume));
+    // Nothing starts until everybody brought in is there (`arrival`).
+    if (holding(loop)) return holdTick(loop, server, tools, layout, heard, now, lines);
     return layout.kind === "parkour"
         ? parkourTick(loop, server, tools, layout.course, layout.volume, heard, now, lines)
         : spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
@@ -302,7 +303,7 @@ async function raise(
         );
         throw new CalledOff(`Only ${brought} could be brought in; it needs ${needed}`);
     }
-    if (preset.kind === "spleef") change(loop, { goAt: now + READY_MS });
+    arrival.open(loop.run.id, now);
     await tools.persist();
 }
 
@@ -431,8 +432,10 @@ async function admit(
             layout.kind === "parkour"
                 ? `title ${one.name} subtitle ${commands.text(messages.parkourSubtitle(loop.language))}`
                 : `title ${one.name} subtitle ${commands.text(messages.spleefReadySubtitle(spleef.variantFor(loop.run.id, (loop.run.preset.options as catalog.EventOptions<"spleef">).variant), loop.language))}`,
+            // "Go!" only to a late racer joining a race already on; everybody
+            // else waits for the rest, and the countdown.
             `title ${one.name} title ${commands.text(
-                layout.kind === "parkour"
+                layout.kind === "parkour" && !holding(loop)
                     ? messages.goTitle(loop.language)
                     : messages.spleefReadyTitle(loop.language)
             )}`,
@@ -573,6 +576,140 @@ function strayed(
         at.z > volume.z2 + 1 + STRAY ||
         at.y > volume.y2 + 2 * STRAY
     );
+}
+
+// ------------------------------------------------------------------ the start
+
+/**
+ * Everybody brought in, and the start not given yet: the wait for whoever is
+ * still on their way (`arrival`). A run already started before this was
+ * written down - its clock running - is never held.
+ */
+function holding(loop: StageLoop): boolean {
+    const current = state(loop);
+    return (
+        current.built &&
+        current.goAt === null &&
+        loop.run.readyAt === null &&
+        current.racers.some((one) => one.outAt === null)
+    );
+}
+
+/** Whether somebody stands where the start puts them: the parkour's start pad,
+ *  the spleef's top floor. */
+function inPlace(layout: Layout, at: { x: number; y: number; z: number }): boolean {
+    if (layout.kind === "parkour") return parkour.onStart(layout.course, at);
+    const { center, size, floor } = layout.arena;
+    return (
+        at.y >= floor + 0.5 &&
+        at.y <= floor + 3 &&
+        Math.abs(at.x - (center.x + 0.5)) <= size + 1 &&
+        Math.abs(at.z - (center.z + 0.5)) <= size + 1
+    );
+}
+
+/**
+ * One tick of the wait before the start: nobody hurt (the tick's own
+ * protection), nothing counted, nobody a step ahead - a racer off the start
+ * pad is put back on it by the quick look (`parkour.holdLines`). Joins and
+ * leaves are taken as before the start. Once everybody is there, or the wait
+ * runs out: the countdown, everybody put back on their own start spot, and
+ * "Go!" - a parkour's clock started for every racer at once, a spleef's
+ * shovels handed out by its own tick straight after.
+ */
+async function holdTick(
+    loop: StageLoop,
+    server: ServerContainer,
+    tools: StageTools,
+    layout: Layout,
+    heard: readonly { name: string; call: stage.Call }[],
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const language = loop.language;
+    let dirty = false;
+    for (const { name, call } of heard) {
+        const racer = state(loop).racers.find((one) => same(one.name, name));
+        const inside = racer !== undefined && racer.outAt === null;
+        if (call === "join" && !inside) {
+            await admit(loop, server, tools, [name], now, lines);
+        } else if (call === "leave" && inside) {
+            await sendHome(loop, server, tools, name);
+            markOut(loop, name, now, 0);
+            lines.push(tell(name, messages.tag(language) + messages.leftYou(language)));
+            dirty = true;
+        }
+    }
+    const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
+    const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
+    const here = new Map(where.map((one) => [one.name.toLowerCase(), one]));
+    // Gone from it by their own doing once in - another world, far off: out,
+    // and home. Whoever has not been seen in yet is waited for, not sent off.
+    for (const racer of state(loop).racers) {
+        const at = here.get(racer.name.toLowerCase());
+        if (
+            racer.outAt !== null ||
+            !at ||
+            !arrival.hasArrived(loop.run.id, racer.name) ||
+            !strayed(at, dimensions.get(at.name), layout.volume)
+        )
+            continue;
+        await sendHome(loop, server, tools, racer.name);
+        markOut(loop, racer.name, now, 0);
+        dirty = true;
+    }
+    const names = state(loop)
+        .racers.filter((one) => one.outAt === null)
+        .map((one) => one.name);
+    if (names.length === 0) {
+        if (dirty) await tools.persist();
+        // Everybody left before the start: nobody to play it.
+        lines.push(commands.say(messages.tag(language) + messages.everybodyDone(language)));
+        return "Everybody dropped out before the start";
+    }
+    const seen = arrival.look(loop.run.id, now, names, (name) => {
+        const at = here.get(name.toLowerCase());
+        return at !== undefined && inPlace(layout, at);
+    });
+    if (!seen.start) {
+        if (dirty) await tools.persist();
+        lines.push(arrival.waitingLine(`@a[tag=${stage.IN_ARENA}]`, seen, language));
+        return null;
+    }
+    arrival.forget(loop.run.id);
+    // What this tick has to say first, then the countdown on time.
+    await server.sayAll(lines.splice(0, lines.length));
+    await arrival.countdown((out) => server.sayAll(out), `@a[tag=${stage.IN_ARENA}]`, language);
+    const go = Date.now();
+    const racing = state(loop).racers.filter((one) => one.outAt === null);
+    if (layout.kind === "parkour") {
+        const start = parkour.spotOn(layout.course, 0);
+        for (const racer of racing)
+            lines.push(
+                stage.moveLine(racer.name, start),
+                ...parkour.racerScores(racer.name, 0),
+                `title ${racer.name} times 5 40 10`,
+                `title ${racer.name} subtitle ${commands.text(messages.parkourSubtitle(language))}`,
+                `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
+                soundFor(racer.name, commands.SOUNDS.start)
+            );
+        // Everybody's time counts from this moment, whoever was in first.
+        change(loop, {
+            racers: state(loop).racers.map((one) =>
+                one.outAt === null ? { ...one, since: go, best: 0, checkpoint: 0 } : one
+            )
+        });
+    } else {
+        const places = spleef.spots(layout.arena, racing.length);
+        racing.forEach((racer, index) => lines.push(stage.moveLine(racer.name, places[index]!)));
+    }
+    lines.push(...arrival.startedWithoutLines(seen, language));
+    // The start, written down: a spleef's tick hands out the shovels from it.
+    change(loop, { goAt: now });
+    await tools.persist();
+    if (layout.kind === "spleef")
+        return spleefTick(loop, server, tools, layout.arena, layout.volume, [], now, lines);
+    return null;
 }
 
 // ------------------------------------------------------------------ parkour
@@ -747,6 +884,8 @@ function lowered(scores: ReadonlyMap<string, number>): Map<string, number> {
 export function quickLines(loop: StageLoop): string[] {
     const layout = built(loop.run);
     if (!layout || layout.kind !== "parkour" || !state(loop).built) return [];
+    // Before the start: nobody off the start pad.
+    if (holding(loop)) return parkour.holdLines(layout.course);
     if (!state(loop).racers.some((one) => one.outAt === null && one.finishedAt === null)) return [];
     const language = loop.language;
     const course = layout.course;

@@ -339,6 +339,52 @@ function dimension(id: string): string {
  * finds a player inside whose score is in range and whose hitbox (0.6 wide, 1.8
  * tall, from their feet) meets the box - which reaches one block past each `d`.
  */
+/** Parkour before the start: who is off the start pad, and put back on it. */
+let offStart = new Set<string>();
+
+function holdAnswer(line: string): string | null {
+    const inside = world.online.filter((name) => world.inside.has(name));
+    if (line === "execute in minecraft:overworld run tag @a[tag=pe_in,distance=0..] add pe_hold") {
+        offStart = new Set(inside);
+        return "";
+    }
+    const pad =
+        /^execute in minecraft:overworld run tag @a\[tag=pe_in,x=(-?\d+),y=(-?\d+),z=(-?\d+),dx=(\d+),dy=(\d+),dz=(\d+)\] remove pe_hold$/.exec(
+            line
+        );
+    if (pad) {
+        const [x, y, z, dx, dy, dz] = pad.slice(1).map(Number) as number[];
+        for (const name of inside) {
+            const [px, py, pz] = world.at[name] ?? [0, 0, 0];
+            if (
+                px + 0.3 > x! &&
+                px - 0.3 < x! + dx! + 1 &&
+                py + 1.8 > y! &&
+                py < y! + dy! + 1 &&
+                pz + 0.3 > z! &&
+                pz - 0.3 < z! + dz! + 1
+            )
+                offStart.delete(name);
+        }
+        return "";
+    }
+    const back =
+        /^execute in minecraft:overworld run tp @a\[tag=pe_hold\] (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(
+            line
+        );
+    if (back) {
+        for (const name of offStart)
+            if (!world.stuck.includes(name))
+                world.at[name] = [Number(back[1]), Number(back[2]), Number(back[3])];
+        return "";
+    }
+    if (line === "tag @a remove pe_hold") {
+        offStart = new Set();
+        return "";
+    }
+    return null;
+}
+
 function quickAnswer(line: string): string | null {
     const set = /^scoreboard players set (\w+) pe_cp (-?\d+)$/.exec(line);
     if (set) {
@@ -795,11 +841,14 @@ function answer(sent: string): string {
             world.at[name] = [Number(landed[1]), Number(landed[2]) - 6, Number(landed[3])];
         return `Teleported ${name}`;
     }
+    const holding = holdAnswer(line);
+    if (holding !== null) return holding;
     const moved = /^execute in (\S+) run tp (\w+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/.exec(line);
     if (moved) {
         const name = moved[2] as string;
         if (!world.online.includes(name)) return "No entity was found";
-        world.at[name] = [Number(moved[3]), Number(moved[4]), Number(moved[5])];
+        if (!world.stuck.includes(name))
+            world.at[name] = [Number(moved[3]), Number(moved[4]), Number(moved[5])];
         return `Teleported ${name} to ${moved[3]}, ${moved[4]}, ${moved[5]}`;
     }
     const quick = quickAnswer(line);
@@ -1687,6 +1736,7 @@ const hillService = await import(
     "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service"
 );
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
+const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
 
 /** What a player reads of a command's text: the words of its JSON, without the
  *  formatting that splits them into parts (a highlighted name, a number). */
@@ -5204,6 +5254,73 @@ describe("a parkour race", () => {
         keptTheRules();
     });
 
+    it("holds everybody on the start pad until all are in, counts down, and starts every clock at Go", async () => {
+        world.online = ["Ana", "Ben"];
+        world.stuck = ["Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        for (let tick = 0; tick < 200 && !state().run?.stage?.racers.length; tick += 1)
+            await play(500);
+        await play(4_000);
+        const run = state().run!;
+        const stageNow = run.stage!;
+        expect(stageNow.racers.map((one) => one.name)).toEqual(["Ana", "Ben"]);
+        // Ben is still loading in: nothing has started, and those in are told why.
+        expect(run.readyAt).toBeNull();
+        expect(stageNow.goAt).toBeNull();
+        expect(world.sent.some((line) => line.includes("Waiting for everybody"))).toBe(true);
+        expect(world.sent.some((line) => line.includes("Go!"))).toBe(false);
+        const course = parkour.course(race().options, run.id, stageNow.origin!, stageNow.origin!.y);
+        const start = parkour.spotOn(course, 0);
+        expect(world.at.Ana).toEqual([start.x, start.y, start.z]);
+        // A step onto the first platform before the start: back on the pad at once.
+        const first = course.platforms[1]!;
+        world.at.Ana = [first.x + first.size / 2, first.y + 1, first.z + first.size / 2];
+        await play(450);
+        expect(world.at.Ana).toEqual([start.x, start.y, start.z]);
+        // Ben arrives: the countdown, then "Go!" for both at once.
+        world.stuck = [];
+        world.at.Ben = [start.x, start.y, start.z];
+        const before = world.sent.length;
+        await play(8_000);
+        const after = world.sent.slice(before);
+        const shown = (text: string) =>
+            after.findIndex(
+                (line) => line.includes(" title ") && visible(line).endsWith(` title ${text}`)
+            );
+        expect(shown("3")).toBeGreaterThan(-1);
+        expect(shown("2")).toBeGreaterThan(shown("3"));
+        expect(shown("1")).toBeGreaterThan(shown("2"));
+        expect(shown("Go!")).toBeGreaterThan(shown("1"));
+        const started = state().run!;
+        expect(started.readyAt).not.toBeNull();
+        expect(started.stage!.goAt).not.toBeNull();
+        const [ana, ben] = started.stage!.racers;
+        // Both clocks from the same moment, after the countdown.
+        expect(ana!.since).toBe(ben!.since);
+        expect(ana!.since).toBeGreaterThanOrEqual(started.stage!.goAt! + 3_000);
+        expect(world.sent.some((line) => line.includes("Started without"))).toBe(false);
+    });
+
+    it("starts without a racer still not in when the wait runs out, and says who", async () => {
+        world.online = ["Ana", "Ben"];
+        world.stuck = ["Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        for (let tick = 0; tick < 200 && !state().run?.stage?.racers.length; tick += 1)
+            await play(500);
+        expect(state().run!.readyAt).toBeNull();
+        await play(arrival.ARRIVAL_MS + 8_000);
+        expect(state().run!.readyAt).not.toBeNull();
+        const without = world.sent.find((line) => line.includes("Started without waiting longer for"));
+        expect(without).toContain("Ben");
+        expect(without).not.toContain("Ana");
+    });
+
     it("holds the day and keeps phantoms and hostiles off while it runs, and gives both rules back exactly", async () => {
         setUp([race()]);
         await startArena("race");
@@ -5459,6 +5576,35 @@ describe("spleef", () => {
         ...newPreset("spleef", "floor"),
         minutes: 5,
         options: { place: { mode: "players" as const }, size: 6, height: 30, variant }
+    });
+
+    it("hands the shovels out only once everybody is on the floor, after the countdown", async () => {
+        world.online = ["Ana", "Ben"];
+        world.stuck = ["Ben"];
+        setUp([floor()]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        for (let tick = 0; tick < 200 && !state().run?.stage?.racers.length; tick += 1)
+            await play(500);
+        await play(6_000);
+        const shovel = (name: string) =>
+            world.sent.findIndex((line) => line.startsWith(`give ${name} minecraft:iron_shovel`));
+        // Ben is not on the floor yet: nobody digs.
+        expect(shovel("Ana")).toBe(-1);
+        expect(state().run!.readyAt).toBeNull();
+        const run = state().run!;
+        const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
+        world.stuck = [];
+        world.at.Ben = [arenaAt.center.x + 0.5, arenaAt.floor + 1, arenaAt.center.z + 0.5];
+        await play(8_000);
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        expect(one).toBeGreaterThan(-1);
+        expect(shovel("Ana")).toBeGreaterThan(one);
+        expect(shovel("Ben")).toBeGreaterThan(one);
+        expect(state().run!.readyAt).not.toBeNull();
     });
 
     it("hands out a marked shovel, sends whoever falls through home, and the last one standing wins", async () => {
@@ -6744,6 +6890,28 @@ describe("a team duel", () => {
         expect(state().run?.arena).toBeTruthy();
         expect(state().run?.readyAt).not.toBeNull();
         expect(world.sent.some((line) => line.endsWith(" keep"))).toBe(true);
+    });
+
+    it("hands out the kit only at Go, after the countdown, to everybody at once", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        await play(10_000);
+        expect(state().run?.readyAt).not.toBeNull();
+        const shown = (text: string) =>
+            world.sent.findIndex(
+                (line) => line.includes(" title ") && visible(line).endsWith(` title ${text}`)
+            );
+        const sword = (name: string) =>
+            world.sent.findIndex((line) => line.startsWith(`give ${name} minecraft:stone_sword`));
+        const entered = world.sent.findIndex((line) => / tp Ben /.test(line));
+        expect(entered).toBeGreaterThan(-1);
+        // Everybody in first, then 3-2-1, and only then a sword in anybody's hand.
+        expect(shown("3")).toBeGreaterThan(entered);
+        expect(shown("1")).toBeGreaterThan(shown("3"));
+        expect(sword("Ana")).toBeGreaterThan(shown("1"));
+        expect(sword("Ben")).toBeGreaterThan(shown("1"));
+        expect(state().run!.readyAt! - state().run!.startsAt).toBe(0);
     });
 
     it("never runs its clock back up while the arena goes up", async () => {

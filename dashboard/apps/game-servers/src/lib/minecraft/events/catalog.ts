@@ -1327,7 +1327,7 @@ export function readyToPlay(run: {
     readonly chests: readonly unknown[];
     readonly meteors: readonly unknown[];
     readonly round: number;
-    readonly stage: { readonly racers: readonly unknown[] } | null;
+    readonly stage: { readonly racers: readonly unknown[]; readonly goAt?: number | null } | null;
     readonly readyAt: number | null;
 }): boolean {
     const { preset } = run;
@@ -1352,7 +1352,8 @@ export function readyToPlay(run: {
             return run.round >= 0;
         case "parkour":
         case "spleef":
-            return (run.stage?.racers.length ?? 0) > 0;
+            // Once everybody brought in is there and the start given (`arrival`).
+            return (run.stage?.racers.length ?? 0) > 0 && (run.stage?.goAt ?? null) !== null;
         case "team-duel":
         case "build-battle":
             // The arena writes its own start when everybody is in it.

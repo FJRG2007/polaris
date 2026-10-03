@@ -28,6 +28,7 @@ import * as stage from "./stage";
 import * as duel from "./team-duel";
 import * as catalog from "../catalog";
 import * as build from "./build-battle";
+import * as arrival from "./arrival";
 import * as hill from "./hill";
 import * as hillService from "./hill-service";
 import * as stashService from "./stash-service";
@@ -187,9 +188,8 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
     if (ctx.run.readyAt === null) {
         if (!ctx.run.enrolled) await enroll(ctx, lines);
         else if (!ctx.run.arena) await raise(ctx);
-        // The hill counts nothing until everybody stands on it.
-        else if (hillService.awaitingArrivals(ctx.run.id))
-            await hillService.arrivalTick(ctx, lines);
+        // Nothing counts until everybody brought in is there (`arrival`).
+        else if (arrival.isOpen(ctx.run.id)) await arrivalTick(ctx, lines);
         else await bringIn(ctx);
         return null;
     }
@@ -440,43 +440,15 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 build.themeFor(options as catalog.EventOptions<"build-battle">, run.id, ctx.home)
         };
     const overGround = hillside ? await ctx.atLeast([1, 19, 4]) : false;
-    const counts = [0, 0];
     const linesIn = (one: stored.Entrant): string[] => {
-        if (duelling) {
-            const slot = counts[one.side] ?? 0;
-            counts[one.side] = slot + 1;
-            return [
-                ...arena.enter(one.name, duel.sideSpot(box, one.side, slot)),
-                duel.joinTeam(one.name, one.side),
-                ...kit.map((id) => arena.giveMarked(one.name, id, 1, marker)),
-                ...arena.titleTo(
-                    one.name,
-                    messages.duelEnterTitle(one.side, language),
-                    messages.duelEnterSubtitle(
-                        (options as catalog.EventOptions<"team-duel">).downHearts,
-                        language
-                    )
-                )
-            ];
-        }
         if (hillside)
             return hillService.enterLines(ctx.run, one.name, one.side, overGround, language);
+        // In, and nothing more: the kit, the side's colors and the theme are
+        // handed out at "Go!", to everybody at once (`goLines`).
         return [
-            ...arena.enter(
-                one.name,
-                build.plotSpot(
-                    box,
-                    one.side,
-                    (options as catalog.EventOptions<"build-battle">).plotSize,
-                    run.joined.length
-                )
-            ),
-            ...build.kitCommands(one.name, marker, build.paletteFor(run.id)),
-            ...arena.titleTo(
-                one.name,
-                messages.themeTitle(language),
-                `&f${theme ?? ""} &7- ${speech.pickIn(build.PALETTES[build.paletteFor(run.id)].name, language)}`
-            )
+            ...arena.enter(one.name, spotsOf(ctx.run).get(lower(one.name))!),
+            ...(duelling ? [duel.joinTeam(one.name, one.side)] : []),
+            arena.protect(one.name)
         ];
     };
     // One at a time: what they carry put away, and straight in - nobody left
@@ -496,34 +468,139 @@ async function bringIn(ctx: KindContext): Promise<void> {
     // Everybody left on the one team: nobody to play against.
     if (duelling && [0, 1].some((side) => !ctx.run.entrants.some((one) => one.side === side)))
         throw new TooFew(ONE_SIDED);
-    // The hill's clock, and its "Go!", wait for everybody to be on it.
-    if (hillside) {
-        hillService.awaitArrivals(ctx.run.id, ctx.now);
+    // The clock, the kit and "Go!" wait for everybody to be in.
+    arrival.open(ctx.run.id, ctx.now);
+}
+
+/** Where each entrant starts, by name in lower case: a duel's side, a build
+ *  battle's plot. Not the hill's, which has its own round the circle. */
+function spotsOf(run: stored.EventRun): Map<string, arena.Spot> {
+    const box = run.arena!.box;
+    const spots = new Map<string, arena.Spot>();
+    const counts = [0, 0];
+    for (const one of run.entrants) {
+        if (run.preset.kind === "team-duel") {
+            const slot = counts[one.side] ?? 0;
+            counts[one.side] = slot + 1;
+            spots.set(lower(one.name), duel.sideSpot(box, one.side, slot));
+        } else
+            spots.set(
+                lower(one.name),
+                build.plotSpot(box, one.side, plotSize(run), run.joined.length)
+            );
+    }
+    return spots;
+}
+
+/**
+ * One tick of the wait before the start (`arrival`): nobody hurt, nothing
+ * counted, nothing handed out - until everybody brought in is seen in the
+ * arena, or the wait runs out. Then the countdown, everybody put back on their
+ * own start spot - nobody in first is any closer to anything - and "Go!": the
+ * clock started, the kit and the theme handed out to all of them at once.
+ */
+async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
+    const run = ctx.run;
+    const language = ctx.language;
+    const hillside = run.preset.kind === "king-of-the-hill";
+    const box = run.arena!.box;
+    const names = run.entrants.map((one) => one.name);
+    const where = commands.readWhere(await ctx.server.say([commands.IN_OVERWORLD]));
+    const here = new Map(where.map((one) => [lower(one.name), one]));
+    const seen = arrival.look(run.id, ctx.now, names, (name) => {
+        const at = here.get(lower(name));
+        if (!at) return false;
+        return hillside ? hillService.onHill(run, at) : arena.contains(box, at);
+    });
+    const arrived = (name: string) => arrival.hasArrived(run.id, name);
+    const everybody = `@a[tag=${arena.IN_ARENA}]`;
+    if (hillside) lines.push(...(await hillService.holdLines(ctx, where, arrived)));
+    else {
+        const spots = spotsOf(run);
+        for (const one of run.entrants) {
+            const at = here.get(lower(one.name));
+            // Wandered out - a chorus fruit, a fall: back on their own spot.
+            if (at && arrived(one.name) && !arena.contains(box, at))
+                lines.push(arena.moveTo(one.name, spots.get(lower(one.name))!));
+            lines.push(arena.protect(one.name), arena.feed(one.name));
+        }
+        lines.push(...arena.keepThrown(box));
+    }
+    if (!seen.start) {
+        lines.push(arrival.waitingLine(everybody, seen, language));
         return;
     }
-    const out: string[] = [];
-    if (theme !== null)
-        out.push(
-            commands.say(messages.tag(language) + messages.themeLine(theme, language)),
-            commands.say(
-                messages.tag(language) +
-                    messages.materialLine(build.PALETTES[build.paletteFor(run.id)].name, language)
-            )
-        );
-    out.push(commands.sound(commands.SOUNDS.start));
-    await ctx.server.sayAll(out);
+    arrival.forget(run.id);
+    // What this tick has to say first, then the countdown on time.
+    await ctx.server.sayAll(lines.splice(0, lines.length));
+    await arrival.countdown((out) => ctx.server.sayAll(out), everybody, language);
+    const now = Date.now();
     const seconds =
         run.preset.minutes * 60 +
-        (duelling || hillside
-            ? 0
-            : (run.preset.options as catalog.EventOptions<"build-battle">).voteSeconds);
-    ctx.run = {
-        ...ctx.run,
-        readyAt: ctx.now,
-        startsAt: ctx.now,
-        endsAt: ctx.now + seconds * 1000
-    };
-    await ctx.persist();
+        (run.preset.kind === "build-battle"
+            ? (run.preset.options as catalog.EventOptions<"build-battle">).voteSeconds
+            : 0);
+    const started = { readyAt: now, startsAt: now, endsAt: now + seconds * 1000 };
+    if (hillside) {
+        // Written down first: nothing is handed out on the hill.
+        ctx.run = { ...ctx.run, ...started };
+        await ctx.persist();
+        lines.push(...(await hillService.goLines(ctx)));
+    } else {
+        // Handed out first and only then written down: a restart in between
+        // hands the kit out again (marked, and taken back at the end) rather
+        // than starting a fight with nothing in anybody's hands.
+        await ctx.server.sayAll(goLines(ctx.run, language));
+        ctx.run = { ...ctx.run, ...started };
+        await ctx.persist();
+    }
+    lines.push(
+        ...arrival.startedWithoutLines(seen, language),
+        commands.sound(commands.SOUNDS.start)
+    );
+}
+
+/** "Go!" in a duel or a build battle: everybody on their own spot, the kit in
+ *  their hands, and what to do on their screen. */
+function goLines(run: stored.EventRun, language: speech.Speech): string[] {
+    const spots = spotsOf(run);
+    const marker = run.marker!;
+    const out: string[] = [];
+    if (run.preset.kind === "team-duel") {
+        const options = run.preset.options as catalog.EventOptions<"team-duel">;
+        for (const one of run.entrants)
+            out.push(
+                arena.moveTo(one.name, spots.get(lower(one.name))!),
+                ...run.kit.map((id) => arena.giveMarked(one.name, id, 1, marker)),
+                ...arena.titleTo(
+                    one.name,
+                    messages.duelEnterTitle(one.side, language),
+                    messages.duelEnterSubtitle(options.downHearts, language)
+                )
+            );
+        return out;
+    }
+    const theme = build.themeFor(
+        run.preset.options as catalog.EventOptions<"build-battle">,
+        run.id,
+        language
+    );
+    const palette = build.PALETTES[build.paletteFor(run.id)].name;
+    for (const one of run.entrants)
+        out.push(
+            arena.moveTo(one.name, spots.get(lower(one.name))!),
+            ...build.kitCommands(one.name, marker, build.paletteFor(run.id)),
+            ...arena.titleTo(
+                one.name,
+                messages.themeTitle(language),
+                `&f${theme} &7- ${speech.pickIn(palette, language)}`
+            )
+        );
+    out.push(
+        commands.say(messages.tag(language) + messages.themeLine(theme, language)),
+        commands.say(messages.tag(language) + messages.materialLine(palette, language))
+    );
+    return out;
 }
 
 /**
@@ -1019,7 +1096,7 @@ export async function closeArena(
     language: speech.Speech | null = null
 ): Promise<stored.ArenaLeftover | null> {
     memories.delete(left.id);
-    hillService.forgetArrivals(left.id);
+    arrival.forget(left.id);
     let rules = left.gamerules;
     const remaining: stored.Entrant[] = [];
     let index = 0;
