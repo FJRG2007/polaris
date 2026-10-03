@@ -387,6 +387,12 @@ describe("trivia", () => {
         expect(trivia.answers("  Caña de Azúcar!! ", ["caña de azucar"])).toBe(true);
         expect(trivia.answers("DIAMOND pickaxe", ["diamond pickaxe"])).toBe(true);
         expect(trivia.answers("iron", ["diamond pickaxe"])).toBe(false);
+        // The game's id, and the plural, are the same answer.
+        expect(trivia.answers("minecraft:ender_pearl", ["ender pearl"])).toBe(true);
+        expect(trivia.answers("Creepers", ["creeper"])).toBe(true);
+        expect(trivia.answers("lingotes", ["lingote"])).toBe(true);
+        expect(trivia.answers("minecraft", ["creeper"])).toBe(false);
+        expect(trivia.answers("creep", ["creeper"])).toBe(false);
     });
 
     it("finds the first right answer in the log, whatever the loader prints", () => {
@@ -434,29 +440,45 @@ describe("trivia", () => {
         }
     });
 
-    it("has hundreds of questions, each in both languages, in categories, with ids that never clash", () => {
-        expect(trivia.BANK.length).toBeGreaterThanOrEqual(200);
+    it("has hundreds of Minecraft questions, each in both languages, with a source and ids that never clash", () => {
+        expect(trivia.BANK.length).toBeGreaterThanOrEqual(250);
         expect(new Set(trivia.BANK.map((one) => one.id)).size).toBe(trivia.BANK.length);
+        // Every category is about Minecraft, and every one of them is asked.
         const categories = new Set(trivia.BANK.map((one) => one.category));
-        for (const wanted of [
-            "mobs",
-            "items",
-            "world",
-            "geography",
-            "science",
-            "history",
-            "general"
-        ])
-            expect(categories).toContain(wanted);
+        expect([...categories].sort()).toEqual([...trivia.CATEGORIES].sort());
+        for (const language of ["en", "es"] as const) {
+            const asked = trivia.BANK.map((one) => trivia.normalizeAnswer(one[language].question));
+            expect(new Set(asked).size).toBe(asked.length);
+        }
         for (const one of trivia.BANK) {
+            expect(one.source).toMatch(/^https:\/\/minecraft\.wiki\/w\/[^\s]+$/);
             expect(one.en.question.endsWith("?")).toBe(true);
             expect(one.es.question).toMatch(/^¿.*\?$|\?$/);
+            expect(one.en.answers.length).toBeGreaterThan(0);
+            expect(one.es.answers.length).toBeGreaterThan(0);
             // Every accepted answer still reads as one once compared.
             for (const answer of [...one.en.answers, ...one.es.answers])
                 expect(trivia.normalizeAnswer(answer).length).toBeGreaterThan(0);
         }
         // Readers of either language are asked the same question in the same round.
         expect(trivia.QUESTIONS.en).toHaveLength(trivia.QUESTIONS.es.length);
+    });
+
+    it("asks nothing but Minecraft by default, in a new trivia event and in one saved before", () => {
+        const offTopic = /capital of|planet|guitar|piano|ocean on earth|chemical symbol|olympic|painted/i;
+        for (const one of trivia.BANK) expect(one.en.question).not.toMatch(offTopic);
+        const made = catalog.newPreset("trivia", "t");
+        const saved = catalog.presetSchema.parse({
+            ...made,
+            options: { rounds: 8, seconds: 30, mode: "questions" }
+        });
+        for (const preset of [made, saved]) {
+            const options = preset.options as catalog.EventOptions<"trivia">;
+            expect(options.questions).toEqual([]);
+        }
+        const ids = new Set(trivia.BANK.map((one) => one.id));
+        for (const one of trivia.ordered("event-1", ["geography-148", "history-207"]))
+            expect(ids.has(one.id)).toBe(true);
     });
 
     it("never repeats a question inside a game, and asks what was not asked lately first", () => {
