@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * The four things the search panel can list, and how each is drawn.
+ * The things the search panel can list, and how each is drawn.
  *
- * They are deliberately not one row with four variations. A page and a task are
- * not the same kind of answer: a page is a place that was always going to be
- * there, a task is a record that existed when the query ran and carries its own
- * handle and state. Somebody scanning the list should be able to tell which half
- * of the panel they are looking at without reading it, which is why the ones
- * that came from the database wear a face - a status colour, an avatar, a
- * reference - and the ones that came from the app registry wear an icon.
+ * They are deliberately not one row with several variations. A page and a task
+ * are not the same kind of answer: a page is a place that was always going to
+ * be there, a task is a record that existed when the query ran and carries its
+ * own handle and state. Somebody scanning the list should be able to tell which
+ * half of the panel they are looking at without reading it, which is why the
+ * ones that came from the database wear a face - a status colour, an avatar, a
+ * reference - and the ones that came from the app registry or parsed from the
+ * query itself, like a clock command, wear an icon.
  */
 
 import { Badge, cn } from "@polaris/ui";

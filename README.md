@@ -151,7 +151,8 @@ with one thing does not get the rest.
 - **Calendar** - day, week, month and year views, sharing and public links,
   two-way sync with Google, Microsoft 365 and any CalDAV server or ICS feed,
   reminders, invitations, free/busy, meeting rooms and booking pages other
-  people can reserve a slot on.
+  people can reserve a slot on, plus a Time area with alarms, timers, focus
+  cycles, a stopwatch and a world clock.
 - **Chat** - servers and channels, direct messages and groups, with calls,
   meetings, screen sharing, voice messages, screen clips recorded in the browser,
   and messages written now and sent at an hour that suits.
