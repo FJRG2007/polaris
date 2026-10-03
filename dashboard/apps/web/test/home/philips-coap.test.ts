@@ -17,6 +17,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CoapMessage } from "@polaris-app/places/src/lib/integrations/coap";
+import type { AirCommand } from "@polaris-app/places/src/lib/device-kinds";
+import * as ac4221 from "./fixtures/philips-ac4221";
 /** What the reference code produced (see the header). */
 const CRYPTO = {
     desired:
@@ -195,15 +197,35 @@ vi.mock("@polaris-app/places/src/lib/integrations/philips-udp", () => ({
     }
 }));
 
-const subnet = vi.hoisted(() => ({ addresses: [] as string[] }));
-vi.mock("@polaris-app/places/src/lib/integrations/lan-unit", () => ({
-    async unitAddressOf(typed: string) {
-        return typed;
-    },
-    async subnetTargets() {
-        return subnet.addresses;
-    }
+const subnet = vi.hoisted(() => ({
+    addresses: [] as string[],
+    /** Polaris's own network, or null where it is not known. */
+    own: null as string | null
 }));
+vi.mock("@polaris-app/places/src/lib/integrations/lan-unit", () => {
+    const networkOf = (address: string) =>
+        /^\d+\.\d+\.\d+\.\d+$/.test(address)
+            ? `${address.split(".").slice(0, 3).join(".")}.0/24`
+            : null;
+    return {
+        async unitAddressOf(typed: string) {
+            return typed;
+        },
+        async subnetTargets() {
+            return subnet.addresses;
+        },
+        networkOf,
+        async ownNetwork() {
+            return subnet.own;
+        },
+        subnetAround(address: string) {
+            const base = address.split(".").slice(0, 3).join(".");
+            return Array.from({ length: 254 }, (_, index) => `${base}.${index + 1}`).filter(
+                (entry) => entry !== address
+            );
+        }
+    };
+});
 
 const api = await import("@polaris-app/places/src/lib/integrations/philips-api");
 const driver = await import("@polaris-app/places/src/lib/drivers/philips-coap");
@@ -218,6 +240,7 @@ beforeEach(() => {
     units.clear();
     opened.length = 0;
     subnet.addresses = [];
+    subnet.own = null;
     driver.resetPhilipsState();
 });
 
@@ -746,5 +769,187 @@ describe("a unit whose firmware only pushes", () => {
         await driver.philipsCoapDriver.forget!(stored);
         await driver.philipsCoapDriver.list(stored);
         expect(fake.links).toBe(2);
+    });
+});
+
+// --- the 4200 series --------------------------------------------------------------
+
+describe("the PureProtect Pro 4200 (AC4220, AC4221)", () => {
+    const model = () => driver.philipsModelOf("AC4221/11", "AWS_Philips_AIR_Combo@3.0");
+
+    it("is found under both model codes, as the AC22xx family", () => {
+        expect(model()?.generation).toBe("gen3");
+        expect(driver.philipsModelOf("AC4220/12")).toBe(model());
+        expect(driver.philipsModelOf("AC4220/10")).toBe(model());
+    });
+
+    it("reads every preset, speed, switch, measure and filter a recorded status holds", () => {
+        const air = driver.philipsAir(ac4221.AC4221_AUTO_PLUS, model());
+        expect(air).toEqual({
+            mode: "auto",
+            modes: ["auto", "medium", "turbo", "sleep"],
+            speed: null,
+            speeds: ["speed_1", "speed_2", "speed_3", "speed_4", "speed_5"],
+            humidity: null,
+            options: { childLock: false, beep: true, autoPlus: true, light: true },
+            readings: { pm25: 1, allergen: 1, gas: 1, humidity: 49, temperature: 20.7 },
+            filters: [
+                { kind: "nanoprotect", percent: 100, hours: 9600, state: "ok" },
+                { kind: "pre", percent: 100, hours: 720, state: "ok" }
+            ]
+        });
+        expect(kinds.airSettings(air)).toEqual(air);
+        expect(kinds.airQuality(air)).toEqual({ level: "good", measure: "pm25" });
+    });
+
+    it("tells each recorded preset and speed apart", () => {
+        expect(driver.philipsAir(ac4221.AC4221_MEDIUM, model()).mode).toBe("medium");
+        expect(driver.philipsAir(ac4221.AC4221_TURBO, model()).mode).toBe("turbo");
+        expect(driver.philipsAir(ac4221.AC4221_SPEED_3, model())).toMatchObject({
+            mode: null,
+            speed: "speed_3"
+        });
+        expect(driver.philipsAir(ac4221.AC4221_MEDIUM, model()).options.autoPlus).toBe(false);
+    });
+
+    it("reads the display light off at 0 and on at every brightness, auto included", () => {
+        expect(driver.philipsAir(ac4221.AC4221_LIGHT_OFF, model()).options.light).toBe(false);
+        // 101 is the app's Auto brightness (issue #160).
+        expect(driver.philipsAir(ac4221.AC4221_AUTO_PLUS, model()).options.light).toBe(true);
+    });
+
+    it("draws a unit that is off, with its filters' wear", () => {
+        const row = driver.philipsSnapshot(
+            {
+                address: "10.0.1.40",
+                deviceId: "fixture0000000000000000000004221",
+                infoId: "",
+                model: "AC4221/11",
+                wifi: "AWS_Philips_AIR_Combo@86",
+                name: "Wohnzimmer"
+            },
+            ac4221.AC4221_OFF
+        );
+        expect(row).toMatchObject({
+            state: "off",
+            online: true,
+            firmware: "0.2.1",
+            value: "3",
+            unit: "µg/m³"
+        });
+        expect(row.air?.filters).toEqual([
+            { kind: "nanoprotect", percent: 98, hours: 9421, state: "ok" },
+            { kind: "pre", percent: 75, hours: 541, state: "ok" }
+        ]);
+        expect(row.air?.readings).toMatchObject({ gas: 1, temperature: 29.2, humidity: 23 });
+    });
+
+    it("writes each control in the unit's own keys", () => {
+        const values = (command: AirCommand) =>
+            driver.philipsValues(model(), "gen3", command.action, command);
+        expect(driver.philipsValues(model(), "gen3", "turn-on", undefined)).toEqual({
+            D03102: 1
+        });
+        expect(values({ action: "set-mode", mode: "sleep" })).toEqual({ D03102: 1, D0310C: 17 });
+        expect(values({ action: "set-fan", speed: "speed_3" })).toEqual({ D03102: 1, D0310C: 3 });
+        expect(values({ action: "set-option", option: "childLock", on: true })).toEqual({
+            D03103: 1
+        });
+        expect(values({ action: "set-option", option: "light", on: true })).toEqual({
+            D03105: 123
+        });
+        expect(values({ action: "set-option", option: "beep", on: false })).toEqual({
+            D03130: 0
+        });
+        expect(values({ action: "set-option", option: "autoPlus", on: true })).toEqual({
+            D03180: 1
+        });
+        expect(() => values({ action: "set-option", option: "oscillate", on: true })).toThrow(
+            "That setting is not one this device has"
+        );
+    });
+
+    it("is connected by its address and read with its gas level", async () => {
+        unit("10.0.1.40", {
+            status: { ...ac4221.AC4221_AUTO_PLUS },
+            info: { modelid: "AC4221/11", name: "Living room", device_id: "info-4221" }
+        });
+        const stored = await driver.philipsCoapDriver.verify({ host: "10.0.1.40" });
+        const [row] = await driver.philipsCoapDriver.list({ units: stored!.units! });
+        expect(row).toMatchObject({ kind: "air", state: "on", online: true, model: "AC4221/11" });
+        expect(row!.air?.readings.gas).toBe(1);
+    });
+
+    it("switches Auto+ off on the unit, which lands on it", async () => {
+        const fake = unit("10.0.1.40", {
+            status: { ...ac4221.AC4221_AUTO_PLUS },
+            info: { modelid: "AC4221/11", name: "Living room", device_id: "info-4221" }
+        });
+        const stored = await driver.philipsCoapDriver.verify({ host: "10.0.1.40" });
+        await driver.philipsCoapDriver.act(
+            { units: stored!.units! },
+            { externalId: "fixture0000000000000000000004221" } as never,
+            "set-option",
+            { action: "set-option", option: "autoPlus", on: false }
+        );
+        expect(fake.told.at(-1)).toEqual({ D03180: 0 });
+        expect(fake.status.D03180).toBe(0);
+    });
+});
+
+// --- a unit on another network --------------------------------------------------
+
+describe("a unit on another network than Polaris", () => {
+    /** One AC4221 stored at an address on 10.0.2.0/24. */
+    const elsewhere = () => ({
+        units: STORED("abc123", "AC4221/11").units.replace("10.0.1.40", "10.0.2.40")
+    });
+
+    beforeEach(() => {
+        subnet.own = "10.0.1.0/24";
+    });
+
+    it("is connected by its address when the router passes traffic to it", async () => {
+        unit("10.0.2.40", {
+            status: { ...ac4221.AC4221_AUTO_PLUS },
+            info: { modelid: "AC4221/11", name: "Living room", device_id: "info-4221" }
+        });
+        const stored = await driver.philipsCoapDriver.verify({ host: "10.0.2.40" });
+        expect(JSON.parse(stored!.units!)[0].address).toBe("10.0.2.40");
+    });
+
+    it("says it is on a network Polaris cannot reach when nothing answers there", async () => {
+        await expect(driver.philipsCoapDriver.verify({ host: "10.0.2.40" })).rejects.toThrow(
+            driver.otherNetworkSentence("10.0.2.40", "10.0.1.0/24")
+        );
+        // On Polaris's own network, silence is just silence.
+        await expect(driver.philipsCoapDriver.verify({ host: "10.0.1.99" })).rejects.toThrow(
+            "No Philips air purifier answered at that address"
+        );
+    });
+
+    it("says the same when a command cannot reach it", async () => {
+        unit("10.0.2.40", { status: { ...ac4221.AC4221_AUTO_PLUS }, deafSyncs: 99 });
+        await expect(
+            driver.philipsCoapDriver.act(
+                elsewhere(),
+                { externalId: "abc123" } as never,
+                "turn-off",
+                undefined
+            )
+        ).rejects.toThrow(driver.otherNetworkSentence("10.0.2.40", "10.0.1.0/24"));
+    });
+
+    it("is looked for on its own network after it moves there, not only on Polaris's", async () => {
+        subnet.addresses = ["10.0.1.40"];
+        unit("10.0.2.40", { deafSyncs: 99 });
+        unit("10.0.2.77", {
+            status: { ...ac4221.AC4221_AUTO_PLUS, DeviceId: "abc123" },
+            info: { modelid: "AC4221/11", name: "Bedroom", device_id: "info-1" }
+        });
+        const [row] = await driver.philipsCoapDriver.list(elsewhere());
+        expect(row!.online).toBe(true);
+        const renewed = await driver.philipsCoapDriver.renew!(elsewhere());
+        expect(JSON.parse(renewed!.units!)[0].address).toBe("10.0.2.77");
     });
 });

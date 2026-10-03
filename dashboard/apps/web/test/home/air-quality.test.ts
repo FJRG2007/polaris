@@ -71,6 +71,21 @@ describe("allergen index bands", () => {
     });
 });
 
+describe("gas level bands", () => {
+    it.each([
+        [1, "good"],
+        [2, "fair"],
+        [3, "poor"],
+        [4, "veryPoor"]
+    ] as const)("L%s is %s", (value, level) => {
+        expect(kinds.gasQuality(value)).toBe(level);
+    });
+
+    it("is written L1 to L4, as the unit writes it", () => {
+        expect(kinds.measureLine("gas", 2)).toBe("L2");
+    });
+});
+
 describe("a unit's verdict", () => {
     it("is judged by PM2.5 where the unit measures it", () => {
         expect(kinds.airQuality(air({ pm25: 60, allergen: 2 }))).toEqual({
@@ -84,6 +99,23 @@ describe("a unit's verdict", () => {
             level: "poor",
             measure: "allergen"
         });
+    });
+
+    it("takes the worse of the dust and the gas, as the unit's own light does", () => {
+        expect(kinds.airQuality(air({ pm25: 3, gas: 3 }))).toEqual({
+            level: "poor",
+            measure: "gas"
+        });
+        expect(kinds.airQuality(air({ pm25: 60, gas: 2 }))).toEqual({
+            level: "poor",
+            measure: "pm25"
+        });
+        // A tie is said from the dust, the finer scale.
+        expect(kinds.airQuality(air({ pm25: 10, gas: 2 }))).toEqual({
+            level: "fair",
+            measure: "pm25"
+        });
+        expect(kinds.airQuality(air({ gas: 4 }))).toEqual({ level: "veryPoor", measure: "gas" });
     });
 
     it("says nothing for a unit that measures neither", () => {

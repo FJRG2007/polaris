@@ -556,6 +556,8 @@
         "philipsCloudLinkRefused": "La nube de Philips no deja a Polaris llegar a este dispositivo. Vuelve a conectar la cuenta.",
         "philipsCloudNotOnAccount": "Ese dispositivo no está en esta cuenta Philips.",
         "philipsCloudEnterCode": "Escribe el código del email",
+        "philipsCloudEmpty": "Polaris entró en Philips como {email}, y esa cuenta no tiene dispositivos. Preguntó a los servidores de Philips de {country} ({area}) y de las demás regiones que conoce. Lo que vio: {summary}. Entra con el mismo email que usas en la app Air+. Emails probados: {emails}.{homeid, select, yes { El servicio HomeID de Philips falló en esta cuenta; si el aparato está en la app HomeID, quítalo y vuelve a añadirlo.} other {}}",
+        "philipsOtherNetwork": "Nada respondió en {address}, que está en una red distinta de la de Polaris ({network}). Tu router tiene que dejar que las dos redes se vean, y una wifi de invitados no suele hacerlo. Pon el purificador en la misma wifi que Polaris, o conéctalo con una cuenta Philips.",
         "philipsCloudNothing": "Polaris no ha encontrado ningún dispositivo en esta cuenta Philips. Preguntó a los servidores de Philips de {country} ({area}) y de las demás regiones que conoce. Lo que vio: {summary}. Comprueba que está en una app de Philips con este mismo email.{homeid, select, yes { El servicio HomeID de Philips falló en esta cuenta; si el aparato está en la app HomeID, quítalo y vuelve a añadirlo.} other {}}",
         "airMattersRefused": "La nube de ventiladores de Philips rechazó el acceso. Sube otra vez la app Philips Air+.",
         "apkNotAnApp": "Ese archivo no es una app. Sube la app Philips Air+ como archivo .apk, .apkm o .xapk.",
@@ -876,7 +878,7 @@
         "philips-coap": {
             "label": "Philips Air+ (red local)",
             "summary": "Los purificadores y humidificadores que usas con la app Philips Air+, directamente por tu red. Sin cuenta y sin pasar por la nube.",
-            "note": "Polaris busca los aparatos en tu red y los lee como hace Home Assistant. Antes tienen que estar configurados en la app Philips Air+ y en la misma red que Polaris. Algunos firmwares nuevos desactivan el control local; ese aparato puede funcionar con una cuenta Philips Air+, y Polaris lo indica.",
+            "note": "Polaris busca los aparatos en tu red y los lee como hace Home Assistant. Antes tienen que estar configurados en la app Philips Air+, en la misma red que Polaris o en una que tu router conecte con ella. Algunos firmwares nuevos desactivan el control local; ese aparato puede funcionar con una cuenta Philips Air+, y Polaris lo indica.",
             "steps": {
                 "s0": "Configura el purificador en la app Philips Air+, en la misma red wifi que Polaris.",
                 "s1": "Pulsa Conectar. Deja la dirección vacía para buscar todos los aparatos, o escribe una para añadir solo ese."
@@ -884,7 +886,7 @@
             "fields": {
                 "host": {
                     "label": "Dirección",
-                    "hint": "Opcional. Vacía busca todos los aparatos de esta red; tu router muestra la dirección de cada uno entre sus dispositivos conectados.",
+                    "hint": "Opcional. Vacía busca todos los aparatos de esta red; tu router muestra la dirección de cada uno entre sus dispositivos conectados. Uno en otra red solo se encuentra por su dirección.",
                     "placeholder": "192.168.1.40"
                 }
             }
@@ -892,7 +894,7 @@
         "philips-cloud": {
             "label": "Cuenta Philips",
             "summary": "Los purificadores, ventiladores y electrodomésticos de tu cuenta Philips, por la nube de Philips como sus apps. Funciona desde cualquier red.",
-            "note": "No oficial: Philips no publica una API para esto, así que podría dejar de funcionar si Philips cambia su nube. Entra con un código que Philips te envía por email, y no se guarda ninguna contraseña. Purificadores que conoce: AC0650, AC0651, AC1715, AC3221 y AC3360, y el ventilador CX3550; los demás solo muestran lecturas y encendido. Los electrodomésticos se muestran y nunca se encienden; una freidora se puede parar. Ventiladores y calefactores piden una vez el archivo de la app Philips Air+. Si un purificador está en la misma red que Polaris, la conexión local no depende de Philips.",
+            "note": "No oficial: Philips no publica una API para esto, así que podría dejar de funcionar si Philips cambia su nube. Entra con un código que Philips te envía por email, y no se guarda ninguna contraseña. Purificadores que conoce: AC0650, AC0651, AC1715, AC3221, AC3360, AC4220 y AC4221, y el ventilador CX3550; los demás solo muestran lecturas y encendido. Los electrodomésticos se muestran y nunca se encienden; una freidora se puede parar. Ventiladores y calefactores piden una vez el archivo de la app Philips Air+. Si un purificador está en la misma red que Polaris, la conexión local no depende de Philips.",
             "steps": {
                 "s0": "Configura el aparato en su app de Philips (Air+, HomeID o NutriU) y entra en ella con tu email.",
                 "s1": "Elige tu país, escribe ese email y pulsa Pedir código. Philips te envía un código de un solo uso.",
@@ -1373,7 +1375,9 @@
                 "childLock": "Bloqueo niños",
                 "light": "Luz pantalla",
                 "humidify": "Humidificar",
-                "oscillate": "Oscilación"
+                "oscillate": "Oscilación",
+                "beep": "Pitido botones",
+                "autoPlus": "Auto+"
             },
             "filters": {
                 "pre": "Prefiltro",
@@ -1390,6 +1394,7 @@
             "measures": {
                 "pm25": "PM2.5",
                 "allergen": "Índice alérgenos",
+                "gas": "Nivel de gas",
                 "humidity": "Humedad",
                 "temperature": "Temperatura"
             },
@@ -1509,7 +1514,8 @@
             "filters": "Filtros",
             "lifePercent": "Queda {percent}%",
             "lifeHours": "Quedan {hours} h",
-            "quality": "Calidad"
+            "quality": "Calidad",
+            "byGas": "{quality}, gas {level}"
         },
         "appliance": {
             "type": "Aparato",

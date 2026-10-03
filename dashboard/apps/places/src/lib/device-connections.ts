@@ -696,7 +696,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     // on another network, and for the models whose firmware has no local
     // control. Second, not recommended: Philips publishes no API for it, so it
     // is the less reliable of the two over time, and it covers only the units
-    // the community integrations have mapped (AC0650, AC0651, AC1715, AC3221).
+    // the community integrations have mapped (AC0650, AC0651, AC1715, AC3221,
+    // AC4220, AC4221).
     {
         id: "philips-cloud",
         brand: "Philips",

@@ -77,15 +77,27 @@ interface CloudModel {
  * the AC1715 is a step between Medium and Turbo, which Places calls High. The
  * AC3221's values are the source's own unverified mapping, from the local
  * protocol of that family rather than a captured cloud message.
+ *
+ * The 4200 series (AC4220, AC4221) is that same family locally
+ * (kongo09/philips-airpurifier-coap `philips.py` line 1612, `PhilipsAC4220
+ * (PhilipsAC22xx)`), and an AC4221/11's own status carries the very `D0310C`
+ * values - 0, 17, 18, 19 and 1 to 5 - in that repository's issue #160. It is
+ * set up with the Air+ app (its manual), whose purifiers are the ones this
+ * registry lists. Like the AC3221's, its entry is mapped, not captured from
+ * the cloud: no community source has a 4200's cloud message yet.
  */
+const AC22XX_CLOUD: CloudModel = {
+    modes: { auto: 0, medium: 19, sleep: 17, turbo: 18 },
+    speeds: { speed_1: 1, speed_2: 2, speed_3: 3, speed_4: 4, speed_5: 5 }
+};
+
 export const PHILIPS_CLOUD_MODELS: Readonly<Record<string, CloudModel>> = {
     AC0650: { modes: { gentle: 1, sleep: 17, turbo: 18 }, speeds: {} },
     AC0651: { modes: { auto: 0, medium: 1, sleep: 17, turbo: 18 }, speeds: {} },
     AC1715: { modes: { auto: 0, medium: 1, high: 2, sleep: 17, turbo: 18 }, speeds: {} },
-    AC3221: {
-        modes: { auto: 0, medium: 19, sleep: 17, turbo: 18 },
-        speeds: { speed_1: 1, speed_2: 2, speed_3: 3, speed_4: 4, speed_5: 5 }
-    }
+    AC3221: AC22XX_CLOUD,
+    AC4220: AC22XX_CLOUD,
+    AC4221: AC22XX_CLOUD
 };
 
 export function philipsCloudModel(model: string | null): CloudModel | null {
@@ -576,7 +588,10 @@ const pairingStateSchema = z.object({
         .optional(),
     ticket: z.string().min(1).max(100).optional(),
     appSecret: z.string().min(1).max(100).optional(),
-    skip: z.literal("1").optional()
+    skip: z.literal("1").optional(),
+    /** The other emails tried in the same dialog, comma-separated, for the
+     *  refusal to list when this one has no devices either. */
+    tried: z.string().max(2000).optional()
 });
 
 type PairingState = z.infer<typeof pairingStateSchema>;
@@ -593,6 +608,26 @@ function versuniCredentials(email: string, found: cloud.PhilipsFound): Credentia
     };
 }
 
+/** How many emails a refusal lists: the most recent ones. */
+const MAX_TRIED = 5;
+
+const triedSchema = z.array(z.string().email().max(254)).max(MAX_TRIED * 4);
+
+/**
+ * The emails tried, this one last: the ones the dialog says it tried before,
+ * as sent, and this one. What does not read as a list of addresses is dropped
+ * rather than refusing the sign-in over it - it only ever feeds a sentence.
+ */
+export function emailsTried(sent: string | undefined, email: string): string[] {
+    const listed = (sent ?? "")
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter(Boolean);
+    const parsed = triedSchema.safeParse(listed);
+    const earlier = parsed.success ? parsed.data.filter((entry) => entry !== email) : [];
+    return [...new Set([...earlier, email])].slice(-MAX_TRIED);
+}
+
 /** The country a connection was made for: one Philips serves, or none. */
 function countryOf(fields: Credentials): string {
     const code = (fields.country ?? "").trim().toUpperCase();
@@ -600,24 +635,35 @@ function countryOf(fields: Credentials): string {
 }
 
 /**
- * The refusal for an account with nothing on it anywhere: which country's
- * region was asked - every other one known was too - and what each list said,
- * with what to do about a HomeID backend that failed. Written in English for
+ * The refusal for an account with nothing on it anywhere: which account it
+ * signed in to, which country's region was asked - every other one known was
+ * too - and what each list said, that the email has to be the Air+ app's own,
+ * every email tried so far, and what to do about a HomeID backend that failed.
+ *
+ * Signing in with an email that has a Philips account but not the purifier is
+ * the usual cause: Philips sends a code to any account, and a list that comes
+ * back empty everywhere is that account's, not a fault. Written in English for
  * the log and the account's history; the screen says it in the reader's
  * language (`refusal-text.ts`).
  */
-export function nothingFoundSentence(summary: string, asked: PairingAsked): string {
+export function nothingFoundSentence(
+    summary: string,
+    asked: PairingAsked,
+    emails: readonly string[]
+): string {
     const country = asked.country
         ? regions.philipsCountryName(asked.country, "en")
         : englishPlaces("connections.philips-cloud.yourCountry");
     const area = regions.philipsRegionWords(englishPlaces, asked.region);
     const homeId = asked.homeIdBroken ? ` ${PHILIPS_HOMEID_BROKEN}` : "";
-    return `Polaris found no device on this Philips account. It asked Philips' servers for ${country} (${area}) and every other region it knows. What it saw: ${summary}. Check that the device is in a Philips app under this same email.${homeId}`;
+    const email = emails[emails.length - 1] ?? "";
+    return `Polaris signed in to Philips as ${email}, and that account has no devices. It asked Philips' servers for ${country} (${area}) and every other region it knows. What it saw: ${summary}. Sign in with the same email you use in the Air+ app. Emails tried: ${emails.join(", ")}.${homeId}`;
 }
 
-function nothingFound(summary: string, asked: PairingAsked): never {
+function nothingFound(summary: string, asked: PairingAsked, emails: readonly string[]): never {
+    // No address in the log: the summary says what was seen, which is enough.
     console.warn(`places: a Philips account sign-in found nothing to drive (${summary})`);
-    throw new DriverError(nothingFoundSentence(summary, asked), "refused");
+    throw new DriverError(nothingFoundSentence(summary, asked, emails), "refused");
 }
 
 /** Where the devices were found, for the dialog to say, when it is not the
@@ -642,6 +688,7 @@ async function afterCode(
     ]);
     const found = await cloud.discoverPhilipsDevices(gigyaSession, session, region);
     const summary = cloud.philipsLookupSummary(found.lookups);
+    const tried = emailsTried(state.tried, email);
     const asked: PairingAsked = {
         country,
         region: found.asked.region,
@@ -665,7 +712,7 @@ async function afterCode(
                 ...foundElsewhere(found, country)
             };
         }
-        nothingFound(summary, asked);
+        nothingFound(summary, asked, tried);
     }
     // Every region known has been asked by now: the app file is the last
     // resort, and the step says so.
@@ -678,7 +725,8 @@ async function afterCode(
             summary,
             country,
             region: asked.region,
-            homeIdBroken: asked.homeIdBroken ? "1" : ""
+            homeIdBroken: asked.homeIdBroken ? "1" : "",
+            tried: tried.join(",")
         },
         STEP_MS
     );
@@ -724,11 +772,15 @@ async function afterFile(email: string, state: PairingState) {
     dropPairing(state.appSecret);
     if (devices.length === 0) {
         if (versuni) return { done: true as const, credentials: versuni };
-        nothingFound(seen, {
-            country: ticket.country ?? "",
-            region: ticket.region || cloud.PHILIPS_EU.region,
-            homeIdBroken: ticket.homeIdBroken === "1"
-        });
+        nothingFound(
+            seen,
+            {
+                country: ticket.country ?? "",
+                region: ticket.region || cloud.PHILIPS_EU.region,
+                homeIdBroken: ticket.homeIdBroken === "1"
+            },
+            emailsTried(ticket.tried, email)
+        );
     }
     airTokens.set(email, token);
     airListed.set(email, devices);

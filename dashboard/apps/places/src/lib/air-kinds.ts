@@ -75,9 +75,17 @@ export const AIR_SPEEDS = [
 export type AirSpeed = (typeof AIR_SPEEDS)[number];
 
 /** The switches some units have: the lock on the buttons, the light of the
- *  display, on a purifier that also humidifies whether it humidifies, and on a
- *  fan whether it swings from side to side. */
-export const AIR_OPTIONS = ["childLock", "light", "humidify", "oscillate"] as const;
+ *  display, on a purifier that also humidifies whether it humidifies, on a fan
+ *  whether it swings from side to side, whether the buttons beep, and whether
+ *  Auto runs as the Air+ app's Auto+ (the AI version that learns the room). */
+export const AIR_OPTIONS = [
+    "childLock",
+    "light",
+    "humidify",
+    "oscillate",
+    "beep",
+    "autoPlus"
+] as const;
 export type AirOption = (typeof AIR_OPTIONS)[number];
 
 /** The filters a unit reports. A combined unit has three; a humidifier has a
@@ -90,15 +98,17 @@ export const FILTER_STATES = ["ok", "soon", "now"] as const;
 export type FilterState = (typeof FILTER_STATES)[number];
 
 /** What a unit measures about the room. Each is optional: a humidifier has no
- *  particle sensor, and an old purifier no thermometer. */
-export const AIR_MEASURES = ["pm25", "allergen", "humidity", "temperature"] as const;
+ *  particle sensor, and an old purifier no thermometer. `gas` is the level of
+ *  gases and odours (VOCs) the units with a gas sensor report, 1 to 4. */
+export const AIR_MEASURES = ["pm25", "allergen", "gas", "humidity", "temperature"] as const;
 export type AirMeasure = (typeof AIR_MEASURES)[number];
 
 /** The units each measure is in, as a person writes them. The allergen index
- *  is a bare number from 1 to 12. */
+ *  is a bare number from 1 to 12, and the gas level a step written L1 to L4. */
 export const MEASURE_UNITS: Readonly<Record<AirMeasure, string>> = {
     pm25: "µg/m³",
     allergen: "",
+    gas: "",
     humidity: "%",
     temperature: "°C"
 };
@@ -144,11 +154,14 @@ export const airSettingsSchema = z.object({
         childLock: z.boolean().optional(),
         light: z.boolean().optional(),
         humidify: z.boolean().optional(),
-        oscillate: z.boolean().optional()
+        oscillate: z.boolean().optional(),
+        beep: z.boolean().optional(),
+        autoPlus: z.boolean().optional()
     }),
     readings: z.object({
         pm25: z.number().finite().min(0).max(10_000).optional(),
         allergen: z.number().finite().min(0).max(100).optional(),
+        gas: z.number().finite().min(0).max(100).optional(),
         humidity: percent.optional(),
         temperature: z.number().finite().min(-50).max(100).optional()
     }),
@@ -275,6 +288,19 @@ function banded(
     return bands.find(([edge]) => rounded <= edge)?.[1] ?? above;
 }
 
+/**
+ * Philips' gas level, for a unit with a gas (VOC and odour) sensor: L1 Good, L2
+ * Fair, L3 Poor, L4 Very poor - the four colours of the air-quality light in
+ * the PureProtect Pro 4200 manual (AC4220/AC4221: blue, blue-purple,
+ * purple-red, red). Like the allergen index, its scale has no Moderate and no
+ * Extremely poor.
+ */
+const GAS_BANDS: readonly (readonly [number, AirQualityLevel])[] = [
+    [1, "good"],
+    [2, "fair"],
+    [3, "poor"]
+];
+
 /** How good the air is, judged by PM2.5. */
 export function pm25Quality(microgramsPerCubicMetre: number): AirQualityLevel {
     return banded(microgramsPerCubicMetre, PM25_BANDS, "extremelyPoor");
@@ -285,20 +311,36 @@ export function allergenQuality(index: number): AirQualityLevel {
     return banded(index, ALLERGEN_BANDS, "veryPoor");
 }
 
+/** How good the air is, judged by Philips' gas level. */
+export function gasQuality(level: number): AirQualityLevel {
+    return banded(level, GAS_BANDS, "veryPoor");
+}
+
 /**
  * How good the air is where a unit is, and which figure said so: PM2.5 where it
  * measures it, since the index is a scale of the maker's own, and the allergen
- * index where it is all there is. Null on a unit that measures neither - a
+ * index where it is all there is. A unit that also measures gas is judged by
+ * the worse of its dust and its gas, as its own light is ("determined by the
+ * highest index between PM2.5 and Gas", the 4200 manual); gas wins a tie only
+ * where there is no dust figure. Null on a unit that measures none of them - a
  * humidifier is not a judge of dust.
  */
 export function airQuality(
     settings: AirSettings | null | undefined
-): { level: AirQualityLevel; measure: "pm25" | "allergen" } | null {
+): { level: AirQualityLevel; measure: "pm25" | "allergen" | "gas" } | null {
     const pm25 = settings?.readings.pm25;
-    if (pm25 !== undefined) return { level: pm25Quality(pm25), measure: "pm25" };
     const allergen = settings?.readings.allergen;
-    if (allergen !== undefined) return { level: allergenQuality(allergen), measure: "allergen" };
-    return null;
+    const dust =
+        pm25 !== undefined
+            ? { level: pm25Quality(pm25), measure: "pm25" as const }
+            : allergen !== undefined
+              ? { level: allergenQuality(allergen), measure: "allergen" as const }
+              : null;
+    const gas = settings?.readings.gas;
+    if (gas === undefined) return dust;
+    const fromGas = { level: gasQuality(gas), measure: "gas" as const };
+    if (!dust) return fromGas;
+    return airQualityRank(fromGas.level) > airQualityRank(dust.level) ? fromGas : dust;
 }
 
 /** A level's place in the order, 1 for Good: what an automation compares. */
@@ -390,7 +432,8 @@ export function applyAir(settings: AirSettings, command: AirCommand): AirSetting
 }
 
 /** The one figure a list shows for a unit: the dust where it measures it, the
- *  humidity on a humidifier, nothing on one that measures neither. */
+ *  humidity on a humidifier, nothing on one that measures neither. The gas
+ *  level is never the headline: a bare L2 says nothing on a row. */
 export function airHeadline(
     settings: AirSettings
 ): { value: string; unit: string; measure: AirMeasure } | null {
@@ -429,6 +472,8 @@ export function airMeasureText(measure: AirMeasure, t: PlacesTranslator = en): s
 /** A measure as a person reads it: the number, then its unit closed up where
  *  it is a symbol. */
 export function measureLine(measure: AirMeasure, value: number): string {
+    // Written the way the unit's own display and manual write it.
+    if (measure === "gas") return `L${Math.round(value)}`;
     const unit = MEASURE_UNITS[measure];
     const rounded = Math.round(value * 10) / 10;
     const text = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
