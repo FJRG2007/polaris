@@ -16,7 +16,11 @@ import { readdir, readFile } from "node:fs/promises";
 import { placesCatalogs } from "@polaris-app/places/messages";
 import { placesRefusalText } from "@polaris-app/places/src/lib/refusal-text";
 import { outageHeadline, outageLength } from "@polaris-app/places/src/lib/reachability";
-import { nothingFoundSentence } from "@polaris-app/places/src/lib/drivers/philips-cloud";
+import { otherNetworkSentence } from "@polaris-app/places/src/lib/drivers/philips-coap";
+import {
+    emailsTried,
+    nothingFoundSentence
+} from "@polaris-app/places/src/lib/drivers/philips-cloud";
 
 const LIB = fileURLToPath(new URL("../../../places/src/lib/", import.meta.url));
 
@@ -85,27 +89,63 @@ describe("a refusal from Places", () => {
         );
     });
 
-    it("names the region asked, and what fixes a HomeID backend that failed", () => {
-        const english = nothingFoundSentence("Air+ (eu-west-1): 0; HomeID app: HTTP 500", {
-            country: "US",
-            region: "eu-west-1",
-            homeIdBroken: true
-        });
+    it("names the account signed in to, every email tried, the region asked, and what fixes a HomeID backend that failed", () => {
+        const english = nothingFoundSentence(
+            "Air+ (eu-west-1): 0; HomeID app: HTTP 500",
+            { country: "US", region: "eu-west-1", homeIdBroken: true },
+            ["first@example.com", "owner@example.com"]
+        );
         expect(english).toBe(
-            "Polaris found no device on this Philips account. It asked Philips' servers for United States (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID app: HTTP 500. Check that the device is in a Philips app under this same email. Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again."
+            "Polaris signed in to Philips as owner@example.com, and that account has no devices. It asked Philips' servers for United States (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID app: HTTP 500. Sign in with the same email you use in the Air+ app. Emails tried: first@example.com, owner@example.com. Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again."
         );
         expect(placesRefusalText(en, english)).toBe(english);
         expect(placesRefusalText(es, english)).toBe(
-            "Polaris no ha encontrado ningún dispositivo en esta cuenta Philips. Preguntó a los servidores de Philips de Estados Unidos (Europa) y de las demás regiones que conoce. Lo que vio: Air+ (eu-west-1): 0; HomeID app: HTTP 500. Comprueba que está en una app de Philips con este mismo email. El servicio HomeID de Philips falló en esta cuenta; si el aparato está en la app HomeID, quítalo y vuelve a añadirlo."
+            "Polaris entró en Philips como owner@example.com, y esa cuenta no tiene dispositivos. Preguntó a los servidores de Philips de Estados Unidos (Europa) y de las demás regiones que conoce. Lo que vio: Air+ (eu-west-1): 0; HomeID app: HTTP 500. Entra con el mismo email que usas en la app Air+. Emails probados: first@example.com, owner@example.com. El servicio HomeID de Philips falló en esta cuenta; si el aparato está en la app HomeID, quítalo y vuelve a añadirlo."
         );
-        const unpicked = nothingFoundSentence("Air+ (eu-west-1): 0", {
-            country: "",
-            region: "eu-west-1",
-            homeIdBroken: false
-        });
+        const unpicked = nothingFoundSentence(
+            "Air+ (eu-west-1): 0",
+            { country: "", region: "eu-west-1", homeIdBroken: false },
+            ["owner@example.com"]
+        );
+        expect(unpicked).toContain("Emails tried: owner@example.com.");
+        expect(placesRefusalText(es, unpicked)).toContain("Emails probados: owner@example.com.");
         expect(unpicked).toContain("Philips' servers for your country (Europe)");
         expect(placesRefusalText(es, unpicked)).toContain(
             "servidores de Philips de tu país (Europa)"
+        );
+    });
+
+    it("still reads the sentence Polaris stored before it named the account", () => {
+        expect(
+            placesRefusalText(
+                es,
+                "Polaris found no device on this Philips account. It asked Philips' servers for Spain (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0. Check that the device is in a Philips app under this same email."
+            )
+        ).toContain("Polaris no ha encontrado ningún dispositivo en esta cuenta Philips.");
+    });
+
+    it("lists the emails tried, this one last, and drops what is not one", () => {
+        expect(emailsTried(undefined, "owner@example.com")).toEqual(["owner@example.com"]);
+        expect(emailsTried("First@Example.com, owner@example.com", "owner@example.com")).toEqual([
+            "first@example.com",
+            "owner@example.com"
+        ]);
+        expect(emailsTried("not an address", "owner@example.com")).toEqual(["owner@example.com"]);
+        const many = Array.from({ length: 9 }, (_, index) => `user${index}@example.com`).join(",");
+        expect(emailsTried(many, "owner@example.com")).toEqual([
+            "user5@example.com",
+            "user6@example.com",
+            "user7@example.com",
+            "user8@example.com",
+            "owner@example.com"
+        ]);
+    });
+
+    it("says a purifier is on a network Polaris cannot reach, in Spanish too", () => {
+        const english = otherNetworkSentence("192.168.50.20", "192.168.1.0/24");
+        expect(placesRefusalText(en, english)).toBe(english);
+        expect(placesRefusalText(es, english)).toBe(
+            "Nada respondió en 192.168.50.20, que está en una red distinta de la de Polaris (192.168.1.0/24). Tu router tiene que dejar que las dos redes se vean, y una wifi de invitados no suele hacerlo. Pon el purificador en la misma wifi que Polaris, o conéctalo con una cuenta Philips."
         );
     });
 

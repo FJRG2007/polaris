@@ -30,7 +30,7 @@ const buttonVariants = cva(
                 secondary:
                     "border border-white/[0.06] bg-muted text-foreground hover:bg-card-hover active:bg-card-hover/80",
                 outline:
-                    "border border-border-strong bg-transparent text-foreground hover:border-control-edge hover:bg-card-hover active:bg-muted",
+                    "border border-border bg-transparent text-foreground hover:border-border-strong hover:bg-card-hover active:bg-muted",
                 ghost: "text-muted-foreground hover:bg-card-hover hover:text-foreground active:bg-muted",
                 danger: "border border-white/10 bg-danger text-danger-foreground hover:bg-danger/90 active:bg-danger/80"
             },
@@ -49,8 +49,7 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-    extends ButtonHTMLAttributes<HTMLButtonElement>,
-        VariantProps<typeof buttonVariants> {
+    extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
     asChild?: boolean;
 }
 

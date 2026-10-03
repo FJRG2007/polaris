@@ -10,20 +10,37 @@
 import bank from "./trivia-questions.json";
 import type { Language, TriviaQuestion } from "./catalog";
 
+/** What a bank question is about - every one of them is about Minecraft. */
+export const CATEGORIES = [
+    "blocks",
+    "mobs",
+    "crafting",
+    "world",
+    "redstone",
+    "enchanting",
+    "versions",
+    "advancements",
+    "mechanics"
+] as const;
+
 /** One question of the bank, in every language, and what it is about. */
 export interface BankQuestion {
     /** Stable: kept in a server's list of what was asked lately. */
     readonly id: string;
-    readonly category: string;
+    readonly category: (typeof CATEGORIES)[number];
+    /** The Minecraft Wiki page the answer was checked against. */
+    readonly source: string;
     readonly en: TriviaQuestion;
     readonly es: TriviaQuestion;
 }
 
 /**
- * Every built-in question, kept as data (`trivia-questions.json`): Minecraft's
- * mobs, items and world, and general knowledge - geography, science, history,
- * numbers. Each is the same question in every language, so players reading
- * different languages are asked the same thing in the same round.
+ * Every built-in question, kept as data (`trivia-questions.json`): Minecraft
+ * only - its blocks, mobs, crafting, world, redstone, enchanting and brewing,
+ * versions, advancements and mechanics, each answer checked on the Minecraft
+ * Wiki for Java Edition 1.21. Each is the same question in every language, so
+ * players reading different languages are asked the same thing in the same
+ * round, and the game's own names are accepted in either language.
  */
 export const BANK: readonly BankQuestion[] = bank as BankQuestion[];
 
@@ -156,11 +173,17 @@ export function normalizeAnswer(text: string): string {
         .trim();
 }
 
-/** Whether something said in the chat answers the question. */
+/** Whether something said in the chat answers the question: written as the
+ *  game's id (`minecraft:ender_pearl`) or in the plural counts too. */
 export function answers(said: string, accepted: readonly string[]): boolean {
-    const typed = normalizeAnswer(said);
+    const typed = normalizeAnswer(said).replace(/^minecraft (?=.)/, "");
     if (!typed) return false;
-    return accepted.some((answer) => normalizeAnswer(answer) === typed);
+    return accepted.some((answer) => {
+        const right = normalizeAnswer(answer);
+        if (!right) return false;
+        const plural = (word: string) => [word, `${word}s`, `${word}es`];
+        return plural(right).includes(typed) || plural(typed).includes(right);
+    });
 }
 
 /**

@@ -108,10 +108,14 @@ left out.
 - **Treasure hunt** hides one treasure, a bastion's treasure room by default,
   under a column of light, with every player's action bar giving its distance
   and direction for the whole hunt.
-- **Trivia** draws from `trivia-questions.json`: over two hundred questions,
-  each in English and Spanish, by category (mobs, items, world, geography,
-  science, history, general). Nothing repeats inside a game, and the
-  questions asked in the last games (`RECENT_KEPT`) come after all the others.
+- **Trivia** draws from `trivia-questions.json`: Minecraft only, over four
+  hundred questions, each in English and Spanish, by category (blocks, mobs,
+  crafting, world, redstone, enchanting, versions, advancements, mechanics).
+  Every question names the Minecraft Wiki page its answer was checked on
+  (Java Edition 1.21), and the names of things are the game's own in each
+  language, so either is accepted, as is the plural or the `minecraft:` id.
+  Nothing repeats inside a game, and the questions asked in the last games
+  (`RECENT_KEPT`) come after all the others.
 - **Parkour** is laid out from the run's id, so every run is a new course.
   Past easy, some plain jumps are traps: slime pads that throw the player up
   again, and orange platforms that vanish for two seconds in every six

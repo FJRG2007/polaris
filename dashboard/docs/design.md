@@ -119,15 +119,6 @@ on the dark theme and invisible on the light one - there the page is 97% and the
 card over it is white. A filled button carries a hairline top edge, which is
 what stops a solid fill from reading as a rectangle pasted onto the page.
 
-The section hairline (`border`/`border-strong`) is deliberately quiet - it tells
-one card from the next, nothing more - so it is not what draws the edge of
-something you operate. `--control-edge` is that edge: a field, a textarea, a
-select, a checkbox, the selected `SegmentedControl` option and an unchecked
-`Switch` track all take it, held to WCAG 1.4.11's 3:1 against every surface it
-can sit on (background, surface, card, elevated, field), in every theme -
-`packages/ui/test/token-contrast.test.ts` measures each pair. An outline button
-takes `border-strong` instead, because a button already carries a label.
-
 ## Empty states
 
 `EmptyState` from `@polaris/ui`: an optional icon, a short statement of what is

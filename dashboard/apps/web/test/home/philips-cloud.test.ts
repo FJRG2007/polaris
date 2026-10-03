@@ -382,7 +382,19 @@ describe("signing in with an emailed code", () => {
                 { vToken: "vt-1", code: "123456" }
             )
         ).rejects.toThrow(
-            "Polaris found no device on this Philips account. It asked Philips' servers for your country (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0. Check that the device is in a Philips app under this same email."
+            "Polaris signed in to Philips as owner@example.com, and that account has no devices. It asked Philips' servers for your country (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0. Sign in with the same email you use in the Air+ app. Emails tried: owner@example.com."
+        );
+    });
+
+    it("lists every email the dialog tried when this one is empty too", async () => {
+        philips({ homeIdApp: { appliances: [] }, uid: null });
+        await expect(
+            driver.philipsCloudDriver.pair!.poll(
+                { email: "Owner@Example.com" },
+                { vToken: "vt-1", code: "123456", tried: "work@example.com,owner@example.com" }
+            )
+        ).rejects.toThrow(
+            "Sign in with the same email you use in the Air+ app. Emails tried: work@example.com, owner@example.com."
         );
     });
 
@@ -546,7 +558,7 @@ describe("going on to Philips' fan and heater cloud", () => {
                 { ...next.state, ...read }
             )
         ).rejects.toThrow(
-            "What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Philips Air: 0. Check that the device is in a Philips app under this same email."
+            "What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Philips Air: 0. Sign in with the same email you use in the Air+ app. Emails tried: owner@example.com."
         );
     });
 
@@ -920,6 +932,9 @@ describe("a unit's status", () => {
 
     it("finds models by prefix, as models.yaml is matched", () => {
         expect(driver.philipsCloudModel("AC1715/71")).toBe(driver.PHILIPS_CLOUD_MODELS.AC1715);
+        // The 4200 series, mapped as the AC22xx family it is locally.
+        expect(driver.philipsCloudModel("AC4221/11")).toBe(driver.PHILIPS_CLOUD_MODELS.AC3221);
+        expect(driver.philipsCloudModel("AC4220/12")).toBe(driver.PHILIPS_CLOUD_MODELS.AC3221);
         expect(driver.philipsCloudModel("AC9999")).toBeNull();
     });
 
@@ -1499,7 +1514,7 @@ describe("the account's region", () => {
     it("refuses with the country and region asked when there is no id for the third cloud", async () => {
         philips({ homeIdApp: { appliances: [] }, uid: null });
         await expect(signIn("ES")).rejects.toThrow(
-            "Polaris found no device on this Philips account. It asked Philips' servers for Spain (Europe) and every other region it knows."
+            "and that account has no devices. It asked Philips' servers for Spain (Europe) and every other region it knows."
         );
     });
 

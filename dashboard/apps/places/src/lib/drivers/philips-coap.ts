@@ -1,5 +1,5 @@
 /**
- * Philips air purifiers and humidifiers on the same network, as devices - the
+ * Philips air purifiers and humidifiers on the local network, as devices - the
  * units the Philips Air+ app drives.
  *
  * Local, like Home Assistant's Philips integration (ruaan-deysel/
@@ -33,6 +33,16 @@
  * unit answers "port unreachable", or answers who it is and nothing else; either
  * way it is said in those words rather than as a unit that is not there.
  *
+ * A unit can be on another network than Polaris - a second Wi-Fi, a guest one.
+ * Its address is taken as typed (or found by its MAC, where the host has a leg
+ * on that network), and it works wherever the router passes traffic between
+ * the two. Where it does not, the unit is silent, and that is said as what it
+ * is: an address on a network Polaris cannot reach, with the two ways out. A
+ * guest Wi-Fi is the usual case, and the usual culprit: kongo09/
+ * philips-airpurifier-coap issue #295 is an AC4220 that only answered once it
+ * was moved off one. A unit that was on another network is looked for on that
+ * network too after it moves, not only on Polaris's own.
+ *
  * Server-only.
  */
 
@@ -40,13 +50,20 @@ import { z } from "zod";
 import { HomeError } from "../home-error";
 import * as philips from "../integrations/philips-api";
 import { forbiddenAddress } from "../integrations/lan-address";
-import { subnetTargets, unitAddressOf } from "../integrations/lan-unit";
+import {
+    networkOf,
+    ownNetwork,
+    subnetAround,
+    subnetTargets,
+    unitAddressOf
+} from "../integrations/lan-unit";
 import { macsAt } from "../integrations/mac-locate";
 import {
     PHILIPS_CHILD_LOCKS,
     PHILIPS_HUMIDIFIERS,
     PHILIPS_LIGHTS,
     PHILIPS_MODELS,
+    PHILIPS_SWITCHES,
     type PhilipsModel,
     type Value
 } from "../integrations/philips-models";
@@ -83,6 +100,10 @@ const SENSORS: readonly {
     { key: "iaql", measure: "allergen" },
     { key: "D03-32", measure: "allergen" },
     { key: "D03120", measure: "allergen" },
+    // `NEW2_GAS`: the gas (VOC and odour) level, 1 to 4, of the units with a
+    // gas sensor - the 4200 series reports it (kongo09/philips-airpurifier-coap
+    // `const.py` line 470 and 643, issue #380).
+    { key: "D03122", measure: "gas" },
     { key: "rh", measure: "humidity" },
     { key: "D03125", measure: "humidity" },
     { key: "temp", measure: "temperature" },
@@ -193,6 +214,11 @@ export function philipsAir(status: Status, model: PhilipsModel | null): kinds.Ai
     const lock = model?.switches.find((key) => key in PHILIPS_CHILD_LOCKS);
     if (lock && status[lock] !== undefined)
         options.childLock = status[lock] !== PHILIPS_CHILD_LOCKS[lock]!.off;
+    for (const key of model?.switches ?? []) {
+        const spec = PHILIPS_SWITCHES[key];
+        if (spec && status[key] !== undefined)
+            options[spec.option] = Number(status[key]) !== Number(spec.off);
+    }
     const light = model?.lights[0];
     if (light && status[bare(light)] !== undefined) {
         // `PhilipsLight.is_on`: compared as numbers.
@@ -294,6 +320,14 @@ export function philipsValues(
                 const values = PHILIPS_CHILD_LOCKS[lock]!;
                 return { [lock]: setting.on ? values.on : values.off };
             }
+            if (setting.option === "beep" || setting.option === "autoPlus") {
+                const key = model?.switches.find(
+                    (entry) => PHILIPS_SWITCHES[entry]?.option === setting.option
+                );
+                if (!key) break;
+                const values = PHILIPS_SWITCHES[key]!;
+                return { [key]: setting.on ? values.on : values.off };
+            }
             if (setting.option === "light") {
                 const light = model?.lights[0];
                 if (!light) break;
@@ -312,6 +346,28 @@ export function philipsValues(
     }
     throw new HomeError("That setting is not one this device has");
 }
+
+// --- the network a unit is on ---------------------------------------------------
+
+/** The sentence for a unit that is silent at an address on another network
+ *  than Polaris's own. Shaped in `refusal-text.ts`. */
+export function otherNetworkSentence(address: string, network: string): string {
+    return `Nothing answered at ${address}, which is on a different network from Polaris (${network}). Your router has to let the two networks reach each other, and a guest Wi-Fi usually does not. Put the purifier on the same Wi-Fi as Polaris, or connect it with a Philips account instead.`;
+}
+
+/** A unit's silence, said as the network it is on where that is not Polaris's
+ *  own; any other refusal, and silence on Polaris's own network, as it was. */
+async function silentAt(address: string, error: DriverError): Promise<DriverError> {
+    if (error.message !== philips.PHILIPS_QUIET) return error;
+    const theirs = networkOf(address);
+    const own = theirs ? await ownNetwork() : null;
+    if (!own || own === theirs) return error;
+    return new DriverError(otherNetworkSentence(address, own), "unreachable");
+}
+
+/** At most this many other networks are looked through for units that moved:
+ *  each is up to 254 datagrams. */
+const MAX_OTHER_NETWORKS = 4;
 
 // --- the units a connection holds -----------------------------------------------
 
@@ -538,7 +594,24 @@ async function relocate(units: readonly PhilipsUnit[]): Promise<void> {
         .join(",");
     if (Date.now() - (looked.get(key) ?? 0) < LOOK_AGAIN_MS) return;
     looked.set(key, Date.now());
-    const found = await philips.scanPhilips(await subnetTargets());
+    // Polaris's own network, and the one each unit was on where that is
+    // another: a unit on a second Wi-Fi gets a new address there, not here.
+    const own = await ownNetwork();
+    const targets = new Set(await subnetTargets());
+    const others = [
+        ...new Set(
+            findable
+                .map((unit) => networkOf(unit.address))
+                .filter((network): network is string => network !== null && network !== own)
+        )
+    ].slice(0, MAX_OTHER_NETWORKS);
+    for (const unit of findable) {
+        if (!others.includes(networkOf(unit.address) ?? "")) continue;
+        for (const address of subnetAround(unit.address)) targets.add(address);
+    }
+    const found = await philips.scanPhilips(
+        [...targets].filter((address) => !forbiddenAddress(address))
+    );
     for (const unit of findable) {
         const seen = found.find((entry) => entry.deviceId === unit.infoId);
         if (seen && seen.address !== located(unit).address && !forbiddenAddress(seen.address)) {
@@ -617,6 +690,8 @@ export const philipsCoapDriver: DeviceDriver = {
                 return { host: typed, units: JSON.stringify([unit]) };
             } catch (error) {
                 if (error instanceof DriverError && error.message === philips.PHILIPS_QUIET) {
+                    const elsewhere = await silentAt(address, error);
+                    if (elsewhere !== error) throw elsewhere;
                     throw new DriverError(
                         "No Philips air purifier answered at that address. Check it is switched on and on the same network as Polaris.",
                         "unreachable"
@@ -683,23 +758,28 @@ export const philipsCoapDriver: DeviceDriver = {
         const here = located(unit);
         const model = modelOfUnit(here);
         const watch = watches.get(here.address);
-        const generation = model
-            ? model.generation
-            : watch?.status
-              ? generationOf(watch.status, null)
-              : (generations.get(here.deviceId) ??
-                generationOf(await philips.readPhilips(here.address), null));
-        const values = philipsValues(model, generation, action, command);
-        // A push-only unit serves one client: its command goes on the link
-        // already open to it, and the push that follows is its new state.
-        if (model?.nudge && watch?.session) {
-            for (let attempt = 0; attempt < 2; attempt += 1) {
-                await watch.session.sync().catch(() => undefined);
-                if (await watch.session.control(values)) return;
+        try {
+            const generation = model
+                ? model.generation
+                : watch?.status
+                  ? generationOf(watch.status, null)
+                  : (generations.get(here.deviceId) ??
+                    generationOf(await philips.readPhilips(here.address), null));
+            const values = philipsValues(model, generation, action, command);
+            // A push-only unit serves one client: its command goes on the link
+            // already open to it, and the push that follows is its new state.
+            if (model?.nudge && watch?.session) {
+                for (let attempt = 0; attempt < 2; attempt += 1) {
+                    await watch.session.sync().catch(() => undefined);
+                    if (await watch.session.control(values)) return;
+                }
+                throw new DriverError(philips.PHILIPS_REFUSED, "refused");
             }
-            throw new DriverError(philips.PHILIPS_REFUSED, "refused");
+            await philips.controlPhilips(here.address, values);
+        } catch (error) {
+            if (error instanceof DriverError) throw await silentAt(here.address, error);
+            throw error;
         }
-        await philips.controlPhilips(here.address, values);
     },
 
     /** Keep a unit's new address once it has been found there. */

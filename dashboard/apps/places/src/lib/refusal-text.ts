@@ -368,6 +368,25 @@ const SHAPED: readonly {
         })
     },
     {
+        // `nothingFoundSentence` in drivers/philips-cloud.ts.
+        pattern:
+            /^Polaris signed in to Philips as (.+?), and that account has no devices\. It asked Philips' servers for (.+) \((.+)\) and every other region it knows\. What it saw: (.+)\. Sign in with the same email you use in the Air\+ app\. Emails tried: (.+?)\.( Philips' HomeID service failed on this account; if the device is in the HomeID app, remove it there and add it again\.)?$/s,
+        key: "refusals.philipsCloudEmpty",
+        params: ["email", "country", "area", "summary", "emails", "homeid"],
+        words: (t, values) => ({
+            ...values,
+            ...philipsWhereInWords(t, englishPlaces, values.country ?? "", values.area ?? ""),
+            homeid: values.homeid ? "yes" : "no"
+        })
+    },
+    {
+        // `otherNetworkSentence` in drivers/philips-coap.ts.
+        pattern:
+            /^Nothing answered at ([0-9.]+), which is on a different network from Polaris \(([0-9./]+)\)\. Your router has to let the two networks reach each other, and a guest Wi-Fi usually does not\. Put the purifier on the same Wi-Fi as Polaris, or connect it with a Philips account instead\.$/,
+        key: "refusals.philipsOtherNetwork",
+        params: ["address", "network"]
+    },
+    {
         pattern:
             /^Philips did not send a code to that address\. Check it is the one you sign in to the Air\+ app with\. Philips said: (.+)\.$/s,
         key: "refusals.philipsCloudNoCodeSaid",

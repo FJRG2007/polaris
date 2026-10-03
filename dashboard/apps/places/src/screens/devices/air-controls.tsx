@@ -45,7 +45,9 @@ const QUALITY_TONES: Readonly<Record<kinds.AirQualityLevel, string>> = {
 };
 
 /** How good the air is, as a word next to the figure it was judged from, with
- *  what to do about it on hover - or, in the panel, written underneath. */
+ *  what to do about it on hover - or, in the panel, written underneath. A
+ *  verdict the gas level gave says so, since the row's own figure is the dust
+ *  and "Poor" next to 1 µg/m³ would read as a fault. */
 export function AirQualityChip({
     air,
     detailed = false,
@@ -58,7 +60,14 @@ export function AirQualityChip({
     const t = usePlacesT();
     const quality = kinds.airQuality(air);
     if (!quality) return null;
-    const level = kinds.airQualityText(quality.level, t);
+    const gas = air?.readings.gas;
+    const level =
+        quality.measure === "gas" && gas !== undefined
+            ? t("devicePanel.air.byGas", {
+                  quality: kinds.airQualityText(quality.level, t),
+                  level: kinds.measureLine("gas", gas)
+              })
+            : kinds.airQualityText(quality.level, t);
     const hint = kinds.airQualityHint(quality.level, t);
     const chip = (
         <Badge

@@ -59,6 +59,26 @@ describe("a king of the hill's platform", () => {
         expect(hill.strayed({ x: 130, y: 64, z: -40 }, place, 6)).toBe(true);
     });
 
+    it("knows who stands on the platform, and who is still on the way or under it", () => {
+        // `place` is the circle's height: the floor's top.
+        expect(hill.onPlatform({ x: 100.5, y: 64, z: -40.5 }, place, 6)).toBe(true);
+        expect(hill.onPlatform({ x: 91.2, y: 65.2, z: -48.7 }, place, 6)).toBe(true);
+        expect(hill.onPlatform({ x: 90.5, y: 64, z: -40 }, place, 6)).toBe(false);
+        expect(hill.onPlatform({ x: 100, y: 60, z: -40 }, place, 6)).toBe(false);
+        expect(hill.onPlatform({ x: 0, y: 70, z: 0 }, place, 6)).toBe(false);
+        expect(
+            hill.notArrived(
+                ["Ana", "Ben", "Cy"],
+                [
+                    { name: "ana", x: 100, y: 64, z: -40 },
+                    { name: "Ben", x: 0, y: 70, z: 0 }
+                ],
+                place,
+                6
+            )
+        ).toEqual(["Ben", "Cy"]);
+    });
+
     it("keeps everybody it brought from harm, and nobody else", () => {
         const lines = hill.protectLines();
         expect(lines).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 3 true");

@@ -672,6 +672,7 @@ describe("an air purifier", () => {
         expect(auto.measuresFor("air")).toEqual([
             "pm25",
             "allergen",
+            "gas",
             "humidity",
             "temperature",
             "filter",
