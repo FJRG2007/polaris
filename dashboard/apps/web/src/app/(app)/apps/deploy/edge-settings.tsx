@@ -189,7 +189,7 @@ export function EdgeSettings({
     function save(card: EdgeCard) {
         const keys = CARD_KEYS[card];
         const verdict = core.appEdgeConfigSchema.safeParse(nextFor(keys));
-        if (!verdict.success) return;
+        if (!verdict.success || pendingCard !== null) return;
         setErrors((current) => ({ ...current, [card]: null }));
         const next = verdict.data;
         setPendingCard(card);
@@ -236,6 +236,7 @@ export function EdgeSettings({
             <SaveBar
                 dirty={dirtyFor(CARD_KEYS[card])}
                 pending={pending && pendingCard === card}
+                busy={pendingCard !== null}
                 justSaved={flash === card}
                 invalid={problemFor(CARD_KEYS[card])}
                 error={errors[card]}

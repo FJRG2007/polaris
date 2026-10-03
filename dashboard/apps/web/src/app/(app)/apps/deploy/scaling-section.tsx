@@ -192,7 +192,7 @@ export function ScalingSection({
     }
 
     function save(card: ScalingCard) {
-        if (kept || !draft || !base) return;
+        if (kept || !draft || !base || pendingCard !== null) return;
         const next = withFields(base, draft, CARD_KEYS[card]);
         const input = parse(next, t).input;
         if (!input) return;
@@ -227,6 +227,7 @@ export function ScalingSection({
         <SaveBar
             dirty={dirty(card) && !kept}
             pending={pending && pendingCard === card}
+            busy={pendingCard !== null}
             justSaved={flash === card}
             invalid={checks[card].problem}
             error={errors[card]}

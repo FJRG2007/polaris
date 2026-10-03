@@ -565,6 +565,8 @@
         "tcpAdd": "Add TCP proxy",
         "tcpTo": "TCP to :{port}",
         "tcpRemove": "Remove TCP proxy",
+        "alsoTunnel": "Also a tunnel",
+        "alsoTunnelHint": "A tunnel serves this name too. Remove this entry to keep only the tunnel.",
         "tcpForward": "Behind a router: forward TCP {ports} to {lan} for these to answer from outside your network.",
         "tcpApply": "The change takes effect when the service is next started.",
         "tcpApplyNow": "Redeploy now",

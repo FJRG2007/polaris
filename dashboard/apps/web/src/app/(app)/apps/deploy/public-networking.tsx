@@ -508,12 +508,15 @@ export function TcpProxyList({
     applicationId,
     nonce,
     canEdit,
-    onChanged
+    onChanged,
+    onCount
 }: {
     applicationId: string;
     nonce: number;
     canEdit: boolean;
     onChanged: () => void;
+    /** How many proxies the service has, whenever that is read or changes. */
+    onCount?: (count: number) => void;
 }) {
     const t = useTranslations("deployService");
     const [view, setView] = useState<TcpProxyView | null>(null);
@@ -540,6 +543,9 @@ export function TcpProxyList({
             active = false;
         };
     }, [applicationId, nonce]);
+
+    const count = view?.proxies.length ?? 0;
+    useEffect(() => onCount?.(count), [count]);
 
     if (!view || (view.proxies.length === 0 && !stale && !error)) return null;
     const host = view.publicHost ?? view.lanHost;

@@ -305,6 +305,7 @@ export function SaveBar({
     invalid,
     error,
     label,
+    busy,
     onSave,
     onDiscard
 }: {
@@ -314,11 +315,13 @@ export function SaveBar({
     invalid?: string | null;
     error?: string | null;
     label?: string;
+    /** Another card that shares this one's server write is saving. */
+    busy?: boolean;
     onSave: () => void;
     onDiscard?: () => void;
 }) {
     const t = useTranslations("deployService");
-    const blocked = !dirty || Boolean(invalid) || pending;
+    const blocked = !dirty || Boolean(invalid) || pending || Boolean(busy);
     return (
         <>
             <p className="mr-auto min-w-0 text-xs" role="status" aria-live="polite">
@@ -335,7 +338,7 @@ export function SaveBar({
                 ) : null}
             </p>
             {dirty && onDiscard && (
-                <Button variant="ghost" size="sm" onClick={onDiscard} disabled={pending}>
+                <Button variant="ghost" size="sm" onClick={onDiscard} disabled={pending || busy}>
                     {t("kit.discard")}
                 </Button>
             )}

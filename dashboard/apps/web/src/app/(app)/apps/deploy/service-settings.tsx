@@ -679,7 +679,8 @@ export function SettingsTab({
             label: t("settings.networking"),
             intro: t("kit.networkingIntro"),
             icon: Network,
-            shown: configure || domains
+            // The private network is shown, read-only, to anybody on the tab.
+            shown: true
         },
         {
             id: `settings-source-${app.id}`,
@@ -723,19 +724,19 @@ export function SettingsTab({
 
     return (
         <SettingsLayout sections={shown}>
-            {section(0).shown && (
-                <SettingsSection {...head(0)}>
-                    {domains && <PublicNetworking app={app} onChanged={onChanged} />}
-                    <PrivateNetworkPanel kind="application" id={app.id} embedded />
-                    {configure && <ContainerPortCard app={app} onChanged={onChanged} />}
+            <SettingsSection {...head(0)}>
+                {domains && <PublicNetworking app={app} onChanged={onChanged} />}
+                <PrivateNetworkPanel kind="application" id={app.id} embedded />
+                {configure && <ContainerPortCard app={app} onChanged={onChanged} />}
+                {(configure || domains) && (
                     <EdgeSettings
                         applicationId={app.id}
                         canEdit={domains}
                         canConfigure={configure}
                         onChanged={onChanged}
                     />
-                </SettingsSection>
-            )}
+                )}
+            </SettingsSection>
 
             <SettingsSection {...head(1)}>
                 {configure && (
@@ -892,6 +893,7 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         : null;
 
     function savePaths(card: string, keys: readonly (keyof SourceFields)[]) {
+        if (pendingCard !== null) return;
         const next = form.next(keys);
         setErrors((current) => ({ ...current, [card]: null }));
         setPendingCard(card);
@@ -917,6 +919,7 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
     }
 
     function saveDeploys(card: string, keys: readonly (keyof SourceFields)[]) {
+        if (pendingCard !== null) return;
         const next = form.next(keys);
         setErrors((current) => ({ ...current, [card]: null }));
         setPendingCard(card);
@@ -943,6 +946,7 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         <SaveBar
             dirty={form.dirty(keys)}
             pending={pendingCard === card}
+            busy={pendingCard !== null}
             justSaved={form.justSaved(card)}
             invalid={invalid}
             error={errors[card]}
@@ -1065,8 +1069,8 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     title={t("settings.autoDeploy")}
                     description={t("settings.autoDeployShort")}
                     badge={
-                        <Badge variant={draft.autoDeploy ? "success" : "neutral"}>
-                            {draft.autoDeploy ? t("kit.on") : t("kit.off")}
+                        <Badge variant={form.saved.autoDeploy ? "success" : "neutral"}>
+                            {form.saved.autoDeploy ? t("kit.on") : t("kit.off")}
                         </Badge>
                     }
                     actions={
@@ -1138,18 +1142,18 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
 function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
     const t = useTranslations("deployService");
     const can = useProjectCan();
-    // The project page merges a live tunnel's hostname into the domains, for the
-    // canvas and the cards. Here each tunnel has a row of its own with its real
-    // state, so drawing the merged entry as well listed the same name twice.
     // Each tunnel's live hostname, by kind. A domain row for the same name - one
-    // added by hand before such names were refused - would otherwise be listed
-    // beside the tunnel's own row; the tunnel's row is the one with the true state.
+    // added by hand before such names were refused - stays listed so it can still
+    // be removed, marked as the tunnel's name; the tunnel's row has the true state.
     const [tunnelHosts, setTunnelHosts] = useState<Record<string, string | null>>({});
     const reportHost = (kind: string) => (hostname: string | null) =>
         setTunnelHosts((current) => (current[kind] === hostname ? current : { ...current, [kind]: hostname }));
     const live = new Set(Object.values(tunnelHosts).filter((host): host is string => host !== null));
+    const [tcpProxies, setTcpProxies] = useState(0);
+    // The project page merges a live tunnel's hostname into the domains, for the
+    // canvas and the cards. Here each tunnel has a row of its own with its real
+    // state, so drawing the merged entry as well listed the same name twice.
     const own = ownDomains(app.domains);
-    const listed = own.filter((domain) => !live.has(domain.hostname.toLowerCase()));
     const [hostname, setHostname] = useState("");
     const [label, setLabel] = useState("");
     const [connectorToken, setConnectorToken] = useState("");
@@ -1504,13 +1508,14 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                 }
             >
                 <ServedByChoice app={app} onChanged={onChanged} />
-                {listed.length === 0 && (
+                {own.length === 0 && live.size === 0 && tcpProxies === 0 && (
                     <p className="text-xs text-foreground-subtle">{t("deployments.noDomain")}</p>
                 )}
                 <ul className="-mx-2 flex flex-col">
-                    {listed.map((rendered) => {
+                    {own.map((rendered) => {
                         const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
                         const local = domain.kind === "lan" || domain.hostname.endsWith(".plr.local");
+                        const tunneled = live.has(domain.hostname.toLowerCase());
                         return (
                             <Fragment key={domain.id}>
                                 <li className="group flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-2 py-1.5 hover:bg-card-hover">
@@ -1557,6 +1562,11 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                     {local && (
                                         <Badge variant="neutral" className="shrink-0">
                                             {t("settings.local")}
+                                        </Badge>
+                                    )}
+                                    {tunneled && (
+                                        <Badge variant="warning" className="shrink-0" title={t("publicNet.alsoTunnelHint")}>
+                                            {t("publicNet.alsoTunnel")}
                                         </Badge>
                                     )}
                                     {domain.targetPort !== undefined && (
@@ -1648,6 +1658,7 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                         nonce={tcpNonce}
                         canEdit={can("domains.manage")}
                         onChanged={onChanged}
+                        onCount={setTcpProxies}
                     />
                 </ul>
                 <publicNet.PrivateNetworkingLink targetId={privateNetworkAnchor(app.id)} />
