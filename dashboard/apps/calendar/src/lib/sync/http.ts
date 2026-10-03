@@ -283,9 +283,9 @@ export function errorForProblem(
                 status
             );
         default:
-            if (status === 401 || status === 403)
+            if ((status === 401 || status === 403) && problem.reason)
                 return new SyncRefusedError(
-                    `${provider.name} refused the request (${status})${said || (problem.reason ? `: ${problem.reason}` : "")}`,
+                    `${provider.name} refused the request (${status})${said || `: ${problem.reason}`}`,
                     status
                 );
             return errorFor(response, problem.message);

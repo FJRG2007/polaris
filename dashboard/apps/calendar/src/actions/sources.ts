@@ -68,7 +68,9 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
         ];
         const used = new Set(list.map((source) => source.connectionId).filter(Boolean));
         const waiting = user.isAdmin && list.some((source) => source.status === "setup");
-        const apiState = waiting ? await readGoogleCalendarApi() : null;
+        const [apiState, clientProject] = waiting
+            ? await Promise.all([readGoogleCalendarApi(), host.calendarHost.googleClientProject()])
+            : [null, null];
         return {
             accounts: {
                 sources: list,
@@ -79,8 +81,12 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
                 canManage: user.isAdmin,
                 googleSetup: waiting
                     ? {
-                          enableUrl: googleApiEnableUrl(CALENDAR_API.service, apiState),
-                          project: apiState?.project ?? null
+                          enableUrl: googleApiEnableUrl(
+                              CALENDAR_API.service,
+                              apiState,
+                              clientProject
+                          ),
+                          project: apiState?.project ?? clientProject
                       }
                     : null,
                 presets: sync.CALDAV_PRESETS,

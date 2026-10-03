@@ -252,6 +252,7 @@ export const serverHost = {
         createDueTask: later(load.calendarHost, "createDueTask"),
         createMeetingLink: later(load.calendarHost, "createMeetingLink"),
         displayTimeZone: later(load.calendarHost, "displayTimeZone"),
+        googleClientProject: later(load.calendarHost, "googleClientProject"),
         listCalendarLinks: later(load.calendarHost, "listCalendarLinks"),
         openCalendarSecret: later(load.calendarHost, "openCalendarSecret"),
         peopleByIds: later(load.calendarHost, "peopleByIds"),

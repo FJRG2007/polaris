@@ -151,6 +151,19 @@ describe("the Microsoft Graph calendar client", () => {
     });
 });
 
+describe("a refusal with no body to read", () => {
+    it("still offers reconnecting, as a bare 401 or 403 always did", async () => {
+        const bare: Fetcher = async () => new Response("", { status: 403 });
+        const fromGoogle = createGoogleProvider({
+            accessToken: async () => "token",
+            fetcher: bare
+        });
+        const fromGraph = createGraphProvider({ accessToken: async () => "token", fetcher: bare });
+        expect(await failure(fromGoogle.listCalendars())).toBeInstanceOf(SyncAuthError);
+        expect(await failure(fromGraph.listCalendars())).toBeInstanceOf(SyncAuthError);
+    });
+});
+
 describe("Google API state and links", () => {
     const at = (iso: string) => new Date(iso);
 

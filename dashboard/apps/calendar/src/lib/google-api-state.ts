@@ -61,7 +61,7 @@ export async function recordGoogleCalendarApiOn(now: Date): Promise<void> {
 /** Make every Google source waiting on the API due now. */
 export async function retryWaitingSources(now: Date): Promise<number> {
     const moved = await prisma.calendarSource.updateMany({
-        where: { kind: "google", status: "setup", nextSyncAt: { gt: now } },
+        where: core.googleSourcesWaitingOnApi(now),
         data: { nextSyncAt: now }
     });
     return moved.count;

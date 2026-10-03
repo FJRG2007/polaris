@@ -102,6 +102,15 @@ export async function calendarLinkAvailable(
     return connectionLinkAvailable(provider, { admin: options.admin });
 }
 
+/** The Cloud project number of the operator's Google OAuth client, when its id
+ *  names one: where a switched-off API is turned on while nothing better is known. */
+export async function googleClientProject(): Promise<string | null> {
+    const { getGoogleOAuthClient } = await import("@/lib/google-calendar/service");
+    const { projectFromGoogleClientId } = await import("@polaris/core");
+    const client = await getGoogleOAuthClient();
+    return client ? projectFromGoogleClientId(client.clientId) : null;
+}
+
 /**
  * The link stopped being accepted - revoked, a changed password, or never
  * granted calendars. The app says "connect it again" rather than an error.

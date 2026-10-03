@@ -128,24 +128,33 @@ async function refresh(
         // The calendars waiting on it are tried on the next sync pass rather than
         // at the end of their growing gap.
         await prisma.calendarSource.updateMany({
-            where: { kind: "google", status: "setup", nextSyncAt: { gt: now } },
+            where: core.googleSourcesWaitingOnApi(now),
             data: { nextSyncAt: now }
         });
     }
     return next;
 }
 
-let running: Promise<GoogleApiHealth[]> | null = null;
+let running: { readonly force: boolean; readonly result: Promise<GoogleApiHealth[]> } | null = null;
 
 /**
  * Every API's state. Asks Google only for an answer older than ten minutes, or
  * on `force` for one older than twenty seconds; one check at a time per process.
+ * A forced call that finds an unforced check running waits for it, then runs its own.
  */
 export function googleApiHealth(readerId: string, force = false): Promise<GoogleApiHealth[]> {
-    running ??= check(readerId, force).finally(() => {
-        running = null;
-    });
-    return running;
+    if (running && (running.force || !force)) return running.result;
+    const before = running?.result.catch(() => undefined);
+    const current = {
+        force,
+        result: Promise.resolve(before)
+            .then(() => check(readerId, force))
+            .finally(() => {
+                if (running === current) running = null;
+            })
+    };
+    running = current;
+    return current.result;
 }
 
 async function check(readerId: string, force: boolean): Promise<GoogleApiHealth[]> {

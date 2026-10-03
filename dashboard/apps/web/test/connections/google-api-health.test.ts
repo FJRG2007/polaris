@@ -151,6 +151,25 @@ describe("googleApiHealth", () => {
         ]);
     });
 
+    it("asks Google again for a forced check that arrives while an unforced one runs", async () => {
+        links.push({
+            id: "mine",
+            userId: "admin-1",
+            scope: "https://www.googleapis.com/auth/calendar"
+        });
+        answer = () => disabled();
+        await googleApiHealth("admin-1");
+        vi.setSystemTime(new Date(NOW.getTime() + 60_000));
+        answer = () =>
+            new Response(JSON.stringify({ kind: "calendar#calendarList" }), { status: 200 });
+        const unforced = googleApiHealth("admin-1");
+        const forced = googleApiHealth("admin-1", true);
+        const again = googleApiHealth("admin-1");
+        expect((await unforced)[0]?.state).toBe("disabled");
+        expect((await forced)[0]?.state).toBe("enabled");
+        expect(await again).toBe(await forced);
+    });
+
     it("leaves the state alone when Google answers something else", async () => {
         links.push({
             id: "mine",

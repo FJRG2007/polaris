@@ -508,18 +508,19 @@ function GoogleApiRow({ api }: { api: GoogleApiHealth }) {
             : api.state === "unknown"
               ? t(`integrations.googleApis.unknownHint.${api.id}`)
               : null;
+    const usedFor = t(`integrations.googleApis.usedFor.${api.id}`);
     return (
         <li className="flex flex-col gap-1 py-2 first:pt-0 last:pb-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="min-w-0 flex-1 basis-40">
-                    <span className="block truncate font-medium" title={api.title}>
+                    <span
+                        className="block truncate font-medium"
+                        title={`${api.title} - ${api.service}`}
+                    >
                         {api.title}
                     </span>
-                    <span
-                        className="block truncate text-xs text-muted-foreground"
-                        title={api.service}
-                    >
-                        {t(`integrations.googleApis.usedFor.${api.id}`)}
+                    <span className="block truncate text-xs text-muted-foreground" title={usedFor}>
+                        {usedFor}
                     </span>
                 </span>
                 <span

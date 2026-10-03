@@ -348,3 +348,12 @@ export function nextProviderApiState(
         checkedAt: at
     };
 }
+
+/**
+ * The Google calendar sources waiting on the Calendar API to be switched on that
+ * are not due yet - the ones to make due at once when it answers again. Shared by
+ * the Calendar's sync and the admin Integrations check, so both retry the same set.
+ */
+export function googleSourcesWaitingOnApi(now: Date) {
+    return { kind: "google", status: "setup", nextSyncAt: { gt: now } } as const;
+}
