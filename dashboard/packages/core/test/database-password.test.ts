@@ -31,7 +31,8 @@ describe("changing a password", () => {
         const dedicated = changePasswordCommands({ ...base, engine: "mysql" })[0]?.argv ?? [];
         expect(dedicated.slice(0, 3)).toEqual(["mysql", "-uroot", "-pold-password"]);
         expect(dedicated[4]).toContain("'root'@'localhost'");
-        const hosted = changePasswordCommands({ ...base, engine: "mariadb", hosted: true })[0]?.argv ?? [];
+        const hosted =
+            changePasswordCommands({ ...base, engine: "mariadb", hosted: true })[0]?.argv ?? [];
         expect(hosted[0]).toBe("mariadb");
         expect(hosted[4]).not.toContain("root");
     });
@@ -40,7 +41,9 @@ describe("changing a password", () => {
         expect(changePasswordCommands({ ...base, engine: "mongo" })[0]?.argv.at(-1)).toBe(
             'db.getSiblingDB("admin").changeUserPassword("polaris", "Gk2_x-9ZqLmN4pRsTuVwXyZ01234abcd")'
         );
-        expect(changePasswordCommands({ ...base, engine: "mongo", hosted: true })[0]?.argv.at(-1)).toContain('getSiblingDB("shop")');
+        expect(
+            changePasswordCommands({ ...base, engine: "mongo", hosted: true })[0]?.argv.at(-1)
+        ).toContain('getSiblingDB("shop")');
         expect(changePasswordCommands({ ...base, engine: "redis" })[0]?.argv.slice(-3)).toEqual([
             "SET",
             "requirepass",
@@ -49,7 +52,11 @@ describe("changing a password", () => {
     });
 
     it("refuses a password Polaris did not generate, so a literal cannot be ended", () => {
-        expect(() => changePasswordCommands({ ...base, newPassword: "abc'; DROP ROLE x; --abcdefgh" })).toThrow(/generated/);
-        expect(() => changePasswordCommands({ ...base, newPassword: "short" })).toThrow(/generated/);
+        expect(() =>
+            changePasswordCommands({ ...base, newPassword: "abc'; DROP ROLE x; --abcdefgh" })
+        ).toThrow(/generated/);
+        expect(() => changePasswordCommands({ ...base, newPassword: "short" })).toThrow(
+            /generated/
+        );
     });
 });

@@ -42,8 +42,21 @@ import { requireDatabaseAccess } from "@/lib/deploy-project-access";
 import { engineStatsAt, type DatabaseStats } from "@/lib/data/stats";
 import { databaseInsightsAt, type DatabaseInsights } from "@/lib/data/insights";
 import { rowDeleteSchema, rowInsertSchema, tableDraftSchema } from "@/lib/data/row-edit-schema";
-import { cachedHealth, forgetHealth, healthAt, runnerFor, type HealthReport } from "@/lib/data/health";
-import { DataRequestError, type DataColumn, type DataNamespace, type DataPage, type DataRelation, type QueryResult } from "@/lib/data/driver";
+import {
+    cachedHealth,
+    forgetHealth,
+    healthAt,
+    runnerFor,
+    type HealthReport
+} from "@/lib/data/health";
+import {
+    DataRequestError,
+    type DataColumn,
+    type DataNamespace,
+    type DataPage,
+    type DataRelation,
+    type QueryResult
+} from "@/lib/data/driver";
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -67,7 +80,8 @@ async function open(source: ManagedSource) {
 }
 
 const spoken = (caught: unknown) =>
-    caught instanceof DatabaseOperationError || (caught instanceof Error && caught.message === "Database not found");
+    caught instanceof DatabaseOperationError ||
+    (caught instanceof Error && caught.message === "Database not found");
 
 /** Parse a request body, refusing with the schema's own sentence. */
 function parse<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown): T {
@@ -80,8 +94,19 @@ async function guard<T>(run: () => Promise<T>) {
     return guardData(run, spoken);
 }
 
-async function audit(actorId: string, action: string, databaseId: string, metadata?: Record<string, unknown>) {
-    await recordDeployAudit({ actorId, action, targetType: "database", targetId: databaseId, ...(metadata ? { metadata } : {}) });
+async function audit(
+    actorId: string,
+    action: string,
+    databaseId: string,
+    metadata?: Record<string, unknown>
+) {
+    await recordDeployAudit({
+        actorId,
+        action,
+        targetType: "database",
+        targetId: databaseId,
+        ...(metadata ? { metadata } : {})
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -113,14 +138,28 @@ export async function managedRowsAction(
 ): Promise<{ page?: DataPage; columns?: DataColumn[]; error?: string }> {
     const result = await guard(async () => {
         const { address } = await open(source);
-        return browser.rowsAt(address, namespace === null ? null : String(namespace), String(relation), {
-            limit: Number(query.limit) || undefined,
-            offset: Number(query.offset) || 0,
-            orderBy: query.orderBy === null || query.orderBy === undefined ? null : String(query.orderBy),
-            descending: query.descending === true,
-            filter: query.filter === null || query.filter === undefined ? null : String(query.filter),
-            cursor: query.cursor === null || query.cursor === undefined ? null : String(query.cursor)
-        });
+        return browser.rowsAt(
+            address,
+            namespace === null ? null : String(namespace),
+            String(relation),
+            {
+                limit: Number(query.limit) || undefined,
+                offset: Number(query.offset) || 0,
+                orderBy:
+                    query.orderBy === null || query.orderBy === undefined
+                        ? null
+                        : String(query.orderBy),
+                descending: query.descending === true,
+                filter:
+                    query.filter === null || query.filter === undefined
+                        ? null
+                        : String(query.filter),
+                cursor:
+                    query.cursor === null || query.cursor === undefined
+                        ? null
+                        : String(query.cursor)
+            }
+        );
     });
     return result.error ? { error: result.error } : { page: result.value };
 }
@@ -135,7 +174,10 @@ export async function managedRunAction(
         const changed = results.filter((entry) => entry.affected !== null).length;
         // What ran is not recorded - a statement can carry a password or a
         // customer's data - only that something written was run, and how much.
-        if (changed > 0) await audit(opened.userId, "deploy.db.statement", opened.databaseId, { statements: changed });
+        if (changed > 0)
+            await audit(opened.userId, "deploy.db.statement", opened.databaseId, {
+                statements: changed
+            });
         return results;
     });
     return result.error ? { error: result.error } : { results: result.value };
@@ -143,7 +185,13 @@ export async function managedRunAction(
 
 export async function managedUpdateCellAction(
     source: ManagedSource,
-    edit: { namespace: string | null; relation: string; column: string; value: string | null; key: Record<string, unknown> }
+    edit: {
+        namespace: string | null;
+        relation: string;
+        column: string;
+        value: string | null;
+        key: Record<string, unknown>;
+    }
 ): Promise<{ changed?: number; error?: string }> {
     const result = await guard(async () => {
         const opened = await open(source);
@@ -154,7 +202,9 @@ export async function managedUpdateCellAction(
             value: edit.value === null ? null : String(edit.value),
             key: edit.key
         });
-        await audit(opened.userId, "deploy.db.row.update", opened.databaseId, { table: String(edit.relation) });
+        await audit(opened.userId, "deploy.db.row.update", opened.databaseId, {
+            table: String(edit.relation)
+        });
         return changed;
     });
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
@@ -168,7 +218,9 @@ export async function managedInsertRowAction(
         const parsed = parse(rowInsertSchema, insert);
         const opened = await open(source);
         const done = await browser.insertRowAt(opened.address, parsed);
-        await audit(opened.userId, "deploy.db.row.insert", opened.databaseId, { table: parsed.relation });
+        await audit(opened.userId, "deploy.db.row.insert", opened.databaseId, {
+            table: parsed.relation
+        });
         return done;
     });
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
@@ -191,7 +243,10 @@ export async function managedDeleteRowsAction(
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
 
-export async function managedCreateTableAction(source: ManagedSource, draft: unknown): Promise<{ error?: string }> {
+export async function managedCreateTableAction(
+    source: ManagedSource,
+    draft: unknown
+): Promise<{ error?: string }> {
     const result = await guard(async () => {
         const parsed = parse(tableDraftSchema, draft) as TableDraft;
         const opened = await open(source);
@@ -212,12 +267,18 @@ export async function managedRedisValueAction(
 ): Promise<{ value?: browser.KeyValueView; error?: string }> {
     const result = await guard(async () => {
         const { address } = await open(source);
-        return browser.keyValueAt(address, namespace === null ? null : String(namespace), String(key));
+        return browser.keyValueAt(
+            address,
+            namespace === null ? null : String(namespace),
+            String(key)
+        );
     });
     return result.error ? { error: result.error } : { value: result.value };
 }
 
-export async function managedStatsAction(source: ManagedSource): Promise<{ stats?: DatabaseStats; error?: string }> {
+export async function managedStatsAction(
+    source: ManagedSource
+): Promise<{ stats?: DatabaseStats; error?: string }> {
     const result = await guard(async () => engineStatsAt((await open(source)).address));
     return result.error ? { error: result.error } : { stats: result.value };
 }
@@ -254,12 +315,20 @@ export async function vacuumTableAction(
     table: { schema: string; name: string }
 ): Promise<{ error?: string }> {
     const result = await guard(async () => {
-        const target = parse(z.object({ schema: z.string().min(1).max(256), name: z.string().min(1).max(256) }), table);
+        const target = parse(
+            z.object({ schema: z.string().min(1).max(256), name: z.string().min(1).max(256) }),
+            table
+        );
         const opened = await open({ databaseId, writable: true });
-        if (opened.address.engine !== "postgres") throw new DatabaseOperationError("Vacuum is a PostgreSQL command.");
-        await withDriver(opened.address, (driver) => maintenance.vacuumTable(runnerFor(driver), target.schema, target.name));
+        if (opened.address.engine !== "postgres")
+            throw new DatabaseOperationError("Vacuum is a PostgreSQL command.");
+        await withDriver(opened.address, (driver) =>
+            maintenance.vacuumTable(runnerFor(driver), target.schema, target.name)
+        );
         forgetHealth(opened.databaseId);
-        await audit(opened.userId, "deploy.db.vacuum", opened.databaseId, { table: `${target.schema}.${target.name}` });
+        await audit(opened.userId, "deploy.db.vacuum", opened.databaseId, {
+            table: `${target.schema}.${target.name}`
+        });
     });
     return result.error ? { error: result.error } : {};
 }
@@ -280,12 +349,21 @@ export async function setExtensionAction(
     input: { name: string; installed: boolean }
 ): Promise<{ error?: string }> {
     const result = await guard(async () => {
-        const wanted = parse(z.object({ name: z.string().min(1).max(63), installed: z.boolean() }), input);
+        const wanted = parse(
+            z.object({ name: z.string().min(1).max(63), installed: z.boolean() }),
+            input
+        );
         const opened = await open({ databaseId, writable: true });
-        if (opened.address.engine !== "postgres") throw new DatabaseOperationError("Extensions are a PostgreSQL feature.");
+        if (opened.address.engine !== "postgres")
+            throw new DatabaseOperationError("Extensions are a PostgreSQL feature.");
         if (wanted.name === "pg_stat_statements") {
             // Loaded at start, so it is the instance setting, not just the extension.
-            await admin.setStatStatements(opened.databaseId, opened.ownerId, opened.userId, wanted.installed);
+            await admin.setStatStatements(
+                opened.databaseId,
+                opened.ownerId,
+                opened.userId,
+                wanted.installed
+            );
         } else {
             await withDriver(opened.address, (driver) =>
                 wanted.installed
@@ -331,14 +409,21 @@ export async function regeneratePasswordAction(
 ): Promise<{ restarted?: admin.DependentService[]; error?: string }> {
     const result = await guard(async () => {
         const opened = await open({ databaseId, writable: true });
-        const restarted = await admin.regeneratePassword(opened.databaseId, opened.ownerId, opened.userId, (ids) => {
-            for (const id of ids) {
-                void redeployForEnvScope("application", id, opened.ownerId, opened.userId, {
-                    reason: "database-password",
-                    databaseId: opened.databaseId
-                }).catch((error: unknown) => console.error("deploy: a restart after a password change failed", error));
+        const restarted = await admin.regeneratePassword(
+            opened.databaseId,
+            opened.ownerId,
+            opened.userId,
+            (ids) => {
+                for (const id of ids) {
+                    void redeployForEnvScope("application", id, opened.ownerId, opened.userId, {
+                        reason: "database-password",
+                        databaseId: opened.databaseId
+                    }).catch((error: unknown) =>
+                        console.error("deploy: a restart after a password change failed", error)
+                    );
+                }
             }
-        });
+        );
         await audit(opened.userId, "deploy.db.password.regenerate", opened.databaseId, {
             restarted: restarted.map((service) => service.id)
         });
@@ -363,7 +448,9 @@ export interface ConnectInfo {
 
 /** Everything the Connect panel shows. Hands out the password, so it is gated
  *  like the Connect dialog: `databases.manage`. */
-export async function databaseConnectInfoAction(databaseId: string): Promise<{ info?: ConnectInfo; error?: string }> {
+export async function databaseConnectInfoAction(
+    databaseId: string
+): Promise<{ info?: ConnectInfo; error?: string }> {
     const result = await guard(async () => {
         const id = parse(z.string().uuid(), databaseId);
         const user = await requirePermission("deploy.manage");
@@ -374,7 +461,11 @@ export async function databaseConnectInfoAction(databaseId: string): Promise<{ i
             select: {
                 slug: true,
                 engine: true,
-                parent: { select: { target: { select: { kind: true, host: { select: { address: true } } } } } },
+                parent: {
+                    select: {
+                        target: { select: { kind: true, host: { select: { address: true } } } }
+                    }
+                },
                 target: { select: { kind: true, host: { select: { address: true } } } }
             }
         });
@@ -404,16 +495,24 @@ export async function databaseConnectInfoAction(databaseId: string): Promise<{ i
 }
 
 /** Publish the database on a port of its server, or stop. Redeploys it. */
-export async function setPublicPortAction(databaseId: string, port: number | null): Promise<{ error?: string }> {
+export async function setPublicPortAction(
+    databaseId: string,
+    port: number | null
+): Promise<{ error?: string }> {
     const result = await guard(async () => {
         const wanted = parse(z.number().int().nullable(), port);
         const id = parse(z.string().uuid(), databaseId);
         const user = await requirePermission("deploy.manage");
         const access = await requireDatabaseAccess(id, user.id, "databases.manage");
         await admin.setPublicPort(id, access.ownerId, user.id, wanted);
-        await audit(user.id, wanted === null ? "deploy.db.public.close" : "deploy.db.public.open", id, {
-            ...(wanted === null ? {} : { port: wanted })
-        });
+        await audit(
+            user.id,
+            wanted === null ? "deploy.db.public.close" : "deploy.db.public.open",
+            id,
+            {
+                ...(wanted === null ? {} : { port: wanted })
+            }
+        );
     });
     if (!result.error) revalidatePath(DEPLOY_PATH);
     return result.error ? { error: result.error } : {};

@@ -41,7 +41,9 @@ const VACUUM_TIMEOUT_MS = 30 * 60_000;
 function rowsOf(results: Awaited<ReturnType<Run>>): Record<string, unknown>[] {
     const result = results[0];
     if (!result) return [];
-    return result.rows.map((row) => Object.fromEntries(result.columns.map((column, index) => [column, row[index]])));
+    return result.rows.map((row) =>
+        Object.fromEntries(result.columns.map((column, index) => [column, row[index]]))
+    );
 }
 
 /** What the server ships and what is installed in this database. */
@@ -54,7 +56,10 @@ export async function listExtensions(run: Run): Promise<ExtensionView[]> {
     ).map((row) => ({
         name: String(row.name ?? ""),
         defaultVersion: row.default_version === null ? null : String(row.default_version ?? ""),
-        installedVersion: row.installed_version === null || row.installed_version === undefined ? null : String(row.installed_version),
+        installedVersion:
+            row.installed_version === null || row.installed_version === undefined
+                ? null
+                : String(row.installed_version),
         comment: row.comment === null || row.comment === undefined ? null : String(row.comment)
     }));
 }
@@ -75,7 +80,8 @@ export async function installExtension(run: Run, name: string): Promise<void> {
 
 /** Remove an installed extension, never with CASCADE. */
 export async function uninstallExtension(run: Run, name: string): Promise<void> {
-    if (KEPT_EXTENSIONS.has(name)) throw new DataRequestError("That extension is part of the database and stays.");
+    if (KEPT_EXTENSIONS.has(name))
+        throw new DataRequestError("That extension is part of the database and stays.");
     const known = rowsOf(await run("SELECT extname FROM pg_extension WHERE extname = $1", [name]));
     if (known.length !== 1) throw new DataRequestError("That extension is not installed here.");
     await run(`DROP EXTENSION IF EXISTS ${quoteSqlIdent(name)}`);

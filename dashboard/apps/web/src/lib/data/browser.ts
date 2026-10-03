@@ -150,10 +150,15 @@ export async function updateCell(
     return updateCellAt(await addressOf(userId, connectionId), edit);
 }
 
-export async function updateCellAt(address: data.DataAddress, edit: data.CellEdit): Promise<data.CellEditResult> {
+export async function updateCellAt(
+    address: data.DataAddress,
+    edit: data.CellEdit
+): Promise<data.CellEditResult> {
     return withDriver(address, async (driver) => {
         if (!driver.updateCell) {
-            throw new data.DataRequestError("Values in this kind of database are not edited from the grid.");
+            throw new data.DataRequestError(
+                "Values in this kind of database are not edited from the grid."
+            );
         }
         const known = await driver.relations(edit.namespace);
         if (!known.some((entry) => entry.name === edit.relation)) {
@@ -172,7 +177,10 @@ export async function run(
     return runAt(await addressOf(userId, connectionId), statement);
 }
 
-export async function runAt(address: data.DataAddress, statement: string): Promise<data.QueryResult[]> {
+export async function runAt(
+    address: data.DataAddress,
+    statement: string
+): Promise<data.QueryResult[]> {
     return withDriver(address, (driver) => driver.run(statement));
 }
 
@@ -208,7 +216,11 @@ export async function keyValueAt(
  * it - its name goes where no parameter can - and the engine has to be one with
  * rows to add and remove.
  */
-async function knownRelation(driver: data.DataDriver, namespace: string | null, relation: string): Promise<void> {
+async function knownRelation(
+    driver: data.DataDriver,
+    namespace: string | null,
+    relation: string
+): Promise<void> {
     const known = await driver.relations(namespace);
     if (!known.some((entry) => entry.name === relation && entry.kind === "table")) {
         throw new data.DataRequestError("There is nothing here by that name.");
@@ -218,11 +230,18 @@ async function knownRelation(driver: data.DataDriver, namespace: string | null, 
 const NO_ROW_WRITES = "Rows in this kind of database are not added or removed from the grid.";
 
 /** Add one row. */
-export async function insertRow(userId: string, connectionId: string, insert: RowInsert): Promise<RowWriteResult> {
+export async function insertRow(
+    userId: string,
+    connectionId: string,
+    insert: RowInsert
+): Promise<RowWriteResult> {
     return insertRowAt(await addressOf(userId, connectionId), insert);
 }
 
-export async function insertRowAt(address: data.DataAddress, insert: RowInsert): Promise<RowWriteResult> {
+export async function insertRowAt(
+    address: data.DataAddress,
+    insert: RowInsert
+): Promise<RowWriteResult> {
     return withDriver(address, async (driver) => {
         if (!driver.insertRow) throw new data.DataRequestError(NO_ROW_WRITES);
         await knownRelation(driver, insert.namespace, insert.relation);
@@ -231,11 +250,18 @@ export async function insertRowAt(address: data.DataAddress, insert: RowInsert):
 }
 
 /** Remove rows, each named by its primary key. */
-export async function deleteRows(userId: string, connectionId: string, removal: RowDelete): Promise<RowWriteResult> {
+export async function deleteRows(
+    userId: string,
+    connectionId: string,
+    removal: RowDelete
+): Promise<RowWriteResult> {
     return deleteRowsAt(await addressOf(userId, connectionId), removal);
 }
 
-export async function deleteRowsAt(address: data.DataAddress, removal: RowDelete): Promise<RowWriteResult> {
+export async function deleteRowsAt(
+    address: data.DataAddress,
+    removal: RowDelete
+): Promise<RowWriteResult> {
     return withDriver(address, async (driver) => {
         if (!driver.deleteRows) throw new data.DataRequestError(NO_ROW_WRITES);
         await knownRelation(driver, removal.namespace, removal.relation);
@@ -244,17 +270,26 @@ export async function deleteRowsAt(address: data.DataAddress, removal: RowDelete
 }
 
 /** Create a table in a schema the connection holds. */
-export async function createTable(userId: string, connectionId: string, draft: TableDraft): Promise<void> {
+export async function createTable(
+    userId: string,
+    connectionId: string,
+    draft: TableDraft
+): Promise<void> {
     return createTableAt(await addressOf(userId, connectionId), draft);
 }
 
 export async function createTableAt(address: data.DataAddress, draft: TableDraft): Promise<void> {
     return withDriver(address, async (driver) => {
         if (!driver.createTable) {
-            throw new data.DataRequestError("Tables in this kind of database are not created from here.");
+            throw new data.DataRequestError(
+                "Tables in this kind of database are not created from here."
+            );
         }
         const namespaces = await driver.namespaces();
-        if (draft.namespace !== null && !namespaces.some((entry) => entry.name === draft.namespace)) {
+        if (
+            draft.namespace !== null &&
+            !namespaces.some((entry) => entry.name === draft.namespace)
+        ) {
             throw new data.DataRequestError("There is nothing here by that name.");
         }
         await driver.createTable(draft);

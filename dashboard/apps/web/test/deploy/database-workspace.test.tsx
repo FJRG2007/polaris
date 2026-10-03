@@ -62,12 +62,24 @@ vi.mock("@/app/(app)/apps/deploy/database-data-actions", () => ({
 // presentational piece, so it is reproduced here rather than dragging that
 // graph in just to resolve one export.
 vi.mock("@/app/(app)/apps/deploy/deploy-view", () => ({
-    CopyRow: ({ value, secret, copyValue }: { value: string; secret?: boolean; copyValue?: string }) => {
+    CopyRow: ({
+        value,
+        secret,
+        copyValue
+    }: {
+        value: string;
+        secret?: boolean;
+        copyValue?: string;
+    }) => {
         const shown = secret ? value.replace(/:\/\/([^:]*):[^@]*@/, "://$1:********@") : value;
         return (
             <span>
                 <code title={shown}>{shown}</code>
-                <button type="button" aria-label="Copy" onClick={() => void navigator.clipboard?.writeText(copyValue ?? value)}>
+                <button
+                    type="button"
+                    aria-label="Copy"
+                    onClick={() => void navigator.clipboard?.writeText(copyValue ?? value)}
+                >
                     Copy
                 </button>
             </span>
@@ -93,7 +105,11 @@ vi.mock("@/app/(app)/apps/databases/actions", () => ({
     insightsAction: vi.fn()
 }));
 
-const DATABASE = { id: "11111111-1111-1111-1111-111111111111", name: "orders-db", engine: "postgres" };
+const DATABASE = {
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "orders-db",
+    engine: "postgres"
+};
 
 const HEALTH: HealthReport = {
     engine: "postgres",
@@ -123,12 +139,23 @@ const HEALTH: HealthReport = {
     ],
     tablesTotal: 1,
     vacuum: { databaseXidAge: 102_300, freezeMaxAge: 200_000_000, freezeRisk: false },
-    unusedIndexes: [{ schema: "public", table: "orders", name: "orders_legacy_idx", bytes: 1_048_576, scans: 0 }],
+    unusedIndexes: [
+        { schema: "public", table: "orders", name: "orders_legacy_idx", bytes: 1_048_576, scans: 0 }
+    ],
     queries: {
         available: true,
         installed: true,
         preloaded: true,
-        rows: [{ statement: "SELECT * FROM orders WHERE id = $1", calls: 940, rows: 940, totalMs: 812.4, meanMs: 0.86, maxMs: 14.2 }]
+        rows: [
+            {
+                statement: "SELECT * FROM orders WHERE id = $1",
+                calls: 940,
+                rows: 940,
+                totalMs: 812.4,
+                meanMs: 0.86,
+                maxMs: 14.2
+            }
+        ]
     },
     facts: []
 };
@@ -173,8 +200,12 @@ beforeEach(() => {
         relations: [{ name: "orders", namespace: "public", kind: "table", rows: 48_210 }],
         namespace: "public"
     });
-    managedStatsAction.mockResolvedValue({ stats: { at: Date.now(), engine: "postgres", gauges: [], counters: [] } });
-    managedInsightsAction.mockResolvedValue({ insights: { biggest: [], frequent: [], frequentUnavailable: "" } });
+    managedStatsAction.mockResolvedValue({
+        stats: { at: Date.now(), engine: "postgres", gauges: [], counters: [] }
+    });
+    managedInsightsAction.mockResolvedValue({
+        insights: { biggest: [], frequent: [], frequentUnavailable: "" }
+    });
 });
 
 function mount(overrides: Partial<Parameters<typeof DatabaseWorkspace>[0]> = {}) {
@@ -195,8 +226,15 @@ describe("the Database tab's four views", () => {
         await act(async () => mount());
 
         expect(screen.getByRole("radiogroup", { name: "Database view" })).toBeDefined();
-        expect(screen.getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["Data", "Stats", "Config", "Connect"]);
-        expect(screen.getByText("Read-only. Browse and query without changing anything.")).toBeDefined();
+        expect(screen.getAllByRole("radio").map((radio) => radio.textContent)).toEqual([
+            "Data",
+            "Stats",
+            "Config",
+            "Connect"
+        ]);
+        expect(
+            screen.getByText("Read-only. Browse and query without changing anything.")
+        ).toBeDefined();
         expect(await screen.findByText("orders")).toBeDefined();
     });
 
@@ -205,12 +243,22 @@ describe("the Database tab's four views", () => {
         await act(async () => mount());
         await screen.findByText("orders");
 
-        expect(screen.queryByText("Changes allowed. Edits, new rows and statements write to the live database.")).toBeNull();
+        expect(
+            screen.queryByText(
+                "Changes allowed. Edits, new rows and statements write to the live database."
+            )
+        ).toBeNull();
         await user.click(screen.getByRole("switch", { name: "Read-only" }));
         expect(screen.getByRole("dialog", { name: "Allow changes?" })).toBeDefined();
 
-        await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Allow changes" }));
-        expect(screen.getByText("Changes allowed. Edits, new rows and statements write to the live database.")).toBeDefined();
+        await user.click(
+            within(screen.getByRole("dialog")).getByRole("button", { name: "Allow changes" })
+        );
+        expect(
+            screen.getByText(
+                "Changes allowed. Edits, new rows and statements write to the live database."
+            )
+        ).toBeDefined();
     });
 
     it("draws the Stats report: connections, cache hit, table health, vacuum and pg_stat_statements", async () => {
@@ -231,14 +279,22 @@ describe("the Database tab's four views", () => {
         await user.click(screen.getByRole("button", { name: "Vacuum" }));
         expect(screen.getByRole("dialog", { name: "Vacuum orders?" })).toBeDefined();
         vacuumTableAction.mockResolvedValue({});
-        await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Vacuum" }));
-        expect(vacuumTableAction).toHaveBeenCalledWith(DATABASE.id, { schema: "public", name: "orders" });
+        await user.click(
+            within(screen.getByRole("dialog")).getByRole("button", { name: "Vacuum" })
+        );
+        expect(vacuumTableAction).toHaveBeenCalledWith(DATABASE.id, {
+            schema: "public",
+            name: "orders"
+        });
     });
 
     it("offers Enable when PostgreSQL has not been told to record statement statistics", async () => {
         const user = userEvent.setup();
         databaseHealthAction.mockResolvedValue({
-            report: { ...HEALTH, queries: { available: true, installed: false, preloaded: false, rows: [] } }
+            report: {
+                ...HEALTH,
+                queries: { available: true, installed: false, preloaded: false, rows: [] }
+            }
         });
         await act(async () => mount());
         await user.click(screen.getByRole("radio", { name: "Stats" }));
@@ -254,7 +310,12 @@ describe("the Database tab's four views", () => {
         listExtensionsAction.mockResolvedValue({
             extensions: [
                 { name: "plpgsql", defaultVersion: "1.0", installedVersion: "1.0", comment: null },
-                { name: "pg_stat_statements", defaultVersion: "1.10", installedVersion: null, comment: "track statement execution statistics" }
+                {
+                    name: "pg_stat_statements",
+                    defaultVersion: "1.10",
+                    installedVersion: null,
+                    comment: "track statement execution statistics"
+                }
             ]
         });
 
@@ -274,7 +335,9 @@ describe("the Database tab's four views", () => {
         expect(screen.getByRole("dialog", { name: "Regenerate the password?" })).toBeDefined();
         expect(screen.getByText("This service restarts: api.")).toBeDefined();
 
-        await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Regenerate password" }));
+        await user.click(
+            within(screen.getByRole("dialog")).getByRole("button", { name: "Regenerate password" })
+        );
         expect(regeneratePasswordAction).toHaveBeenCalledWith(DATABASE.id);
         expect(await screen.findByText("Password changed. Restarting api.")).toBeDefined();
     });
@@ -290,19 +353,37 @@ describe("the Database tab's four views", () => {
         expect(screen.getByRole("button", { name: "PGHOST" })).toBeDefined();
 
         await user.click(screen.getByRole("radio", { name: "Public network" }));
-        expect(screen.getByText("Anyone who can reach this port can try to sign in. Keep the password private, and close the port when it is not needed.")).toBeDefined();
-        expect(screen.getByText("postgresql://orders_app:********@203.0.113.10:25432/orders")).toBeDefined();
-        expect(screen.getByText("PGPASSWORD=******** psql -h 203.0.113.10 -p 25432 -U orders_app -d orders")).toBeDefined();
+        expect(
+            screen.getByText(
+                "Anyone who can reach this port can try to sign in. Keep the password private, and close the port when it is not needed."
+            )
+        ).toBeDefined();
+        expect(
+            screen.getByText("postgresql://orders_app:********@203.0.113.10:25432/orders")
+        ).toBeDefined();
+        expect(
+            screen.getByText(
+                "PGPASSWORD=******** psql -h 203.0.113.10 -p 25432 -U orders_app -d orders"
+            )
+        ).toBeDefined();
         expect(screen.queryByText((text) => text.includes("s3cret-pass"))).toBeNull();
 
         await user.click(screen.getByRole("button", { name: "Show" }));
-        expect(screen.getByText("postgresql://orders_app:s3cret-pass@203.0.113.10:25432/orders")).toBeDefined();
-        expect(screen.getByText("PGPASSWORD=s3cret-pass psql -h 203.0.113.10 -p 25432 -U orders_app -d orders")).toBeDefined();
+        expect(
+            screen.getByText("postgresql://orders_app:s3cret-pass@203.0.113.10:25432/orders")
+        ).toBeDefined();
+        expect(
+            screen.getByText(
+                "PGPASSWORD=s3cret-pass psql -h 203.0.113.10 -p 25432 -U orders_app -d orders"
+            )
+        ).toBeDefined();
     });
 
     it("offers Try again instead of a skeleton that never resolves when the account cannot be read", async () => {
         const user = userEvent.setup();
-        databaseConnectInfoAction.mockResolvedValueOnce({ error: "The database is not answering." });
+        databaseConnectInfoAction.mockResolvedValueOnce({
+            error: "The database is not answering."
+        });
         listExtensionsAction.mockResolvedValue({ extensions: [] });
         await act(async () => mount());
         await user.click(screen.getByRole("radio", { name: "Config" }));
@@ -312,7 +393,9 @@ describe("the Database tab's four views", () => {
         await user.click(screen.getByRole("button", { name: "Try again" }));
         expect(await screen.findByText("orders_app")).toBeDefined();
 
-        databaseConnectInfoAction.mockResolvedValueOnce({ error: "The database is not answering." });
+        databaseConnectInfoAction.mockResolvedValueOnce({
+            error: "The database is not answering."
+        });
         await user.click(screen.getByRole("radio", { name: "Connect" }));
         expect(await screen.findByText("The database is not answering.")).toBeDefined();
         await user.click(screen.getByRole("button", { name: "Try again" }));
@@ -324,7 +407,11 @@ describe("the Database tab's four views", () => {
         databaseConnectInfoAction.mockResolvedValue({
             info: {
                 ...CONNECT_INFO,
-                connection: { ...CONNECT_INFO.connection, port: 27017, exposedPort: null } as ConnectInfo["connection"],
+                connection: {
+                    ...CONNECT_INFO.connection,
+                    port: 27017,
+                    exposedPort: null
+                } as ConnectInfo["connection"],
                 publicHost: null
             }
         });
@@ -335,16 +422,24 @@ describe("the Database tab's four views", () => {
         await user.click(screen.getByRole("radio", { name: "Public network" }));
         expect(screen.getByPlaceholderText("47017")).toBeDefined();
         await user.click(screen.getByRole("button", { name: "Publish" }));
-        await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Publish" }));
+        await user.click(
+            within(screen.getByRole("dialog")).getByRole("button", { name: "Publish" })
+        );
         expect(setPublicPortAction).toHaveBeenCalledWith(DATABASE.id, 47017);
     });
 
     it("needs deploy.manage and databases.manage, and a provisioned instance, before any of this opens", async () => {
         await act(async () => mount({ manage: false }));
-        expect(screen.getByText("Browsing this database needs the right to manage Deploy and the project's databases.")).toBeDefined();
+        expect(
+            screen.getByText(
+                "Browsing this database needs the right to manage Deploy and the project's databases."
+            )
+        ).toBeDefined();
 
         cleanup();
         await act(async () => mount({ deployed: false }));
-        expect(screen.getByText("Provision it first; there is nothing running to manage yet.")).toBeDefined();
+        expect(
+            screen.getByText("Provision it first; there is nothing running to manage yet.")
+        ).toBeDefined();
     });
 });

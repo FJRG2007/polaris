@@ -55,7 +55,9 @@ function postgresCreate(grant: DatabaseGrant): string[] {
     const user = quoteIdent(grant.username);
     return [
         `CREATE ROLE ${user} WITH LOGIN PASSWORD ${quoteLiteral(grant.password)}`,
-        grant.privileges === "owner" ? `CREATE DATABASE ${db} OWNER ${user}` : `CREATE DATABASE ${db}`,
+        grant.privileges === "owner"
+            ? `CREATE DATABASE ${db} OWNER ${user}`
+            : `CREATE DATABASE ${db}`,
         `GRANT CONNECT ON DATABASE ${db} TO ${user}`
     ];
 }
@@ -83,7 +85,17 @@ function postgresGrantInDatabase(grant: DatabaseGrant): string[] {
 
 /** A `psql` invocation against one database, running one statement. */
 function psql(grant: DatabaseGrant, database: string, statement: string): string[] {
-    return ["psql", "-v", "ON_ERROR_STOP=1", "-U", grant.adminUser, "-d", database, "-c", statement];
+    return [
+        "psql",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-U",
+        grant.adminUser,
+        "-d",
+        database,
+        "-c",
+        statement
+    ];
 }
 
 function mysqlPrivilegeList(privileges: DbPrivilege): string {
@@ -149,7 +161,13 @@ export function createDatabaseCommands(engine: DbEngine, grant: DatabaseGrant): 
                 // The admin password goes in the argv of a process inside the
                 // container, which is the only channel the client offers without
                 // a config file; the container is not shared with other tenants.
-                argv: [engine === "mysql" ? "mysql" : "mariadb", `-u${grant.adminUser}`, `-p${grant.adminPassword}`, "-e", mysqlCreate(grant).join(" ")],
+                argv: [
+                    engine === "mysql" ? "mysql" : "mariadb",
+                    `-u${grant.adminUser}`,
+                    `-p${grant.adminPassword}`,
+                    "-e",
+                    mysqlCreate(grant).join(" ")
+                ],
                 describe: `Creating database ${grant.database} and user ${grant.username}`
             }
         ];
@@ -200,7 +218,13 @@ export function dropDatabaseCommands(engine: DbEngine, grant: DatabaseGrant): Co
         ];
         return [
             {
-                argv: [engine === "mysql" ? "mysql" : "mariadb", `-u${grant.adminUser}`, `-p${grant.adminPassword}`, "-e", statements.join(" ")],
+                argv: [
+                    engine === "mysql" ? "mysql" : "mariadb",
+                    `-u${grant.adminUser}`,
+                    `-p${grant.adminPassword}`,
+                    "-e",
+                    statements.join(" ")
+                ],
                 describe: `Dropping database ${grant.database} and user ${grant.username}`
             }
         ];
@@ -277,7 +301,9 @@ export function changePasswordCommands(change: PasswordChange): ContainerCommand
         ];
     }
     if (change.engine === "mysql" || change.engine === "mariadb") {
-        const statements = [`ALTER USER IF EXISTS ${quoteLiteral(change.username)}@'%' IDENTIFIED BY ${quoteLiteral(change.newPassword)};`];
+        const statements = [
+            `ALTER USER IF EXISTS ${quoteLiteral(change.username)}@'%' IDENTIFIED BY ${quoteLiteral(change.newPassword)};`
+        ];
         if (!change.hosted) {
             statements.push(
                 `ALTER USER IF EXISTS 'root'@'%' IDENTIFIED BY ${quoteLiteral(change.newPassword)};`,
@@ -287,7 +313,13 @@ export function changePasswordCommands(change: PasswordChange): ContainerCommand
         statements.push("FLUSH PRIVILEGES;");
         return [
             {
-                argv: [change.engine === "mysql" ? "mysql" : "mariadb", "-uroot", `-p${change.adminPassword}`, "-e", statements.join(" ")],
+                argv: [
+                    change.engine === "mysql" ? "mysql" : "mariadb",
+                    "-uroot",
+                    `-p${change.adminPassword}`,
+                    "-e",
+                    statements.join(" ")
+                ],
                 describe
             }
         ];
@@ -315,7 +347,16 @@ export function changePasswordCommands(change: PasswordChange): ContainerCommand
     if (change.engine === "redis") {
         return [
             {
-                argv: ["redis-cli", "--no-auth-warning", "-a", change.adminPassword, "CONFIG", "SET", "requirepass", change.newPassword],
+                argv: [
+                    "redis-cli",
+                    "--no-auth-warning",
+                    "-a",
+                    change.adminPassword,
+                    "CONFIG",
+                    "SET",
+                    "requirepass",
+                    change.newPassword
+                ],
                 describe
             }
         ];

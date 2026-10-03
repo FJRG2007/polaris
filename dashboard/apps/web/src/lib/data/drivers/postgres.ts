@@ -275,7 +275,11 @@ export class PostgresDriver implements data.DataDriver {
     async query(statement: string, params: readonly unknown[]): Promise<data.QueryResult[]> {
         const client = await this.open();
         const started = Date.now();
-        const result = await client.query({ text: statement, values: [...params], rowMode: "array" });
+        const result = await client.query({
+            text: statement,
+            values: [...params],
+            rowMode: "array"
+        });
         return [
             {
                 statement,
@@ -312,7 +316,12 @@ export class PostgresDriver implements data.DataDriver {
     async insertRow(insert: rowEdit.RowInsert): Promise<rowEdit.RowWriteResult> {
         if (this.address.readOnly) throw new data.ReadOnlyError("adding a row");
         const columns = await this.columns(insert.namespace, insert.relation);
-        const prepared = rowEdit.prepareInsert(insert, columns, this.dialect(insert.namespace, insert.relation), "postgres");
+        const prepared = rowEdit.prepareInsert(
+            insert,
+            columns,
+            this.dialect(insert.namespace, insert.relation),
+            "postgres"
+        );
         const client = await this.open();
         const result = await client.query(prepared.text, prepared.params);
         return { changed: result.rowCount ?? 0 };
@@ -326,7 +335,11 @@ export class PostgresDriver implements data.DataDriver {
     async deleteRows(removal: rowEdit.RowDelete): Promise<rowEdit.RowWriteResult> {
         if (this.address.readOnly) throw new data.ReadOnlyError("removing rows");
         const columns = await this.columns(removal.namespace, removal.relation);
-        const prepared = rowEdit.prepareDelete(removal, columns, this.dialect(removal.namespace, removal.relation));
+        const prepared = rowEdit.prepareDelete(
+            removal,
+            columns,
+            this.dialect(removal.namespace, removal.relation)
+        );
         const client = await this.open();
         await client.query("BEGIN");
         try {
@@ -341,8 +354,11 @@ export class PostgresDriver implements data.DataDriver {
 
     async createTable(draft: rowEdit.TableDraft): Promise<void> {
         if (this.address.readOnly) throw new data.ReadOnlyError("creating a table");
-        const text = rowEdit.prepareCreateTable(draft, "postgres", quoteSqlIdent, (namespace, name) =>
-            quoteQualified([namespace ?? "public", name], quoteSqlIdent)
+        const text = rowEdit.prepareCreateTable(
+            draft,
+            "postgres",
+            quoteSqlIdent,
+            (namespace, name) => quoteQualified([namespace ?? "public", name], quoteSqlIdent)
         );
         const client = await this.open();
         await client.query(text);

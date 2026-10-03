@@ -41,7 +41,16 @@ export interface ConnectionUse {
     readonly idleInTransaction: number | null;
 }
 
-export type SizeKey = "database" | "tables" | "indexes" | "system" | "wal" | "other" | "data" | "storage" | "memory";
+export type SizeKey =
+    | "database"
+    | "tables"
+    | "indexes"
+    | "system"
+    | "wal"
+    | "other"
+    | "data"
+    | "storage"
+    | "memory";
 
 export interface SizePart {
     readonly key: SizeKey;
@@ -167,7 +176,9 @@ function firstRow(results: readonly QueryResult[]): Record<string, unknown> {
 function allRows(results: readonly QueryResult[]): Record<string, unknown>[] {
     const result = results[0];
     if (!result) return [];
-    return result.rows.map((row) => Object.fromEntries(result.columns.map((column, index) => [column, row[index]])));
+    return result.rows.map((row) =>
+        Object.fromEntries(result.columns.map((column, index) => [column, row[index]]))
+    );
 }
 
 /** Asked on its own: a statement this account may not run is a missing figure. */
@@ -343,7 +354,8 @@ export async function postgresHealth(run: Run): Promise<HealthReport> {
         vacuum: {
             databaseXidAge,
             freezeMaxAge,
-            freezeRisk: databaseXidAge !== null && freezeMaxAge !== null && databaseXidAge >= freezeMaxAge
+            freezeRisk:
+                databaseXidAge !== null && freezeMaxAge !== null && databaseXidAge >= freezeMaxAge
         },
         unusedIndexes: unused.map((row) => ({
             schema: text(row.schemaname),
@@ -368,15 +380,17 @@ export async function postgresHealth(run: Run): Promise<HealthReport> {
 
 export async function mysqlHealth(run: Run, engine: string): Promise<HealthReport> {
     const status = new Map<string, number>();
-    for (const row of (await run(
-        "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running', 'Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Slow_queries', 'Aborted_connects', 'Uptime')"
-    ))[0]?.rows ?? []) {
+    for (const row of (
+        await run(
+            "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running', 'Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Slow_queries', 'Aborted_connects', 'Uptime')"
+        )
+    )[0]?.rows ?? []) {
         status.set(String(row[0] ?? ""), num(row[1]));
     }
     const variables = new Map<string, string>();
-    for (const row of (await run(
-        "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('max_connections', 'version')"
-    ))[0]?.rows ?? []) {
+    for (const row of (
+        await run("SHOW GLOBAL VARIABLES WHERE Variable_name IN ('max_connections', 'version')")
+    )[0]?.rows ?? []) {
         variables.set(String(row[0] ?? ""), String(row[1] ?? ""));
     }
     const tables = allRows(
@@ -482,7 +496,9 @@ export async function mysqlHealth(run: Run, engine: string): Promise<HealthRepor
             }))
         },
         facts: [
-            ...(variables.get("version") ? [{ key: "version" as const, value: variables.get("version") as string }] : []),
+            ...(variables.get("version")
+                ? [{ key: "version" as const, value: variables.get("version") as string }]
+                : []),
             { key: "uptime", value: status.get("Uptime") ?? 0, unit: "seconds" },
             { key: "slowQueries", value: status.get("Slow_queries") ?? 0, unit: "count" },
             { key: "abortedConnects", value: status.get("Aborted_connects") ?? 0, unit: "count" },
@@ -502,7 +518,10 @@ export function redisHealthFromInfo(info: string): HealthReport {
         return match ? (match[1] ?? "").trim() : null;
     };
     const read = (name: string): number | null => maybeNum(field(name));
-    const keys = [...info.matchAll(/^db\d+:keys=(\d+)/gm)].reduce((total, match) => total + Number(match[1]), 0);
+    const keys = [...info.matchAll(/^db\d+:keys=(\d+)/gm)].reduce(
+        (total, match) => total + Number(match[1]),
+        0
+    );
     const hits = read("keyspace_hits") ?? 0;
     const misses = read("keyspace_misses") ?? 0;
     const maxMemory = read("maxmemory");
@@ -529,7 +548,9 @@ export function redisHealthFromInfo(info: string): HealthReport {
         unusedIndexes: null,
         queries: null,
         facts: [
-            ...(field("redis_version") ? [{ key: "version" as const, value: field("redis_version") as string }] : []),
+            ...(field("redis_version")
+                ? [{ key: "version" as const, value: field("redis_version") as string }]
+                : []),
             { key: "uptime", value: read("uptime_in_seconds") ?? 0, unit: "seconds" },
             { key: "keys", value: keys, unit: "count" },
             { key: "evicted", value: read("evicted_keys") ?? 0, unit: "count" },
@@ -551,7 +572,10 @@ export async function mongoHealth(run: Run): Promise<HealthReport> {
         const raw = firstRow(server)[field];
         if (raw === undefined || raw === null) return null;
         try {
-            const parsed = (typeof raw === "string" ? JSON.parse(raw) : raw) as Record<string, unknown>;
+            const parsed = (typeof raw === "string" ? JSON.parse(raw) : raw) as Record<
+                string,
+                unknown
+            >;
             return maybeNum(parsed[key]);
         } catch {
             return null;
@@ -564,8 +588,10 @@ export async function mongoHealth(run: Run): Promise<HealthReport> {
         connections: {
             used: nested("connections", "current") ?? 0,
             max:
-                nested("connections", "current") !== null && nested("connections", "available") !== null
-                    ? (nested("connections", "current") ?? 0) + (nested("connections", "available") ?? 0)
+                nested("connections", "current") !== null &&
+                nested("connections", "available") !== null
+                    ? (nested("connections", "current") ?? 0) +
+                      (nested("connections", "available") ?? 0)
                     : null,
             active: nested("connections", "active"),
             idle: null,
@@ -620,11 +646,15 @@ export async function healthAt(address: DataAddress): Promise<HealthReport> {
 export function runnerFor(driver: DataDriver): Run {
     // Asked of the driver rather than imported: importing the Postgres driver
     // here would load `pg` into every request that reads any engine's report.
-    const bound = (driver as { query?: (statement: string, params: readonly unknown[]) => Promise<QueryResult[]> })
-        .query;
+    const bound = (
+        driver as {
+            query?: (statement: string, params: readonly unknown[]) => Promise<QueryResult[]>;
+        }
+    ).query;
     return (statement, params) => {
         if (params && params.length > 0) {
-            if (typeof bound !== "function") throw new Error("Bound values are only sent to PostgreSQL here.");
+            if (typeof bound !== "function")
+                throw new Error("Bound values are only sent to PostgreSQL here.");
             return bound.call(driver, statement, params);
         }
         return driver.run(statement);
@@ -641,7 +671,11 @@ const CACHE_ENTRIES = 500;
  * a fresh one. Two screens opening at once share one read. A failed read is not
  * kept, so the next open tries again.
  */
-export function cachedHealth(key: string, read: () => Promise<HealthReport>, now = Date.now()): Promise<HealthReport> {
+export function cachedHealth(
+    key: string,
+    read: () => Promise<HealthReport>,
+    now = Date.now()
+): Promise<HealthReport> {
     const kept = cache.get(key);
     if (kept && now - kept.at < HEALTH_TTL_MS) return kept.report;
     const report = read();

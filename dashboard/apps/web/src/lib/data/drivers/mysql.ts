@@ -280,7 +280,12 @@ export class MysqlDriver implements data.DataDriver {
     async insertRow(insert: rowEdit.RowInsert): Promise<rowEdit.RowWriteResult> {
         if (this.address.readOnly) throw new data.ReadOnlyError("adding a row");
         const columns = await this.columns(insert.namespace, insert.relation);
-        const prepared = rowEdit.prepareInsert(insert, columns, this.dialect(insert.namespace, insert.relation), "mysql");
+        const prepared = rowEdit.prepareInsert(
+            insert,
+            columns,
+            this.dialect(insert.namespace, insert.relation),
+            "mysql"
+        );
         const connection = await this.open();
         const [result] = await connection.query(prepared.text, prepared.params);
         return { changed: (result as { affectedRows?: number }).affectedRows ?? 0 };
@@ -290,7 +295,11 @@ export class MysqlDriver implements data.DataDriver {
     async deleteRows(removal: rowEdit.RowDelete): Promise<rowEdit.RowWriteResult> {
         if (this.address.readOnly) throw new data.ReadOnlyError("removing rows");
         const columns = await this.columns(removal.namespace, removal.relation);
-        const prepared = rowEdit.prepareDelete(removal, columns, this.dialect(removal.namespace, removal.relation));
+        const prepared = rowEdit.prepareDelete(
+            removal,
+            columns,
+            this.dialect(removal.namespace, removal.relation)
+        );
         const connection = await this.open();
         await connection.beginTransaction();
         try {
@@ -306,8 +315,11 @@ export class MysqlDriver implements data.DataDriver {
     /** MySQL commits a CREATE TABLE on its own; there is nothing to roll back. */
     async createTable(draft: rowEdit.TableDraft): Promise<void> {
         if (this.address.readOnly) throw new data.ReadOnlyError("creating a table");
-        const text = rowEdit.prepareCreateTable(draft, "mysql", quoteBacktickIdent, (namespace, name) =>
-            quoteQualified([namespace, name], quoteBacktickIdent)
+        const text = rowEdit.prepareCreateTable(
+            draft,
+            "mysql",
+            quoteBacktickIdent,
+            (namespace, name) => quoteQualified([namespace, name], quoteBacktickIdent)
         );
         const connection = await this.open();
         await connection.query(text);

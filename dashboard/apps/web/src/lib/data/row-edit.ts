@@ -162,13 +162,15 @@ export function isPlainIdentifier(name: string): boolean {
  * be read two ways.
  */
 export function defaultLiteral(type: TableType, value: string): string {
-    if (value.length > 200) throw new data.DataRequestError("A default can be at most 200 characters.");
+    if (value.length > 200)
+        throw new data.DataRequestError("A default can be at most 200 characters.");
     // eslint-disable-next-line no-control-regex
     if (/[\\\u0000-\u001f\u007f]/.test(value)) {
         throw new data.DataRequestError("A default cannot hold a backslash or a line break.");
     }
     if (NUMERIC_TYPES.has(type)) {
-        if (!/^-?\d+(\.\d+)?$/.test(value)) throw new data.DataRequestError("That default has to be a number.");
+        if (!/^-?\d+(\.\d+)?$/.test(value))
+            throw new data.DataRequestError("That default has to be a number.");
         return value;
     }
     if (type === "boolean") {
@@ -198,9 +200,12 @@ export function prepareCreateTable(
             "A table name starts with a letter or an underscore and holds only letters, digits and underscores."
         );
     }
-    if (draft.columns.length === 0) throw new data.DataRequestError("Give the table at least one column.");
+    if (draft.columns.length === 0)
+        throw new data.DataRequestError("Give the table at least one column.");
     if (draft.columns.length > MAX_NEW_COLUMNS) {
-        throw new data.DataRequestError(`A table made here can have at most ${MAX_NEW_COLUMNS} columns.`);
+        throw new data.DataRequestError(
+            `A table made here can have at most ${MAX_NEW_COLUMNS} columns.`
+        );
     }
 
     const seen = new Set<string>();
@@ -213,14 +218,17 @@ export function prepareCreateTable(
             );
         }
         const folded = column.name.toLowerCase();
-        if (seen.has(folded)) throw new data.DataRequestError(`There are two columns called ${column.name}.`);
+        if (seen.has(folded))
+            throw new data.DataRequestError(`There are two columns called ${column.name}.`);
         seen.add(folded);
         if (!(TABLE_TYPES as readonly string[]).includes(column.type)) {
             throw new data.DataRequestError(`Pick a type for ${column.name}.`);
         }
         const auto = AUTO_TYPES.has(column.type);
         if (auto && !column.primaryKey) {
-            throw new data.DataRequestError(`${column.name} is numbered automatically, so it has to be the primary key.`);
+            throw new data.DataRequestError(
+                `${column.name} is numbered automatically, so it has to be the primary key.`
+            );
         }
 
         const parts = [quote(column.name), TYPE_SQL[column.type][flavor]];
@@ -231,7 +239,9 @@ export function prepareCreateTable(
 
         const fallback = column.defaultValue;
         if (fallback.kind !== "none" && auto) {
-            throw new data.DataRequestError(`${column.name} is numbered automatically and takes no default.`);
+            throw new data.DataRequestError(
+                `${column.name} is numbered automatically and takes no default.`
+            );
         }
         if (fallback.kind === "value") {
             parts.push(`DEFAULT ${defaultLiteral(column.type, fallback.value)}`);
@@ -240,7 +250,9 @@ export function prepareCreateTable(
                 throw new data.DataRequestError("That default is not one Polaris offers.");
             }
             if (!EXPRESSION_TYPES[fallback.expression].has(column.type)) {
-                throw new data.DataRequestError(`That default does not fit the type of ${column.name}.`);
+                throw new data.DataRequestError(
+                    `That default does not fit the type of ${column.name}.`
+                );
             }
             parts.push(`DEFAULT ${EXPRESSION_SQL[fallback.expression][flavor]}`);
         }
@@ -267,15 +279,20 @@ export function prepareInsert(
     const quoted: string[] = [];
     for (const name of names) {
         const column = columns.find((entry) => entry.name === name);
-        if (!column) throw new data.DataRequestError(`There is no column called ${name.slice(0, 64)}.`);
+        if (!column)
+            throw new data.DataRequestError(`There is no column called ${name.slice(0, 64)}.`);
         const value = insert.values[name] ?? null;
-        if (value === null && !column.nullable) throw new data.DataRequestError(`${column.name} cannot be empty.`);
+        if (value === null && !column.nullable)
+            throw new data.DataRequestError(`${column.name} cannot be empty.`);
         params.push(value);
         quoted.push(dialect.quote(column.name));
     }
     if (quoted.length === 0) {
         return {
-            text: flavor === "postgres" ? `INSERT INTO ${dialect.target} DEFAULT VALUES` : `INSERT INTO ${dialect.target} () VALUES ()`,
+            text:
+                flavor === "postgres"
+                    ? `INSERT INTO ${dialect.target} DEFAULT VALUES`
+                    : `INSERT INTO ${dialect.target} () VALUES ()`,
             params
         };
     }
@@ -306,7 +323,9 @@ export function prepareDelete(
     }
     if (removal.keys.length === 0) throw new data.DataRequestError("Pick the rows to remove.");
     if (removal.keys.length > MAX_DELETE_ROWS) {
-        throw new data.DataRequestError(`Remove at most ${MAX_DELETE_ROWS} rows at a time from here.`);
+        throw new data.DataRequestError(
+            `Remove at most ${MAX_DELETE_ROWS} rows at a time from here.`
+        );
     }
     const params: unknown[] = [];
     const groups = removal.keys.map((key) => {

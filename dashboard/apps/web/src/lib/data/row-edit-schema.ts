@@ -43,7 +43,10 @@ export const rowDeleteSchema = z.object({
 
 const columnDefaultSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("none") }),
-    z.object({ kind: z.literal("value"), value: z.string().max(200, "A default can be at most 200 characters.") }),
+    z.object({
+        kind: z.literal("value"),
+        value: z.string().max(200, "A default can be at most 200 characters.")
+    }),
     z.object({ kind: z.literal("expression"), expression: z.enum(DEFAULT_EXPRESSIONS) })
 ]);
 
@@ -51,7 +54,10 @@ export const columnDraftSchema = z.object({
     name: z
         .string()
         .trim()
-        .refine(isPlainIdentifier, "A column name starts with a letter or an underscore and holds only letters, digits and underscores."),
+        .refine(
+            isPlainIdentifier,
+            "A column name starts with a letter or an underscore and holds only letters, digits and underscores."
+        ),
     type: z.enum(TABLE_TYPES),
     nullable: z.boolean(),
     primaryKey: z.boolean(),

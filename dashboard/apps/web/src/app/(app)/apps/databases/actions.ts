@@ -56,7 +56,9 @@ const guard = guardData;
 function parsed<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown): T {
     const result = schema.safeParse(value);
     if (!result.success) {
-        throw new DataRequestError(result.error.issues[0]?.message ?? "That did not work. Nothing was changed.");
+        throw new DataRequestError(
+            result.error.issues[0]?.message ?? "That did not work. Nothing was changed."
+        );
     }
     return result.data;
 }
@@ -317,15 +319,25 @@ export async function updateCellAction(
  * coming from `row-edit.ts`. The shape is checked here against the schema the
  * forms validate with.
  */
-export async function insertRowAction(id: string, insert: unknown): Promise<{ changed?: number; error?: string }> {
+export async function insertRowAction(
+    id: string,
+    insert: unknown
+): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
-    const result = await guard(async () => browser.insertRow(me.id, String(id), parsed(rowInsertSchema, insert)));
+    const result = await guard(async () =>
+        browser.insertRow(me.id, String(id), parsed(rowInsertSchema, insert))
+    );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
 
-export async function deleteRowsAction(id: string, removal: unknown): Promise<{ changed?: number; error?: string }> {
+export async function deleteRowsAction(
+    id: string,
+    removal: unknown
+): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
-    const result = await guard(async () => browser.deleteRows(me.id, String(id), parsed(rowDeleteSchema, removal)));
+    const result = await guard(async () =>
+        browser.deleteRows(me.id, String(id), parsed(rowDeleteSchema, removal))
+    );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
 

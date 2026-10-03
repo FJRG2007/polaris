@@ -179,10 +179,15 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
  * in the row, where turning it off again is a redeploy rather than an edit to a
  * file inside the volume.
  */
-export function postgresServerCommand(row: { readonly pitr: boolean; readonly statStatements: boolean }): string[] | undefined {
+export function postgresServerCommand(row: {
+    readonly pitr: boolean;
+    readonly statStatements: boolean;
+}): string[] | undefined {
     if (!row.pitr && !row.statStatements) return undefined;
     const command = row.pitr ? core.pitrServerCommand() : ["postgres"];
-    return row.statStatements ? [...command, "-c", "shared_preload_libraries=pg_stat_statements"] : command;
+    return row.statStatements
+        ? [...command, "-c", "shared_preload_libraries=pg_stat_statements"]
+        : command;
 }
 
 /** The spec for a stored engine, or a clear refusal for one this build lacks. */

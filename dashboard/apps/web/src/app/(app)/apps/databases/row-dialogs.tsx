@@ -57,11 +57,29 @@ interface ColumnRow {
 let nextRow = 1;
 
 function idColumn(): ColumnRow {
-    return { id: nextRow++, name: "id", type: "bigserial", nullable: false, primaryKey: true, unique: false, fallback: "none", value: "" };
+    return {
+        id: nextRow++,
+        name: "id",
+        type: "bigserial",
+        nullable: false,
+        primaryKey: true,
+        unique: false,
+        fallback: "none",
+        value: ""
+    };
 }
 
 function blankColumn(): ColumnRow {
-    return { id: nextRow++, name: "", type: "text", nullable: true, primaryKey: false, unique: false, fallback: "none", value: "" };
+    return {
+        id: nextRow++,
+        name: "",
+        type: "text",
+        nullable: true,
+        primaryKey: false,
+        unique: false,
+        fallback: "none",
+        value: ""
+    };
 }
 
 function toDraft(row: ColumnRow): ColumnDraft {
@@ -123,7 +141,11 @@ export function NewTableDialog({
                 // A default that no longer fits the type is cleared rather than
                 // kept as a refusal waiting to happen.
                 if (isAutoType(next.type)) next.fallback = "none";
-                else if (next.fallback !== "none" && next.fallback !== "value" && !expressionsFor(next.type).includes(next.fallback as DefaultExpression)) {
+                else if (
+                    next.fallback !== "none" &&
+                    next.fallback !== "value" &&
+                    !expressionsFor(next.type).includes(next.fallback as DefaultExpression)
+                ) {
                     next.fallback = "none";
                 }
                 if (next.primaryKey) next.nullable = false;
@@ -167,10 +189,15 @@ export function NewTableDialog({
                 <DialogHeader>
                     <DialogTitle>{t("newTable.title")}</DialogTitle>
                     <DialogDescription>
-                        {namespace ? t("newTable.inSchema", { schema: namespace }) : t("newTable.description")}
+                        {namespace
+                            ? t("newTable.inSchema", { schema: namespace })
+                            : t("newTable.description")}
                     </DialogDescription>
                 </DialogHeader>
-                <form className="flex min-w-0 flex-col gap-4" onSubmit={(event) => void submit(event)}>
+                <form
+                    className="flex min-w-0 flex-col gap-4"
+                    onSubmit={(event) => void submit(event)}
+                >
                     <label className="flex flex-col gap-1.5 text-sm">
                         <span className="font-medium">
                             {t("newTable.name")} <span aria-hidden="true">*</span>
@@ -191,7 +218,9 @@ export function NewTableDialog({
                         <span className="text-sm font-medium">{t("newTable.columns")}</span>
                         <div className="flex max-h-[45vh] flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
                             {columns.map((column, index) => {
-                                const nameIssue = column.name.trim() ? issues.get(`columns.${index}.name`) : undefined;
+                                const nameIssue = column.name.trim()
+                                    ? issues.get(`columns.${index}.name`)
+                                    : undefined;
                                 const auto = isAutoType(column.type);
                                 return (
                                     <div
@@ -204,12 +233,16 @@ export function NewTableDialog({
                                                 placeholder={t("newTable.columnName")}
                                                 aria-label={t("newTable.columnName")}
                                                 aria-invalid={Boolean(nameIssue)}
-                                                onChange={(event) => update(column.id, { name: event.target.value })}
+                                                onChange={(event) =>
+                                                    update(column.id, { name: event.target.value })
+                                                }
                                             />
                                             <Select
                                                 value={column.type}
                                                 aria-label={t("newTable.type")}
-                                                onValueChange={(type) => update(column.id, { type: type as TableType })}
+                                                onValueChange={(type) =>
+                                                    update(column.id, { type: type as TableType })
+                                                }
                                                 options={TABLE_TYPES.map((type) => ({
                                                     value: type,
                                                     label: t(`newTable.types.${type}`)
@@ -219,14 +252,28 @@ export function NewTableDialog({
                                                 value={column.fallback}
                                                 disabled={auto}
                                                 aria-label={t("newTable.default")}
-                                                onValueChange={(fallback) => update(column.id, { fallback })}
+                                                onValueChange={(fallback) =>
+                                                    update(column.id, { fallback })
+                                                }
                                                 options={[
-                                                    { value: "none", label: auto ? t("newTable.defaults.auto") : t("newTable.defaults.none") },
-                                                    { value: "value", label: t("newTable.defaults.value") },
-                                                    ...expressionsFor(column.type).map((expression) => ({
-                                                        value: expression,
-                                                        label: t(`newTable.defaults.${expression}`)
-                                                    }))
+                                                    {
+                                                        value: "none",
+                                                        label: auto
+                                                            ? t("newTable.defaults.auto")
+                                                            : t("newTable.defaults.none")
+                                                    },
+                                                    {
+                                                        value: "value",
+                                                        label: t("newTable.defaults.value")
+                                                    },
+                                                    ...expressionsFor(column.type).map(
+                                                        (expression) => ({
+                                                            value: expression,
+                                                            label: t(
+                                                                `newTable.defaults.${expression}`
+                                                            )
+                                                        })
+                                                    )
                                                 ]}
                                             />
                                             <Button
@@ -236,7 +283,13 @@ export function NewTableDialog({
                                                 title={t("newTable.removeColumn")}
                                                 aria-label={t("newTable.removeColumn")}
                                                 disabled={columns.length === 1}
-                                                onClick={() => setColumns((current) => current.filter((entry) => entry.id !== column.id))}
+                                                onClick={() =>
+                                                    setColumns((current) =>
+                                                        current.filter(
+                                                            (entry) => entry.id !== column.id
+                                                        )
+                                                    )
+                                                }
                                             >
                                                 <Trash2 className="size-4" />
                                             </Button>
@@ -246,14 +299,20 @@ export function NewTableDialog({
                                                 value={column.value}
                                                 placeholder={t("newTable.defaultValue")}
                                                 aria-label={t("newTable.defaultValue")}
-                                                onChange={(event) => update(column.id, { value: event.target.value })}
+                                                onChange={(event) =>
+                                                    update(column.id, { value: event.target.value })
+                                                }
                                             />
                                         ) : null}
                                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                                             <label className="flex items-center gap-1.5">
                                                 <Checkbox
                                                     checked={column.primaryKey}
-                                                    onChange={(event) => update(column.id, { primaryKey: event.target.checked })}
+                                                    onChange={(event) =>
+                                                        update(column.id, {
+                                                            primaryKey: event.target.checked
+                                                        })
+                                                    }
                                                 />
                                                 {t("newTable.primaryKey")}
                                             </label>
@@ -261,7 +320,11 @@ export function NewTableDialog({
                                                 <Checkbox
                                                     checked={column.nullable && !column.primaryKey}
                                                     disabled={column.primaryKey}
-                                                    onChange={(event) => update(column.id, { nullable: event.target.checked })}
+                                                    onChange={(event) =>
+                                                        update(column.id, {
+                                                            nullable: event.target.checked
+                                                        })
+                                                    }
                                                 />
                                                 {t("newTable.nullable")}
                                             </label>
@@ -269,18 +332,29 @@ export function NewTableDialog({
                                                 <Checkbox
                                                     checked={column.unique && !column.primaryKey}
                                                     disabled={column.primaryKey}
-                                                    onChange={(event) => update(column.id, { unique: event.target.checked })}
+                                                    onChange={(event) =>
+                                                        update(column.id, {
+                                                            unique: event.target.checked
+                                                        })
+                                                    }
                                                 />
                                                 {t("newTable.unique")}
                                             </label>
                                         </div>
-                                        {nameIssue ? <span className="text-xs text-danger">{nameIssue}</span> : null}
+                                        {nameIssue ? (
+                                            <span className="text-xs text-danger">{nameIssue}</span>
+                                        ) : null}
                                         {(() => {
                                             const other = [...issues.entries()].find(
-                                                ([at]) => at.startsWith(`columns.${index}.`) && at !== `columns.${index}.name`
+                                                ([at]) =>
+                                                    at.startsWith(`columns.${index}.`) &&
+                                                    at !== `columns.${index}.name`
                                             );
-                                            return other && (column.fallback !== "value" || column.value) ? (
-                                                <span className="text-xs text-danger">{other[1]}</span>
+                                            return other &&
+                                                (column.fallback !== "value" || column.value) ? (
+                                                <span className="text-xs text-danger">
+                                                    {other[1]}
+                                                </span>
                                             ) : null;
                                         })()}
                                     </div>
@@ -300,7 +374,10 @@ export function NewTableDialog({
                     </div>
 
                     {error ? (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     ) : null}
@@ -397,19 +474,29 @@ export function NewRowDialog({
                     <DialogTitle>{t("newRow.title", { table: relation })}</DialogTitle>
                     <DialogDescription>{t("newRow.description")}</DialogDescription>
                 </DialogHeader>
-                <form className="flex min-w-0 flex-col gap-3" onSubmit={(event) => void submit(event)}>
+                <form
+                    className="flex min-w-0 flex-col gap-3"
+                    onSubmit={(event) => void submit(event)}
+                >
                     <div className="flex max-h-[55vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
                         {columns.map((column) => {
                             const state = field(column.name);
                             return (
-                                <label key={column.name} className="flex min-w-0 flex-col gap-1 text-sm">
+                                <label
+                                    key={column.name}
+                                    className="flex min-w-0 flex-col gap-1 text-sm"
+                                >
                                     <span className="flex min-w-0 items-baseline gap-2">
                                         <span className="truncate font-medium" title={column.name}>
                                             {column.name}
                                         </span>
-                                        <span className="truncate font-mono text-xs text-muted-foreground">{column.type}</span>
+                                        <span className="truncate font-mono text-xs text-muted-foreground">
+                                            {column.type}
+                                        </span>
                                         {column.primaryKey ? (
-                                            <span className="text-xs text-muted-foreground">{t("newRow.key")}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {t("newRow.key")}
+                                            </span>
                                         ) : null}
                                     </span>
                                     <span className="flex items-center gap-2">
@@ -417,10 +504,15 @@ export function NewRowDialog({
                                             className="font-mono"
                                             value={state.mode === "value" ? state.value : ""}
                                             disabled={state.mode === "null"}
-                                            placeholder={state.mode === "null" ? "NULL" : t("newRow.default")}
+                                            placeholder={
+                                                state.mode === "null" ? "NULL" : t("newRow.default")
+                                            }
                                             onChange={(event) =>
                                                 set(column.name, {
-                                                    mode: event.target.value === "" ? "default" : "value",
+                                                    mode:
+                                                        event.target.value === ""
+                                                            ? "default"
+                                                            : "value",
                                                     value: event.target.value
                                                 })
                                             }
@@ -429,10 +521,14 @@ export function NewRowDialog({
                                             <span className="flex shrink-0 items-center gap-1.5 text-xs">
                                                 <Checkbox
                                                     checked={state.mode === "null"}
-                                                    aria-label={t("newRow.nullFor", { column: column.name })}
+                                                    aria-label={t("newRow.nullFor", {
+                                                        column: column.name
+                                                    })}
                                                     onChange={(event) =>
                                                         set(column.name, {
-                                                            mode: event.target.checked ? "null" : "default",
+                                                            mode: event.target.checked
+                                                                ? "null"
+                                                                : "default",
                                                             value: ""
                                                         })
                                                     }
@@ -446,7 +542,10 @@ export function NewRowDialog({
                         })}
                     </div>
                     {error ? (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
                             {error}
                         </p>
                     ) : null}

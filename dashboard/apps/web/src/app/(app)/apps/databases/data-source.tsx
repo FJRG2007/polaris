@@ -20,7 +20,13 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { DatabaseStats } from "@/lib/data/stats";
 import type { DatabaseInsights } from "@/lib/data/insights";
 import type { RowDelete, RowInsert, TableDraft } from "@/lib/data/row-edit";
-import type { DataColumn, DataNamespace, DataPage, DataRelation, QueryResult } from "@/lib/data/driver";
+import type {
+    DataColumn,
+    DataNamespace,
+    DataPage,
+    DataRelation,
+    QueryResult
+} from "@/lib/data/driver";
 
 type Reply<T> = Promise<T & { error?: string }>;
 
@@ -41,7 +47,11 @@ export interface DataSource {
         relations?: DataRelation[];
         namespace?: string | null;
     }>;
-    rows(namespace: string | null, relation: string, query: RowRequest): Reply<{ page?: DataPage; columns?: DataColumn[] }>;
+    rows(
+        namespace: string | null,
+        relation: string,
+        query: RowRequest
+    ): Reply<{ page?: DataPage; columns?: DataColumn[] }>;
     run(statement: string): Reply<{ results?: QueryResult[] }>;
     updateCell(edit: CellEditRequest): Reply<{ changed?: number }>;
     insertRow(insert: RowInsert): Reply<{ changed?: number }>;
@@ -57,7 +67,8 @@ export function connectionSource(connectionId: string): DataSource {
     return {
         key: connectionId,
         browse: (namespace) => actions.browseAction(connectionId, namespace),
-        rows: (namespace, relation, query) => actions.rowsAction(connectionId, namespace, relation, query),
+        rows: (namespace, relation, query) =>
+            actions.rowsAction(connectionId, namespace, relation, query),
         run: (statement) => actions.runAction(connectionId, statement),
         updateCell: (edit) => actions.updateCellAction(connectionId, edit),
         insertRow: (insert) => actions.insertRowAction(connectionId, insert),
@@ -71,7 +82,13 @@ export function connectionSource(connectionId: string): DataSource {
 
 const Source = createContext<DataSource | null>(null);
 
-export function DataSourceProvider({ source, children }: { source: DataSource; children: ReactNode }) {
+export function DataSourceProvider({
+    source,
+    children
+}: {
+    source: DataSource;
+    children: ReactNode;
+}) {
     return <Source.Provider value={source}>{children}</Source.Provider>;
 }
 

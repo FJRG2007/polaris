@@ -38,6 +38,8 @@ describe("the PostgreSQL server command", () => {
             "-c",
             "shared_preload_libraries=pg_stat_statements"
         ]);
-        expect(postgresServerCommand({ pitr: true, statStatements: false })).toEqual(pitrServerCommand());
+        expect(postgresServerCommand({ pitr: true, statStatements: false })).toEqual(
+            pitrServerCommand()
+        );
     });
 });

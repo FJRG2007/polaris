@@ -644,7 +644,12 @@ function DatabaseCard({
                 onOpenChange={setConnecting}
             />
             {managing ? (
-                <DatabaseManageDialog database={database} open deployManage={canManage} onOpenChange={setManaging} />
+                <DatabaseManageDialog
+                    database={database}
+                    open
+                    deployManage={canManage}
+                    onOpenChange={setManaging}
+                />
             ) : null}
 
             <ConfirmDeleteDialog

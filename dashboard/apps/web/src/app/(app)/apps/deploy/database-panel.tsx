@@ -21,7 +21,17 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { PrivateNetworkPanel } from "./private-network-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
-import { KeyRound, Link2, Loader2, Maximize2, Minimize2, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import {
+    KeyRound,
+    Link2,
+    Loader2,
+    Maximize2,
+    Minimize2,
+    Plus,
+    RefreshCw,
+    RotateCcw,
+    Trash2
+} from "lucide-react";
 import { DatabaseWorkspace } from "./database-workspace";
 import {
     Badge,
@@ -43,7 +53,15 @@ import {
 } from "@polaris/ui";
 
 type Overview = NonNullable<Awaited<ReturnType<typeof actions.databaseOverviewAction>>["overview"]>;
-type Tab = "database" | "versions" | "settings" | "network" | "pitr" | "copy" | "buckets" | "activity";
+type Tab =
+    | "database"
+    | "versions"
+    | "settings"
+    | "network"
+    | "pitr"
+    | "copy"
+    | "buckets"
+    | "activity";
 
 /** A pending confirmation: what it says, and what it runs once agreed to. */
 interface Confirmation {
@@ -161,7 +179,9 @@ export function DatabaseManageDialog({
             <DialogContent
                 className={cn(
                     "right-0 left-auto top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-4 overflow-y-auto overscroll-contain rounded-none rounded-l-xl border-y-0 border-r-0 data-[state=open]:slide-in-from-right-4",
-                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[920px] sm:max-w-[calc(100vw-2rem)]"
+                    full
+                        ? "w-full max-w-none"
+                        : "w-full max-w-none sm:w-[920px] sm:max-w-[calc(100vw-2rem)]"
                 )}
             >
                 <button

@@ -26,20 +26,36 @@ import { decryptedValue } from "@/lib/deploy/env-values";
 import { forgetHealth, runnerFor } from "@/lib/data/health";
 import { installExtension, uninstallExtension } from "@/lib/data/maintenance";
 import { deployDatabaseAndWait, type DbCredentials } from "@/lib/database-service";
-import { DatabaseOperationError, instanceContext, lastLine, withPorts, type InstanceContext } from "./ops";
+import {
+    DatabaseOperationError,
+    instanceContext,
+    lastLine,
+    withPorts,
+    type InstanceContext
+} from "./ops";
 
 /** A dedicated, deployed PostgreSQL instance the owner holds. */
 async function postgresInstance(databaseId: string, ownerId: string) {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        select: { id: true, engine: true, parentId: true, containerName: true, statStatements: true }
+        select: {
+            id: true,
+            engine: true,
+            parentId: true,
+            containerName: true,
+            statStatements: true
+        }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
-    if (row.engine !== "postgres") throw new DatabaseOperationError("Query statistics are recorded by PostgreSQL only.");
+    if (row.engine !== "postgres")
+        throw new DatabaseOperationError("Query statistics are recorded by PostgreSQL only.");
     if (row.parentId) {
-        throw new DatabaseOperationError("This database lives inside another instance; turn statistics on for that instance.");
+        throw new DatabaseOperationError(
+            "This database lives inside another instance; turn statistics on for that instance."
+        );
     }
-    if (!row.containerName) throw new DatabaseOperationError("Deploy this database first - it has no container yet.");
+    if (!row.containerName)
+        throw new DatabaseOperationError("Deploy this database first - it has no container yet.");
     return row;
 }
 
@@ -56,12 +72,20 @@ export async function setStatStatements(
 ): Promise<void> {
     const row = await postgresInstance(databaseId, ownerId);
     if (row.statStatements !== enabled) {
-        await prisma.managedDatabase.update({ where: { id: row.id }, data: { statStatements: enabled } });
+        await prisma.managedDatabase.update({
+            where: { id: row.id },
+            data: { statStatements: enabled }
+        });
         const failure = await deployDatabaseAndWait(row.id, ownerId, userId);
         if (failure) {
-            await prisma.managedDatabase.update({ where: { id: row.id }, data: { statStatements: row.statStatements } });
+            await prisma.managedDatabase.update({
+                where: { id: row.id },
+                data: { statStatements: row.statStatements }
+            });
             await deployDatabaseAndWait(row.id, ownerId, userId);
-            throw new DatabaseOperationError(`The instance did not start that way, so it was put back: ${failure}`);
+            throw new DatabaseOperationError(
+                `The instance did not start that way, so it was put back: ${failure}`
+            );
         }
     }
     const address = await managedAddress(ownerId, row.id, false);
@@ -86,7 +110,10 @@ export interface DependentService {
  * it; one in a service's own variables reaches that service. Secrets are opened
  * only to find the reference, and nothing but the service's name leaves here.
  */
-export async function dependentServices(databaseId: string, ownerId: string): Promise<DependentService[]> {
+export async function dependentServices(
+    databaseId: string,
+    ownerId: string
+): Promise<DependentService[]> {
     const database = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         select: { environmentId: true, slug: true, name: true }
@@ -115,7 +142,8 @@ export async function dependentServices(databaseId: string, ownerId: string): Pr
         } catch {
             continue;
         }
-        if (!value || !core.referencesIn(value).some((reference) => names.has(reference.name))) continue;
+        if (!value || !core.referencesIn(value).some((reference) => names.has(reference.name)))
+            continue;
         if (variable.scopeType === "environment") everyone = true;
         else named.add(variable.scopeId);
     }
@@ -130,7 +158,11 @@ function newPassword(): string {
     return randomBytes(24).toString("base64url");
 }
 
-async function applyPassword(context: InstanceContext, password: string, adminPassword: string): Promise<void> {
+async function applyPassword(
+    context: InstanceContext,
+    password: string,
+    adminPassword: string
+): Promise<void> {
     const commands = core.changePasswordCommands({
         engine: context.engine as core.DbEngine,
         username: context.own.username,
@@ -145,7 +177,9 @@ async function applyPassword(context: InstanceContext, password: string, adminPa
             const result = await ports.runIn(context.container, [...command.argv]);
             if (result.code !== 0) {
                 const said = lastLine(result.output, [password, adminPassword]);
-                throw new DatabaseOperationError(`${command.describe} failed${said ? `: ${said}` : ""}`);
+                throw new DatabaseOperationError(
+                    `${command.describe} failed${said ? `: ${said}` : ""}`
+                );
             }
         }
     });
@@ -189,7 +223,9 @@ function oneChangeAtATime(databaseId: string, work: () => Promise<void>): Promis
 async function changePassword(databaseId: string, ownerId: string, userId: string): Promise<void> {
     const context = await instanceContext(databaseId, ownerId);
     if (!core.isDbEngine(context.engine)) {
-        throw new DatabaseOperationError("An object store's keys are managed from its Buckets panel.");
+        throw new DatabaseOperationError(
+            "An object store's keys are managed from its Buckets panel."
+        );
     }
     if (context.cluster || context.topology.kind !== "single") {
         throw new DatabaseOperationError(
@@ -207,7 +243,11 @@ async function changePassword(databaseId: string, ownerId: string, userId: strin
         await storeCredentials(context.id, stored);
     } catch (error) {
         // Put the engine back on the password that is still stored.
-        await applyPassword(context, context.own.password, context.hosted ? adminBefore : password).catch((undo: unknown) =>
+        await applyPassword(
+            context,
+            context.own.password,
+            context.hosted ? adminBefore : password
+        ).catch((undo: unknown) =>
             console.error("databases: a password change could not be undone", undo)
         );
         throw error;
@@ -221,7 +261,9 @@ async function changePassword(databaseId: string, ownerId: string, userId: strin
             await storeCredentials(context.id, context.own);
             await deployDatabaseAndWait(context.id, ownerId, userId);
             forgetHealth(context.id);
-            throw new DatabaseOperationError(`The database did not start that way, so it was put back: ${failure}`);
+            throw new DatabaseOperationError(
+                `The database did not start that way, so it was put back: ${failure}`
+            );
         }
     }
 }
@@ -230,7 +272,11 @@ async function storeCredentials(databaseId: string, credentials: DbCredentials):
     const blob = encryptCredentials(credentials, loadEnv().POLARIS_MASTER_KEY);
     await prisma.managedDatabase.update({
         where: { id: databaseId },
-        data: { encryptedCredential: blob.ciphertext, credentialNonce: blob.nonce, credentialKeyId: blob.keyId }
+        data: {
+            encryptedCredential: blob.ciphertext,
+            credentialNonce: blob.nonce,
+            credentialKeyId: blob.keyId
+        }
     });
 }
 
@@ -254,28 +300,40 @@ export async function setPublicPort(
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
     if (row.parentId) {
-        throw new DatabaseOperationError("This database lives inside another instance; publish that instance instead.");
+        throw new DatabaseOperationError(
+            "This database lives inside another instance; publish that instance instead."
+        );
     }
     if (port !== null) {
         if (!Number.isInteger(port) || port < 1024 || port > 65535) {
             throw new DatabaseOperationError("Pick a port between 1024 and 65535.");
         }
         if (port >= core.APP_HOST_PORTS.from && port <= core.APP_HOST_PORTS.to) {
-            throw new DatabaseOperationError("Ports 20000 to 39999 are kept for services. Pick another.");
+            throw new DatabaseOperationError(
+                "Ports 20000 to 39999 are kept for services. Pick another."
+            );
         }
         const clash = await prisma.managedDatabase.findFirst({
             where: { targetId: row.targetId, exposePort: port, id: { not: row.id } },
             select: { id: true }
         });
-        if (clash) throw new DatabaseOperationError("Another database on this server already uses that port.");
+        if (clash)
+            throw new DatabaseOperationError(
+                "Another database on this server already uses that port."
+            );
     }
     if (row.exposePort === port) return;
     await prisma.managedDatabase.update({ where: { id: row.id }, data: { exposePort: port } });
     if (!row.containerName) return;
     const failure = await deployDatabaseAndWait(row.id, ownerId, userId);
     if (failure) {
-        await prisma.managedDatabase.update({ where: { id: row.id }, data: { exposePort: row.exposePort } });
+        await prisma.managedDatabase.update({
+            where: { id: row.id },
+            data: { exposePort: row.exposePort }
+        });
         await deployDatabaseAndWait(row.id, ownerId, userId);
-        throw new DatabaseOperationError(`The database did not start that way, so it was put back: ${failure}`);
+        throw new DatabaseOperationError(
+            `The database did not start that way, so it was put back: ${failure}`
+        );
     }
 }

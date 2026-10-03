@@ -150,12 +150,14 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That extension is not installed here.": "refusals.notInstalled",
     "That extension is part of the database and stays.": "refusals.keptExtension",
     "Query statistics are recorded by PostgreSQL only.": "refusals.statsPostgresOnly",
-    "This database lives inside another instance; turn statistics on for that instance.": "refusals.statsHosted",
+    "This database lives inside another instance; turn statistics on for that instance.":
+        "refusals.statsHosted",
     "Deploy this database first - it has no container yet.": "refusals.deployFirst",
     "An object store's keys are managed from its Buckets panel.": "refusals.objectStoreKeys",
     "This instance runs as several containers, and their passwords are changed together by redeploying it, not from here.":
         "refusals.severalContainers",
-    "This database lives inside another instance; publish that instance instead.": "refusals.publishHosted",
+    "This database lives inside another instance; publish that instance instead.":
+        "refusals.publishHosted",
     "Pick a port between 1024 and 65535.": "refusals.portRange",
     "Ports 20000 to 39999 are kept for services. Pick another.": "refusals.portServices",
     "Another database on this server already uses that port.": "refusals.portTaken",
@@ -259,13 +261,29 @@ const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
     ],
     [/^There are two columns called (.+)\.$/, "refusals.duplicateColumn", ["column"]],
     [/^Pick a type for (.+)\.$/, "refusals.pickType", ["column"]],
-    [/^(.+) is numbered automatically, so it has to be the primary key\.$/, "refusals.autoKey", ["column"]],
+    [
+        /^(.+) is numbered automatically, so it has to be the primary key\.$/,
+        "refusals.autoKey",
+        ["column"]
+    ],
     [/^(.+) is numbered automatically and takes no default\.$/, "refusals.autoDefault", ["column"]],
     [/^That default does not fit the type of (.+)\.$/, "refusals.defaultType", ["column"]],
     [/^There is no column called (.+)\.$/, "refusals.unknownColumn", ["column"]],
-    [/^The instance did not start that way, so it was put back: (.+)$/, "refusals.putBack", ["reason"]],
-    [/^The database did not start that way, so it was put back: (.+)$/, "refusals.publicPutBack", ["reason"]],
-    [/^Changing the password of (.+?) failed: (.+)$/, "refusals.passwordChangeSaid", ["user", "reason"]],
+    [
+        /^The instance did not start that way, so it was put back: (.+)$/,
+        "refusals.putBack",
+        ["reason"]
+    ],
+    [
+        /^The database did not start that way, so it was put back: (.+)$/,
+        "refusals.publicPutBack",
+        ["reason"]
+    ],
+    [
+        /^Changing the password of (.+?) failed: (.+)$/,
+        "refusals.passwordChangeSaid",
+        ["user", "reason"]
+    ],
     [/^Changing the password of (.+) failed$/, "refusals.passwordChange", ["user"]]
 ];
 

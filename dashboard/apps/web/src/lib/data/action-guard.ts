@@ -28,7 +28,9 @@ export async function guardData<T>(
         unstable_rethrow(caught);
         const t = await getTranslations("databases");
         const spoken =
-            caught instanceof DataConnectionError || caught instanceof ReadOnlyError || caught instanceof DataRequestError;
+            caught instanceof DataConnectionError ||
+            caught instanceof ReadOnlyError ||
+            caught instanceof DataRequestError;
         if (spoken) return { error: dataText(t, (caught as Error).message) };
         if (spokenToo(caught)) return { error: dataText(t, (caught as Error).message) };
         console.error("databases: an action failed", caught);
