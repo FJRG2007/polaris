@@ -538,6 +538,8 @@
         "web/src/app/(app)/apps/deploy/scaling-section.tsx",
         "web/src/app/(app)/apps/deploy/service-detail.tsx",
         "web/src/app/(app)/apps/deploy/service-history.ts",
+        "web/src/app/(app)/apps/deploy/service-settings.tsx",
+        "web/src/app/(app)/apps/deploy/settings-kit.tsx",
         "web/src/app/(app)/apps/deploy/settings/danger-section.tsx",
         "web/src/app/(app)/apps/deploy/settings/environments-section.tsx",
         "web/src/app/(app)/apps/deploy/settings/feature-flags-section.tsx",

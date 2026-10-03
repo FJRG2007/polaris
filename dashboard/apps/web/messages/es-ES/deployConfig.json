@@ -26,8 +26,6 @@
             "replacePath": "Reescribir la ruta con un patrón"
         },
         "checkValues": "Revisa los valores",
-        "loading": "Cargando los ajustes del borde",
-        "saved": "Guardado. El borde ya lo está usando.",
         "opening": "Abriendo el puerto. El servicio se está volviendo a desplegar.",
         "closing": "Cerrando el puerto. El servicio se está volviendo a desplegar.",
         "savedShort": "Guardado.",
@@ -92,9 +90,9 @@
         "removeRewrite": "Quitar esta reescritura",
         "addRedirect": "Añadir redirección",
         "addRewrite": "Nueva reescritura",
-        "saving": "Guardando...",
-        "save": "Guardar",
-        "discard": "Descartar"
+        "browserCheckShort": "Los navegadores pasan una prueba rápida que los scripts no pueden saltar.",
+        "open": "Abierto",
+        "closed": "Cerrado"
     },
     "variables": {
         "hiddenValue": "Valor oculto",

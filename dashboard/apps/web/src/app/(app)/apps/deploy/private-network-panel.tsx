@@ -17,9 +17,11 @@ import type { ReactNode } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { SettingsCard } from "./settings-kit";
 import {
     Badge,
     Button,
+    cn,
     CopyButton,
     Dialog,
     DialogContent,
@@ -116,7 +118,17 @@ export function privateNetworkAnchor(id: string): string {
     return `private-network-${id}`;
 }
 
-export function PrivateNetworkPanel({ kind, id }: { kind: Kind; id: string }) {
+export function PrivateNetworkPanel({
+    kind,
+    id,
+    embedded
+}: {
+    kind: Kind;
+    id: string;
+    /** Drawn as one card of a settings section, which supplies the spacing and
+     *  the surface; standalone it is a section with its own heading. */
+    embedded?: boolean;
+}) {
     const t = useTranslations("deployPrivateNet");
     const key = `${kind}:${id}`;
     const [data, setData] = useState(() => {
@@ -160,6 +172,55 @@ export function PrivateNetworkPanel({ kind, id }: { kind: Kind; id: string }) {
         [key, load]
     );
 
+    const content = (
+        <>
+            {error && !data && (
+                <div className="flex items-center gap-2 text-xs text-danger-ink">
+                    <span>{error}</span>
+                    <Button size="xs" variant="outline" onClick={() => void load(true)}>
+                        {t("retry")}
+                    </Button>
+                </div>
+            )}
+            {!data && !error && (
+                <div
+                    className={cn(
+                        "flex flex-col gap-2 rounded-md p-3",
+                        embedded ? "bg-surface" : "border border-border/60"
+                    )}
+                >
+                    <Skeleton className="h-5 w-64 max-w-full" />
+                    <Skeleton className="h-4 w-48 max-w-full" />
+                    <Skeleton className="h-4 w-56 max-w-full" />
+                </div>
+            )}
+            {data && (
+                <PanelBody
+                    kind={kind}
+                    id={id}
+                    view={data.view}
+                    canEdit={data.canEdit}
+                    notice={notice}
+                    embedded={embedded}
+                    onChanged={changed}
+                />
+            )}
+        </>
+    );
+
+    if (embedded) {
+        return (
+            <SettingsCard
+                id={privateNetworkAnchor(id)}
+                title={t("title")}
+                description={t("intro")}
+                busy={!data && !error}
+            >
+                {content}
+            </SettingsCard>
+        );
+    }
+
     return (
         <section
             id={privateNetworkAnchor(id)}
@@ -175,31 +236,7 @@ export function PrivateNetworkPanel({ kind, id }: { kind: Kind; id: string }) {
                 </h3>
                 <p className="text-xs text-muted-foreground">{t("intro")}</p>
             </div>
-            {error && !data && (
-                <div className="flex items-center gap-2 text-xs text-danger-ink">
-                    <span>{error}</span>
-                    <Button size="xs" variant="outline" onClick={() => void load(true)}>
-                        {t("retry")}
-                    </Button>
-                </div>
-            )}
-            {!data && !error && (
-                <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
-                    <Skeleton className="h-5 w-64" />
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-4 w-56" />
-                </div>
-            )}
-            {data && (
-                <PanelBody
-                    kind={kind}
-                    id={id}
-                    view={data.view}
-                    canEdit={data.canEdit}
-                    notice={notice}
-                    onChanged={changed}
-                />
-            )}
+            {content}
         </section>
     );
 }
@@ -210,6 +247,7 @@ function PanelBody({
     view,
     canEdit,
     notice,
+    embedded,
     onChanged
 }: {
     kind: Kind;
@@ -217,6 +255,7 @@ function PanelBody({
     view: PrivateNetworkView;
     canEdit: boolean;
     notice: string | null;
+    embedded?: boolean;
     onChanged: (message: string | null) => Promise<void>;
 }) {
     const t = useTranslations("deployPrivateNet");
@@ -230,7 +269,12 @@ function PanelBody({
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
+            <div
+                className={cn(
+                    "flex flex-col gap-2 rounded-md p-3",
+                    embedded ? "bg-surface" : "border border-border/60"
+                )}
+            >
                 {editing ? (
                     <RenameForm
                         kind={kind}

@@ -18,7 +18,9 @@ import * as core from "@polaris/core";
 import * as deployActions from "./actions";
 import { Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Button, Input, SegmentedControl, Select, Switch, Textarea, useToast } from "@polaris/ui";
+import { sameSettings, withFields } from "./settings-form";
+import { Badge, Button, Input, SegmentedControl, Select, Switch, Textarea, useToast } from "@polaris/ui";
+import { CardError, CardSkeleton, LearnMore, SaveBar, SettingsCard } from "./settings-kit";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -34,6 +36,14 @@ interface Facts {
     readonly local: boolean;
     readonly guardChallenge: boolean | null;
 }
+
+/** The cards the edge settings are split into, and the fields each one saves. */
+type EdgeCard = "traffic" | "headers" | "redirects";
+const CARD_KEYS: Record<EdgeCard, readonly (keyof Config)[]> = {
+    traffic: ["rateLimits", "concurrency", "concurrencyScope", "challenge"],
+    headers: ["headers"],
+    redirects: ["redirects", "rewrites"]
+};
 
 type Option = { readonly value: string; readonly label: NamespaceKey<"deployConfig"> };
 
@@ -104,7 +114,9 @@ export function EdgeSettings({
     const [draft, setDraft] = useState<Config | null>(null);
     const [facts, setFacts] = useState<Facts | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Partial<Record<EdgeCard, string | null>>>({});
+    const [pendingCard, setPendingCard] = useState<EdgeCard | null>(null);
+    const [flash, setFlashState] = useState<EdgeCard | null>(null);
     const [pending, startTransition] = useTransition();
     const [toggling, startToggle] = useTransition();
     const [headerName, setHeaderName] = useState("");
@@ -132,35 +144,65 @@ export function EdgeSettings({
 
     useEffect(load, [load]);
 
-    // Checked against the same schema the server applies, on every change, so what
-    // Save would refuse is said beside the form rather than after pressing it.
-    const verdict = useMemo(() => (draft ? core.appEdgeConfigSchema.safeParse(draft) : null), [draft]);
-    const invalid = verdict && !verdict.success ? (verdict.error.issues[0]?.message ?? t("edge.checkValues")) : null;
-    // Dirty means the values differ from what is saved, not that a field was touched.
-    const dirty = Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
+    // "Saved" stays beside the card that saved for a few seconds.
+    useEffect(() => {
+        if (!flash) return;
+        const timer = setTimeout(() => setFlashState(null), 3000);
+        return () => clearTimeout(timer);
+    }, [flash]);
+    const setFlash = (card: EdgeCard) => setFlashState(card);
+
     const preview = useMemo(() => (draft ? core.securityHeaderMap(draft.headers) : {}), [draft]);
 
-    if (loadError) return <p className="text-xs text-danger">{loadError}</p>;
-    if (!draft || !facts) {
-        return <div className="h-40 animate-pulse rounded-md bg-muted/40" aria-label={t("edge.loading")} />;
+    if (loadError) {
+        return <CardError title={t("edge.traffic")} message={loadError} onRetry={load} />;
+    }
+    if (!draft || !saved || !facts) {
+        return (
+            <>
+                {canConfigure && <CardSkeleton title={t("edge.publishPort")} rows={1} />}
+                <CardSkeleton title={t("edge.traffic")} />
+                <CardSkeleton title={t("edge.headers")} />
+                <CardSkeleton title={t("edge.redirects")} rows={1} />
+            </>
+        );
     }
 
     const update = (next: Partial<Config>) => setDraft({ ...draft, ...next });
     const updateHeaders = (next: Partial<Headers>) => update({ headers: { ...draft.headers, ...next } });
+    const stored = saved;
 
-    function save() {
-        if (!verdict?.success) return;
-        setError(null);
+    /** What saving one card writes: its fields as edited, the rest as stored. */
+    const nextFor = (keys: readonly (keyof Config)[]) => withFields(stored, draft, keys);
+    const dirtyFor = (keys: readonly (keyof Config)[]) =>
+        !sameSettings(
+            keys.map((key) => draft[key]),
+            keys.map((key) => stored[key])
+        );
+    // Checked against the same schema the server applies, on every change, so what
+    // Save would refuse is said beside the card rather than after pressing it.
+    const problemFor = (keys: readonly (keyof Config)[]) => {
+        const verdict = core.appEdgeConfigSchema.safeParse(nextFor(keys));
+        return verdict.success ? null : (verdict.error.issues[0]?.message ?? t("edge.checkValues"));
+    };
+
+    function save(card: EdgeCard) {
+        const keys = CARD_KEYS[card];
+        const verdict = core.appEdgeConfigSchema.safeParse(nextFor(keys));
+        if (!verdict.success) return;
+        setErrors((current) => ({ ...current, [card]: null }));
         const next = verdict.data;
+        setPendingCard(card);
         startTransition(async () => {
             const result = await deployActions.saveEdgeSettingsAction(applicationId, next);
+            setPendingCard(null);
             if (result.error) {
-                setError(result.error);
+                setErrors((current) => ({ ...current, [card]: result.error ?? null }));
                 return;
             }
             setSaved(next);
-            setDraft(next);
-            toast.show({ title: t("edge.saved") });
+            setDraft((current) => (current ? withFields(current, next, keys) : current));
+            setFlash(card);
             onChanged();
         });
     }
@@ -189,44 +231,48 @@ export function EdgeSettings({
     }
 
     const portLocked = facts.catalog || facts.servedThroughPolaris;
+    const bar = (card: EdgeCard) =>
+        canEdit ? (
+            <SaveBar
+                dirty={dirtyFor(CARD_KEYS[card])}
+                pending={pending && pendingCard === card}
+                justSaved={flash === card}
+                invalid={problemFor(CARD_KEYS[card])}
+                error={errors[card]}
+                onSave={() => save(card)}
+                onDiscard={() => setDraft(withFields(draft, stored, CARD_KEYS[card]))}
+            />
+        ) : undefined;
 
     return (
-        <div className="flex flex-col gap-6">
+        <>
             {canConfigure && (
-                <section className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                            <h3 className="text-sm font-medium">{t("edge.publishPort")}</h3>
-                            <p className="text-xs text-muted-foreground">
-                                {facts.publishPort
-                                    ? t("edge.publishPortOpen")
-                                    : t("edge.publishPortClosed")}
-                            </p>
-                        </div>
+                <SettingsCard
+                    title={t("edge.publishPort")}
+                    description={facts.publishPort ? t("edge.publishPortOpen") : t("edge.publishPortClosed")}
+                    badge={
+                        <Badge variant={facts.publishPort ? "warning" : "success"}>
+                            {facts.publishPort ? t("edge.open") : t("edge.closed")}
+                        </Badge>
+                    }
+                    actions={
                         <Switch
                             checked={facts.publishPort}
                             onChange={togglePort}
                             disabled={toggling || (portLocked && facts.publishPort)}
                             aria-label={t("edge.publishPort")}
                         />
-                    </div>
+                    }
+                >
                     {portLocked && facts.publishPort && (
                         <p className="text-xs text-foreground-subtle">
-                            {facts.catalog
-                                ? t("edge.lockedCatalog")
-                                : t("edge.lockedPolaris")}
+                            {facts.catalog ? t("edge.lockedCatalog") : t("edge.lockedPolaris")}
                         </p>
                     )}
-                </section>
+                </SettingsCard>
             )}
 
-            <section className="flex flex-col gap-3">
-                <div>
-                    <h3 className="text-sm font-medium">{t("edge.traffic")}</h3>
-                    <p className="text-xs text-muted-foreground">
-                        {t("edge.trafficHint")}
-                    </p>
-                </div>
+            <SettingsCard title={t("edge.traffic")} description={t("edge.trafficHint")} footer={bar("traffic")}>
 
                 <div className="flex flex-col gap-2">
                     <span className="text-xs font-medium text-muted-foreground">{t("edge.rateLimits")}</span>
@@ -234,7 +280,7 @@ export function EdgeSettings({
                         <p className="text-xs text-foreground-subtle">{t("edge.noLimit")}</p>
                     )}
                     {draft.rateLimits.map((limit, index) => (
-                        <div key={index} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+                        <div key={index} className="flex flex-wrap items-center gap-2 rounded-md bg-surface p-2">
                             <Input
                                 value={limit.path ?? ""}
                                 onChange={(event) =>
@@ -390,28 +436,23 @@ export function EdgeSettings({
                         ]}
                         aria-label={t("edge.browserCheck")}
                     />
-                    <p className="text-xs text-foreground-subtle">
-                        {t("edge.browserCheckHint")}
-                    </p>
+                    <p className="text-xs text-foreground-subtle">{t("edge.browserCheckShort")}</p>
+                    <LearnMore>{t("edge.browserCheckHint")}</LearnMore>
                     {draft.challenge === "auto" && facts.flooded && (
-                        <p className="flex items-center gap-1.5 text-xs text-warning">
+                        <p className="flex items-center gap-1.5 text-xs text-warning-ink">
                             <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
                             {t("edge.floodedNow")}
                         </p>
                     )}
                     {draft.challenge !== "off" && facts.guardChallenge === false && (
-                        <p className="text-xs text-danger">
+                        <p className="text-xs text-danger-ink">
                             {t("edge.guardTooOld")}
                         </p>
                     )}
                 </div>
-            </section>
+            </SettingsCard>
 
-            <section className="flex flex-col gap-3">
-                <div>
-                    <h3 className="text-sm font-medium">{t("edge.headers")}</h3>
-                    <p className="text-xs text-muted-foreground">{t("edge.headersHint")}</p>
-                </div>
+            <SettingsCard title={t("edge.headers")} description={t("edge.headersHint")} footer={bar("headers")}>
                 <SegmentedControl
                     size="sm"
                     value={draft.headers.preset}
@@ -469,7 +510,7 @@ export function EdgeSettings({
                     />
                 </label>
                 {Object.keys(preview).length > 0 && (
-                    <ul className="flex flex-col gap-1 rounded-md border border-border p-2">
+                    <ul className="flex flex-col gap-1 rounded-md bg-surface p-2">
                         {Object.entries(preview).map(([name, value]) => {
                             const preset = PRESET_FIELDS[name];
                             const custom = draft.headers.custom.some((entry) => entry.name === name);
@@ -533,17 +574,11 @@ export function EdgeSettings({
                         </Button>
                     </div>
                 )}
-            </section>
+            </SettingsCard>
 
-            <section className="flex flex-col gap-3">
-                <div>
-                    <h3 className="text-sm font-medium">{t("edge.redirects")}</h3>
-                    <p className="text-xs text-muted-foreground">
-                        {t("edge.redirectsHint")}
-                    </p>
-                </div>
+            <SettingsCard title={t("edge.redirects")} description={t("edge.redirectsHint")} footer={bar("redirects")}>
                 {draft.redirects.map((redirect, index) => (
-                    <div key={`r${index}`} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+                    <div key={`r${index}`} className="flex flex-wrap items-center gap-2 rounded-md bg-surface p-2">
                         <Select
                             value={redirect.kind}
                             onValueChange={(kind) =>
@@ -619,7 +654,7 @@ export function EdgeSettings({
                     </div>
                 ))}
                 {draft.rewrites.map((rewrite, index) => (
-                    <div key={`w${index}`} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
+                    <div key={`w${index}`} className="flex flex-wrap items-center gap-2 rounded-md bg-surface p-2">
                         <Select
                             value={rewrite.kind}
                             onValueChange={(kind) =>
@@ -719,22 +754,7 @@ export function EdgeSettings({
                         )}
                     </div>
                 )}
-            </section>
-
-            {canEdit && (
-                <div className="flex items-center gap-3">
-                    <Button size="sm" onClick={save} disabled={!dirty || Boolean(invalid) || pending} aria-disabled={!dirty || Boolean(invalid) || pending}>
-                        {pending ? t("edge.saving") : t("edge.save")}
-                    </Button>
-                    {dirty && (
-                        <Button variant="ghost" size="sm" onClick={() => setDraft(saved)} disabled={pending}>
-                            {t("edge.discard")}
-                        </Button>
-                    )}
-                    {dirty && invalid && <span className="text-xs text-danger">{invalid}</span>}
-                    {error && <span className="text-xs text-danger">{error}</span>}
-                </div>
-            )}
-        </div>
+            </SettingsCard>
+        </>
     );
 }

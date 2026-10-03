@@ -19,6 +19,7 @@ import { formatBytes } from "@polaris/core";
 import { Button, Input, cn } from "@polaris/ui";
 import { FolderUp, Loader2 } from "lucide-react";
 import { uploadedSourceAction } from "./source-actions";
+import { SettingsCard } from "./settings-kit";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDesktopBridge } from "@/components/desktop-app";
 import type { UploadedSource } from "@/lib/deploy/source-upload";
@@ -390,40 +391,46 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
     }
 
     return (
-        <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">{t("upload.title")}</h3>
-            <div className="flex flex-col gap-3 rounded-md border border-border p-3 text-sm">
-                {state.upload ? (
-                    <p className="text-xs text-muted-foreground">
-                        {t.rich("upload.builtFrom", {
-                            name: state.upload.name,
-                            count: state.upload.files,
-                            size: formatBytes(state.upload.bytes),
-                            strong: (chunks) => (
-                                <span key="name" className="font-medium text-foreground">
-                                    {chunks}
-                                </span>
-                            )
-                        })}
-                    </p>
-                ) : (
-                    <p className="text-xs text-muted-foreground">{t("upload.nothing")}</p>
-                )}
-                <SourceDropZone
-                    picked={picked}
-                    disabled={pending}
-                    onPicked={(next, reason) => {
-                        setPicked(next);
-                        setError(reason ?? null);
-                    }}
-                />
-                {error && <p className="text-sm text-danger">{error}</p>}
-                <div className="flex justify-end">
-                    <Button onClick={send} disabled={pending || !picked}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} {t("upload.send")}
+        <SettingsCard
+            title={t("upload.title")}
+            description={
+                state.upload
+                    ? t.rich("upload.builtFrom", {
+                          name: state.upload.name,
+                          count: state.upload.files,
+                          size: formatBytes(state.upload.bytes),
+                          strong: (chunks) => (
+                              <span key="name" className="font-medium text-foreground">
+                                  {chunks}
+                              </span>
+                          )
+                      })
+                    : t("upload.nothing")
+            }
+            footer={
+                <>
+                    {error && <p className="mr-auto min-w-0 text-xs text-danger-ink">{error}</p>}
+                    <Button
+                        size="sm"
+                        onClick={() => {
+                            if (picked && !pending) send();
+                        }}
+                        aria-disabled={pending || !picked}
+                        className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                    >
+                        {pending && <Loader2 className="animate-spin" aria-hidden />} {t("upload.send")}
                     </Button>
-                </div>
-            </div>
-        </section>
+                </>
+            }
+        >
+            <SourceDropZone
+                picked={picked}
+                disabled={pending}
+                onPicked={(next, reason) => {
+                    setPicked(next);
+                    setError(reason ?? null);
+                }}
+            />
+        </SettingsCard>
     );
 }
