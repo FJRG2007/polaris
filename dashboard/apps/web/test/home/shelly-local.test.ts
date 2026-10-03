@@ -61,7 +61,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
 const shelly = await import("@polaris-app/places/src/lib/integrations/shelly-api");
 const { shellyLocalDriver } = await import("@polaris-app/places/src/lib/drivers/shelly-local");
 
-const HOST = { host: "192.168.1.30" };
+const HOST = { host: "10.0.1.30" };
 
 beforeEach(() => {
     sent = [];
@@ -114,7 +114,7 @@ describe("digest authentication", () => {
             return { status: 200, body: { was_on: false } };
         };
         await shelly.shellyRpc(
-            { origin: "http://192.168.1.30", username: "admin", password: "pw" },
+            { origin: "http://10.0.1.30", username: "admin", password: "pw" },
             "Switch.Set",
             {
                 id: 0,
@@ -340,6 +340,6 @@ describe("an address", () => {
     });
 
     it("with a path in it is refused rather than trimmed", async () => {
-        await expect(shellyLocalDriver.verify({ host: "192.168.1.30/admin" })).rejects.toThrow();
+        await expect(shellyLocalDriver.verify({ host: "10.0.1.30/admin" })).rejects.toThrow();
     });
 });

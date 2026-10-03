@@ -22,7 +22,7 @@ describe("isTunnelHostname", () => {
     });
 
     it("does not flag real domains or sslip.io names", () => {
-        expect(isTunnelHostname("orphion-ef161a-192-168-1-138.sslip.io")).toBe(false);
+        expect(isTunnelHostname("storefront-ef161a-10-0-1-138.sslip.io")).toBe(false);
         expect(isTunnelHostname("app.example.com")).toBe(false);
         expect(isTunnelHostname("myapp.duckdns.org")).toBe(false);
         expect(isTunnelHostname("service.plr.local")).toBe(false);

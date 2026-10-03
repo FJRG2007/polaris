@@ -32,7 +32,7 @@ vi.mock("@polaris/db", () => ({
         placeDevice: {
             findFirst: async () => ({
                 id: "air",
-                externalId: "192.168.1.40",
+                externalId: "10.0.1.40",
                 accountId: "account-1",
                 vendor: "philips",
                 kind: "air",
@@ -99,12 +99,10 @@ describe("a command on an air purifier", () => {
 
     it("sends one it has, and stores the unit as it landed", async () => {
         await actOnDevice("app", "air", "set-fan", "Ana", { action: "set-fan", speed: "turbo" });
-        expect(act).toHaveBeenCalledWith(
-            {},
-            { externalId: "192.168.1.40", kind: "air" },
-            "set-fan",
-            { action: "set-fan", speed: "turbo" }
-        );
+        expect(act).toHaveBeenCalledWith({}, { externalId: "10.0.1.40", kind: "air" }, "set-fan", {
+            action: "set-fan",
+            speed: "turbo"
+        });
         const data = (
             update.mock.calls[0]![0] as {
                 data: { air: { speed: string; mode: unknown }; state?: string };

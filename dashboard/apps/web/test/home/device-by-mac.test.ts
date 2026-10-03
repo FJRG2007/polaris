@@ -41,21 +41,21 @@ beforeEach(() => {
             knocks += 1;
             for (const [address, mac] of onKnock) table.set(address, mac);
         },
-        subnet: async () => ["192.168.1.2", "192.168.1.3"],
+        subnet: async () => ["10.0.1.2", "10.0.1.3"],
         settleMs: 0
     });
 });
 
 describe("finding where a MAC is", () => {
     it("reads it from the neighbour table, whatever spelling the table uses", async () => {
-        table.set("192.168.1.40", "c8:f7:42:1a:2b:3c");
-        await expect(locateMac(MAC)).resolves.toBe("192.168.1.40");
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
+        await expect(locateMac(MAC)).resolves.toBe("10.0.1.40");
         expect(knocks).toBe(0);
     });
 
     it("asks the table once for a house full of lookups", async () => {
-        table.set("192.168.1.40", "c8:f7:42:1a:2b:3c");
-        table.set("192.168.1.41", "c8:f7:42:1a:2b:3d");
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
+        table.set("10.0.1.41", "c8:f7:42:1a:2b:3d");
         await locateMac(MAC);
         await locateMac("C8:F7:42:1A:2B:3D");
         await locateMac(MAC);
@@ -63,8 +63,8 @@ describe("finding where a MAC is", () => {
     });
 
     it("knocks on the subnet when the table has not seen it, then reads again", async () => {
-        onKnock.set("192.168.1.3", "c8f7421a2b3c");
-        await expect(locateMac(MAC)).resolves.toBe("192.168.1.3");
+        onKnock.set("10.0.1.3", "c8f7421a2b3c");
+        await expect(locateMac(MAC)).resolves.toBe("10.0.1.3");
         expect(knocks).toBe(1);
     });
 
@@ -72,9 +72,9 @@ describe("finding where a MAC is", () => {
         const asked: string[] = [];
         const own = async (hex: string) => {
             asked.push(hex);
-            return "192.168.1.50";
+            return "10.0.1.50";
         };
-        await expect(locateMac(MAC, { own })).resolves.toBe("192.168.1.50");
+        await expect(locateMac(MAC, { own })).resolves.toBe("10.0.1.50");
         expect(asked).toEqual(["c8f7421a2b3c"]);
         expect(knocks).toBe(0);
     });
@@ -91,17 +91,17 @@ describe("finding where a MAC is", () => {
     });
 
     it("prefers a new address over the one it stopped answering at", async () => {
-        table.set("192.168.1.40", "c8:f7:42:1a:2b:3c");
-        table.set("192.168.1.77", "c8:f7:42:1a:2b:3c");
-        await expect(locateMac(MAC, { fresh: true, avoid: "192.168.1.40" })).resolves.toBe(
-            "192.168.1.77"
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
+        table.set("10.0.1.77", "c8:f7:42:1a:2b:3c");
+        await expect(locateMac(MAC, { fresh: true, avoid: "10.0.1.40" })).resolves.toBe(
+            "10.0.1.77"
         );
     });
 
     it("names the MAC each scanned address answered as", async () => {
-        table.set("192.168.1.40", "c8:f7:42:1a:2b:3c");
-        const macs = await macsAt(["192.168.1.40", "192.168.1.41"]);
-        expect([...macs]).toEqual([["192.168.1.40", MAC]]);
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
+        const macs = await macsAt(["10.0.1.40", "10.0.1.41"]);
+        expect([...macs]).toEqual([["10.0.1.40", MAC]]);
     });
 });
 
@@ -132,34 +132,34 @@ function shelly(answering: Set<string>) {
 
 describe("a driver handed a MAC", () => {
     it("is given the IP, and what it returns to be stored keeps the MAC", async () => {
-        table.set("192.168.1.40", "c8:f7:42:1a:2b:3c");
-        const { driver, handed } = shelly(new Set(["192.168.1.40"]));
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
+        const { driver, handed } = shelly(new Set(["10.0.1.40"]));
         const stored = await driver.verify({ host: MAC, password: "pw" });
-        expect(handed).toEqual(["192.168.1.40"]);
+        expect(handed).toEqual(["10.0.1.40"]);
         expect(stored).toEqual({ host: MAC, password: "pw" });
     });
 
     it("follows the device when the router lends it a new address", async () => {
-        table.set("192.168.1.40", "c8:f7:42:1a:2b:3c");
-        const answering = new Set(["192.168.1.40"]);
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
+        const answering = new Set(["10.0.1.40"]);
         const { driver, handed } = shelly(answering);
         await driver.list({ host: MAC });
 
         // The lease changes: the old address is silent, the new one answers.
         answering.clear();
-        answering.add("192.168.1.77");
-        table.delete("192.168.1.40");
-        onKnock.set("192.168.1.77", "c8:f7:42:1a:2b:3c");
+        answering.add("10.0.1.77");
+        table.delete("10.0.1.40");
+        onKnock.set("10.0.1.77", "c8:f7:42:1a:2b:3c");
         await expect(driver.list({ host: MAC })).resolves.toEqual([]);
-        expect(handed).toEqual(["192.168.1.40", "192.168.1.40", "192.168.1.77"]);
+        expect(handed).toEqual(["10.0.1.40", "10.0.1.40", "10.0.1.77"]);
 
         // And keeps the new one: the next call goes straight there.
         await driver.list({ host: MAC });
-        expect(handed.at(-1)).toBe("192.168.1.77");
+        expect(handed.at(-1)).toBe("10.0.1.77");
     });
 
     it("passes the refusal on when the device is nowhere else", async () => {
-        table.set("192.168.1.40", "c8:f7:42:1a:2b:3c");
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
         const { driver } = shelly(new Set());
         await expect(driver.list({ host: MAC })).rejects.toThrow("did not answer in time");
     });
@@ -173,10 +173,10 @@ describe("a driver handed a MAC", () => {
     });
 
     it("leaves an address that is an IP or a name alone, and never looks anything up", async () => {
-        const { driver, handed } = shelly(new Set(["192.168.1.40", "shelly-plug.local"]));
-        await driver.list({ host: "192.168.1.40" });
+        const { driver, handed } = shelly(new Set(["10.0.1.40", "shelly-plug.local"]));
+        await driver.list({ host: "10.0.1.40" });
         await driver.list({ host: "shelly-plug.local" });
-        expect(handed).toEqual(["192.168.1.40", "shelly-plug.local"]);
+        expect(handed).toEqual(["10.0.1.40", "shelly-plug.local"]);
         expect(reads).toBe(0);
     });
 });
@@ -195,9 +195,7 @@ describe("the registry's address fields", () => {
     it("stores a MAC in one spelling, whichever it was typed in", () => {
         const connection = registry.deviceConnection("shelly-local")!;
         expect(registry.normalizeFields(connection, { host: " c8f7.421a.2b3c " }).host).toBe(MAC);
-        expect(registry.normalizeFields(connection, { host: "192.168.1.40" }).host).toBe(
-            "192.168.1.40"
-        );
+        expect(registry.normalizeFields(connection, { host: "10.0.1.40" }).host).toBe("10.0.1.40");
     });
 
     it("holds a MAC being typed to all twelve digits, and leaves empty alone", () => {

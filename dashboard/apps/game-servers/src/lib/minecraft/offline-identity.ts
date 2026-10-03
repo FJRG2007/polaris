@@ -71,14 +71,14 @@ export function offlineUuid(name: string): string {
  * The spelling to use for a name somebody typed, given the ones this server has
  * already seen.
  *
- * On a server that invents identities the spelling IS the player: `PICHURRINA`
- * and `pichurrina` hash to two different people, and only one of them ever
+ * On a server that invents identities the spelling IS the player: `DINNERBONE`
+ * and `dinnerbone` hash to two different people, and only one of them ever
  * connects. So a name typed in the wrong case produces a roster entry under an
  * identity nothing will look up - the player is listed on every screen, the file
  * plainly names them, and the login refuses them. That is the defect this whole
  * module exists to prevent, arrived at from an operator's keyboard instead of
  * from Mojang's UUIDs, and it cost a real player hours: the rule said
- * `pichurrina`, the whitelist was written for `pichurrina`, and `PICHURRINA` was
+ * `dinnerbone`, the whitelist was written for `dinnerbone`, and `DINNERBONE` was
  * told he was not on a list with his name on it.
  *
  * The seen spellings are the only authority on the question - a name is however
@@ -90,7 +90,7 @@ export function asSeenSpelling(typed: string, seen: readonly string[]): string {
     const wanted = typed.trim();
     // Exactly, across all of them, before any difference in case is considered -
     // the same order `indexOfName` uses over a roster file, and for the same
-    // reason. A server that has seen both `solojose` and `Solojose` has seen two
+    // reason. A server that has seen both `notch` and `Notch` has seen two
     // players, and answering a request about one of them with the other would
     // put a working name on somebody else's identity.
     if (seen.some((name) => name.trim() === wanted)) return wanted;
@@ -317,11 +317,16 @@ export function withOfflineIdentities(content: string): string | null {
  * about - taking that away would be this deciding, with no instruction from
  * anybody, that a player an operator listed is not listed any more.
  */
-export function withoutInventedIdentities(content: string, names: readonly string[]): string | null {
+export function withoutInventedIdentities(
+    content: string,
+    names: readonly string[]
+): string | null {
     const entries = parseRoster(content);
     if (entries === null) return null;
     const wanted = new Set(names.map((name) => name.trim().toLowerCase()));
-    const left = entries.filter((entry) => !(isOfflineUuid(entry.uuid) && wanted.has(entry.name.trim().toLowerCase())));
+    const left = entries.filter(
+        (entry) => !(isOfflineUuid(entry.uuid) && wanted.has(entry.name.trim().toLowerCase()))
+    );
     return left.length === entries.length ? null : serialize(left);
 }
 

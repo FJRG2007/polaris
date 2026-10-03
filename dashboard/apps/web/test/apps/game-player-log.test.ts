@@ -64,24 +64,24 @@ const JOIN = [
     neo(
         "30Sep2026 20:26:05.000",
         "net.minecraft.server.players.PlayerList",
-        "PICHURRINA[/203.0.113.9:51001] logged in with entity id 412 at (100.5, 64.0, -20.3)"
+        "DINNERBONE[/203.0.113.9:51001] logged in with entity id 412 at (100.5, 64.0, -20.3)"
     ),
     neo(
         "30Sep2026 20:26:05.000",
         "net.minecraft.server.MinecraftServer",
-        "PICHURRINA joined the game"
+        "DINNERBONE joined the game"
     )
 ].join("\n");
 const LEAVE = [
     neo(
         "30Sep2026 21:00:00.000",
         "net.minecraft.server.network.ServerGamePacketListenerImpl",
-        "PICHURRINA lost connection: Disconnected"
+        "DINNERBONE lost connection: Disconnected"
     ),
     neo(
         "30Sep2026 21:00:00.100",
         "net.minecraft.server.MinecraftServer",
-        "PICHURRINA left the game"
+        "DINNERBONE left the game"
     )
 ].join("\n");
 
@@ -125,17 +125,17 @@ describe("the cursor", () => {
         )!;
         expect(sessions(state)).toEqual([
             {
-                name: "PICHURRINA",
+                name: "DINNERBONE",
                 kind: "join",
                 at: "2026-09-30T20:26:05.000Z",
                 address: "203.0.113.9"
             }
         ]);
-        expect(logConnection(sessionsByPlayer(sessions(state)).get("pichurrina") ?? []).since).toBe(
+        expect(logConnection(sessionsByPlayer(sessions(state)).get("dinnerbone") ?? []).since).toBe(
             "2026-09-30T20:26:05.000Z"
         );
         // The address guard and the chat relay read the same lines.
-        expect(parseJoinAddresses(state.lines.join("\n")).get("pichurrina")).toBe("203.0.113.9");
+        expect(parseJoinAddresses(state.lines.join("\n")).get("dinnerbone")).toBe("203.0.113.9");
         expect(state.cursor).toEqual({ inode: "7", offset: 125_000_000 });
     });
 
@@ -178,9 +178,9 @@ describe("the cursor", () => {
                 "@clock +0200 2026-10-01",
                 `@stat 7 300 ${Date.parse("2026-09-30T22:00:15Z") / 1000}`,
                 "@from 0",
-                "[23:59:50] [Server thread/INFO]: FJRG2007 joined the game",
-                "[00:00:10 INFO]: FJRG2007 lost connection: Disconnected",
-                "[00:00:10 INFO]: FJRG2007 left the game",
+                "[23:59:50] [Server thread/INFO]: PlayerOne joined the game",
+                "[00:00:10 INFO]: PlayerOne lost connection: Disconnected",
+                "[00:00:10 INFO]: PlayerOne left the game",
                 "07 joined the game"
             ].join("\n")
         )!;
@@ -201,7 +201,7 @@ describe("the cursor", () => {
                     ...lines
                 ].join("\n")
             )!;
-        const join = "[23:59:58] [Server thread/INFO]: FJRG2007 joined the game";
+        const join = "[23:59:58] [Server thread/INFO]: PlayerOne joined the game";
         // RCON chatter wrote to the file at 00:00:02; the newest join is from 23:59:58.
         const first = read(NO_PLAYER_LOG, "2026-10-01T00:00:02Z", [join]);
         expect(sessions(first).map((event) => event.at)).toEqual(["2026-09-30T23:59:58.000Z"]);
@@ -209,7 +209,7 @@ describe("the cursor", () => {
         expect(read(first, "2026-10-01T00:10:00Z", [join]).lines).toEqual(first.lines);
         // A restart at 00:10 rescans a log whose last join was at 23:30.
         const rescan = read(NO_PLAYER_LOG, "2026-10-01T00:10:00Z", [
-            "[23:30:00] [Server thread/INFO]: FJRG2007 joined the game"
+            "[23:30:00] [Server thread/INFO]: PlayerOne joined the game"
         ]);
         expect(sessions(rescan).map((event) => event.at)).toEqual(["2026-09-30T23:30:00.000Z"]);
     });

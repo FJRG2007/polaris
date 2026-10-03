@@ -25,7 +25,7 @@ function line(overrides: Partial<ActivityLine> = {}): ActivityLine {
 
 describe("describing what happened to a server", () => {
     it("names the new name when there is one", () => {
-        expect(describeServerEvent(line({ toValue: "lirio-0" }))).toBe("Ana renamed it to lirio-0");
+        expect(describeServerEvent(line({ toValue: "node-0" }))).toBe("Ana renamed it to node-0");
     });
 
     it("still reads as a sentence when the new name was not recorded", () => {
@@ -39,8 +39,8 @@ describe("describing what happened to a server", () => {
     });
 
     it("credits Polaris when nobody is named", () => {
-        expect(describeServerEvent(line({ authorName: null, toValue: "lirio-0" }))).toBe(
-            "Polaris renamed it to lirio-0"
+        expect(describeServerEvent(line({ authorName: null, toValue: "node-0" }))).toBe(
+            "Polaris renamed it to node-0"
         );
     });
 
@@ -75,7 +75,9 @@ describe("in Spanish", () => {
     const spanish = translatorFor("es-ES", "servers");
 
     it("reads a rename and a failed set-up in Spanish", () => {
-        expect(describeIn(line({ toValue: "lirio-0" }), spanish)).toBe("Ana lo ha renombrado a lirio-0");
+        expect(describeIn(line({ toValue: "node-0" }), spanish)).toBe(
+            "Ana lo ha renombrado a node-0"
+        );
         expect(describeIn(line({ action: "edge-failed", authorName: null }), spanish)).toBe(
             "Polaris no ha podido prepararlo para servir sus propios dominios"
         );

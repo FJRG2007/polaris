@@ -20,7 +20,13 @@ vi.mock("@polaris/db", () => ({
                 const value = store.get(where.key);
                 return value === undefined ? null : { value };
             },
-            upsert: async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { key: string };
+                create: { value: string };
+            }) => {
                 store.set(where.key, create.value);
             },
             deleteMany: async ({ where }: { where: { key: string } }) => {
@@ -83,8 +89,8 @@ describe("appBaseUrl", () => {
     });
 
     it("prefers a free public-IP subdomain over the LAN name", async () => {
-        store.set("domain.publicIp", "51.15.20.30");
-        expect(await appBaseUrl()).toMatch(/^https:\/\/app-[a-z0-9]+-51-15-20-30\.sslip\.io$/);
+        store.set("domain.publicIp", "5.6.7.8");
+        expect(await appBaseUrl()).toMatch(/^https:\/\/app-[a-z0-9]+-5-6-7-8\.sslip\.io$/);
     });
 
     it("falls back to the LAN name only when nothing else is reachable", async () => {
@@ -113,7 +119,7 @@ describe("sharingBaseUrl", () => {
     });
 
     it("labels its free subdomain differently from the app one", async () => {
-        store.set("domain.publicIp", "51.15.20.30");
-        expect(await sharingBaseUrl()).toMatch(/^https:\/\/share-[a-z0-9]+-51-15-20-30\.sslip\.io$/);
+        store.set("domain.publicIp", "5.6.7.8");
+        expect(await sharingBaseUrl()).toMatch(/^https:\/\/share-[a-z0-9]+-5-6-7-8\.sslip\.io$/);
     });
 });

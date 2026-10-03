@@ -2,7 +2,7 @@
  * One scoped search, for the commands that cannot be answered from the index the
  * palette already holds.
  *
- * `GET /api/search/lookup?scope=tasks&q=orphion`. The scope is required and
+ * `GET /api/search/lookup?scope=tasks&q=storefront`. The scope is required and
  * closed: there is no "search everything" here, because running four searches
  * for a name somebody was halfway through typing is exactly what the commands
  * exist to avoid. Callers debounce, drop stale replies and keep the answer for a
@@ -23,15 +23,28 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const params = new URL(request.url).searchParams;
-    const parsed = searchLookupSchema.safeParse({ scope: params.get("scope"), query: params.get("q") ?? "" });
+    const parsed = searchLookupSchema.safeParse({
+        scope: params.get("scope"),
+        query: params.get("q") ?? ""
+    });
     if (!parsed.success) {
-        return Response.json({ error: parsed.error.issues[0]?.message ?? (await readerWords("api"))("errors.unknownScope") }, { status: 400 });
+        return Response.json(
+            {
+                error:
+                    parsed.error.issues[0]?.message ??
+                    (await readerWords("api"))("errors.unknownScope")
+            },
+            { status: 400 }
+        );
     }
 
     try {
         return Response.json({ hits: await lookup(user, parsed.data) });
     } catch (caught) {
         console.error(caught);
-        return Response.json({ error: (await readerWords("api"))("errors.searchFailed") }, { status: 500 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.searchFailed") },
+            { status: 500 }
+        );
     }
 }

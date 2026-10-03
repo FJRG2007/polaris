@@ -81,7 +81,7 @@ afterEach(() => {
 describe("the Announce screen", () => {
     it("previews what is typed and sends that", async () => {
         render(
-            <MinecraftAnnounce installedAppId="s1" running edition="java" players={["ErMigue04"]} />
+            <MinecraftAnnounce installedAppId="s1" running edition="java" players={["Jeb_04"]} />
         );
         fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Server restart" } });
 

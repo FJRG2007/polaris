@@ -26,7 +26,7 @@ vi.mock("@polaris/db", () => ({
         installedApp: {
             findUnique: async () => ({
                 config: JSON.stringify(fake.config),
-                name: "Offgrid",
+                name: "ExampleSMP",
                 status: "running",
                 catalogId: "minecraft"
             }),
@@ -496,7 +496,7 @@ describe("watching a server", () => {
         await approach("Steve", 70, -50, 72);
         mine("Steve", 70, -50, 70);
         await look();
-        expect(fake.notified).toEqual(["Steve dug to 2 hidden ores on Offgrid"]);
+        expect(fake.notified).toEqual(["Steve dug to 2 hidden ores on ExampleSMP"]);
         expect(fake.banned).toEqual([]);
     });
 

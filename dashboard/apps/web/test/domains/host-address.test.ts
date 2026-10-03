@@ -35,7 +35,7 @@ async function readAddress(): Promise<string | null> {
 
 describe("getHostLanIp", () => {
     it("accepts an address on each of the private ranges", async () => {
-        for (const address of ["192.168.1.20", "10.0.4.7", "172.16.0.5", "172.31.255.254"]) {
+        for (const address of ["192.168.50.20", "10.0.4.7", "172.16.0.5", "172.31.255.254"]) {
             await writeFile(file, `${address}\n`);
             expect(await readAddress()).toBe(address);
         }
@@ -44,7 +44,7 @@ describe("getHostLanIp", () => {
     it("refuses an address no router on this network could forward to", async () => {
         // Link-local means the NIC never got a lease; a public address means the
         // responder picked an interface that holds one, or was overridden.
-        for (const address of ["169.254.10.4", "85.87.156.88", "127.0.0.1", "172.32.0.1"]) {
+        for (const address of ["169.254.10.4", "5.6.7.8", "127.0.0.1", "172.32.0.1"]) {
             await writeFile(file, `${address}\n`);
             expect(await readAddress()).toBeNull();
         }

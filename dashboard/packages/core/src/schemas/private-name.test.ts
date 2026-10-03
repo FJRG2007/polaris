@@ -9,12 +9,12 @@ import {
 describe("a private name", () => {
     it("is normalized the one way DNS compares names", () => {
         expect(normalizePrivateName("  Api ")).toBe("api");
-        expect(privateNameSchema.parse(" DymoAPI ")).toBe("dymoapi");
+        expect(privateNameSchema.parse(" PaymentsAPI ")).toBe("paymentsapi");
     });
 
     it("is one DNS label with a letter in it", () => {
         expect(privateNameProblem("api")).toBeNull();
-        expect(privateNameProblem("dymo-api-2")).toBeNull();
+        expect(privateNameProblem("payments-api-2")).toBeNull();
         expect(privateNameProblem("")).toBe("empty");
         expect(privateNameProblem("a".repeat(64))).toBe("tooLong");
         expect(privateNameProblem("api.v2")).toBe("characters");

@@ -40,13 +40,18 @@ function contextWith(overrides: Partial<RuntimeContext["ports"]> = {}) {
 const MOUNT: MountTarget = {
     id: "117044d3-1dcb-8b1f-9f0e-cca6e3b24332",
     kind: "smb",
-    source: "//192.168.1.145/Personal-Drive"
+    source: "//10.0.1.145/Personal-Drive"
 } as MountTarget;
 
 function planWithMount(): AppDeployPlan {
     return {
-        ref: { name: "orphion", project: "polaris-abcd1234" },
-        build: { method: "image", name: "orphion", contextPath: "/ctx", imageRef: "ghcr.io/acme/orphion:latest" },
+        ref: { name: "storefront", project: "polaris-abcd1234" },
+        build: {
+            method: "image",
+            name: "storefront",
+            contextPath: "/ctx",
+            imageRef: "ghcr.io/acme/storefront:latest"
+        },
         env: {},
         replicas: 1,
         domains: [],
@@ -59,7 +64,7 @@ describe("a deploy that gives up", () => {
     it("writes the reason a share could not be mounted", async () => {
         const { ctx, lines } = contextWith({
             ensureMount: vi.fn(async () => {
-                throw new Error("SMB connection failed: connect EHOSTUNREACH 192.168.1.145:445");
+                throw new Error("SMB connection failed: connect EHOSTUNREACH 10.0.1.145:445");
             })
         } as Partial<RuntimeContext["ports"]>);
 
@@ -69,9 +74,9 @@ describe("a deploy that gives up", () => {
         const log = lines.join("");
         // The step is announced, and then the reason follows it. Before this,
         // the announcement was the last line anybody saw.
-        expect(log).toContain("Mounting SMB //192.168.1.145/Personal-Drive");
+        expect(log).toContain("Mounting SMB //10.0.1.145/Personal-Drive");
         expect(log).toContain("is not answering");
-        expect(log).toContain("EHOSTUNREACH 192.168.1.145:445");
+        expect(log).toContain("EHOSTUNREACH 10.0.1.145:445");
     });
 
     it("never starts the containers when the share it needs is not there", async () => {
@@ -117,9 +122,13 @@ describe("a deploy that gives up", () => {
         // the machine, and the only move anybody has is to press deploy again.
         const composeUp = vi
             .fn()
-            .mockRejectedValueOnce(new Error("unable to lease content: lease does not exist: not found"))
+            .mockRejectedValueOnce(
+                new Error("unable to lease content: lease does not exist: not found")
+            )
             .mockResolvedValueOnce(undefined);
-        const { ctx, lines, ports } = contextWith({ composeUp } as Partial<RuntimeContext["ports"]>);
+        const { ctx, lines, ports } = contextWith({ composeUp } as Partial<
+            RuntimeContext["ports"]
+        >);
 
         const result = await new ComposeRuntime().deployApplication(planWithMount(), ctx);
 
@@ -160,13 +169,16 @@ describe("a deploy that gives up", () => {
             ...planWithMount(),
             build: {
                 method: "dockerfile",
-                name: "orphion",
+                name: "storefront",
                 contextPath: "/ctx",
                 commitSha: "abcdef1",
                 dockerfilePath: "Dockerfile"
             }
         } as unknown as AppDeployPlan;
-        const ctxWithSource = { ...ctx, buildContext: async () => ({ tar: Buffer.from("") }) } as RuntimeContext;
+        const ctxWithSource = {
+            ...ctx,
+            buildContext: async () => ({ tar: Buffer.from("") })
+        } as RuntimeContext;
 
         const result = await new ComposeRuntime().deployApplication(plan, ctxWithSource);
 

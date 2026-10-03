@@ -94,7 +94,7 @@ Or: Settings -> Devices & Services -> Add Integration -> search "UniFi UNAS".
 
 Fill in:
 
-- **Host** - UNAS IP address (e.g. `192.168.1.25`)
+- **Host** - UNAS IP address (e.g. `10.0.1.25`)
 - **Username** - `root`
 - **Password** - your UNAS SSH password (leave blank if using an SSH key)
 - **MQTT Host** - IP of your MQTT broker (your HA IP if using the Mosquitto add-on)

@@ -17,10 +17,10 @@ import {
 
 describe("enrollmentAddressCandidates", () => {
     it("leads with the address it observed over the ones it was told", () => {
-        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "192.168.1.7"])).toEqual([
+        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "10.0.1.7"])).toEqual([
             "203.0.113.8",
             "10.0.0.5",
-            "192.168.1.7"
+            "10.0.1.7"
         ]);
     });
 
@@ -29,19 +29,19 @@ describe("enrollmentAddressCandidates", () => {
     // reported addresses is the only thing between that and an enrollment that
     // fails on a machine which was reachable all along.
     it("keeps the reported addresses behind an observed one that is not the machine", () => {
-        expect(enrollmentAddressCandidates("192.168.1.1", ["192.168.1.142"])).toEqual([
-            "192.168.1.1",
-            "192.168.1.142"
+        expect(enrollmentAddressCandidates("10.0.1.1", ["10.0.1.142"])).toEqual([
+            "10.0.1.1",
+            "10.0.1.142"
         ]);
     });
 
     it("falls back to a reported address when nothing was observed", () => {
-        expect(enrollmentAddressCandidates(undefined, ["192.168.1.7"])).toEqual(["192.168.1.7"]);
+        expect(enrollmentAddressCandidates(undefined, ["10.0.1.7"])).toEqual(["10.0.1.7"]);
     });
 
     it("never offers loopback, which is Polaris's own proxy and not the machine", () => {
-        expect(enrollmentAddressCandidates("127.0.0.1", ["192.168.1.7"])).toEqual(["192.168.1.7"]);
-        expect(enrollmentAddressCandidates("::1", ["192.168.1.7"])).toEqual(["192.168.1.7"]);
+        expect(enrollmentAddressCandidates("127.0.0.1", ["10.0.1.7"])).toEqual(["10.0.1.7"]);
+        expect(enrollmentAddressCandidates("::1", ["10.0.1.7"])).toEqual(["10.0.1.7"]);
         expect(enrollmentAddressCandidates("127.0.0.1", ["127.0.0.1", "localhost"])).toEqual([]);
     });
 
@@ -58,23 +58,24 @@ describe("enrollmentAddressCandidates", () => {
      */
     it("prefers the address on Polaris's own network when it knows what that is", () => {
         expect(
-            enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "192.168.1.7"], "192.168.1.50")
-        ).toEqual(["192.168.1.7", "10.0.0.5", "203.0.113.8"]);
+            enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "10.0.1.7"], "10.0.1.50")
+        ).toEqual(["10.0.1.7", "10.0.0.5", "203.0.113.8"]);
     });
 
     it("still knocks on the public address, second", () => {
         // Being near is a reason to try first, never a reason to stop trying:
         // the LAN address may be stale, and the public one may be the only one
         // that answers.
-        expect(enrollmentAddressCandidates("203.0.113.8", ["192.168.1.7"], "192.168.1.50")).toContain(
+        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.1.7"], "10.0.1.50")).toContain(
             "203.0.113.8"
         );
     });
 
     it("orders nothing differently when Polaris is not on a local network itself", () => {
-        expect(
-            enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5"], "203.0.113.20")
-        ).toEqual(["203.0.113.8", "10.0.0.5"]);
+        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5"], "203.0.113.20")).toEqual([
+            "203.0.113.8",
+            "10.0.0.5"
+        ]);
         expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5"], null)).toEqual([
             "203.0.113.8",
             "10.0.0.5"
@@ -82,8 +83,8 @@ describe("enrollmentAddressCandidates", () => {
     });
 
     it("does not knock twice on the same address", () => {
-        expect(enrollmentAddressCandidates("192.168.1.7", ["192.168.1.7", "10.0.0.5"])).toEqual([
-            "192.168.1.7",
+        expect(enrollmentAddressCandidates("10.0.1.7", ["10.0.1.7", "10.0.0.5"])).toEqual([
+            "10.0.1.7",
             "10.0.0.5"
         ]);
     });
@@ -109,9 +110,10 @@ describe("refuseEnrollmentSchema", () => {
     // Free text here would be a stranger writing into an operator's dashboard, so
     // the machine picks a code and Polaris owns every word that gets rendered.
     it("never lets the machine supply the sentence Polaris shows", () => {
-        expect(refuseEnrollmentSchema.safeParse({ reason: "Your account is locked, call 555-0100" }).success).toBe(
-            false
-        );
+        expect(
+            refuseEnrollmentSchema.safeParse({ reason: "Your account is locked, call 555-0100" })
+                .success
+        ).toBe(false);
         const parsed = refuseEnrollmentSchema.parse({ reason: "ssh-not-listening" });
         expect(Object.keys(parsed)).toEqual(["reason"]);
         for (const reason of ENROLLMENT_REFUSAL_REASONS) {
@@ -148,7 +150,9 @@ describe("enrollmentCommand", () => {
     // offering choices that produced registered-but-useless machines. They stay
     // spelled out as arguments so the command still says what it does.
     it("grants container access and root without asking", () => {
-        expect(enrollmentCommand("https://polaris.example.com", "tok")).toContain("-- --docker --root");
+        expect(enrollmentCommand("https://polaris.example.com", "tok")).toContain(
+            "-- --docker --root"
+        );
     });
 });
 
@@ -232,7 +236,10 @@ describe("enrollmentScript", () => {
         // before anything else has happened - so a systemsetup that touched stdin
         // would swallow the script from its very first line.
         expect(script).toContain("systemsetup -getremotelogin </dev/null");
-        const calls = script.slice(script.indexOf("read_remote_login() {")).match(/systemsetup -[a-z]+[^\n]*/g) ?? [];
+        const calls =
+            script
+                .slice(script.indexOf("read_remote_login() {"))
+                .match(/systemsetup -[a-z]+[^\n]*/g) ?? [];
         expect(calls).toHaveLength(3);
         for (const call of calls) expect(call).toContain("</dev/null");
         // Read back rather than trusted - Full Disk Access can refuse the change,
@@ -265,7 +272,9 @@ describe("enrollmentScript", () => {
         );
         expect(enabled).toContain("dseditgroup -o create -q com.apple.access_ssh");
         expect(enabled).toContain("dseditgroup -o edit -d everyone -t group com.apple.access_ssh");
-        expect(enabled).toContain('dseditgroup -o edit -a "$POLARIS_USER" -t user com.apple.access_ssh');
+        expect(enabled).toContain(
+            'dseditgroup -o edit -a "$POLARIS_USER" -t user com.apple.access_ssh'
+        );
 
         // The already-on path adds and never removes.
         const alreadyOn = script.slice(script.indexOf('if [ "$REMOTE_LOGIN" = "unknown" ]'));
@@ -276,7 +285,9 @@ describe("enrollmentScript", () => {
         // And the one thing that helper does to a list is put a login on it.
         const adder = script.slice(script.indexOf("add_to_access_list() {"));
         const body = adder.slice(0, adder.indexOf("\n    }"));
-        expect(body).toContain('dseditgroup -o edit -a "$POLARIS_USER" -t user com.apple.access_ssh');
+        expect(body).toContain(
+            'dseditgroup -o edit -a "$POLARIS_USER" -t user com.apple.access_ssh'
+        );
         expect(body).not.toContain("-d ");
         expect(body).not.toContain("-o create");
         expect(body).not.toContain("-o delete");
@@ -310,7 +321,10 @@ describe("enrollmentScript", () => {
         expect(body.match(/-d everyone/g)).toHaveLength(1);
         // The branch for a list that was already here adds to it and leaves it
         // otherwise alone, exactly like the already-on path.
-        const kept = body.slice(body.indexOf('if [ "$ACCESS_LIST" = "yes" ]'), body.indexOf("dseditgroup -o create -q"));
+        const kept = body.slice(
+            body.indexOf('if [ "$ACCESS_LIST" = "yes" ]'),
+            body.indexOf("dseditgroup -o create -q")
+        );
         expect(kept).toContain("ADDED=$(add_to_access_list)");
         expect(kept).not.toContain("-d everyone");
         expect(kept).not.toContain("-o create");
@@ -326,7 +340,7 @@ describe("enrollmentScript", () => {
     it("tells an access list that is not there from one it could not read", () => {
         const reader = script.slice(script.indexOf("access_ssh_exists() {"));
         const body = reader.slice(0, reader.indexOf("\n    }"));
-        expect(body).toContain("_groups=$(dscl . -list /Groups 2>/dev/null) || _groups=\"\"");
+        expect(body).toContain('_groups=$(dscl . -list /Groups 2>/dev/null) || _groups=""');
         // Absence is the listing not naming it, matched whole rather than anywhere
         // in a line, and never parsed out of an error message.
         expect(body).toContain("grep -qxF com.apple.access_ssh");
@@ -400,7 +414,9 @@ describe("enrollmentScript", () => {
             "die ssh-access-list-unrestricted"
         );
         // And the warning it used to carry on past is gone.
-        expect(script).not.toContain("WARNING: turned Remote Login on, and left the SSH access list alone");
+        expect(script).not.toContain(
+            "WARNING: turned Remote Login on, and left the SSH access list alone"
+        );
     });
 
     // The access list is what macOS turns an unlisted login away with, so an add
@@ -410,7 +426,9 @@ describe("enrollmentScript", () => {
     // announced on somebody else's membership and never read back.
     it("reads back the login's own membership before announcing it", () => {
         const adder = script.slice(script.indexOf("add_to_access_list() {"));
-        expect(adder.slice(0, adder.indexOf("\n    }"))).toContain('access_ssh_member "$POLARIS_USER" user');
+        expect(adder.slice(0, adder.indexOf("\n    }"))).toContain(
+            'access_ssh_member "$POLARIS_USER" user'
+        );
         expect(script.match(/die not-in-ssh-access-list/g)).toHaveLength(2);
         // The already-on path refuses only on a list that was read and says no: an
         // answer nobody got has never been allowed to strand an enrollment.
@@ -456,7 +474,9 @@ describe("enrollmentScript", () => {
         expect(built).toContain('[ "$(access_ssh_member everyone group)" = "yes" ]');
         expect(built).toContain("die remote-login-unrestricted");
         // The group made for a switch that never moved goes with it.
-        expect(built.indexOf("dseditgroup -o delete")).toBeLessThan(built.indexOf("die remote-login-unrestricted"));
+        expect(built.indexOf("dseditgroup -o delete")).toBeLessThan(
+            built.indexOf("die remote-login-unrestricted")
+        );
         expect(built).toContain("was left off, the way this found it");
     });
 
@@ -504,7 +524,10 @@ describe("enrollmentScript", () => {
     // reported like any other rather than printed and walked past.
     it("puts Remote Login back off when it cannot read back the narrowing it made", () => {
         const enabled = script.slice(script.indexOf("dseditgroup -o create -q"));
-        const failed = enabled.slice(enabled.indexOf("\n            else"), enabled.indexOf("\n        else"));
+        const failed = enabled.slice(
+            enabled.indexOf("\n            else"),
+            enabled.indexOf("\n        else")
+        );
         expect(failed).toContain("dseditgroup -o delete com.apple.access_ssh");
         // -f suppresses the confirmation, which systemsetup only asks on the way
         // off - and stdin is this script, so nothing can answer it.
@@ -522,7 +545,9 @@ describe("enrollmentScript", () => {
         // told to the operator as a machine that may be open right now.
         expect(failed).toContain('if [ "$REMOTE_LOGIN" = "no" ]');
         expect(failed).toContain("could not confirm it went back off");
-        expect(script).not.toContain("WARNING: turned Remote Login on, but SSH could not be limited");
+        expect(script).not.toContain(
+            "WARNING: turned Remote Login on, but SSH could not be limited"
+        );
     });
 
     // One code for both halves told the dashboard to go and turn Remote Login on -
@@ -531,7 +556,10 @@ describe("enrollmentScript", () => {
     // read, so the state the machine was left in is what the code has to carry.
     it("does not report a machine left open as one that was put back safely", () => {
         const enabled = script.slice(script.indexOf("dseditgroup -o create -q"));
-        const failed = enabled.slice(enabled.indexOf("\n            else"), enabled.indexOf("\n        else"));
+        const failed = enabled.slice(
+            enabled.indexOf("\n            else"),
+            enabled.indexOf("\n        else")
+        );
         const reverted = failed.indexOf("die remote-login-unrestricted");
         const open = failed.indexOf("die remote-login-left-open");
         expect(reverted).toBeGreaterThan(-1);
@@ -540,7 +568,9 @@ describe("enrollmentScript", () => {
         // left when that read did not say "off".
         expect(failed.slice(reverted, open)).toContain("was put back off");
         expect(failed.slice(open)).toContain("may be reachable over SSH right now");
-        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-left-open"]).toContain("may be reachable over SSH right now");
+        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-left-open"]).toContain(
+            "may be reachable over SSH right now"
+        );
         // And Polaris's own sentence for it does not send anybody to switch on what
         // is already on.
         expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-left-open"]).not.toMatch(/turn it on/i);
@@ -549,7 +579,9 @@ describe("enrollmentScript", () => {
         // both end with Remote Login off the way the command found it, and neither
         // is told a revert happened that may not have.
         expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-unrestricted"]).toContain("left off");
-        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-unrestricted"]).not.toContain("put back off");
+        expect(ENROLLMENT_REFUSAL_MESSAGES["remote-login-unrestricted"]).not.toContain(
+            "put back off"
+        );
     });
 
     it("says how to undo the Remote Login changes it can make", () => {
@@ -600,7 +632,9 @@ describe("enrollmentScript", () => {
         expect(script).toContain("LISTENERS_PLAIN=$(netstat -lnt 2>/dev/null || true)");
         const probe = script.slice(script.indexOf("SSH_PROBE=none"));
         // Taken before anything reads them, and read from the variable after.
-        expect(probe.indexOf("LISTENERS_OWNED=$(ss -ltnp")).toBeLessThan(probe.indexOf("for port in $SSH_PORTS; do"));
+        expect(probe.indexOf("LISTENERS_OWNED=$(ss -ltnp")).toBeLessThan(
+            probe.indexOf("for port in $SSH_PORTS; do")
+        );
         expect(probe).not.toContain("$(listeners ");
     });
 
@@ -657,8 +691,12 @@ describe("enrollmentScript", () => {
         const probe = script.slice(script.indexOf("SSH_PROBE=none"));
         const bare = probe.slice(probe.indexOf('if [ "$SSH_LISTENING" != "yes" ]'));
         const sweep = bare.slice(0, bare.indexOf('case "$SSH_LISTENING" in'));
-        expect(sweep.indexOf("SSH_PORT=$port")).toBeGreaterThan(sweep.indexOf('if listening_on "$port"'));
-        expect(sweep.indexOf("SSH_PORT=$port")).toBeLessThan(sweep.indexOf("SSH_LISTENING=unknown"));
+        expect(sweep.indexOf("SSH_PORT=$port")).toBeGreaterThan(
+            sweep.indexOf('if listening_on "$port"')
+        );
+        expect(sweep.indexOf("SSH_PORT=$port")).toBeLessThan(
+            sweep.indexOf("SSH_LISTENING=unknown")
+        );
         expect(script).toContain("so port $SSH_PORT is what gets reported");
     });
 
@@ -668,7 +706,9 @@ describe("enrollmentScript", () => {
     it("takes a systemd-held socket only on a port this machine declares", () => {
         expect(script).toContain('if owned_by "$port" systemd');
         const probe = script.slice(script.indexOf("SSH_PROBE=none"));
-        expect(probe.indexOf('owned_by "$port" systemd')).toBeLessThan(probe.indexOf('listening_on "$port"'));
+        expect(probe.indexOf('owned_by "$port" systemd')).toBeLessThan(
+            probe.indexOf('listening_on "$port"')
+        );
     });
 
     // `index($0, "sshd")` matched anywhere on the line, so a process merely named
@@ -730,7 +770,9 @@ describe("enrollmentScript", () => {
         const probe = script.slice(script.indexOf("SSH_PROBE=none"));
         expect(probe).toContain('"$LISTENERS_OWNED" | reachable_listener "" sshd)');
         // The candidate sweep is the else, so it only runs when the owner was mute.
-        expect(probe.indexOf('if [ -n "$OBSERVED_PORT" ]')).toBeLessThan(probe.indexOf("for port in $SSH_PORTS; do"));
+        expect(probe.indexOf('if [ -n "$OBSERVED_PORT" ]')).toBeLessThan(
+            probe.indexOf("for port in $SSH_PORTS; do")
+        );
         expect(probe).toContain("SSH_PORT=$OBSERVED_PORT");
     });
 
@@ -757,7 +799,9 @@ describe("enrollmentScript", () => {
         expect(probe).toContain("SSH_PORT=$port");
         expect(probe).toContain("SSH_LISTENING=yes");
         // The refusal is outside the loops: it needs every candidate to have missed.
-        expect(probe.indexOf("die ssh-not-listening")).toBeGreaterThan(probe.lastIndexOf("SSH_LISTENING=yes"));
+        expect(probe.indexOf("die ssh-not-listening")).toBeGreaterThan(
+            probe.lastIndexOf("SSH_LISTENING=yes")
+        );
     });
 
     // Before this, the pre-claim abort existed only in a terminal nobody was
@@ -771,7 +815,9 @@ describe("enrollmentScript", () => {
         expect(script).toContain("/refuse");
         // No bare `die "message"` anywhere: a code is not optional.
         expect(script).not.toMatch(/die "/);
-        const codes = [...script.matchAll(/(?:^|[|;&\s])die ([a-z-]+) "/gm)].map((match) => match[1]);
+        const codes = [...script.matchAll(/(?:^|[|;&\s])die ([a-z-]+) "/gm)].map(
+            (match) => match[1]
+        );
         expect(codes.length).toBeGreaterThan(0);
         for (const code of codes) expect(ENROLLMENT_REFUSAL_REASONS).toContain(code);
         // Nothing the script can refuse over is missing a sentence Polaris owns.
@@ -809,7 +855,9 @@ describe("enrollmentScript", () => {
         const die = preClaim.slice(preClaim.indexOf("die() {"));
         const body = die.slice(0, die.indexOf("\n}"));
         // awk's own `exit` carries no status, so a numbered one is always the shell.
-        const stops = preClaim.split("\n").filter((line) => /\bexit [0-9]/.test(line) || />&2/.test(line));
+        const stops = preClaim
+            .split("\n")
+            .filter((line) => /\bexit [0-9]/.test(line) || />&2/.test(line));
         expect(stops.length).toBeGreaterThan(0);
         for (const stop of stops) expect(body).toContain(stop.trim());
         expect(preClaim).not.toContain("exit 2");
@@ -843,7 +891,7 @@ describe("enrollmentScript", () => {
         expect(body).toContain("|| true");
         expect(body).toContain("--max-time");
         // A code, never a sentence: this endpoint is unauthenticated.
-        expect(body).toContain("printf '{\"reason\":\"%s\"}' \"$1\"");
+        expect(body).toContain('printf \'{"reason":"%s"}\' "$1"');
         // Reported before the operator is told, and the exit code is still 1.
         expect(body.indexOf("/refuse")).toBeLessThan(body.indexOf('echo "polaris: $2"'));
         expect(body).toContain("exit 1");
@@ -853,7 +901,7 @@ describe("enrollmentScript", () => {
     // command can be most of the way through its life by the time somebody has
     // installed an SSH server - so the next thing they saw was "expired".
     it("does not promise a re-run the command may be too old for", () => {
-        expect(script).not.toContain("then run this command again\"");
+        expect(script).not.toContain('then run this command again"');
         const dies =
             script.match(
                 /die (?:ssh-not-listening|remote-login-off|ssh-access-list-unrestricted|remote-login-unrestricted|remote-login-left-open|ssh-access-list-left-behind|not-in-ssh-access-list) "[^"]*"/g

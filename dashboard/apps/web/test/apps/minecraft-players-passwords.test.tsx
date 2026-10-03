@@ -89,11 +89,11 @@ describe("passwords in the players table", () => {
         table({
             passwords: [
                 { name: "steve", lastLoginAt: "2026-09-17T10:00:00.000Z" },
-                { name: "Reckmy", lastLoginAt: null }
+                { name: "Grumm", lastLoginAt: null }
             ]
         });
         expect(within(rowOf("Steve")).getByText("password set")).toBeTruthy();
-        expect(within(rowOf("Reckmy")).getByText("password set")).toBeTruthy();
+        expect(within(rowOf("Grumm")).getByText("password set")).toBeTruthy();
         expect(within(rowOf("Alex")).getByText("no password yet")).toBeTruthy();
     });
 

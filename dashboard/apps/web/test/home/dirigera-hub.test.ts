@@ -76,7 +76,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
 const ikea = await import("@polaris-app/places/src/lib/integrations/dirigera-api");
 const { dirigeraHubDriver } = await import("@polaris-app/places/src/lib/drivers/dirigera-hub");
 
-const PAIRED = { host: "192.168.1.25", token: "hub-token", fingerprint: PIN };
+const PAIRED = { host: "10.0.1.25", token: "hub-token", fingerprint: PIN };
 
 beforeEach(() => {
     sent = [];
@@ -102,8 +102,8 @@ describe("PKCE", () => {
 describe("pairing", () => {
     it("waits for the button, then keeps the token and the certificate it was paired over", async () => {
         pressAfter = 2;
-        const hub = await ikea.pairHub("192.168.1.25", { pollMs: 1 });
-        expect(hub).toEqual({ host: "192.168.1.25", token: "hub-token", fingerprint: PIN });
+        const hub = await ikea.pairHub("10.0.1.25", { pollMs: 1 });
+        expect(hub).toEqual({ host: "10.0.1.25", token: "hub-token", fingerprint: PIN });
 
         const authorize = sent[0]!;
         const query = new URL(authorize.url).searchParams;
@@ -128,17 +128,15 @@ describe("pairing", () => {
 
     it("says the button was not pressed when the window closes", async () => {
         pressAfter = 1000;
-        await expect(
-            ikea.pairHub("192.168.1.25", { pollMs: 1, windowMs: 5 })
-        ).rejects.toMatchObject({
+        await expect(ikea.pairHub("10.0.1.25", { pollMs: 1, windowMs: 5 })).rejects.toMatchObject({
             kind: "refused",
             message: expect.stringContaining("action button")
         });
     });
 
     it("stores what pairing produced, not what was typed", async () => {
-        const stored = await dirigeraHubDriver.verify({ host: "192.168.1.25" });
-        expect(stored).toEqual({ host: "192.168.1.25", token: "hub-token", fingerprint: PIN });
+        const stored = await dirigeraHubDriver.verify({ host: "10.0.1.25" });
+        expect(stored).toEqual({ host: "10.0.1.25", token: "hub-token", fingerprint: PIN });
     });
 });
 
@@ -239,7 +237,7 @@ describe("what a hub has", () => {
     });
 
     it("asks to be paired again when a connection never was", async () => {
-        await expect(dirigeraHubDriver.list({ host: "192.168.1.25" })).rejects.toMatchObject({
+        await expect(dirigeraHubDriver.list({ host: "10.0.1.25" })).rejects.toMatchObject({
             kind: "unauthorized"
         });
     });

@@ -41,7 +41,7 @@ export async function ensureShareReachability(): Promise<void> {
  * It is only ever raised when a link is handed out, and nothing else looked at it
  * afterwards: a box that later got a working domain kept the connector for good,
  * and one raised against the web container's old name kept forwarding into a name
- * that no longer existed (lirio-0 had one doing both for two months). So a tunnel
+ * that no longer existed (one server had one doing both for months). So a tunnel
  * that is no longer needed goes, and one that is needed but stale is raised again.
  */
 export async function settleShareTunnel(): Promise<"removed" | "repaired" | "unchanged"> {

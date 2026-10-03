@@ -283,7 +283,9 @@ describe("withoutInventedIdentities", () => {
             { uuid: offlineUuid("Steve"), name: "Steve" },
             { uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", name: "Alice" }
         ]);
-        expect(rosterNames(withoutInventedIdentities(before, ["Steve", "Alice"]) ?? "")).toEqual(["Alice"]);
+        expect(rosterNames(withoutInventedIdentities(before, ["Steve", "Alice"]) ?? "")).toEqual([
+            "Alice"
+        ]);
     });
 
     // Removing it is only ever the first half of putting the player back through
@@ -321,21 +323,19 @@ describe("withoutInventedIdentities", () => {
  *
  * The same defect as everything above, reached from the other end: not a UUID
  * from the wrong issuer, but the right kind of UUID over the wrong spelling. It
- * locked a real player out for hours - the rule said `pichurrina`, so the
- * whitelist was written for `pichurrina`, and `PICHURRINA` was refused from a
+ * locked a real player out for hours - the rule said `dinnerbone`, so the
+ * whitelist was written for `dinnerbone`, and `DINNERBONE` was refused from a
  * list carrying his name. Both halves were behaving as documented and every
  * screen said he was allowed.
  */
 describe("the spelling a name is stored under", () => {
-    const SEEN = ["PICHURRINA", "ErMigue04", "Solojose"];
+    const SEEN = ["DINNERBONE", "Jeb_04", "Notch"];
 
     it("is the one the server has seen, not the one that was typed", () => {
-        expect(asSeenSpelling("pichurrina", SEEN)).toBe("PICHURRINA");
-        expect(asSeenSpelling("ERMIGUE04", SEEN)).toBe("ErMigue04");
+        expect(asSeenSpelling("dinnerbone", SEEN)).toBe("DINNERBONE");
+        expect(asSeenSpelling("JEB_04", SEEN)).toBe("Jeb_04");
         // And the identity that follows from it is the one the login computes.
-        expect(offlineUuid(asSeenSpelling("pichurrina", SEEN))).toBe(
-            offlineUuid("PICHURRINA")
-        );
+        expect(offlineUuid(asSeenSpelling("dinnerbone", SEEN))).toBe(offlineUuid("DINNERBONE"));
     });
 
     it("keeps what was typed for somebody nobody has seen", () => {
@@ -346,15 +346,15 @@ describe("the spelling a name is stored under", () => {
     });
 
     it("trims, and never answers with nothing", () => {
-        expect(asSeenSpelling("  pichurrina  ", SEEN)).toBe("PICHURRINA");
+        expect(asSeenSpelling("  dinnerbone  ", SEEN)).toBe("DINNERBONE");
         expect(asSeenSpelling("  Newcomer  ", SEEN)).toBe("Newcomer");
     });
 
     it("corrects a whole list in one pass, which is what repairs a stored rule", () => {
-        expect(asSeenSpellings(["pichurrina", "solojose", "Reckmy"], SEEN)).toEqual([
-            "PICHURRINA",
-            "Solojose",
-            "Reckmy"
+        expect(asSeenSpellings(["dinnerbone", "notch", "Grumm"], SEEN)).toEqual([
+            "DINNERBONE",
+            "Notch",
+            "Grumm"
         ]);
     });
 
@@ -362,7 +362,7 @@ describe("the spelling a name is stored under", () => {
     // both of them holds both of those players. Whichever it has seen is the one
     // it answers with, and neither is renamed into the other.
     it("leaves a spelling the server itself has seen alone", () => {
-        expect(asSeenSpelling("solojose", ["solojose", "Solojose"])).toBe("solojose");
-        expect(asSeenSpelling("Solojose", ["solojose", "Solojose"])).toBe("Solojose");
+        expect(asSeenSpelling("notch", ["notch", "Notch"])).toBe("notch");
+        expect(asSeenSpelling("Notch", ["notch", "Notch"])).toBe("Notch");
     });
 });

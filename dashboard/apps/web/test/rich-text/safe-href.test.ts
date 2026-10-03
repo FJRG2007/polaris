@@ -19,7 +19,7 @@ import { isSafeHref } from "@/components/rich-text/rich-text";
 describe("what may be linked to", () => {
     it("allows the three schemes a written link has a reason to use", () => {
         expect(isSafeHref("https://example.com/thing")).toBe(true);
-        expect(isSafeHref("http://192.168.1.10:8080/admin")).toBe(true);
+        expect(isSafeHref("http://10.0.1.10:8080/admin")).toBe(true);
         expect(isSafeHref("mailto:someone@example.com")).toBe(true);
     });
 
@@ -33,7 +33,9 @@ describe("what may be linked to", () => {
     });
 
     it("refuses a data URL, which is a page the writer wrote", () => {
-        expect(isSafeHref("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==")).toBe(false);
+        expect(isSafeHref("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==")).toBe(
+            false
+        );
         expect(isSafeHref("data:image/png;base64,iVBORw0KGgo=")).toBe(false);
     });
 

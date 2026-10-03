@@ -19,7 +19,7 @@ vi.mock("@/lib/chat/call-server", () => ({
     callServer: async () => endpoint,
     answering: async () => up
 }));
-vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => "192.168.1.50" }));
+vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => "10.0.1.50" }));
 
 const settings: Record<string, string> = {};
 vi.mock("@/lib/setting-store", () => ({

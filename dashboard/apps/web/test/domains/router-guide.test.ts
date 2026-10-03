@@ -71,7 +71,11 @@ describe("giving the server a fixed address", () => {
         expect(reserve.kind).toBe("form");
         if (reserve.kind !== "form") return;
         // The three fields that form asks for, and the button that commits them.
-        expect(reserve.fields.map((field) => field.label)).toEqual(["Name", "MAC Address", "IP Address"]);
+        expect(reserve.fields.map((field) => field.label)).toEqual([
+            "Name",
+            "MAC Address",
+            "IP Address"
+        ]);
         expect(reserve.save).toBe("Create New Item");
     });
 
@@ -126,10 +130,9 @@ describe("names the form will accept", () => {
         // 17 characters, and the form refuses the entry rather than trimming it: the
         // page would otherwise print a value that cannot be typed into the router.
         expect(routerGuide("zte").nameLimit).toBe(16);
-        expect(fitRuleNames(ranged, routerGuide("zte").nameLimit).map((rule) => rule.name)).toEqual([
-            "plr-games-tcp",
-            "plr-games-udp"
-        ]);
+        expect(fitRuleNames(ranged, routerGuide("zte").nameLimit).map((rule) => rule.name)).toEqual(
+            ["plr-games-tcp", "plr-games-udp"]
+        );
     });
 
     it("leaves every rule alone where the brand does not cap the name", () => {
@@ -137,14 +140,19 @@ describe("names the form will accept", () => {
         // Polaris's own two rules fit anywhere, so even a capped brand gets them
         // verbatim - a name nobody has to shorten should not be shortened.
         expect(
-            fitRuleNames([{ name: "polaris-https", protocol: "TCP", port: 443 }], 16).map((rule) => rule.name)
+            fitRuleNames([{ name: "polaris-https", protocol: "TCP", port: 443 }], 16).map(
+                (rule) => rule.name
+            )
         ).toEqual(["polaris-https"]);
     });
 
     it("keeps the port when it has to cut a per-port rule down", () => {
         // The tail is what says which server and which rule this is; the middle is
         // the part that can go.
-        const [fitted] = fitRuleNames([{ name: "game-old-world-7777", protocol: "TCP", port: 7777 }], 16);
+        const [fitted] = fitRuleNames(
+            [{ name: "game-old-world-7777", protocol: "TCP", port: 7777 }],
+            16
+        );
 
         expect(fitted?.name).toBe("game-old-wo-7777");
         expect(fitted?.name.length).toBeLessThanOrEqual(16);
@@ -215,7 +223,12 @@ describe("the rules a game server needs", () => {
     });
 
     it("follows a widened block rather than the default", () => {
-        expect(gameForwardRules([java], "range", { tcp: { start: 30000, end: 30099 }, udp: DEFAULT_PORT_BLOCKS.udp })).toEqual([
+        expect(
+            gameForwardRules([java], "range", {
+                tcp: { start: 30000, end: 30099 },
+                udp: DEFAULT_PORT_BLOCKS.udp
+            })
+        ).toEqual([
             { name: "polaris-games-tcp", protocol: "TCP", port: 30000, endPort: 30099 },
             // 25565 is outside the widened block, so it keeps a rule of its own.
             { name: "game-survival-25565", protocol: "TCP", port: 25565 }
@@ -225,7 +238,7 @@ describe("the rules a game server needs", () => {
 
 describe("finding the router's own address", () => {
     it("proposes the gateway from this server's address", () => {
-        expect(likelyGateway("192.168.1.142")).toBe("192.168.1.1");
+        expect(likelyGateway("10.0.1.142")).toBe("10.0.1.1");
         expect(likelyGateway("10.0.5.7")).toBe("10.0.5.1");
     });
 
@@ -287,6 +300,8 @@ describe("one rule where the router's form can hold two", () => {
     });
 
     it("gives ZTE the both-at-once label its form actually shows", () => {
-        expect(ROUTER_BRANDS.find((brand) => brand.id === "zte")?.combinedProtocol).toBe("TCP And UDP");
+        expect(ROUTER_BRANDS.find((brand) => brand.id === "zte")?.combinedProtocol).toBe(
+            "TCP And UDP"
+        );
     });
 });

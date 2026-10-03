@@ -3,7 +3,7 @@
  *
  * Three ways in, because people reach for different ones: "/services" is the
  * deliberate spelling, "@ana" is the one everybody already knows from every
- * comment box, and "services orphion" is what somebody types when they were not
+ * comment box, and "services storefront" is what somebody types when they were not
  * thinking about commands at all. All three end at the same place - a scope and
  * the words after it.
  *
@@ -13,7 +13,7 @@
  * A slashed word can take effect the moment it is complete, but only when no
  * longer command starts with it. "/task" is not taken, because the next
  * keystroke may well be the "s" of "/tasks" - taking it would swallow that "s"
- * into the query and search tasks for "s orphion". "/svc" has nothing after it
+ * into the query and search tasks for "s storefront". "/svc" has nothing after it
  * and is taken at once. Either way the space still commits, so "/task " works.
  */
 
@@ -41,7 +41,9 @@ const SIGILS = SEARCH_SCOPE_LIST.filter((scope) => scope.sigil);
 /** Keywords no other keyword continues, so finishing one means finishing it. */
 const KEYWORDS = [...BY_KEYWORD.keys()];
 const TERMINAL = new Set(
-    KEYWORDS.filter((keyword) => !KEYWORDS.some((other) => other !== keyword && other.startsWith(keyword)))
+    KEYWORDS.filter(
+        (keyword) => !KEYWORDS.some((other) => other !== keyword && other.startsWith(keyword))
+    )
 );
 
 /** A command word: letters, digits and dashes, nothing that needs escaping. */
@@ -57,7 +59,8 @@ export function detectCommand(raw: string): ActiveCommand | null {
     if (!text) return null;
 
     for (const scope of SIGILS) {
-        if (text.startsWith(scope.sigil!)) return { scope, term: text.slice(scope.sigil!.length).trimStart() };
+        if (text.startsWith(scope.sigil!))
+            return { scope, term: text.slice(scope.sigil!.length).trimStart() };
     }
 
     const match = COMMAND.exec(text);
@@ -91,5 +94,7 @@ export function commandSuggestions(raw: string): SearchScopeDefinition[] {
     // A word already taken as a command never reaches here - the field holds the
     // query by then - so a complete keyword shown here is one still waiting for
     // its space, and Enter or Tab is how it is taken.
-    return SEARCH_SCOPE_LIST.filter((scope) => scope.keywords.some((keyword) => keyword.startsWith(token)));
+    return SEARCH_SCOPE_LIST.filter((scope) =>
+        scope.keywords.some((keyword) => keyword.startsWith(token))
+    );
 }

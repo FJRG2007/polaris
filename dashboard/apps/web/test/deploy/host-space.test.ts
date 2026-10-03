@@ -93,7 +93,7 @@ describe("what the container store is holding", () => {
                 {
                     Size: 2 * GB,
                     Containers: 0,
-                    RepoTags: ["polaris-release/orphion-e6ba:cf94f613"]
+                    RepoTags: ["polaris-release/storefront-e6ba:cf94f613"]
                 },
                 { Size: 1 * GB, Containers: 0, RepoTags: ["mongo:7"] }
             ]

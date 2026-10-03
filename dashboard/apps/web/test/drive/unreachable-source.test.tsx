@@ -74,7 +74,7 @@ const { DriveExplorer } = await import("../../src/app/(app)/drive/drive-explorer
 
 const SERVER: ConnectionSummary = {
     id: "host:33333333-3333-4333-8333-333333333333",
-    name: "lirio-2",
+    name: "node-2",
     kind: "sftp",
     requiresHostd: false,
     shared: false,
@@ -84,7 +84,7 @@ const SERVER: ConnectionSummary = {
 
 const NAS: ConnectionSummary = {
     id: "44444444-4444-4444-8444-444444444444",
-    name: "unas-pro",
+    name: "office-nas",
     kind: "unifi-unas",
     requiresHostd: false,
     config: { kind: "unifi-unas", host: "10.0.0.9" },
@@ -107,11 +107,11 @@ describe("a Drive source whose machine is down", () => {
                 id: SERVER.id,
                 state: "down",
                 detail: "No answer within 3 seconds",
-                endpoint: "lirio-2.example.test:22"
+                endpoint: "node-2.example.test:22"
             }
         ]);
 
-        expect(markup).toContain("lirio-2 is not answering");
+        expect(markup).toContain("node-2 is not answering");
         // The reason the probe gave, not a generic failure.
         expect(markup).toContain("No answer within 3 seconds");
         expect(markup).not.toContain("files-view");
@@ -126,11 +126,11 @@ describe("a Drive source whose machine is down", () => {
                 id: SERVER.id,
                 state: "down",
                 detail: "That address does not resolve",
-                endpoint: "lirio-2:22"
+                endpoint: "node-2:22"
             }
         ]);
 
-        expect(markup).toContain("lirio-2:22");
+        expect(markup).toContain("node-2:22");
     });
 
     it("offers to find the machine here rather than sending the reader elsewhere", () => {
@@ -145,7 +145,7 @@ describe("a Drive source whose machine is down", () => {
                 id: SERVER.id,
                 state: "down",
                 detail: "No route to that address",
-                endpoint: "192.168.1.138:22"
+                endpoint: "10.0.1.138:22"
             }
         ]);
 
@@ -163,12 +163,12 @@ describe("a Drive source whose machine is down", () => {
                 state: "down",
                 local: true,
                 detail: "No route to that address",
-                endpoint: "192.168.1.138:22"
+                endpoint: "10.0.1.138:22"
             }
         ]);
 
-        expect(markup).toContain("cannot reach lirio-2 from inside itself");
-        expect(markup).not.toContain("lirio-2 is not answering");
+        expect(markup).toContain("cannot reach node-2 from inside itself");
+        expect(markup).not.toContain("node-2 is not answering");
         // And the search is not offered: it skips Polaris' own address by
         // design, so it could only ever come back with "not on this network".
         expect(markup).not.toContain("Look for it on this network");
@@ -204,7 +204,7 @@ describe("a Drive source whose machine is down", () => {
             }
         ]);
 
-        expect(markup).toContain("unas-pro is not answering");
+        expect(markup).toContain("office-nas is not answering");
         expect(markup).toContain("No route to that address");
         expect(markup).not.toContain("/drive?c=");
         expect(markup).not.toContain("files-view");
@@ -212,7 +212,7 @@ describe("a Drive source whose machine is down", () => {
 
     it("browses normally once it answers", () => {
         const markup = render(SERVER, [
-            { id: SERVER.id, state: "up", detail: null, endpoint: "lirio-2.example.test:22" }
+            { id: SERVER.id, state: "up", detail: null, endpoint: "node-2.example.test:22" }
         ]);
 
         expect(markup).toContain("files-view");

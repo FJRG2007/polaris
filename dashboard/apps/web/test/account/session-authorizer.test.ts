@@ -27,11 +27,14 @@ let pinAccepted = true;
 /** The last update the pending session's state was given. */
 let updated: Record<string, unknown> | null = null;
 
-vi.mock("next/headers", () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) }));
+vi.mock("next/headers", () => ({
+    headers: async () => new Headers(),
+    cookies: async () => ({ get: () => undefined })
+}));
 vi.mock("@polaris/auth", () => ({ verifyQuickPin: async () => pinAccepted }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
-vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "85.87.156.88" }));
+vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "198.51.100.88" }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         // The account's own rule about addresses, which the directory reads to
@@ -61,9 +64,14 @@ function sessionRow(id: string, userAgent: string, state: Record<string, unknown
         id,
         createdAt: new Date("2026-08-01T10:00:00Z"),
         expiresAt: new Date("2026-09-01T10:00:00Z"),
-        ipAddress: "85.87.156.88",
+        ipAddress: "5.6.7.8",
         userAgent,
-        state: { userAgent, lastSeenAt: new Date("2026-08-04T10:00:00Z"), approval: "approved", ...state }
+        state: {
+            userAgent,
+            lastSeenAt: new Date("2026-08-04T10:00:00Z"),
+            approval: "approved",
+            ...state
+        }
     };
 }
 
@@ -77,7 +85,10 @@ beforeEach(() => {
 describe("reading who let a session in", () => {
     it("names the device and links it while that session is still signed in", async () => {
         sessionRows = [
-            sessionRow(LAPTOP, CHROME, { authorizedBySessionId: PHONE, authorizedByDevice: "Safari on iOS" }),
+            sessionRow(LAPTOP, CHROME, {
+                authorizedBySessionId: PHONE,
+                authorizedByDevice: "Safari on iOS"
+            }),
             sessionRow(PHONE, SAFARI)
         ];
         const [laptop] = await listUserSessions(OWNER, LAPTOP);
@@ -93,7 +104,10 @@ describe("reading who let a session in", () => {
     // gone, and it cannot be asked what it was called.
     it("keeps the label after the answering session has ended, and says it is gone", async () => {
         sessionRows = [
-            sessionRow(LAPTOP, CHROME, { authorizedBySessionId: PHONE, authorizedByDevice: "Safari on iOS" })
+            sessionRow(LAPTOP, CHROME, {
+                authorizedBySessionId: PHONE,
+                authorizedByDevice: "Safari on iOS"
+            })
         ];
         expect((await listUserSessions(OWNER, LAPTOP))[0]?.authorizedBy).toMatchObject({
             device: "Safari on iOS",
@@ -103,7 +117,10 @@ describe("reading who let a session in", () => {
 
     it("marks the reader's own device when it is the one that answered", async () => {
         sessionRows = [
-            sessionRow(LAPTOP, CHROME, { authorizedBySessionId: PHONE, authorizedByDevice: "Safari on iOS" }),
+            sessionRow(LAPTOP, CHROME, {
+                authorizedBySessionId: PHONE,
+                authorizedByDevice: "Safari on iOS"
+            }),
             sessionRow(PHONE, SAFARI)
         ];
         expect((await listUserSessions(OWNER, PHONE))[0]?.authorizedBy?.current).toBe(true);

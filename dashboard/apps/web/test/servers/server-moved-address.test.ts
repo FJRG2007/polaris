@@ -24,9 +24,9 @@ const HOST = "11111111-1111-4111-8111-111111111111";
 const ADA = "22222222-2222-4222-8222-222222222222";
 
 /** Polaris' own address on the network. */
-let near: string | null = "192.168.1.50";
+let near: string | null = "10.0.1.50";
 /** Where the server is recorded, which is where it no longer is. */
-let recorded = "192.168.1.138";
+let recorded = "10.0.1.138";
 /** Whether the machine answers where Polaris has it recorded. */
 let answersAtRecorded = false;
 /** Addresses with the port open, as the sweep would find them. */
@@ -47,7 +47,7 @@ vi.mock("@/lib/host-address", () => ({ getHostLanIp: async () => near }));
 vi.mock("@/lib/host-service", () => ({
     getHostConnection: async () => ({
         id: HOST,
-        name: "lirio-0",
+        name: "node-0",
         address: recorded,
         port: 22,
         username: "polaris",
@@ -89,8 +89,8 @@ beforeEach(() => {
     vi.clearAllMocks();
     probed.length = 0;
     handshakes.length = 0;
-    near = "192.168.1.50";
-    recorded = "192.168.1.138";
+    near = "10.0.1.50";
+    recorded = "10.0.1.138";
     answersAtRecorded = false;
     openPorts = new Set();
     realAddress = null;
@@ -98,61 +98,61 @@ beforeEach(() => {
 
 describe("a machine whose address moved", () => {
     it("is found by its host key and reported as moved", async () => {
-        openPorts = new Set(["192.168.1.1", "192.168.1.142"]);
-        realAddress = "192.168.1.142";
+        openPorts = new Set(["10.0.1.1", "10.0.1.142"]);
+        realAddress = "10.0.1.142";
 
         const path = await findLocalPath(HOST, ADA);
 
-        expect(path).toEqual({ kind: "found", address: "192.168.1.142", moved: true });
+        expect(path).toEqual({ kind: "found", address: "10.0.1.142", moved: true });
     });
 
     it("only ever looks on the network Polaris is on", async () => {
-        openPorts = new Set(["192.168.1.142"]);
-        realAddress = "192.168.1.142";
+        openPorts = new Set(["10.0.1.142"]);
+        realAddress = "10.0.1.142";
 
         await findLocalPath(HOST, ADA);
 
-        expect(probed.every((address) => address.startsWith("192.168.1."))).toBe(true);
+        expect(probed.every((address) => address.startsWith("10.0.1."))).toBe(true);
         expect(probed.length).toBeLessThanOrEqual(254);
     });
 
     it("does not knock on Polaris' own door, or on the address that failed", async () => {
-        openPorts = new Set(["192.168.1.142"]);
-        realAddress = "192.168.1.142";
+        openPorts = new Set(["10.0.1.142"]);
+        realAddress = "10.0.1.142";
 
         await findLocalPath(HOST, ADA);
 
         // On a host-networked install Polaris' own address is the box this runs
         // on, and the recorded one has already been tried and failed.
-        expect(probed).not.toContain("192.168.1.50");
-        expect(probed).not.toContain("192.168.1.138");
+        expect(probed).not.toContain("10.0.1.50");
+        expect(probed).not.toContain("10.0.1.138");
     });
 
     it("only handshakes with what answered on the port", async () => {
         // A handshake is far more expensive than a connect, and the whole point
         // of the sweep is that it costs a second rather than a minute.
-        openPorts = new Set(["192.168.1.7", "192.168.1.142"]);
-        realAddress = "192.168.1.142";
+        openPorts = new Set(["10.0.1.7", "10.0.1.142"]);
+        realAddress = "10.0.1.142";
 
         await findLocalPath(HOST, ADA);
 
-        expect(handshakes.sort()).toEqual(["192.168.1.142", "192.168.1.7"]);
+        expect(handshakes.sort()).toEqual(["10.0.1.142", "10.0.1.7"]);
     });
 
     it("stops at the machine that answers with the key", async () => {
-        openPorts = new Set(["192.168.1.142", "192.168.1.200"]);
-        realAddress = "192.168.1.142";
+        openPorts = new Set(["10.0.1.142", "10.0.1.200"]);
+        realAddress = "10.0.1.142";
 
         await findLocalPath(HOST, ADA);
 
         // Nothing to learn from the ones after it.
-        expect(handshakes).not.toContain("192.168.1.200");
+        expect(handshakes).not.toContain("10.0.1.200");
     });
 });
 
 describe("a machine that really is not there", () => {
     it("says so rather than guessing at an address", async () => {
-        openPorts = new Set(["192.168.1.1", "192.168.1.7"]);
+        openPorts = new Set(["10.0.1.1", "10.0.1.7"]);
         realAddress = null;
 
         expect(await findLocalPath(HOST, ADA)).toEqual({ kind: "unreachable" });
@@ -167,13 +167,10 @@ describe("a machine that really is not there", () => {
 
 describe("a machine that is already reached directly", () => {
     it("has nothing to offer, once it has answered there", async () => {
-        recorded = "192.168.1.99";
+        recorded = "10.0.1.99";
         answersAtRecorded = true;
 
-        expect(await findLocalPath(HOST, ADA)).toEqual({
-            kind: "already",
-            address: "192.168.1.99"
-        });
+        expect(await findLocalPath(HOST, ADA)).toEqual({ kind: "already", address: "10.0.1.99" });
         expect(probed).toEqual([]);
     });
 
@@ -181,14 +178,14 @@ describe("a machine that is already reached directly", () => {
         // The case this whole thing exists for: the recorded address is on the
         // right network and is simply not where the machine is any more. Reading
         // "near" as "reached" is what made this answer nothing useful.
-        recorded = "192.168.1.138";
+        recorded = "10.0.1.138";
         answersAtRecorded = false;
-        openPorts = new Set(["192.168.1.142"]);
-        realAddress = "192.168.1.142";
+        openPorts = new Set(["10.0.1.142"]);
+        realAddress = "10.0.1.142";
 
         expect(await findLocalPath(HOST, ADA)).toEqual({
             kind: "found",
-            address: "192.168.1.142",
+            address: "10.0.1.142",
             moved: true
         });
     });
@@ -199,18 +196,18 @@ describe("moving a server onto the address it was found at", () => {
         // Two requests with somebody's decision in between, and what is written
         // is the address every future connection takes: a wrong one is a server
         // that has disappeared with no way back that does not involve a terminal.
-        realAddress = "192.168.1.142";
+        realAddress = "10.0.1.142";
 
-        expect(await adoptLocalPath(HOST, ADA, "192.168.1.142")).toEqual({});
+        expect(await adoptLocalPath(HOST, ADA, "10.0.1.142")).toEqual({});
         expect(updated).toHaveBeenCalledWith(
-            expect.objectContaining({ data: { address: "192.168.1.142" } })
+            expect.objectContaining({ data: { address: "10.0.1.142" } })
         );
     });
 
     it("refuses an address that does not answer as this server", async () => {
-        realAddress = "192.168.1.142";
+        realAddress = "10.0.1.142";
 
-        const result = await adoptLocalPath(HOST, ADA, "192.168.1.200");
+        const result = await adoptLocalPath(HOST, ADA, "10.0.1.200");
 
         expect(result.error).toBeTruthy();
         expect(updated).not.toHaveBeenCalled();

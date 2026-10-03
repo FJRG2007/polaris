@@ -5,9 +5,9 @@
  * it threw another one out". There was exactly one refusal in the container's
  * entire history, and it was a player being refused on their own join:
  *
- *   Reckmy[/79.157.164.219:53808] logged in with entity id 224582
- *   Reckmy joined the game
- *   Reckmy lost connection: Your account is registered to a different network.
+ *   Grumm[/198.51.100.219:53808] logged in with entity id 224582
+ *   Grumm joined the game
+ *   Grumm lost connection: Your account is registered to a different network.
  *
  * Their home connection had been given a new address, which is what a home
  * connection does. The message tells the player to ask the server's owner, and
@@ -22,8 +22,8 @@ import {
 } from "@polaris-app/game-servers/src/lib/minecraft/player-access";
 
 const REFUSAL = {
-    player: "Reckmy",
-    address: "79.157.164.219",
+    player: "Grumm",
+    address: "198.51.100.219",
     why: "Your account is registered to a different network. Ask the server's owner to add this one.",
     at: "2026-09-21T20:32:57.000Z"
 };
@@ -41,7 +41,7 @@ describe("what the owner is told about a refusal", () => {
         // It is a settings blob, and a bad entry must not take down the screen
         // somebody would fix it from.
         expect(readRefusals({ [REFUSALS_KEY]: "nobody" })).toEqual([]);
-        expect(readRefusals({ [REFUSALS_KEY]: [{ player: "Reckmy" }, REFUSAL] })).toEqual([REFUSAL]);
+        expect(readRefusals({ [REFUSALS_KEY]: [{ player: "Grumm" }, REFUSAL] })).toEqual([REFUSAL]);
         expect(readRefusals({ [REFUSALS_KEY]: [null, 7] })).toEqual([]);
     });
 

@@ -44,8 +44,8 @@ const STATUS: MinecraftStatus = {
 };
 
 const REFUSAL: PlayerRefusal = {
-    player: "Reckmy",
-    address: "79.157.164.219",
+    player: "Grumm",
+    address: "198.51.100.219",
     why: "Your account is registered to a different network. Ask the server's owner to add this one.",
     at: "2026-09-21T20:32:57.000Z"
 };
@@ -55,7 +55,7 @@ function screenWith(refusals: PlayerRefusal[], changed = vi.fn()): void {
         <MinecraftPlayers
             installedAppId="server-1"
             status={STATUS}
-            roster={{ ops: [], whitelist: ["Reckmy"], bans: [], whitelistEnforced: true }}
+            roster={{ ops: [], whitelist: ["Grumm"], bans: [], whitelistEnforced: true }}
             rosterAsOf={null}
             access={{
                 rules: [],
@@ -95,8 +95,8 @@ describe("turned away recently", () => {
         // which is the row this card exists to explain.
         const card = screen.getByText("Turned away recently").closest("div");
         if (!card) throw new Error("no card");
-        expect(within(card).getByText("Reckmy")).toBeTruthy();
-        expect(within(card).getByText(/arrived from 79\.157\.164\.219/)).toBeTruthy();
+        expect(within(card).getByText("Grumm")).toBeTruthy();
+        expect(within(card).getByText(/arrived from 198\.51\.100\.219/)).toBeTruthy();
     });
 
     it("allows the address they actually arrived from", async () => {
@@ -106,8 +106,8 @@ describe("turned away recently", () => {
         await waitFor(() =>
             expect(actions.grantPlayerAccessAction).toHaveBeenCalledWith({
                 installedAppId: "server-1",
-                username: "Reckmy",
-                address: "79.157.164.219",
+                username: "Grumm",
+                address: "198.51.100.219",
                 note: "Added from a refused join"
             })
         );

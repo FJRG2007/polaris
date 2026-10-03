@@ -27,7 +27,7 @@ function session(overrides: Partial<SessionView> = {}): SessionView {
         browserVersion: "131",
         os: "Windows",
         osVersion: null,
-        ip: "192.168.1.131",
+        ip: "10.0.1.131",
         publicIp: null,
         country: "ES",
         host: "polaris.local",
@@ -54,28 +54,32 @@ function authorizer(overrides: Partial<NonNullable<SessionView["authorizedBy"]>>
 /** The table as the account's own list draws it: the reader may open a session's
  *  history, which is what `activityHref` says. */
 function render(sessions: SessionView[]): string {
-    return renderToStaticMarkup(withMessages(
-        <SessionsTable
-            sessions={sessions}
-            busyId={null}
-            emptyLabel="Nothing is signed in."
-            activityHref={(session) => `/account/activity?session=${session.id}`}
-            onRevoke={() => {}}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <SessionsTable
+                sessions={sessions}
+                busyId={null}
+                emptyLabel="Nothing is signed in."
+                activityHref={(session) => `/account/activity?session=${session.id}`}
+                onRevoke={() => {}}
+            />
+        )
+    );
 }
 
 /** The table as an administrator reading somebody else's account draws it: no
  *  history to open, because that log is the account holder's own. */
 function renderForAdmin(sessions: SessionView[]): string {
-    return renderToStaticMarkup(withMessages(
-        <SessionsTable
-            sessions={sessions}
-            busyId={null}
-            emptyLabel="Nothing is signed in."
-            onRevoke={() => {}}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <SessionsTable
+                sessions={sessions}
+                busyId={null}
+                emptyLabel="Nothing is signed in."
+                onRevoke={() => {}}
+            />
+        )
+    );
 }
 
 describe("the session table", () => {
@@ -257,15 +261,17 @@ describe("the session table", () => {
     });
 
     it("links a row to that session's own history rather than to the whole log", () => {
-        const markup = renderToStaticMarkup(withMessages(
-            <SessionsTable
-                sessions={[session({ id: "session-1" })]}
-                busyId={null}
-                emptyLabel="Nothing is signed in."
-                activityHref={(entry) => `/account/activity?session=${entry.id}`}
-                onRevoke={() => {}}
-            />
-        ));
+        const markup = renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    sessions={[session({ id: "session-1" })]}
+                    busyId={null}
+                    emptyLabel="Nothing is signed in."
+                    activityHref={(entry) => `/account/activity?session=${entry.id}`}
+                    onRevoke={() => {}}
+                />
+            )
+        );
         expect(markup).toContain('href="/account/activity?session=session-1"');
         expect(markup).toContain('aria-label="Activity from Chrome on Windows"');
     });
@@ -281,30 +287,30 @@ describe("the session table", () => {
     // A local address is not something a person can connect with the rows for the
     // same device seen from outside, which is most of the list.
     it("shows the address a local session leaves the network by, beside the local one", () => {
-        const markup = render([session({ ip: "192.168.1.131", publicIp: "85.87.156.88" })]);
-        expect(markup).toContain("192.168.1.131");
-        expect(markup).toContain("85.87.156.88");
+        const markup = render([session({ ip: "10.0.1.131", publicIp: "198.51.100.88" })]);
+        expect(markup).toContain("10.0.1.131");
+        expect(markup).toContain("198.51.100.88");
     });
 
     it("leaves a public address alone rather than pairing it with itself", () => {
-        const markup = render([session({ ip: "85.87.156.88", publicIp: null })]);
+        const markup = render([session({ ip: "198.51.100.88", publicIp: null })]);
         expect(markup).not.toContain("via");
     });
 });
 
 describe("the one-line origin", () => {
     it("reads address, country, then the name it was opened on", () => {
-        expect(sessionOrigin(session())).toBe("192.168.1.131 - ES - polaris.local");
+        expect(sessionOrigin(session())).toBe("10.0.1.131 - ES - polaris.local");
     });
 
     it("carries both addresses when the session came in over the local network", () => {
-        expect(sessionOrigin(session({ publicIp: "85.87.156.88" }))).toBe(
-            "192.168.1.131 via 85.87.156.88 - ES - polaris.local"
+        expect(sessionOrigin(session({ publicIp: "198.51.100.88" }))).toBe(
+            "10.0.1.131 via 198.51.100.88 - ES - polaris.local"
         );
     });
 
     it("skips what was never recorded rather than printing gaps", () => {
-        expect(sessionOrigin(session({ country: null, host: null }))).toBe("192.168.1.131");
+        expect(sessionOrigin(session({ country: null, host: null }))).toBe("10.0.1.131");
     });
 
     it("says something when nothing at all is known", () => {
@@ -321,7 +327,7 @@ describe("a browser extension's connection", () => {
         name: "Chrome on Windows",
         browser: "Chrome",
         os: "Windows",
-        ip: "192.168.1.131",
+        ip: "10.0.1.131",
         host: "polaris.local",
         createdAt: "2026-09-01T10:00:00.000Z",
         lastSeenAt: "2026-09-17T10:00:00.000Z",
@@ -339,24 +345,26 @@ describe("a browser extension's connection", () => {
             pinToAddress: pin?.pinToAddress ?? null,
             pinnedByRule: pin?.pinnedByRule ?? false
         };
-        return renderToStaticMarkup(withMessages(
-            <SessionsTable
-                sessions={[]}
-                extensions={[shown]}
-                busyId={null}
-                emptyLabel="Nothing is signed in."
-                onRevoke={() => {}}
-                {...(onDisconnect ? { onDisconnect } : {})}
-                {...(pin ? { onPinExtension: pin.onPinExtension } : {})}
-            />
-        ));
+        return renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    sessions={[]}
+                    extensions={[shown]}
+                    busyId={null}
+                    emptyLabel="Nothing is signed in."
+                    onRevoke={() => {}}
+                    {...(onDisconnect ? { onDisconnect } : {})}
+                    {...(pin ? { onPinExtension: pin.onPinExtension } : {})}
+                />
+            )
+        );
     }
 
     it("is a row beside the browsers, with what it was seen from", () => {
         const markup = renderWithExtension(() => {});
         expect(markup).toContain("Chrome");
         expect(markup).toContain("Windows");
-        expect(markup).toContain("192.168.1.131");
+        expect(markup).toContain("10.0.1.131");
         expect(markup).toContain("polaris.local");
         expect(markup).toContain("Extension");
     });

@@ -16,20 +16,29 @@ import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 describe("detectCommand", () => {
     it("takes a slashed command as soon as the word is complete", () => {
         expect(detectCommand("/services")).toMatchObject({ scope: { id: "services" }, term: "" });
-        expect(detectCommand("/services orphion")).toMatchObject({ scope: { id: "services" }, term: "orphion" });
-        expect(detectCommand("/servers lirio-0")).toMatchObject({ scope: { id: "servers" }, term: "lirio-0" });
+        expect(detectCommand("/services storefront")).toMatchObject({
+            scope: { id: "services" },
+            term: "storefront"
+        });
+        expect(detectCommand("/servers node-0")).toMatchObject({
+            scope: { id: "servers" },
+            term: "node-0"
+        });
     });
 
     it("waits for a word another command continues, so the next letter is not eaten", () => {
         // "/task" is one keystroke short of "/tasks": taking it here would put
-        // the "s" of "tasks" into the query and search for "s orphion".
+        // the "s" of "tasks" into the query and search for "s storefront".
         expect(detectCommand("/task")).toBeNull();
         expect(detectCommand("/tasks")).toMatchObject({ scope: { id: "tasks" }, term: "" });
         expect(detectCommand("/service")).toBeNull();
         expect(detectCommand("/server")).toBeNull();
         // A space commits it whether or not anything continues the word.
         expect(detectCommand("/task ")).toMatchObject({ scope: { id: "tasks" }, term: "" });
-        expect(detectCommand("/task orphion")).toMatchObject({ scope: { id: "tasks" }, term: "orphion" });
+        expect(detectCommand("/task storefront")).toMatchObject({
+            scope: { id: "tasks" },
+            term: "storefront"
+        });
     });
 
     it("takes a word nothing continues at once", () => {
@@ -42,7 +51,10 @@ describe("detectCommand", () => {
         // Still an ordinary search: this is what finds the Services page.
         expect(detectCommand("services")).toBeNull();
         expect(detectCommand("apps")).toBeNull();
-        expect(detectCommand("services orphion")).toMatchObject({ scope: { id: "services" }, term: "orphion" });
+        expect(detectCommand("services storefront")).toMatchObject({
+            scope: { id: "services" },
+            term: "storefront"
+        });
         // A trailing space is the same commitment as a word after it.
         expect(detectCommand("servers ")).toMatchObject({ scope: { id: "servers" }, term: "" });
     });
@@ -50,33 +62,43 @@ describe("detectCommand", () => {
     it("reads @ as people, with or without a name after it", () => {
         expect(detectCommand("@")).toMatchObject({ scope: { id: "users" }, term: "" });
         expect(detectCommand("@ana")).toMatchObject({ scope: { id: "users" }, term: "ana" });
-        expect(detectCommand("@ ana ruiz")).toMatchObject({ scope: { id: "users" }, term: "ana ruiz" });
+        expect(detectCommand("@ ana ruiz")).toMatchObject({
+            scope: { id: "users" },
+            term: "ana ruiz"
+        });
     });
 
     it("leaves an ordinary search alone", () => {
-        expect(detectCommand("orphion")).toBeNull();
-        expect(detectCommand("orphion checkout")).toBeNull();
+        expect(detectCommand("storefront")).toBeNull();
+        expect(detectCommand("storefront checkout")).toBeNull();
         expect(detectCommand("/nonsense something")).toBeNull();
         expect(detectCommand("")).toBeNull();
         expect(detectCommand("   ")).toBeNull();
     });
 
     it("accepts the singular and the shorthand, whatever the casing", () => {
-        expect(detectCommand("/service orphion")).toMatchObject({ scope: { id: "services" } });
-        expect(detectCommand("/svc orphion")).toMatchObject({ scope: { id: "services" } });
+        expect(detectCommand("/service storefront")).toMatchObject({ scope: { id: "services" } });
+        expect(detectCommand("/svc storefront")).toMatchObject({ scope: { id: "services" } });
         expect(detectCommand("/DB main")).toMatchObject({ scope: { id: "databases" } });
-        expect(detectCommand("/Tasks release")).toMatchObject({ scope: { id: "tasks" }, term: "release" });
+        expect(detectCommand("/Tasks release")).toMatchObject({
+            scope: { id: "tasks" },
+            term: "release"
+        });
         expect(detectCommand("/SVC")).toMatchObject({ scope: { id: "services" } });
     });
 
     it("keeps the rest of the query intact", () => {
-        expect(detectCommand("/tasks release 2.1 / rollout")).toMatchObject({ term: "release 2.1 / rollout" });
+        expect(detectCommand("/tasks release 2.1 / rollout")).toMatchObject({
+            term: "release 2.1 / rollout"
+        });
     });
 });
 
 describe("commandSuggestions", () => {
     it("offers everything behind a lone slash", () => {
-        expect(commandSuggestions("/").map((scope) => scope.id)).toEqual(SEARCH_SCOPE_LIST.map((scope) => scope.id));
+        expect(commandSuggestions("/").map((scope) => scope.id)).toEqual(
+            SEARCH_SCOPE_LIST.map((scope) => scope.id)
+        );
     });
 
     it("narrows to what is being spelled, across both spellings of a word", () => {
@@ -96,8 +118,8 @@ describe("commandSuggestions", () => {
     });
 
     it("says nothing for a word that is no command, or once the search is under way", () => {
-        expect(commandSuggestions("orphion")).toEqual([]);
-        expect(commandSuggestions("services orphion")).toEqual([]);
+        expect(commandSuggestions("storefront")).toEqual([]);
+        expect(commandSuggestions("services storefront")).toEqual([]);
         expect(commandSuggestions("")).toEqual([]);
     });
 });

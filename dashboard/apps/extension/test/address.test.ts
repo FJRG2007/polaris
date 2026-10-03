@@ -46,7 +46,7 @@ describe("what enables the button", () => {
         // valid domains, and both are where Polaris usually lives.
         expect(looksLikeAddress("polaris.local")).toBe(true);
         expect(looksLikeAddress("localhost")).toBe(true);
-        expect(looksLikeAddress("192.168.1.4:8080")).toBe(true);
+        expect(looksLikeAddress("10.0.1.4:8080")).toBe(true);
     });
 });
 

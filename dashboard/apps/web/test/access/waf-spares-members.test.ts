@@ -47,7 +47,7 @@ vi.mock("@/lib/waf-intel-service", () => ({
 
 const { runWafJails } = await import("../../src/lib/waf-ban-service");
 
-const MEMBER = "87.218.4.87";
+const MEMBER = "198.51.100.87";
 const STRANGER = "203.0.113.9";
 
 /** One Traefik access-log line, in the JSON format the edge writes. */

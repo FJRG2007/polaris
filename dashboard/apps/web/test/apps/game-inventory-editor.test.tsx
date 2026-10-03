@@ -29,12 +29,14 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () 
     cancelQueuedActionAction: async () => ({})
 }));
 
-const { InventoryEditor } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-inventory-editor");
+const { InventoryEditor } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-inventory-editor"
+);
 
 describe("InventoryEditor", () => {
     it("draws the whole panel before any read has landed", () => {
         const markup = renderToStaticMarkup(
-            <InventoryEditor installedAppId="id" player="FJRG2007" editable onChanged={() => {}} />
+            <InventoryEditor installedAppId="id" player="PlayerOne" editable onChanged={() => {}} />
         );
         expect(markup).toContain("Bag");
         expect(markup).toContain("Hotbar");
@@ -46,7 +48,7 @@ describe("InventoryEditor", () => {
         // The two used to be separate screens, and taking an item off somebody who
         // was not on the server was not offered at all.
         const markup = renderToStaticMarkup(
-            <InventoryEditor installedAppId="id" player="FJRG2007" editable onChanged={() => {}} />
+            <InventoryEditor installedAppId="id" player="PlayerOne" editable onChanged={() => {}} />
         );
         expect(markup).toContain("Save it for their next join");
         expect(markup).toContain("Take it when they join");

@@ -78,13 +78,7 @@ vi.mock("@polaris/db", () => ({
         addressReputation: {
             findUnique: async ({ where }: { where: { ip: string } }) =>
                 verdicts.find((row) => row.ip === where.ip) ?? null,
-            upsert: async ({
-                where,
-                create
-            }: {
-                where: { ip: string };
-                create: ReputationRow;
-            }) => {
+            upsert: async ({ where, create }: { where: { ip: string }; create: ReputationRow }) => {
                 verdicts = [...verdicts.filter((row) => row.ip !== where.ip), create];
                 return create;
             },
@@ -140,7 +134,7 @@ describe("asking a provider about the addresses in the log", () => {
     });
 
     it("leaves addresses nobody outside can reach alone", async () => {
-        await checkReputation(["192.168.1.5", "127.0.0.1", "10.0.0.3", "172.16.0.9"]);
+        await checkReputation(["192.168.50.5", "127.0.0.1", "10.0.0.3", "172.16.0.9"]);
         expect(asked).toEqual([]);
     });
 

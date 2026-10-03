@@ -25,7 +25,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const COMPOSE = readFileSync(new URL("../../../../docker/docker-compose.yml", import.meta.url), "utf8");
+const COMPOSE = readFileSync(
+    new URL("../../../../docker/docker-compose.yml", import.meta.url),
+    "utf8"
+);
 
 /** The excluded ranges, as written in the call server's own configuration. */
 const EXCLUDED = [...COMPOSE.matchAll(/^\s*-\s*(\d+\.\d+\.\d+\.\d+\/\d+)\s*$/gm)].map(
@@ -34,9 +37,7 @@ const EXCLUDED = [...COMPOSE.matchAll(/^\s*-\s*(\d+\.\d+\.\d+\.\d+\/\d+)\s*$/gm)
 
 /** An address as the number a mask is compared against. */
 function asNumber(address: string): number {
-    return address
-        .split(".")
-        .reduce((total, part) => total * 256 + Number(part), 0);
+    return address.split(".").reduce((total, part) => total * 256 + Number(part), 0);
 }
 
 /** Whether a block covers an address, which is the whole of what a CIDR means. */
@@ -45,7 +46,7 @@ function covers(block: string, address: string): boolean {
     const width = Number(bits);
     if (width === 0) return true;
     const mask = (0xffffffff << (32 - width)) >>> 0;
-    return ((asNumber(network!) & mask) >>> 0) === ((asNumber(address) & mask) >>> 0);
+    return (asNumber(network!) & mask) >>> 0 === (asNumber(address) & mask) >>> 0;
 }
 
 const excluded = (address: string) => EXCLUDED.some((block) => covers(block, address));
@@ -80,14 +81,14 @@ describe("the addresses a call may be answered on", () => {
         // house where two people in the same room have their call sent out to
         // the router and back, on a router that will usually not do it.
         for (const real of [
-            "192.168.1.142",
+            "10.0.1.142",
             "192.168.0.10",
             "10.0.0.5",
             "10.42.7.1",
             // Docker never allocates from this one, so it is left alone: an
             // office LAN occasionally sits in it.
             "172.16.0.5",
-            "85.87.158.186"
+            "198.51.100.186"
         ]) {
             expect([real, excluded(real)]).toEqual([real, false]);
         }

@@ -146,7 +146,7 @@ describe("effects", () => {
     });
 
     it("slide a long text through a window of its width", () => {
-        const text = "Welcome to Offgrid - be nice";
+        const text = "Welcome to ExampleSMP - be nice";
         const frames = [0, 1, 2].map((step) =>
             plain(applyEffect(text, effect("scroll", { width: 10 }), step))
         );

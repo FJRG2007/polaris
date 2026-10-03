@@ -52,7 +52,8 @@ const prisma = {
         findMany: async ({ where }: { where: Record<string, unknown> }) =>
             matchPasses(where).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
         findFirst: async ({ where }: { where: Record<string, unknown> }) =>
-            matchPasses(where).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null,
+            matchPasses(where).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ??
+            null,
         deleteMany: async ({ where }: { where: Record<string, unknown> }) => {
             const doomed = matchPasses(where);
             verifications = verifications.filter((row) => !doomed.includes(row));
@@ -61,7 +62,9 @@ const prisma = {
     },
     trustedDevice: {
         findMany: async ({ where }: { where: { userId: string; identifier: { in: string[] } } }) =>
-            devices.filter((row) => row.userId === where.userId && where.identifier.in.includes(row.identifier)),
+            devices.filter(
+                (row) => row.userId === where.userId && where.identifier.in.includes(row.identifier)
+            ),
         findUnique: async ({ where }: { where: { identifier: string } }) =>
             devices.find((row) => row.identifier === where.identifier) ?? null,
         create: async ({ data }: { data: DeviceRow }) => {
@@ -72,7 +75,13 @@ const prisma = {
             devices.push(created);
             return created;
         },
-        update: async ({ where, data }: { where: { identifier: string }; data: Partial<DeviceRow> }) => {
+        update: async ({
+            where,
+            data
+        }: {
+            where: { identifier: string };
+            data: Partial<DeviceRow>;
+        }) => {
             const row = devices.find((entry) => entry.identifier === where.identifier);
             if (!row) throw new Error("no such device");
             Object.assign(row, data);
@@ -100,7 +109,10 @@ const prisma = {
             const before = devices.length;
             devices = devices.filter(
                 (row) =>
-                    !(row.userId === where.userId && (where.identifier === undefined || row.identifier === where.identifier))
+                    !(
+                        row.userId === where.userId &&
+                        (where.identifier === undefined || row.identifier === where.identifier)
+                    )
             );
             return { count: before - devices.length };
         }
@@ -156,7 +168,11 @@ describe("listing what an account has remembered", () => {
     it("names a device Polaris described, and still lists one it did not", async () => {
         pass("trust-device-aaa", USER, 5);
         pass("trust-device-bbb", USER, 1);
-        await twoFactor.recordTrustedDevice(USER, { userAgent: "Firefox/1", ip: "10.0.0.9", host: "polaris.local" });
+        await twoFactor.recordTrustedDevice(USER, {
+            userAgent: "Firefox/1",
+            ip: "10.0.0.9",
+            host: "polaris.local"
+        });
 
         const listed = await twoFactor.listTrustedDevices(USER, null);
         expect(listed.map((device) => device.id)).toEqual(["trust-device-bbb", "trust-device-aaa"]);
@@ -203,7 +219,10 @@ describe("a pass better-auth rotated", () => {
         // a new one takes its place.
         verifications = [];
         pass("trust-device-new");
-        await twoFactor.followTrustedDevice(USER, "trust-device-old", { userAgent: "Firefox/2", ip: "10.0.0.10" });
+        await twoFactor.followTrustedDevice(USER, "trust-device-old", {
+            userAgent: "Firefox/2",
+            ip: "10.0.0.10"
+        });
 
         const listed = await twoFactor.listTrustedDevices(USER, null);
         expect(listed).toHaveLength(1);
@@ -215,7 +234,9 @@ describe("a pass better-auth rotated", () => {
     it("describes a device that was remembered before Polaris kept descriptions", async () => {
         verifications = [];
         pass("trust-device-new");
-        await twoFactor.followTrustedDevice(USER, "trust-device-nameless", { userAgent: "Safari/1" });
+        await twoFactor.followTrustedDevice(USER, "trust-device-nameless", {
+            userAgent: "Safari/1"
+        });
         const listed = await twoFactor.listTrustedDevices(USER, null);
         expect(listed[0]?.userAgent).toBe("Safari/1");
     });
@@ -235,14 +256,14 @@ describe("naming the pass the browser reading the page holds", () => {
         expect(
             await twoFactor.adoptTrustedDevice(USER, "trust-device-mine", {
                 userAgent: "Chrome/1",
-                ip: "192.168.1.131",
+                ip: "10.0.1.131",
                 host: "polaris.local"
             })
         ).toBe(true);
 
         const listed = await twoFactor.listTrustedDevices(USER, null);
         expect(listed[0]?.userAgent).toBe("Chrome/1");
-        expect(listed[0]?.ip).toBe("192.168.1.131");
+        expect(listed[0]?.ip).toBe("10.0.1.131");
         expect(listed[0]?.host).toBe("polaris.local");
     });
 
@@ -251,21 +272,31 @@ describe("naming the pass the browser reading the page holds", () => {
     it("never overwrites a description that already exists", async () => {
         pass("trust-device-mine");
         await twoFactor.recordTrustedDevice(USER, { userAgent: "Firefox/1", ip: "10.0.0.9" });
-        expect(await twoFactor.adoptTrustedDevice(USER, "trust-device-mine", { userAgent: "Chrome/1" })).toBe(false);
+        expect(
+            await twoFactor.adoptTrustedDevice(USER, "trust-device-mine", { userAgent: "Chrome/1" })
+        ).toBe(false);
         expect((await twoFactor.listTrustedDevices(USER, null))[0]?.userAgent).toBe("Firefox/1");
     });
 
     it("describes nothing when there is no pass behind the handle", async () => {
-        expect(await twoFactor.adoptTrustedDevice(USER, "trust-device-gone", { userAgent: "Chrome/1" })).toBe(false);
+        expect(
+            await twoFactor.adoptTrustedDevice(USER, "trust-device-gone", { userAgent: "Chrome/1" })
+        ).toBe(false);
         expect(devices).toEqual([]);
     });
 
     it("never reaches another account's pass, or anything that is not one", async () => {
         pass("trust-device-theirs", OTHER);
-        expect(await twoFactor.adoptTrustedDevice(USER, "trust-device-theirs", { userAgent: "Chrome/1" })).toBe(false);
-        expect(await twoFactor.adoptTrustedDevice(USER, "2fa-attempts-something", { userAgent: "Chrome/1" })).toBe(
-            false
-        );
+        expect(
+            await twoFactor.adoptTrustedDevice(USER, "trust-device-theirs", {
+                userAgent: "Chrome/1"
+            })
+        ).toBe(false);
+        expect(
+            await twoFactor.adoptTrustedDevice(USER, "2fa-attempts-something", {
+                userAgent: "Chrome/1"
+            })
+        ).toBe(false);
         expect(devices).toEqual([]);
     });
 
@@ -284,9 +315,9 @@ describe("ending a pass", () => {
 
         expect(await twoFactor.revokeTrustedDevice(USER, "trust-device-drop")).toBe(true);
         expect(devices).toEqual([]);
-        expect((await twoFactor.listTrustedDevices(USER, null)).map((device) => device.id)).toEqual([
-            "trust-device-keep"
-        ]);
+        expect((await twoFactor.listTrustedDevices(USER, null)).map((device) => device.id)).toEqual(
+            ["trust-device-keep"]
+        );
     });
 
     it("refuses a handle belonging to another account", async () => {
@@ -319,7 +350,9 @@ describe("which pass this browser is holding", () => {
      *  and the identifier, then the identifier, then better-call's signature. */
     async function cookieFor(userId: string, identifier: string): Promise<string> {
         const { createHmac } = await import("node:crypto");
-        const token = createHmac("sha256", SECRET).update(`${userId}!${identifier}`).digest("base64url");
+        const token = createHmac("sha256", SECRET)
+            .update(`${userId}!${identifier}`)
+            .digest("base64url");
         return `${token}!${identifier}.${"s".repeat(43)}=`;
     }
 

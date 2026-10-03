@@ -16,7 +16,7 @@ function domain(partial: Partial<AppDomain> & { hostname: string; kind: string }
     return { id: partial.hostname, enabled: true, ...partial };
 }
 
-const FREE = domain({ hostname: "invoices-a1b2c3-51-15-20-30.sslip.io", kind: "auto" });
+const FREE = domain({ hostname: "invoices-a1b2c3-5-6-7-8.sslip.io", kind: "auto" });
 
 describe("primaryDomain", () => {
     it("keeps the free subdomain over a quick tunnel that is renamed on every deploy", () => {
@@ -33,7 +33,7 @@ describe("primaryDomain", () => {
     });
 
     it("still offers a throwaway tunnel over a name that only resolves on the LAN", () => {
-        const lan = domain({ hostname: "invoices-a1b2c3-192-168-1-20.sslip.io", kind: "lan" });
+        const lan = domain({ hostname: "invoices-a1b2c3-10-0-1-20.sslip.io", kind: "lan" });
         const tunnel = domain({
             hostname: "ronald-kent-leg-plate.trycloudflare.com",
             kind: "tunnel-temp"
@@ -50,7 +50,7 @@ describe("primaryDomain", () => {
 
     it("never presents a service as one of its releases", () => {
         const release = domain({
-            hostname: "invoices-a1b2c3-9f8e7d6-51-15-20-30.sslip.io",
+            hostname: "invoices-a1b2c3-9f8e7d6-5-6-7-8.sslip.io",
             kind: "release"
         });
         expect(primaryDomain([release])).toBeNull();

@@ -29,7 +29,7 @@ describe("what counts as an address a provider can reach", () => {
             "http://polaris.lan",
             "https://box.internal",
             "http://localhost:3000",
-            "https://192.168.1.142",
+            "https://10.0.1.142",
             "http://polaris"
         ]) {
             expect(publicHostname(value), value).toBeNull();
@@ -52,7 +52,9 @@ describe("the flow refuses a trip it cannot finish", () => {
 
     it("stops the button being drawn at all", async () => {
         const options = await readFile(`${SRC}lib/mailbox/connect-options.ts`, "utf8");
-        expect(options).toContain("googleReady: Boolean(google?.enabled && google.hasSecret && publicUrl)");
+        expect(options).toContain(
+            "googleReady: Boolean(google?.enabled && google.hasSecret && publicUrl)"
+        );
         expect(options).toContain(
             "microsoftReady: Boolean(microsoft?.enabled && microsoft.hasSecret && publicUrl)"
         );
@@ -64,6 +66,8 @@ describe("the flow refuses a trip it cannot finish", () => {
         expect(dialog).toContain("/admin/domains");
         // And for somebody who cannot set it themself, who to ask.
         expect(dialog).toContain('t("connect.askAdmin")');
-        expect(mail.connect.askAdmin).toBe("Ask an administrator to give Polaris a public address.");
+        expect(mail.connect.askAdmin).toBe(
+            "Ask an administrator to give Polaris a public address."
+        );
     });
 });

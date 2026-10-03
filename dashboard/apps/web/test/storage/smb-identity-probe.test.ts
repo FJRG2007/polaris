@@ -82,7 +82,7 @@ function track(socket: Socket): void {
 
 /** A server on a free local port that answers like an SMB2 server and records
  *  every message it is sent. */
-async function smbServer(names = { netbios: "UNAS-PRO", dns: "unas-pro.local" }) {
+async function smbServer(names = { netbios: "OFFICE-NAS", dns: "office-nas.local" }) {
     const received: Buffer[] = [];
     server = createServer((socket: Socket) => {
         track(socket);
@@ -121,8 +121,8 @@ describe("asking an SMB server who it is", () => {
             ok: true,
             identity: {
                 serverGuid: "00112233445566778899aabbccddeeff",
-                netbiosName: "UNAS-PRO",
-                dnsName: "unas-pro.local"
+                netbiosName: "OFFICE-NAS",
+                dnsName: "office-nas.local"
             }
         });
     });

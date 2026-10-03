@@ -75,35 +75,61 @@ describe("the site and anything under it", () => {
 
 describe("the narrower rules", () => {
     it("matches one host and not its neighbours", () => {
-        expect(uris.uriMatches("accounts.example.com", wire.URI_MATCH_HOST, "https://accounts.example.com/x")).toBe(true);
-        expect(uris.uriMatches("accounts.example.com", wire.URI_MATCH_HOST, "https://example.com/x")).toBe(false);
+        expect(
+            uris.uriMatches(
+                "accounts.example.com",
+                wire.URI_MATCH_HOST,
+                "https://accounts.example.com/x"
+            )
+        ).toBe(true);
+        expect(
+            uris.uriMatches("accounts.example.com", wire.URI_MATCH_HOST, "https://example.com/x")
+        ).toBe(false);
     });
 
     it("matches a prefix, for a site that keeps its logins under one path", () => {
         const saved = "https://example.com/apps/";
-        expect(uris.uriMatches(saved, wire.URI_MATCH_STARTS_WITH, "https://example.com/apps/mail")).toBe(true);
-        expect(uris.uriMatches(saved, wire.URI_MATCH_STARTS_WITH, "https://example.com/other")).toBe(false);
+        expect(
+            uris.uriMatches(saved, wire.URI_MATCH_STARTS_WITH, "https://example.com/apps/mail")
+        ).toBe(true);
+        expect(
+            uris.uriMatches(saved, wire.URI_MATCH_STARTS_WITH, "https://example.com/other")
+        ).toBe(false);
     });
 
     it("matches one address exactly", () => {
         const saved = "https://example.com/login";
-        expect(uris.uriMatches(saved, wire.URI_MATCH_EXACT, "https://example.com/login")).toBe(true);
-        expect(uris.uriMatches(saved, wire.URI_MATCH_EXACT, "https://example.com/login?x=1")).toBe(false);
+        expect(uris.uriMatches(saved, wire.URI_MATCH_EXACT, "https://example.com/login")).toBe(
+            true
+        );
+        expect(uris.uriMatches(saved, wire.URI_MATCH_EXACT, "https://example.com/login?x=1")).toBe(
+            false
+        );
     });
 
     it("never offers an entry marked never", () => {
-        expect(uris.uriMatches("example.com", wire.URI_MATCH_NEVER, "https://example.com")).toBe(false);
+        expect(uris.uriMatches("example.com", wire.URI_MATCH_NEVER, "https://example.com")).toBe(
+            false
+        );
     });
 });
 
 describe("a pattern somebody wrote themselves", () => {
     it("is used as written", () => {
-        expect(uris.uriMatches("^https://(a|b)\\.example\\.com/", wire.URI_MATCH_REGEX, "https://a.example.com/x")).toBe(
-            true
-        );
-        expect(uris.uriMatches("^https://(a|b)\\.example\\.com/", wire.URI_MATCH_REGEX, "https://c.example.com/x")).toBe(
-            false
-        );
+        expect(
+            uris.uriMatches(
+                "^https://(a|b)\\.example\\.com/",
+                wire.URI_MATCH_REGEX,
+                "https://a.example.com/x"
+            )
+        ).toBe(true);
+        expect(
+            uris.uriMatches(
+                "^https://(a|b)\\.example\\.com/",
+                wire.URI_MATCH_REGEX,
+                "https://c.example.com/x"
+            )
+        ).toBe(false);
     });
 
     it("matches nothing at all when it will not compile", () => {
@@ -117,7 +143,9 @@ describe("what is not an address", () => {
     it("matches nothing", () => {
         expect(uris.uriMatches("", null, "https://example.com")).toBe(false);
         expect(uris.uriMatches("example.com", null, "")).toBe(false);
-        expect(uris.uriMatches("not a url at all", wire.URI_MATCH_DOMAIN, "https://example.com")).toBe(false);
+        expect(
+            uris.uriMatches("not a url at all", wire.URI_MATCH_DOMAIN, "https://example.com")
+        ).toBe(false);
     });
 });
 
@@ -150,7 +178,7 @@ describe("what is wrong with what was typed", () => {
             "https://example.com/login?next=x",
             "*.example.com",
             "localhost:8080",
-            "192.168.1.1",
+            "10.0.1.1",
             "nas"
         ]) {
             expect(uris.uriProblem(value, null)).toBeNull();
@@ -194,7 +222,9 @@ describe("choosing between several saved addresses", () => {
 describe("withoutWildcard", () => {
     it("takes off a leading wildcard label, with or without a scheme", () => {
         expect(uris.withoutWildcard("*.example.com")).toBe("example.com");
-        expect(uris.withoutWildcard("https://*.example.com/login")).toBe("https://example.com/login");
+        expect(uris.withoutWildcard("https://*.example.com/login")).toBe(
+            "https://example.com/login"
+        );
     });
 
     it("leaves a star that is part of a label, rather than inventing another site", () => {

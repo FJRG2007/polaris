@@ -27,9 +27,9 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
                     name: "Bedroom",
                     model: "gree",
                     mac: "AA:BB:CC:11:22:33",
-                    address: "192.168.1.40"
+                    address: "10.0.1.40"
                 },
-                { name: "Lounge", model: "gree", mac: "AA:BB:CC:44:55:66", address: "192.168.1.41" }
+                { name: "Lounge", model: "gree", mac: "AA:BB:CC:44:55:66", address: "10.0.1.41" }
             ]
         };
     },
@@ -71,7 +71,7 @@ describe("units found on the network", () => {
         drawn("Gree", "gree");
         expect(await screen.findByText("Found on your network")).toBeTruthy();
         expect(await screen.findByRole("button", { name: "Use Bedroom" })).toBeTruthy();
-        expect(screen.getByText("AA:BB:CC:44:55:66 - 192.168.1.41")).toBeTruthy();
+        expect(screen.getByText("AA:BB:CC:44:55:66 - 10.0.1.41")).toBeTruthy();
         expect(scans).toEqual([{ connection: "gree-local", fresh: false }]);
     });
 

@@ -89,7 +89,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
 const hue = await import("@polaris-app/places/src/lib/integrations/hue-api");
 const { hueBridgeDriver } = await import("@polaris-app/places/src/lib/drivers/hue-bridge");
 
-const PAIRED = { host: "192.168.1.20", appKey: "stored-key", bridgeId: BRIDGE_ID };
+const PAIRED = { host: "10.0.1.20", appKey: "stored-key", bridgeId: BRIDGE_ID };
 
 beforeEach(() => {
     sent = [];
@@ -128,7 +128,7 @@ describe("Hue's authorities", () => {
 
 describe("pairing", () => {
     it("says to press the button when it has not been pressed", async () => {
-        await expect(hueBridgeDriver.verify({ host: "192.168.1.20" })).rejects.toMatchObject({
+        await expect(hueBridgeDriver.verify({ host: "10.0.1.20" })).rejects.toMatchObject({
             kind: "refused",
             message: expect.stringContaining("link button")
         });
@@ -137,9 +137,9 @@ describe("pairing", () => {
     it("keeps the key the bridge handed back and the id its certificate names", async () => {
         buttonPressed = true;
         resources = { light: [], device: [], zigbee_connectivity: [] };
-        const stored = await hueBridgeDriver.verify({ host: "192.168.1.20" });
+        const stored = await hueBridgeDriver.verify({ host: "10.0.1.20" });
         expect(stored).toEqual({
-            host: "192.168.1.20",
+            host: "10.0.1.20",
             appKey: "new-app-key",
             bridgeId: BRIDGE_ID
         });
@@ -153,7 +153,7 @@ describe("pairing", () => {
 
     it("uses a key somebody already had instead of pairing again", async () => {
         resources = { light: [], device: [], zigbee_connectivity: [] };
-        const stored = await hueBridgeDriver.verify({ host: "192.168.1.20", appKey: "their-key" });
+        const stored = await hueBridgeDriver.verify({ host: "10.0.1.20", appKey: "their-key" });
         expect(stored).toMatchObject({ appKey: "their-key" });
         expect(sent.some((request) => new URL(request.url).pathname === "/api")).toBe(false);
     });
@@ -161,7 +161,7 @@ describe("pairing", () => {
     it("says a key the bridge refuses is the problem, from a page that is not even JSON", async () => {
         keyValid = false;
         await expect(
-            hueBridgeDriver.verify({ host: "192.168.1.20", appKey: "revoked" })
+            hueBridgeDriver.verify({ host: "10.0.1.20", appKey: "revoked" })
         ).rejects.toMatchObject({
             kind: "unauthorized"
         });
@@ -263,7 +263,7 @@ describe("what a bridge has", () => {
     });
 
     it("asks to be paired again when a connection has no key", async () => {
-        await expect(hueBridgeDriver.list({ host: "192.168.1.20" })).rejects.toMatchObject({
+        await expect(hueBridgeDriver.list({ host: "10.0.1.20" })).rejects.toMatchObject({
             kind: "unauthorized"
         });
     });

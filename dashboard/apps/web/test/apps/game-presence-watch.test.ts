@@ -166,18 +166,18 @@ describe("subscribeGamePresence", () => {
     it("writes every reading into the record, so 'since' is as fresh as the feed", async () => {
         // The minute's sweep only sees who is on once a minute, and not at all on
         // an instance with no cron configured. While a screen watches, this does.
-        answer = [playing(ONE, ["FJRG2007"])];
-        visitSince = new Map([["@fjrg2007", new Date("2026-09-29T15:04:00.000Z")]]);
+        answer = [playing(ONE, ["PlayerOne"])];
+        visitSince = new Map([["@playerone", new Date("2026-09-29T15:04:00.000Z")]]);
         const frames: (string | null | undefined)[] = [];
         const stop = subscribeGamePresence(OWNER, [], (reading) =>
             frames.push(reading.servers[0]?.players[0]?.since)
         );
         await vi.advanceTimersByTimeAsync(0);
-        expect(recorded).toEqual([{ id: ONE, names: ["FJRG2007"], log: "changes" }]);
+        expect(recorded).toEqual([{ id: ONE, names: ["PlayerOne"], log: "changes" }]);
         expect(frames).toEqual(["2026-09-29T15:04:00.000Z"]);
 
         // He reconnects: the record opens a new visit and the next frame says so.
-        visitSince = new Map([["@fjrg2007", new Date("2026-09-29T15:30:10.000Z")]]);
+        visitSince = new Map([["@playerone", new Date("2026-09-29T15:30:10.000Z")]]);
         await vi.advanceTimersByTimeAsync(3000);
         expect(frames).toEqual(["2026-09-29T15:04:00.000Z", "2026-09-29T15:30:10.000Z"]);
         stop();

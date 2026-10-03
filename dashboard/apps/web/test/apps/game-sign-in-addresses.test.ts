@@ -36,7 +36,9 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "5.6.7.8" }));
 
-const { signInAddresses, signedIn } = await import("@polaris-app/game-servers/src/lib/game-sign-in-addresses");
+const { signInAddresses, signedIn } = await import(
+    "@polaris-app/game-servers/src/lib/game-sign-in-addresses"
+);
 
 const ADA = "ada";
 const BOB = "bob";
@@ -99,11 +101,11 @@ describe("the addresses an account is signed in from", () => {
         rows = [
             {
                 userId: ADA,
-                ipAddress: "192.168.1.20",
+                ipAddress: "10.0.1.20",
                 state: { ip: null, approval: "approved", lockedAt: null }
             }
         ];
-        expect((await signInAddresses([ADA])).get(ADA)).toEqual(["192.168.1.20", "5.6.7.8"]);
+        expect((await signInAddresses([ADA])).get(ADA)).toEqual(["10.0.1.20", "5.6.7.8"]);
         expect(await signedIn([ADA])).toEqual(new Set([ADA]));
     });
 });

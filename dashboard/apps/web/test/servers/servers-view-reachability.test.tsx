@@ -25,7 +25,7 @@ let statuses: ServerStatus[] = [];
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("@/components/use-live-resource", () => ({
     useLiveResource: () => ({
-        data: { servers: statuses, machineName: "lirio-0" } satisfies ServerStatusPayload,
+        data: { servers: statuses, machineName: "node-0" } satisfies ServerStatusPayload,
         loading: false,
         error: null,
         stale: null,
@@ -54,10 +54,10 @@ function server(overrides: Partial<ServerRow> = {}): ServerRow {
     return {
         id: "33333333-3333-4333-8333-333333333333",
         kind: "host",
-        name: "lirio-2",
+        name: "node-2",
         detail: "polaris",
         os: "Ubuntu 24.04.1 LTS",
-        address: "192.168.1.160",
+        address: "10.0.1.160",
         port: 22,
         authMethod: "key",
         sudo: true,

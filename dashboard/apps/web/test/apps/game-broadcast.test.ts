@@ -55,7 +55,11 @@ describe("a message from Polaris", () => {
     it("keeps accents and emoji intact", () => {
         const typed = "Reinicio en 5 minutos - guardad, por favor";
         const body = broadcastArgv("java", typed)[2] ?? "";
-        expect(JSON.parse(body).map((part: { text: string }) => part.text).join("")).toContain(typed);
+        expect(
+            JSON.parse(body)
+                .map((part: { text: string }) => part.text)
+                .join("")
+        ).toContain(typed);
     });
 
     it("is never split into words on the way out", () => {
@@ -82,7 +86,9 @@ describe("a line typed into the console", () => {
             broadcastArgv("java", "hola a todos")
         );
         expect(consoleBroadcastArgv("java", "/SAY  hola")).toEqual(broadcastArgv("java", "hola"));
-        expect(consoleBroadcastArgv("bedrock", "say hola")).toEqual(broadcastArgv("bedrock", "hola"));
+        expect(consoleBroadcastArgv("bedrock", "say hola")).toEqual(
+            broadcastArgv("bedrock", "hola")
+        );
     });
 
     it("whispers to the one player as Polaris", async () => {
@@ -90,8 +96,8 @@ describe("a line typed into the console", () => {
             "@polaris-app/game-servers/src/lib/minecraft/broadcast"
         );
         for (const verb of ["tell", "msg", "w"]) {
-            const argv = consoleBroadcastArgv("java", `${verb} ErMigue04 ven al spawn`);
-            expect(argv?.slice(0, 2)).toEqual(["tellraw", "ErMigue04"]);
+            const argv = consoleBroadcastArgv("java", `${verb} Jeb_04 ven al spawn`);
+            expect(argv?.slice(0, 2)).toEqual(["tellraw", "Jeb_04"]);
             expect(JSON.parse(argv?.[2] ?? "[]")).toEqual([
                 { text: "[Polaris] ", color: "gray" },
                 { text: "ven al spawn", color: "gray", italic: true }
@@ -103,9 +109,9 @@ describe("a line typed into the console", () => {
         const { consoleBroadcastArgv } = await import(
             "@polaris-app/game-servers/src/lib/minecraft/broadcast"
         );
-        expect(consoleBroadcastArgv("java", "op ErMigue04")).toBeNull();
+        expect(consoleBroadcastArgv("java", "op Jeb_04")).toBeNull();
         expect(consoleBroadcastArgv("java", "say")).toBeNull();
-        expect(consoleBroadcastArgv("java", "tell ErMigue04")).toBeNull();
+        expect(consoleBroadcastArgv("java", "tell Jeb_04")).toBeNull();
         expect(consoleBroadcastArgv("java", "sayhello")).toBeNull();
     });
 });

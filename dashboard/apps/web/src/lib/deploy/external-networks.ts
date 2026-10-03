@@ -2,7 +2,7 @@
  * Networks of the operator's own that a service joins.
  *
  * A server Polaris is brought to often already runs things that reach each other
- * by name over a Docker network nobody here made - `http://dymo-api:3050` on
+ * by name over a Docker network nobody here made - `http://payments-api:3050` on
  * `app_network`. A service moved onto Polaris has to stay on that network, under
  * the names those things call it by, or every one of them loses it.
  *

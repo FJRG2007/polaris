@@ -23,12 +23,12 @@ describe("what an invite promises", () => {
                 resourceId: "server-1",
                 actions: [],
                 grantedById: BY,
-                appLink: { kind: "gamePlayer", player: "ErMigue04" }
+                appLink: { kind: "gamePlayer", player: "Jeb_04" }
             })
         );
         expect(parsed?.appLink).toEqual({
             kind: "gamePlayer",
-            player: "ErMigue04",
+            player: "Jeb_04",
             followSignIns: true
         });
     });

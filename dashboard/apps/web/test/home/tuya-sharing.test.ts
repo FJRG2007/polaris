@@ -296,7 +296,7 @@ describe("where the account's calls go", () => {
         expect(sharing.tuyaEndpoint("https://apigw.tuyaeu.com/")).toBe("https://apigw.tuyaeu.com");
         for (const bad of [
             "http://apigw.tuyaeu.com",
-            "https://192.168.1.10",
+            "https://10.0.1.10",
             "https://[::1]",
             "https://user:pass@apigw.tuyaeu.com",
             "not a url"

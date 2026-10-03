@@ -37,7 +37,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris/auth", () => ({ verifyQuickPin: async () => false }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
-vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "85.87.156.88" }));
+vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "198.51.100.88" }));
 
 const { clientHost } = await import("../../src/lib/request-context");
 const { listUserSessions } = await import("../../src/lib/session-directory");
@@ -48,7 +48,7 @@ function sessionRow(id: string, state: Record<string, unknown> | null) {
         id,
         createdAt: new Date("2026-08-01T10:00:00Z"),
         expiresAt: new Date("2026-08-08T10:00:00Z"),
-        ipAddress: "192.168.1.131",
+        ipAddress: "10.0.1.131",
         userAgent: "Mozilla/5.0 (Windows NT 10.0) Chrome/140",
         state
     };
@@ -67,7 +67,10 @@ describe("the address a request arrived on", () => {
     });
 
     it("prefers what the proxy forwarded, since that is the name the browser used", async () => {
-        requestHeaders = new Headers({ host: "polaris:3000", "x-forwarded-host": "polaris.example.com" });
+        requestHeaders = new Headers({
+            host: "polaris:3000",
+            "x-forwarded-host": "polaris.example.com"
+        });
         expect(await clientHost()).toBe("polaris.example.com");
     });
 
@@ -107,11 +110,20 @@ describe("listing an account's sessions", () => {
 
     it("returns every session, whichever name each was opened on", async () => {
         sessionRows = [
-            sessionRow("session-1", { host: "polaris.local", lastSeenAt: new Date("2026-08-02T10:00:00Z") }),
-            sessionRow("session-2", { host: "polaris.example.com", lastSeenAt: new Date("2026-08-02T11:00:00Z") })
+            sessionRow("session-1", {
+                host: "polaris.local",
+                lastSeenAt: new Date("2026-08-02T10:00:00Z")
+            }),
+            sessionRow("session-2", {
+                host: "polaris.example.com",
+                lastSeenAt: new Date("2026-08-02T11:00:00Z")
+            })
         ];
         const sessions = await listUserSessions("user-1", "session-1");
-        expect(sessions.map((session) => session.host)).toEqual(["polaris.local", "polaris.example.com"]);
+        expect(sessions.map((session) => session.host)).toEqual([
+            "polaris.local",
+            "polaris.example.com"
+        ]);
         expect(sessions.filter((session) => session.current)).toHaveLength(1);
     });
 

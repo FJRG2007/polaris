@@ -14,11 +14,14 @@
 import { describe, expect, it } from "vitest";
 import { mountFailureReason } from "../src/mount-failure.js";
 
-const SHARE = "//192.168.1.145/Personal-Drive";
+const SHARE = "//10.0.1.145/Personal-Drive";
 
 describe("what a failed mount means", () => {
     it("says a machine that is not there is not there", () => {
-        const said = mountFailureReason(SHARE, "mount error: Server abruptly closed the connection.");
+        const said = mountFailureReason(
+            SHARE,
+            "mount error: Server abruptly closed the connection."
+        );
         expect(said).toContain("is not answering");
         expect(said).toContain(SHARE);
         // And the original survives, for searching.
@@ -28,7 +31,7 @@ describe("what a failed mount means", () => {
     it("reads every shape of unreachable the same way", () => {
         for (const raw of [
             "mount error(112): Host is down",
-            "connect EHOSTUNREACH 192.168.1.145:445",
+            "connect EHOSTUNREACH 10.0.1.145:445",
             "mount error(113): No route to host",
             "connect ETIMEDOUT",
             "Connection refused",
@@ -48,7 +51,9 @@ describe("what a failed mount means", () => {
     });
 
     it("calls a share name that does not exist what it is", () => {
-        expect(mountFailureReason(SHARE, "Status code: NT_STATUS_BAD_NETWORK_NAME")).toContain("not a share");
+        expect(mountFailureReason(SHARE, "Status code: NT_STATUS_BAD_NETWORK_NAME")).toContain(
+            "not a share"
+        );
     });
 
     it("names a mount left behind by a connection that died", () => {

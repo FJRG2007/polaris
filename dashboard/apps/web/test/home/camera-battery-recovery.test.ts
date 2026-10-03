@@ -76,7 +76,7 @@ const input = (power: string, modelId = "tapo-c410") =>
         vendor: "tapo-battery",
         modelId,
         power,
-        address: "192.168.1.64",
+        address: "10.0.1.64",
         detection: DEFAULT_DETECTION
     });
 

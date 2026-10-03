@@ -13,9 +13,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findUnique = vi.fn();
 
-vi.mock("@polaris/db", () => ({ prisma: { setting: { findUnique, upsert: vi.fn(), deleteMany: vi.fn() } } }));
+vi.mock("@polaris/db", () => ({
+    prisma: { setting: { findUnique, upsert: vi.fn(), deleteMany: vi.fn() } }
+}));
 
-const { dashboardHosts, publicHostname, renderDashboardConfig } = await import("../../src/lib/domain-edge");
+const { dashboardHosts, publicHostname, renderDashboardConfig } = await import(
+    "../../src/lib/domain-edge"
+);
 
 /** The Setting rows an install would hold, so the reads follow the real path. */
 function stored(values: Record<string, string>): void {
@@ -45,7 +49,13 @@ describe("which names count as public", () => {
     it("leaves the names the compose labels already serve", () => {
         // These have their own router and the internal certificate; routing them here
         // would ask Let's Encrypt for a certificate it can never issue.
-        for (const name of ["polaris.local", "polaris", "polaris.internal", "box.lan", "192.168.1.138"]) {
+        for (const name of [
+            "polaris.local",
+            "polaris",
+            "polaris.internal",
+            "box.lan",
+            "10.0.1.138"
+        ]) {
             expect(publicHostname(name)).toBeNull();
         }
     });
@@ -61,7 +71,9 @@ describe("what the edge is told to serve", () => {
     it("routes the hostnames over https, with a certificate", () => {
         const config = renderDashboardConfig(["polaris.example.com", "share.polaris.example.com"]);
 
-        expect(config).toContain('rule: "Host(`polaris.example.com`) || Host(`share.polaris.example.com`)"');
+        expect(config).toContain(
+            'rule: "Host(`polaris.example.com`) || Host(`share.polaris.example.com`)"'
+        );
         expect(config).toContain("entryPoints: [websecure]");
         expect(config).toContain("certResolver: letsencrypt");
         expect(config).toContain('- url: "http://web:3000"');
@@ -78,7 +90,9 @@ describe("what the edge is told to serve", () => {
     it("names its redirect middleware apart from the one the app routes define", () => {
         // Every file in the directory merges into one config, so the shared name the
         // deployed-app routes use would be a duplicate definition and get dropped.
-        expect(renderDashboardConfig(["a.example.com"])).not.toContain("    polaris-redirect-https:");
+        expect(renderDashboardConfig(["a.example.com"])).not.toContain(
+            "    polaris-redirect-https:"
+        );
     });
 
     it("stays under the terminal WebSocket router's priority", () => {
@@ -104,7 +118,11 @@ describe("guarding the dashboard itself", () => {
     };
 
     it("adds no middleware when nothing is configured", () => {
-        const config = renderDashboardConfig(["polaris.example.com"], { allow: [], deny: [], rules: [] });
+        const config = renderDashboardConfig(["polaris.example.com"], {
+            allow: [],
+            deny: [],
+            rules: []
+        });
 
         expect(config).not.toContain("ipAllowList");
         expect(config).not.toContain("X-Polaris-Waf");
@@ -124,22 +142,27 @@ describe("guarding the dashboard itself", () => {
 
     it("narrows the route to an allowlist natively", () => {
         // Traefik enforces this one itself, so it keeps working with the guard down.
-        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["192.168.1.0/24"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["10.0.1.0/24"] });
 
-        expect(config).toContain("      ipAllowList:\n        sourceRange: [\"192.168.1.0/24\"]");
+        expect(config).toContain('      ipAllowList:\n        sourceRange: ["10.0.1.0/24"]');
         expect(config).toContain("middlewares: [polaris-dashboard-allow]");
     });
 
     it("keeps the allowlist on the :80 redirect router as well", () => {
         // Otherwise a blocked address still reaches the redirect and learns the name
         // is served here.
-        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["192.168.1.0/24"] });
+        const config = renderDashboardConfig(["polaris.example.com"], { allow: ["10.0.1.0/24"] });
 
-        expect(config).toContain("middlewares: [polaris-dashboard-allow, polaris-dashboard-redirect-https]");
+        expect(config).toContain(
+            "middlewares: [polaris-dashboard-allow, polaris-dashboard-redirect-https]"
+        );
     });
 
     it("carries a denylist and the custom rules to the guard", () => {
-        const config = renderDashboardConfig(["polaris.example.com"], { deny: ["203.0.113.9"], rules: [RULE] });
+        const config = renderDashboardConfig(["polaris.example.com"], {
+            deny: ["203.0.113.9"],
+            rules: [RULE]
+        });
 
         expect(config).toContain("X-Polaris-Waf:");
         expect(config).toContain("polaris-dashboard-waf-guard");
@@ -160,7 +183,9 @@ describe("guarding the dashboard itself", () => {
         const config = renderDashboardConfig(["polaris.example.com"], { deny: ["203.0.113.9"] });
         const header = /X-Polaris-Waf: "([^"]+)"/.exec(config)?.[1] ?? "";
 
-        expect(JSON.parse(Buffer.from(header, "base64").toString("utf8"))).toMatchObject({ l: false });
+        expect(JSON.parse(Buffer.from(header, "base64").toString("utf8"))).toMatchObject({
+            l: false
+        });
     });
 });
 
@@ -205,7 +230,11 @@ describe("which hostnames are collected", () => {
             "domain.extra": JSON.stringify(["old.example.com", "www.example.com"])
         });
 
-        expect(await dashboardHosts()).toEqual(["polaris.example.com", "old.example.com", "www.example.com"]);
+        expect(await dashboardHosts()).toEqual([
+            "polaris.example.com",
+            "old.example.com",
+            "www.example.com"
+        ]);
     });
 
     it("keeps serving the app domain when the extra list is unreadable", async () => {

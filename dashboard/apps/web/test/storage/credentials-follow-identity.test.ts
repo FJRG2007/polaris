@@ -16,9 +16,9 @@ import type { SmbProbeResult } from "@/lib/storage-whereabouts/smb-probe";
 
 const ID = "018f2b7a-0000-7000-8000-0000000000b2";
 const NAS: DeviceIdentity = {
-    mac: "6c:63:f8:6e:53:50",
+    mac: "00:00:5e:00:53:50",
     serverGuid: "0123456789abcdef0123456789abcdef",
-    netbiosName: "UNAS-PRO"
+    netbiosName: "OFFICE-NAS"
 };
 
 let row: Record<string, unknown>;
@@ -119,12 +119,12 @@ beforeEach(() => {
     });
     row = {
         id: ID,
-        name: "UNAS Pro",
+        name: "Office NAS",
         kind: "unifi-unas",
         ownerId: "018f2b7a-0000-7000-8000-0000000000c3",
         config: JSON.stringify({
             kind: "unifi-unas",
-            host: "192.168.1.129",
+            host: "10.0.1.129",
             username: "fixture-user",
             secure: true,
             smbShare: "Share"
@@ -132,19 +132,19 @@ beforeEach(() => {
         encryptedCredential: Buffer.from("cipher"),
         credentialNonce: Buffer.from("nonce"),
         credentialKeyId: "k",
-        deviceIdentity: { ...NAS, address: "192.168.1.129", seenAt: "2026-10-01T10:00:00.000Z" }
+        deviceIdentity: { ...NAS, address: "10.0.1.129", seenAt: "2026-10-01T10:00:00.000Z" }
     };
 });
 
 describe("a different SMB server at the old address", () => {
     it("is never signed in to, and the real device is followed instead", async () => {
-        devices.set("192.168.1.129", {
+        devices.set("10.0.1.129", {
             serverGuid: "ffffffffffffffffffffffffffff0009",
             netbiosName: "LAPTOP"
         });
-        table.set("192.168.1.129", "aa:bb:cc:dd:ee:09");
-        devices.set("192.168.1.134", NAS);
-        table.set("192.168.1.134", NAS.mac!);
+        table.set("10.0.1.129", "aa:bb:cc:dd:ee:09");
+        devices.set("10.0.1.134", NAS);
+        table.set("10.0.1.134", NAS.mac!);
 
         await expect(service.getDriverForConnection(ID)).rejects.toBeInstanceOf(
             follow.DeviceNotConfirmed
@@ -159,9 +159,9 @@ describe("a different SMB server at the old address", () => {
         // The search the refusal started finds the NAS where it went.
         await expect(follow.searchFor(ID)).resolves.toMatchObject({
             kind: "followed",
-            to: "192.168.1.134"
+            to: "10.0.1.134"
         });
-        expect(JSON.parse(row.config as string).host).toBe("192.168.1.134");
+        expect(JSON.parse(row.config as string).host).toBe("10.0.1.134");
         await vi.waitFor(() => expect(reportStorageMoved).toHaveBeenCalledOnce());
 
         // And the next open signs in there.
@@ -172,7 +172,7 @@ describe("a different SMB server at the old address", () => {
     });
 
     it("is not given the password for the console sign-in either", async () => {
-        devices.set("192.168.1.129", {
+        devices.set("10.0.1.129", {
             serverGuid: "ffffffffffffffffffffffffffff0009",
             netbiosName: "LAPTOP"
         });
@@ -184,7 +184,7 @@ describe("a different SMB server at the old address", () => {
     });
 
     it("is not mounted by the deploy pipeline either", async () => {
-        devices.set("192.168.1.129", {
+        devices.set("10.0.1.129", {
             serverGuid: "ffffffffffffffffffffffffffff0009",
             netbiosName: "LAPTOP"
         });
@@ -198,7 +198,7 @@ describe("a different SMB server at the old address", () => {
 
 describe("the device it remembers", () => {
     it("is signed in to as before", async () => {
-        devices.set("192.168.1.129", NAS);
+        devices.set("10.0.1.129", NAS);
         await expect(service.getDriverForConnection(ID)).resolves.toBeDefined();
         expect(SmbDriver).toHaveBeenCalledOnce();
         expect(decryptCredentials).toHaveBeenCalled();

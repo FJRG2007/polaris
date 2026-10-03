@@ -119,7 +119,10 @@ export async function removeDashboardDomain(value: string): Promise<boolean> {
         removed = true;
     }
     if (extra.includes(host)) {
-        await setSetting(KEYS.extra, extra.length > 1 ? JSON.stringify(extra.filter((entry) => entry !== host)) : null);
+        await setSetting(
+            KEYS.extra,
+            extra.length > 1 ? JSON.stringify(extra.filter((entry) => entry !== host)) : null
+        );
         removed = true;
     }
     if (removed) await syncDashboardRoute();
@@ -170,7 +173,10 @@ export async function deployBase(): Promise<string> {
  * private one and would otherwise quietly replace it.
  */
 export async function getPublicIp(): Promise<string | null> {
-    const [stored, manual] = await Promise.all([getSetting(KEYS.publicIp), getSetting(KEYS.publicIpManual)]);
+    const [stored, manual] = await Promise.all([
+        getSetting(KEYS.publicIp),
+        getSetting(KEYS.publicIpManual)
+    ]);
     if (stored && manual === "1") return stored;
     if (!stored || isLanAddress(stored)) {
         const detected = await getHostLanIp();
@@ -192,7 +198,7 @@ function isRoutableIpv4(value: string): boolean {
 
 /**
  * Auto-fill the free-subdomain public IP from a detected server address the first
- * time (Caddy sets `X-Server-Ip` to the connection's local host, e.g. 192.168.1.138,
+ * time (Caddy sets `X-Server-Ip` to the connection's local host, e.g. 10.0.1.138,
  * even when reached by hostname), so free subdomains work with zero setup - the way
  * Dokploy/Coolify do. An address already recorded is never overwritten; a detected
  * one written here does not outrank what the responder sees on the host today, so a
@@ -300,7 +306,9 @@ export function browserOrigin(requestOrigin: string): string {
  */
 export function requestOrigin(request: Request): string {
     const fallback = browserOrigin(new URL(request.url).origin);
-    const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host"))?.split(",")[0]?.trim();
+    const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host"))
+        ?.split(",")[0]
+        ?.trim();
     if (!host) return fallback;
     const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
     try {
@@ -337,9 +345,12 @@ export async function setDomainConfig(input: {
     publicIp?: string;
 }): Promise<void> {
     if (input.appDomain !== undefined) await setSetting(KEYS.app, input.appDomain.trim() || null);
-    if (input.sharingDomain !== undefined) await setSetting(KEYS.sharing, input.sharingDomain.trim() || null);
-    if (input.duckdnsSubdomain !== undefined) await setSetting(KEYS.duckSub, input.duckdnsSubdomain.trim() || null);
-    if (input.deployBase !== undefined) await setSetting(KEYS.deployBase, input.deployBase.trim() || null);
+    if (input.sharingDomain !== undefined)
+        await setSetting(KEYS.sharing, input.sharingDomain.trim() || null);
+    if (input.duckdnsSubdomain !== undefined)
+        await setSetting(KEYS.duckSub, input.duckdnsSubdomain.trim() || null);
+    if (input.deployBase !== undefined)
+        await setSetting(KEYS.deployBase, input.deployBase.trim() || null);
     if (input.publicIp !== undefined) {
         const value = input.publicIp.trim() || null;
         await setSetting(KEYS.publicIp, value);
@@ -351,7 +362,8 @@ export async function setDomainConfig(input: {
     // A saved domain is only a domain once the edge serves it, so republish the route
     // here rather than at each call site - the wizard, the admin panel and the DNS
     // check's dashboard move all land on this function.
-    if (input.appDomain !== undefined || input.sharingDomain !== undefined) await syncDashboardRoute();
+    if (input.appDomain !== undefined || input.sharingDomain !== undefined)
+        await syncDashboardRoute();
     if (input.duckdnsToken !== undefined && input.duckdnsToken.trim()) {
         const blob = encryptSecret(input.duckdnsToken.trim(), loadEnv().POLARIS_MASTER_KEY);
         await setSetting(
@@ -419,6 +431,9 @@ export async function syncDuckDns(): Promise<{ ok: boolean; detail: string }> {
         const text = (await res.text()).trim();
         return { ok: text.startsWith("OK"), detail: text || `HTTP ${res.status}` };
     } catch (caught) {
-        return { ok: false, detail: caught instanceof Error ? caught.message : "DuckDNS request failed" };
+        return {
+            ok: false,
+            detail: caught instanceof Error ? caught.message : "DuckDNS request failed"
+        };
     }
 }

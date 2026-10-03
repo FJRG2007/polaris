@@ -255,7 +255,7 @@ const api = await import("@polaris-app/places/src/lib/integrations/gree-api");
 
 function fakeUnit(overrides: Partial<FakeUnit> = {}): FakeUnit {
     return {
-        address: "192.168.1.40",
+        address: "10.0.1.40",
         mac: "aabbcc112233",
         name: "Bedroom",
         key: "FixtureKey000001",
@@ -327,11 +327,11 @@ describe("the messages", () => {
             "v1"
         );
         const found = api.readScanReply({
-            address: "192.168.1.40",
+            address: "10.0.1.40",
             data: Buffer.from(JSON.stringify({ t: "pack", i: 1, pack: sealed.pack }))
         });
         expect(found).toMatchObject({
-            address: "192.168.1.40",
+            address: "10.0.1.40",
             mac: "aabbcc112233",
             name: "fake unit"
         });
@@ -341,14 +341,14 @@ describe("the messages", () => {
 describe("connecting", () => {
     it("asks the typed address, binds, and keeps the key and not the address alone", async () => {
         units = [fakeUnit()];
-        const stored = await gree.greeLocalDriver.verify({ host: "192.168.1.40" });
-        expect(sent[0]).toEqual({ targets: ["192.168.1.40"], message: { t: "scan" } });
+        const stored = await gree.greeLocalDriver.verify({ host: "10.0.1.40" });
+        expect(sent[0]).toEqual({ targets: ["10.0.1.40"], message: { t: "scan" } });
         expect(stored).toBeTruthy();
         const saved = JSON.parse((stored as Record<string, string>).units!);
         expect(saved).toEqual([
             {
                 mac: "aabbcc112233",
-                address: "192.168.1.40",
+                address: "10.0.1.40",
                 key: "FixtureKey000001",
                 cipher: "v1",
                 name: "Bedroom",
@@ -359,7 +359,7 @@ describe("connecting", () => {
 
     it("binds in V2 when the unit does not answer V1", async () => {
         units = [fakeUnit({ cipher: "v2" })];
-        const stored = await gree.greeLocalDriver.verify({ host: "192.168.1.40" });
+        const stored = await gree.greeLocalDriver.verify({ host: "10.0.1.40" });
         const saved = JSON.parse((stored as Record<string, string>).units!);
         expect(saved[0].cipher).toBe("v2");
         // Asked in V1 first, as the library does.
@@ -371,7 +371,7 @@ describe("connecting", () => {
     it("looks on the network when no address is typed, broadcast included", async () => {
         units = [
             fakeUnit(),
-            fakeUnit({ address: "192.168.1.41", mac: "aabbcc445566", name: "Lounge" })
+            fakeUnit({ address: "10.0.1.41", mac: "aabbcc445566", name: "Lounge" })
         ];
         const stored = await gree.greeLocalDriver.verify({});
         expect(sent[0]!.targets).toContain("255.255.255.255");
@@ -379,7 +379,7 @@ describe("connecting", () => {
     });
 
     it("says so when nothing answers", async () => {
-        await expect(gree.greeLocalDriver.verify({ host: "192.168.1.40" })).rejects.toThrow(
+        await expect(gree.greeLocalDriver.verify({ host: "10.0.1.40" })).rejects.toThrow(
             "No Gree air conditioner answered at that address."
         );
     });
@@ -550,14 +550,14 @@ describe("finding units on the network", () => {
     it("lists each unit with its name, its MAC in the usual spelling, and where it is", async () => {
         units = [
             fakeUnit(),
-            fakeUnit({ address: "192.168.1.41", mac: "aabbcc445566", name: "Lounge" })
+            fakeUnit({ address: "10.0.1.41", mac: "aabbcc445566", name: "Lounge" })
         ];
         const found = await gree.greeLocalDriver.discover!();
         expect(sent[0]).toMatchObject({ message: { t: "scan" } });
         expect(sent[0]!.targets).toContain("255.255.255.255");
         expect(found).toEqual([
-            { name: "Bedroom", model: "", mac: "AA:BB:CC:11:22:33", address: "192.168.1.40" },
-            { name: "Lounge", model: "", mac: "AA:BB:CC:44:55:66", address: "192.168.1.41" }
+            { name: "Bedroom", model: "", mac: "AA:BB:CC:11:22:33", address: "10.0.1.40" },
+            { name: "Lounge", model: "", mac: "AA:BB:CC:44:55:66", address: "10.0.1.41" }
         ]);
         // A look, not a pairing: nothing was bound.
         expect(sent.some((entry) => entry.message.i === 1)).toBe(false);
@@ -570,10 +570,8 @@ describe("finding units on the network", () => {
     });
 
     it("finds a unit by its MAC, however the MAC is spelled", async () => {
-        units = [fakeUnit({ address: "192.168.1.77" })];
-        await expect(gree.greeLocalDriver.locate!("AA:BB:CC:11:22:33")).resolves.toBe(
-            "192.168.1.77"
-        );
+        units = [fakeUnit({ address: "10.0.1.77" })];
+        await expect(gree.greeLocalDriver.locate!("AA:BB:CC:11:22:33")).resolves.toBe("10.0.1.77");
         await expect(gree.greeLocalDriver.locate!("aabbcc999999")).resolves.toBeNull();
     });
 });

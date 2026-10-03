@@ -17,7 +17,13 @@ vi.mock("@polaris/db", () => ({
                 const value = store.get(where.key);
                 return value === undefined ? null : { value };
             },
-            upsert: async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { key: string };
+                create: { value: string };
+            }) => {
                 store.set(where.key, create.value);
             },
             deleteMany: async ({ where }: { where: { key: string } }) => {
@@ -35,25 +41,31 @@ describe("resolveAutoDomain for a remote server", () => {
     });
 
     it("uses the server's own wildcard domain, with a real certificate", async () => {
-        const plan = await resolveAutoDomain("invoices", { ip: "51.15.20.30", wildcard: "apps.example.com" });
+        const plan = await resolveAutoDomain("invoices", {
+            ip: "5.6.7.8",
+            wildcard: "apps.example.com"
+        });
         expect(plan?.hostname.endsWith(".apps.example.com")).toBe(true);
         expect(plan).toMatchObject({ cert: "le", kind: "auto" });
     });
 
     it("prefers the wildcard over the address, so the name is not tied to an IP", async () => {
-        const plan = await resolveAutoDomain("invoices", { ip: "192.168.1.20", wildcard: "apps.example.com" });
-        expect(plan?.hostname).not.toContain("192-168-1-20");
+        const plan = await resolveAutoDomain("invoices", {
+            ip: "10.0.1.20",
+            wildcard: "apps.example.com"
+        });
+        expect(plan?.hostname).not.toContain("10-0-1-20");
         expect(plan?.kind).toBe("auto");
     });
 
     it("falls back to a public IP subdomain when the server has no domain", async () => {
-        const plan = await resolveAutoDomain("invoices", { ip: "51.15.20.30" });
+        const plan = await resolveAutoDomain("invoices", { ip: "5.6.7.8" });
         expect(plan).toMatchObject({ cert: "le", kind: "auto" });
-        expect(plan?.hostname).toContain("51-15-20-30.sslip.io");
+        expect(plan?.hostname).toContain("5-6-7-8.sslip.io");
     });
 
     it("marks a private-IP subdomain as LAN-only, served by the internal CA", async () => {
-        const plan = await resolveAutoDomain("invoices", { ip: "192.168.1.20" });
+        const plan = await resolveAutoDomain("invoices", { ip: "10.0.1.20" });
         expect(plan).toMatchObject({ cert: "internal", kind: "lan" });
     });
 
@@ -75,8 +87,8 @@ describe("resolveAutoDomain on the Polaris host", () => {
                 ]
             })
         );
-        store.set("domain.publicIp", "51.15.20.30");
-        store.set("network.detectedPublicIp", "51.15.20.30");
+        store.set("domain.publicIp", "5.6.7.8");
+        store.set("network.detectedPublicIp", "5.6.7.8");
         store.set("network.detectedPublicIpAt", String(Date.now()));
         // Answered, so nothing probes the network behind the classification.
         store.set("network.environment", "vps");
@@ -84,7 +96,7 @@ describe("resolveAutoDomain on the Polaris host", () => {
 
     it("keeps new services on a free subdomain while the zone is unproven", async () => {
         const plan = await resolveAutoDomain("invoices");
-        expect(plan?.hostname).toContain("51-15-20-30.sslip.io");
+        expect(plan?.hostname).toContain("5-6-7-8.sslip.io");
         expect(plan?.hostname).not.toContain("plr.example.com");
     });
 
@@ -92,7 +104,7 @@ describe("resolveAutoDomain on the Polaris host", () => {
         store.set("network.mode", "wildcard");
         const plan = await resolveAutoDomain("invoices");
         expect(plan).toMatchObject({ cert: "le", kind: "auto" });
-        expect(plan?.hostname).toContain("51-15-20-30.sslip.io");
+        expect(plan?.hostname).toContain("5-6-7-8.sslip.io");
     });
 
     it("mints in the deploy zone once its wildcard has been seen resolving here", async () => {

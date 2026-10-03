@@ -24,7 +24,13 @@ vi.mock("@polaris/db", () => ({
                 const value = store.get(where.key);
                 return value === undefined ? null : { value };
             },
-            upsert: async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { key: string };
+                create: { value: string };
+            }) => {
                 store.set(where.key, create.value);
             },
             deleteMany: async ({ where }: { where: { key: string } }) => {
@@ -34,7 +40,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_APP_URL: "http://polaris.local" }) }));
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_APP_URL: "http://polaris.local" })
+}));
 vi.mock("@polaris/storage", () => ({ decryptSecret: () => "", encryptSecret: () => "" }));
 vi.mock("../../src/lib/domain-edge", () => ({
     syncDashboardRoute: async () => undefined,
@@ -50,7 +58,9 @@ vi.mock("../../src/lib/host-address", async (importOriginal) => ({
     getHostLanIp: async () => state.detected
 }));
 
-const { getPublicIp, setDomainConfig, ensurePublicIp } = await import("../../src/lib/domain-service");
+const { getPublicIp, setDomainConfig, ensurePublicIp } = await import(
+    "../../src/lib/domain-service"
+);
 
 describe("getPublicIp", () => {
     beforeEach(() => {
@@ -60,37 +70,37 @@ describe("getPublicIp", () => {
     });
 
     it("corrects a detected address that has gone stale", async () => {
-        await ensurePublicIp("192.168.1.138");
-        state.detected = "192.168.1.142";
-        expect(await getPublicIp()).toBe("192.168.1.142");
+        await ensurePublicIp("10.0.1.138");
+        state.detected = "10.0.1.142";
+        expect(await getPublicIp()).toBe("10.0.1.142");
     });
 
     it("keeps the stored address when nothing is detected", async () => {
-        await ensurePublicIp("192.168.1.138");
-        expect(await getPublicIp()).toBe("192.168.1.138");
+        await ensurePublicIp("10.0.1.138");
+        expect(await getPublicIp()).toBe("10.0.1.138");
     });
 
     it("keeps an address that was entered by hand", async () => {
         await setDomainConfig({ publicIp: "203.0.113.9" });
-        state.detected = "192.168.1.142";
+        state.detected = "10.0.1.142";
         expect(await getPublicIp()).toBe("203.0.113.9");
     });
 
     it("hands the address back to detection when the entered one is cleared", async () => {
         await setDomainConfig({ publicIp: "203.0.113.9" });
         await setDomainConfig({ publicIp: "" });
-        state.detected = "192.168.1.142";
-        expect(await getPublicIp()).toBe("192.168.1.142");
+        state.detected = "10.0.1.142";
+        expect(await getPublicIp()).toBe("10.0.1.142");
     });
 
     it("uses detection before the install-time variable", async () => {
-        process.env.POLARIS_PUBLIC_IP = "192.168.1.138";
-        state.detected = "192.168.1.142";
-        expect(await getPublicIp()).toBe("192.168.1.142");
+        process.env.POLARIS_PUBLIC_IP = "10.0.1.138";
+        state.detected = "10.0.1.142";
+        expect(await getPublicIp()).toBe("10.0.1.142");
     });
 
     it("falls back to the install-time variable when nothing else is known", async () => {
-        process.env.POLARIS_PUBLIC_IP = "192.168.1.138";
-        expect(await getPublicIp()).toBe("192.168.1.138");
+        process.env.POLARIS_PUBLIC_IP = "10.0.1.138";
+        expect(await getPublicIp()).toBe("10.0.1.138");
     });
 });

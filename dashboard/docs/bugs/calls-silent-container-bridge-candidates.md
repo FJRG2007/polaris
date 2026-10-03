@@ -24,8 +24,8 @@ nothing outside a container on that machine can reach:
 
 ```
 using external IPs {"ips": [
-  "192.168.1.10/192.168.1.10",
-  "192.168.1.11/192.168.1.11",
+  "10.0.1.10/10.0.1.10",
+  "10.0.1.11/10.0.1.11",
   "172.19.0.1/172.19.0.1",
   "172.18.0.1/172.18.0.1",
   "172.21.0.1/172.21.0.1",
@@ -52,10 +52,10 @@ duplicates. Which local address the public one ends up attached to is therefore
 a race between goroutines, settled anew **on every restart**. Two boots of the
 same unchanged configuration on the same machine:
 
-| Boot | Public address attached to |
-| --- | --- |
-| August | the real network interface |
-| September | a container bridge |
+| Boot      | Public address attached to |
+| --------- | -------------------------- |
+| August    | the real network interface |
+| September | a container bridge         |
 
 Nothing was changed between them. That is the whole of "it worked for days and
 then stopped for no reason", and it is why nobody looked at the configuration:
@@ -103,14 +103,14 @@ them.
 
 ```yaml
 rtc:
-  ips:
-    excludes:
-      - 172.17.0.0/16   # docker0
-      - 172.18.0.0/15   # and every network Docker creates after it,
-      - 172.20.0.0/14   # written as four blocks rather than 172.16/12
-      - 172.24.0.0/13   # so that 172.16.0.0/16 is left alone
-      - 192.168.122.0/24  # libvirt
-      - 169.254.0.0/16    # what a machine calls itself when DHCP failed
+    ips:
+        excludes:
+            - 172.17.0.0/16 # docker0
+            - 172.18.0.0/15 # and every network Docker creates after it,
+            - 172.20.0.0/14 # written as four blocks rather than 172.16/12
+            - 172.24.0.0/13 # so that 172.16.0.0/16 is left alone
+            - 192.168.122.0/24 # libvirt
+            - 169.254.0.0/16 # what a machine calls itself when DHCP failed
 ```
 
 `172.16.0.0/16` is deliberately left in: Docker does not allocate from it and an

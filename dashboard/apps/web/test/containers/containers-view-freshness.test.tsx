@@ -54,7 +54,7 @@ vi.mock("../../src/app/(app)/apps/containers/polaris-footprint", () => ({
 const { ContainersView } = await import("../../src/app/(app)/apps/containers/containers-view");
 
 const overview: OverviewData = {
-    name: "lirio-0",
+    name: "node-0",
     serverVersion: "27.0.0",
     containers: 2,
     running: 1,
@@ -83,23 +83,25 @@ function row(overrides: Partial<ContainerRow> = {}): ContainerRow {
 
 function render(value: HostSnapshot): string {
     snapshot = value;
-    return renderToStaticMarkup(withMessages(
-        <ContainersView
-            connections={[
-                {
-                    id: "local",
-                    name: "Local host",
-                    transport: "socket",
-                    status: "active",
-                    local: true
-                }
-            ]}
-            connectionId="local"
-            sshEnabled
-            canManage
-            localDiagnostic={null}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <ContainersView
+                connections={[
+                    {
+                        id: "local",
+                        name: "Local host",
+                        transport: "socket",
+                        status: "active",
+                        local: true
+                    }
+                ]}
+                connectionId="local"
+                sshEnabled
+                canManage
+                localDiagnostic={null}
+            />
+        )
+    );
 }
 
 describe("containers table freshness", () => {

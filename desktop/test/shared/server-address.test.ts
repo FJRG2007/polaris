@@ -33,7 +33,7 @@ describe("serverAddressSchema", () => {
         expect(serverAddressSchema.parse("https://polaris.example.com:443")).toBe("https://polaris.example.com");
         expect(serverAddressSchema.parse("http://polaris.local:80")).toBe("http://polaris.local");
         expect(serverAddressSchema.parse("polaris.example.com:8443")).toBe("https://polaris.example.com:8443");
-        expect(serverAddressSchema.parse("http://192.168.1.20:3000")).toBe("http://192.168.1.20:3000");
+        expect(serverAddressSchema.parse("http://10.0.1.20:3000")).toBe("http://10.0.1.20:3000");
     });
 
     it("asks for an address when there is none", () => {
@@ -60,7 +60,7 @@ describe("serverAddressSchema", () => {
             "http://10.0.0.5",
             "http://172.16.0.1",
             "http://172.31.255.255",
-            "http://192.168.1.20:3000",
+            "http://192.168.50.20:3000",
             "http://169.254.10.1",
             "http://100.101.102.103",
             "http://[::1]:3000",

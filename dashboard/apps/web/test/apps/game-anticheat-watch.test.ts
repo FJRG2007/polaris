@@ -18,7 +18,7 @@ vi.mock("@polaris/db", () => ({
         installedApp: {
             findUnique: async () => ({
                 config: JSON.stringify(fake.config),
-                name: "Offgrid",
+                name: "ExampleSMP",
                 status: "running",
                 catalogId: "minecraft"
             }),
@@ -234,20 +234,20 @@ describe("watching movement", () => {
     });
 
     it("does not record the respawn of a player who waited on the death screen", async () => {
-        // Offgrid, 2026-09-27: shot by a Sentry, the death counted and reset at
+        // Seen on a real server: shot by a Sentry, the death counted and reset at
         // the next look, and the respawn 200 blocks away a few looks later.
         await start();
-        players = [{ name: "ErMigue04", x: -5420, y: 123, z: -2280 }];
+        players = [{ name: "Jeb_04", x: 1000, y: 70, z: 1000 }];
         await look();
         await look();
-        deaths.add("ErMigue04");
+        deaths.add("Jeb_04");
         await look();
         await look();
         await look();
-        players = [{ name: "ErMigue04", x: -5420, y: 123, z: -2477 }];
+        players = [{ name: "Jeb_04", x: 1000, y: 70, z: 803 }];
         await look();
         await look();
-        expect(incidents("ErMigue04")).toEqual([]);
+        expect(incidents("Jeb_04")).toEqual([]);
     });
 
     it("records a jump once a player who died has been seen back on their feet", async () => {
@@ -331,6 +331,6 @@ describe("watching movement", () => {
             await look();
         }
         expect(incidents("Steve")).toHaveLength(2);
-        expect(fake.notified).toEqual(["Steve may be flying or teleporting on Offgrid"]);
+        expect(fake.notified).toEqual(["Steve may be flying or teleporting on ExampleSMP"]);
     });
 });

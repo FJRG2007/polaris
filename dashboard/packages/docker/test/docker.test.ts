@@ -127,7 +127,7 @@ describe("docker driver", () => {
             httpResponse("200 OK", {
                 cpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
                 precpu_stats: { cpu_usage: { total_usage: 0 }, system_cpu_usage: 0 },
-                // lirio-0's Minecraft server: 7094 MiB counted, 1741 MiB of it world
+                // A modded Minecraft server: 7094 MiB counted, 1741 MiB of it world
                 // files in the page cache.
                 memory_stats: {
                     usage: 7094,

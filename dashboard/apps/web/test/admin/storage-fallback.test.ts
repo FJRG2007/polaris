@@ -160,7 +160,7 @@ beforeEach(() => {
 describe("a file kept on this server instead", () => {
     it("is listed to go back to its storage once that answers again", async () => {
         getDriverForConnection.mockImplementation(async () => {
-            throw new Error("connect EHOSTUNREACH 192.168.1.129:445");
+            throw new Error("connect EHOSTUNREACH 10.0.1.129:445");
         });
 
         const placed = await put();
@@ -541,35 +541,35 @@ describe("what the sender is told", () => {
     it("is that files cannot be saved, and which storage is not there", async () => {
         const failure = new StorageRefused(
             "The NAS could not take the file: EHOSTUNREACH",
-            "UNAS Pro",
+            "Office NAS",
             true
         );
 
         expect(await storageRefusal(failure, false)).toBe(
-            "Files cannot be saved right now: the storage UNAS Pro is not reachable."
+            "Files cannot be saved right now: the storage Office NAS is not reachable."
         );
     });
 
     it("keeps the device's own words for an administrator", async () => {
         const failure = new StorageRefused(
-            "UNAS Pro could not take the file: EHOSTUNREACH",
-            "UNAS Pro",
+            "Office NAS could not take the file: EHOSTUNREACH",
+            "Office NAS",
             true
         );
 
         const said = await storageRefusal(failure, true);
-        expect(said).toContain("the storage UNAS Pro is not reachable");
+        expect(said).toContain("the storage Office NAS is not reachable");
         expect(said).toContain("EHOSTUNREACH");
     });
 
     it("tells a refusal from an outage", async () => {
         const failure = new StorageRefused(
-            "UNAS Pro could not take the file: STATUS_DISK_FULL",
-            "UNAS Pro"
+            "Office NAS could not take the file: STATUS_DISK_FULL",
+            "Office NAS"
         );
 
         expect(await storageRefusal(failure, false)).toBe(
-            "The storage UNAS Pro would not keep that file."
+            "The storage Office NAS would not keep that file."
         );
     });
 

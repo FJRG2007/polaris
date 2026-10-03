@@ -56,16 +56,16 @@ describe("subdomain", () => {
 
 describe("release subdomain", () => {
     it("adds the commit to the service's own name and leaves that name alone", () => {
-        const service = magicDomain("invoices", "51.15.20.30");
+        const service = magicDomain("invoices", "5.6.7.8");
         const release = releaseDomain(service, "9f8e7d6");
         expect(release).not.toBe(service);
         expect(release).toContain("-9f8e7d6-");
-        expect(magicDomain("invoices", "51.15.20.30")).toBe(service);
+        expect(magicDomain("invoices", "5.6.7.8")).toBe(service);
     });
 
     it("keeps the encoded address at the end, where wildcard DNS reads it", () => {
-        expect(releaseDomain("invoices-a1b2c3-51-15-20-30.sslip.io", "9f8e7d6")).toBe(
-            "invoices-a1b2c3-9f8e7d6-51-15-20-30.sslip.io"
+        expect(releaseDomain("invoices-a1b2c3-5-6-7-8.sslip.io", "9f8e7d6")).toBe(
+            "invoices-a1b2c3-9f8e7d6-5-6-7-8.sslip.io"
         );
     });
 
@@ -81,7 +81,9 @@ describe("release subdomain", () => {
     });
 
     it("shortens a full commit sha rather than overrunning the label", () => {
-        expect(releaseDomain("web-a1b2c3.sslip.io", "9f8e7d6c5b4a39281706")).toBe("web-a1b2c3-9f8e7d6c5b4a.sslip.io");
+        expect(releaseDomain("web-a1b2c3.sslip.io", "9f8e7d6c5b4a39281706")).toBe(
+            "web-a1b2c3-9f8e7d6c5b4a.sslip.io"
+        );
     });
 
     it("has nothing to offer without a usable marker or label", () => {
@@ -134,19 +136,42 @@ describe("builders", () => {
     });
 
     it("pulls for an image source and does not tag it", () => {
-        const spec = buildSpec({ method: "image", name: "cache", contextPath: "/ctx", imageRef: "redis:7" });
+        const spec = buildSpec({
+            method: "image",
+            name: "cache",
+            contextPath: "/ctx",
+            imageRef: "redis:7"
+        });
         expect(spec.imageTag).toBe("");
         expect(buildCommand(spec)).toEqual(["docker", "pull", "redis:7"]);
     });
 
     it("emits no build command for compose (it builds inline on up)", () => {
-        const spec = buildSpec({ method: "compose", name: "stack", contextPath: "/ctx", composeYaml: "services: {}" });
+        const spec = buildSpec({
+            method: "compose",
+            name: "stack",
+            contextPath: "/ctx",
+            composeYaml: "services: {}"
+        });
         expect(buildCommand(spec)).toEqual([]);
     });
 
     it("builds a nixpacks command with env flags", () => {
-        const spec = buildSpec({ method: "nixpacks", name: "web", contextPath: "/ctx", buildArgs: { PORT: "3000" } });
-        expect(buildCommand(spec)).toEqual(["nixpacks", "build", "/ctx", "--name", "web:latest", "--env", "PORT=3000"]);
+        const spec = buildSpec({
+            method: "nixpacks",
+            name: "web",
+            contextPath: "/ctx",
+            buildArgs: { PORT: "3000" }
+        });
+        expect(buildCommand(spec)).toEqual([
+            "nixpacks",
+            "build",
+            "/ctx",
+            "--name",
+            "web:latest",
+            "--env",
+            "PORT=3000"
+        ]);
     });
 
     it("defaults the buildpacks builder", () => {
@@ -157,7 +182,9 @@ describe("builders", () => {
 
 describe("traefik labels", () => {
     it("returns nothing when there are no domains", () => {
-        expect(traefikLabels({ serviceName: "web", network: "polaris-proxy", domains: [] })).toEqual({});
+        expect(
+            traefikLabels({ serviceName: "web", network: "polaris-proxy", domains: [] })
+        ).toEqual({});
     });
 
     it("emits a websecure router with LE and an http->https redirect", () => {
@@ -170,7 +197,9 @@ describe("traefik labels", () => {
         expect(labels["traefik.http.services.web.loadbalancer.server.port"]).toBe("3000");
         expect(labels["traefik.http.routers.web.tls.certresolver"]).toBe("letsencrypt");
         expect(labels["traefik.http.routers.web.rule"]).toBe("Host(`web.sslip.io`)");
-        expect(labels["traefik.http.routers.web-web.middlewares"]).toBe("polaris-redirect-https@docker");
+        expect(labels["traefik.http.routers.web-web.middlewares"]).toBe(
+            "polaris-redirect-https@docker"
+        );
     });
 
     it("adds a path prefix to the rule", () => {
@@ -184,7 +213,11 @@ describe("traefik labels", () => {
     });
 
     it("hashes label sets order-independently", () => {
-        const a = traefikLabels({ serviceName: "w", network: "n", domains: [{ hostname: "h", targetPort: 1, certResolver: "le" }] });
+        const a = traefikLabels({
+            serviceName: "w",
+            network: "n",
+            domains: [{ hostname: "h", targetPort: 1, certResolver: "le" }]
+        });
         const b = { ...a };
         expect(configHash(a)).toBe(configHash(b));
         expect(configHash({ ...a, extra: "x" })).not.toBe(configHash(a));

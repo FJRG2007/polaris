@@ -134,7 +134,7 @@ vi.mock("@/lib/storage-target", () => ({
     LOCAL_TARGET: "local",
     driverForTarget: vi.fn(async (target: string) => {
         if (target === "local") return here;
-        if (!nas) throw new Error("connect EHOSTUNREACH 192.168.1.129:445");
+        if (!nas) throw new Error("connect EHOSTUNREACH 10.0.1.129:445");
         return nas;
     })
 }));

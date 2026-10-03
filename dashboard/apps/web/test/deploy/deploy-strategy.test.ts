@@ -127,12 +127,12 @@ describe("the container the edge dials", () => {
 describe("networks of the operator's own", () => {
     it("takes several names on one network - the one the service is called and the one a client insists on", () => {
         const parsed = externalNetworksSchema.parse([
-            { name: "app_network", aliases: ["dymo-api", " DymoAPI ", "dymo-api"] }
+            { name: "app_network", aliases: ["payments-api", " PaymentsAPI ", "payments-api"] }
         ]);
-        expect(parsed).toEqual([{ name: "app_network", aliases: ["dymo-api", "dymoapi"] }]);
+        expect(parsed).toEqual([{ name: "app_network", aliases: ["payments-api", "paymentsapi"] }]);
         expect(externalNetworkPlan(parsed)).toEqual({
             networks: ["app_network"],
-            aliases: { app_network: ["dymo-api", "dymoapi"] }
+            aliases: { app_network: ["payments-api", "paymentsapi"] }
         });
     });
 

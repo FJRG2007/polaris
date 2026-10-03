@@ -435,8 +435,12 @@ describe("choosing a name", () => {
 
     it("checks extra names like names, and drops the service's own", async () => {
         expect(
-            await names.setPrivateAliases("application", "a1", ["DymoAPI", "api", "dymoapi"])
-        ).toEqual(["dymoapi"]);
+            await names.setPrivateAliases("application", "a1", [
+                "PaymentsAPI",
+                "api",
+                "paymentsapi"
+            ])
+        ).toEqual(["paymentsapi"]);
         await expect(names.setPrivateAliases("application", "a1", ["site"])).rejects.toMatchObject({
             reason: "taken"
         });

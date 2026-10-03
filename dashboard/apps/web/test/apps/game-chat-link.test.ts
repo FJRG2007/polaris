@@ -98,7 +98,7 @@ describe("who may link to what", () => {
         spaces: [
             {
                 id: SPACE,
-                name: "Offgrid",
+                name: "ExampleSMP",
                 channels: [
                     { id: VOICE, name: "voice", kind: "voice" },
                     { id: TEXT, name: "general", kind: "text" }

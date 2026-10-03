@@ -151,7 +151,7 @@ describe("what is stored", () => {
         parseCameraInput({
             name: "Garden",
             vendor: "generic",
-            address: "192.168.1.64",
+            address: "10.0.1.64",
             detection: DEFAULT_DETECTION,
             ...over
         });
@@ -217,7 +217,7 @@ describe("a camera that is already connected", () => {
         parseCameraInput({
             name: "Studio",
             vendor: "generic",
-            address: "192.168.1.143",
+            address: "10.0.1.143",
             detection: DEFAULT_DETECTION,
             ...over
         });
@@ -272,7 +272,7 @@ describe("a camera on its own charge, with nothing said about it", () => {
         parseCameraInput({
             name: "Garden",
             vendor: "generic",
-            address: "192.168.1.64",
+            address: "10.0.1.64",
             detection: DEFAULT_DETECTION,
             ...over
         });

@@ -24,7 +24,7 @@ describe("what is worth carrying", () => {
         // afternoon to find at worst.
         expect(
             carriable({
-                POLARIS_INSTANCE: "lirio-0",
+                POLARIS_INSTANCE: "node-0",
                 OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
                 API_KEY: "keep me"
             })
@@ -70,7 +70,9 @@ describe("which of them anybody was meant to see", () => {
 describe("the repository a service here is built from", () => {
     it("reads the address and the branch", () => {
         expect(
-            repoFromSourceConfig(JSON.stringify({ repoUrl: "https://github.com/o/r.git", branch: "main" }))
+            repoFromSourceConfig(
+                JSON.stringify({ repoUrl: "https://github.com/o/r.git", branch: "main" })
+            )
         ).toEqual({ repoUrl: "https://github.com/o/r.git", branch: "main" });
     });
 
@@ -86,6 +88,9 @@ describe("the repository a service here is built from", () => {
     it("survives a row that is not what it claims to be", () => {
         expect(repoFromSourceConfig("{oh dear")).toEqual({ repoUrl: "", branch: "" });
         expect(repoFromSourceConfig("null")).toEqual({ repoUrl: "", branch: "" });
-        expect(repoFromSourceConfig(JSON.stringify({ repoUrl: 42 }))).toEqual({ repoUrl: "", branch: "" });
+        expect(repoFromSourceConfig(JSON.stringify({ repoUrl: 42 }))).toEqual({
+            repoUrl: "",
+            branch: ""
+        });
     });
 });

@@ -71,10 +71,17 @@ const { getWafIgnoreList, recordWafBan, setWafIgnoreList, wafTrustedAddresses } 
     "../../src/lib/waf-intel-service"
 );
 
-const OPERATOR = "85.87.156.88";
+const OPERATOR = "198.51.100.88";
 
 function ban(ip: string): BanRow {
-    return { ip, reason: "ban", source: "not-found", note: "Missing-page flood", until: null, offences: 6 };
+    return {
+        ip,
+        reason: "ban",
+        source: "not-found",
+        note: "Missing-page flood",
+        until: null,
+        offences: 6
+    };
 }
 
 beforeEach(() => {
@@ -98,7 +105,9 @@ describe("trusting an address", () => {
         await setWafIgnoreList([OPERATOR]);
 
         const published: unknown = JSON.parse(await readFile(INTEL_FILE, "utf8"));
-        expect(Object.keys((published as { ips: Record<string, unknown> }).ips)).not.toContain(OPERATOR);
+        expect(Object.keys((published as { ips: Record<string, unknown> }).ips)).not.toContain(
+            OPERATOR
+        );
     });
 
     it("keeps loopback trusted without anybody saying so", async () => {
@@ -111,7 +120,12 @@ describe("banning an address", () => {
     it("refuses the ones an operator marked as theirs, whichever jail asked", async () => {
         await setWafIgnoreList([OPERATOR]);
 
-        await recordWafBan({ ip: OPERATOR, reason: "ban", source: "anomaly:route-flood", until: null });
+        await recordWafBan({
+            ip: OPERATOR,
+            reason: "ban",
+            source: "anomaly:route-flood",
+            until: null
+        });
 
         expect(bans).toEqual([]);
     });
@@ -119,7 +133,12 @@ describe("banning an address", () => {
     it("still bans everyone else", async () => {
         await setWafIgnoreList([OPERATOR]);
 
-        await recordWafBan({ ip: "203.0.113.9", reason: "ban", source: "anomaly:route-flood", until: null });
+        await recordWafBan({
+            ip: "203.0.113.9",
+            reason: "ban",
+            source: "anomaly:route-flood",
+            until: null
+        });
 
         expect(bans.map((row) => row.ip)).toEqual(["203.0.113.9"]);
     });

@@ -9,7 +9,12 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_RECENT_SEARCHES, mergeRecentSearches, recentSearchKey, type RecentSearch } from "@polaris/core";
+import {
+    MAX_RECENT_SEARCHES,
+    mergeRecentSearches,
+    recentSearchKey,
+    type RecentSearch
+} from "@polaris/core";
 import {
     clearRecentSearches,
     forgetRecentSearch,
@@ -46,21 +51,51 @@ function stored(): unknown {
 
 describe("remembering a search", () => {
     it("keeps what was opened, newest first", () => {
-        rememberSearch({ kind: "result", scope: "tasks", term: "release", label: "Ship 2.1", href: "/tasks/t/a" });
-        const list = rememberSearch({ kind: "result", scope: null, term: "", label: "Servers", href: "/apps/servers" });
+        rememberSearch({
+            kind: "result",
+            scope: "tasks",
+            term: "release",
+            label: "Ship 2.1",
+            href: "/tasks/t/a"
+        });
+        const list = rememberSearch({
+            kind: "result",
+            scope: null,
+            term: "",
+            label: "Servers",
+            href: "/apps/servers"
+        });
         expect(list.map((entry) => entry.label)).toEqual(["Servers", "Ship 2.1"]);
         expect(readRecentSearches()).toHaveLength(2);
     });
 
     it("counts opening the same thing again as one memory", () => {
-        rememberSearch({ kind: "result", scope: "tasks", term: "a", label: "Ship 2.1", href: "/tasks/t/a" });
-        const list = rememberSearch({ kind: "result", scope: "tasks", term: "b", label: "Ship 2.1", href: "/tasks/t/a" });
+        rememberSearch({
+            kind: "result",
+            scope: "tasks",
+            term: "a",
+            label: "Ship 2.1",
+            href: "/tasks/t/a"
+        });
+        const list = rememberSearch({
+            kind: "result",
+            scope: "tasks",
+            term: "b",
+            label: "Ship 2.1",
+            href: "/tasks/t/a"
+        });
         expect(list).toHaveLength(1);
         expect(list[0]?.term).toBe("b");
     });
 
     it("tells a remembered query apart from a remembered result", () => {
-        rememberSearch({ kind: "query", scope: "tasks", term: "release", label: "release", href: null });
+        rememberSearch({
+            kind: "query",
+            scope: "tasks",
+            term: "release",
+            label: "release",
+            href: null
+        });
         const list = rememberSearch({
             kind: "result",
             scope: "tasks",
@@ -73,13 +108,25 @@ describe("remembering a search", () => {
 
     it("holds the cap however much is written", () => {
         for (let index = 0; index < MAX_RECENT_SEARCHES + 8; index += 1) {
-            rememberSearch({ kind: "result", scope: null, term: "", label: `Page ${index}`, href: `/p/${index}` });
+            rememberSearch({
+                kind: "result",
+                scope: null,
+                term: "",
+                label: `Page ${index}`,
+                href: `/p/${index}`
+            });
         }
         expect(readRecentSearches()).toHaveLength(MAX_RECENT_SEARCHES);
     });
 
     it("forgets one entry, and all of them", () => {
-        rememberSearch({ kind: "result", scope: null, term: "", label: "Servers", href: "/apps/servers" });
+        rememberSearch({
+            kind: "result",
+            scope: null,
+            term: "",
+            label: "Servers",
+            href: "/apps/servers"
+        });
         rememberSearch({ kind: "result", scope: null, term: "", label: "Drive", href: "/drive" });
         const key = recentSearchKey({ kind: "result", scope: null, term: "", href: "/drive" });
         expect(forgetRecentSearch(key).map((entry) => entry.label)).toEqual(["Servers"]);
@@ -93,7 +140,14 @@ describe("reading back what was stored", () => {
         store.cells.set(
             STORE_KEY,
             JSON.stringify([
-                { kind: "result", scope: null, term: "", label: "Real", href: "/drive", usedAt: "2026-08-06T10:00:00Z" },
+                {
+                    kind: "result",
+                    scope: null,
+                    term: "",
+                    label: "Real",
+                    href: "/drive",
+                    usedAt: "2026-08-06T10:00:00Z"
+                },
                 {
                     kind: "result",
                     scope: null,
@@ -147,7 +201,9 @@ describe("reading back what was stored", () => {
             }
         });
         expect(readRecentSearches()).toEqual([]);
-        expect(() => rememberSearch({ kind: "query", scope: null, term: "x", label: "x", href: null })).not.toThrow();
+        expect(() =>
+            rememberSearch({ kind: "query", scope: null, term: "x", label: "x", href: null })
+        ).not.toThrow();
     });
 });
 
@@ -171,14 +227,14 @@ describe("merging the account's copy", () => {
             {
                 kind: "result",
                 scope: "servers",
-                term: "lirio",
-                label: "lirio-0",
+                term: "node",
+                label: "node-0",
                 href: "/apps/servers",
                 usedAt: "2026-08-06T09:00:00.000Z"
             }
         ]);
-        expect(merged.map((entry) => entry.label)).toContain("lirio-0");
+        expect(merged.map((entry) => entry.label)).toContain("node-0");
         expect(Array.isArray(stored())).toBe(true);
-        expect(readRecentSearches().map((entry) => entry.label)).toContain("lirio-0");
+        expect(readRecentSearches().map((entry) => entry.label)).toContain("node-0");
     });
 });

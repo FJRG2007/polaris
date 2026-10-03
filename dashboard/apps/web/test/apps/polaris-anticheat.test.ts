@@ -215,17 +215,17 @@ describe("on a NeoForge server, through the Polaris mod", () => {
     });
 
     it("is on already where the login put the mod there, and off once switched off", () => {
-        const offgrid = neo([
+        const examplesmp = neo([
             ["MODS", MOD],
             ["POLARIS_LOGIN", "on"]
         ]);
-        expect(anticheat.anticheatActive(offgrid)).toBe(true);
+        expect(anticheat.anticheatActive(examplesmp)).toBe(true);
         expect(anticheat.anticheatActive(neo())).toBe(false);
-        const off = anticheat.anticheatDisableEnv(offgrid);
+        const off = anticheat.anticheatDisableEnv(examplesmp);
         // The login still needs the mod; it is only told to stop hiding ore.
         expect(off.get("MODS")).toBe(MOD);
         expect(off.get("POLARIS_ANTIXRAY")).toBe("off");
-        expect(anticheat.anticheatActive(new Map([...offgrid, ...off]))).toBe(false);
+        expect(anticheat.anticheatActive(new Map([...examplesmp, ...off]))).toBe(false);
     });
 
     it("puts the mod on the list when turned on, and takes it off again without the login", () => {

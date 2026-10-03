@@ -88,7 +88,7 @@ export interface SessionView {
     osVersion: string | null;
     ip: string | null;
     /** The address this network reaches the internet from, set only when `ip` is
-     *  a local one. A row that says 192.168.1.131 and nothing else cannot be
+     *  a local one. A row that says 10.0.1.131 and nothing else cannot be
      *  connected with the rows for the same device seen from outside. */
     publicIp: string | null;
     country: string | null;
@@ -478,7 +478,11 @@ export async function revokeDeviceSessions(
             action: "account.session.revoked-device",
             metadata: { count, device: detail.device.device }
         });
-        await notifySessionsClosed({ userId, count, reason: `Everything open on ${detail.device.device}.` });
+        await notifySessionsClosed({
+            userId,
+            count,
+            reason: `Everything open on ${detail.device.device}.`
+        });
     }
     return { count, endedCurrent: ids.includes(currentSessionId) };
 }

@@ -277,7 +277,7 @@ describe("what a release is started with", () => {
                 ...plan,
                 volumes: [],
                 extraNetworks: ["app_network"],
-                networkAliases: { app_network: ["dymo-api", "dymoapi"] }
+                networkAliases: { app_network: ["payments-api", "paymentsapi"] }
             },
             "nginx:1",
             "polaris-proxy"
@@ -285,7 +285,7 @@ describe("what a release is started with", () => {
         expect(spec.networks).toEqual(["polaris-proxy", "app_network"]);
         const yaml = renderComposeYaml(spec, "/v", "/m");
         expect(yaml).toContain(
-            '      polaris-proxy:\n        aliases:\n          - "shop"\n      app_network:\n        aliases:\n          - "shop"\n          - "dymo-api"\n          - "dymoapi"'
+            '      polaris-proxy:\n        aliases:\n          - "shop"\n      app_network:\n        aliases:\n          - "shop"\n          - "payments-api"\n          - "paymentsapi"'
         );
         // Declared external: Polaris never creates or removes it.
         expect(yaml).toContain("  app_network:\n    external: true");
@@ -293,7 +293,7 @@ describe("what a release is started with", () => {
 
     it("drops names for a network it does not join", () => {
         const spec = appComposeSpec(
-            { ...plan, volumes: [], networkAliases: { app_network: ["dymoapi"] } },
+            { ...plan, volumes: [], networkAliases: { app_network: ["paymentsapi"] } },
             "nginx:1",
             "polaris-proxy"
         );

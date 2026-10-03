@@ -50,8 +50,8 @@ export type ContainerFileRead =
  * The most a `run` reports back. The host daemon cuts a command's output there
  * (`EXEC_RUN_MAX_OUTPUT` in polaris-hostd), without saying so, because that route
  * is meant for a status line - and a stats file, a whitelist or a stretch of log
- * is often longer. Offgrid's leaderboard named one player out of seven, the one
- * whose file came first, because the rest never arrived.
+ * is often longer. A server's leaderboard once named one player out of seven,
+ * the one whose file came first, because the rest never arrived.
  */
 export const RUN_OUTPUT_MAX = 16 * 1024;
 

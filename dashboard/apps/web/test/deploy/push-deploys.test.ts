@@ -98,7 +98,7 @@ describe("a webhook delivered twice", () => {
         findMany.mockResolvedValue([
             {
                 id: "app-1",
-                slug: "orphion",
+                slug: "storefront",
                 lastDeployedSha: "old",
                 autoDeploy: true,
                 sourceType: "dockerfile",

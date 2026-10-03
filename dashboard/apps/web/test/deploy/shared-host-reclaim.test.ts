@@ -90,15 +90,15 @@ describe("telling whether a server is shared", () => {
         const listing = [
             "polaris-1a2b-shop|polaris-1a2b3c4d",
             "polaris-traefik|",
-            "dymo-api|dymo",
+            "payments-api|payments",
             "old-cron|"
         ].join("\n");
-        expect(space.foreignContainers(listing)).toEqual(["dymo-api", "old-cron"]);
+        expect(space.foreignContainers(listing)).toEqual(["payments-api", "old-cron"]);
         expect(space.foreignContainers("polaris-1a2b-shop|polaris-1a2b3c4d\n")).toEqual([]);
     });
 
     it("decides once from what runs there, and keeps the answer", async () => {
-        said.listing = "dymo-api|dymo\n";
+        said.listing = "payments-api|payments\n";
         expect(await space.isSharedHost("host-1")).toBe(true);
         expect(host.sharedHost).toBe(true);
         said.listing = "";
@@ -129,7 +129,7 @@ describe("telling whether a server is shared", () => {
 
     it("follows the operator's own answer over what it finds", async () => {
         host.sharedHost = false;
-        said.listing = "dymo-api|dymo\n";
+        said.listing = "payments-api|payments\n";
         expect(await space.isSharedHost("host-1")).toBe(false);
     });
 });

@@ -1,7 +1,7 @@
 /**
  * The playtime leaderboard, read the way the server is really read.
  *
- * Offgrid, 2026-09-27: seven stats files, 110 KB between them, and the host
+ * A real server: seven stats files, 110 KB between them, and the host
  * daemon answers a command with 16 KiB. Read as one answer, the leaderboard had
  * the one player whose file came first - somebody with an hour and a half - and
  * not the owner with eighty hours. The fake cuts where the daemon cuts.
@@ -12,7 +12,7 @@ import { filesAnswer } from "./container-fake";
 
 const LIMIT = 16 * 1024;
 
-/** Stats files as the game writes them, padded to the sizes Offgrid's had. */
+/** Stats files as the game writes them, padded to the sizes a real server's had. */
 function statsFile(ticks: number, pad: number, alive = 0): string {
     return JSON.stringify({
         stats: {
@@ -29,25 +29,25 @@ function statsFile(ticks: number, pad: number, alive = 0): string {
 
 const DIR = "/data/world/stats";
 const files: Record<string, string> = {
-    [`${DIR}/1b6b8f8d-bab0-31ec-81f0-3b688de1427b.json`]: statsFile(119_463, 4_300),
-    [`${DIR}/4ffcd79a-00f0-320e-83ed-b7ee339805bd.json`]: statsFile(2_584_666, 20_500),
-    [`${DIR}/566ef275-58fd-3496-b868-8bf93dfa1f6d.json`]: statsFile(3_119_889, 25_600),
-    [`${DIR}/778ec1e8-ba87-46bc-a217-e543e6d40cf2.json`]: statsFile(26_912, 200, 72_000),
-    [`${DIR}/a92884cc-f611-30ea-bd4a-4f985d5876d8.json`]: statsFile(2_425_468, 25_800),
-    [`${DIR}/e5092d24-33f4-334a-8ad5-e0d5bfdc7d92.json`]: statsFile(5_752_132, 32_500, 1_872_000),
+    [`${DIR}/11111111-1111-3111-8111-111111111111.json`]: statsFile(119_463, 4_300),
+    [`${DIR}/44444444-4444-3444-8444-444444444444.json`]: statsFile(2_584_666, 20_500),
+    [`${DIR}/55555555-5555-3555-8555-555555555555.json`]: statsFile(3_119_889, 25_600),
+    [`${DIR}/77777777-7777-4777-8777-777777777777.json`]: statsFile(26_912, 200, 72_000),
+    [`${DIR}/aaaaaaaa-aaaa-3aaa-8aaa-aaaaaaaaaaaa.json`]: statsFile(2_425_468, 25_800),
+    [`${DIR}/eeeeeeee-eeee-3eee-8eee-eeeeeeeeeeee.json`]: statsFile(5_752_132, 32_500, 1_872_000),
     "/data/usercache.json": JSON.stringify([
-        { name: "PICHURRINA", uuid: "4ffcd79a-00f0-320e-83ed-b7ee339805bd" },
+        { name: "DINNERBONE", uuid: "44444444-4444-3444-8444-444444444444" },
         {
-            name: "FJRG2007",
-            uuid: "e5092d24-33f4-334a-8ad5-e0d5bfdc7d92",
+            name: "PlayerOne",
+            uuid: "eeeeeeee-eeee-3eee-8eee-eeeeeeeeeeee",
             expiresOn: "2026-08-02 10:00:00 +0000"
         },
-        { name: "Reckmy", uuid: "a92884cc-f611-30ea-bd4a-4f985d5876d8" },
-        { name: "ErMigue04", uuid: "566ef275-58fd-3496-b868-8bf93dfa1f6d" },
-        { name: "Solojose", uuid: "1b6b8f8d-bab0-31ec-81f0-3b688de1427b" },
+        { name: "Grumm", uuid: "aaaaaaaa-aaaa-3aaa-8aaa-aaaaaaaaaaaa" },
+        { name: "Jeb_04", uuid: "55555555-5555-3555-8555-555555555555" },
+        { name: "Notch", uuid: "11111111-1111-3111-8111-111111111111" },
         {
-            name: "FJRG2007",
-            uuid: "778ec1e8-ba87-46bc-a217-e543e6d40cf2",
+            name: "PlayerOne",
+            uuid: "77777777-7777-4777-8777-777777777777",
             expiresOn: "2026-10-27 18:04:12 +0000"
         }
     ])
@@ -119,23 +119,23 @@ const { statsRanking } = await import("@polaris-app/game-servers/src/lib/minecra
 
 describe("the playtime leaderboard, read from the server", () => {
     it("has every player, longest first, and one row for a player filed under two uuids", async () => {
-        const figures = await readAllPlayerStats("owner", "offgrid");
+        const figures = await readAllPlayerStats("owner", "examplesmp");
         expect(statsRanking("rank.playtime", figures)).toEqual([
-            "1. FJRG2007 80h",
-            "2. ErMigue04 43h",
-            "3. PICHURRINA 35h",
-            "4. Reckmy 33h",
-            "5. Solojose 1h"
+            "1. PlayerOne 80h",
+            "2. Jeb_04 43h",
+            "3. DINNERBONE 35h",
+            "4. Grumm 33h",
+            "5. Notch 1h"
         ]);
     });
 
     it("reads the current life from the uuid the player joined under last, not the longer", async () => {
-        const figures = await readAllPlayerStats("owner", "offgrid");
-        expect(statsRanking("rank.alive", figures)).toEqual(["1. FJRG2007 1h"]);
+        const figures = await readAllPlayerStats("owner", "examplesmp");
+        expect(statsRanking("rank.alive", figures)).toEqual(["1. PlayerOne 1h"]);
     });
 
     it("gives one player's figures from every file they are filed under", async () => {
-        const stats = await readMinecraftStats("owner", "offgrid", "FJRG2007");
+        const stats = await readMinecraftStats("owner", "examplesmp", "PlayerOne");
         expect(stats?.playedMs).toBe((5_752_132 + 26_912) * 50);
         expect(stats?.deaths).toBe(2);
     });
@@ -148,6 +148,6 @@ describe("a server that could not be read", () => {
         expect(await readAllMining("owner", "restarting")).toEqual([]);
         reach.down = false;
         const figures = await readAllPlayerStats("owner", "restarting");
-        expect(statsRanking("rank.playtime", figures)[0]).toBe("1. FJRG2007 80h");
+        expect(statsRanking("rank.playtime", figures)[0]).toBe("1. PlayerOne 80h");
     });
 });

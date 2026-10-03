@@ -19,7 +19,7 @@ import { enrollmentRefusalText } from "@/app/(app)/apps/servers/enrollment-refus
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("@/components/use-live-resource", () => ({
     useLiveResource: () => ({
-        data: { servers: [], machineName: "lirio-0" } satisfies ServerStatusPayload,
+        data: { servers: [], machineName: "node-0" } satisfies ServerStatusPayload,
         loading: false,
         error: null,
         stale: null,
@@ -32,7 +32,9 @@ vi.mock("@/app/(app)/apps/servers/actions", () => ({ renameServerAction: async (
 vi.mock("@/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 vi.mock("@/app/(app)/apps/servers/quick-enroll", () => ({ QuickEnroll: () => null }));
 vi.mock("@/app/(app)/apps/servers/server-groups", () => ({ ServerGroups: () => null }));
-vi.mock("@/app/(app)/apps/servers/remove-server-dialog", () => ({ RemoveServerDialog: () => null }));
+vi.mock("@/app/(app)/apps/servers/remove-server-dialog", () => ({
+    RemoveServerDialog: () => null
+}));
 vi.mock("@/app/(app)/apps/servers/environment-dialog", () => ({ EnvironmentDialog: () => null }));
 
 const { ServersView } = await import("@/app/(app)/apps/servers/servers-view");
@@ -40,10 +42,10 @@ const { ServersView } = await import("@/app/(app)/apps/servers/servers-view");
 const row: ServerRow = {
     id: "33333333-3333-4333-8333-333333333333",
     kind: "host",
-    name: "lirio-2",
+    name: "node-2",
     detail: "polaris",
     os: "Ubuntu 24.04.1 LTS",
-    address: "192.168.1.160",
+    address: "10.0.1.160",
     port: 22,
     authMethod: "key",
     sudo: true,
@@ -57,7 +59,7 @@ const row: ServerRow = {
 describe("the Servers table", () => {
     it("is drawn in Spanish, with a server whose place is not set yet", () => {
         const markup = renderToStaticMarkup(
-            withMessages(<ServersView servers={[row]} machineName="lirio-0" />, "es-ES")
+            withMessages(<ServersView servers={[row]} machineName="node-0" />, "es-ES")
         );
         expect(markup).toContain("Servidores");
         expect(markup).toContain("Ubicación");
@@ -82,7 +84,9 @@ describe("a machine that refused to enroll", () => {
         expect(enrollmentRefusalText(t, ENROLLMENT_REFUSAL_MESSAGES["not-root"])).toBe(
             "La máquina se detuvo antes de registrarse: el comando no se ejecutó como root. Ejecútalo con sudo."
         );
-        expect(enrollmentRefusalText(t, ENROLLMENT_REFUSAL_MESSAGES["no-home-directory"])).toContain("'polaris'");
+        expect(
+            enrollmentRefusalText(t, ENROLLMENT_REFUSAL_MESSAGES["no-home-directory"])
+        ).toContain("'polaris'");
     });
 
     it("keeps English readers' sentence exactly as it was", () => {

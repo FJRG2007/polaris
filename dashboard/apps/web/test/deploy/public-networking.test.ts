@@ -84,7 +84,7 @@ vi.mock("@/lib/deploy-service", () => ({
 }));
 vi.mock("@/lib/domain-zones", () => ({ listDeployZones: mocks.listDeployZones }));
 vi.mock("@/lib/network-service", () => ({ detectPublicIp: async () => "203.0.113.7" }));
-vi.mock("@/lib/domain-service", () => ({ getPublicIp: async () => "192.168.1.10" }));
+vi.mock("@/lib/domain-service", () => ({ getPublicIp: async () => "10.0.1.10" }));
 vi.mock("@/lib/deploy/runtime", () => ({
     getPorts: async () => ({ runIn: mocks.runIn, dispose: async () => undefined })
 }));
