@@ -86,7 +86,7 @@ left out.
 - **Build battle** needs three builders at the least, whatever the event's own
   minimum (`catalog.BUILD_BATTLE_FLOOR`): with two, each vote can only go to the
   other build. Each round is built in one material drawn for it
-  (`build-battle.PALETTES`: glass, wool, concrete, terracotta, quartz and glass),
+  (`build-battle.PALETTES`: glass, wool, concrete, terracotta and quartz),
   said in the theme title and the chat; the brush breaks only that material.
 - **World boss** health grows with every fighter:
   `effective = base x level.health x (1 + level.perFighter x (fighters - 1))`,
@@ -117,4 +117,3 @@ left out.
   again, and orange platforms that vanish for two seconds in every six
   (`parkour.blinkLines`). Never two in a row, never a checkpoint; a fall is only
   ever back to the last checkpoint.
-
