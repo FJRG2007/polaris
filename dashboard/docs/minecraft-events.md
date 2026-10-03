@@ -19,6 +19,21 @@ own play).
   player reading their own (`speech.ts`). Nothing is shown to a player still at
   Polaris login's prompt.
 
+## Where an event is held
+
+- **On the ground** (supply drop, treasure, a boss without its sky arena): only
+  on the world's own walkable ground, clear of every bed, never on a build.
+- **In the air** (spleef, parkour, build battle, team duel, king of the hill,
+  the boss's sky arena): only the air it takes counts. The highest thing in its
+  footprint - a roof, a tree, the sea - is read with the `motion_blocking`
+  heightmap, and the arena floats above it and below the build limit; its whole
+  volume is proved empty before a block goes in. A build below is never a reason
+  to look elsewhere.
+- **Where it looks**: round a player in the Overworld (one in the Nether or the
+  End is never the anchor, and is brought in like anybody when they join).
+  After a few tries it comes in closer. With nobody in the Overworld it fails
+  saying so; with nowhere free it says what stopped each try.
+
 ## World requirements
 
 Each kind declares the time of day and the weather it needs in

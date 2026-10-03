@@ -2587,3 +2587,26 @@ describe("the world an event holds", () => {
         expect(commands.cleanup(quiz, null, null, {}, 1234)).not.toContain("time set 1234");
     });
 });
+
+describe("the top of a footprint, for what is built in the air", () => {
+    it("reads every column, the edges included, a few blocks apart", () => {
+        const columns = commands.footprintColumns({ x: 100, z: -50 }, 10);
+        const xs = [...new Set(columns.map((one) => one.x))].sort((a, b) => a - b);
+        expect(xs[0]).toBe(90);
+        expect(xs.at(-1)).toBe(110);
+        expect(xs.every((x, index) => index === 0 || x - xs[index - 1]! <= commands.TOP_STEP)).toBe(true);
+        expect(columns).toHaveLength(xs.length * xs.length);
+    });
+
+    it("stands each marker on whatever is highest, roofs and crowns included", () => {
+        const [clear, first] = commands.topLines([{ x: 3, z: -4 }]);
+        expect(clear).toBe(commands.CLEAR_SAMPLES);
+        expect(first).toContain("positioned 3.5 0 -3.5 positioned over motion_blocking run summon");
+        expect(first).not.toContain("no_leaves");
+    });
+
+    it("takes the highest top read", () => {
+        expect(commands.highestTop([{ y: 64 }, { y: 140 }, { y: 70 }])).toBe(140);
+        expect(commands.highestTop([])).toBeNull();
+    });
+});

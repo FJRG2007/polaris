@@ -945,6 +945,39 @@ export function summonOnGround(x: number, z: number, tag: string | null = null):
     return `execute in minecraft:overworld positioned ${x + 0.5} 0 ${z + 0.5} positioned over motion_blocking_no_leaves run summon minecraft:armor_stand ~ ~ ~ {Tags:[${tags}],${MARKER_DATA}}`;
 }
 
+/**
+ * A marker on top of whatever is highest in a column - a roof, a tree's crown,
+ * the sea - by the heightmap that counts all of them (`motion_blocking`), for
+ * what is built in the air over it.
+ */
+export function summonOnTop(x: number, z: number, tag: string): string {
+    return `execute in minecraft:overworld positioned ${x + 0.5} 0 ${z + 0.5} positioned over motion_blocking run summon minecraft:armor_stand ~ ~ ~ {Tags:["${MARK_TAG}","${tag}"],${MARKER_DATA}}`;
+}
+
+/** How far apart the columns of a footprint are read for its top. */
+export const TOP_STEP = 4;
+
+/** Every column of a square footprint, `TOP_STEP` apart, its edges included. */
+export function footprintColumns(
+    center: { x: number; z: number },
+    radius: number
+): { x: number; z: number }[] {
+    const offsets: number[] = [];
+    for (let at = -radius; at < radius; at += TOP_STEP) offsets.push(at);
+    offsets.push(radius);
+    return offsets.flatMap((dx) => offsets.map((dz) => ({ x: center.x + dx, z: center.z + dz })));
+}
+
+/** A marker on top of every column of a footprint, the old ones taken away first. */
+export function topLines(columns: readonly { x: number; z: number }[]): string[] {
+    return [`kill @e[tag=${SAMPLE_TAG}]`, ...columns.map((one) => summonOnTop(one.x, one.z, SAMPLE_TAG))];
+}
+
+/** The highest of the tops read, or null when none was. */
+export function highestTop(points: readonly { y: number }[]): number | null {
+    return points.length === 0 ? null : Math.max(...points.map((one) => one.y));
+}
+
 /** Every column of a place with a marker on its ground, the old ones taken away first. */
 export function sampleLines(samples: readonly { x: number; z: number }[]): string[] {
     return [

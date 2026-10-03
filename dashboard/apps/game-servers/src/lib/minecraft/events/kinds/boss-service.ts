@@ -340,9 +340,15 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
 
     const origin = stageOf(ctx).origin;
     if (!origin) {
-        const ground = await ctx.findPlace(options.place, DISTANCE, SPOT_RADIUS, "open");
+        const ground = await ctx.findPlace(
+            options.place,
+            DISTANCE,
+            boss.ARENA_HALF + 1,
+            "air",
+            true
+        );
         if (ground === "failed")
-            throw new EventStopped("No dry ground was found for it near the players");
+            throw new EventStopped("No open air was found for it near the players");
         if (!ground) return;
         const { top } = await versionOf(ctx, memory);
         let y = ground.y + boss.ARENA_HEIGHT;

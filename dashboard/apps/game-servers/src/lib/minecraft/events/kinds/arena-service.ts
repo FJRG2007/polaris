@@ -62,10 +62,12 @@ export interface KindContext {
         place: catalog.EventPlace,
         distance: number,
         radius: number,
-        /** `open` for what is built in the air, where open water under it will do. */
-        surface?: "ground" | "open",
+        /** `air` for what is built in the air: over anything, only its air counts. */
+        surface?: "ground" | "open" | "air",
         /** Whether, after a few tries, it may come in closer and near a home. */
-        nearHome?: boolean
+        nearHome?: boolean,
+        /** For `air`: how far over the highest thing in its footprint. */
+        lift?: number
     ): Promise<stored.Point | "failed" | null>;
     /** The place given up, for the reason given, and another looked for; throws
      *  once the tries run out. */
@@ -88,7 +90,7 @@ export class EventStopped extends Error {}
  *  failure - as a spleef with one player is. */
 export class TooFew extends EventStopped {}
 
-const NO_PLACE = "No dry ground was found for it near the players";
+const NO_PLACE = "No open air was found for it near the players";
 const ONE_SIDED = "Everybody left in it was on the same team";
 /** Why it was called off, as the history keeps it (and `messages.cancelReason`
  *  says it to players). */
@@ -268,7 +270,7 @@ async function raise(ctx: KindContext): Promise<void> {
                 ? duel.DUEL_REACH
                 : build.platformReach(run.joined.length, plotSize(run));
         const options = run.preset.options as { place: catalog.EventPlace };
-        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "open");
+        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "air", true);
         if (found === "failed") throw new EventStopped(NO_PLACE);
         return;
     }

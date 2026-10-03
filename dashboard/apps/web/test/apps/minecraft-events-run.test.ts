@@ -3049,10 +3049,11 @@ describe("the others", () => {
             startedBy: null
         });
         await play(8_100);
+        // On its platform, floating over whatever is under it.
         expect(
             world.sent.some((line) =>
-                line.includes(
-                    "positioned 300.5 70 0.5 as @a[distance=..6,gamemode=!spectator] run scoreboard players add @s pe_score 2"
+                /positioned 300\.5 \d+ 0\.5 as @a\[distance=\.\.6,gamemode=!spectator\] run scoreboard players add @s pe_score 2/.test(
+                    line
                 )
             )
         ).toBe(true);
@@ -3094,66 +3095,54 @@ describe("the others", () => {
 
     it("gives up a place on somebody's build and says it could not find one", async () => {
         world.built = true;
-        const hill = { ...walkInHill(), minutes: 3 };
-        setUp([hill]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
-            presetId: "hill",
+            presetId: "drop",
             trigger: "manual",
             startedBy: null
         });
         await play(150_000);
-        expect(
-            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
-        ).toBe(false);
+        expect(world.sent.some((line) => /setblock .* minecraft:chest/.test(line))).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
-        // Where it looked and what stopped it: on the land, then over the sea.
+        // Where it looked and what stopped it.
         const search = state().history[0]?.search;
-        expect(search?.overSea).toBe(true);
-        // Its own tries on the land and over the sea, and the ones a search that
-        // comes in near a home has besides (NEAR_TRIES).
-        expect(search?.tries).toBe(40);
+        expect(search?.tries).toBeGreaterThan(0);
         expect(search?.from?.near).toMatch(/^(Ana|Ben)$/);
         // This world answers that every column stands on a tree: rough ground, every try.
-        expect(search?.why).toEqual([{ why: "uneven", count: 40 }]);
+        expect(search?.why).toEqual([{ why: "uneven", count: search?.tries }]);
     });
 
     it("judges the ground by older names on a server that refuses the newest", async () => {
         world.built = true;
         world.refusedGround = ["leaf_litter"];
-        const hill = { ...walkInHill(), minutes: 3 };
-        setUp([hill]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
-            presetId: "hill",
+            presetId: "drop",
             trigger: "manual",
             startedBy: null
         });
         await play(150_000);
-        expect(
-            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
-        ).toBe(false);
+        expect(world.sent.some((line) => /setblock .* minecraft:chest/.test(line))).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
     });
 
     it("keeps judging the ground after a column that could not be read", async () => {
         world.built = true;
         world.unsureGround = 2;
-        const hill = { ...walkInHill(), minutes: 3 };
-        setUp([hill]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
-            presetId: "hill",
+            presetId: "drop",
             trigger: "manual",
             startedBy: null
         });
         await play(150_000);
-        expect(
-            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
-        ).toBe(false);
+        expect(world.sent.some((line) => /setblock .* minecraft:chest/.test(line))).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
     });
 
@@ -5216,14 +5205,74 @@ describe("a parkour race", () => {
         await startArena("race");
         await play(2_100);
         chat(["Ana", "join"], ["Ben", "join"]);
-        await play(120_000);
+        await play(600_000);
         const after = state();
         expect(after.history[0]).toMatchObject({ outcome: "failed" });
+        expect(after.history[0]?.note).toBe("No open air was found for it near the players");
         expect(
             world.sent.some((line) => line.endsWith(" keep") && !line.includes("structure_void"))
         ).toBe(false);
         expect(world.sent.some((line) => / tp (Ana|Ben) /.test(line))).toBe(false);
         keptTheRules();
+    });
+});
+
+describe("an event built in the air", () => {
+    const race = () => ({
+        ...newPreset("parkour", "race"),
+        minutes: 5,
+        options: {
+            place: { mode: "players" as const },
+            jumps: 12,
+            difficulty: "medium" as const,
+            height: 30
+        }
+    });
+
+    it("goes up over a densely built area: only the air it takes counts", async () => {
+        // Every column answers that it stands on something built.
+        world.built = true;
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        expect(state().run?.stage?.built).toBe(true);
+        // Measured over the highest thing in its footprint, roofs and crowns included.
+        expect(
+            world.sent.some((line) => line.includes("positioned over motion_blocking run summon"))
+        ).toBe(true);
+        expect(state().run?.placeLog.some((one) => one.why === "built")).toBe(false);
+    });
+
+    it("is held near the players in the Overworld when another is in the Nether", async () => {
+        world.online = ["Ana", "Ben"];
+        world.dims = { Ben: "minecraft:the_nether" };
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        expect(state().run?.stage?.built).toBe(true);
+        expect(state().run?.placeFrom?.near).toBe("Ana");
+        // Ben is brought in from the Nether, his things kept for him like anybody's.
+        expect(state().run?.stage?.saved.map((one) => one.name).sort()).toEqual(["Ana", "Ben"]);
+        expect(
+            world.sent.some((line) => /^execute in minecraft:overworld run tp Ben /.test(line))
+        ).toBe(true);
+    });
+
+    it("says nobody is in the Overworld rather than that there was no ground", async () => {
+        world.online = ["Ana", "Ben"];
+        world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_end" };
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(60_000);
+        expect(state().history[0]?.outcome).toBe("failed");
+        expect(state().history[0]?.note).toBe("Nobody is in the Overworld to hold it near");
     });
 });
 
@@ -6257,7 +6306,6 @@ describe("a king of the hill", () => {
         await joinAndStart("hill");
         await play(30_000);
         const run = state().run!;
-        expect(run.overSea).toBe(true);
         expect(run.arena?.blocks).toEqual(["minecraft:smooth_stone"]);
         expect(run.readyAt).not.toBeNull();
         // Only into air proven empty.

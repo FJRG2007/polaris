@@ -34,6 +34,9 @@ const HEADROOM = 4;
 /** How far from the players its place is looked for. */
 export const DISTANCE = 32;
 
+/** How far over the highest thing under it the platform floats. */
+export const LIFT = 20;
+
 /** How many can play: as many as fit round the circle. */
 export const MOST = 16;
 

@@ -20,7 +20,7 @@ import { EventStopped, type KindContext } from "./arena-service";
 const messages = speech.spoken(written);
 const hillMessages = speech.spoken(said);
 
-const NO_PLACE = "No dry ground was found for it near the players";
+const NO_PLACE = "No open air was found for it near the players";
 
 /** Ticks a platform's chunks are waited for before its site is given up. */
 const LOAD_WAITS = 5;
@@ -32,32 +32,24 @@ function optionsOf(run: stored.EventRun): catalog.EventOptions<"king-of-the-hill
 }
 
 /**
- * The circle's place, over a few ticks: the world's own ground first, clear of
- * homes and builds; with none, open water, and a platform built over it into
- * air proven empty. Answers whether it is ready. Throws once nowhere would do.
+ * The circle's place, over a few ticks: a platform floating `hill.LIFT` over
+ * the highest thing under it - a build, a tree, the sea - built into air proven
+ * empty, like every other arena. Answers whether it is ready. Throws once
+ * nowhere would do.
  */
 export async function raiseHill(ctx: KindContext): Promise<boolean> {
     const run = ctx.run;
     const { radius, place } = optionsOf(run);
     if (run.place && run.arena) return true;
-    if (!run.overSea) {
-        const found = await ctx.findPlace(place, hill.DISTANCE, radius, "ground", true);
-        if (found === null) return false;
-        if (found !== "failed") {
-            // The world's own ground: nothing built, nothing to take down after.
-            ctx.run = { ...ctx.run, arena: { box: hill.bounds(found, radius), blocks: [] } };
-            await ctx.persist();
-            await announce(ctx, found);
-            return true;
-        }
-        // No untouched ground as wide as the circle - a small island: over the sea.
-        ctx.run = { ...ctx.run, overSea: true, placeTries: 0, target: null, place: null };
-        await ctx.persist();
-        await ctx.server.sayAll([commands.CLEAR_MARK]);
-        return false;
-    }
     if (!run.place) {
-        const found = await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "open", true);
+        const found = await ctx.findPlace(
+            place,
+            hill.DISTANCE,
+            radius + hill.MARGIN,
+            "air",
+            true,
+            hill.LIFT
+        );
         if (found === "failed") throw new EventStopped(NO_PLACE);
         return false;
     }

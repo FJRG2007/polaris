@@ -300,6 +300,10 @@ export function cancelReason(note: string, language: Language): string {
         "Fewer than two players joined": "se apuntaron menos de dos jugadores.",
         "No dry ground was found for it near the players":
             "no se encontró un sitio libre y seguro cerca de los jugadores.",
+        "No open air was found for it near the players":
+            "no se encontró aire libre para montarlo cerca de los jugadores.",
+        "Nobody is in the Overworld to hold it near":
+            "no hay nadie en el mundo normal cerca de quien montarlo.",
         "The server stopped during the event": "el servidor se paró durante el evento."
     };
     return known[note] ?? (note.endsWith(".") ? note : `${note}.`);

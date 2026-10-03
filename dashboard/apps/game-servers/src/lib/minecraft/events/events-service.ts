@@ -214,7 +214,15 @@ const NEAR_AFTER = 4;
 /** How a place is looked for: on land to stand on, or anywhere nothing is built
  *  for what goes up in the air; and whether it may come in near a home. */
 interface PlaceHow {
-    readonly surface?: "ground" | "open";
+    /**
+     * `ground`: on the world's own walkable ground. `open`: the same, with open
+     * water as good as land. `air`: built in the air - nothing under it matters,
+     * a build or the sea, only the air it takes; the point answered stands on
+     * top of the highest thing in its footprint (plus `lift`).
+     */
+    readonly surface?: "ground" | "open" | "air";
+    /** For `air`: how far above the highest thing in its footprint. */
+    readonly lift?: number;
     readonly nearHome?: boolean;
     /** The way to look, in radians from north (`commands.pointAway`). */
     readonly bearing?: number;
@@ -1592,7 +1600,8 @@ async function findPlace(
     const limit = placeLimit(loop, how.nearHome === true);
     if (!loop.run.target) {
         const center = await centerFor(server, place);
-        if (!center) return "failed";
+        // Everybody in the Nether or the End: nobody to hold it near, said so.
+        if (!center) throw new PlaceNotFound(NOBODY_IN_OVERWORLD);
         loop.run = { ...loop.run, placeFrom: center };
         let point: { x: number; z: number } | null = center;
         if (!chosen) {
@@ -1635,18 +1644,33 @@ async function findPlace(
         // Judged at once: the ground there is loaded by asking about it.
     }
     const { x, z } = loop.run.target!;
-    const point = await dropMark(server, x, z);
+    const air = how.surface === "air";
+    const dropped = await dropMark(server, x, z);
+    // In the air: over the highest thing in the whole footprint, however tall
+    // a build or a tree there is; the arena itself proves its air empty.
+    const top = dropped && air ? await footprintTop(server, dropped, radius) : null;
+    const point =
+        dropped && air
+            ? { ...dropped, y: Math.max(dropped.y, top ?? dropped.y) + (how.lift ?? 0) }
+            : dropped;
     // Across the water from where the players are: they live on an island, and
     // nothing further out will do - the next try comes in at once.
-    const walkable = !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
+    const walkable =
+        air || !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
     if (!walkable && how.nearHome)
         loop.run = { ...loop.run, placeTries: Math.max(loop.run.placeTries, NEAR_AFTER - 1) };
     const refused: search.PlaceRefusal | null =
-        !point || chosen
+        !point || chosen || air
             ? null
             : !walkable
               ? "water"
-              : await siteIsOpen(loop, server, point, radius, how.surface ?? "ground");
+              : await siteIsOpen(
+                    loop,
+                    server,
+                    point,
+                    radius,
+                    how.surface === "open" ? "open" : "ground"
+                );
     const why: search.PlaceRefusal = refused ?? "noGround";
     if (point && !refused) {
         // The marker can come down a block or two from the column tried - an
@@ -1673,6 +1697,34 @@ async function findPlace(
     loop.run = { ...noted(loop, x, z, why), target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     return loop.run.placeTries >= limit ? "failed" : null;
+}
+
+/**
+ * The top of the highest thing over a footprint - roofs, crowns, the sea - read
+ * from a marker on top of each of its columns, all summoned and read at once.
+ * Null on a server too old for the heightmap (before 1.19.4), where the arena's
+ * own proof that its air is empty is what keeps it off anything.
+ */
+async function footprintTop(
+    server: ServerContainer,
+    center: stored.Point,
+    radius: number
+): Promise<number | null> {
+    const reach = radius + 1;
+    const area = `${center.x - reach} ${center.z - reach} ${center.x + reach} ${center.z + reach}`;
+    try {
+        await server.sayAll([
+            `execute in minecraft:overworld run forceload add ${area}`,
+            ...commands.topLines(commands.footprintColumns(center, radius))
+        ]);
+        return commands.highestTop(commands.samplesIn(await server.say([commands.READ_SAMPLES])));
+    } finally {
+        await server.sayAll([
+            commands.CLEAR_SAMPLES,
+            `execute in minecraft:overworld run forceload remove ${area}`,
+            commands.forceload(center.x, center.z)
+        ]);
+    }
 }
 
 /** Whether a place can be walked to from a point (`commands.walkable`), judged
@@ -1989,7 +2041,11 @@ async function retryPlace(
         placeTries: loop.run.placeTries + 1
     };
     await persist(installedAppId, loop);
-    if (loop.run.placeTries >= placeLimit(loop, nearHome)) throw new PlaceNotFound();
+    if (loop.run.placeTries >= placeLimit(loop, nearHome)) {
+        const inAir =
+            catalog.playsInArena(loop.run.preset) || catalog.playsOnStage(loop.run.preset);
+        throw new PlaceNotFound(inAir ? NO_AIR : NO_GROUND);
+    }
 }
 
 /** Where a walk to an event's place starts: the fixed point, or where most
@@ -2043,7 +2099,7 @@ function kindContext(
             loop.run = next;
         },
         persist: () => persist(installedAppId, loop),
-        findPlace: (place, distance, radius, surface, nearHome) => {
+        findPlace: (place, distance, radius, surface, nearHome, lift) => {
             nearHomeLast = nearHome === true;
             return findPlace(
                 installedAppId,
@@ -2056,7 +2112,8 @@ function kindContext(
                 true,
                 {
                     surface: surface ?? "ground",
-                    nearHome: nearHomeLast
+                    nearHome: nearHomeLast,
+                    lift
                 }
             );
         },
@@ -3082,13 +3139,14 @@ function stageTools(
                 radius,
                 commands.HOME_CLEARANCE + radius,
                 true,
-                // Built in the air: over the sea as well as over land.
-                { surface: "open" }
+                // Built in the air: over anything, a build or the sea; and in
+                // closer after a few tries, since it changes nothing below.
+                { surface: "air", nearHome: true }
             );
-            if (found === "failed") throw new PlaceNotFound();
+            if (found === "failed") throw new PlaceNotFound(NO_AIR);
             return found;
         },
-        giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, false, why),
+        giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, true, why),
         chat: () => newChat(server, loop),
         owed: async () => {
             const row = await readRow(installedAppId);
@@ -3159,8 +3217,8 @@ async function chestTest(
 }
 
 class PlaceNotFound extends Error {
-    constructor() {
-        super("No dry ground was found for it near the players");
+    constructor(why: string = NO_GROUND) {
+        super(why);
     }
 }
 
@@ -3923,6 +3981,11 @@ async function sample(
 }
 
 // ------------------------------------------------------------------ the sweep
+
+/** Why there was nowhere to hold an event, as the history says it. */
+export const NO_GROUND = "No dry ground was found for it near the players";
+export const NO_AIR = "No open air was found for it near the players";
+export const NOBODY_IN_OVERWORLD = "Nobody is in the Overworld to hold it near";
 
 /**
  * When the sweep last looked at each server's draw. Kept in this process rather
