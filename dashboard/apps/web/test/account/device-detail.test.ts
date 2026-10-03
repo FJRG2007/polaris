@@ -89,7 +89,7 @@ function pass(overrides: Partial<Pass> = {}): Pass {
 }
 
 /** One Session row as the directory selects it. */
-function session(id: string, userAgent: string, host: string, ip = "198.51.100.88") {
+function session(id: string, userAgent: string, host: string, ip = "5.6.7.8") {
     return {
         id,
         createdAt: new Date("2026-08-01T10:00:00Z"),

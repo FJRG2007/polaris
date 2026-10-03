@@ -61,7 +61,7 @@ function sessionRow(id: string, userAgent: string, state: Record<string, unknown
         id,
         createdAt: new Date("2026-08-01T10:00:00Z"),
         expiresAt: new Date("2026-09-01T10:00:00Z"),
-        ipAddress: "198.51.100.88",
+        ipAddress: "5.6.7.8",
         userAgent,
         state: { userAgent, lastSeenAt: new Date("2026-08-04T10:00:00Z"), approval: "approved", ...state }
     };
