@@ -259,7 +259,8 @@
         "settings": "Calendar settings",
         "shortcuts": "Keyboard shortcuts",
         "today": "Today",
-        "todayHint": "Go to today",
+        "todayHint": "Go to today, {day}",
+        "todayShown": "Today is already in view",
         "trash": "Trash",
         "view": "View",
         "time": "Alarms, timers and world clock"
@@ -295,12 +296,21 @@
         "title": "New task"
     },
     "popover": {
+        "bookingHint": "People book a time within these hours, every week, from a page you share.",
         "chooseCalendar": "Choose a calendar first",
         "edit": "Edit",
+        "kind": "What to create",
+        "kindBooking": "Booking page",
+        "kindEvent": "Event",
+        "kindTask": "Task",
         "more": "More details",
+        "nameFirst": "Add a title first",
+        "newBooking": "New booking page",
         "newTitle": "New event",
         "noWritable": "None of your calendars takes events. Make one in the sidebar.",
-        "open": "Open"
+        "open": "Open",
+        "openInTasks": "Create the task and open it in Tasks",
+        "setUpBooking": "Set up page"
     },
     "printPage": {
         "badRange": "The last day is before the first.",
@@ -457,7 +467,7 @@
         "defaultView": "Open on",
         "defaultViewHint": "Changes when you switch views.",
         "description": "How your calendar looks and what new events start with.",
-        "dimPast": "Fade past events",
+        "dimPast": "Dim past days and events",
         "display": "Display",
         "endAfterStart": "The end must be after the start.",
         "eventLimit": "Events per day in a month",

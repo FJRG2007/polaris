@@ -5,22 +5,31 @@
  * was selected.
  *
  * The event card shows what the grid already knows at once and reads the rest
- * (the description, the reader's own answer) behind it. The new-event card asks
- * for a title and a calendar and saves; "More details" carries what was typed
- * into the full editor.
+ * (the description, the reader's own answer) behind it.
+ *
+ * The new card is Google's: a switch at the top between an event, a task and a
+ * booking page (Google's appointment schedule). An event asks for a title and a
+ * calendar and saves, and "More details" carries what was typed into the full
+ * editor; a task is made in Tasks, due at the time picked, through the same
+ * creation as "New task due here" (`new-task-dialog.tsx`), and "More details"
+ * opens it there; a booking page goes on to its editor with the title and the
+ * picked hours filled in.
  */
 
 import { useCalendarT } from "./i18n";
 import { unwrap } from "./cached-read";
 import { isWebLink } from "./editor-model";
 import { RespondBar } from "./event-editor";
+import { formatDay, addDays } from "./time";
+import type { GridMoment } from "./grid-view";
 import * as eventActions from "../actions/events";
 import { useEffect, useId, useState } from "react";
-import { Button, Input, Select } from "@polaris/ui";
+import { useBookingSwitch } from "./booking/reads";
 import { AnchoredPanel, ColorDot, Linkified } from "./ui";
-import { formatDay, addDays } from "./time";
+import { Button, Input, SegmentedControl, Select } from "@polaris/ui";
 import type { CalendarSummary, EventDetail, OccurrenceView } from "../lib/wire";
 import { CalendarClock, Copy, Download, MapPin, Pencil, Trash2, Video } from "lucide-react";
+import { dueText, TaskListField, useTaskCreation, type CreatedTask } from "./new-task-dialog";
 
 export function whenOf(occurrence: OccurrenceView, locale: string, zone: string): string {
     if (occurrence.allDay && occurrence.startDate) {
@@ -205,9 +214,29 @@ export function EventCard({
     );
 }
 
+/** What the card makes: Google's Event | Task | Appointment schedule. */
+export type NewItemKind = "event" | "task" | "booking";
+
+/** The kinds the card offers: a task while the account can make tasks (or
+ *  while that is still being read, or could not be), a booking page while the
+ *  operator has them switched on. */
+export function cardKinds(
+    lists: readonly unknown[] | null | undefined,
+    listsFailed: boolean,
+    booking: { readonly allowed: boolean } | null
+): NewItemKind[] {
+    const kinds: NewItemKind[] = ["event"];
+    if (lists !== null || listsFailed) kinds.push("task");
+    if (booking?.allowed) kinds.push("booking");
+    return kinds;
+}
+
 export function NewEventCard({
     anchor,
+    start,
     when,
+    zone,
+    locale,
     calendars,
     calendarId,
     onCalendar,
@@ -216,10 +245,16 @@ export function NewEventCard({
     busy,
     onSave,
     onMore,
+    onTaskCreated,
+    onBooking,
     onClose
 }: {
     anchor: DOMRect | null;
+    /** Where the pick starts: when a task made here is due. */
+    start: GridMoment;
     when: string;
+    zone: string;
+    locale: string;
     calendars: readonly CalendarSummary[];
     calendarId: string;
     onCalendar: (id: string) => void;
@@ -228,71 +263,176 @@ export function NewEventCard({
     busy: boolean;
     onSave: () => void;
     onMore: () => void;
+    /** A task was made from the card; `open` asks for it to be opened in Tasks. */
+    onTaskCreated: (task: CreatedTask, open: boolean) => void;
+    /** Go on to a new booking page for the picked time. */
+    onBooking: () => void;
     onClose: () => void;
 }) {
     const t = useCalendarT();
     const ids = useId();
+    const [kind, setKind] = useState<NewItemKind>("event");
+    const creation = useTaskCreation(true);
+    const booking = useBookingSwitch();
+    const kinds = cardKinds(creation.lists, creation.listsError !== null, booking);
+    // A kind that stopped being offered (the lists said no) falls back to an event.
+    const shown = kinds.includes(kind) ? kind : "event";
     const writable = calendars.filter(
         (calendar) =>
             calendar.writable && calendar.components.includes("VEVENT") && !calendar.hidden
     );
-    const blocked = calendarId === "" ? t("popover.chooseCalendar") : null;
+    const blocked =
+        shown === "event"
+            ? calendarId === ""
+                ? t("popover.chooseCalendar")
+                : null
+            : shown === "task" && summary.trim() === ""
+              ? t("popover.nameFirst")
+              : null;
+    const taskReady = creation.canCreate(summary);
+
+    const makeTask = async (open: boolean) => {
+        if (!taskReady) return;
+        const created = await creation.create(start, summary);
+        if (created) onTaskCreated(created, open);
+    };
+
+    const title =
+        shown === "task"
+            ? t("newTask.title")
+            : shown === "booking"
+              ? t("popover.newBooking")
+              : t("popover.newTitle");
+    const kindLabels: Record<NewItemKind, string> = {
+        event: t("popover.kindEvent"),
+        task: t("popover.kindTask"),
+        booking: t("popover.kindBooking")
+    };
+
     return (
         <AnchoredPanel
             open
             onOpenChange={(open) => !open && onClose()}
             anchor={anchor}
-            title={t("popover.newTitle")}
+            title={title}
         >
             <form
                 className="flex flex-col gap-3"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    if (!blocked && !busy) onSave();
+                    if (shown === "event") {
+                        if (!blocked && !busy) onSave();
+                    } else if (shown === "task") void makeTask(false);
+                    else onBooking();
                 }}
             >
+                {kinds.length > 1 ? (
+                    <SegmentedControl
+                        size="sm"
+                        className="self-start"
+                        aria-label={t("popover.kind")}
+                        value={shown}
+                        onValueChange={(next) => {
+                            creation.clearError();
+                            setKind(next);
+                        }}
+                        options={kinds.map((value) => ({ value, label: kindLabels[value] }))}
+                    />
+                ) : null}
                 <Input
                     id={`${ids}-title`}
-                    aria-label={t("editor.titleField")}
-                    placeholder={t("editor.titlePlaceholder")}
+                    aria-label={shown === "task" ? t("newTask.name") : t("editor.titleField")}
+                    placeholder={
+                        shown === "task"
+                            ? t("newTask.namePlaceholder")
+                            : t("editor.titlePlaceholder")
+                    }
                     value={summary}
                     maxLength={500}
                     autoFocus
                     onChange={(event) => onSummary(event.target.value)}
                 />
                 <p className="flex items-start gap-1.5 text-xs text-muted-foreground tabular-nums">
-                    <CalendarClock aria-hidden className="mt-px size-3.5" />
-                    {when}
+                    <CalendarClock aria-hidden className="mt-px size-3.5 shrink-0" />
+                    <span className="min-w-0 first-letter:uppercase">
+                        {shown === "task"
+                            ? t("newTask.due", { when: dueText(start, locale, zone) })
+                            : when}
+                    </span>
                 </p>
-                {writable.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">{t("popover.noWritable")}</p>
+                {shown === "event" ? (
+                    <>
+                        {writable.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("popover.noWritable")}
+                            </p>
+                        ) : (
+                            <Select
+                                aria-label={t("editor.calendar")}
+                                placeholder={t("editor.chooseCalendar")}
+                                value={calendarId}
+                                onValueChange={onCalendar}
+                                options={writable.map((calendar) => ({
+                                    value: calendar.id,
+                                    label: calendar.name,
+                                    icon: <ColorDot color={calendar.color} />
+                                }))}
+                            />
+                        )}
+                        <div className="flex items-center justify-end gap-2">
+                            <Button type="button" size="sm" variant="ghost" onClick={onMore}>
+                                {t("popover.more")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                aria-disabled={blocked !== null || busy}
+                                title={blocked ?? undefined}
+                                className={blocked ? "opacity-50" : undefined}
+                            >
+                                {busy ? t("screen.saving") : t("screen.save")}
+                            </Button>
+                        </div>
+                    </>
+                ) : shown === "task" ? (
+                    <TaskListField creation={creation} id={`${ids}-list`}>
+                        {creation.error ? (
+                            <p role="alert" className="text-xs text-danger">
+                                {creation.error}
+                            </p>
+                        ) : null}
+                        <div className="flex items-center justify-end gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                aria-disabled={!taskReady}
+                                title={blocked ?? t("popover.openInTasks")}
+                                onClick={() => void makeTask(true)}
+                            >
+                                {t("popover.more")}
+                            </Button>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                aria-disabled={!taskReady}
+                                title={blocked ?? undefined}
+                                className={taskReady ? undefined : "opacity-50"}
+                            >
+                                {creation.busy ? t("screen.saving") : t("screen.save")}
+                            </Button>
+                        </div>
+                    </TaskListField>
                 ) : (
-                    <Select
-                        aria-label={t("editor.calendar")}
-                        placeholder={t("editor.chooseCalendar")}
-                        value={calendarId}
-                        onValueChange={onCalendar}
-                        options={writable.map((calendar) => ({
-                            value: calendar.id,
-                            label: calendar.name,
-                            icon: <ColorDot color={calendar.color} />
-                        }))}
-                    />
+                    <>
+                        <p className="text-xs text-muted-foreground">{t("popover.bookingHint")}</p>
+                        <div className="flex items-center justify-end gap-2">
+                            <Button type="submit" size="sm">
+                                {t("popover.setUpBooking")}
+                            </Button>
+                        </div>
+                    </>
                 )}
-                <div className="flex items-center justify-end gap-2">
-                    <Button type="button" size="sm" variant="ghost" onClick={onMore}>
-                        {t("popover.more")}
-                    </Button>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        aria-disabled={blocked !== null || busy}
-                        title={blocked ?? undefined}
-                        className={blocked ? "opacity-50" : undefined}
-                    >
-                        {busy ? t("screen.saving") : t("screen.save")}
-                    </Button>
-                </div>
             </form>
         </AnchoredPanel>
     );

@@ -57,10 +57,11 @@ import { useCalendarT } from "./i18n";
 import * as model from "./editor-model";
 import { calendarSlots } from "./slots";
 import { MiniMonth } from "./mini-month";
+import type { PartStat } from "../engine";
 import { TodoEditor } from "./todo-editor";
-import { AnchoredPanel, useNow } from "./ui";
 import * as taskActions from "../actions/tasks";
 import { useScopeChoice } from "./scope-dialog";
+import type { GridTarget } from "./grid-target";
 import * as trashActions from "../actions/trash";
 import { hostUi } from "@polaris/app-host/client";
 import * as eventActions from "../actions/events";
@@ -68,19 +69,18 @@ import { ShortcutsDialog } from "./shortcuts-dialog";
 import * as calendarActions from "../actions/calendars";
 import { Sidebar, type SidebarActions } from "./sidebar";
 import { EventCard, NewEventCard } from "./event-popover";
-import { gridEvents, type GridItem } from "./grid-events";
-import type { GridTarget } from "./grid-target";
-import type { GridChange, GridMoment, GridRange } from "./grid-view";
-import { GridMenu, type GridMenuActions, type MenuTarget } from "./grid-menu";
-import { NewTaskDialog, useTaskLists } from "./new-task-dialog";
-import { AddCalendarMenu } from "./accounts/add-calendar-menu";
-import type { PartStat } from "../engine";
+import { AnchoredPanel, useCardColor, useNow } from "./ui";
 import * as preferenceActions from "../actions/preferences";
 import { CalendarSearch, type SearchResult } from "./search";
+import { AddCalendarMenu } from "./accounts/add-calendar-menu";
 import { EventEditor, type EditorTarget } from "./event-editor";
 import { useShortcuts, type ShortcutAction } from "./shortcuts";
+import type { GridChange, GridMoment, GridRange } from "./grid-view";
+import { DARK_SURFACE, gridEvents, type GridItem } from "./grid-events";
 import { cacheKey, dropCached, unwrap, useCachedRead } from "./cached-read";
+import { GridMenu, type GridMenuActions, type MenuTarget } from "./grid-menu";
 import { CalendarDialog, type CalendarDialogTarget } from "./calendar-dialog";
+import { NewTaskDialog, useTaskLists, type CreatedTask } from "./new-task-dialog";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CalendarSummary, OccurrenceView, RangeView, TaskItemView } from "../lib/wire";
 import {
@@ -212,6 +212,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const hour12 = format.preferences.clock === "12h";
     const now = useNow(60_000);
     const today = time.todayIn(zone, now);
+    const surface = useCardColor(DARK_SURFACE);
+    /** Bumped by "Today", so a time grid scrolls back to the red line. */
+    const [nowSignal, setNowSignal] = useState(0);
 
     const [view, setView] = useState<CalendarViewName>(route.view ?? DEFAULT_PREFERENCES.view);
     const [anchor, setAnchor] = useState<string>(route.date ?? today);
@@ -320,6 +323,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 showDeclined: preferences.showDeclined,
                 showTasks: preferences.showTasks,
                 dimPast: preferences.dimPast,
+                surface,
                 calendars: calendarsById,
                 t
             }),
@@ -331,6 +335,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
             preferences.showDeclined,
             preferences.showTasks,
             preferences.dimPast,
+            surface,
             calendarsById,
             t
         ]
@@ -377,6 +382,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
         viewChosen.current = true;
         setView(next);
         void savePreferences({ view: next });
+    };
+    const goToday = () => {
+        setAnchor(today);
+        setNowSignal((value) => value + 1);
     };
     const step = (direction: 1 | -1) =>
         setAnchor((current) => time.stepAnchor(view, current, direction, preferences.customDays));
@@ -1214,7 +1223,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 step(1);
                 return true;
             case "today":
-                setAnchor(today);
+                goToday();
                 return true;
             case "goTo":
                 setPicker(
@@ -1265,6 +1274,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
     });
 
     const label = time.windowLabel(view, anchor, span, locale);
+    const todayShown = time.showsToday(view, anchor, span, today);
     const viewOptions = VIEWS.map((entry) => ({
         value: entry,
         label: t(`views.${entry}`, { count: preferences.customDays })
@@ -1290,6 +1300,46 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const AddCalendars = calendarSlots.AddCalendars;
     const newCard = popover?.kind === "new" ? popover : null;
 
+    /** A task was made from the calendar: say so with a way to it, or go there. */
+    const taskCreated = (created: CreatedTask, open: boolean) => {
+        setPopover(null);
+        eventsChanged();
+        if (open) {
+            router.push(`/tasks/t/${created.taskId}`);
+            return;
+        }
+        toast.show({
+            key: "calendar-task-created",
+            title: t("newTask.created", { reference: created.reference }),
+            actions: [
+                {
+                    label: t("newTask.open"),
+                    run: async () => {
+                        router.push(`/tasks/t/${created.taskId}`);
+                        return null;
+                    }
+                }
+            ]
+        });
+    };
+
+    /** A new booking page for what the card picked: its title, its day and,
+     *  when a time was picked within one day, those hours. */
+    const bookingFor = (card: NonNullable<typeof newCard>): string => {
+        const query = new URLSearchParams();
+        if (card.summary.trim()) query.set("title", card.summary.trim());
+        query.set("day", card.start.day);
+        if (!card.start.allDay) {
+            const from = time.wallOf(card.start.at, zone);
+            const to = time.wallOf(card.end.at, zone);
+            if (from.slice(0, 10) === to.slice(0, 10)) {
+                query.set("from", time.timeOfWall(from));
+                query.set("to", time.timeOfWall(to));
+            }
+        }
+        return `/calendar/booking/new?${query.toString()}`;
+    };
+
     const sidebar = (
         <Sidebar
             calendars={calendars}
@@ -1310,7 +1360,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
     return (
         <div data-cal-ready className="flex h-full min-h-0 flex-col">
             <header className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-2 sm:gap-2">
-                <div className="flex min-w-0 flex-1 items-center gap-1">
+                {/* Wide enough for the range it names: on a phone the controls
+                    wrap below it rather than squeezing it out of sight. */}
+                <div className="flex min-w-0 flex-1 basis-60 items-center gap-1">
                     <Button
                         size="icon-sm"
                         variant="ghost"
@@ -1325,8 +1377,18 @@ export function CalendarScreen({ path }: { path: string[] }) {
                         size="sm"
                         variant="outline"
                         aria-label={t("header.today")}
-                        title={t("header.todayHint")}
-                        onClick={() => setAnchor(today)}
+                        aria-disabled={todayShown || undefined}
+                        title={
+                            todayShown
+                                ? t("header.todayShown")
+                                : t("header.todayHint", {
+                                      day: time.formatDay(today, locale, { dateStyle: "full" })
+                                  })
+                        }
+                        className={todayShown ? "opacity-50" : undefined}
+                        onClick={() => {
+                            if (!todayShown) goToday();
+                        }}
                     >
                         <CalendarCheck className="sm:hidden" />
                         <span className="hidden sm:inline">{t("header.today")}</span>
@@ -1609,6 +1671,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                         firstDay={firstDay}
                                         showWeekends={preferences.showWeekends}
                                         showWeekNumbers={preferences.showWeekNumbers}
+                                        now={now}
+                                        dimPast={preferences.dimPast}
+                                        scrollToNowSignal={nowSignal}
                                         slotMinutes={preferences.slotMinutes}
                                         dayStart={preferences.dayStart}
                                         eventLimit={preferences.eventLimit}
@@ -1715,6 +1780,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
             {newCard ? (
                 <NewEventCard
                     anchor={newCard.anchor}
+                    start={newCard.start}
+                    zone={zone}
+                    locale={locale}
                     when={
                         newCard.start.allDay
                             ? new Intl.DateTimeFormat(locale, {
@@ -1751,6 +1819,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                 newCard.calendarId
                             )
                         });
+                        setPopover(null);
+                    }}
+                    onTaskCreated={taskCreated}
+                    onBooking={() => {
+                        router.push(bookingFor(newCard));
                         setPopover(null);
                     }}
                     onClose={() => setPopover(null)}
@@ -1829,22 +1902,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 zone={zone}
                 locale={locale}
                 onClose={() => setTaskAt(null)}
-                onCreated={(created) => {
-                    toast.show({
-                        key: "calendar-task-created",
-                        title: t("newTask.created", { reference: created.reference }),
-                        actions: [
-                            {
-                                label: t("newTask.open"),
-                                run: async () => {
-                                    router.push(`/tasks/t/${created.taskId}`);
-                                    return null;
-                                }
-                            }
-                        ]
-                    });
-                    eventsChanged();
-                }}
+                onCreated={(created) => taskCreated(created, false)}
             />
             <ShortcutsDialog
                 open={helpOpen}

@@ -289,6 +289,24 @@ describe("the calendar screen", () => {
         expect(screen.queryByRole("note")).toBeNull();
     });
 
+    it("holds Today while today is on screen, and lets it bring the reader back", async () => {
+        render(<CalendarScreen path={[]} />, { wrapper: MessagesWrapper });
+        await settle();
+        await screen.findByTestId("grid");
+        const today = screen.getByRole("button", { name: "Today" });
+        expect(today.getAttribute("aria-disabled")).toBe("true");
+        expect(today.getAttribute("title")).toBe("Today is already in view");
+        const start = grid().getAttribute("data-anchor");
+
+        press("j");
+        expect(today.getAttribute("aria-disabled")).toBeNull();
+        expect(today.getAttribute("title")).toMatch(/^Go to today, /);
+        fireEvent.click(today);
+        await settle();
+        expect(grid().getAttribute("data-anchor")).toBe(start);
+        expect(today.getAttribute("aria-disabled")).toBe("true");
+    });
+
     it("says nothing about linking once the tip was closed", async () => {
         preferences = { ...preferences, dismissedHints: ["link-accounts"] };
         render(<CalendarScreen path={["week", "2026-10-07"]} />, { wrapper: MessagesWrapper });

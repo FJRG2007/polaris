@@ -12,23 +12,32 @@
  * `selection` names it (while its new-event card or its menu is open), and goes
  * when that is cleared. Every event carries `data-event-id` and every day cell
  * and day column is a keyboard stop, which is what the grid's menu reads.
+ *
+ * Where the reader is in time is drawn the way Google draws it: today's date in
+ * a filled circle wherever a day is named, a red line across today at the
+ * current minute (with the time on the axis, as Apple and Outlook show it),
+ * the days and hours already gone dimmed, the weekend a shade off the week,
+ * and the first of a month named in the month grid. A time grid opens scrolled
+ * to now when today is on it.
  */
 
 import * as time from "./time";
 import { GRID_CSS } from "./grid-css";
-import { KEYBOARD_CELLS } from "./grid-target";
 import listPlugin from "@fullcalendar/list";
-import type { GridItem } from "./grid-events";
+import { KEYBOARD_CELLS } from "./grid-target";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { useEffect, useMemo, useRef } from "react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import multiMonthPlugin from "@fullcalendar/multimonth";
 import interactionPlugin from "@fullcalendar/interaction";
+import { elapsedToday, type GridItem } from "./grid-events";
 import type { CalendarViewName } from "../lib/preferences";
 import type { EventReceiveArg, EventResizeDoneArg } from "@fullcalendar/interaction";
 import type {
     DateSelectArg,
+    DayCellContentArg,
+    DayHeaderContentArg,
     EventApi,
     EventClickArg,
     EventDropArg,
@@ -78,6 +87,12 @@ export interface GridViewProps {
     readonly firstDay: number;
     readonly showWeekends: boolean;
     readonly showWeekNumbers: boolean;
+    /** The current moment; the line across today follows it. */
+    readonly now: Date;
+    /** Dim the days and hours already gone. */
+    readonly dimPast: boolean;
+    /** Changed to scroll a time grid to now (on "Today"). */
+    readonly scrollToNowSignal: number;
     readonly slotMinutes: number;
     readonly dayStart: string;
     readonly eventLimit: number;
@@ -140,6 +155,16 @@ function markCells(root: HTMLElement | null, anchor: string, name: (day: string)
     stop.tabIndex = 0;
 }
 
+/** Name the display zone in a time grid's empty top-left corner, as Google
+ *  does; a corner holding the week number keeps it. */
+function markZone(root: HTMLElement | null, label: string): void {
+    if (!root) return;
+    for (const corner of root.querySelectorAll<HTMLElement>(
+        ".fc-col-header .fc-timegrid-axis-frame"
+    ))
+        corner.setAttribute("data-zone", label);
+}
+
 /** Whether two ranges are the same, so a highlight is not drawn twice. */
 function sameRange(a: GridRange | null, b: GridRange | null): boolean {
     if (!a || !b) return a === b;
@@ -149,6 +174,9 @@ function sameRange(a: GridRange | null, b: GridRange | null): boolean {
         a.end.at.getTime() === b.end.at.getTime()
     );
 }
+
+/** The views drawn as a time grid, where now is a line and the past is hours. */
+const TIME_GRIDS: readonly CalendarViewName[] = ["day", "week", "days"];
 
 export default function GridView(props: GridViewProps) {
     const calendar = useRef<FullCalendar>(null);
@@ -199,6 +227,49 @@ export default function GridView(props: GridViewProps) {
         else api.gotoDate(props.anchor);
     }, [fcView, props.anchor, props.customDays]);
 
+    const timeGrid = TIME_GRIDS.includes(props.view);
+    const today = time.todayIn(props.zone, props.now);
+    const shown = time.viewWindow(props.view, props.anchor, props.firstDay, props.customDays);
+    const todayShown = timeGrid && today >= shown.start && today < shown.end;
+    /** Where a time grid opens: at now when today is on it, else the day's start. */
+    const openingScroll = useRef(
+        todayShown ? time.nowScrollTime(props.now, props.zone) : `${props.dayStart}:00`
+    );
+
+    // "Today" brings the line back into view, once the dates have moved there.
+    useEffect(() => {
+        if (props.scrollToNowSignal === 0) return;
+        const frame = requestAnimationFrame(() => {
+            const current = propsRef.current;
+            if (!TIME_GRIDS.includes(current.view)) return;
+            calendar.current?.getApi().scrollToTime(time.nowScrollTime(new Date(), current.zone));
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [props.scrollToNowSignal]);
+
+    // The corner follows a change of zone, which moves no dates.
+    const zoneLabel = time.zoneOffsetLabel(props.zone, props.now, props.locale);
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => markZone(root.current, zoneLabel));
+        return () => cancelAnimationFrame(frame);
+    }, [zoneLabel, fcView]);
+
+    const weekend = useMemo(() => new Set(time.weekendDays(props.locale)), [props.locale]);
+    const dayClasses = (date: Date): string[] =>
+        weekend.has(date.getUTCDay()) ? ["pc-weekend"] : [];
+    const dayFormat = useMemo(
+        () => ({
+            weekday: new Intl.DateTimeFormat(props.locale, { weekday: "short", timeZone: "UTC" }),
+            number: new Intl.DateTimeFormat(props.locale, { day: "numeric", timeZone: "UTC" }),
+            monthDay: new Intl.DateTimeFormat(props.locale, {
+                day: "numeric",
+                month: "short",
+                timeZone: "UTC"
+            })
+        }),
+        [props.locale]
+    );
+
     const views = useMemo(
         () => ({
             timeGridDays: { type: "timeGrid", duration: { days: props.customDays } },
@@ -219,21 +290,21 @@ export default function GridView(props: GridViewProps) {
     );
     const secondary =
         props.secondaryZone && props.secondaryZone !== props.zone ? props.secondaryZone : null;
-    const events = useMemo(
-        () =>
-            props.events.map((event) =>
-                event.id === props.selectedId
-                    ? {
-                          ...event,
-                          classNames: [...((event.classNames as string[]) ?? []), "pc-selected"]
-                      }
-                    : event
-            ),
-        [props.events, props.selectedId]
-    );
+    const nowWall = time.wallOf(props.now, props.zone);
+    const events = useMemo(() => {
+        const drawn = props.events.map((event) =>
+            event.id === props.selectedId
+                ? {
+                      ...event,
+                      classNames: [...((event.classNames as string[]) ?? []), "pc-selected"]
+                  }
+                : event
+        );
+        return props.dimPast && todayShown ? [...drawn, elapsedToday(today, nowWall)] : drawn;
+    }, [props.events, props.selectedId, props.dimPast, todayShown, today, nowWall]);
 
     return (
-        <div ref={root} className="pc-grid h-full min-h-0">
+        <div ref={root} className={`pc-grid h-full min-h-0${props.dimPast ? " pc-dim-past" : ""}`}>
             <style>{GRID_CSS}</style>
             <FullCalendar
                 ref={calendar}
@@ -271,7 +342,7 @@ export default function GridView(props: GridViewProps) {
                     propsRef.current.onOpenDay(time.gridDay(date), "week")
                 }
                 slotDuration={{ minutes: props.slotMinutes }}
-                scrollTime={`${props.dayStart}:00`}
+                scrollTime={openingScroll.current}
                 scrollTimeReset={false}
                 slotLabelFormat={{
                     hour: "numeric",
@@ -304,6 +375,46 @@ export default function GridView(props: GridViewProps) {
                           }
                         : undefined
                 }
+                dayHeaderClassNames={(arg: DayHeaderContentArg) => dayClasses(arg.date)}
+                dayCellClassNames={(arg: DayCellContentArg) => dayClasses(arg.date)}
+                dayHeaderContent={(arg: DayHeaderContentArg) =>
+                    TIME_GRIDS.includes(propsRef.current.view) ? (
+                        <span className="pc-dh">
+                            <span className="pc-dh-weekday">
+                                {dayFormat.weekday.format(arg.date)}
+                            </span>
+                            <span
+                                className="pc-dh-number"
+                                aria-current={arg.isToday ? "date" : undefined}
+                            >
+                                {dayFormat.number.format(arg.date)}
+                            </span>
+                        </span>
+                    ) : (
+                        arg.text
+                    )
+                }
+                // Only where a day cell shows its number: a time grid's all-day
+                // row has none, and the header above it already names the day.
+                dayCellContent={
+                    timeGrid
+                        ? undefined
+                        : (arg: DayCellContentArg) => (
+                              <span
+                                  className="pc-day-number"
+                                  aria-current={arg.isToday ? "date" : undefined}
+                              >
+                                  {arg.date.getUTCDate() === 1 && propsRef.current.view === "month"
+                                      ? dayFormat.monthDay.format(arg.date)
+                                      : dayFormat.number.format(arg.date)}
+                              </span>
+                          )
+                }
+                nowIndicatorContent={(arg) =>
+                    arg.isAxis ? (
+                        <span className="pc-now-time">{hourFormat.format(arg.date)}</span>
+                    ) : null
+                }
                 dayMaxEvents={props.eventLimit === 0 ? false : props.eventLimit}
                 businessHours={props.businessHours.length > 0 ? props.businessHours : false}
                 nowIndicator
@@ -317,14 +428,25 @@ export default function GridView(props: GridViewProps) {
                 droppable
                 unselectAuto={false}
                 datesSet={() =>
-                    requestAnimationFrame(() =>
-                        markCells(root.current, propsRef.current.anchor, propsRef.current.words.day)
-                    )
+                    requestAnimationFrame(() => {
+                        const current = propsRef.current;
+                        markCells(root.current, current.anchor, current.words.day);
+                        markZone(
+                            root.current,
+                            time.zoneOffsetLabel(current.zone, current.now, current.locale)
+                        );
+                    })
                 }
                 eventAllow={(drop, dragged) => (dragged ? drop.allDay === dragged.allDay : true)}
                 events={events}
                 eventDidMount={(arg) => {
-                    const label = (arg.event.extendedProps as { label?: string }).label;
+                    // The dimmed past is drawing, not something a menu can be about.
+                    if (arg.event.display === "background") return;
+                    const { label, stripe } = arg.event.extendedProps as {
+                        label?: string;
+                        stripe?: string | null;
+                    };
+                    if (stripe) arg.el.style.setProperty("--pc-stripe", stripe);
                     arg.el.setAttribute("data-event-id", arg.event.id);
                     if (label) {
                         arg.el.setAttribute("aria-label", label);
@@ -337,6 +459,7 @@ export default function GridView(props: GridViewProps) {
                 }}
                 eventClick={(arg: EventClickArg) => {
                     arg.jsEvent.preventDefault();
+                    if (!(arg.event.extendedProps as { item?: GridItem }).item) return;
                     propsRef.current.onItemClick(
                         itemOf(arg.event),
                         arg.event.id,

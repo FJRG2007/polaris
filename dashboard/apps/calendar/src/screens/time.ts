@@ -323,3 +323,59 @@ export function weekdayLabels(
 export function zoneOption(zone: string, now: Date, locale: string): string {
     return engine.zoneLabel(zone, now, locale);
 }
+
+/**
+ * Whether a view already shows today, so "Today" has nowhere to go. A month is
+ * the month named in its heading - the days of the months either side it also
+ * draws are not it - and a year is the year; anything else is its days.
+ */
+export function showsToday(
+    view: CalendarViewName,
+    anchor: DayString,
+    window: DayWindow,
+    today: DayString
+): boolean {
+    if (view === "month") return anchor.slice(0, 7) === today.slice(0, 7);
+    if (view === "year") return anchor.slice(0, 4) === today.slice(0, 4);
+    return today >= window.start && today < window.end;
+}
+
+/** Days of the weekend where `locale` is read (0 = Sunday), from Intl where the
+ *  browser knows them; Saturday and Sunday where it does not. */
+export function weekendDays(locale: string): number[] {
+    type WeekInfo = { weekend?: number[] };
+    try {
+        // `getWeekInfo()` in current engines, the `weekInfo` getter in older ones.
+        const intl = new Intl.Locale(locale) as Intl.Locale & {
+            getWeekInfo?: () => WeekInfo;
+            weekInfo?: WeekInfo;
+        };
+        const weekend = (intl.getWeekInfo?.() ?? intl.weekInfo)?.weekend;
+        // Intl counts Monday as 1 and Sunday as 7.
+        if (weekend && weekend.length > 0) return weekend.map((day) => day % 7);
+    } catch {
+        // A locale Intl does not know has the usual weekend.
+    }
+    return [6, 0];
+}
+
+/** How far into the day a time grid opens: an hour and a half before now, so
+ *  the red line sits near the top with what comes next below it. */
+export function nowScrollTime(now: Date, zone: string): string {
+    const minutes = minutesOfTime(timeOfWall(wallOf(now, zone))) - 90;
+    return `${timeOfMinutes(Math.max(0, minutes))}:00`;
+}
+
+/** A zone's offset the way a time grid's corner shows it (Google's "GMT+02"),
+ *  at the moment given - a zone with summer time has two. */
+export function zoneOffsetLabel(zone: string, at: Date, locale: string): string {
+    try {
+        return (
+            new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: "shortOffset" })
+                .formatToParts(at)
+                .find((part) => part.type === "timeZoneName")?.value ?? ""
+        );
+    } catch {
+        return "";
+    }
+}
