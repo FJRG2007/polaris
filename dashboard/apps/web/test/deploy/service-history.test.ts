@@ -54,6 +54,15 @@ describe("describing what happened to a service", () => {
         );
     });
 
+    it("says when Polaris stopped a service nobody asked it to, or took one back as running", () => {
+        expect(describeServiceEvent(line({ action: "stopped-unasked", authorName: null, toValue: "1" }))).toBe(
+            "Polaris stopped it: it was running although it was set to stopped"
+        );
+        expect(describeServiceEvent(line({ action: "resumed", authorName: null }))).toBe(
+            "Polaris set it back to running: it was stopped for failing to start and is up again"
+        );
+    });
+
     it("falls back to something true for an action it does not know", () => {
         expect(describeServiceEvent(line({ action: "something-new" }))).toBe("Ana changed it");
     });

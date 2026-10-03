@@ -22,12 +22,28 @@
  * `host-containers`'s. This one only closes the gap between a stop somebody
  * asked for and a stop that happened.
  *
+ * Two things it does not do silently. A service an app stopped by itself - a
+ * game server Polaris stopped for crash-looping - is asked about first: once it
+ * has been brought back up, the app takes it as running again rather than this
+ * pass stopping a repaired server with people on it, which is what it did before
+ * that question existed. And every container it does stop is written into the
+ * service's history and the audit log, with nobody as the actor, so a server
+ * that went down without anybody pressing anything says who did it.
+ *
  * Server-only.
  */
 
 import { prisma } from "@polaris/db";
 import { serviceRef } from "./releases";
 import { getPorts } from "./runtime";
+import * as activity from "@/lib/activity/activity";
+import { recordDeployAudit } from "@/lib/deploy-audit";
+import { adoptsRunningService } from "@/lib/app-extensions/registry";
+
+/** The history line for a container this pass stopped, and for one an app took
+ *  back as running instead. Read by `service-history.ts`. */
+export const STOPPED_UNASKED_ACTION = "stopped-unasked";
+export const RESUMED_ACTION = "resumed";
 
 /** What one pass did, for the line it logs. */
 export interface DesiredStatePass {
@@ -38,6 +54,8 @@ export interface DesiredStatePass {
     /** Machines that would not answer. Their services are looked at again on the
      *  next pass rather than being assumed to be right. */
     readonly unreachable: number;
+    /** Services an app took back as running instead of having them stopped. */
+    readonly adopted: number;
 }
 
 /**
@@ -64,7 +82,7 @@ export async function runDesiredStatePass(): Promise<DesiredStatePass> {
             environment: { select: { project: { select: { slug: true, ownerId: true } } } }
         }
     });
-    if (apps.length === 0) return { checked: 0, stopped: 0, unreachable: 0 };
+    if (apps.length === 0) return { checked: 0, stopped: 0, unreachable: 0, adopted: 0 };
 
     type Deployed = (typeof apps)[number];
     const byTarget = new Map<string, Deployed[]>();
@@ -76,6 +94,7 @@ export async function runDesiredStatePass(): Promise<DesiredStatePass> {
 
     let stopped = 0;
     let unreachable = 0;
+    let adopted = 0;
     for (const group of byTarget.values()) {
         const first = group[0];
         if (!first) continue;
@@ -102,20 +121,56 @@ export async function runDesiredStatePass(): Promise<DesiredStatePass> {
                     unreachable += 1;
                     continue;
                 }
+                if (running.length === 0) continue;
+                // Asked before anything is stopped: the app may have stopped it
+                // itself, and somebody may since have brought it back.
+                if (await adoptsRunningService(app.environment.project.ownerId, app.id)) {
+                    adopted += 1;
+                    await activity
+                        .record({ subjectType: "app", subjectId: app.id, userId: null, action: RESUMED_ACTION })
+                        .catch(() => undefined);
+                    continue;
+                }
+                const halted: string[] = [];
                 for (const name of running) {
                     // One at a time, and a failure on one is not a reason to
                     // leave the next one up. The next pass tries again.
-                    const halted = await ports
+                    const ok = await ports
                         .container(name, "stop")
                         .then(() => true)
                         .catch(() => false);
-                    if (halted) stopped += 1;
+                    if (ok) halted.push(name);
                 }
+                stopped += halted.length;
+                if (halted.length > 0) await recordStop(app.id, halted);
             }
         } finally {
             await ports.dispose().catch(() => undefined);
         }
     }
 
-    return { checked: apps.length, stopped, unreachable };
+    return { checked: apps.length, stopped, unreachable, adopted };
+}
+
+/** Say that this pass stopped something, where the owner reads what happened to
+ *  the service and where an administrator reads what happened at all. */
+async function recordStop(applicationId: string, containers: readonly string[]): Promise<void> {
+    await activity
+        .record({
+            subjectType: "app",
+            subjectId: applicationId,
+            userId: null,
+            action: STOPPED_UNASKED_ACTION,
+            toValue: String(containers.length)
+        })
+        .catch(() => undefined);
+    await recordDeployAudit({
+        // Nobody pressed anything: the service was recorded as stopped and the
+        // machine was running it.
+        actorId: null,
+        action: "deploy.app.stop-unasked",
+        targetType: "application",
+        targetId: applicationId,
+        metadata: { containers }
+    }).catch(() => undefined);
 }

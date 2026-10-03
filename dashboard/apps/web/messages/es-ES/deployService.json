@@ -111,6 +111,8 @@
         "restarted": "{who} lo reinició",
         "started": "{who} lo inició",
         "stopped": "{who} lo detuvo",
+        "stoppedUnasked": "{who} lo detuvo: estaba en marcha aunque figuraba como detenido",
+        "resumed": "{who} lo puso en marcha de nuevo: se detuvo por no arrancar y ya está en pie",
         "tornDown": "{who} retiró el despliegue en ejecución",
         "duplicated": "{who} lo duplicó",
         "variableNamed": "{who} cambió la variable {name}",

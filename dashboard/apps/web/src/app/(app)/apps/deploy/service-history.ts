@@ -58,6 +58,12 @@ export function describeServiceEvent(line: ActivityLine, t: ServiceT): string {
             return t("history.started", { who });
         case "stopped":
             return t("history.stopped", { who });
+        // Written by the pass that halts services recorded as stopped
+        // (`deploy/desired-state.ts`), with nobody as the author.
+        case "stopped-unasked":
+            return t("history.stoppedUnasked", { who });
+        case "resumed":
+            return t("history.resumed", { who });
         case "torn down":
             return t("history.tornDown", { who });
         case "duplicated":
