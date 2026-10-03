@@ -9,6 +9,12 @@
 
 import { z } from "zod";
 
+/** Why there was nowhere to hold an event, as the history says it (and
+ *  `messages.ts` translates it). */
+export const NO_GROUND = "No dry ground was found for it near the players";
+export const NO_AIR = "No open air was found for it near the players";
+export const NOBODY_IN_OVERWORLD = "Nobody is in the Overworld to hold it near";
+
 /** What stopped one try, in the operator's terms. */
 export const PLACE_REFUSALS = [
     /** No column far enough from every home. */

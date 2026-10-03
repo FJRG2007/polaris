@@ -15,14 +15,12 @@ import * as written from "../messages";
 import * as commands from "../commands";
 import * as said from "./hill-messages";
 import type * as stored from "../state";
+import * as search from "../place-search";
 import { EventStopped, type KindContext } from "./arena-service";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
 const hillMessages = speech.spoken(said);
-
-const NO_AIR = "No open air was found for it near the players";
-const NO_GROUND = "No dry ground was found for it near the players";
 
 /** Ticks a platform's chunks are waited for before its site is given up. */
 const LOAD_WAITS = 5;
@@ -65,7 +63,8 @@ export async function raiseHill(ctx: KindContext): Promise<boolean> {
         const found = fistsOnly
             ? await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "air", true, hill.LIFT)
             : await ctx.findPlace(place, hill.DISTANCE, radius + hill.MARGIN, "open", true);
-        if (found === "failed") throw new EventStopped(fistsOnly ? NO_AIR : NO_GROUND);
+        if (found === "failed")
+            throw new EventStopped(fistsOnly ? search.NO_AIR : search.NO_GROUND);
         return false;
     }
     return buildPlatform(ctx, run.place, radius);

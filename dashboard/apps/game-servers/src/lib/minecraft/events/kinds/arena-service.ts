@@ -36,7 +36,7 @@ import * as speech from "../../speech";
 import * as written from "../messages";
 import type * as stored from "../state";
 import type { ServerContainer } from "../../service";
-import type { PlaceRefusal } from "../place-search";
+import { NO_AIR, type PlaceRefusal } from "../place-search";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
@@ -90,7 +90,6 @@ export class EventStopped extends Error {}
  *  failure - as a spleef with one player is. */
 export class TooFew extends EventStopped {}
 
-const NO_PLACE = "No open air was found for it near the players";
 const ONE_SIDED = "Everybody left in it was on the same team";
 /** Why it was called off, as the history keeps it (and `messages.cancelReason`
  *  says it to players). */
@@ -271,7 +270,7 @@ async function raise(ctx: KindContext): Promise<void> {
                 : build.platformReach(run.joined.length, plotSize(run));
         const options = run.preset.options as { place: catalog.EventPlace };
         const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "air", true);
-        if (found === "failed") throw new EventStopped(NO_PLACE);
+        if (found === "failed") throw new EventStopped(NO_AIR);
         return;
     }
     const box = boxFor(run, place);

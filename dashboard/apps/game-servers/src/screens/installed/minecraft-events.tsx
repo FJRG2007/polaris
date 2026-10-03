@@ -75,7 +75,6 @@ const OUTCOME: Readonly<
     failed: { label: "events.outcomes.failed", tone: "danger" }
 };
 
-/** m:ss, or h:mm:ss past an hour. */
 /**
  * How the draw stands: when the next one comes (a countdown), why a due one
  * waits, the last one it started, and when the sweep last looked - the proof it
@@ -122,20 +121,27 @@ function DrawStatus({
     );
 }
 
-/** A score as the screen shows it: time held as a duration, anything else as
- *  a count with its unit (`figures`). */
+/** A score's figure: time held as a duration, anything else as a count (`figures`). */
+function scoreFigure(kind: catalog.EventKind, score: number, locale: string): string {
+    const language = figureLanguage(locale);
+    return catalog.KIND_INFO[kind].unit === "seconds"
+        ? formatDuration(score * 1000, language)
+        : formatCount(score, language);
+}
+
+/** A score as the screen shows it: its figure, and a count's unit after it. */
 function scoreText(
     t: GameText<"minecraft">,
     kind: catalog.EventKind,
     score: number,
     locale: string
 ): string {
-    const language = figureLanguage(locale);
-    if (catalog.KIND_INFO[kind].unit === "seconds") return formatDuration(score * 1000, language);
-    const unit = kindUnit(t, kind);
-    return unit ? `${formatCount(score, language)} ${unit}` : formatCount(score, language);
+    const figure = scoreFigure(kind, score, locale);
+    const unit = catalog.KIND_INFO[kind].unit === "seconds" ? "" : kindUnit(t, kind);
+    return unit ? `${figure} ${unit}` : figure;
 }
 
+/** m:ss, or h:mm:ss past an hour. */
 function clock(ms: number): string {
     const total = Math.max(0, Math.ceil(ms / 1000));
     const hours = Math.floor(total / 3600);
@@ -648,7 +654,7 @@ export function MinecraftEvents({
     }
 
     /** What the last press of Run a random event left out, and why. */
-    const [skipped, setSkipped] = useState<{ name: string; reason: string }[] | null>(null);
+    const [skipped, setSkipped] = useState<{ presetId: string; name: string; reason: string }[] | null>(null);
 
     function runRandom(): void {
         setError(null);
@@ -889,7 +895,7 @@ export function MinecraftEvents({
                             {skipped && skipped.length > 0 && (
                                 <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
                                     {skipped.map((one) => (
-                                        <li key={one.name} className="min-w-0 truncate" title={schemaText(one.reason) ?? ""}>
+                                        <li key={one.presetId} className="min-w-0 truncate" title={schemaText(one.reason) ?? ""}>
                                             {t("events.skippedOne", {
                                                 name: one.name,
                                                 reason: lowerFirst(schemaText(one.reason) ?? "")
@@ -1749,7 +1755,7 @@ export function MinecraftEvents({
                                             ? entry.podium
                                                   .map(
                                                       (one) =>
-                                                          `${one.place}. ${one.name} (${entry.kind === "parkour" ? one.score : formatCount(one.score, figureLanguage(locale))})`
+                                                          `${one.place}. ${one.name} (${entry.kind === "parkour" ? one.score : scoreFigure(entry.kind, one.score, locale)})`
                                                   )
                                                   .join("  ")
                                             : entry.note}

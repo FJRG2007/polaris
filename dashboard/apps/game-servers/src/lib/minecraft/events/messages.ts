@@ -8,6 +8,7 @@
  */
 
 import type { Heading } from "./commands";
+import * as search from "./place-search";
 import {
     itemName,
     KIND_NAMES,
@@ -298,11 +299,11 @@ export function cancelReason(note: string, language: Language): string {
         "Everybody left in it was on the same team":
             "todos los que quedaban eran del mismo equipo.",
         "Fewer than two players joined": "se apuntaron menos de dos jugadores.",
-        "No dry ground was found for it near the players":
+        [search.NO_GROUND]:
             "no se encontró un sitio libre y seguro cerca de los jugadores.",
-        "No open air was found for it near the players":
+        [search.NO_AIR]:
             "no se encontró aire libre para montarlo cerca de los jugadores.",
-        "Nobody is in the Overworld to hold it near":
+        [search.NOBODY_IN_OVERWORLD]:
             "no hay nadie en el mundo normal cerca de quien montarlo.",
         "The server stopped during the event": "el servidor se paró durante el evento."
     };

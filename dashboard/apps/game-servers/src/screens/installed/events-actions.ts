@@ -91,7 +91,7 @@ export async function startEventAction(input: z.input<typeof startSchema>): Prom
 /** Draw an event now from the pool: what was picked, and why the rest were not. */
 export async function runRandomAction(
     installedAppId: string
-): Promise<Answer & { picked?: string | null; skipped?: { name: string; reason: string }[] }> {
+): Promise<Answer & { picked?: string | null; skipped?: { presetId: string; name: string; reason: string }[] }> {
     const t = await gameWords("minecraft");
     const parsed = serverId.safeParse(installedAppId);
     if (!parsed.success) return { error: t("events.errors.noServer") };
@@ -114,7 +114,11 @@ export async function runRandomAction(
         return {
             view: await events.eventsView(parsed.data),
             picked: drawn.run?.preset.name ?? null,
-            skipped: drawn.skipped.map((one) => ({ name: one.name, reason: one.reason }))
+            skipped: drawn.skipped.map((one) => ({
+                presetId: one.presetId,
+                name: one.name,
+                reason: one.reason
+            }))
         };
     } catch (caught) {
         return { error: await failure(caught, t("events.errors.start")) };

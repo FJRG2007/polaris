@@ -1793,7 +1793,7 @@
             "wavesScaling": "Each wave brings the first wave's size, half as many again for every wave before it and for every defender at the point past the first (up to 5), at most 60. Every defender past the first gives each monster 4 more health (up to 16), and from 3 defenders they hit harder.",
             "wavesGear": "Armor grows wave by wave, from none to leather, chainmail, iron and diamond on the last, with enchanted bows and swords on the last two. Spider jockeys come from 40% of the waves, chicken jockeys from 60% and horsemen from 80%. Nothing they wear or ride is ever dropped, and all of it is removed.",
             "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins.",
-            "world": "{time, select, day {Holds midday} night {Holds midnight} other {Leaves the time alone}}{weather, select, clear { and clear weather} rain { and rain} other {}} while it runs, then puts the time and weather back."
+            "world": "{time, select, day {Holds midday} night {Holds midnight} other {Leaves the time alone}}{weather, select, clear { and clear weather} rain { and rain} other {}} while it runs, then gives the time back and lets the weather change again."
         },
         "errors": {
             "read": "The events could not be read",

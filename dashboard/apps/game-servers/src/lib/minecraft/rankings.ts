@@ -11,7 +11,7 @@
  */
 
 import { miningFigures } from "./xray";
-import { formatCount, formatDuration, type FigureLanguage } from "../figures";
+import { formatCount, formatPlain, formatDuration, type FigureLanguage } from "../figures";
 import type { PlayerStats } from "../games-activity";
 
 /**
@@ -138,7 +138,7 @@ export function distanceText(cm: number, language: FigureLanguage = "en"): strin
     const metres = cm / 100;
     if (metres < 1_000) return `${Math.floor(metres)}m`;
     const km = metres / 1_000;
-    return `${km < COMPACT_KM ? new Intl.NumberFormat(language === "es" ? "es-ES" : "en-US", { maximumFractionDigits: 1, useGrouping: false }).format(km) : formatCount(km, language)}km`;
+    return `${km < COMPACT_KM ? formatPlain(km, language) : formatCount(km, language)}km`;
 }
 
 /** Past this many kilometres the distance is written short too. */

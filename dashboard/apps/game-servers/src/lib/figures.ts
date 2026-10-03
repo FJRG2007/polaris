@@ -60,7 +60,7 @@ export function durationParts(ms: number): { value: number; unit: DurationUnit }
 }
 
 /** A number as the language writes it: `1.5`, `1,5`. */
-function plain(value: number, language: FigureLanguage): string {
+export function formatPlain(value: number, language: FigureLanguage = "en"): string {
     return new Intl.NumberFormat(TAGS[language], {
         maximumFractionDigits: 1,
         useGrouping: false
@@ -70,7 +70,7 @@ function plain(value: number, language: FigureLanguage): string {
 /** A duration, short: `45 s`, `12 min`, `1.1 d`, `6.4 wk`, `2 yr`; in Spanish `6,4 sem`. */
 export function formatDuration(ms: number, language: FigureLanguage = "en"): string {
     const { value, unit } = durationParts(ms);
-    return `${plain(value, language)} ${UNIT_LABELS[language][unit]}`;
+    return `${formatPlain(value, language)} ${UNIT_LABELS[language][unit]}`;
 }
 
 /** Below this a count is written out in full. */

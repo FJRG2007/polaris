@@ -229,6 +229,9 @@ interface PlaceHow {
     /** Only somewhere the players can walk to from here (`commands.walkable`):
      *  on an island, the island. */
     readonly walkFrom?: { x: number; z: number };
+    /** Nobody in the Overworld answers `failed` instead of ending the event:
+     *  for an event of many places, which can let one of them go. */
+    readonly letGo?: boolean;
 }
 
 /** How many tries a search has, counted from where it starts (`Loop.placeFloor`). */
@@ -1603,7 +1606,10 @@ async function findPlace(
     if (!loop.run.target) {
         const center = await centerFor(server, place);
         // Everybody in the Nether or the End: nobody to hold it near, said so.
-        if (!center) throw new PlaceNotFound(NOBODY_IN_OVERWORLD);
+        if (!center) {
+            if (how.letGo) return "failed";
+            throw new PlaceNotFound(search.NOBODY_IN_OVERWORLD);
+        }
         loop.run = { ...loop.run, placeFrom: center };
         let point: { x: number; z: number } | null = center;
         if (!chosen) {
@@ -2046,7 +2052,7 @@ async function retryPlace(
     if (loop.run.placeTries >= placeLimit(loop, nearHome)) {
         const inAir =
             catalog.playsInArena(loop.run.preset) || catalog.playsOnStage(loop.run.preset);
-        throw new PlaceNotFound(inAir ? NO_AIR : NO_GROUND);
+        throw new PlaceNotFound(inAir ? search.NO_AIR : search.NO_GROUND);
     }
 }
 
@@ -2971,7 +2977,11 @@ async function meteorShower(
             false,
             // Ore put only into air, and taken out again: on an island it comes
             // down on the island, where it can be walked to.
-            { nearHome: true, walkFrom: await walkStart(server, options.place) }
+            {
+                nearHome: true,
+                walkFrom: await walkStart(server, options.place),
+                letGo: true
+            }
         );
         if (found === "failed") {
             // Nowhere for this one: it is let go, and the next looked for afresh.
@@ -3165,7 +3175,7 @@ function stageTools(
                 // closer after a few tries, since it changes nothing below.
                 { surface: "air", nearHome: true }
             );
-            if (found === "failed") throw new PlaceNotFound(NO_AIR);
+            if (found === "failed") throw new PlaceNotFound(search.NO_AIR);
             return found;
         },
         giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, true, why),
@@ -3239,7 +3249,7 @@ async function chestTest(
 }
 
 class PlaceNotFound extends Error {
-    constructor(why: string = NO_GROUND) {
+    constructor(why: string = search.NO_GROUND) {
         super(why);
     }
 }
@@ -4005,10 +4015,6 @@ async function sample(
 
 // ------------------------------------------------------------------ the sweep
 
-/** Why there was nowhere to hold an event, as the history says it. */
-export const NO_GROUND = "No dry ground was found for it near the players";
-export const NO_AIR = "No open air was found for it near the players";
-export const NOBODY_IN_OVERWORLD = "Nobody is in the Overworld to hold it near";
 
 /**
  * When the sweep last looked at each server's draw. Kept in this process rather
