@@ -656,7 +656,8 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     // Philips air purifiers and humidifiers. Local stays the recommended way in:
     // it covers every model Home Assistant's Philips integration lists, needs no
     // account, and keeps working when Philips' servers do not. Units are found
-    // on the network, or at an address; nothing is paired and no key is kept.
+    // on the network, or at an address - including one on another network the
+    // router routes to; nothing is paired and no key is kept.
     {
         id: "philips-coap",
         brand: "Philips",

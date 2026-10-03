@@ -1,5 +1,5 @@
 /**
- * Philips air purifiers and humidifiers on the same network, as devices - the
+ * Philips air purifiers and humidifiers on the local network, as devices - the
  * units the Philips Air+ app drives.
  *
  * Local, like Home Assistant's Philips integration (ruaan-deysel/
