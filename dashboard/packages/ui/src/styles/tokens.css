@@ -166,9 +166,10 @@
     --danger-solid: 356 64% 48%;
     --danger-foreground: 0 0% 100%;
 
-    --shadow-popover: 0 8px 24px -6px hsl(225 30% 20% / 0.14), 0 2px 6px -2px hsl(225 30% 20% / 0.1);
-    --shadow-modal: 0 24px 56px -12px hsl(225 30% 20% / 0.2),
-        0 8px 20px -8px hsl(225 30% 20% / 0.12);
+    --shadow-popover:
+        0 8px 24px -6px hsl(225 30% 20% / 0.14), 0 2px 6px -2px hsl(225 30% 20% / 0.1);
+    --shadow-modal:
+        0 24px 56px -12px hsl(225 30% 20% / 0.2), 0 8px 20px -8px hsl(225 30% 20% / 0.12);
 }
 
 /*
@@ -225,10 +226,10 @@
         --danger-solid: 356 64% 48%;
         --danger-foreground: 0 0% 100%;
 
-        --shadow-popover: 0 8px 24px -6px hsl(225 30% 20% / 0.14),
-            0 2px 6px -2px hsl(225 30% 20% / 0.1);
-        --shadow-modal: 0 24px 56px -12px hsl(225 30% 20% / 0.2),
-            0 8px 20px -8px hsl(225 30% 20% / 0.12);
+        --shadow-popover:
+            0 8px 24px -6px hsl(225 30% 20% / 0.14), 0 2px 6px -2px hsl(225 30% 20% / 0.1);
+        --shadow-modal:
+            0 24px 56px -12px hsl(225 30% 20% / 0.2), 0 8px 20px -8px hsl(225 30% 20% / 0.12);
     }
 }
 
