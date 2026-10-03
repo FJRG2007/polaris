@@ -169,7 +169,11 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
                 {t.rich("connection.noLinkedAccount", {
                     provider: (field.provider && PROVIDER_NAMES[field.provider]) ?? "",
                     link: (chunks) => (
-                        <Link key="link" href="/account/connections" className="text-primary hover:underline">
+                        <Link
+                            key="link"
+                            href="/account/connections"
+                            className="text-primary hover:underline"
+                        >
                             {chunks}
                         </Link>
                     )
@@ -222,8 +226,18 @@ function KeyFileField({ name, label }: { name: string; label: string }) {
     );
 }
 
-const host: FieldDef = { name: "host", label: "connection.fields.host", required: true, group: "config" };
-const port: FieldDef = { name: "port", label: "connection.fields.port", type: "number", group: "config" };
+const host: FieldDef = {
+    name: "host",
+    label: "connection.fields.host",
+    required: true,
+    group: "config"
+};
+const port: FieldDef = {
+    name: "port",
+    label: "connection.fields.port",
+    type: "number",
+    group: "config"
+};
 
 const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     local: [{ name: "root", label: "connection.fields.rootPath", required: true, group: "config" }],
@@ -257,14 +271,34 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     webdav: [
         { name: "baseUrl", label: "connection.fields.baseUrl", required: true, group: "config" },
         { name: "username", label: "connection.fields.username", group: "config" },
-        { name: "password", label: "connection.fields.password", type: "password", group: "credentials" }
+        {
+            name: "password",
+            label: "connection.fields.password",
+            type: "password",
+            group: "credentials"
+        }
     ],
     s3: [
         { name: "endpoint", label: "connection.fields.endpoint", group: "config" },
-        { name: "region", label: "connection.fields.region", placeholder: "us-east-1", group: "config" },
+        {
+            name: "region",
+            label: "connection.fields.region",
+            placeholder: "us-east-1",
+            group: "config"
+        },
         { name: "bucket", label: "connection.fields.bucket", required: true, group: "config" },
-        { name: "forcePathStyle", label: "connection.fields.forcePathStyle", type: "checkbox", group: "config" },
-        { name: "accessKeyId", label: "connection.fields.accessKeyId", required: true, group: "config" },
+        {
+            name: "forcePathStyle",
+            label: "connection.fields.forcePathStyle",
+            type: "checkbox",
+            group: "config"
+        },
+        {
+            name: "accessKeyId",
+            label: "connection.fields.accessKeyId",
+            required: true,
+            group: "config"
+        },
         {
             name: "secretAccessKey",
             label: "connection.fields.secretAccessKey",
@@ -278,9 +312,22 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
         { name: "share", label: "connection.fields.share", required: true, group: "config" },
         { name: "domain", label: "connection.fields.domain", group: "config" },
         { name: "username", label: "connection.fields.username", group: "config" },
-        { name: "password", label: "connection.fields.password", type: "password", group: "credentials" }
+        {
+            name: "password",
+            label: "connection.fields.password",
+            type: "password",
+            group: "credentials"
+        }
     ],
-    nfs: [host, { name: "exportPath", label: "connection.fields.exportPath", required: true, group: "config" }],
+    nfs: [
+        host,
+        {
+            name: "exportPath",
+            label: "connection.fields.exportPath",
+            required: true,
+            group: "config"
+        }
+    ],
     synology: [
         host,
         { name: "username", label: "connection.fields.username", required: true, group: "config" },
@@ -305,13 +352,29 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     ],
     truenas: [
         host,
-        { name: "apiKey", label: "connection.fields.apiKey", type: "password", required: true, group: "credentials" }
+        {
+            name: "apiKey",
+            label: "connection.fields.apiKey",
+            type: "password",
+            required: true,
+            group: "credentials"
+        }
     ],
     "unifi-unas": [
         host,
         port,
-        { name: "username", label: "connection.fields.consoleUsername", required: true, group: "config" },
-        { name: "password", label: "connection.fields.consolePassword", type: "password", group: "credentials" },
+        {
+            name: "username",
+            label: "connection.fields.consoleUsername",
+            required: true,
+            group: "config"
+        },
+        {
+            name: "password",
+            label: "connection.fields.consolePassword",
+            type: "password",
+            group: "credentials"
+        },
         { name: "smbShare", label: "connection.fields.smbShare", group: "config" }
     ],
     // The consumer drives hold no credentials of their own: the account is
@@ -327,7 +390,12 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
             group: "config"
         },
         // i18n-ignore: the default folder is named after the product
-        { name: "rootFolderName", label: "connection.fields.folderName", placeholder: "Polaris", group: "config" }
+        {
+            name: "rootFolderName",
+            label: "connection.fields.folderName",
+            placeholder: "Polaris",
+            group: "config"
+        }
     ],
     onedrive: [
         {
@@ -339,7 +407,12 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
             group: "config"
         },
         // i18n-ignore: the default folder is named after the product
-        { name: "rootFolderName", label: "connection.fields.folderName", placeholder: "Polaris", group: "config" }
+        {
+            name: "rootFolderName",
+            label: "connection.fields.folderName",
+            placeholder: "Polaris",
+            group: "config"
+        }
     ],
     dropbox: [
         {
@@ -350,7 +423,12 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
             required: true,
             group: "config"
         },
-        { name: "rootPath", label: "connection.fields.folder", placeholder: "/Polaris", group: "config" }
+        {
+            name: "rootPath",
+            label: "connection.fields.folder",
+            placeholder: "/Polaris",
+            group: "config"
+        }
     ]
 };
 
@@ -423,20 +501,18 @@ export function EditConnectionDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {rekey ? t("connection.rekeyTitle", { kind: t(LABELS[kind]) }) : t("connection.editTitle", { kind: t(LABELS[kind]) })}
+                        {rekey
+                            ? t("connection.rekeyTitle", { kind: t(LABELS[kind]) })
+                            : t("connection.editTitle", { kind: t(LABELS[kind]) })}
                     </DialogTitle>
                     <DialogDescription>
-                        {rekey
-                            ? t("connection.rekeyDescription")
-                            : t("connection.editDescription")}
+                        {rekey ? t("connection.rekeyDescription") : t("connection.editDescription")}
                     </DialogDescription>
                 </DialogHeader>
                 {rekey ? (
                     <div className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-2 text-xs text-muted-foreground">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-                        <span>
-                            {t("connection.rekeyWarning")}
-                        </span>
+                        <span>{t("connection.rekeyWarning")}</span>
                     </div>
                 ) : null}
                 <form
@@ -629,7 +705,9 @@ export function ConnectionDialog() {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {step === "provider" ? t("connection.newTitle") : t("connection.connectTitle", { kind: t(LABELS[kind]) })}
+                        {step === "provider"
+                            ? t("connection.newTitle")
+                            : t("connection.connectTitle", { kind: t(LABELS[kind]) })}
                     </DialogTitle>
                     <DialogDescription>
                         {step === "provider"
@@ -693,7 +771,11 @@ export function ConnectionDialog() {
                     <form onSubmit={onSubmit} className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
                             {t("connection.name")}
-                            <Input name="name" required placeholder={t("connection.namePlaceholder")} />
+                            <Input
+                                name="name"
+                                required
+                                placeholder={t("connection.namePlaceholder")}
+                            />
                         </label>
                         {FIELDS[kind].map((field) => (
                             <label

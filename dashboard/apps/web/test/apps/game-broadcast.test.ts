@@ -55,7 +55,11 @@ describe("a message from Polaris", () => {
     it("keeps accents and emoji intact", () => {
         const typed = "Reinicio en 5 minutos - guardad, por favor";
         const body = broadcastArgv("java", typed)[2] ?? "";
-        expect(JSON.parse(body).map((part: { text: string }) => part.text).join("")).toContain(typed);
+        expect(
+            JSON.parse(body)
+                .map((part: { text: string }) => part.text)
+                .join("")
+        ).toContain(typed);
     });
 
     it("is never split into words on the way out", () => {
@@ -82,7 +86,9 @@ describe("a line typed into the console", () => {
             broadcastArgv("java", "hola a todos")
         );
         expect(consoleBroadcastArgv("java", "/SAY  hola")).toEqual(broadcastArgv("java", "hola"));
-        expect(consoleBroadcastArgv("bedrock", "say hola")).toEqual(broadcastArgv("bedrock", "hola"));
+        expect(consoleBroadcastArgv("bedrock", "say hola")).toEqual(
+            broadcastArgv("bedrock", "hola")
+        );
     });
 
     it("whispers to the one player as Polaris", async () => {

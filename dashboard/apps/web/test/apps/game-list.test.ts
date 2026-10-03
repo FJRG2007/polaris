@@ -9,7 +9,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { GameServerFacts, GameServerLive } from "@polaris-app/game-servers/src/lib/games-service";
+import type {
+    GameServerFacts,
+    GameServerLive
+} from "@polaris-app/game-servers/src/lib/games-service";
 import {
     canBrowseFiles,
     filterServers,
@@ -79,11 +82,15 @@ function server(name: string, over: Partial<ServerView> = {}): ServerView {
 
 describe("what one row is doing", () => {
     it("keeps a failed install failed however the container reads", () => {
-        expect(statusOf(server("a", { status: "failed", facts: facts({ running: false }) }))).toBe("failed");
+        expect(statusOf(server("a", { status: "failed", facts: facts({ running: false }) }))).toBe(
+            "failed"
+        );
     });
 
     it("tells a server nobody has stopped and that is not running from one that is stopped", () => {
-        expect(statusOf(server("a", { live: live({ containerRunning: false, answering: false }) }))).toBe("down");
+        expect(
+            statusOf(server("a", { live: live({ containerRunning: false, answering: false }) }))
+        ).toBe("down");
         expect(statusOf(server("b", { facts: facts({ running: false }) }))).toBe("stopped");
     });
 
@@ -100,11 +107,17 @@ describe("what one row is doing", () => {
 
 describe("searching and filtering", () => {
     const servers = [
-        server("Survival", { facts: facts({ address: "survival.mc.example.com", release: "1.21.4" }) }),
+        server("Survival", {
+            facts: facts({ address: "survival.mc.example.com", release: "1.21.4" })
+        }),
         server("Island", {
             game: "ark",
             catalogName: "ARK",
-            facts: facts({ address: "island.ark.example.com", serverName: "node-2", release: null }),
+            facts: facts({
+                address: "island.ark.example.com",
+                serverName: "node-2",
+                release: null
+            }),
             live: live({ answering: false, containerRunning: false })
         }),
         server("Creative", {
@@ -114,19 +127,30 @@ describe("searching and filtering", () => {
     ];
 
     it("matches the address and the machine, not only the name", () => {
-        expect(filterServers(servers, "ark.example", "", "").map((row) => row.name)).toEqual(["Island"]);
+        expect(filterServers(servers, "ark.example", "", "").map((row) => row.name)).toEqual([
+            "Island"
+        ]);
         expect(filterServers(servers, "node-2", "", "").map((row) => row.name)).toEqual(["Island"]);
-        expect(filterServers(servers, "1.21.4", "", "").map((row) => row.name)).toEqual(["Survival", "Creative"]);
+        expect(filterServers(servers, "1.21.4", "", "").map((row) => row.name)).toEqual([
+            "Survival",
+            "Creative"
+        ]);
     });
 
     it("ignores case and surrounding space", () => {
-        expect(filterServers(servers, "  SURVIVAL ", "", "").map((row) => row.name)).toEqual(["Survival"]);
+        expect(filterServers(servers, "  SURVIVAL ", "", "").map((row) => row.name)).toEqual([
+            "Survival"
+        ]);
     });
 
     it("narrows by game and by what is wrong", () => {
         expect(filterServers(servers, "", "ark", "").map((row) => row.name)).toEqual(["Island"]);
-        expect(filterServers(servers, "", "", "problem").map((row) => row.name)).toEqual(["Island"]);
-        expect(filterServers(servers, "", "", "stopped").map((row) => row.name)).toEqual(["Creative"]);
+        expect(filterServers(servers, "", "", "problem").map((row) => row.name)).toEqual([
+            "Island"
+        ]);
+        expect(filterServers(servers, "", "", "stopped").map((row) => row.name)).toEqual([
+            "Creative"
+        ]);
     });
 
     it("leaves the list alone when nothing has been asked", () => {
@@ -148,7 +172,10 @@ describe("ordering", () => {
     });
 
     it("sorts by who is playing", () => {
-        expect(sortServers([quiet, busy], "players", "desc").map((row) => row.name)).toEqual(["Busy", "Quiet"]);
+        expect(sortServers([quiet, busy], "players", "desc").map((row) => row.name)).toEqual([
+            "Busy",
+            "Quiet"
+        ]);
         expect(sortServers([busy, quiet], "players", "asc")[0]?.name).toBe("Quiet");
     });
 
@@ -170,7 +197,10 @@ describe("ordering", () => {
 describe("the line under the badge", () => {
     it("says how long a server that is answering has been up", () => {
         const up = server("a", { facts: facts({ onlineSince: "2026-08-13T09:00:00.000Z" }) });
-        expect(uptimeLine(up)).toEqual({ prefix: "status.upSince", at: "2026-08-13T09:00:00.000Z" });
+        expect(uptimeLine(up)).toEqual({
+            prefix: "status.upSince",
+            at: "2026-08-13T09:00:00.000Z"
+        });
     });
 
     it("says when a stopped server was last up", () => {
@@ -178,18 +208,25 @@ describe("the line under the badge", () => {
             facts: facts({ running: false, lastOnlineAt: "2026-08-10T09:00:00.000Z" }),
             live: live({ answering: false })
         });
-        expect(uptimeLine(off)).toEqual({ prefix: "status.lastUp", at: "2026-08-10T09:00:00.000Z" });
+        expect(uptimeLine(off)).toEqual({
+            prefix: "status.lastUp",
+            at: "2026-08-10T09:00:00.000Z"
+        });
     });
 
     it("never says a server that is answering was last up at some point", () => {
-        const up = server("a", { facts: facts({ lastOnlineAt: "2026-08-10T09:00:00.000Z", onlineSince: null }) });
+        const up = server("a", {
+            facts: facts({ lastOnlineAt: "2026-08-10T09:00:00.000Z", onlineSince: null })
+        });
         expect(uptimeLine(up)).toBeNull();
     });
 
     it("has nothing to say about a server that has never been seen up", () => {
         expect(uptimeLine(server("a", { facts: null, live: null }))).toBeNull();
         expect(
-            uptimeLine(server("b", { facts: facts({ running: false }), live: live({ answering: false }) }))
+            uptimeLine(
+                server("b", { facts: facts({ running: false }), live: live({ answering: false }) })
+            )
         ).toBeNull();
     });
 });
@@ -202,7 +239,10 @@ describe("whether the files can be browsed", () => {
         // is not being empty.
         expect(
             canBrowseFiles(
-                server("a", { facts: facts({ running: false }), live: live({ containerRunning: false }) })
+                server("a", {
+                    facts: facts({ running: false }),
+                    live: live({ containerRunning: false })
+                })
             )
         ).toBe(true);
     });
@@ -252,6 +292,9 @@ describe("clicking a column", () => {
     });
 
     it("moves to another column on its own terms", () => {
-        expect(nextSort({ key: "players", dir: "asc" }, "status")).toEqual({ key: "status", dir: "asc" });
+        expect(nextSort({ key: "players", dir: "asc" }, "status")).toEqual({
+            key: "status",
+            dir: "asc"
+        });
     });
 });

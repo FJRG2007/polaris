@@ -81,7 +81,9 @@ describe("the Deploys section of a service page", () => {
     it("shows the operator's own networks with the name a container there calls this service by", async () => {
         behaviourAction.mockResolvedValue({
             view: view({
-                externalNetworks: [{ name: "app_network", aliases: ["payments-api", "paymentsapi"] }]
+                externalNetworks: [
+                    { name: "app_network", aliases: ["payments-api", "paymentsapi"] }
+                ]
             })
         });
         render(<DeployBehaviourSection applicationId="app-1" canConfigure={true} />, {

@@ -156,11 +156,9 @@ describe("joinAccess", () => {
 describe("what the game's whitelist is missing", () => {
     it("reads the names out of the line the server prints", () => {
         // Colour codes and all, which is how it comes back over RCON.
-        expect(parseWhitelistNames("There are 3 whitelisted player(s): Steve, alice, Bob\x1b[0m")).toEqual([
-            "Steve",
-            "alice",
-            "Bob"
-        ]);
+        expect(
+            parseWhitelistNames("There are 3 whitelisted player(s): Steve, alice, Bob\x1b[0m")
+        ).toEqual(["Steve", "alice", "Bob"]);
     });
 
     it("reads an empty list as empty rather than as unreadable", () => {
@@ -187,7 +185,9 @@ describe("what the game's whitelist is missing", () => {
     it("leaves alone a name somebody put on the game's list by hand", () => {
         // Only ever adding is the whole safety of this: the other direction is
         // Polaris quietly locking out a player it was never told about.
-        expect(missingWhitelistNames([{ username: "Steve", address: "any" }], ["Steve", "Mallory"])).toEqual([]);
+        expect(
+            missingWhitelistNames([{ username: "Steve", address: "any" }], ["Steve", "Mallory"])
+        ).toEqual([]);
     });
 });
 
@@ -271,7 +271,9 @@ describe("gameReachAdvice", () => {
         expect(gameReachAdvice("home-nat", both, false, null, "range").steps[0]).toContain(
             "TCP 25565-25664 and UDP 19132-19231"
         );
-        expect(gameReachAdvice("home-nat", ports, false, null, "range").steps[0]).not.toContain("UDP");
+        expect(gameReachAdvice("home-nat", ports, false, null, "range").steps[0]).not.toContain(
+            "UDP"
+        );
     });
 });
 

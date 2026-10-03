@@ -24,7 +24,13 @@ vi.mock("@polaris/db", () => ({
                 const value = store.get(where.key);
                 return value === undefined ? null : { value };
             },
-            upsert: async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { key: string };
+                create: { value: string };
+            }) => {
                 store.set(where.key, create.value);
             },
             deleteMany: async ({ where }: { where: { key: string } }) => {
@@ -39,7 +45,9 @@ vi.mock("@polaris/db", () => ({
 vi.mock("node:dns/promises", () => ({ resolve4 }));
 vi.mock("../../src/lib/network-service", () => ({ detectPublicIp: async () => "5.6.7.8" }));
 vi.mock("../../src/lib/domain-service", () => ({ setDomainConfig }));
-vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: async () => null }));
+vi.mock("../../src/lib/integrations/cloudflare-account-service", () => ({
+    loadCloudflareToken: async () => null
+}));
 
 const { checkZoneDns } = await import("../../src/lib/domain-dns");
 const { saveDomainZones, setDashboardZoneIntent, zoneDnsVerified, zoneReachable } = await import(
@@ -111,7 +119,11 @@ describe("checkZoneDns", () => {
         const report = await checkZoneDns();
         expect(await zoneDnsVerified()).toBe(true);
         expect(report.gameZones).toHaveLength(1);
-        expect(report.gameZones[0]).toMatchObject({ game: "Minecraft", wildcard: "*.mc.example.com", ok: false });
+        expect(report.gameZones[0]).toMatchObject({
+            game: "Minecraft",
+            wildcard: "*.mc.example.com",
+            ok: false
+        });
     });
 
     it("reports a game's wildcard as done once it answers here", async () => {
@@ -129,7 +141,10 @@ describe("checkZoneDns", () => {
         resolve4.mockResolvedValue(["5.6.7.8"]);
         const report = await checkZoneDns();
         expect(report.gameZones).toHaveLength(1);
-        expect(report.gameZones[0]).toMatchObject({ game: "ARK: Survival Evolved", wildcard: "*.ark.example.com" });
+        expect(report.gameZones[0]).toMatchObject({
+            game: "ARK: Survival Evolved",
+            wildcard: "*.ark.example.com"
+        });
     });
 
     it("asks for no game wildcard on an instance with no game server", async () => {

@@ -83,23 +83,25 @@ function row(overrides: Partial<ContainerRow> = {}): ContainerRow {
 
 function render(value: HostSnapshot): string {
     snapshot = value;
-    return renderToStaticMarkup(withMessages(
-        <ContainersView
-            connections={[
-                {
-                    id: "local",
-                    name: "Local host",
-                    transport: "socket",
-                    status: "active",
-                    local: true
-                }
-            ]}
-            connectionId="local"
-            sshEnabled
-            canManage
-            localDiagnostic={null}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <ContainersView
+                connections={[
+                    {
+                        id: "local",
+                        name: "Local host",
+                        transport: "socket",
+                        status: "active",
+                        local: true
+                    }
+                ]}
+                connectionId="local"
+                sshEnabled
+                canManage
+                localDiagnostic={null}
+            />
+        )
+    );
 }
 
 describe("containers table freshness", () => {

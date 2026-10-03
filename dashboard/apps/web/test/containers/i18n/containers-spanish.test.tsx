@@ -18,7 +18,13 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }))
 vi.mock("@/components/use-live-resource", () => ({
     useLiveResource: (options: { url: string }) =>
         options.url.includes("host-status")
-            ? { data: [{ id: HOST, state: "down", detail: null }], loading: false, error: null, stale: null, refresh: () => {} }
+            ? {
+                  data: [{ id: HOST, state: "down", detail: null }],
+                  loading: false,
+                  error: null,
+                  stale: null,
+                  refresh: () => {}
+              }
             : { data: null, loading: true, error: null, stale: null, refresh: () => {} }
 }));
 vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => [async () => true, null] }));
@@ -27,14 +33,25 @@ vi.mock("@/app/(app)/apps/containers/actions", () => ({
     removeContainerAction: async () => ({}),
     deleteDockerConnectionAction: async () => undefined
 }));
-vi.mock("@/app/(app)/apps/containers/docker-connection-dialog", () => ({ DockerConnectionDialog: () => null }));
-vi.mock("@/app/(app)/apps/containers/polaris-footprint", () => ({ PolarisFootprintCard: () => null }));
+vi.mock("@/app/(app)/apps/containers/docker-connection-dialog", () => ({
+    DockerConnectionDialog: () => null
+}));
+vi.mock("@/app/(app)/apps/containers/polaris-footprint", () => ({
+    PolarisFootprintCard: () => null
+}));
 
 const { ContainersView } = await import("@/app/(app)/apps/containers/containers-view");
 
 const connections: DockerConnectionSummary[] = [
     { id: "local", name: "Local host", transport: "socket", status: "active", local: true },
-    { id: `host:${HOST}`, name: "node-2", transport: "ssh", status: "active", host: true, hostId: HOST }
+    {
+        id: `host:${HOST}`,
+        name: "node-2",
+        transport: "ssh",
+        status: "active",
+        host: true,
+        hostId: HOST
+    }
 ];
 
 describe("the host list", () => {
@@ -64,6 +81,8 @@ describe("a container's state", () => {
         const t = translatorFor("es-ES", "containers");
         expect(containerStateLabel(t, "exited")).toBe("detenido");
         expect(containerStateLabel(t, "hibernating")).toBe("hibernating");
-        expect(containerStateLabel(translatorFor("en-US", "containers"), "running")).toBe("running");
+        expect(containerStateLabel(translatorFor("en-US", "containers"), "running")).toBe(
+            "running"
+        );
     });
 });

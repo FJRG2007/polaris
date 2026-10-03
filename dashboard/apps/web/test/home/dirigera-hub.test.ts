@@ -128,9 +128,7 @@ describe("pairing", () => {
 
     it("says the button was not pressed when the window closes", async () => {
         pressAfter = 1000;
-        await expect(
-            ikea.pairHub("10.0.1.25", { pollMs: 1, windowMs: 5 })
-        ).rejects.toMatchObject({
+        await expect(ikea.pairHub("10.0.1.25", { pollMs: 1, windowMs: 5 })).rejects.toMatchObject({
             kind: "refused",
             message: expect.stringContaining("action button")
         });

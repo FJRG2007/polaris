@@ -45,7 +45,11 @@ describe("what the sync corrects", () => {
     it("counts a name that answers with the new address among others as settled", () => {
         // Cloudflare is mid-propagation, or a second record is on its way out. The
         // name reaches this server, which is what the sync is for.
-        const { ours } = classifyStale([{ name: "a.example.com", addresses: [OLD, NEW] }], NEW, OLD);
+        const { ours } = classifyStale(
+            [{ name: "a.example.com", addresses: [OLD, NEW] }],
+            NEW,
+            OLD
+        );
         expect(ours).toEqual([]);
     });
 });
@@ -71,7 +75,11 @@ describe("what the sync refuses to touch", () => {
     it("does not treat a name that resolves to nothing as stale", () => {
         // Absent, not wrong. Creating it is the guided setup's job, done in front
         // of somebody, not a correction made behind their back.
-        const { ours, theirs } = classifyStale([{ name: "new.example.com", addresses: [] }], NEW, OLD);
+        const { ours, theirs } = classifyStale(
+            [{ name: "new.example.com", addresses: [] }],
+            NEW,
+            OLD
+        );
         expect(ours).toEqual([]);
         expect(theirs).toEqual([]);
     });
@@ -80,7 +88,11 @@ describe("what the sync refuses to touch", () => {
         // Detection returned what we already knew, so a record disagreeing with it
         // disagrees for some other reason - and guessing is how a working zone gets
         // rewritten.
-        const { ours, theirs } = classifyStale([{ name: "a.example.com", addresses: ["198.51.100.4"] }], OLD, OLD);
+        const { ours, theirs } = classifyStale(
+            [{ name: "a.example.com", addresses: ["198.51.100.4"] }],
+            OLD,
+            OLD
+        );
         expect(ours).toEqual([]);
         expect(theirs.map((entry) => entry.name)).toEqual(["a.example.com"]);
     });

@@ -74,12 +74,7 @@ describe("provisionHostnameDns", () => {
     it("creates it just the same on a different domain the token reaches", async () => {
         resolveZoneForHostname.mockResolvedValue({ id: "zone-2", name: "example.org" });
         expect((await provisionHostnameDns("example.org")).status).toBe("created");
-        expect(upsertARecord).toHaveBeenCalledWith(
-            "cf-token",
-            "zone-2",
-            "example.org",
-            "5.6.7.8"
-        );
+        expect(upsertARecord).toHaveBeenCalledWith("cf-token", "zone-2", "example.org", "5.6.7.8");
     });
 
     it("takes the hostname as typed, however it was capitalized or spaced", async () => {

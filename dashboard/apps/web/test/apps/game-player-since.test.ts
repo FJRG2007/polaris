@@ -302,7 +302,12 @@ describe("the record, kept true to the log", () => {
     it("splits a visit when the player dropped and came back between two looks", () => {
         // The minute's look saw PlayerOne at 09:59 and again at 10:01: never absent.
         const open = [
-            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
+            {
+                id: "v1",
+                name: "PlayerOne",
+                playerId: null,
+                joinedAt: at("2026-09-29T08:00:00.000Z")
+            }
         ];
         const roster = [{ name: "PlayerOne", id: null }];
         const change = rosterChange(open, roster);
@@ -329,7 +334,12 @@ describe("the record, kept true to the log", () => {
     it("leaves a visit alone when the log's arrival is the one that opened it", () => {
         // Opened by the look a few seconds after the join line: the same connection.
         const open = [
-            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:03.000Z") }
+            {
+                id: "v1",
+                name: "PlayerOne",
+                playerId: null,
+                joinedAt: at("2026-09-29T08:00:03.000Z")
+            }
         ];
         const roster = [{ name: "PlayerOne", id: null }];
         const log = login("2026-09-29T08:00:00.000000000Z", "PlayerOne", 51001).join("\n");
@@ -396,7 +406,12 @@ describe("the record, kept true to the log", () => {
         // A leave line lost to the tail, a crash, a log that could not be read:
         // the server's own answer to who is on is what ends it.
         const open = [
-            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
+            {
+                id: "v1",
+                name: "PlayerOne",
+                playerId: null,
+                joinedAt: at("2026-09-29T08:00:00.000Z")
+            }
         ];
         const now = at("2026-09-29T09:00:00.000Z");
         const change = rosterChange(open, []);
@@ -424,7 +439,12 @@ describe("the record, kept true to the log", () => {
         // The server's machine is 30s ahead: the arrival was opened at the look,
         // and once the look's clock passes the logged join it sits past the start.
         const open = [
-            { id: "v1", name: "PlayerOne", playerId: null, joinedAt: at("2026-09-29T08:00:00.000Z") }
+            {
+                id: "v1",
+                name: "PlayerOne",
+                playerId: null,
+                joinedAt: at("2026-09-29T08:00:00.000Z")
+            }
         ];
         const roster = [{ name: "PlayerOne", id: null }];
         const log = [
@@ -444,7 +464,9 @@ describe("the record, kept true to the log", () => {
     it("never dates an arrival after the look that saw it", () => {
         const now = at("2026-09-29T08:00:00.000Z");
         const roster = [{ name: "PlayerOne", id: null }];
-        const ahead = logged(login("2026-09-29T08:00:05.000000000Z", "PlayerOne", 51001).join("\n"));
+        const ahead = logged(
+            login("2026-09-29T08:00:05.000000000Z", "PlayerOne", 51001).join("\n")
+        );
         expect(
             sessionWrites([], rosterChange([], roster), roster, ahead, now).open[0]?.joinedAt
         ).toEqual(now);
@@ -536,7 +558,9 @@ describe("the players table", () => {
         expect(row?.lastSeen).toBe("2026-09-29T15:59:30.000Z");
         // A frame with nothing new hands the same object back, so nothing redraws.
         expect(
-            withLiveSince(live, [{ name: "PlayerOne", id: null, since: "2026-09-29T15:59:30.000Z" }])
+            withLiveSince(live, [
+                { name: "PlayerOne", id: null, since: "2026-09-29T15:59:30.000Z" }
+            ])
         ).toBe(live);
         expect(withLiveSince(seen, [{ name: "PlayerOne", id: null }])).toBe(seen);
     });

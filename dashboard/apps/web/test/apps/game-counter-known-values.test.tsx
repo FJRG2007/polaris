@@ -19,19 +19,26 @@ vi.mock("@polaris/app-host/client", () => ({
         i18nProvider: { useLocale: () => "en-US" },
         confirmDialog: { useConfirm: () => [async () => true, null] },
         liveRead: { useKeptSnapshot: () => undefined },
-        snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined },
+        snapshotCache: {
+            readSnapshot: () => null,
+            writeSnapshot: () => undefined,
+            dropSnapshots: () => undefined
+        },
         structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next },
         copyButton: { CopyButton: () => null }
     }
 }));
 
 const { visibleLength } = await import("@polaris-app/game-servers/src/lib/minecraft/text-vars");
-const { sidebarProblems, DEFAULT_SIDEBAR, plainLine, SIDEBAR_TITLE_MAX } =
-    await import("@polaris-app/game-servers/src/lib/minecraft/sidebar");
-const { announcementProblems, BLANK_ANNOUNCEMENT, LINE_MAX } =
-    await import("@polaris-app/game-servers/src/lib/minecraft/announcement");
-const { FieldNote } =
-    await import("@polaris-app/game-servers/src/screens/installed/minecraft-announce");
+const { sidebarProblems, DEFAULT_SIDEBAR, plainLine, SIDEBAR_TITLE_MAX } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/sidebar"
+);
+const { announcementProblems, BLANK_ANNOUNCEMENT, LINE_MAX } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/announcement"
+);
+const { FieldNote } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-announce"
+);
 
 afterEach(cleanup);
 
@@ -53,7 +60,9 @@ describe("counting a text", () => {
 describe("what is refused", () => {
     it("takes a panel title that fits with the server's own name", () => {
         const sidebar = { ...DEFAULT_SIDEBAR, title: plainLine(TITLE) };
-        expect(english(sidebarProblems(sidebar).title[0])).toBe(`At most ${SIDEBAR_TITLE_MAX} characters`);
+        expect(english(sidebarProblems(sidebar).title[0])).toBe(
+            `At most ${SIDEBAR_TITLE_MAX} characters`
+        );
         expect(sidebarProblems(sidebar, KNOWN).title[0]).toBeNull();
     });
 

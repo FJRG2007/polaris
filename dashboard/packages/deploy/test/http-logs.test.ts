@@ -36,7 +36,8 @@ describe("parseHttpLogs", () => {
     });
 
     it("strips a leading Docker --timestamps token and reuses it when the line has none", () => {
-        const raw = '2026-07-21T12:32:05.123456789Z 10.0.0.5 - - [-] "POST /api HTTP/2.0" 500 12 "-" "curl/8"';
+        const raw =
+            '2026-07-21T12:32:05.123456789Z 10.0.0.5 - - [-] "POST /api HTTP/2.0" 500 12 "-" "curl/8"';
         const [entry] = parseHttpLogs(raw);
         expect(entry).toMatchObject({ ip: "10.0.0.5", method: "POST", path: "/api", status: 500 });
     });
@@ -83,7 +84,12 @@ describe("parseHttpLogs", () => {
     });
 
     it("drops the client port from an ip:port address", () => {
-        const raw = JSON.stringify({ ClientAddr: "198.51.100.2:52344", method: "GET", uri: "/x", status: 404 });
+        const raw = JSON.stringify({
+            ClientAddr: "198.51.100.2:52344",
+            method: "GET",
+            uri: "/x",
+            status: 404
+        });
         expect(parseHttpLogs(raw)[0]!.ip).toBe("198.51.100.2");
     });
 
@@ -153,7 +159,12 @@ describe("bucketHttpMetrics", () => {
     });
 
     it("marks empty buckets with a null error rate and spreads points across the window", () => {
-        const points = bucketHttpMetrics([entry({ time: new Date(from + 1_000).toISOString() })], from, to, 4);
+        const points = bucketHttpMetrics(
+            [entry({ time: new Date(from + 1_000).toISOString() })],
+            from,
+            to,
+            4
+        );
         expect(points).toHaveLength(4);
         expect(points[0]!.requests).toBe(1);
         expect(points[0]!.errorRate).toBe(0);
@@ -162,7 +173,10 @@ describe("bucketHttpMetrics", () => {
     });
 
     it("ignores entries outside the window or without a time, and rejects a bad range", () => {
-        const entries = [entry({ time: new Date(to + 5_000).toISOString() }), entry({ time: null })];
+        const entries = [
+            entry({ time: new Date(to + 5_000).toISOString() }),
+            entry({ time: null })
+        ];
         expect(bucketHttpMetrics(entries, from, to, 1)[0]!.requests).toBe(0);
         expect(bucketHttpMetrics(entries, to, from, 1)).toEqual([]);
     });

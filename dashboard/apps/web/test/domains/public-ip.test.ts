@@ -24,7 +24,13 @@ vi.mock("@polaris/db", () => ({
                 const value = store.get(where.key);
                 return value === undefined ? null : { value };
             },
-            upsert: async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { key: string };
+                create: { value: string };
+            }) => {
                 store.set(where.key, create.value);
             },
             deleteMany: async ({ where }: { where: { key: string } }) => {
@@ -34,7 +40,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_APP_URL: "http://polaris.local" }) }));
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_APP_URL: "http://polaris.local" })
+}));
 vi.mock("@polaris/storage", () => ({ decryptSecret: () => "", encryptSecret: () => "" }));
 vi.mock("../../src/lib/domain-edge", () => ({
     syncDashboardRoute: async () => undefined,
@@ -50,7 +58,9 @@ vi.mock("../../src/lib/host-address", async (importOriginal) => ({
     getHostLanIp: async () => state.detected
 }));
 
-const { getPublicIp, setDomainConfig, ensurePublicIp } = await import("../../src/lib/domain-service");
+const { getPublicIp, setDomainConfig, ensurePublicIp } = await import(
+    "../../src/lib/domain-service"
+);
 
 describe("getPublicIp", () => {
     beforeEach(() => {

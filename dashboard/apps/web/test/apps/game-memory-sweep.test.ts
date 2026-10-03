@@ -98,11 +98,14 @@ vi.mock("@/lib/apps/install-config", async (importOriginal) => {
 });
 
 vi.mock("@polaris-app/game-servers/src/lib/games-service", async (importOriginal) => {
-    const real = await importOriginal<typeof import("@polaris-app/game-servers/src/lib/games-service")>();
+    const real =
+        await importOriginal<typeof import("@polaris-app/game-servers/src/lib/games-service")>();
     return { ...real, listGameMachines: async () => machines };
 });
 
-const { resetHeapMb, sweepMemoryPlans } = await import("@polaris-app/game-servers/src/lib/games-memory");
+const { resetHeapMb, sweepMemoryPlans } = await import(
+    "@polaris-app/game-servers/src/lib/games-memory"
+);
 
 function server(config: Record<string, unknown>): Install {
     return {

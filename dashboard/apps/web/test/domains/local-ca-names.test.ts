@@ -10,7 +10,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const findMany = vi.fn(async () => [{ hostname: "app.plr.local" }, { hostname: "a.10-0-1-8.sslip.io" }]);
+const findMany = vi.fn(async () => [
+    { hostname: "app.plr.local" },
+    { hostname: "a.10-0-1-8.sslip.io" }
+]);
 const access = vi.fn(async () => undefined);
 const hostLanIp = vi.fn(async () => "10.0.1.42" as string | null);
 const interfaces = vi.fn(() => ({
@@ -64,7 +67,10 @@ describe("the local certificate's names", () => {
 
     it("does not change when the same domains come back in another order", async () => {
         const first = await subjectAltNames();
-        findMany.mockResolvedValueOnce([{ hostname: "a.10-0-1-8.sslip.io" }, { hostname: "app.plr.local" }]);
+        findMany.mockResolvedValueOnce([
+            { hostname: "a.10-0-1-8.sslip.io" },
+            { hostname: "app.plr.local" }
+        ]);
         expect(await subjectAltNames()).toEqual(first);
     });
 

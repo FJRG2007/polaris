@@ -14,7 +14,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { TrustedDeviceRow } from "@/lib/session-directory";
 
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh: () => undefined, push: () => undefined, replace: () => undefined }),
+    useRouter: () => ({
+        refresh: () => undefined,
+        push: () => undefined,
+        replace: () => undefined
+    }),
     useSearchParams: () => new URLSearchParams()
 }));
 vi.mock("@/components/confirm-dialog", () => ({ useConfirm: () => [async () => true, null] }));
@@ -65,7 +69,10 @@ function device(overrides: Partial<TrustedDeviceRow> = {}): TrustedDeviceRow {
 
 describe("the remembered devices in Spanish", () => {
     const markup = renderToStaticMarkup(
-        withMessages(<TrustedDevicesCard devices={[device(), device({ id: "two", current: true })]} />, "es-ES")
+        withMessages(
+            <TrustedDevicesCard devices={[device(), device({ id: "two", current: true })]} />,
+            "es-ES"
+        )
     );
 
     it("names the columns and the device being read on", () => {
@@ -83,8 +90,12 @@ describe("the remembered devices in Spanish", () => {
 
 describe("the backup codes card in Spanish", () => {
     it("agrees the count with its number", () => {
-        const one = renderToStaticMarkup(withMessages(<BackupCodesCard twoFactorEnabled remaining={1} />, "es-ES"));
-        const many = renderToStaticMarkup(withMessages(<BackupCodesCard twoFactorEnabled remaining={8} />, "es-ES"));
+        const one = renderToStaticMarkup(
+            withMessages(<BackupCodesCard twoFactorEnabled remaining={1} />, "es-ES")
+        );
+        const many = renderToStaticMarkup(
+            withMessages(<BackupCodesCard twoFactorEnabled remaining={8} />, "es-ES")
+        );
         expect(one).toContain("Queda 1");
         expect(many).toContain("Quedan 8");
         expect(many).not.toContain("8 left");
@@ -93,7 +104,9 @@ describe("the backup codes card in Spanish", () => {
 
 describe("the privacy settings in Spanish", () => {
     const everybody = { audience: "everyone" as const, people: [], listId: null };
-    const settings = Object.fromEntries(core.PRIVACY_FIELDS.map((field) => [field, everybody])) as unknown as PrivacySettings;
+    const settings = Object.fromEntries(
+        core.PRIVACY_FIELDS.map((field) => [field, everybody])
+    ) as unknown as PrivacySettings;
     const markup = renderToStaticMarkup(
         withMessages(<PrivacyView settings={settings} lists={[]} people={[]} />, "es-ES")
     );
@@ -110,13 +123,17 @@ describe("a sentence written elsewhere", () => {
     const tv = webCatalogs.translator("es-ES", "validation");
 
     it("is said in Spanish when the screen knows it", () => {
-        expect(knownMessage(t, tv, "Current password is incorrect.")).toBe("La contraseña actual no es correcta.");
+        expect(knownMessage(t, tv, "Current password is incorrect.")).toBe(
+            "La contraseña actual no es correcta."
+        );
         expect(knownMessage(t, tv, "Too many attempts. Try again in 5 minutes.")).toBe(
             "Demasiados intentos. Vuelve a intentarlo dentro de 5 minutos."
         );
     });
 
     it("is left as it was when it does not", () => {
-        expect(knownMessage(t, tv, "Something only the server knows")).toBe("Something only the server knows");
+        expect(knownMessage(t, tv, "Something only the server knows")).toBe(
+            "Something only the server knows"
+        );
     });
 });

@@ -73,7 +73,9 @@ describe("the mod list both installers read", () => {
     });
 
     it("says in both scripts which server it is for", () => {
-        expect(shellInstaller("https://polaris.test/pack.tsv", "ExampleSMP")).toContain('"ExampleSMP"');
+        expect(shellInstaller("https://polaris.test/pack.tsv", "ExampleSMP")).toContain(
+            '"ExampleSMP"'
+        );
         expect(powershellInstaller("https://polaris.test/pack.tsv", "ExampleSMP")).toContain(
             '"ExampleSMP"'
         );

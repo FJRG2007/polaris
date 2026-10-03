@@ -40,7 +40,11 @@ describe("a password built out of the account", () => {
 
 describe("a password unrelated to the account", () => {
     it("passes", () => {
-        for (const candidate of ["correct horse battery staple", "7uKq!vbz#Lm2", "quiet-lantern-drift"]) {
+        for (const candidate of [
+            "correct horse battery staple",
+            "7uKq!vbz#Lm2",
+            "quiet-lantern-drift"
+        ]) {
             expect(passwordMatchesIdentity(candidate, IDENTITY)).toBe(false);
         }
     });

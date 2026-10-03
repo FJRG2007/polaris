@@ -73,9 +73,9 @@ describe("which service a provider's copy belongs to", () => {
     });
 
     it("reads a repository however it was written", () => {
-        expect(
-            repoOfSource(JSON.stringify({ repoUrl: "git@github.com:acme/portfolio.git" }))
-        ).toBe("acme/portfolio");
+        expect(repoOfSource(JSON.stringify({ repoUrl: "git@github.com:acme/portfolio.git" }))).toBe(
+            "acme/portfolio"
+        );
         expect(repoOfSource(JSON.stringify({ imageRef: "nginx" }))).toBeNull();
     });
 });

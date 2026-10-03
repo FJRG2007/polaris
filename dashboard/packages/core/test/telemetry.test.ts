@@ -46,8 +46,19 @@ const crash = {
                 value: "Cannot read properties of undefined (reading 'id')",
                 stacktrace: {
                     frames: [
-                        { filename: "node_modules/next/server.js", function: "run", lineno: 90, in_app: false },
-                        { filename: "src/lib/deploy.ts", function: "deployApp", lineno: 42, colno: 7, in_app: true }
+                        {
+                            filename: "node_modules/next/server.js",
+                            function: "run",
+                            lineno: 90,
+                            in_app: false
+                        },
+                        {
+                            filename: "src/lib/deploy.ts",
+                            function: "deployApp",
+                            lineno: 42,
+                            colno: 7,
+                            in_app: true
+                        }
                     ]
                 }
             }
@@ -109,9 +120,9 @@ describe("which project a request names", () => {
                 header: "Sentry sentry_version=7, sentry_key=abc123def456, sentry_client=sentry.javascript/8"
             })
         ).toBe("abc123def456");
-        expect(readIngestKey({ dsn: "https://abc123def456@polaris.example.test/api/telemetry/3" })).toBe(
-            "abc123def456"
-        );
+        expect(
+            readIngestKey({ dsn: "https://abc123def456@polaris.example.test/api/telemetry/3" })
+        ).toBe("abc123def456");
     });
 
     it("refuses anything that is not shaped like a key", () => {
@@ -214,25 +225,39 @@ describe("which issue an event belongs to", () => {
 
     it("is a different crash when the exception or the function is", () => {
         const other = readEvent(
-            { ...crash, exception: { values: [{ ...crash.exception.values[0], type: "RangeError" }] } },
+            {
+                ...crash,
+                exception: { values: [{ ...crash.exception.values[0], type: "RangeError" }] }
+            },
             NOW
         )!;
         expect(other.fingerprint).not.toBe(event.fingerprint);
     });
 
     it("is one issue for a message that only differs by an id", () => {
-        const first = readEvent({ message: "user 91 not found", timestamp: NOW.toISOString() }, NOW)!;
-        const second = readEvent({ message: "user 92 not found", timestamp: NOW.toISOString() }, NOW)!;
+        const first = readEvent(
+            { message: "user 91 not found", timestamp: NOW.toISOString() },
+            NOW
+        )!;
+        const second = readEvent(
+            { message: "user 92 not found", timestamp: NOW.toISOString() },
+            NOW
+        )!;
         expect(first.fingerprint).toBe(second.fingerprint);
         // But not for a message that says something else.
-        const third = readEvent({ message: "team 91 not found", timestamp: NOW.toISOString() }, NOW)!;
+        const third = readEvent(
+            { message: "team 91 not found", timestamp: NOW.toISOString() },
+            NOW
+        )!;
         expect(third.fingerprint).not.toBe(first.fingerprint);
     });
 
     it("takes the reporter's own fingerprint over the guess", () => {
         const stated = fingerprintOf(event, ["payments", "timeout"]);
         expect(stated).not.toBe(event.fingerprint);
-        expect(fingerprintOf({ ...event, type: "RangeError" }, ["payments", "timeout"])).toBe(stated);
+        expect(fingerprintOf({ ...event, type: "RangeError" }, ["payments", "timeout"])).toBe(
+            stated
+        );
     });
 
     it("adds to the guess rather than replacing it when asked to", () => {

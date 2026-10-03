@@ -75,7 +75,9 @@ async function cloudMetadataReachable(): Promise<boolean> {
 /** A stored setting read back as an environment, or null when absent or from a
  *  version that knew a value this one does not. */
 function asEnvironment(value: string | null): ServerEnvironment | null {
-    return value && SERVER_ENVIRONMENTS.includes(value as ServerEnvironment) ? (value as ServerEnvironment) : null;
+    return value && SERVER_ENVIRONMENTS.includes(value as ServerEnvironment)
+        ? (value as ServerEnvironment)
+        : null;
 }
 
 /**
@@ -188,7 +190,11 @@ export async function detectPublicIp(force = false): Promise<string | null> {
         const cached = await getSetting(KEYS.detectedIp);
         if (cached && Number.isFinite(at) && Date.now() - at < DETECT_TTL_MS) return cached;
     }
-    for (const url of ["https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"]) {
+    for (const url of [
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+        "https://icanhazip.com"
+    ]) {
         try {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 4000);
@@ -228,7 +234,10 @@ export async function detectPublicIp(force = false): Promise<string | null> {
  * must not wait on three HTTP timeouts to draw a table.
  */
 export async function networkPublicIp(): Promise<string | null> {
-    const [cached, at] = await Promise.all([getSetting(KEYS.detectedIp), getSetting(KEYS.detectedAt)]);
+    const [cached, at] = await Promise.all([
+        getSetting(KEYS.detectedIp),
+        getSetting(KEYS.detectedAt)
+    ]);
     const stamp = Number(at);
     if (!Number.isFinite(stamp) || Date.now() - stamp >= DETECT_TTL_MS) {
         void detectPublicIp().catch(() => undefined);
@@ -265,18 +274,27 @@ export interface NetworkStatus {
 }
 
 export async function getNetworkStatus(): Promise<NetworkStatus> {
-    const [storedMode, storedWildcard, zoneBase, zoneVerified, subdomainIp, publicIp, base, placement, duckdns] =
-        await Promise.all([
-            getSetting(KEYS.mode),
-            getSetting(KEYS.wildcardDomain),
-            deployZoneBase(),
-            zoneDnsVerified(),
-            getPublicIp(),
-            detectPublicIp(),
-            deployBase(),
-            detectPlacement(),
-            duckdnsConfigured()
-        ]);
+    const [
+        storedMode,
+        storedWildcard,
+        zoneBase,
+        zoneVerified,
+        subdomainIp,
+        publicIp,
+        base,
+        placement,
+        duckdns
+    ] = await Promise.all([
+        getSetting(KEYS.mode),
+        getSetting(KEYS.wildcardDomain),
+        deployZoneBase(),
+        zoneDnsVerified(),
+        getPublicIp(),
+        detectPublicIp(),
+        deployBase(),
+        detectPlacement(),
+        duckdnsConfigured()
+    ]);
     // The zone layout is the source of truth once a base domain is configured: the
     // guided setup writes it, and every deploy zone already carries its own wildcard
     // record. The standalone field stays as the fallback for setups that predate it.
@@ -320,8 +338,12 @@ export async function getNetworkStatus(): Promise<NetworkStatus> {
     };
 }
 
-export async function setNetworkConfig(input: { mode?: NetworkMode; wildcardDomain?: string }): Promise<void> {
-    if (input.mode !== undefined && MODES.includes(input.mode)) await setSetting(KEYS.mode, input.mode);
+export async function setNetworkConfig(input: {
+    mode?: NetworkMode;
+    wildcardDomain?: string;
+}): Promise<void> {
+    if (input.mode !== undefined && MODES.includes(input.mode))
+        await setSetting(KEYS.mode, input.mode);
     if (input.wildcardDomain !== undefined) {
         const clean = input.wildcardDomain
             .trim()
@@ -360,7 +382,8 @@ export async function resolveAutoDomain(
         // it beats the IP-derived name - and it is the only option when the server is
         // reached by hostname, where there is no address to encode.
         const wildcard = override.wildcard?.trim();
-        if (wildcard) return { hostname: magicDomain(name, "", wildcard), cert: "le", kind: "auto" };
+        if (wildcard)
+            return { hostname: magicDomain(name, "", wildcard), cert: "le", kind: "auto" };
         const ip = override.ip.trim();
         // The subdomain encodes the address in a DNS label, so a host reached by
         // name or over IPv6 has no auto domain to offer - the caller falls back.
@@ -379,14 +402,22 @@ export async function resolveAutoDomain(
         return { hostname: magicDomain(name, "", status.wildcardDomain), cert: "le", kind: "auto" };
     }
     if (status.effectiveMode === "public" && status.subdomainIp) {
-        return { hostname: magicDomain(name, status.subdomainIp, DEFAULT_SUBDOMAIN_BASE), cert: "le", kind: "auto" };
+        return {
+            hostname: magicDomain(name, status.subdomainIp, DEFAULT_SUBDOMAIN_BASE),
+            cert: "le",
+            kind: "auto"
+        };
     }
     if (status.subdomainIp) {
         // LAN-only but universally resolvable: a sslip.io name that public DNS maps to
         // the private IP, so it works on any LAN device with no mDNS or per-name setup
         // (unlike a *.plr.local name). Served by the internal CA and labelled. A NATed
         // box's public reachability is handled separately (an auto Cloudflare quick tunnel).
-        return { hostname: magicDomain(name, status.subdomainIp, DEFAULT_SUBDOMAIN_BASE), cert: "internal", kind: "lan" };
+        return {
+            hostname: magicDomain(name, status.subdomainIp, DEFAULT_SUBDOMAIN_BASE),
+            cert: "internal",
+            kind: "lan"
+        };
     }
     return null;
 }

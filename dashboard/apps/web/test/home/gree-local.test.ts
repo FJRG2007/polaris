@@ -571,9 +571,7 @@ describe("finding units on the network", () => {
 
     it("finds a unit by its MAC, however the MAC is spelled", async () => {
         units = [fakeUnit({ address: "10.0.1.77" })];
-        await expect(gree.greeLocalDriver.locate!("AA:BB:CC:11:22:33")).resolves.toBe(
-            "10.0.1.77"
-        );
+        await expect(gree.greeLocalDriver.locate!("AA:BB:CC:11:22:33")).resolves.toBe("10.0.1.77");
         await expect(gree.greeLocalDriver.locate!("aabbcc999999")).resolves.toBeNull();
     });
 });

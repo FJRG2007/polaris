@@ -67,7 +67,10 @@ describe("the address a request arrived on", () => {
     });
 
     it("prefers what the proxy forwarded, since that is the name the browser used", async () => {
-        requestHeaders = new Headers({ host: "polaris:3000", "x-forwarded-host": "polaris.example.com" });
+        requestHeaders = new Headers({
+            host: "polaris:3000",
+            "x-forwarded-host": "polaris.example.com"
+        });
         expect(await clientHost()).toBe("polaris.example.com");
     });
 
@@ -107,11 +110,20 @@ describe("listing an account's sessions", () => {
 
     it("returns every session, whichever name each was opened on", async () => {
         sessionRows = [
-            sessionRow("session-1", { host: "polaris.local", lastSeenAt: new Date("2026-08-02T10:00:00Z") }),
-            sessionRow("session-2", { host: "polaris.example.com", lastSeenAt: new Date("2026-08-02T11:00:00Z") })
+            sessionRow("session-1", {
+                host: "polaris.local",
+                lastSeenAt: new Date("2026-08-02T10:00:00Z")
+            }),
+            sessionRow("session-2", {
+                host: "polaris.example.com",
+                lastSeenAt: new Date("2026-08-02T11:00:00Z")
+            })
         ];
         const sessions = await listUserSessions("user-1", "session-1");
-        expect(sessions.map((session) => session.host)).toEqual(["polaris.local", "polaris.example.com"]);
+        expect(sessions.map((session) => session.host)).toEqual([
+            "polaris.local",
+            "polaris.example.com"
+        ]);
         expect(sessions.filter((session) => session.current)).toHaveLength(1);
     });
 

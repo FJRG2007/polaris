@@ -17,7 +17,13 @@ vi.mock("@polaris/db", () => ({
                 const value = store.get(where.key);
                 return value === undefined ? null : { value };
             },
-            upsert: async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { key: string };
+                create: { value: string };
+            }) => {
                 store.set(where.key, create.value);
             },
             deleteMany: async ({ where }: { where: { key: string } }) => {
@@ -35,13 +41,19 @@ describe("resolveAutoDomain for a remote server", () => {
     });
 
     it("uses the server's own wildcard domain, with a real certificate", async () => {
-        const plan = await resolveAutoDomain("invoices", { ip: "5.6.7.8", wildcard: "apps.example.com" });
+        const plan = await resolveAutoDomain("invoices", {
+            ip: "5.6.7.8",
+            wildcard: "apps.example.com"
+        });
         expect(plan?.hostname.endsWith(".apps.example.com")).toBe(true);
         expect(plan).toMatchObject({ cert: "le", kind: "auto" });
     });
 
     it("prefers the wildcard over the address, so the name is not tied to an IP", async () => {
-        const plan = await resolveAutoDomain("invoices", { ip: "10.0.1.20", wildcard: "apps.example.com" });
+        const plan = await resolveAutoDomain("invoices", {
+            ip: "10.0.1.20",
+            wildcard: "apps.example.com"
+        });
         expect(plan?.hostname).not.toContain("10-0-1-20");
         expect(plan?.kind).toBe("auto");
     });

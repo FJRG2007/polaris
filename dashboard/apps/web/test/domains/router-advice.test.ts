@@ -49,7 +49,10 @@ let tlsReply: { status: number; body: string; trusted: boolean; server?: string 
 
 vi.mock("node:https", () => ({
     request: (_options: unknown, callback: (response: unknown) => void) => {
-        const client = new EventEmitter() as EventEmitter & { end: () => void; destroy: () => void };
+        const client = new EventEmitter() as EventEmitter & {
+            end: () => void;
+            destroy: () => void;
+        };
         client.destroy = () => undefined;
         client.end = () => {
             if (!tlsReply) {
@@ -76,12 +79,19 @@ vi.mock("node:https", () => ({
     }
 }));
 
-const { probeEdge, reportRouterAdvice, routerAdvice } = await import("../../src/lib/network-advice");
+const { probeEdge, reportRouterAdvice, routerAdvice } = await import(
+    "../../src/lib/network-advice"
+);
 
 /** The probe result for a hostname nothing answered on. */
 const SILENT = { answer: "silent", server: null, status: null, certificate: "unknown" } as const;
 /** Somebody answered, and named itself the way router firmware does. */
-const ROUTER = { answer: "other", server: "ZTE web server 1.0", status: 400, certificate: "unknown" } as const;
+const ROUTER = {
+    answer: "other",
+    server: "ZTE web server 1.0",
+    status: 400,
+    certificate: "unknown"
+} as const;
 const POLARIS = { answer: "polaris", server: null, status: 200, certificate: "trusted" } as const;
 
 describe("when Polaris itself answers", () => {
@@ -170,13 +180,17 @@ describe("every advice", () => {
         // An HTTPS-only reading of the advice leaves :80 shut, and then the
         // certificate never issues - the site is unreachable for a different reason.
         for (const environment of ["home-nat", "cloud", "unknown"] as const) {
-            expect(routerAdvice(environment, "a.example.com", SILENT).steps.join(" ")).toMatch(/Port 80 is needed/);
+            expect(routerAdvice(environment, "a.example.com", SILENT).steps.join(" ")).toMatch(
+                /Port 80 is needed/
+            );
         }
     });
 
     it("names the hostname it is talking about", () => {
         for (const probe of [SILENT, ROUTER]) {
-            expect(routerAdvice("home-nat", "polaris.example.com", probe).detail).toContain("polaris.example.com");
+            expect(routerAdvice("home-nat", "polaris.example.com", probe).detail).toContain(
+                "polaris.example.com"
+            );
         }
     });
 
@@ -204,7 +218,10 @@ describe("probing who answers", () => {
     });
 
     it("takes only Polaris's own marker as Polaris", async () => {
-        vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+        vi.stubGlobal(
+            "fetch",
+            async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 })
+        );
 
         expect(await probeEdge("a.example.com")).toMatchObject({ answer: "polaris" });
     });
@@ -212,7 +229,11 @@ describe("probing who answers", () => {
     it("treats any other reply as something in the way, and keeps its name", async () => {
         vi.stubGlobal(
             "fetch",
-            async () => new Response("<h2>400 Bad Request</h2>", { status: 400, headers: { server: "ZTE web server 1.0" } })
+            async () =>
+                new Response("<h2>400 Bad Request</h2>", {
+                    status: 400,
+                    headers: { server: "ZTE web server 1.0" }
+                })
         );
 
         expect(await probeEdge("a.example.com")).toEqual({
@@ -250,11 +271,17 @@ describe("probing who answers", () => {
         vi.stubGlobal(
             "fetch",
             async () =>
-                new Response(null, { status: 302, headers: { location: "https://a.example.com/api/health" } })
+                new Response(null, {
+                    status: 302,
+                    headers: { location: "https://a.example.com/api/health" }
+                })
         );
         tlsReply = { status: 200, body: '{"status":"ok"}', trusted: false };
 
-        expect(await probeEdge("a.example.com")).toMatchObject({ answer: "polaris", certificate: "untrusted" });
+        expect(await probeEdge("a.example.com")).toMatchObject({
+            answer: "polaris",
+            certificate: "untrusted"
+        });
     });
 
     it("counts the edge's own redirect to HTTPS as Polaris answering on 80", async () => {
@@ -263,17 +290,27 @@ describe("probing who answers", () => {
         vi.stubGlobal(
             "fetch",
             async () =>
-                new Response(null, { status: 301, headers: { location: "https://a.example.com/api/health" } })
+                new Response(null, {
+                    status: 301,
+                    headers: { location: "https://a.example.com/api/health" }
+                })
         );
 
-        expect(await probeEdge("a.example.com")).toMatchObject({ answer: "polaris", certificate: "unknown" });
+        expect(await probeEdge("a.example.com")).toMatchObject({
+            answer: "polaris",
+            certificate: "unknown"
+        });
     });
 
     it("does not take a redirect somewhere else as Polaris", async () => {
         // A router bouncing the request to its own portal is not evidence of anything.
         vi.stubGlobal(
             "fetch",
-            async () => new Response(null, { status: 302, headers: { location: "http://10.0.1.1/login.html" } })
+            async () =>
+                new Response(null, {
+                    status: 302,
+                    headers: { location: "http://10.0.1.1/login.html" }
+                })
         );
 
         expect(await probeEdge("a.example.com")).toMatchObject({ answer: "other" });
@@ -308,10 +345,12 @@ describe("telling the administrators", () => {
             const value = settings.get(where.key);
             return value === undefined ? null : { value };
         });
-        upsert.mockImplementation(async ({ where, update }: { where: { key: string }; update: { value: string } }) => {
-            settings.set(where.key, update.value);
-            return { key: where.key, value: update.value };
-        });
+        upsert.mockImplementation(
+            async ({ where, update }: { where: { key: string }; update: { value: string } }) => {
+                settings.set(where.key, update.value);
+                return { key: where.key, value: update.value };
+            }
+        );
         vi.stubGlobal("fetch", async () => {
             throw new Error("ECONNREFUSED");
         });
@@ -321,7 +360,10 @@ describe("telling the administrators", () => {
         await reportRouterAdvice("home-nat", "polaris.example.com");
 
         expect(create).toHaveBeenCalledTimes(2);
-        expect(create.mock.calls.map((call) => call[0].data.userId).sort()).toEqual(["admin-1", "admin-2"]);
+        expect(create.mock.calls.map((call) => call[0].data.userId).sort()).toEqual([
+            "admin-1",
+            "admin-2"
+        ]);
         expect(create.mock.calls[0][0].data.href).toBe("/admin/domains");
     });
 
@@ -338,7 +380,10 @@ describe("telling the administrators", () => {
     it("speaks again when the diagnosis changes", async () => {
         await reportRouterAdvice("home-nat", "polaris.example.com");
         create.mockReset();
-        vi.stubGlobal("fetch", async () => new Response("nope", { status: 400, headers: { server: "ZTE" } }));
+        vi.stubGlobal(
+            "fetch",
+            async () => new Response("nope", { status: 400, headers: { server: "ZTE" } })
+        );
 
         await reportRouterAdvice("home-nat", "polaris.example.com");
 
@@ -349,7 +394,10 @@ describe("telling the administrators", () => {
     it("says so when it starts working, so a fix is confirmed", async () => {
         await reportRouterAdvice("home-nat", "polaris.example.com");
         create.mockReset();
-        vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+        vi.stubGlobal(
+            "fetch",
+            async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 })
+        );
 
         await reportRouterAdvice("home-nat", "polaris.example.com");
 
@@ -358,7 +406,10 @@ describe("telling the administrators", () => {
     });
 
     it("announces nothing on a first check that finds no problem", async () => {
-        vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+        vi.stubGlobal(
+            "fetch",
+            async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 })
+        );
 
         await reportRouterAdvice("home-nat", "polaris.example.com");
 

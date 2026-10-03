@@ -16,8 +16,14 @@ import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 describe("detectCommand", () => {
     it("takes a slashed command as soon as the word is complete", () => {
         expect(detectCommand("/services")).toMatchObject({ scope: { id: "services" }, term: "" });
-        expect(detectCommand("/services storefront")).toMatchObject({ scope: { id: "services" }, term: "storefront" });
-        expect(detectCommand("/servers node-0")).toMatchObject({ scope: { id: "servers" }, term: "node-0" });
+        expect(detectCommand("/services storefront")).toMatchObject({
+            scope: { id: "services" },
+            term: "storefront"
+        });
+        expect(detectCommand("/servers node-0")).toMatchObject({
+            scope: { id: "servers" },
+            term: "node-0"
+        });
     });
 
     it("waits for a word another command continues, so the next letter is not eaten", () => {
@@ -29,7 +35,10 @@ describe("detectCommand", () => {
         expect(detectCommand("/server")).toBeNull();
         // A space commits it whether or not anything continues the word.
         expect(detectCommand("/task ")).toMatchObject({ scope: { id: "tasks" }, term: "" });
-        expect(detectCommand("/task storefront")).toMatchObject({ scope: { id: "tasks" }, term: "storefront" });
+        expect(detectCommand("/task storefront")).toMatchObject({
+            scope: { id: "tasks" },
+            term: "storefront"
+        });
     });
 
     it("takes a word nothing continues at once", () => {
@@ -42,7 +51,10 @@ describe("detectCommand", () => {
         // Still an ordinary search: this is what finds the Services page.
         expect(detectCommand("services")).toBeNull();
         expect(detectCommand("apps")).toBeNull();
-        expect(detectCommand("services storefront")).toMatchObject({ scope: { id: "services" }, term: "storefront" });
+        expect(detectCommand("services storefront")).toMatchObject({
+            scope: { id: "services" },
+            term: "storefront"
+        });
         // A trailing space is the same commitment as a word after it.
         expect(detectCommand("servers ")).toMatchObject({ scope: { id: "servers" }, term: "" });
     });
@@ -50,7 +62,10 @@ describe("detectCommand", () => {
     it("reads @ as people, with or without a name after it", () => {
         expect(detectCommand("@")).toMatchObject({ scope: { id: "users" }, term: "" });
         expect(detectCommand("@ana")).toMatchObject({ scope: { id: "users" }, term: "ana" });
-        expect(detectCommand("@ ana ruiz")).toMatchObject({ scope: { id: "users" }, term: "ana ruiz" });
+        expect(detectCommand("@ ana ruiz")).toMatchObject({
+            scope: { id: "users" },
+            term: "ana ruiz"
+        });
     });
 
     it("leaves an ordinary search alone", () => {
@@ -65,18 +80,25 @@ describe("detectCommand", () => {
         expect(detectCommand("/service storefront")).toMatchObject({ scope: { id: "services" } });
         expect(detectCommand("/svc storefront")).toMatchObject({ scope: { id: "services" } });
         expect(detectCommand("/DB main")).toMatchObject({ scope: { id: "databases" } });
-        expect(detectCommand("/Tasks release")).toMatchObject({ scope: { id: "tasks" }, term: "release" });
+        expect(detectCommand("/Tasks release")).toMatchObject({
+            scope: { id: "tasks" },
+            term: "release"
+        });
         expect(detectCommand("/SVC")).toMatchObject({ scope: { id: "services" } });
     });
 
     it("keeps the rest of the query intact", () => {
-        expect(detectCommand("/tasks release 2.1 / rollout")).toMatchObject({ term: "release 2.1 / rollout" });
+        expect(detectCommand("/tasks release 2.1 / rollout")).toMatchObject({
+            term: "release 2.1 / rollout"
+        });
     });
 });
 
 describe("commandSuggestions", () => {
     it("offers everything behind a lone slash", () => {
-        expect(commandSuggestions("/").map((scope) => scope.id)).toEqual(SEARCH_SCOPE_LIST.map((scope) => scope.id));
+        expect(commandSuggestions("/").map((scope) => scope.id)).toEqual(
+            SEARCH_SCOPE_LIST.map((scope) => scope.id)
+        );
     });
 
     it("narrows to what is being spelled, across both spellings of a word", () => {

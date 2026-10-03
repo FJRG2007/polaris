@@ -283,7 +283,9 @@ describe("withoutInventedIdentities", () => {
             { uuid: offlineUuid("Steve"), name: "Steve" },
             { uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", name: "Alice" }
         ]);
-        expect(rosterNames(withoutInventedIdentities(before, ["Steve", "Alice"]) ?? "")).toEqual(["Alice"]);
+        expect(rosterNames(withoutInventedIdentities(before, ["Steve", "Alice"]) ?? "")).toEqual([
+            "Alice"
+        ]);
     });
 
     // Removing it is only ever the first half of putting the player back through
@@ -333,9 +335,7 @@ describe("the spelling a name is stored under", () => {
         expect(asSeenSpelling("dinnerbone", SEEN)).toBe("DINNERBONE");
         expect(asSeenSpelling("JEB_04", SEEN)).toBe("Jeb_04");
         // And the identity that follows from it is the one the login computes.
-        expect(offlineUuid(asSeenSpelling("dinnerbone", SEEN))).toBe(
-            offlineUuid("DINNERBONE")
-        );
+        expect(offlineUuid(asSeenSpelling("dinnerbone", SEEN))).toBe(offlineUuid("DINNERBONE"));
     });
 
     it("keeps what was typed for somebody nobody has seen", () => {

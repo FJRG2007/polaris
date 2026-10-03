@@ -62,15 +62,17 @@ const connections: DockerConnectionSummary[] = [
 ];
 
 function render(selected: string): string {
-    return renderToStaticMarkup(withMessages(
-        <ContainersView
-            connections={connections}
-            connectionId={selected}
-            sshEnabled
-            canManage
-            localDiagnostic={null}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <ContainersView
+                connections={connections}
+                connectionId={selected}
+                sshEnabled
+                canManage
+                localDiagnostic={null}
+            />
+        )
+    );
 }
 
 beforeEach(() => {

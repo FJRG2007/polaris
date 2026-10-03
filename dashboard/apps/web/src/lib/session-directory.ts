@@ -478,7 +478,11 @@ export async function revokeDeviceSessions(
             action: "account.session.revoked-device",
             metadata: { count, device: detail.device.device }
         });
-        await notifySessionsClosed({ userId, count, reason: `Everything open on ${detail.device.device}.` });
+        await notifySessionsClosed({
+            userId,
+            count,
+            reason: `Everything open on ${detail.device.device}.`
+        });
     }
     return { count, endedCurrent: ids.includes(currentSessionId) };
 }

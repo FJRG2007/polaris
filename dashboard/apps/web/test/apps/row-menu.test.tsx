@@ -29,7 +29,11 @@ const ENTRIES: RowMenuEntry[] = [
     { kind: "item", text: "Kick them", onSelect: kicked },
     { kind: "item", text: "Teleport", disabled: true, onSelect: () => undefined },
     { kind: "item", text: "Kill", danger: true, onSelect: () => undefined },
-    { kind: "link", text: "Open their Steam profile", href: "https://steamcommunity.com/profiles/1" }
+    {
+        kind: "link",
+        text: "Open their Steam profile",
+        href: "https://steamcommunity.com/profiles/1"
+    }
 ];
 
 afterEach(() => {

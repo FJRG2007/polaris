@@ -46,7 +46,12 @@ const MOUNT: MountTarget = {
 function planWithMount(): AppDeployPlan {
     return {
         ref: { name: "storefront", project: "polaris-abcd1234" },
-        build: { method: "image", name: "storefront", contextPath: "/ctx", imageRef: "ghcr.io/acme/storefront:latest" },
+        build: {
+            method: "image",
+            name: "storefront",
+            contextPath: "/ctx",
+            imageRef: "ghcr.io/acme/storefront:latest"
+        },
         env: {},
         replicas: 1,
         domains: [],
@@ -117,9 +122,13 @@ describe("a deploy that gives up", () => {
         // the machine, and the only move anybody has is to press deploy again.
         const composeUp = vi
             .fn()
-            .mockRejectedValueOnce(new Error("unable to lease content: lease does not exist: not found"))
+            .mockRejectedValueOnce(
+                new Error("unable to lease content: lease does not exist: not found")
+            )
             .mockResolvedValueOnce(undefined);
-        const { ctx, lines, ports } = contextWith({ composeUp } as Partial<RuntimeContext["ports"]>);
+        const { ctx, lines, ports } = contextWith({ composeUp } as Partial<
+            RuntimeContext["ports"]
+        >);
 
         const result = await new ComposeRuntime().deployApplication(planWithMount(), ctx);
 
@@ -166,7 +175,10 @@ describe("a deploy that gives up", () => {
                 dockerfilePath: "Dockerfile"
             }
         } as unknown as AppDeployPlan;
-        const ctxWithSource = { ...ctx, buildContext: async () => ({ tar: Buffer.from("") }) } as RuntimeContext;
+        const ctxWithSource = {
+            ...ctx,
+            buildContext: async () => ({ tar: Buffer.from("") })
+        } as RuntimeContext;
 
         const result = await new ComposeRuntime().deployApplication(plan, ctxWithSource);
 

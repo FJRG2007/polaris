@@ -7,7 +7,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Slot -> stack, as the fake server holds it. */
-const fake = vi.hoisted(() => ({ slots: new Map<number, { id: string; count: number }>(), wrote: [] as string[] }));
+const fake = vi.hoisted(() => ({
+    slots: new Map<number, { id: string; count: number }>(),
+    wrote: [] as string[]
+}));
 
 /** Which slot number a replace command's slot name is. */
 function slotNumber(name: string): number {
@@ -41,7 +44,11 @@ const server = {
 };
 
 vi.mock("@polaris/db", () => ({
-    prisma: { installedApp: { findUnique: async () => ({ config: JSON.stringify({ itemCommand: "item" }) }) } }
+    prisma: {
+        installedApp: {
+            findUnique: async () => ({ config: JSON.stringify({ itemCommand: "item" }) })
+        }
+    }
 }));
 vi.mock("@polaris/app-host", () => ({
     host: {
@@ -52,7 +59,8 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
-    withServerContainer: async (_owner: string, _id: string, work: (one: unknown) => unknown) => work(server)
+    withServerContainer: async (_owner: string, _id: string, work: (one: unknown) => unknown) =>
+        work(server)
 }));
 
 const { moveStack } = await import("@polaris-app/game-servers/src/lib/minecraft/item-service");
@@ -68,7 +76,15 @@ async function drag(from: number, to: number, count?: number) {
         const held = fake.slots.get(slot);
         return held ? stack(slot, held.id, held.count) : null;
     };
-    await moveStack("owner", "install", "Grumm", from, to, { from: seen(from), to: seen(to) }, count);
+    await moveStack(
+        "owner",
+        "install",
+        "Grumm",
+        from,
+        to,
+        { from: seen(from), to: seen(to) },
+        count
+    );
 }
 
 beforeEach(() => {
@@ -78,7 +94,14 @@ beforeEach(() => {
 
 describe("what a drop does", () => {
     it("tops the same item up and leaves the rest behind", () => {
-        expect(planStackMove(stack(9, "minecraft:stone", 40), stack(0, "minecraft:stone", 50), undefined, 64)).toEqual({
+        expect(
+            planStackMove(
+                stack(9, "minecraft:stone", 40),
+                stack(0, "minecraft:stone", 50),
+                undefined,
+                64
+            )
+        ).toEqual({
             kind: "merge",
             target: 64,
             source: 26
@@ -86,16 +109,29 @@ describe("what a drop does", () => {
     });
 
     it("does nothing onto the same item already full, and swaps anything else", () => {
-        expect(planStackMove(stack(9, "minecraft:stone", 5), stack(0, "minecraft:stone", 64), undefined, 64).kind).toBe(
-            "full"
-        );
-        expect(planStackMove(stack(9, "minecraft:stone", 5), stack(0, "minecraft:dirt", 3), undefined, 64).kind).toBe(
-            "swap"
-        );
+        expect(
+            planStackMove(
+                stack(9, "minecraft:stone", 5),
+                stack(0, "minecraft:stone", 64),
+                undefined,
+                64
+            ).kind
+        ).toBe("full");
+        expect(
+            planStackMove(
+                stack(9, "minecraft:stone", 5),
+                stack(0, "minecraft:dirt", 3),
+                undefined,
+                64
+            ).kind
+        ).toBe("swap");
     });
 
     it("never stacks items whose data differs", () => {
-        const sword = { ...stack(9, "minecraft:diamond_sword", 1), data: { era: "components" as const, snbt: "{a:1}" } };
+        const sword = {
+            ...stack(9, "minecraft:diamond_sword", 1),
+            data: { era: "components" as const, snbt: "{a:1}" }
+        };
         const other = { ...sword, slot: 0, data: { era: "components" as const, snbt: "{a:2}" } };
         expect(planStackMove(sword, other, undefined, 1).kind).toBe("swap");
     });

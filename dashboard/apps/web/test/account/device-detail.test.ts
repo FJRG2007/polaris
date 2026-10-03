@@ -38,7 +38,9 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined })
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "198.51.100.88" }));
-vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_APP_URL: "https://polaris.example.com" }) }));
+vi.mock("@polaris/config", () => ({
+    loadEnv: () => ({ POLARIS_APP_URL: "https://polaris.example.com" })
+}));
 vi.mock("@polaris/auth", () => ({
     TRUST_DEVICE_COOKIE_NAMES: ["polaris.trust_device"],
     adoptTrustedDevice: async () => false,
@@ -72,7 +74,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { revokeDeviceSessions, trustedDeviceDetail } = await import("../../src/lib/session-directory");
+const { revokeDeviceSessions, trustedDeviceDetail } = await import(
+    "../../src/lib/session-directory"
+);
 
 function pass(overrides: Partial<Pass> = {}): Pass {
     return {
@@ -96,7 +100,13 @@ function session(id: string, userAgent: string, host: string, ip = "5.6.7.8") {
         expiresAt: new Date("2026-09-01T10:00:00Z"),
         ipAddress: ip,
         userAgent,
-        state: { userAgent, host, ip, lastSeenAt: new Date("2026-08-03T10:00:00Z"), approval: "approved" }
+        state: {
+            userAgent,
+            host,
+            ip,
+            lastSeenAt: new Date("2026-08-03T10:00:00Z"),
+            approval: "approved"
+        }
     };
 }
 
@@ -117,13 +127,22 @@ describe("opening a remembered device", () => {
         ];
         const detail = await trustedDeviceDetail("user-1", "session-1", "trust-device-aaaaaaaa");
         expect(detail?.identified).toBe(true);
-        expect(detail?.sessions.map((row) => row.host)).toEqual(["polaris.local", "polaris.example.com"]);
+        expect(detail?.sessions.map((row) => row.host)).toEqual([
+            "polaris.local",
+            "polaris.example.com"
+        ]);
         expect(detail?.sessions.filter((row) => row.current)).toHaveLength(1);
     });
 
     it("asks only for the passkeys that browser registered", async () => {
         passkeyRows = [
-            { id: "key-1", name: "Laptop", rpId: "polaris.local", userAgent: CHROME, createdAt: new Date() },
+            {
+                id: "key-1",
+                name: "Laptop",
+                rpId: "polaris.local",
+                userAgent: CHROME,
+                createdAt: new Date()
+            },
             { id: "key-2", name: null, rpId: null, userAgent: SAFARI, createdAt: new Date() }
         ];
         const detail = await trustedDeviceDetail("user-1", "session-1", "trust-device-aaaaaaaa");

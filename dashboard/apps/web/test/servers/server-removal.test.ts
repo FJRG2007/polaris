@@ -47,14 +47,16 @@ const applicationFindMany = vi.fn(async (args?: { where?: Record<string, any> })
             (where.currentDeploymentId === undefined || row.currentDeploymentId !== null)
     );
 });
-const applicationUpdate = vi.fn(async (args: { where: { id: string }; data: { targetId: string } }) => {
-    const row = appRows.find((entry) => entry.id === args.where.id);
-    if (row) {
-        row.targetId = args.data.targetId;
-        row.hostId = args.data.targetId === NEW_TARGET ? OTHER_HOST : HOST;
+const applicationUpdate = vi.fn(
+    async (args: { where: { id: string }; data: { targetId: string } }) => {
+        const row = appRows.find((entry) => entry.id === args.where.id);
+        if (row) {
+            row.targetId = args.data.targetId;
+            row.hostId = args.data.targetId === NEW_TARGET ? OTHER_HOST : HOST;
+        }
+        return args;
     }
-    return args;
-});
+);
 const volumeUpdateMany = vi.fn(async (args: unknown) => args);
 const volumeCount = vi.fn(async () => 0);
 const runnerPoolCount = vi.fn(async () => 0);
@@ -114,7 +116,12 @@ describe("removing a server", () => {
     beforeEach(() => {
         calls.length = 0;
         vi.clearAllMocks();
-        hostFindFirst.mockResolvedValue({ id: HOST, name: "node-1", username: "polaris", sudo: false });
+        hostFindFirst.mockResolvedValue({
+            id: HOST,
+            name: "node-1",
+            username: "polaris",
+            sudo: false
+        });
         hostFindMany.mockResolvedValue([]);
         appRows = [];
         deployAndWait.mockResolvedValue(null);
@@ -131,7 +138,10 @@ describe("removing a server", () => {
 
     it("brings the service up on the new server before stopping the old one", async () => {
         oneService("api", true);
-        const result = await removeServer(OWNER, HOST, OWNER, { mode: "move", destinationId: OTHER_HOST });
+        const result = await removeServer(OWNER, HOST, OWNER, {
+            mode: "move",
+            destinationId: OTHER_HOST
+        });
 
         expect(result.error).toBeUndefined();
         expect(result.moved).toEqual(["api"]);
@@ -141,7 +151,10 @@ describe("removing a server", () => {
         expect(calls).toContain("stop");
         expect(calls.indexOf("deploy")).toBeLessThan(calls.indexOf("stop"));
         expect(stopApplicationOnTarget).toHaveBeenCalledWith(APP, OWNER, OLD_TARGET);
-        expect(applicationUpdate).toHaveBeenCalledWith({ where: { id: APP }, data: { targetId: NEW_TARGET } });
+        expect(applicationUpdate).toHaveBeenCalledWith({
+            where: { id: APP },
+            data: { targetId: NEW_TARGET }
+        });
         expect(deleteHost).toHaveBeenCalled();
     });
 
@@ -149,18 +162,27 @@ describe("removing a server", () => {
         oneService("api", true);
         deployAndWait.mockResolvedValue("image not found");
 
-        const result = await removeServer(OWNER, HOST, OWNER, { mode: "move", destinationId: OTHER_HOST });
+        const result = await removeServer(OWNER, HOST, OWNER, {
+            mode: "move",
+            destinationId: OTHER_HOST
+        });
 
         expect(result.error).toContain("api");
         expect(result.error).toContain("image not found");
         expect(stopApplicationOnTarget).not.toHaveBeenCalled();
-        expect(applicationUpdate).toHaveBeenLastCalledWith({ where: { id: APP }, data: { targetId: OLD_TARGET } });
+        expect(applicationUpdate).toHaveBeenLastCalledWith({
+            where: { id: APP },
+            data: { targetId: OLD_TARGET }
+        });
         expect(deleteHost).not.toHaveBeenCalled();
     });
 
     it("retargets a service that was not running without deploying it", async () => {
         oneService("worker", false);
-        const result = await removeServer(OWNER, HOST, OWNER, { mode: "move", destinationId: OTHER_HOST });
+        const result = await removeServer(OWNER, HOST, OWNER, {
+            mode: "move",
+            destinationId: OTHER_HOST
+        });
         expect(result.moved).toEqual(["worker"]);
         expect(calls).toEqual([]);
     });

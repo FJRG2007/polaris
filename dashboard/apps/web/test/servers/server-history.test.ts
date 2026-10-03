@@ -75,7 +75,9 @@ describe("in Spanish", () => {
     const spanish = translatorFor("es-ES", "servers");
 
     it("reads a rename and a failed set-up in Spanish", () => {
-        expect(describeIn(line({ toValue: "node-0" }), spanish)).toBe("Ana lo ha renombrado a node-0");
+        expect(describeIn(line({ toValue: "node-0" }), spanish)).toBe(
+            "Ana lo ha renombrado a node-0"
+        );
         expect(describeIn(line({ action: "edge-failed", authorName: null }), spanish)).toBe(
             "Polaris no ha podido prepararlo para servir sus propios dominios"
         );

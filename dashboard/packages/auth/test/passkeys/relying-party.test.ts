@@ -76,9 +76,9 @@ describe("resolvePasskeyAddress", () => {
     it("accepts a domain configured after install", async () => {
         const options = { configuredHosts: async () => ["files.example.com"] };
         const { resolvePasskeyAddress } = authModule;
-        expect(await resolvePasskeyAddress(requestFrom({ host: "files.example.com" }), options)).toBe(
-            "files.example.com"
-        );
+        expect(
+            await resolvePasskeyAddress(requestFrom({ host: "files.example.com" }), options)
+        ).toBe("files.example.com");
     });
 
     it("prefers the forwarded host the edge sets", async () => {
@@ -87,12 +87,16 @@ describe("resolvePasskeyAddress", () => {
     });
 
     it("refuses a host this deployment does not answer on", async () => {
-        expect(await authModule.resolvePasskeyAddress(requestFrom({ host: "evil.example" }), {})).toBeNull();
+        expect(
+            await authModule.resolvePasskeyAddress(requestFrom({ host: "evil.example" }), {})
+        ).toBeNull();
     });
 
     it("refuses an address that could never hold a passkey", async () => {
         const { resolvePasskeyAddress } = authModule;
         expect(await resolvePasskeyAddress(requestFrom({ host: "10.0.1.40:3000" }), {})).toBeNull();
-        expect(await resolvePasskeyAddress(requestFrom({ host: "polaris.local:notaport" }), {})).toBeNull();
+        expect(
+            await resolvePasskeyAddress(requestFrom({ host: "polaris.local:notaport" }), {})
+        ).toBeNull();
     });
 });

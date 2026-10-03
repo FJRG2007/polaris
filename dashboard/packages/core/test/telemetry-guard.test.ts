@@ -48,7 +48,9 @@ describe("where a report may come from", () => {
     });
 
     it("takes an outside address that was named, whichever policy", () => {
-        expect(reporterRefusal(rules({ allowedCidrs: ["100.0.0.1"] }), from("100.0.0.1"))).toBeNull();
+        expect(
+            reporterRefusal(rules({ allowedCidrs: ["100.0.0.1"] }), from("100.0.0.1"))
+        ).toBeNull();
         expect(
             reporterRefusal(
                 rules({ reporters: "listed", allowedCidrs: ["100.0.0.0/24"] }),
@@ -61,7 +63,10 @@ describe("where a report may come from", () => {
         // "listed" means listed. An address being local is not a reason on its
         // own once somebody has said which addresses they meant.
         expect(
-            reporterRefusal(rules({ reporters: "listed", allowedCidrs: ["100.0.0.1"] }), from("10.1.2.3"))
+            reporterRefusal(
+                rules({ reporters: "listed", allowedCidrs: ["100.0.0.1"] }),
+                from("10.1.2.3")
+            )
         ).toBe("address");
     });
 
@@ -69,9 +74,9 @@ describe("where a report may come from", () => {
         // A policy of "only from here" must not be satisfied by declining to
         // answer the question.
         expect(reporterRefusal(rules(), from(null))).toBe("address");
-        expect(reporterRefusal(rules({ reporters: "listed", allowedCidrs: ["10.0.0.0/8"] }), from(""))).toBe(
-            "address"
-        );
+        expect(
+            reporterRefusal(rules({ reporters: "listed", allowedCidrs: ["10.0.0.0/8"] }), from(""))
+        ).toBe("address");
     });
 
     it("asks nothing about the address when the policy is anywhere", () => {
@@ -97,10 +102,7 @@ describe("what may be reporting", () => {
 
     it("checks the address first, because that is the one to fix first", () => {
         expect(
-            reporterRefusal(
-                rules({ deniedUserAgents: ["curl*"] }),
-                from("100.0.0.1", "curl/8.4.0")
-            )
+            reporterRefusal(rules({ deniedUserAgents: ["curl*"] }), from("100.0.0.1", "curl/8.4.0"))
         ).toBe("address");
     });
 });
@@ -118,14 +120,19 @@ describe("the key, for a project that asks for one", () => {
 
     it("is asked for even when everything else is wide open", () => {
         expect(
-            reporterRefusal(rules({ reporters: "anywhere", requireSecret: true }), from("100.0.0.1"))
+            reporterRefusal(
+                rules({ reporters: "anywhere", requireSecret: true }),
+                from("100.0.0.1")
+            )
         ).toBe("secret");
     });
 });
 
 describe("reading the key off a request", () => {
     it("takes the header of our own first", () => {
-        expect(readIngestSecret({ header: "plt_abcdefghijklmnopqrst" })).toBe("plt_abcdefghijklmnopqrst");
+        expect(readIngestSecret({ header: "plt_abcdefghijklmnopqrst" })).toBe(
+            "plt_abcdefghijklmnopqrst"
+        );
     });
 
     it("takes an ordinary bearer token", () => {
@@ -136,7 +143,9 @@ describe("reading the key off a request", () => {
 
     it("takes the deprecated half of the old DSN format, which some clients still send", () => {
         expect(
-            readIngestSecret({ sentryAuth: "Sentry sentry_key=abc123, sentry_secret=abcdefghijklmnopqrst" })
+            readIngestSecret({
+                sentryAuth: "Sentry sentry_key=abc123, sentry_secret=abcdefghijklmnopqrst"
+            })
         ).toBe("abcdefghijklmnopqrst");
     });
 

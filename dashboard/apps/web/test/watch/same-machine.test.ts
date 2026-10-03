@@ -36,7 +36,13 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         host: {
             findMany: async () => hosts,
-            updateMany: async ({ where, data }: { where: { id: string }; data: { dockerId: string } }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: { dockerId: string };
+            }) => {
                 const host = hosts.find((entry) => entry.id === where.id);
                 if (host) host.dockerId = data.dockerId;
                 return { count: host ? 1 : 0 };
@@ -47,7 +53,9 @@ vi.mock("@polaris/db", () => ({
             // than one setting, and a mock that answers every key with the daemon
             // id would let a test pass on a signal it never set.
             findUnique: async ({ where }: { where: { key: string } }) =>
-                where.key === "metrics.localDockerId" && localDockerIdValue ? { value: localDockerIdValue } : null,
+                where.key === "metrics.localDockerId" && localDockerIdValue
+                    ? { value: localDockerIdValue }
+                    : null,
             upsert: async ({ create }: { create: { value: string } }) => {
                 localDockerIdValue = create.value;
                 return create;
@@ -68,11 +76,44 @@ vi.mock("@polaris/db", () => ({
 /** An engine reporting a given daemon id, with one running container. */
 function engine(dockerId: string) {
     return {
-        info: async () => ({ id: dockerId, name: "box", serverVersion: "27", containers: 1, containersRunning: 1, containersStopped: 0, images: 1, ncpu: 4, memTotal: 8_000_000_000 }),
-        listContainers: async () => [{ id: `${dockerId}-c1`, name: "web", image: "nginx", state: "running", status: "Up 2 hours" }],
+        info: async () => ({
+            id: dockerId,
+            name: "box",
+            serverVersion: "27",
+            containers: 1,
+            containersRunning: 1,
+            containersStopped: 0,
+            images: 1,
+            ncpu: 4,
+            memTotal: 8_000_000_000
+        }),
+        listContainers: async () => [
+            {
+                id: `${dockerId}-c1`,
+                name: "web",
+                image: "nginx",
+                state: "running",
+                status: "Up 2 hours"
+            }
+        ],
         statsMany: async (ids: string[]) =>
-            new Map(ids.map((id) => [id, { cpuPercent: 40, memUsage: 1_000_000, memLimit: 8_000_000_000, memPercent: 12.5 }])),
-        stats: async () => ({ cpuPercent: 40, memUsage: 1_000_000, memLimit: 8_000_000_000, memPercent: 12.5 }),
+            new Map(
+                ids.map((id) => [
+                    id,
+                    {
+                        cpuPercent: 40,
+                        memUsage: 1_000_000,
+                        memLimit: 8_000_000_000,
+                        memPercent: 12.5
+                    }
+                ])
+            ),
+        stats: async () => ({
+            cpuPercent: 40,
+            memUsage: 1_000_000,
+            memLimit: 8_000_000_000,
+            memPercent: 12.5
+        }),
         dispose: async () => undefined
     };
 }
@@ -113,7 +154,16 @@ beforeEach(() => {
 
 describe("collecting from a server that is the machine Polaris runs on", () => {
     it("writes one series for the box, not one per way of reaching it", async () => {
-        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
+        hosts = [
+            {
+                id: "h1",
+                name: "node-0",
+                ownerId: "u1",
+                address: "10.0.1.138",
+                username: "polaris",
+                dockerId: null
+            }
+        ];
         daemons = { h1: SAME };
 
         await collectMetricsOnce({ storage: false });
@@ -124,7 +174,16 @@ describe("collecting from a server that is the machine Polaris runs on", () => {
     });
 
     it("remembers which daemon each side turned out to be", async () => {
-        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
+        hosts = [
+            {
+                id: "h1",
+                name: "node-0",
+                ownerId: "u1",
+                address: "10.0.1.138",
+                username: "polaris",
+                dockerId: null
+            }
+        ];
         daemons = { h1: SAME };
 
         await collectMetricsOnce({ storage: false });
@@ -135,21 +194,46 @@ describe("collecting from a server that is the machine Polaris runs on", () => {
 
     it("still measures a server that is a different machine", async () => {
         hosts = [
-            { id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null },
-            { id: "h2", name: "node-2", ownerId: "u1", address: "10.0.1.160", username: "polaris", dockerId: OTHER }
+            {
+                id: "h1",
+                name: "node-0",
+                ownerId: "u1",
+                address: "10.0.1.138",
+                username: "polaris",
+                dockerId: null
+            },
+            {
+                id: "h2",
+                name: "node-2",
+                ownerId: "u1",
+                address: "10.0.1.160",
+                username: "polaris",
+                dockerId: OTHER
+            }
         ];
         daemons = { h1: SAME, h2: OTHER };
 
         await collectMetricsOnce({ storage: false });
 
-        const subjects = written.filter((row) => row.subjectType === "host").map((row) => row.subjectId);
+        const subjects = written
+            .filter((row) => row.subjectType === "host")
+            .map((row) => row.subjectId);
         expect(subjects).toEqual([LOCAL_SUBJECT, "h2"]);
     });
 });
 
 describe("the servers Watch shows", () => {
     it("shows the box once, under the name it was enrolled with", async () => {
-        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: SAME }];
+        hosts = [
+            {
+                id: "h1",
+                name: "node-0",
+                ownerId: "u1",
+                address: "10.0.1.138",
+                username: "polaris",
+                dockerId: SAME
+            }
+        ];
         localDockerIdValue = SAME;
 
         const cards = await getWatchServers("u1");
@@ -163,7 +247,16 @@ describe("the servers Watch shows", () => {
     });
 
     it("keeps a genuinely remote server as its own card", async () => {
-        hosts = [{ id: "h2", name: "node-2", ownerId: "u1", address: "10.0.1.160", username: "polaris", dockerId: OTHER }];
+        hosts = [
+            {
+                id: "h2",
+                name: "node-2",
+                ownerId: "u1",
+                address: "10.0.1.160",
+                username: "polaris",
+                dockerId: OTHER
+            }
+        ];
         localDockerIdValue = SAME;
 
         const cards = await getWatchServers("u1");
@@ -173,7 +266,16 @@ describe("the servers Watch shows", () => {
     });
 
     it("lists the box's containers once, not once per route to it", async () => {
-        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: SAME }];
+        hosts = [
+            {
+                id: "h1",
+                name: "node-0",
+                ownerId: "u1",
+                address: "10.0.1.138",
+                username: "polaris",
+                dockerId: SAME
+            }
+        ];
         localDockerIdValue = SAME;
 
         const cards = await getWatchContainers("u1");
@@ -186,7 +288,16 @@ describe("the servers Watch shows", () => {
         // Nothing sampled since the server was added, and no address to go on.
         // Guessing here would hide a real machine, which is worse than briefly
         // showing one twice.
-        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
+        hosts = [
+            {
+                id: "h1",
+                name: "node-0",
+                ownerId: "u1",
+                address: "10.0.1.138",
+                username: "polaris",
+                dockerId: null
+            }
+        ];
         localDockerIdValue = SAME;
 
         const cards = await getWatchServers("u1");
@@ -198,7 +309,16 @@ describe("the servers Watch shows", () => {
     // SSH - which is precisely the server that otherwise sits there reporting
     // nothing. The address is known before anything has been sampled.
     it("merges a server enrolled at this machine's own address", async () => {
-        hosts = [{ id: "h1", name: "node-0", ownerId: "u1", address: "10.0.1.138", username: "polaris", dockerId: null }];
+        hosts = [
+            {
+                id: "h1",
+                name: "node-0",
+                ownerId: "u1",
+                address: "10.0.1.138",
+                username: "polaris",
+                dockerId: null
+            }
+        ];
         lanIp = "10.0.1.138";
 
         const cards = await getWatchServers("u1");
@@ -208,7 +328,16 @@ describe("the servers Watch shows", () => {
     });
 
     it("leaves a server at another address alone", async () => {
-        hosts = [{ id: "h2", name: "node-2", ownerId: "u1", address: "10.0.1.160", username: "polaris", dockerId: null }];
+        hosts = [
+            {
+                id: "h2",
+                name: "node-2",
+                ownerId: "u1",
+                address: "10.0.1.160",
+                username: "polaris",
+                dockerId: null
+            }
+        ];
         lanIp = "10.0.1.138";
 
         const cards = await getWatchServers("u1");

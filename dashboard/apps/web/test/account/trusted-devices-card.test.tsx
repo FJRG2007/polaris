@@ -29,9 +29,13 @@ vi.mock("../../src/app/(app)/account/sessions/actions", () => ({
     trustedDeviceAction: async () => ({ detail: undefined })
 }));
 vi.mock("@/lib/auth-client", () => ({ signOut: async () => {} }));
-vi.mock("@/components/display-format", () => ({ useDisplayFormat: () => ({ date: (iso: string) => iso }) }));
+vi.mock("@/components/display-format", () => ({
+    useDisplayFormat: () => ({ date: (iso: string) => iso })
+}));
 
-const { TrustedDevicesCard } = await import("../../src/app/(app)/account/sessions/trusted-devices-card");
+const { TrustedDevicesCard } = await import(
+    "../../src/app/(app)/account/sessions/trusted-devices-card"
+);
 
 function device(overrides: Partial<TrustedDeviceRow> = {}): TrustedDeviceRow {
     return {
@@ -70,7 +74,10 @@ describe("the remembered-devices card", () => {
     });
 
     it("offers to end each pass on its own, named so it can be told apart", () => {
-        const markup = render([device(), device({ id: "trust-device-bbbbbbbb", device: "Safari on iOS" })]);
+        const markup = render([
+            device(),
+            device({ id: "trust-device-bbbbbbbb", device: "Safari on iOS" })
+        ]);
         expect(markup).toContain('aria-label="Stop remembering Chrome on Android"');
         expect(markup).toContain('aria-label="Stop remembering Safari on iOS"');
     });
@@ -81,7 +88,9 @@ describe("the remembered-devices card", () => {
     });
 
     it("lists a pass granted before Polaris described them, rather than hiding it", () => {
-        const markup = render([device({ rememberedAt: null, device: "Unknown device", ip: null, host: null })]);
+        const markup = render([
+            device({ rememberedAt: null, device: "Unknown device", ip: null, host: null })
+        ]);
         expect(markup).toContain("Remembered earlier");
         expect(markup).toContain('aria-label="Stop remembering this device"');
     });
@@ -89,7 +98,10 @@ describe("the remembered-devices card", () => {
     // Ending the pass is not the only thing somebody wants to do about a device
     // they have just recognised - what it can still reach is the other half.
     it("opens each device, named so it can be told apart", () => {
-        const markup = render([device(), device({ id: "trust-device-bbbbbbbb", device: "Safari on iOS" })]);
+        const markup = render([
+            device(),
+            device({ id: "trust-device-bbbbbbbb", device: "Safari on iOS" })
+        ]);
         expect(markup).toContain('aria-label="Open Chrome on Android"');
         expect(markup).toContain('aria-label="Open Safari on iOS"');
     });
@@ -102,7 +114,9 @@ describe("the remembered-devices card", () => {
 
     it("only offers the blunt control when there is more than one to end", () => {
         expect(render([device()])).not.toContain("Forget them all");
-        expect(render([device(), device({ id: "trust-device-bbbbbbbb" })])).toContain("Forget them all");
+        expect(render([device(), device({ id: "trust-device-bbbbbbbb" })])).toContain(
+            "Forget them all"
+        );
     });
 
     it("says plainly when nothing is remembered", () => {

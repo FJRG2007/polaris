@@ -13,11 +13,22 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { alreadyLocal, isLocalAddress, localCandidates, sameLocalNetwork } from "./local-network.js";
+import {
+    alreadyLocal,
+    isLocalAddress,
+    localCandidates,
+    sameLocalNetwork
+} from "./local-network.js";
 
 describe("what counts as local", () => {
     it("is the three private ranges", () => {
-        for (const address of ["10.0.0.5", "10.255.255.254", "172.16.0.1", "172.31.4.9", "192.168.50.7"]) {
+        for (const address of [
+            "10.0.0.5",
+            "10.255.255.254",
+            "172.16.0.1",
+            "172.31.4.9",
+            "192.168.50.7"
+        ]) {
             expect(isLocalAddress(address)).toBe(true);
         }
     });
@@ -38,7 +49,15 @@ describe("what counts as local", () => {
     });
 
     it("is not something that is not an address", () => {
-        for (const value of ["", "10.0.0", "10.0.0.0.1", "10.0.0.256", "ten.0.0.1", "::1", "server.local"]) {
+        for (const value of [
+            "",
+            "10.0.0",
+            "10.0.0.0.1",
+            "10.0.0.256",
+            "ten.0.0.1",
+            "::1",
+            "server.local"
+        ]) {
             expect(isLocalAddress(value)).toBe(false);
         }
     });

@@ -10,14 +10,27 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { describePorts, gameReachAdvice, gameStoppedAdvice, type GamePort } from "@/lib/apps/port-advice";
+import {
+    describePorts,
+    gameReachAdvice,
+    gameStoppedAdvice,
+    type GamePort
+} from "@/lib/apps/port-advice";
 
 const TCP: readonly GamePort[] = [{ port: 25566, protocol: "tcp" }];
 const BLOCKS = { tcp: { start: 25565, end: 25664 }, udp: { start: 19132, end: 19231 } };
 
 describe("a server that is not up yet", () => {
     it("says its port cannot be checked, and asks for nothing", () => {
-        const advice = gameReachAdvice("home-nat", TCP, false, "10.0.1.142", "range", BLOCKS, false);
+        const advice = gameReachAdvice(
+            "home-nat",
+            TCP,
+            false,
+            "10.0.1.142",
+            "range",
+            BLOCKS,
+            false
+        );
 
         expect(advice.ok).toBe(false);
         // The whole point: nothing to do, and no mention of the router - there is

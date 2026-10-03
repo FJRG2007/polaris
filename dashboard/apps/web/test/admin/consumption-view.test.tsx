@@ -235,8 +235,18 @@ describe("an app with things inside it", () => {
                     containers: 2,
                     memUsedBytes: 4 * GB,
                     parts: [
-                        row({ id: "skyblock", name: "skyblock", detail: "Minecraft (Java)", memUsedBytes: 3 * GB }),
-                        row({ id: "bed-wars", name: "bed-wars", detail: "Minecraft (Java)", memUsedBytes: GB })
+                        row({
+                            id: "skyblock",
+                            name: "skyblock",
+                            detail: "Minecraft (Java)",
+                            memUsedBytes: 3 * GB
+                        }),
+                        row({
+                            id: "bed-wars",
+                            name: "bed-wars",
+                            detail: "Minecraft (Java)",
+                            memUsedBytes: GB
+                        })
                     ]
                 })
             ]
@@ -246,7 +256,9 @@ describe("an app with things inside it", () => {
         render(<ConsumptionGroupTable group={app()} />);
         expect(screen.getByText("Game servers")).toBeTruthy();
         expect(screen.queryByText("skyblock")).toBeNull();
-        expect(screen.getByRole("button", { name: "What Game servers runs" }).textContent).toContain("2");
+        expect(
+            screen.getByRole("button", { name: "What Game servers runs" }).textContent
+        ).toContain("2");
     });
 
     it("opens to the things it runs, each with its own figures", async () => {
@@ -262,7 +274,10 @@ describe("an app with things inside it", () => {
         // and it is left off rather than repeated.
         const { container } = render(
             <ConsumptionGroupTable
-                group={group({ id: "apps", rows: [row({ id: "vision", name: "Vision worker", detail: "" })] })}
+                group={group({
+                    id: "apps",
+                    rows: [row({ id: "vision", name: "Vision worker", detail: "" })]
+                })}
             />
         );
         expect(container.textContent?.match(/Vision worker/g)).toHaveLength(1);

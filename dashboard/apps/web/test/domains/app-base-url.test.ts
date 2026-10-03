@@ -20,7 +20,13 @@ vi.mock("@polaris/db", () => ({
                 const value = store.get(where.key);
                 return value === undefined ? null : { value };
             },
-            upsert: async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            upsert: async ({
+                where,
+                create
+            }: {
+                where: { key: string };
+                create: { value: string };
+            }) => {
                 store.set(where.key, create.value);
             },
             deleteMany: async ({ where }: { where: { key: string } }) => {

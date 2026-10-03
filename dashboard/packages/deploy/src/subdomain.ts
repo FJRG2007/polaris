@@ -21,7 +21,11 @@ function dashIp(ip: string): string {
  * base is a real wildcard domain the operator already points at the host, so the
  * IP segment is omitted.
  */
-export function magicDomain(name: string, ip: string, base: string = DEFAULT_SUBDOMAIN_BASE): string {
+export function magicDomain(
+    name: string,
+    ip: string,
+    base: string = DEFAULT_SUBDOMAIN_BASE
+): string {
     const slug = slugify(name) || "app";
     const hash = shortHash(name, 6);
     const host = ip ? `${slug}-${hash}-${dashIp(ip)}` : `${slug}-${hash}`;

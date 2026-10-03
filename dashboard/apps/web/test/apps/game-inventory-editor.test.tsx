@@ -29,7 +29,9 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () 
     cancelQueuedActionAction: async () => ({})
 }));
 
-const { InventoryEditor } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-inventory-editor");
+const { InventoryEditor } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-inventory-editor"
+);
 
 describe("InventoryEditor", () => {
     it("draws the whole panel before any read has landed", () => {

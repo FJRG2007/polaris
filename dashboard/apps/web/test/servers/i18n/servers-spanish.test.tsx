@@ -32,7 +32,9 @@ vi.mock("@/app/(app)/apps/servers/actions", () => ({ renameServerAction: async (
 vi.mock("@/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 vi.mock("@/app/(app)/apps/servers/quick-enroll", () => ({ QuickEnroll: () => null }));
 vi.mock("@/app/(app)/apps/servers/server-groups", () => ({ ServerGroups: () => null }));
-vi.mock("@/app/(app)/apps/servers/remove-server-dialog", () => ({ RemoveServerDialog: () => null }));
+vi.mock("@/app/(app)/apps/servers/remove-server-dialog", () => ({
+    RemoveServerDialog: () => null
+}));
 vi.mock("@/app/(app)/apps/servers/environment-dialog", () => ({ EnvironmentDialog: () => null }));
 
 const { ServersView } = await import("@/app/(app)/apps/servers/servers-view");
@@ -82,7 +84,9 @@ describe("a machine that refused to enroll", () => {
         expect(enrollmentRefusalText(t, ENROLLMENT_REFUSAL_MESSAGES["not-root"])).toBe(
             "La máquina se detuvo antes de registrarse: el comando no se ejecutó como root. Ejecútalo con sudo."
         );
-        expect(enrollmentRefusalText(t, ENROLLMENT_REFUSAL_MESSAGES["no-home-directory"])).toContain("'polaris'");
+        expect(
+            enrollmentRefusalText(t, ENROLLMENT_REFUSAL_MESSAGES["no-home-directory"])
+        ).toContain("'polaris'");
     });
 
     it("keeps English readers' sentence exactly as it was", () => {

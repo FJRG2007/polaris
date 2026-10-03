@@ -33,7 +33,9 @@ describe("what may be linked to", () => {
     });
 
     it("refuses a data URL, which is a page the writer wrote", () => {
-        expect(isSafeHref("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==")).toBe(false);
+        expect(isSafeHref("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==")).toBe(
+            false
+        );
         expect(isSafeHref("data:image/png;base64,iVBORw0KGgo=")).toBe(false);
     });
 

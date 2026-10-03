@@ -317,11 +317,16 @@ export function withOfflineIdentities(content: string): string | null {
  * about - taking that away would be this deciding, with no instruction from
  * anybody, that a player an operator listed is not listed any more.
  */
-export function withoutInventedIdentities(content: string, names: readonly string[]): string | null {
+export function withoutInventedIdentities(
+    content: string,
+    names: readonly string[]
+): string | null {
     const entries = parseRoster(content);
     if (entries === null) return null;
     const wanted = new Set(names.map((name) => name.trim().toLowerCase()));
-    const left = entries.filter((entry) => !(isOfflineUuid(entry.uuid) && wanted.has(entry.name.trim().toLowerCase())));
+    const left = entries.filter(
+        (entry) => !(isOfflineUuid(entry.uuid) && wanted.has(entry.name.trim().toLowerCase()))
+    );
     return left.length === entries.length ? null : serialize(left);
 }
 

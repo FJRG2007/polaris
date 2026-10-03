@@ -25,7 +25,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const COMPOSE = readFileSync(new URL("../../../../docker/docker-compose.yml", import.meta.url), "utf8");
+const COMPOSE = readFileSync(
+    new URL("../../../../docker/docker-compose.yml", import.meta.url),
+    "utf8"
+);
 
 /** The excluded ranges, as written in the call server's own configuration. */
 const EXCLUDED = [...COMPOSE.matchAll(/^\s*-\s*(\d+\.\d+\.\d+\.\d+\/\d+)\s*$/gm)].map(
@@ -34,9 +37,7 @@ const EXCLUDED = [...COMPOSE.matchAll(/^\s*-\s*(\d+\.\d+\.\d+\.\d+\/\d+)\s*$/gm)
 
 /** An address as the number a mask is compared against. */
 function asNumber(address: string): number {
-    return address
-        .split(".")
-        .reduce((total, part) => total * 256 + Number(part), 0);
+    return address.split(".").reduce((total, part) => total * 256 + Number(part), 0);
 }
 
 /** Whether a block covers an address, which is the whole of what a CIDR means. */
@@ -45,7 +46,7 @@ function covers(block: string, address: string): boolean {
     const width = Number(bits);
     if (width === 0) return true;
     const mask = (0xffffffff << (32 - width)) >>> 0;
-    return ((asNumber(network!) & mask) >>> 0) === ((asNumber(address) & mask) >>> 0);
+    return (asNumber(network!) & mask) >>> 0 === (asNumber(address) & mask) >>> 0;
 }
 
 const excluded = (address: string) => EXCLUDED.some((block) => covers(block, address));

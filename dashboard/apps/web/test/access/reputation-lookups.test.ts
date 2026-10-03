@@ -78,13 +78,7 @@ vi.mock("@polaris/db", () => ({
         addressReputation: {
             findUnique: async ({ where }: { where: { ip: string } }) =>
                 verdicts.find((row) => row.ip === where.ip) ?? null,
-            upsert: async ({
-                where,
-                create
-            }: {
-                where: { ip: string };
-                create: ReputationRow;
-            }) => {
+            upsert: async ({ where, create }: { where: { ip: string }; create: ReputationRow }) => {
                 verdicts = [...verdicts.filter((row) => row.ip !== where.ip), create];
                 return create;
             },

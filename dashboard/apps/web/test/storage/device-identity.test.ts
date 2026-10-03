@@ -31,9 +31,9 @@ describe("whether it is the same device", () => {
     });
 
     it("is on the GUID alone, as in the limited edition with no neighbour table", () => {
-        expect(compareIdentity(NAS, { serverGuid: NAS.serverGuid, netbiosName: "OFFICE-NAS" })).toBe(
-            "same"
-        );
+        expect(
+            compareIdentity(NAS, { serverGuid: NAS.serverGuid, netbiosName: "OFFICE-NAS" })
+        ).toBe("same");
     });
 
     it("is on the hardware address alone", () => {
@@ -118,12 +118,7 @@ describe("the pieces", () => {
 
     it("looks through the /24 nearest first, never at itself or past it", () => {
         const order = neighbourhoodOf("10.0.1.129");
-        expect(order.slice(0, 4)).toEqual([
-            "10.0.1.130",
-            "10.0.1.128",
-            "10.0.1.131",
-            "10.0.1.127"
-        ]);
+        expect(order.slice(0, 4)).toEqual(["10.0.1.130", "10.0.1.128", "10.0.1.131", "10.0.1.127"]);
         expect(order).toHaveLength(253);
         expect(order).not.toContain("10.0.1.129");
         expect(order).not.toContain("10.0.1.0");

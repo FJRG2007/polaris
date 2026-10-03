@@ -54,28 +54,32 @@ function authorizer(overrides: Partial<NonNullable<SessionView["authorizedBy"]>>
 /** The table as the account's own list draws it: the reader may open a session's
  *  history, which is what `activityHref` says. */
 function render(sessions: SessionView[]): string {
-    return renderToStaticMarkup(withMessages(
-        <SessionsTable
-            sessions={sessions}
-            busyId={null}
-            emptyLabel="Nothing is signed in."
-            activityHref={(session) => `/account/activity?session=${session.id}`}
-            onRevoke={() => {}}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <SessionsTable
+                sessions={sessions}
+                busyId={null}
+                emptyLabel="Nothing is signed in."
+                activityHref={(session) => `/account/activity?session=${session.id}`}
+                onRevoke={() => {}}
+            />
+        )
+    );
 }
 
 /** The table as an administrator reading somebody else's account draws it: no
  *  history to open, because that log is the account holder's own. */
 function renderForAdmin(sessions: SessionView[]): string {
-    return renderToStaticMarkup(withMessages(
-        <SessionsTable
-            sessions={sessions}
-            busyId={null}
-            emptyLabel="Nothing is signed in."
-            onRevoke={() => {}}
-        />
-    ));
+    return renderToStaticMarkup(
+        withMessages(
+            <SessionsTable
+                sessions={sessions}
+                busyId={null}
+                emptyLabel="Nothing is signed in."
+                onRevoke={() => {}}
+            />
+        )
+    );
 }
 
 describe("the session table", () => {
@@ -257,15 +261,17 @@ describe("the session table", () => {
     });
 
     it("links a row to that session's own history rather than to the whole log", () => {
-        const markup = renderToStaticMarkup(withMessages(
-            <SessionsTable
-                sessions={[session({ id: "session-1" })]}
-                busyId={null}
-                emptyLabel="Nothing is signed in."
-                activityHref={(entry) => `/account/activity?session=${entry.id}`}
-                onRevoke={() => {}}
-            />
-        ));
+        const markup = renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    sessions={[session({ id: "session-1" })]}
+                    busyId={null}
+                    emptyLabel="Nothing is signed in."
+                    activityHref={(entry) => `/account/activity?session=${entry.id}`}
+                    onRevoke={() => {}}
+                />
+            )
+        );
         expect(markup).toContain('href="/account/activity?session=session-1"');
         expect(markup).toContain('aria-label="Activity from Chrome on Windows"');
     });
@@ -339,17 +345,19 @@ describe("a browser extension's connection", () => {
             pinToAddress: pin?.pinToAddress ?? null,
             pinnedByRule: pin?.pinnedByRule ?? false
         };
-        return renderToStaticMarkup(withMessages(
-            <SessionsTable
-                sessions={[]}
-                extensions={[shown]}
-                busyId={null}
-                emptyLabel="Nothing is signed in."
-                onRevoke={() => {}}
-                {...(onDisconnect ? { onDisconnect } : {})}
-                {...(pin ? { onPinExtension: pin.onPinExtension } : {})}
-            />
-        ));
+        return renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    sessions={[]}
+                    extensions={[shown]}
+                    busyId={null}
+                    emptyLabel="Nothing is signed in."
+                    onRevoke={() => {}}
+                    {...(onDisconnect ? { onDisconnect } : {})}
+                    {...(pin ? { onPinExtension: pin.onPinExtension } : {})}
+                />
+            )
+        );
     }
 
     it("is a row beside the browsers, with what it was seen from", () => {

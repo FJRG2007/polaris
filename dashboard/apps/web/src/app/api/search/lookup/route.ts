@@ -23,15 +23,28 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const params = new URL(request.url).searchParams;
-    const parsed = searchLookupSchema.safeParse({ scope: params.get("scope"), query: params.get("q") ?? "" });
+    const parsed = searchLookupSchema.safeParse({
+        scope: params.get("scope"),
+        query: params.get("q") ?? ""
+    });
     if (!parsed.success) {
-        return Response.json({ error: parsed.error.issues[0]?.message ?? (await readerWords("api"))("errors.unknownScope") }, { status: 400 });
+        return Response.json(
+            {
+                error:
+                    parsed.error.issues[0]?.message ??
+                    (await readerWords("api"))("errors.unknownScope")
+            },
+            { status: 400 }
+        );
     }
 
     try {
         return Response.json({ hits: await lookup(user, parsed.data) });
     } catch (caught) {
         console.error(caught);
-        return Response.json({ error: (await readerWords("api"))("errors.searchFailed") }, { status: 500 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.searchFailed") },
+            { status: 500 }
+        );
     }
 }

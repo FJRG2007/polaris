@@ -4,7 +4,14 @@ import { environmentFromAddress, serverEnvironmentGroup } from "../src/schemas/h
 
 describe("isPrivateIp", () => {
     it("treats RFC1918, loopback, link-local and CGNAT space as private", () => {
-        for (const ip of ["10.0.0.5", "172.16.4.1", "192.168.50.138", "127.0.0.1", "169.254.10.1", "100.100.1.1"]) {
+        for (const ip of [
+            "10.0.0.5",
+            "172.16.4.1",
+            "192.168.50.138",
+            "127.0.0.1",
+            "169.254.10.1",
+            "100.100.1.1"
+        ]) {
             expect(isPrivateIp(ip)).toBe(true);
         }
     });

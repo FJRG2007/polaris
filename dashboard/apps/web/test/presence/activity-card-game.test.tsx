@@ -41,13 +41,20 @@ function images(container: HTMLElement): string[] {
 
 describe("the card for a game server", () => {
     it("shows the server's picture with the game's mark in the corner", () => {
-        const { container } = render(<ActivityCard activity={playing} />, { wrapper: MessagesWrapper });
-        expect(images(container)).toEqual(["/api/apps/installed/s1/minecraft/card-icon", "/logos/minecraft.webp"]);
+        const { container } = render(<ActivityCard activity={playing} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(images(container)).toEqual([
+            "/api/apps/installed/s1/minecraft/card-icon",
+            "/logos/minecraft.webp"
+        ]);
         expect(screen.getByText("ExampleSMP")).toBeTruthy();
     });
 
     it("falls back to the game's mark alone when the server has no picture", () => {
-        const { container } = render(<ActivityCard activity={playing} />, { wrapper: MessagesWrapper });
+        const { container } = render(<ActivityCard activity={playing} />, {
+            wrapper: MessagesWrapper
+        });
         fireEvent.error(container.querySelector("img")!);
         expect(images(container)).toEqual(["/logos/minecraft.webp"]);
     });
@@ -70,6 +77,8 @@ describe("the line under a name", () => {
         const es = (key: string, params?: Record<string, string>) =>
             translate("es-ES", `components.${key}` as never, params as never);
         expect(activityLine(playing, es as never)).toBe("Jugando a Minecraft");
-        expect(activityLine({ source: "spotify", name: "Clocks" }, es as never)).toBe("Escuchando Clocks");
+        expect(activityLine({ source: "spotify", name: "Clocks" }, es as never)).toBe(
+            "Escuchando Clocks"
+        );
     });
 });

@@ -195,9 +195,7 @@ describe("the registry's address fields", () => {
     it("stores a MAC in one spelling, whichever it was typed in", () => {
         const connection = registry.deviceConnection("shelly-local")!;
         expect(registry.normalizeFields(connection, { host: " c8f7.421a.2b3c " }).host).toBe(MAC);
-        expect(registry.normalizeFields(connection, { host: "10.0.1.40" }).host).toBe(
-            "10.0.1.40"
-        );
+        expect(registry.normalizeFields(connection, { host: "10.0.1.40" }).host).toBe("10.0.1.40");
     });
 
     it("holds a MAC being typed to all twelve digits, and leaves empty alone", () => {
