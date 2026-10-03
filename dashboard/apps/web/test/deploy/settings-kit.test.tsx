@@ -76,4 +76,23 @@ describe("the Settings tab's shared section and card shape", () => {
         expect(screen.getByText("Saved")).toBeDefined();
         expect(save.getAttribute("aria-disabled")).toBe("true");
     });
+
+    it("blocks a dirty card's Save while a neighbour sharing its write is saving", () => {
+        render(
+            <SettingsLayout sections={[{ id: "networking", label: "Networking", icon: Network }]}>
+                <SettingsSection id="networking" icon={Network} title="Networking" intro="Where the service answers.">
+                    <SettingsCard
+                        title="Port"
+                        description="The port the container listens on."
+                        footer={<SaveBar dirty pending={false} busy justSaved={false} onSave={() => undefined} />}
+                    >
+                        <p>Port field</p>
+                    </SettingsCard>
+                </SettingsSection>
+            </SettingsLayout>,
+            { wrapper: MessagesWrapper }
+        );
+
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("true");
+    });
 });
