@@ -8,10 +8,13 @@
  * vanilla commands only, so it works the same on Vanilla, Paper, Fabric, Forge
  * and NeoForge, and is taken in without a restart.
  *
- * Each tick, for every snowball in the overworld, it takes the stretch the
- * snowball is about to fly (its position plus its motion, in `STEPS` points) and
- * the first point of it that is the arena's snow inside the arena's box is
- * broken, and the snowball with it - as if it had hit there. The box and an
+ * Each tick, for every snowball in the overworld close round the arena, it
+ * takes the stretch the snowball is about to fly - its position plus its
+ * motion, gravity included, and a quarter further so a ball that only grazes
+ * the snow is not missed - and the first point of it that is the arena's snow
+ * inside the arena's box is broken, and the snowball with it, as if it had hit
+ * there. The game pulls a snowball down before it moves it, so a stretch along
+ * the stored motion alone stopped short of a floor it was about to hit. The box and an
  * on/off switch are scores Polaris sets over RCON when the game starts
  * (`armLines`) and clears when it ends (`stopLines`); with the switch off the
  * pack does one score check a tick and nothing else. Outside the box nothing is
@@ -34,9 +37,15 @@ export const PROBE_TAG = "polaris_spleef_probe";
 /** Positions are kept as 64ths of a block: fine enough, and the world's edge at
  *  thirty million blocks still fits in a score. */
 const SCALE = 64;
-/** How many points of the stretch a snowball flies in a tick are tried: at most
- *  a block and a half, so one every three eighths of a block. */
-const STEPS = 4;
+/** A tick's flight is tried in eighths: at most a block and a half, so a point
+ *  every fifth of a block. */
+const STEPS = 8;
+/** And on past it by a quarter: ten eighths. */
+const POINTS = 10;
+/** What the game takes off a snowball's upward speed each tick, in 64ths. */
+const GRAVITY = Math.round(0.03 * SCALE);
+/** How far round the box a snowball is followed at all, in blocks. */
+const NEAR = 3;
 
 const PROBE = `@e[type=minecraft:armor_stand,tag=${PROBE_TAG},limit=1]`;
 
@@ -44,17 +53,37 @@ function score(name: string): string {
     return `#${name} ${OBJECTIVE}`;
 }
 
+/** The `if score` tests that a point (`#cx`, `#cy`, `#cz` for "c") lies inside
+ *  a box (`#x1`..`#z2` for "", `#nx1`..`#nz2` for "n"). */
+function within(point: string, box: string): string {
+    return ["x", "y", "z"]
+        .map(
+            (axis) =>
+                `if score ${score(`${point}${axis}`)} >= ${score(`${box}${axis}1`)} if score ${score(`${point}${axis}`)} <= ${score(`${box}${axis}2`)}`
+        )
+        .join(" ");
+}
+
 const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     tick: [
         `execute if score ${score("on")} matches 1 in minecraft:overworld as @e[type=minecraft:snowball,distance=0..] run function polaris:spleef/ball`
     ],
+    // Only a snowball close round the box is followed any further.
     ball: [
-        ...["x", "y", "z"].flatMap((axis, index) => [
-            `execute store result score ${score(`p${axis}`)} run data get entity @s Pos[${index}] ${SCALE}`,
-            `execute store result score ${score(`m${axis}`)} run data get entity @s Motion[${index}] ${SCALE}`
-        ]),
+        ...["x", "y", "z"].map(
+            (axis, index) =>
+                `execute store result score ${score(`p${axis}`)} run data get entity @s Pos[${index}] ${SCALE}`
+        ),
+        `execute ${within("p", "n")} run function polaris:spleef/near`
+    ],
+    near: [
+        ...["x", "y", "z"].map(
+            (axis, index) =>
+                `execute store result score ${score(`m${axis}`)} run data get entity @s Motion[${index}] ${SCALE}`
+        ),
+        `scoreboard players remove ${score("my")} ${GRAVITY}`,
         `scoreboard players set ${score("hit")} 0`,
-        ...Array.from({ length: STEPS }, (_, index) => [
+        ...Array.from({ length: POINTS }, (_, index) => [
             `scoreboard players set ${score("k")} ${index + 1}`,
             `execute if score ${score("hit")} matches 0 run function polaris:spleef/step`
         ]).flat()
@@ -68,12 +97,7 @@ const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
             `scoreboard players operation ${score(`c${axis}`)} /= ${score("steps")}`,
             `scoreboard players operation ${score(`c${axis}`)} += ${score(`p${axis}`)}`
         ]),
-        `execute ${["x", "y", "z"]
-            .map(
-                (axis) =>
-                    `if score ${score(`c${axis}`)} >= ${score(`${axis}1`)} if score ${score(`c${axis}`)} <= ${score(`${axis}2`)}`
-            )
-            .join(" ")} run function polaris:spleef/probe`
+        `execute ${within("c", "")} run function polaris:spleef/probe`
     ],
     probe: [
         ...[0, 1, 2].map(
@@ -144,6 +168,12 @@ export function armLines(arena: Arena): string[] {
         set("y2", to(top)),
         set("z1", from(z - r)),
         set("z2", to(z + r)),
+        set("nx1", from(x - r - NEAR)),
+        set("nx2", to(x + r + NEAR)),
+        set("ny1", from(bottom - NEAR)),
+        set("ny2", to(top + NEAR)),
+        set("nz1", from(z - r - NEAR)),
+        set("nz2", to(z + r + NEAR)),
         set("steps", STEPS),
         `kill @e[type=minecraft:armor_stand,tag=${PROBE_TAG}]`,
         `execute in minecraft:overworld run summon minecraft:armor_stand ${x + 0.5} ${top + 2} ${z + 0.5} {Tags:["${PROBE_TAG}"],Invisible:1b,Marker:1b,NoGravity:1b,Invulnerable:1b}`,

@@ -1933,7 +1933,7 @@ describe("a spleef floor", () => {
             expect(JSON.parse(files.get(`data/minecraft/tags/${folder}/tick.json`)!)).toEqual({
                 values: ["polaris:spleef/tick"]
             });
-            for (const name of ["tick", "ball", "step", "probe", "hit"])
+            for (const name of ["tick", "ball", "near", "step", "probe", "hit"])
                 expect(files.get(`data/polaris/${folder}/spleef/${name}.mcfunction`)).toBe(
                     files.get(`data/polaris/functions/spleef/${name}.mcfunction`)
                 );
@@ -1943,6 +1943,14 @@ describe("a spleef floor", () => {
         expect(fn("tick")).toBe(
             "execute if score #on polaris_spleef matches 1 in minecraft:overworld as @e[type=minecraft:snowball,distance=0..] run function polaris:spleef/ball\n"
         );
+        // Followed only close round the box; gravity is taken off before it is
+        // followed, and a tick's flight is tried a quarter further than it goes.
+        expect(fn("ball")).toContain(
+            "if score #px polaris_spleef >= #nx1 polaris_spleef if score #px polaris_spleef <= #nx2 polaris_spleef"
+        );
+        expect(fn("near")).toContain("scoreboard players remove #my polaris_spleef 2\n");
+        expect(fn("near")).toContain("scoreboard players set #k polaris_spleef 10\n");
+        expect(fn("near")).not.toContain("#k polaris_spleef 11");
         // A point is tried only inside the box, and only the arena's snow is broken.
         expect(fn("step")).toContain(
             "if score #cy polaris_spleef >= #y1 polaris_spleef if score #cy polaris_spleef <= #y2 polaris_spleef"
@@ -1983,6 +1991,11 @@ describe("a spleef floor", () => {
         expect(lines).toContain(`scoreboard players set #y2 polaris_spleef ${101 * 64 - 1}`);
         expect(lines).toContain(`scoreboard players set #z1 polaris_spleef ${35 * 64}`);
         expect(lines).toContain(`scoreboard players set #z2 polaris_spleef ${46 * 64 - 1}`);
+        expect(lines).toContain(`scoreboard players set #nx1 polaris_spleef ${(-3 - 5 - 3) * 64}`);
+        expect(lines).toContain(
+            `scoreboard players set #ny2 polaris_spleef ${(100 + 3 + 1) * 64 - 1}`
+        );
+        expect(lines).toContain("scoreboard players set #steps polaris_spleef 8");
         expect(lines.at(-1)).toBe("scoreboard players set #on polaris_spleef 1");
         expect(lines.indexOf("scoreboard players set #on polaris_spleef 0")).toBeLessThan(
             lines.findIndex((line) => line.startsWith("scoreboard players set #x1"))
