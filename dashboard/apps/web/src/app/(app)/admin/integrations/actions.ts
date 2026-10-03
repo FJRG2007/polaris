@@ -68,7 +68,8 @@ export async function saveConnectionLimitAction(
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
-    if (!findConnectionProvider(provider)) return { error: t("integrations.errors.unknownService") };
+    if (!findConnectionProvider(provider))
+        return { error: t("integrations.errors.unknownService") };
     if (!Number.isInteger(limit) || limit < 0 || limit > MAX_ACCOUNTS_PER_USER) {
         return { error: t("integrations.errors.limitRange", { max: MAX_ACCOUNTS_PER_USER }) };
     }
@@ -100,7 +101,8 @@ export async function saveConnectionSignInAction(
 ): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
-    if (!findConnectionProvider(provider)) return { error: t("integrations.errors.unknownService") };
+    if (!findConnectionProvider(provider))
+        return { error: t("integrations.errors.unknownService") };
 
     await setSetting(connectionSignInKey(provider), allowed === true ? "true" : "false");
     await recordAudit({
@@ -268,8 +270,7 @@ export async function saveSteamAction(input: {
         });
     } catch (caught) {
         return {
-            error:
-                caught instanceof Error ? caught.message : t("integrations.errors.steamNotSaved")
+            error: caught instanceof Error ? caught.message : t("integrations.errors.steamNotSaved")
         };
     }
 
@@ -397,7 +398,8 @@ export async function saveTunnelAction(input: {
     if (provider !== "cloudflare" && provider !== "ngrok")
         return { error: t("integrations.errors.unknownTunnel") };
     const newToken = input.token && input.token.trim() ? input.token.trim() : undefined;
-    if (newToken && !isTunnelToken(provider, newToken)) return { error: t(`integrations.tunnelHint.${provider}`) };
+    if (newToken && !isTunnelToken(provider, newToken))
+        return { error: t(`integrations.tunnelHint.${provider}`) };
 
     try {
         const existing = await getIntegrationState(provider);
