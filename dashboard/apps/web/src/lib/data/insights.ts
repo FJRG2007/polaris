@@ -74,7 +74,11 @@ export async function databaseInsights(
     userId: string,
     connectionId: string
 ): Promise<DatabaseInsights> {
-    const address = await addressOf(userId, connectionId);
+    return databaseInsightsAt(await addressOf(userId, connectionId));
+}
+
+/** `databaseInsights`, for an address already resolved and authorized by the caller. */
+export async function databaseInsightsAt(address: DataAddress): Promise<DatabaseInsights> {
     switch (address.engine) {
         case "postgres":
             return postgresInsights(address);

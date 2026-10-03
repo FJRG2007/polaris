@@ -33,7 +33,7 @@
  * nobody is watching change would make this panel the load it is measuring.
  */
 
-import * as actions from "./actions";
+import { useDataSource } from "./data-source";
 import { formatBytes } from "@polaris/core";
 import { Loader2, RefreshCw } from "lucide-react";
 import { dataText, statText } from "@/lib/data/words";
@@ -74,7 +74,10 @@ interface Reading {
 /** The rate charts, engine by engine: which counters make a rate worth drawing,
  *  and which pair makes a hit rate. Everything else is drawn as a gauge. */
 const RATES: Record<string, { keys: string[]; hitRate?: [string, string] }> = {
-    redis: { keys: ["commands", "hits", "misses", "expired", "evicted"], hitRate: ["hits", "misses"] },
+    redis: {
+        keys: ["commands", "hits", "misses", "expired", "evicted"],
+        hitRate: ["hits", "misses"]
+    },
     postgres: {
         keys: ["commits", "rollbacks", "returned", "inserted", "updated", "deleted"],
         hitRate: ["hits", "misses"]
@@ -84,8 +87,9 @@ const RATES: Record<string, { keys: string[]; hitRate?: [string, string] }> = {
     mongo: { keys: ["query", "insert", "update", "delete", "getmore"] }
 };
 
-export function StatsPanel({ connectionId }: { connectionId: string }) {
+export function StatsPanel() {
     const t = useTranslations("databases");
+    const source = useDataSource();
     const [readings, setReadings] = useState<Reading[]>([]);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
@@ -104,7 +108,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
         if (running.current) return;
         running.current = true;
         setBusy(true);
-        const result = await actions.statsAction(connectionId);
+        const result = await source.stats();
         running.current = false;
         setBusy(false);
         if (result.error) {
@@ -116,7 +120,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
         setError("");
         setEngine(stats.engine);
         setReadings((current) => [...current, toReading(stats)].slice(-KEPT));
-    }, [connectionId]);
+    }, [source]);
 
     useEffect(() => {
         setReadings([]);
@@ -136,7 +140,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
     useEffect(() => {
         let alive = true;
         setInsights(null);
-        void actions.insightsAction(connectionId).then((result) => {
+        void source.insights().then((result) => {
             if (!alive) return;
             // A failure here is not the panel's failure. The rates above are
             // still worth watching, and an engine that will not answer this is
@@ -146,7 +150,7 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
         return () => {
             alive = false;
         };
-    }, [connectionId]);
+    }, [source]);
 
     const latest = readings[readings.length - 1];
     const rates = RATES[engine] ?? { keys: [] };
@@ -173,7 +177,10 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
     return (
         <div className="flex flex-col gap-3">
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -207,11 +214,16 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                                 aria-label={t("stats.whichRate")}
                                 options={rateKeys.map((key) => ({
                                     value: key,
-                                    label: t("stats.perSecond", { what: statText(t, latest.labels[key] ?? key) })
+                                    label: t("stats.perSecond", {
+                                        what: statText(t, latest.labels[key] ?? key)
+                                    })
                                 }))}
                             />
                             <span className="text-xs text-muted-foreground">
-                                {t("stats.readings", { count: readings.length, seconds: POLL_MS / 1000 })}
+                                {t("stats.readings", {
+                                    count: readings.length,
+                                    seconds: POLL_MS / 1000
+                                })}
                             </span>
                             <Button
                                 size="icon-sm"
@@ -231,7 +243,9 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                             points={ratePoints(readings, shown)}
                             from={readings[0]?.at ?? latest.at}
                             to={latest.at}
-                            label={t("stats.perSecond", { what: statText(t, latest.labels[shown] ?? shown) })}
+                            label={t("stats.perSecond", {
+                                what: statText(t, latest.labels[shown] ?? shown)
+                            })}
                             format={(value) => value.toFixed(value < 10 ? 1 : 0)}
                         />
                     </CardBody>
@@ -293,7 +307,9 @@ function Bar({
                 <span className="min-w-0 flex-1 truncate font-mono text-xs" title={title ?? label}>
                     {label}
                 </span>
-                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{caption}</span>
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                    {caption}
+                </span>
             </div>
             <div className="bg-border h-1.5 overflow-hidden rounded-full">
                 <div className="bg-primary h-full rounded-full" style={{ width: `${share}%` }} />
@@ -363,7 +379,10 @@ function BiggestPanel({ insights }: { insights: DatabaseInsights | null }) {
                             caption={
                                 row.rows === null
                                     ? formatBytes(row.bytes)
-                                    : t("insights.sizeRows", { size: formatBytes(row.bytes), rows: grouped(row.rows) })
+                                    : t("insights.sizeRows", {
+                                          size: formatBytes(row.bytes),
+                                          rows: grouped(row.rows)
+                                      })
                             }
                         />
                     ))}
@@ -411,7 +430,10 @@ function FrequentPanel({ insights }: { insights: DatabaseInsights | null }) {
                             caption={
                                 row.totalMs === null
                                     ? t("insights.calls", { calls: grouped(row.calls) })
-                                    : t("insights.callsTime", { calls: grouped(row.calls), ms: grouped(row.totalMs) })
+                                    : t("insights.callsTime", {
+                                          calls: grouped(row.calls),
+                                          ms: grouped(row.totalMs)
+                                      })
                             }
                         />
                     ))}

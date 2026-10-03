@@ -18,6 +18,7 @@
 
 import * as net from "node:net";
 import * as data from "../driver";
+import * as rowEdit from "../row-edit";
 import * as mysql from "mysql2/promise";
 import { prepareCellEdit } from "../cell-edit";
 import type { Connection as CallbackConnection, FieldPacket, ResultSetHeader } from "mysql2";
@@ -273,6 +274,63 @@ export class MysqlDriver implements data.DataDriver {
         const connection = await this.open();
         const [result] = await connection.query(prepared.text, prepared.params);
         return { changed: (result as { affectedRows?: number }).affectedRows ?? 0 };
+    }
+
+    /** Add one row; a column left out takes its default. See `row-edit.ts`. */
+    async insertRow(insert: rowEdit.RowInsert): Promise<rowEdit.RowWriteResult> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("adding a row");
+        const columns = await this.columns(insert.namespace, insert.relation);
+        const prepared = rowEdit.prepareInsert(
+            insert,
+            columns,
+            this.dialect(insert.namespace, insert.relation),
+            "mysql"
+        );
+        const connection = await this.open();
+        const [result] = await connection.query(prepared.text, prepared.params);
+        return { changed: (result as { affectedRows?: number }).affectedRows ?? 0 };
+    }
+
+    /** Remove rows by their whole primary key, all of them or none. */
+    async deleteRows(removal: rowEdit.RowDelete): Promise<rowEdit.RowWriteResult> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("removing rows");
+        const columns = await this.columns(removal.namespace, removal.relation);
+        const prepared = rowEdit.prepareDelete(
+            removal,
+            columns,
+            this.dialect(removal.namespace, removal.relation)
+        );
+        const connection = await this.open();
+        await connection.beginTransaction();
+        try {
+            const [result] = await connection.query(prepared.text, prepared.params);
+            await connection.commit();
+            return { changed: (result as { affectedRows?: number }).affectedRows ?? 0 };
+        } catch (error) {
+            await connection.rollback().catch(() => undefined);
+            throw error;
+        }
+    }
+
+    /** MySQL commits a CREATE TABLE on its own; there is nothing to roll back. */
+    async createTable(draft: rowEdit.TableDraft): Promise<void> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("creating a table");
+        const text = rowEdit.prepareCreateTable(
+            draft,
+            "mysql",
+            quoteBacktickIdent,
+            (namespace, name) => quoteQualified([namespace, name], quoteBacktickIdent)
+        );
+        const connection = await this.open();
+        await connection.query(text);
+    }
+
+    private dialect(namespace: string | null, relation: string) {
+        return {
+            quote: quoteBacktickIdent,
+            placeholder: () => "?",
+            target: quoteQualified([namespace, relation], quoteBacktickIdent)
+        };
     }
 
     async close(): Promise<void> {

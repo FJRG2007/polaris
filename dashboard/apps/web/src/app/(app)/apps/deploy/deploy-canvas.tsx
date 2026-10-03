@@ -1098,6 +1098,7 @@ export function DeployCanvas({
                 <DatabaseManageDialog
                     database={managing}
                     open
+                    deployManage={canManage}
                     onOpenChange={(open) => {
                         if (!open) {
                             setManaging(null);
