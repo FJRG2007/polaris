@@ -1,5 +1,6 @@
 package polaris.minecraft;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -20,6 +21,7 @@ import net.minecraft.server.bossevents.CustomBossEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.scores.DisplaySlot;
 import net.minecraft.world.scores.Objective;
+import polaris.minecraft.mixin.BossEventPacketAccessor;
 
 /**
  * What a player held at the login prompt is kept from seeing: everything but
@@ -38,11 +40,15 @@ import net.minecraft.world.scores.Objective;
  * - The side panel, the tab list's score and the score under names are blanked
  *   on their screen and put back as they are let in.
  * - Titles, the action bar, system chat, chat a console or a command block
- *   says, boss bar updates and the tab list's header and footer are not sent to
+ *   says, those bars' updates and the tab list's header and footer are not sent to
  *   them at all (the packet filter, {@code HeldPacketMixin}), except what the
  *   login gate itself says ({@link #speak}) and the answer to their own
  *   {@code /login} or {@code /register} ({@link #answering}). The last header
  *   and footer held back is sent as they are let in.
+ *
+ * The game's own bars - a dragon fight, a wither, a raid, another mod's - are
+ * left alone: the game hands each out once, and one held back would never be
+ * there again for the updates that follow it.
  *
  * Other players' chat still reaches them: each message is a link in a signed
  * chain the client checks, and one held back would have the client disconnect
@@ -61,6 +67,9 @@ public final class Unseen {
     private static final Set<UUID> answered = ConcurrentHashMap.newKeySet();
     /** The last tab list header and footer held back from each held player. */
     private static final Map<UUID, ClientboundTabListPacket> deferredTab = new ConcurrentHashMap<>();
+    /** The bars made with {@code /bossbar}, as of the start of this tick, for the
+     *  filter asked off the server thread. */
+    private static final Set<UUID> customBars = ConcurrentHashMap.newKeySet();
     private static final ThreadLocal<Boolean> speaking = ThreadLocal.withInitial(() -> false);
 
     private Unseen() {}
@@ -141,8 +150,30 @@ public final class Unseen {
     }
 
     /** The start of every tick: the answers of the last one are done. */
-    static void nextTick() {
+    static void nextTick(MinecraftServer server) {
         if (!answered.isEmpty()) answered.clear();
+        if (hidden.isEmpty()) {
+            customBars.clear();
+            return;
+        }
+        Set<UUID> now = new HashSet<>();
+        for (CustomBossEvent bar : server.getCustomBossEvents().getEvents()) now.add(bar.getId());
+        customBars.retainAll(now);
+        customBars.addAll(now);
+    }
+
+    /** Whether a boss bar packet is about a bar made with {@code /bossbar}: the
+     *  only ones taken off a held player's screen and handed back as they are let
+     *  in. Every one when the packet cannot be read. */
+    private static boolean customBar(Packet<?> packet, ServerPlayer player) {
+        if (!(packet instanceof BossEventPacketAccessor fields)) return true;
+        UUID id = fields.polaris$id();
+        MinecraftServer server = player.server;
+        if (server == null || !server.isSameThread()) return customBars.contains(id);
+        for (CustomBossEvent bar : server.getCustomBossEvents().getEvents()) {
+            if (bar.getId().equals(id)) return true;
+        }
+        return false;
     }
 
     /** Whether a packet on its way to this player is one a held player does not get. */
@@ -153,8 +184,8 @@ public final class Unseen {
             deferredTab.put(player.getUUID(), tab);
             return true;
         }
-        return packet instanceof ClientboundBossEventPacket
-                || packet instanceof ClientboundSetDisplayObjectivePacket
+        if (packet instanceof ClientboundBossEventPacket) return customBar(packet, player);
+        return packet instanceof ClientboundSetDisplayObjectivePacket
                 || packet instanceof ClientboundSetTitleTextPacket
                 || packet instanceof ClientboundSetSubtitleTextPacket
                 || packet instanceof ClientboundSetActionBarTextPacket

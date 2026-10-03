@@ -10,8 +10,9 @@
  * Everything Polaris says to players in the game goes through three commands -
  * `tellraw`, `title` and `playsound` - so every such line is narrowed here, on
  * its way to the server, to the players without that tag: `@a` becomes
- * `@a[tag=!polaris_pending]`, and a line to one player by name becomes a
- * selector for that name without the tag. A server where nobody carries the tag
+ * `@a[tag=!polaris_pending]`, and a line to one player by name runs as that
+ * player only when they are without the tag. The name stays a name, so the game
+ * finds the player in any case, as it did before. A server where nobody carries the tag
  * (no Polaris login, or everybody logged in) reads exactly what it read before.
  * What only reads or counts, and what an event does to the world, is left as it
  * was: a held player cannot do anything anyway, and a cleanup that skipped them
@@ -42,6 +43,13 @@ const PLAYER_NAME = /^\.?[A-Za-z0-9_]{1,16}$/;
 /** What `execute` aims at somebody with: the name it can take in place of a
  *  selector follows one of these. */
 const AIMING = new Set(["as", "at"]);
+
+/** What follows `as <name>` so the rest runs only for a player who is in. */
+const AS_IN = `if entity @s[${NOT_PENDING}]`;
+
+/** What follows `at <name>` so the rest runs only where a player who is in
+ *  stands, without changing who runs it. */
+const AT_IN = `if entity @a[${NOT_PENDING},distance=..0.01]`;
 
 /** The verbs that show something to a player. */
 type Shown = "tellraw" | "title" | "playsound";
@@ -79,18 +87,24 @@ function nextWord(line: string, from: number): Word | null {
     return { start, end: at };
 }
 
-/** A target narrowed to the players who are in: a selector gets the tag test,
- *  a name becomes a selector for it. `@s` is whoever `execute` already chose,
- *  and a UUID or anything else is left as it is. */
+/** A target narrowed to the players who are in: a selector gets the tag test.
+ *  `@s` is whoever `execute` already chose, and a name is narrowed by the line
+ *  around it (`hiddenFromPending`), never turned into a selector: a selector's
+ *  `name=` matches the case exactly, where the name itself finds the player in
+ *  any case. A UUID or anything else is left as it is. */
 export function narrowedTarget(target: string): string {
     const selector = /^@([aepr])(\[(.*)\])?$/s.exec(target);
-    if (selector) {
-        const inside = selector[3] ?? "";
-        if (new RegExp(`tag=!?${PENDING_TAG}(?![A-Za-z0-9_.+-])`).test(inside)) return target;
-        return `@${selector[1]}[${inside.trim() ? `${inside},` : ""}${NOT_PENDING}]`;
-    }
-    if (PLAYER_NAME.test(target)) return `@a[name=${target},${NOT_PENDING}]`;
-    return target;
+    if (!selector) return target;
+    const inside = selector[3] ?? "";
+    if (new RegExp(`tag=!?${PENDING_TAG}(?![A-Za-z0-9_.+-])`).test(inside)) return target;
+    return `@${selector[1]}[${inside.trim() ? `${inside},` : ""}${NOT_PENDING}]`;
+}
+
+/** Whether `execute` already tests the player it aimed at by name, right after
+ *  the name. */
+function guarded(line: string, after: number, guard: string): boolean {
+    const end = after + guard.length + 1;
+    return line.startsWith(` ${guard}`, after) && (end === line.length || line[end] === " ");
 }
 
 /** Where the target of a showing verb is, counted in words after the verb:
@@ -127,9 +141,12 @@ export function hiddenFromPending(line: string): string {
                 found = nextWord(line, at);
                 break;
             }
-            if (text.startsWith("@") || (AIMING.has(previous) && PLAYER_NAME.test(text))) {
+            if (text.startsWith("@")) {
                 const narrowed = narrowedTarget(text);
                 if (narrowed !== text) replacements.push({ word, text: narrowed });
+            } else if (AIMING.has(previous) && PLAYER_NAME.test(text)) {
+                const guard = previous === "as" ? AS_IN : AT_IN;
+                if (!guarded(line, word.end, guard)) replacements.push({ word, text: `${text} ${guard}` });
             }
             previous = text;
         }
@@ -149,8 +166,13 @@ export function hiddenFromPending(line: string): string {
     const word = words[index];
     if (word) {
         const text = line.slice(word.start, word.end);
-        const narrowed = narrowedTarget(text);
-        if (narrowed !== text) replacements.push({ word, text: narrowed });
+        if (PLAYER_NAME.test(text)) {
+            const before = { start: verbWord.start, end: verbWord.start };
+            replacements.push({ word: before, text: `execute as ${text} ${AS_IN} run ` }, { word, text: "@s" });
+        } else {
+            const narrowed = narrowedTarget(text);
+            if (narrowed !== text) replacements.push({ word, text: narrowed });
+        }
     }
     if (replacements.length === 0) return line;
     let out = line;

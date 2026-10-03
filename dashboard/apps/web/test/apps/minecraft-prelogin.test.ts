@@ -37,12 +37,8 @@ describe("narrowedTarget", () => {
         );
     });
 
-    it("turns a name into a selector for that name, Floodgate's too", () => {
-        expect(prelogin.narrowedTarget("Ana")).toBe(`@a[name=Ana,${IN}]`);
-        expect(prelogin.narrowedTarget(".Bedrock_1")).toBe(`@a[name=.Bedrock_1,${IN}]`);
-    });
-
-    it("leaves @s, a UUID and a selector that already asks about the tag alone", () => {
+    it("leaves @s, a name, a UUID and a selector that already asks about the tag alone", () => {
+        expect(prelogin.narrowedTarget("Ana")).toBe("Ana");
         expect(prelogin.narrowedTarget("@s")).toBe("@s");
         const uuid = "0d6a2c1e-6a3b-4a0b-9c6f-5d1e2f3a4b5c";
         expect(prelogin.narrowedTarget(uuid)).toBe(uuid);
@@ -60,11 +56,20 @@ describe("hiddenFromPending", () => {
         expect(hidden("title @a times 10 70 20")).toBe(`title @a[${IN}] times 10 70 20`);
     });
 
-    it("narrows a line to one player by name", () => {
-        expect(hidden('tellraw Ana {"text":"hi"}')).toBe(
-            `tellraw @a[name=Ana,${IN}] {"text":"hi"}`
+    it("narrows a line to one player by name, keeping the name so any case finds them", () => {
+        expect(hidden('tellraw ana {"text":"hi"}')).toBe(
+            `execute as ana if entity @s[${IN}] run tellraw @s {"text":"hi"}`
         );
-        expect(hidden("title Ana clear")).toBe(`title @a[name=Ana,${IN}] clear`);
+        expect(hidden("title Ana clear")).toBe(`execute as Ana if entity @s[${IN}] run title @s clear`);
+        expect(hidden('tellraw .Bedrock_1 {"text":"hi"}')).toBe(
+            `execute as .Bedrock_1 if entity @s[${IN}] run tellraw @s {"text":"hi"}`
+        );
+        expect(hidden("playsound minecraft:ui.toast.in master Ana ~ ~ ~ 1 1")).toBe(
+            `execute as Ana if entity @s[${IN}] run playsound minecraft:ui.toast.in master @s ~ ~ ~ 1 1`
+        );
+        expect(hidden('execute as @a run tellraw Ana {"text":"x"}')).toBe(
+            `execute as @a[${IN}] run execute as Ana if entity @s[${IN}] run tellraw @s {"text":"x"}`
+        );
     });
 
     it("narrows a sound to its listeners, and whoever execute aims it with", () => {
@@ -79,7 +84,10 @@ describe("hiddenFromPending", () => {
         expect(
             hidden("execute as Ana at @s run playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1")
         ).toBe(
-            `execute as @a[name=Ana,${IN}] at @s run playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1`
+            `execute as Ana if entity @s[${IN}] at @s run playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1`
+        );
+        expect(hidden('execute at Ana run tellraw @a[distance=..8] {"text":"x"}')).toBe(
+            `execute at Ana if entity @a[${IN},distance=..0.01] run tellraw @a[distance=..8,${IN}] {"text":"x"}`
         );
     });
 
@@ -127,8 +135,15 @@ describe("hiddenFromPending", () => {
     });
 
     it("is the same line when asked twice", () => {
-        const once = hidden('execute as Ana at @s run tellraw @a {"text":"x"}');
-        expect(hidden(once)).toBe(once);
+        for (const line of [
+            'execute as Ana at @s run tellraw @a {"text":"x"}',
+            'execute at Ana run tellraw @a {"text":"x"}',
+            'tellraw Ana {"text":"x"}',
+            "title Ana clear"
+        ]) {
+            const once = hidden(line);
+            expect(hidden(once)).toBe(once);
+        }
     });
 
     it("sends the line as it was rather than one the console tool would drop", () => {
@@ -139,10 +154,12 @@ describe("hiddenFromPending", () => {
 
     it("covers what Polaris actually sends: challenges, events, broadcasts, the chat relay", () => {
         expect(hidden(events.sound("minecraft:block.bell.use"))).toContain(`execute as @a[${IN}] at @s`);
-        expect(hidden(challenges.actionBar("Ana", "&aDone"))).toContain(`title @a[name=Ana,${IN}] actionbar`);
+        expect(hidden(challenges.actionBar("Ana", "&aDone"))).toContain(
+            `execute as Ana if entity @s[${IN}] run title @s actionbar`
+        );
         expect(hidden(challenges.tell("@a", "&aSeason over"))).toContain(`tellraw @a[${IN}] `);
         for (const line of challenges.completion("Ana", "Done", "Mine 10 logs"))
-            expect(hidden(line)).toContain(`@a[name=Ana,${IN}]`);
+            expect(hidden(line)).toContain(`execute as Ana if entity @s[${IN}]`);
         expect(hidden(events.say("&eAn event starts"))).toContain(`tellraw @a[${IN}] `);
         for (const line of events.titleCommands("Event", "Starts now"))
             expect(hidden(line)).toContain(`title @a[${IN}] `);

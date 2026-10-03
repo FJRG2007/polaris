@@ -195,7 +195,7 @@ final class LoginGate {
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         tick++;
-        Unseen.nextTick();
+        Unseen.nextTick(event.getServer());
         if (tick % HEARTBEAT_TICKS == 0) heartbeat();
         // A copy: a disconnect fires the logout event, which removes from the map.
         for (Map.Entry<UUID, Held> entry : new ArrayList<>(held.entrySet())) {
