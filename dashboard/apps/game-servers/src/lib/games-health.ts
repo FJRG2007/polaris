@@ -19,8 +19,11 @@
  * here and no record of what has already been said, because ending the loop is
  * what ends the reason to say it again.
  *
- * Only servers Polaris means to be running are looked at. One somebody stopped on
- * purpose is not failing at anything.
+ * Only servers Polaris means to be running are looked at, with one exception: a
+ * server Polaris itself stopped for looping is checked for having come back up
+ * some other way, and is put back to running rather than left reading "stopped"
+ * forever. One somebody stopped on purpose is not failing at anything, and is
+ * never touched either way.
  */
 
 import { gameMessage, gameMessageIn } from "./game-message";
