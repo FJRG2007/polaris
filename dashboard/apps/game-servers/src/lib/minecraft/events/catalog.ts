@@ -200,6 +200,8 @@ export type BossWinner = (typeof BOSS_WINNERS)[number];
 /** What a meteor is made of. */
 export const METEOR_ORES = ["common", "precious", "diamond", "debris"] as const;
 export const PARKOUR_DIFFICULTIES = ["easy", "medium", "hard"] as const;
+/** How a parkour course looks: its blocks, and whether it is climbed by ladder or vine. */
+export const PARKOUR_THEMES = ["classic", "frost", "jungle", "nether"] as const;
 /** The sword a team duel hands everybody, alike for all. */
 export const DUEL_KITS = ["wood", "stone", "iron"] as const;
 /** Where a build battle's theme comes from: the built-in list or the operator's. */
@@ -413,6 +415,8 @@ export const optionsSchemas = {
             .max(40, problem("atMost", { count: 40 }))
             .default(20),
         difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium"),
+        /** Drawn for each run, or always one. */
+        theme: z.enum(["random", ...PARKOUR_THEMES]).default("random"),
         /** How far above the ground it is built. */
         height: z
             .number()

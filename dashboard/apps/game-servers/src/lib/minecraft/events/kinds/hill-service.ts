@@ -116,10 +116,13 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
         return false;
     }
     // Ours, written down before a block goes in.
-    const built: stored.Arena = { box: floor, blocks: [hill.PLATFORM_BLOCK] };
+    const built: stored.Arena = { box: floor, blocks: [...hill.PLATFORM_BLOCKS] };
     ctx.run = { ...ctx.run, arena: built };
     await ctx.persist();
-    await ctx.server.sayAll([arena.fillKeep(floor, hill.PLATFORM_BLOCK)]);
+    await ctx.server.sayAll([
+        ...hill.platformDecor(at, radius).map((one) => arena.fillKeep(one.box, one.block)),
+        arena.fillKeep(floor, hill.PLATFORM_BLOCK)
+    ]);
     const probe = `execute in minecraft:overworld if block ${at.x} ${at.y} ${at.z} ${hill.PLATFORM_BLOCK}`;
     if (commands.readTest(await ctx.server.say([probe])) !== "passed") {
         // A protected area refuses blocks without a word.

@@ -1623,6 +1623,7 @@ const commands = await import("@polaris-app/game-servers/src/lib/minecraft/event
 const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/events/messages");
 const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/plan");
 const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
+const hill = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill");
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 
 /** What a player reads of a command's text: the words of its JSON, without the
@@ -4916,8 +4917,31 @@ function keptTheRules(): void {
         expect(line.endsWith(" keep") || / minecraft:air replace minecraft:\S+$/.test(line)).toBe(
             true
         );
+    // Everything built is taken out again: by its own box, or by a larger one
+    // of the same block that holds it (an arena comes down a block at a time
+    // over its whole box).
     const { built, removed } = builtAndRemoved();
-    for (const one of built) expect(removed).toContain(one);
+    const parse = (one: string) => {
+        const [coords, block] = one.split(" -> ");
+        return { at: coords!.split(" ").map(Number), block };
+    };
+    const holds = (outer: number[], inner: number[]) =>
+        [0, 1, 2].every(
+            (axis) =>
+                Math.min(outer[axis]!, outer[axis + 3]!) <=
+                    Math.min(inner[axis]!, inner[axis + 3]!) &&
+                Math.max(outer[axis]!, outer[axis + 3]!) >= Math.max(inner[axis]!, inner[axis + 3]!)
+        );
+    for (const one of built) {
+        const b = parse(one);
+        expect(
+            removed.some((other) => {
+                const r = parse(other);
+                return r.block === b.block && holds(r.at, b.at);
+            }),
+            one
+        ).toBe(true);
+    }
     for (const line of takesItems(world.sent).filter((one) => one.startsWith("clear ")))
         expect(line).toContain("custom_data={polaris_event:1b}");
     // Never put down; asking whether a column is open water is only asking.
@@ -6385,7 +6409,7 @@ describe("a king of the hill", () => {
         await joinAndStart("hill");
         await play(30_000);
         const run = state().run!;
-        expect(run.arena?.blocks).toEqual(["minecraft:smooth_stone"]);
+        expect(run.arena?.blocks).toEqual([...hill.PLATFORM_BLOCKS]);
         expect(run.readyAt).not.toBeNull();
         // Only into air proven empty.
         const build = world.sent.find((line) => line.includes(" minecraft:smooth_stone keep"));
@@ -6411,7 +6435,7 @@ describe("a king of the hill", () => {
         });
         await play(80_000);
         const run = state().run!;
-        expect(run.arena?.blocks).toEqual(["minecraft:smooth_stone"]);
+        expect(run.arena?.blocks).toEqual([...hill.PLATFORM_BLOCKS]);
         expect(run.place!.y).toBe(run.arena!.box.y1 + 1);
         expect(
             world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))

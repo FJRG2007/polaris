@@ -392,6 +392,8 @@ export const ARENA_HEIGHT = 30;
 
 const FLOOR_BLOCK = "minecraft:light_blue_stained_glass";
 const WALL_BLOCK = "minecraft:white_stained_glass";
+/** The arena's corners: light, so the fight reads at night and from below. */
+const PILLAR_BLOCK = "minecraft:sea_lantern";
 
 /** The whole volume the arena takes up, floor to roof, walls included. */
 export function arenaVolume(origin: Point): stage.Volume {
@@ -414,10 +416,24 @@ export function arenaVolume(origin: Point): stage.Volume {
 export function arenaBoxes(origin: Point): stage.Box[] {
     const v = arenaVolume(origin);
     const wall = { y1: v.y1 + 1, y2: v.y2 - 1, block: WALL_BLOCK } as const;
+    // A pillar of light at each corner, the walls between them.
+    const pillar = (x: number, z: number): stage.Box => ({
+        x1: x,
+        z1: z,
+        x2: x,
+        z2: z,
+        y1: v.y1 + 1,
+        y2: v.y2 - 1,
+        block: PILLAR_BLOCK
+    });
     return [
         { ...v, y2: v.y1, block: FLOOR_BLOCK },
-        { x1: v.x1, z1: v.z1, x2: v.x2, z2: v.z1, ...wall },
-        { x1: v.x1, z1: v.z2, x2: v.x2, z2: v.z2, ...wall },
+        pillar(v.x1, v.z1),
+        pillar(v.x2, v.z1),
+        pillar(v.x1, v.z2),
+        pillar(v.x2, v.z2),
+        { x1: v.x1 + 1, z1: v.z1, x2: v.x2 - 1, z2: v.z1, ...wall },
+        { x1: v.x1 + 1, z1: v.z2, x2: v.x2 - 1, z2: v.z2, ...wall },
         { x1: v.x1, z1: v.z1 + 1, x2: v.x1, z2: v.z2 - 1, ...wall },
         { x1: v.x2, z1: v.z1 + 1, x2: v.x2, z2: v.z2 - 1, ...wall },
         { ...v, y1: v.y2, block: WALL_BLOCK }

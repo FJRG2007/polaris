@@ -9,20 +9,29 @@
  * undone by sending the player back to their last checkpoint.
  *
  * Past the easy course, some jumps are traps: a slime pad that throws whoever
- * lands on it up again, so the next jump starts in the air, and orange
- * platforms that vanish for two seconds in every six (`blinkLines`) - wait for
- * them, or be on them when they go. Never two traps in a row, never the start,
- * a checkpoint or the finish, and every fall is still only back to a checkpoint.
+ * lands on it up again, so the next jump starts in the air; orange platforms
+ * that vanish for two seconds in every six; and magenta ones that move - two
+ * places a step apart, one there and the other gone, swapping every three
+ * seconds (`blinkLines`). Wait for them, or be on them when they go. Some jumps
+ * are a climb instead: three blocks up a ladder or a vine on a column. Never
+ * two of these in a row, never the start, a checkpoint or the finish, and
+ * every fall is still only back to a checkpoint.
+ *
+ * Each course has a theme - classic concrete, frost (packed ice: slippery),
+ * jungle (planks, logs, vines), nether - drawn for the run unless one is chosen.
  */
 
 import { seeded } from "../trivia-bank";
-import type { EventOptions } from "../catalog";
+import { PARKOUR_THEMES, type EventOptions } from "../catalog";
+import { shuffled } from "../trivia-bank";
 import { IN_ARENA, type Box, type Spot, type Volume } from "./stage";
 
 export type Role = "start" | "jump" | "checkpoint" | "finish";
 
 /** A jump that is more than a jump. */
-export type Trap = "slime" | "vanish";
+export type Trap = "slime" | "vanish" | "shift";
+
+export type Theme = (typeof PARKOUR_THEMES)[number];
 
 /** One platform: its lowest corner, how wide it is each way, what it is for. */
 export interface Platform {
@@ -32,6 +41,8 @@ export interface Platform {
     readonly size: number;
     readonly role: Role;
     readonly trap?: Trap;
+    /** Reached by climbing from the platform before: +1 or -1, the way the row runs. */
+    readonly climb?: 1 | -1;
 }
 
 export interface Course {
@@ -42,6 +53,9 @@ export interface Course {
     readonly boxes: readonly Box[];
     /** The platforms that vanish and come back (`blinkLines`). */
     readonly vanishing: readonly Box[];
+    /** The moving platforms: each its two places, swapped (`blinkLines`). */
+    readonly shifting: readonly { readonly a: Box; readonly b: Box }[];
+    readonly theme: Theme;
     /** Everything it takes up, net to headroom: all of it must be air. */
     readonly volume: Volume;
     /** The lowest a player standing on it can be; below this they fell. */
@@ -72,22 +86,99 @@ const STEPS: Readonly<
     hard: { size: 1, gaps: [2, 3], shift: 1, slime: 0.2, vanish: 0.3 }
 };
 
+/** How often a plain jump is a climb, and how often a moving platform. */
+const CLIMB_CHANCE = 0.15;
+const SHIFT_CHANCE: Readonly<Record<EventOptions<"parkour">["difficulty"], number>> = {
+    easy: 0,
+    medium: 0.12,
+    hard: 0.18
+};
+/** How far a moving platform moves, across the row. */
+export const SHIFT_STEP = 1;
+
+/**
+ * How courses are laid out now. A course placed before climbs, moving
+ * platforms and looks (design 1) is laid out the way it was then, so a race
+ * running across an update keeps the course it was built as.
+ */
+export const DESIGN = 2;
+
 const TRAP_BLOCKS: Readonly<Record<Trap, Box["block"]>> = {
     slime: "minecraft:slime_block",
-    vanish: "minecraft:orange_concrete"
+    vanish: "minecraft:orange_concrete",
+    shift: "minecraft:magenta_concrete"
 };
 
-const BLOCKS: Readonly<Record<Role, Box["block"]>> = {
-    start: "minecraft:white_concrete",
-    jump: "minecraft:light_blue_concrete",
+/**
+ * What each theme is built of. Checkpoints stay lime and the finish yellow in
+ * every theme, so they read the same whatever the course looks like. Every
+ * block has been in the game since 1.13.
+ */
+const THEMES: Readonly<
+    Record<
+        Theme,
+        {
+            start: Box["block"];
+            jump: Box["block"];
+            column: Box["block"];
+            light: Box["block"];
+            climb: "ladder" | "vine";
+        }
+    >
+> = {
+    classic: {
+        start: "minecraft:white_concrete",
+        jump: "minecraft:light_blue_concrete",
+        column: "minecraft:quartz_block",
+        light: "minecraft:sea_lantern",
+        climb: "ladder"
+    },
+    frost: {
+        start: "minecraft:blue_ice",
+        jump: "minecraft:packed_ice",
+        column: "minecraft:blue_ice",
+        light: "minecraft:sea_lantern",
+        climb: "ladder"
+    },
+    jungle: {
+        start: "minecraft:mossy_stone_bricks",
+        jump: "minecraft:jungle_planks",
+        column: "minecraft:jungle_log",
+        light: "minecraft:glowstone",
+        climb: "vine"
+    },
+    nether: {
+        start: "minecraft:red_nether_bricks",
+        jump: "minecraft:nether_bricks",
+        column: "minecraft:red_nether_bricks",
+        light: "minecraft:glowstone",
+        climb: "ladder"
+    }
+};
+
+const ROLE_BLOCKS: Readonly<Record<"checkpoint" | "finish", Box["block"]>> = {
     checkpoint: "minecraft:lime_concrete",
     finish: "minecraft:yellow_concrete"
 };
 
+/** A run's theme: the one chosen, or drawn from its id. */
+export function themeFor(options: EventOptions<"parkour">, seed: string): Theme {
+    const chosen = options.theme ?? "random";
+    if (chosen !== "random") return chosen;
+    return shuffled(PARKOUR_THEMES, seeded(`parkour-theme-${seed}`))[0] as Theme;
+}
+
+/** The climbing block on the side of a column facing back along the row. */
+function climbBlock(kind: "ladder" | "vine", direction: 1 | -1): Box["block"] {
+    if (kind === "ladder")
+        return direction > 0 ? "minecraft:ladder[facing=west]" : "minecraft:ladder[facing=east]";
+    return direction > 0 ? "minecraft:vine[east=true]" : "minecraft:vine[west=true]";
+}
+
 const NET: Box["block"] = "minecraft:white_stained_glass";
 
 /** The course laid out around 0 0 0, the rows running between x 0 and `ROW`. */
-function laidOut(options: EventOptions<"parkour">, seed: string): Platform[] {
+function laidOut(options: EventOptions<"parkour">, seed: string, legacy: boolean): Platform[] {
     const random = seeded(`parkour-${seed}`);
     const step = STEPS[options.difficulty];
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T;
@@ -123,30 +214,48 @@ function laidOut(options: EventOptions<"parkour">, seed: string): Platform[] {
             }
             continue;
         }
-        const gap = pick(step.gaps);
+        // A climb now and then: a column a block away, three up, its ladder or
+        // vine on the near side - never right after another special jump.
+        const plain = role === "jump" && index >= 2 && !current.trap && !current.climb;
+        const climbing = !legacy && plain && random() < CLIMB_CHANCE;
+        const gap = climbing ? 1 : pick(step.gaps);
         // A sideways step only onto a small platform, and only where the jump
         // is not already a long one: a checkpoint stays on the row's line.
-        const shift = role === "jump" && step.shift > 0 && gap < 3 ? pick([-1, 0, 1]) : 0;
+        const shift =
+            !climbing && role === "jump" && step.shift > 0 && gap < 3 ? pick([-1, 0, 1]) : 0;
         const x = direction > 0 ? current.x + current.size + gap : current.x - gap - size;
         if (x < 0 || x + size - 1 > ROW) {
             turning = 2;
             index -= 1;
             continue;
         }
+        if (climbing) {
+            platforms.push({
+                x,
+                y: current.y + 3,
+                z: track - Math.floor(size / 2),
+                size,
+                role,
+                climb: direction > 0 ? 1 : -1
+            });
+            continue;
+        }
         // A trap now and then, on a plain jump only, never two in a row.
         const roll = random();
-        const trap: Trap | undefined =
-            role !== "jump" || current.trap || index < 2
-                ? undefined
-                : roll < step.vanish
-                  ? "vanish"
-                  : roll < step.vanish + step.slime
-                    ? "slime"
-                    : undefined;
+        const shifting = legacy ? 0 : SHIFT_CHANCE[options.difficulty];
+        const trap: Trap | undefined = !plain
+            ? undefined
+            : roll < step.vanish
+              ? "vanish"
+              : roll < step.vanish + step.slime
+                ? "slime"
+                : roll < step.vanish + step.slime + shifting
+                  ? "shift"
+                  : undefined;
         platforms.push({
             x,
             y: current.y,
-            z: track - Math.floor(size / 2) + shift,
+            z: track - Math.floor(size / 2) + (trap === "shift" ? 0 : shift),
             size,
             role,
             ...(trap ? { trap } : {})
@@ -163,9 +272,13 @@ export function course(
     options: EventOptions<"parkour">,
     seed: string,
     site: { x: number; z: number },
-    y: number
+    y: number,
+    design: number = DESIGN
 ): Course {
-    const raw = laidOut(options, seed);
+    const legacy = design < 2;
+    const raw = laidOut(options, seed, legacy);
+    const theme = legacy ? "classic" : themeFor(options, seed);
+    const look = THEMES[theme];
     const minX = Math.min(...raw.map((one) => one.x)) - 2;
     const maxX = Math.max(...raw.map((one) => one.x + one.size - 1)) + 2;
     const minZ = Math.min(...raw.map((one) => one.z)) - 2;
@@ -193,6 +306,12 @@ export function course(
         z2: finish.z + 1,
         block: "minecraft:light_weighted_pressure_plate"
     };
+    const blockOf = (one: Platform): Box["block"] =>
+        one.trap
+            ? TRAP_BLOCKS[one.trap]
+            : one.role === "checkpoint" || one.role === "finish"
+              ? ROLE_BLOCKS[one.role]
+              : look[one.role];
     const boxOf = (one: Platform): Box => ({
         x1: one.x,
         y1: one.y,
@@ -200,11 +319,74 @@ export function course(
         x2: one.x + one.size - 1,
         y2: one.y,
         z2: one.z + one.size - 1,
-        block: one.trap ? TRAP_BLOCKS[one.trap] : BLOCKS[one.role]
+        block: blockOf(one)
     });
-    const boxes: Box[] = [net, ...platforms.map(boxOf), plate];
+    // A moving platform's other place: a step across the row.
+    const otherPlace = (one: Platform): Box => ({
+        ...boxOf(one),
+        z1: one.z - SHIFT_STEP,
+        z2: one.z + one.size - 1 - SHIFT_STEP
+    });
+    // Each climb: the column under the platform, then - after it, so it has
+    // something to hang on - the ladder or vine on its near side.
+    const columns: Box[] = [];
+    const climbs: Box[] = [];
+    for (const one of platforms) {
+        if (!one.climb) continue;
+        columns.push({
+            x1: one.x,
+            y1: one.y - 2,
+            z1: one.z,
+            x2: one.x + one.size - 1,
+            y2: one.y - 1,
+            z2: one.z + one.size - 1,
+            block: look.column
+        });
+        const at = one.climb > 0 ? one.x - 1 : one.x + one.size;
+        climbs.push({
+            x1: at,
+            y1: one.y - 2,
+            z1: one.z,
+            x2: at,
+            y2: one.y,
+            z2: one.z + one.size - 1,
+            block: climbBlock(look.climb, one.climb)
+        });
+    }
+    // A light under every checkpoint, so it shows from below and far off.
+    const lights: Box[] = platforms
+        .filter((one) => !legacy && (one.role === "checkpoint" || one.role === "finish"))
+        .map((one) => {
+            const cx = one.x + Math.floor(one.size / 2);
+            const cz = one.z + Math.floor(one.size / 2);
+            return {
+                x1: cx,
+                y1: one.y - 1,
+                z1: cz,
+                x2: cx,
+                y2: one.y - 1,
+                z2: cz,
+                block: look.light
+            };
+        })
+        // Never where a climb's column already stands.
+        .filter((light) => !columns.some((col) => inside(light, col)));
+    const shifts = platforms.filter((one) => one.trap === "shift");
+    // Built in this order and taken out the other way: the climbs come off
+    // their columns before the columns go, so a ladder never drops as an item.
+    const boxes: Box[] = [
+        net,
+        ...platforms.map(boxOf),
+        ...shifts.map(otherPlace),
+        ...lights,
+        ...columns,
+        ...climbs,
+        plate
+    ];
     return {
         platforms,
+        theme,
+        shifting: shifts.map((one) => ({ a: boxOf(one), b: otherPlace(one) })),
         vanishing: platforms.filter((one) => one.trap === "vanish").map(boxOf),
         checkpoints: platforms.flatMap((one, index) =>
             one.role === "checkpoint" || one.role === "finish" ? [index] : []
@@ -233,9 +415,30 @@ export const GONE_MS = 2_000;
  * are still theirs, and put back only into air.
  */
 export function blinkLines(course: Course, now: number): string[] {
-    if (course.vanishing.length === 0) return [];
     const gone = now % BLINK_MS >= BLINK_MS - GONE_MS;
-    return course.vanishing.map((box) => (gone ? removeBox(box) : buildBox(box)));
+    // A moving platform is in its first place for one half of the swap, in the
+    // other for the other half: the place it leaves is taken out first.
+    const first = Math.floor(now / SHIFT_MS) % 2 === 0;
+    return [
+        ...course.vanishing.map((box) => (gone ? removeBox(box) : buildBox(box))),
+        ...(course.shifting ?? []).flatMap(({ a, b }) =>
+            first ? [removeBox(b), buildBox(a)] : [removeBox(a), buildBox(b)]
+        )
+    ];
+}
+
+/** How long a moving platform stays in each of its places. */
+export const SHIFT_MS = 3_000;
+
+function inside(box: Box, outer: Box): boolean {
+    return (
+        box.x1 >= outer.x1 &&
+        box.x2 <= outer.x2 &&
+        box.y1 >= outer.y1 &&
+        box.y2 <= outer.y2 &&
+        box.z1 >= outer.z1 &&
+        box.z2 <= outer.z2
+    );
 }
 
 function buildBox(box: Box): string {
