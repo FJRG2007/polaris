@@ -22,6 +22,7 @@ import * as engine from "../engine";
 import { prisma } from "@polaris/db";
 import { calendarTFor } from "./i18n";
 import { host } from "@polaris/app-host";
+import * as googleApi from "./google-api-state";
 import { userHasPermission } from "@polaris/auth";
 import { tryItemOf, writeItem, type StoredObject } from "./objects";
 
@@ -169,18 +170,53 @@ export async function providerFor(source: SourceRow): Promise<sync.CalendarProvi
     }
 }
 
+/** What a source's status column holds. */
+type SourceStatus = "ok" | "auth" | "consent" | "setup" | "unreachable" | "error";
+
 /** How a failure is recorded on the source, and what its owner is told. */
-function statusFor(caught: unknown): "auth" | "unreachable" | "error" {
+function statusFor(caught: unknown): Exclude<SourceStatus, "ok"> {
+    if (caught instanceof sync.SyncSetupError) return "setup";
+    if (caught instanceof sync.SyncConsentError) return "consent";
     if (caught instanceof sync.SyncAuthError) return "auth";
     if (caught instanceof sync.SyncUnreachableError) return "unreachable";
-    if (caught instanceof Error && caught.name === "RefusedAddressError") return "error";
     return "error";
 }
+
+/** The longest a provider's own "retry after" is honoured for. */
+const LONGEST_RETRY_AFTER_MINUTES = 6 * 60;
+
+/** When a failed source is tried again. */
+async function nextAttempt(caught: unknown, now: Date): Promise<Date> {
+    if (caught instanceof sync.SyncSetupError) {
+        return googleApi.nextSetupRetry(
+            await googleApi.recordGoogleCalendarApiOff(caught.setup, now),
+            now
+        );
+    }
+    if (caught instanceof sync.SyncAuthError) return new Date(now.getTime() + 60 * MINUTE);
+    if (caught instanceof sync.SyncUnreachableError && caught.retryAfterSeconds !== null) {
+        const minutes = Math.min(
+            LONGEST_RETRY_AFTER_MINUTES,
+            Math.max(1, Math.ceil(caught.retryAfterSeconds / 60))
+        );
+        return new Date(now.getTime() + minutes * MINUTE);
+    }
+    return new Date(now.getTime() + 15 * MINUTE);
+}
+
+/** What the owner is told the first time a source starts failing, by status. */
+const FAILED_BODY = {
+    auth: "sync.failedAuth",
+    consent: "sync.failedConsent",
+    setup: "sync.failedSetup",
+    error: "sync.failedOther"
+} as const satisfies Record<Exclude<SourceStatus, "ok" | "unreachable">, string>;
 
 /** Record a failed pass, and tell the owner the first time it starts failing. */
 async function recordFailure(
     source: { id: string; userId: string; label: string },
-    caught: unknown
+    caught: unknown,
+    now = new Date()
 ): Promise<void> {
     const status = statusFor(caught);
     const before = await prisma.calendarSource.findUnique({
@@ -192,7 +228,7 @@ async function recordFailure(
         data: {
             status,
             lastError: caught instanceof sync.SyncError ? caught.message : null,
-            nextSyncAt: new Date(Date.now() + (status === "auth" ? 60 : 15) * MINUTE)
+            nextSyncAt: await nextAttempt(caught, now)
         }
     });
     if (before?.status === "ok" && status !== "unreachable") {
@@ -202,7 +238,7 @@ async function recordFailure(
                 userId: source.userId,
                 event: "calendar.syncFailed",
                 title: t("sync.failedTitle", { label: source.label }),
-                body: status === "auth" ? t("sync.failedAuth") : t("sync.failedOther"),
+                body: t(FAILED_BODY[status]),
                 href: "/calendar/settings/accounts"
             })
             .catch(() => undefined);
@@ -433,6 +469,7 @@ export async function syncSource(sourceId: string, now = new Date()): Promise<vo
             select: { id: true, remoteId: true, syncToken: true, ctag: true, timezone: true }
         });
         for (const calendar of calendars) await pullCalendar(provider, calendar);
+        if (source.kind === "google") await googleApi.recordGoogleCalendarApiOn(now);
         await prisma.calendarSource.update({
             where: { id: source.id },
             data: {
@@ -447,7 +484,7 @@ export async function syncSource(sourceId: string, now = new Date()): Promise<vo
             `polaris: calendar source ${source.id} did not sync:`,
             caught instanceof Error ? caught.message : caught
         );
-        await recordFailure(source, caught);
+        await recordFailure(source, caught, now);
     }
 }
 
@@ -596,7 +633,8 @@ async function pushOnce(objectId: string, sourceId: string): Promise<boolean> {
             });
             return true;
         }
-        if (caught instanceof sync.SyncAuthError) await recordFailure(source, caught);
+        if (caught instanceof sync.SyncAuthError || caught instanceof sync.SyncSetupError)
+            await recordFailure(source, caught);
         throw caught;
     }
 }

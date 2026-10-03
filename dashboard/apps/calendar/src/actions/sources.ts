@@ -8,6 +8,8 @@
 import { z } from "zod";
 import * as sync from "../lib/sync";
 import { host } from "@polaris/app-host";
+import { GOOGLE_APIS, googleApiEnableUrl } from "@polaris/core";
+import { readGoogleCalendarApi } from "../lib/google-api-state";
 import * as sources from "../lib/sources";
 import * as schemas from "../lib/schemas";
 import type { SourceView } from "../lib/wire";
@@ -36,9 +38,14 @@ export interface AccountsView {
     readonly linkAvailable: { readonly google: boolean; readonly microsoft: boolean };
     /** Whether the reader runs this Polaris, and so can set that up. */
     readonly canManage: boolean;
+    /** Where an administrator switches the Google Calendar API on, while a
+     *  source here waits on it. Null for everybody else, and while none does. */
+    readonly googleSetup: { readonly enableUrl: string; readonly project: string | null } | null;
     readonly presets: typeof sync.CALDAV_PRESETS;
     readonly holidays: typeof sync.HOLIDAY_CALENDARS;
 }
+
+const CALENDAR_API = GOOGLE_APIS.find((api) => api.id === "calendar")!;
 
 export async function loadAccountsAction(): Promise<Outcome<{ accounts: AccountsView }>> {
     return outcome(async () => {
@@ -60,6 +67,8 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
             ...settings.suggested.map((entry) => entry.url)
         ];
         const used = new Set(list.map((source) => source.connectionId).filter(Boolean));
+        const waiting = user.isAdmin && list.some((source) => source.status === "setup");
+        const apiState = waiting ? await readGoogleCalendarApi() : null;
         return {
             accounts: {
                 sources: list,
@@ -68,6 +77,12 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
                 linkUrls: { google, microsoft },
                 linkAvailable: { google: googleReady, microsoft: microsoftReady },
                 canManage: user.isAdmin,
+                googleSetup: waiting
+                    ? {
+                          enableUrl: googleApiEnableUrl(CALENDAR_API.service, apiState),
+                          project: apiState?.project ?? null
+                      }
+                    : null,
                 presets: sync.CALDAV_PRESETS,
                 holidays: sync.HOLIDAY_CALENDARS
             }

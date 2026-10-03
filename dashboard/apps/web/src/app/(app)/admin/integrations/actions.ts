@@ -7,6 +7,7 @@
  * integration that needs a key with none on file is rejected up front.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -17,6 +18,7 @@ import { applyTunnel } from "@/lib/tunnel-service";
 import { STEAM_PROVIDER } from "@/lib/connections/steam";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
+import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken } from "@/lib/integrations/tunnel-token";
@@ -807,4 +809,16 @@ export async function disconnectGithubAction(): Promise<{ error?: string }> {
     });
     revalidatePath("/admin/integrations");
     return {};
+}
+
+/**
+ * Whether each Google API Polaris calls is switched on in the OAuth client's
+ * Cloud project. Read-only and bounded (see `googleApiHealth`); `force` asks
+ * Google again instead of showing an answer from the last ten minutes.
+ */
+export async function googleApiHealthAction(force: unknown): Promise<{ apis: GoogleApiHealth[] }> {
+    const user = await requireAdmin();
+    const again = z.boolean().safeParse(force).data ?? false;
+    const { googleApiHealth } = await import("@/lib/connections/google-api-health");
+    return { apis: await googleApiHealth(user.id, again) };
 }

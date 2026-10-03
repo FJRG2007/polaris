@@ -187,7 +187,10 @@ export interface SourceView {
     readonly label: string;
     readonly url: string;
     readonly username: string;
-    readonly status: "ok" | "auth" | "unreachable" | "error";
+    /** `consent`: the account was linked without calendar access; `setup`: the
+     *  provider's API is switched off for this Polaris, which only an
+     *  administrator can change. */
+    readonly status: "ok" | "auth" | "consent" | "setup" | "unreachable" | "error";
     readonly lastError: string | null;
     readonly lastSyncAt: string | null;
     readonly refreshMinutes: number;

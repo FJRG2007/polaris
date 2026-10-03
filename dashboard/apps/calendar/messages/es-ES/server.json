@@ -102,7 +102,9 @@
     },
     "sync": {
         "failedAuth": "Conecta la cuenta de nuevo desde los ajustes de Calendario.",
+        "failedConsent": "Conecta la cuenta de nuevo desde los ajustes de Calendario y permite el acceso al calendario.",
         "failedOther": "Polaris seguirá intentándolo. Abre los ajustes de Calendario para ver por qué.",
+        "failedSetup": "Google para calendarios aún no está configurado del todo en este Polaris. Se sincronizará solo cuando lo esté.",
         "failedTitle": "{label} dejó de sincronizar"
     },
     "trash": {

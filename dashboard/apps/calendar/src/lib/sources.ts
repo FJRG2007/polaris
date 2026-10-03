@@ -65,7 +65,7 @@ function view(row: {
         url: row.url,
         username: row.username,
         status:
-            (["ok", "auth", "unreachable", "error"] as const).find(
+            (["ok", "auth", "consent", "setup", "unreachable", "error"] as const).find(
                 (status) => status === row.status
             ) ?? "error",
         lastError: row.lastError,

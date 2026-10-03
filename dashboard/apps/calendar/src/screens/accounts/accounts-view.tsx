@@ -35,6 +35,7 @@ import {
     ArrowLeft,
     CheckCircle2,
     Clock,
+    ExternalLink,
     KeyRound,
     Link2,
     Loader2,
@@ -209,6 +210,7 @@ export function AccountsView({
                                         : null
                                 }
                                 canManage={data.canManage}
+                                googleSetup={data.googleSetup}
                                 onReplace={(next) =>
                                     accounts.replace({
                                         ...data,
@@ -361,7 +363,7 @@ function LinkedAccounts({ accounts, onChanged }: { accounts: Accounts; onChanged
                             className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5"
                         >
                             <Logo slug={link.provider} className="size-5" />
-                            <div className="min-w-0 flex-1">
+                            <div className="min-w-0 flex-1 basis-48">
                                 <p className="truncate font-medium" title={link.label}>
                                     {link.label}
                                 </p>
@@ -421,13 +423,55 @@ function LinkedAccounts({ accounts, onChanged }: { accounts: Accounts; onChanged
 }
 
 function statusTone(status: SourceView["status"]): "success" | "warning" | "danger" {
-    return status === "ok" ? "success" : status === "auth" ? "warning" : "danger";
+    if (status === "ok") return "success";
+    return status === "auth" || status === "consent" || status === "setup" ? "warning" : "danger";
+}
+
+/**
+ * A Google source waiting on the Calendar API being switched on for this
+ * Polaris. Connecting again cannot fix that, so it is not offered: an
+ * administrator gets the switch and a retry, everybody else who to ask.
+ */
+function SetupNote({
+    setup,
+    syncing,
+    onRetry
+}: {
+    setup: Accounts["googleSetup"];
+    syncing: boolean;
+    onRetry: () => void;
+}) {
+    const t = useCalendarT();
+    if (!setup) return <StatusNote tone="warning">{t("accounts.setup.member")}</StatusNote>;
+    return (
+        <StatusNote tone="warning" className="flex flex-col gap-2">
+            <span>{t("accounts.setup.admin")}</span>
+            {setup.project ? (
+                <span className="text-xs">
+                    {t("accounts.setup.project", { project: setup.project })}
+                </span>
+            ) : null}
+            <span className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" asChild>
+                    <a href={setup.enableUrl} target="_blank" rel="noopener noreferrer">
+                        {t("accounts.setup.open")}
+                        <ExternalLink aria-hidden />
+                    </a>
+                </Button>
+                <Button size="sm" variant="ghost" disabled={syncing} onClick={onRetry}>
+                    {syncing ? <Loader2 className="animate-spin" aria-hidden /> : null}
+                    {t("accounts.retry")}
+                </Button>
+            </span>
+        </StatusNote>
+    );
 }
 
 function SourceRow({
     source,
     reconnectUrl,
     canManage,
+    googleSetup,
     onReplace,
     onRemoved
 }: {
@@ -435,6 +479,7 @@ function SourceRow({
     /** Where to authorize it again; null for a provider that cannot be reached. */
     reconnectUrl: string | null;
     canManage: boolean;
+    googleSetup: Accounts["googleSetup"];
     onReplace: (next: SourceView) => void;
     /** true: take it off the list now; false: the removal was refused, read the list again. */
     onRemoved: (gone: boolean) => void;
@@ -511,7 +556,9 @@ function SourceRow({
         <li className="flex flex-col gap-2 rounded-md border border-border bg-card px-3 py-2.5">
             {confirmNode}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <div className="min-w-0 flex-1">
+                {/* At least room for an address: on a phone the actions move under
+                    it instead of squeezing it to a few letters. */}
+                <div className="min-w-0 flex-1 basis-56">
                     <p className="flex min-w-0 items-center gap-2">
                         <span className="min-w-0 truncate font-medium" title={name}>
                             {name}
@@ -556,8 +603,8 @@ function SourceRow({
                         <p className="mt-0.5 text-xs text-foreground-subtle">{source.lastError}</p>
                     ) : null}
                 </div>
-                <div className="flex items-center gap-1">
-                    {source.status === "auth" && reconnectUrl ? (
+                <div className="flex flex-wrap items-center gap-1">
+                    {(source.status === "auth" || source.status === "consent") && reconnectUrl ? (
                         <Button size="sm" variant="outline" asChild>
                             <a href={reconnectUrl}>{t("accounts.reconnect")}</a>
                         </Button>
@@ -618,7 +665,13 @@ function SourceRow({
                     </Button>
                 </div>
             </div>
-            {source.status === "auth" &&
+            {source.status === "consent" ? (
+                <p className="text-xs text-foreground-subtle">{t("accounts.consentHint")}</p>
+            ) : null}
+            {source.status === "setup" ? (
+                <SetupNote setup={googleSetup} syncing={syncing} onRetry={() => void syncNow()} />
+            ) : null}
+            {(source.status === "auth" || source.status === "consent") &&
             !reconnectUrl &&
             (source.kind === "google" || source.kind === "microsoft") ? (
                 <ProviderUnavailable provider={source.kind} canManage={canManage} />

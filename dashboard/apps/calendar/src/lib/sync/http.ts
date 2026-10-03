@@ -9,14 +9,18 @@
  * travel to the origin they were given for (or a host under it).
  */
 
+import type { ProviderApiProblem } from "@polaris/core";
 import {
     SyncAuthError,
     SyncConflictError,
+    SyncConsentError,
     SyncGoneError,
     SyncNotFoundError,
     SyncRefusedError,
+    SyncSetupError,
     SyncUnreachableError,
-    safeReason
+    safeReason,
+    type ProviderSetup
 } from "./errors";
 
 /** How a client reaches the network. The dashboard injects an SSRF-guarded one. */
@@ -238,6 +242,54 @@ export function errorFor(response: Response, reason = ""): Error {
             retryAfter(response)
         );
     return new SyncRefusedError(`The server refused the request (${status})${said}`, status);
+}
+
+/**
+ * The sync error for a JSON API's refusal once its body has been read
+ * (`readGoogleApiError`, `readGraphApiError`): a switched-off API, a missing
+ * permission and a rate limit each get their own kind instead of all reading as
+ * refused credentials. `other` falls back to the status.
+ */
+export function errorForProblem(
+    response: Response,
+    problem: ProviderApiProblem,
+    provider: {
+        name: string;
+        setup?: (problem: Extract<ProviderApiProblem, { kind: "setup" }>) => ProviderSetup;
+    }
+): Error {
+    const status = response.status;
+    const said = problem.message ? `: ${problem.message}` : "";
+    switch (problem.kind) {
+        case "setup":
+            if (provider.setup)
+                return new SyncSetupError(
+                    `${provider.name} needs an API switched on${said}`,
+                    status,
+                    provider.setup(problem)
+                );
+            return new SyncRefusedError(`${provider.name} refused the request${said}`, status);
+        case "consent":
+            return new SyncConsentError(`${provider.name} needs more permission${said}`, status);
+        case "rate":
+            return new SyncUnreachableError(
+                `${provider.name} asked to slow down`,
+                status,
+                retryAfter(response)
+            );
+        case "auth":
+            return new SyncAuthError(
+                `The server refused the credentials (${status})${said}`,
+                status
+            );
+        default:
+            if (status === 401 || status === 403)
+                return new SyncRefusedError(
+                    `${provider.name} refused the request (${status})${said || (problem.reason ? `: ${problem.reason}` : "")}`,
+                    status
+                );
+            return errorFor(response, problem.message);
+    }
 }
 
 /** A short, safe excerpt of a failed response's body, for an error message. */

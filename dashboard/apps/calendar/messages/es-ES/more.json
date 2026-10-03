@@ -33,6 +33,7 @@
         },
         "calendarCount": "{count, plural, one {# calendario} other {# calendarios}}",
         "cancel": "Cancelar",
+        "consentHint": "Polaris no tiene permiso para leer este calendario. Conecta de nuevo y permite el acceso al calendario.",
         "feed": {
             "add": "Suscribirse",
             "added": "Suscrito. Sus eventos aparecen a medida que llegan.",
@@ -107,12 +108,20 @@
         "replaceAddress": "Nueva dirección de {name}",
         "retry": "Reintentar",
         "save": "Guardar",
+        "setup": {
+            "admin": "La API de Google Calendar está desactivada en el proyecto de Google Cloud con el que Polaris inicia sesión. Actívala y Polaris lo reintentará solo.",
+            "member": "Tu administrador tiene que terminar de configurar Google para calendarios.",
+            "open": "Activar en Google Cloud",
+            "project": "Proyecto {project}"
+        },
         "sourcesEmpty": "Aún no hay nada enlazado. Añade una cuenta, un servidor CalDAV o una suscripción abajo.",
         "sourcesTitle": "Tus orígenes",
         "status": {
             "auth": "Reconectar",
+            "consent": "Falta permiso",
             "error": "Sin sincronía",
             "ok": "Al día",
+            "setup": "Sin configurar",
             "unreachable": "Inaccesible"
         },
         "subscriptionsOff": "Suscribirse a calendarios por dirección está desactivado en este Polaris.",

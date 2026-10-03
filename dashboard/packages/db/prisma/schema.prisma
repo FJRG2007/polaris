@@ -11776,7 +11776,7 @@ model CalendarSource {
     secretNonce     Bytes?
     secretKeyId     String?
     refreshMinutes  Int       @default(15)
-    // ok | auth | unreachable | error
+    // ok | auth | consent | setup | unreachable | error
     status          String    @default("ok")
     lastError       String?
     lastSyncAt      DateTime?

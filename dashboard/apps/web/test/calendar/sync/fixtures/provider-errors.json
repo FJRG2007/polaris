@@ -1,0 +1,214 @@
+{
+    "googleServiceDisabled": {
+        "status": 403,
+        "body": {
+            "error": {
+                "code": 403,
+                "message": "Google Calendar API has not been used in project 100000000001 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=100000000001 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+                "errors": [
+                    {
+                        "message": "Google Calendar API has not been used in project 100000000001 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=100000000001 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+                        "domain": "usageLimits",
+                        "reason": "accessNotConfigured",
+                        "extendedHelp": "https://console.developers.google.com"
+                    }
+                ],
+                "status": "PERMISSION_DENIED",
+                "details": [
+                    {
+                        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                        "reason": "SERVICE_DISABLED",
+                        "domain": "googleapis.com",
+                        "metadata": {
+                            "consumer": "projects/100000000001",
+                            "service": "calendar-json.googleapis.com",
+                            "serviceTitle": "Google Calendar API",
+                            "containerInfo": "100000000001",
+                            "activationUrl": "https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=100000000001"
+                        }
+                    },
+                    {
+                        "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+                        "locale": "en-US",
+                        "message": "Google Calendar API has not been used in project 100000000001 before or it is disabled."
+                    },
+                    {
+                        "@type": "type.googleapis.com/google.rpc.Help",
+                        "links": [
+                            {
+                                "description": "Google developers console API activation",
+                                "url": "https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=100000000001"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    },
+    "googleServiceDisabledLegacy": {
+        "status": 403,
+        "body": {
+            "error": {
+                "code": 403,
+                "message": "Access Not Configured. Calendar API has not been used in project 100000000001 before or it is disabled.",
+                "errors": [
+                    {
+                        "domain": "usageLimits",
+                        "reason": "accessNotConfigured",
+                        "message": "Access Not Configured. Calendar API has not been used in project 100000000001 before or it is disabled.",
+                        "extendedHelp": "https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=100000000001"
+                    }
+                ]
+            }
+        }
+    },
+    "googleServiceDisabledForeignLink": {
+        "status": 403,
+        "body": {
+            "error": {
+                "code": 403,
+                "message": "Google Calendar API has not been used in project 100000000001 before or it is disabled.",
+                "status": "PERMISSION_DENIED",
+                "details": [
+                    {
+                        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                        "reason": "SERVICE_DISABLED",
+                        "metadata": {
+                            "consumer": "projects/100000000001",
+                            "service": "calendar-json.googleapis.com",
+                            "activationUrl": "https://evil.example.test/apis/api/calendar-json.googleapis.com/overview?project=100000000001"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "googleScopeInsufficient": {
+        "status": 403,
+        "body": {
+            "error": {
+                "code": 403,
+                "message": "Request had insufficient authentication scopes.",
+                "errors": [
+                    {
+                        "message": "Insufficient Permission",
+                        "domain": "global",
+                        "reason": "insufficientPermissions"
+                    }
+                ],
+                "status": "PERMISSION_DENIED",
+                "details": [
+                    {
+                        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                        "reason": "ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+                        "domain": "googleapis.com",
+                        "metadata": {
+                            "service": "calendar-json.googleapis.com",
+                            "method": "calendar.v3.CalendarList.List"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "googleRateLimit": {
+        "status": 403,
+        "body": {
+            "error": {
+                "code": 403,
+                "message": "Rate Limit Exceeded",
+                "errors": [
+                    {
+                        "domain": "usageLimits",
+                        "reason": "userRateLimitExceeded",
+                        "message": "Rate Limit Exceeded"
+                    }
+                ]
+            }
+        }
+    },
+    "googleUnauthenticated": {
+        "status": 401,
+        "body": {
+            "error": {
+                "code": 401,
+                "message": "Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential.",
+                "errors": [
+                    {
+                        "message": "Invalid Credentials",
+                        "domain": "global",
+                        "reason": "authError",
+                        "location": "Authorization",
+                        "locationType": "header"
+                    }
+                ],
+                "status": "UNAUTHENTICATED"
+            }
+        }
+    },
+    "googleForbiddenWriter": {
+        "status": 403,
+        "body": {
+            "error": {
+                "code": 403,
+                "message": "You need to have writer access to this calendar.",
+                "errors": [
+                    {
+                        "domain": "calendar",
+                        "reason": "requiredAccessLevel",
+                        "message": "You need to have writer access to this calendar."
+                    }
+                ]
+            }
+        }
+    },
+    "graphAccessDenied": {
+        "status": 403,
+        "body": {
+            "error": {
+                "code": "ErrorAccessDenied",
+                "message": "Access is denied. Check credentials and try again.",
+                "innerError": {
+                    "date": "2026-10-03T10:00:00",
+                    "request-id": "00000000-0000-0000-0000-000000000001",
+                    "client-request-id": "00000000-0000-0000-0000-000000000002"
+                }
+            }
+        }
+    },
+    "graphThrottled": {
+        "status": 429,
+        "body": {
+            "error": {
+                "code": "ApplicationThrottled",
+                "message": "Application is over its MailboxConcurrency limit.",
+                "innerError": {
+                    "date": "2026-10-03T10:00:00",
+                    "request-id": "00000000-0000-0000-0000-000000000003"
+                }
+            }
+        }
+    },
+    "graphInvalidToken": {
+        "status": 401,
+        "body": {
+            "error": {
+                "code": "InvalidAuthenticationToken",
+                "message": "Lifetime validation failed, the token is expired.",
+                "innerError": {
+                    "date": "2026-10-03T10:00:00",
+                    "request-id": "00000000-0000-0000-0000-000000000004"
+                }
+            }
+        }
+    },
+    "graphMailboxNotEnabled": {
+        "status": 404,
+        "body": {
+            "error": {
+                "code": "MailboxNotEnabledForRESTAPI",
+                "message": "The mailbox is either inactive, soft-deleted, or is hosted on-premise."
+            }
+        }
+    }
+}

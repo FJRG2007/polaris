@@ -1339,6 +1339,28 @@
             "configure": "Configure",
             "setUp": "Set up"
         },
+        "googleApis": {
+            "title": "Google APIs",
+            "lead": "Each one has to be turned on in the Google Cloud project of this client.",
+            "check": "Check again",
+            "open": "Open in Google Cloud",
+            "turnOn": "Turn on",
+            "state": {
+                "enabled": "Turned on",
+                "disabled": "Turned off",
+                "unknown": "Not checked yet"
+            },
+            "usedFor": {
+                "calendar": "Calendars",
+                "drive": "Backups to Drive"
+            },
+            "disabledIn": "Turned off in project {project}. Turn it on, then check again.",
+            "disabledHint": "Turned off in this client's project. Turn it on, then check again.",
+            "unknownHint": {
+                "calendar": "Checked once somebody links Google for calendars.",
+                "drive": "Checked once somebody links Google Drive for backups."
+            }
+        },
         "proven": {
             "done": "An account has been connected through this application, so everybody here is offered it.",
             "title": "Not proven yet",
