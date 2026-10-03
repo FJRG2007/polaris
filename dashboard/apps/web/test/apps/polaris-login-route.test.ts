@@ -93,8 +93,10 @@ const noted = vi.hoisted(
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
     playerAccessRules: vi.fn(async () => rules.value),
     noteRefusal: vi.fn(
-        async (installedAppId: string, refusal: { player: string; address: string | null; why: string }) =>
-            void noted.push({ installedAppId, ...refusal })
+        async (
+            installedAppId: string,
+            refusal: { player: string; address: string | null; why: string }
+        ) => void noted.push({ installedAppId, ...refusal })
     )
 }));
 
@@ -124,7 +126,13 @@ const switchedOn = [
 const env = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("@/lib/env-var-service", () => ({ listEnvVars: env.list, setEnvVars: vi.fn() }));
 
-const route = await import("@polaris-app/game-servers/src/routes/api/minecraft/login/[id]/[action]/route");
+const route = await import(
+    "@polaris-app/game-servers/src/routes/api/minecraft/login/[id]/[action]/route"
+);
+const arrivals = await import("@polaris-app/game-servers/src/lib/minecraft/login-arrivals");
+/** Every player the route said was let in, as whatever shows them things hears it. */
+const arrived: string[] = [];
+arrivals.onArrival((installedAppId, player) => void arrived.push(`${installedAppId}:${player}`));
 
 function ask(action: string, body: unknown, options: { id?: string; token?: string } = {}) {
     const request = new Request(`https://polaris.example/api/minecraft/login/x/${action}`, {
@@ -145,6 +153,7 @@ beforeEach(() => {
     checkIns.clear();
     counters.clear();
     noted.length = 0;
+    arrived.length = 0;
     env.list.mockReset();
     env.list.mockResolvedValue(switchedOn);
 });
@@ -207,6 +216,17 @@ describe("registering and logging in", () => {
         const wrong = await ask("login", { player: "Steve", password: "wrong horse" });
         expect(wrong.status).toBe(403);
         expect(await wrong.json()).toEqual({ error: "wrong-password" });
+    });
+
+    it("says a player was let in only when the password is right", async () => {
+        await ask("register", { player: "Steve", password: "correct horse" });
+        expect(arrived).toEqual([`${SERVER}:Steve`]);
+        await ask("register", { player: "Steve", password: "someone else" });
+        await ask("login", { player: "Steve", password: "wrong horse" });
+        await ask("login", { player: "Alex", password: "anything" });
+        expect(arrived).toEqual([`${SERVER}:Steve`]);
+        await ask("login", { player: "Steve", password: "correct horse" });
+        expect(arrived).toEqual([`${SERVER}:Steve`, `${SERVER}:Steve`]);
     });
 
     it("never stores the password itself", async () => {

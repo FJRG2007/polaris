@@ -68,6 +68,7 @@ interface EngineRow {
     readonly recoveryBase: string | null;
     readonly recoveryTarget: Date | null;
     readonly topology: string;
+    readonly statStatements: boolean;
 }
 
 interface EngineSpec {
@@ -97,9 +98,7 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
         command: (_creds, row) =>
             row.recoveryBase && row.recoveryTarget
                 ? core.pitrRecoveryCommand(row.recoveryBase, row.recoveryTarget)
-                : row.pitr
-                  ? core.pitrServerCommand()
-                  : undefined
+                : postgresServerCommand(row)
     },
     mysql: {
         defaultVersion: "8",
@@ -169,6 +168,27 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
         command: () => ["server", "-s3", "-s3.port=8333"]
     }
 };
+
+/**
+ * What a running (not recovering) PostgreSQL instance starts with: the archive
+ * settings when it archives, and pg_stat_statements loaded when its Stats asked
+ * for it. Nothing at all - the image's own command - when neither is on.
+ *
+ * Loading the library at start is the only way pg_stat_statements records
+ * anything, and passing it here rather than with ALTER SYSTEM keeps the setting
+ * in the row, where turning it off again is a redeploy rather than an edit to a
+ * file inside the volume.
+ */
+export function postgresServerCommand(row: {
+    readonly pitr: boolean;
+    readonly statStatements: boolean;
+}): string[] | undefined {
+    if (!row.pitr && !row.statStatements) return undefined;
+    const command = row.pitr ? core.pitrServerCommand() : ["postgres"];
+    return row.statStatements
+        ? [...command, "-c", "shared_preload_libraries=pg_stat_statements"]
+        : command;
+}
 
 /** The spec for a stored engine, or a clear refusal for one this build lacks. */
 function engineSpec(engine: string): EngineSpec {

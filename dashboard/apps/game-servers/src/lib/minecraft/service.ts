@@ -28,6 +28,13 @@ import { readContainerFile } from "../container-files";
 import { gameOfServer, withTimeout } from "@polaris/core";
 import { readsPlayerList, readsServer } from "./text-vars";
 import { sayEachReplies, sayEachScript } from "./say-each";
+import {
+    hiddenFromPending,
+    hiddenFromPendingArgv,
+    PENDING_READ,
+    pendingNames,
+    withoutPending
+} from "./prelogin";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
@@ -414,7 +421,7 @@ export async function sendAnnouncement(
         announcement.chat
     ];
     const players = texts.some((text) => readsPlayerList(text))
-        ? await readPlayerList(install, ownerId).catch(() => null)
+        ? await shownPlayerList(install, ownerId).catch(() => null)
         : null;
     // Every player's figures, for a leaderboard. Loaded when asked for: the
     // module that reads them reads the server through this one.
@@ -518,12 +525,23 @@ function runInContainer(
         : ports.runIn(install.container, argv);
 }
 
+/**
+ * A command as the players should get it: on Java, whatever shows something to
+ * somebody is narrowed to the players who have logged in (`prelogin.ts`), so a
+ * player still at Polaris login's prompt sees that prompt and nothing else.
+ * Bedrock has no Polaris login, and its lines are sent as they are.
+ */
+function forThePlayersIn(install: MinecraftInstall, argv: readonly string[]): readonly string[] {
+    return install.edition === "java" ? hiddenFromPendingArgv(argv) : argv;
+}
+
 /** The same, on ports that are already open. */
 async function sendGameCommand(
     ports: RuntimePorts,
     install: MinecraftInstall,
-    argv: readonly string[]
+    given: readonly string[]
 ): Promise<string> {
+    const argv = forThePlayersIn(install, given);
     assertSafeCommand(argv);
     const command =
         install.edition === "bedrock" ? ["send-command", ...argv] : ["rcon-cli", ...argv];
@@ -667,8 +685,9 @@ function containerOn(install: MinecraftInstall, ports: RuntimePorts): ServerCont
 async function sendGameCommands(
     ports: RuntimePorts,
     install: MinecraftInstall,
-    commands: readonly (readonly string[])[]
+    given: readonly (readonly string[])[]
 ): Promise<(string | null)[]> {
+    const commands = given.map((argv) => forThePlayersIn(install, argv));
     for (const argv of commands) assertSafeCommand(argv);
     if (commands.length === 0) return [];
     if (install.edition !== "java") {
@@ -693,8 +712,9 @@ const BATCH_MAX = 12_000;
 async function sendGameLines(
     ports: RuntimePorts,
     install: MinecraftInstall,
-    lines: readonly string[]
+    given: readonly string[]
 ): Promise<void> {
+    const lines = install.edition === "java" ? given.map((line) => hiddenFromPending(line)) : given;
     for (const line of lines) assertSafeCommand([line]);
     if (install.edition !== "java") {
         for (const line of lines) await sendGameCommand(ports, install, [line]);
@@ -1045,9 +1065,11 @@ export async function applyFirewallBans(ownerId: string, installedAppId: string)
 }
 
 /**
- * Who is online right now, for the words an announcement fills in. Null for a
- * server that is not meant to be up or did not answer: the caller then writes
- * the fallbacks rather than failing the announcement over a count.
+ * Who is online right now, including anybody still at Polaris login's prompt -
+ * for operator tooling (inventory transfer, X-Ray review) that means every
+ * connected player, not just the ones let in. Null for a server that is not
+ * meant to be up or did not answer. A text shown in the game uses
+ * {@link shownPlayers} instead, which leaves pending players out.
  */
 export async function onlinePlayers(
     ownerId: string,
@@ -1056,6 +1078,30 @@ export async function onlinePlayers(
     const install = await resolveInstall(ownerId, installedAppId);
     if (!install.running) return null;
     return readPlayerList(install, ownerId).catch(() => null);
+}
+
+/**
+ * Who is online for the players' own eyes - the names and the count a text in
+ * the game fills in - which leaves out anybody still at Polaris login's prompt:
+ * they are not in yet. Java only; Bedrock has no Polaris login.
+ */
+export async function shownPlayers(
+    ownerId: string,
+    installedAppId: string
+): Promise<parse.PlayerList | null> {
+    const install = await resolveInstall(ownerId, installedAppId);
+    if (!install.running) return null;
+    return shownPlayerList(install, ownerId).catch(() => null);
+}
+
+async function shownPlayerList(
+    install: MinecraftInstall,
+    ownerId: string
+): Promise<parse.PlayerList | null> {
+    const list = await readPlayerList(install, ownerId);
+    if (!list || install.edition !== "java" || list.players.length === 0) return list;
+    const held = await execCommand(install, ownerId, [PENDING_READ]).catch(() => "");
+    return withoutPending(list, pendingNames(held, list.players));
 }
 
 /**

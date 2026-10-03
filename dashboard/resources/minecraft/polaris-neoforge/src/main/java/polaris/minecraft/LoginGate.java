@@ -181,8 +181,11 @@ final class LoginGate {
         // lifted the darkness finds nothing held by then.
         for (Map.Entry<UUID, Held> entry : held.entrySet()) {
             ServerPlayer player = event.getServer().getPlayerList().getPlayer(entry.getKey());
-            if (player != null) lighten(player, entry.getValue());
-            entry.getValue().countdown.removeAllPlayers();
+            if (player != null) {
+                lighten(player, entry.getValue());
+                Unseen.forget(player);
+            }
+            Unseen.speak(entry.getValue().countdown::removeAllPlayers);
         }
         held.clear();
         landing.clear();
@@ -192,18 +195,20 @@ final class LoginGate {
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         tick++;
+        Unseen.nextTick(event.getServer());
         if (tick % HEARTBEAT_TICKS == 0) heartbeat();
         // A copy: a disconnect fires the logout event, which removes from the map.
         for (Map.Entry<UUID, Held> entry : new ArrayList<>(held.entrySet())) {
             ServerPlayer player = event.getServer().getPlayerList().getPlayer(entry.getKey());
             Held waiting = entry.getValue();
             if (player == null) {
-                held.remove(entry.getKey()).countdown.removeAllPlayers();
+                Unseen.speak(held.remove(entry.getKey()).countdown::removeAllPlayers);
             } else if (waiting.kick != null) {
                 player.connection.disconnect(Component.literal(waiting.kick));
             } else if (tick > waiting.deadline && !waiting.busy) {
                 player.connection.disconnect(Component.literal("You took too long to log in."));
             } else {
+                Unseen.keepHidden(event.getServer(), player);
                 if (tick % SECOND == 0) count(waiting);
                 if (tick % (TITLE_TICKS - SECOND) == 0) titleFor(player, waiting);
             }
@@ -215,12 +220,14 @@ final class LoginGate {
     private void count(Held waiting) {
         long left = Math.max(0, waiting.deadline - tick);
         long seconds = (left + SECOND - 1) / SECOND;
-        waiting.countdown.setName(Component.literal(
-                seconds + (seconds == 1 ? " second" : " seconds") + " to log in"));
-        waiting.countdown.setProgress(Math.min(1f, (float) left / LOGIN_TICKS));
-        waiting.countdown.setColor(seconds <= HURRY_SECONDS
-                ? BossEvent.BossBarColor.RED
-                : BossEvent.BossBarColor.YELLOW);
+        Unseen.speak(() -> {
+            waiting.countdown.setName(Component.literal(
+                    seconds + (seconds == 1 ? " second" : " seconds") + " to log in"));
+            waiting.countdown.setProgress(Math.min(1f, (float) left / LOGIN_TICKS));
+            waiting.countdown.setColor(seconds <= HURRY_SECONDS
+                    ? BossEvent.BossBarColor.RED
+                    : BossEvent.BossBarColor.YELLOW);
+        });
     }
 
     private void heartbeat() {
@@ -260,10 +267,14 @@ final class LoginGate {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (!guarding) {
             clearOurs(player);
+            Unseen.clearStale(player);
             return;
         }
         Held waiting = new Held(player.position(), tick + LOGIN_TICKS);
         held.put(player.getUUID(), waiting);
+        // Before anything else is said to them: from here on they see the
+        // prompt, and nothing of Polaris's or anybody else's.
+        Unseen.hide(player.server, player);
         hold(player, waiting);
         if (config.state() != PolarisConfig.State.ON) {
             clearOurs(player);
@@ -272,7 +283,7 @@ final class LoginGate {
         }
         darken(player, waiting);
         count(waiting);
-        waiting.countdown.addPlayer(player);
+        Unseen.speak(() -> waiting.countdown.addPlayer(player));
         title(player, "Checking your account", "One moment");
         waiting.busy = true;
         ask(player, waiting, "status", identity(player), (current, reply) -> {
@@ -296,13 +307,15 @@ final class LoginGate {
     public void onLeave(PlayerEvent.PlayerLoggedOutEvent event) {
         Held waiting = held.remove(event.getEntity().getUUID());
         if (waiting == null) return;
-        waiting.countdown.removeAllPlayers();
+        Unseen.speak(waiting.countdown::removeAllPlayers);
         // Lifted before the player is saved, or they would wake up in the dark on
         // their next join with nothing to say it was this gate's - and the same
-        // for the flight they were lent, which is not theirs to keep.
+        // for the flight they were lent, which is not theirs to keep, and the
+        // tag that keeps Polaris's lines off their screen.
         if (event.getEntity() instanceof ServerPlayer player) {
             lighten(player, waiting);
             letGo(player, waiting);
+            Unseen.forget(player);
         }
         landing.remove(event.getEntity().getUUID());
     }
@@ -329,8 +342,11 @@ final class LoginGate {
         if (waiting != null) {
             lighten(player, waiting);
             letGo(player, waiting);
-            waiting.countdown.removeAllPlayers();
+            Unseen.speak(waiting.countdown::removeAllPlayers);
         }
+        // Everything they were kept from comes back now - their bars, the side
+        // panel - not on whatever writes it next.
+        Unseen.show(player.server, player);
         player.connection.send(new ClientboundClearTitlesPacket(true));
         player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.GREEN));
     }
@@ -338,11 +354,13 @@ final class LoginGate {
     /** What to do, in the middle of the screen. Sent again by every reminder, so it
      *  never fades while the player is still waiting. */
     private static void title(ServerPlayer player, String title, String subtitle) {
-        player.connection.send(new ClientboundSetTitlesAnimationPacket(0, TITLE_TICKS, 10));
-        player.connection.send(new ClientboundSetSubtitleTextPacket(
-                Component.literal(subtitle).withStyle(ChatFormatting.YELLOW)));
-        player.connection.send(new ClientboundSetTitleTextPacket(
-                Component.literal(title).withStyle(ChatFormatting.GOLD)));
+        Unseen.speak(() -> {
+            player.connection.send(new ClientboundSetTitlesAnimationPacket(0, TITLE_TICKS, 10));
+            player.connection.send(new ClientboundSetSubtitleTextPacket(
+                    Component.literal(subtitle).withStyle(ChatFormatting.YELLOW)));
+            player.connection.send(new ClientboundSetTitleTextPacket(
+                    Component.literal(title).withStyle(ChatFormatting.GOLD)));
+        });
     }
 
     /**
@@ -588,7 +606,7 @@ final class LoginGate {
     }
 
     private static void tell(ServerPlayer player, String message) {
-        player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.GOLD));
+        Unseen.speak(() -> player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.GOLD)));
     }
 
     // ------------------------------------------------------------------ holding
@@ -679,7 +697,11 @@ final class LoginGate {
         if (input.startsWith("/")) input = input.substring(1);
         int space = input.indexOf(' ');
         String root = (space < 0 ? input : input.substring(0, space)).toLowerCase(Locale.ROOT);
-        if (OPEN_COMMANDS.contains(root)) return;
+        if (OPEN_COMMANDS.contains(root)) {
+            // What the game answers to it - a usage line, a typo - is theirs to read.
+            Unseen.answering(player);
+            return;
+        }
         event.setCanceled(true);
         remind(player);
     }

@@ -417,6 +417,40 @@ export function playerAddress(embed: Embed, pageHost: string): string {
     return `${embed.url}${embed.url.includes("?") ? "&" : "?"}${extra.join("&")}`;
 }
 
+/**
+ * TikTok's player errors worth one more try: TikTok failing to serve the video
+ * (2001) and the video failing to play (3001). Not a video that does not exist
+ * (1001), and not a refused autoplay (3002) - loading it again changes neither.
+ */
+const TIKTOK_RETRYABLE = new Set([2001, 3001]);
+
+/**
+ * Whether a message from a player's frame is that player saying it could not
+ * play, in a way that loading it once more fixes.
+ *
+ * TikTok's player fails the first time a browser that holds no TikTok cookie
+ * plays anything: the player page sets the cookie, but the video it asks for in
+ * the same load is answered with something that is not a video, Chrome blocks
+ * that answer (ERR_BLOCKED_BY_ORB), and the player shows "Player error - please
+ * check your network connection". The second load carries the cookie and plays.
+ * It does the same with no sandbox and on TikTok's other embed address, so it is
+ * TikTok's, not the frame's. The player reports it through its documented
+ * `onPlayerError` message, which is what this recognises.
+ *
+ * The message comes from another site, so all of it is checked: the origin the
+ * frame was built for, TikTok's own marker, the type, and a numeric code.
+ */
+export function playerFailed(embed: Embed, origin: string, data: unknown): boolean {
+    if (embed.provider !== "TikTok" || origin !== new URL(embed.url).origin) return false;
+    if (typeof data !== "object" || data === null) return false;
+    const message = data as Record<string, unknown>;
+    if (message["x-tiktok-player"] !== true || message.type !== "onPlayerError") return false;
+    const value = message.value;
+    if (typeof value !== "object" || value === null) return false;
+    const code = (value as Record<string, unknown>).errorCode;
+    return typeof code === "number" && TIKTOK_RETRYABLE.has(code);
+}
+
 /** Each site's oEmbed endpoint, by the host its links are posted on. */
 const OEMBED: ReadonlyMap<string, string> = new Map([
     ["youtube.com", "https://www.youtube.com/oembed"],

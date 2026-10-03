@@ -1,8 +1,9 @@
 "use server";
 
 /**
- * Pinning apps to the top of the switcher. The whole list is sent rather than
- * one change, so a repeated or reordered save lands on the same answer.
+ * Saving the apps somebody chose as favorites, in the order they arranged them.
+ * The whole list is sent rather than one change, so a repeated or reordered save
+ * lands on the same answer.
  *
  * Not filtered by permission on the way in, for the reason the Overview layout
  * is not: a pin is a preference, not a grant. What is drawn is decided against
@@ -18,8 +19,10 @@ import { saveFavoriteApps } from "@/lib/app-launcher-service";
 export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = favoriteAppsSchema.safeParse(input);
+    // The schema's own words are English and name internals; the reader gets
+    // the sentence in their language, and the menu puts their list back.
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("nav"))("errors.favoritesNotSaved") };
+        return { error: (await getTranslations("nav"))("errors.favoritesNotSaved") };
     await saveFavoriteApps(user.id, parsed.data);
     return {};
 }

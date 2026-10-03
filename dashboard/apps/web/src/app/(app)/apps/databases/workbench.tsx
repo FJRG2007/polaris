@@ -26,17 +26,23 @@
  * file browser uses, so what somebody has learnt in Drive works here.
  */
 
-import * as actions from "./actions";
 import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
 import { dataText } from "@/lib/data/words";
-import { spreadsheetSafe } from "@/lib/data/spreadsheet";
 import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
+import { spreadsheetSafe } from "@/lib/data/spreadsheet";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
+import { DeleteRowsDialog, NewRowDialog, NewTableDialog } from "./row-dialogs";
+import {
+    DataSourceProvider,
+    connectionSource,
+    useDataSource,
+    type DataSource
+} from "./data-source";
 import type {
     DataColumn,
     DataNamespace,
@@ -52,6 +58,8 @@ import {
     Loader2,
     Pencil,
     Play,
+    Plus,
+    Trash2,
     RefreshCw,
     Search,
     Table2,
@@ -101,8 +109,22 @@ const RELATION_FIELDS: readonly SearchField<DataRelation>[] = [
     { text: (relation) => relation.name }
 ];
 
-export function Workbench({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
+export function Workbench({
+    connectionId,
+    readOnly,
+    source: given,
+    canCreateTable = !readOnly
+}: {
+    /** What the open tabs are remembered under; a saved connection's id. */
+    connectionId: string;
+    readOnly: boolean;
+    /** Where reads and writes go. A saved connection's actions when absent. */
+    source?: DataSource;
+    /** Whether "New table" is offered at all. */
+    canCreateTable?: boolean;
+}) {
     const t = useTranslations("databases");
+    const source = useMemo(() => given ?? connectionSource(connectionId), [given, connectionId]);
     const [shape, setShape] = useState<string>("sql");
     const [namespaces, setNamespaces] = useState<DataNamespace[]>([]);
     const [namespace, setNamespace] = useState<string | null>(null);
@@ -177,7 +199,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
         async (chosen: string | null) => {
             setRelations(null);
             setError("");
-            const result = await actions.browseAction(connectionId, chosen);
+            const result = await source.browse(chosen);
             if (result.error) {
                 setError(result.error);
                 setRelations([]);
@@ -207,7 +229,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                 );
             }
         },
-        [change, connectionId]
+        [change, source]
     );
 
     useEffect(() => {
@@ -238,195 +260,214 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
         return list;
     }, [relations, find, order]);
 
+    const [creating, setCreating] = useState(false);
+
     return (
-        <div className="flex min-h-0 flex-1 gap-4">
-            <aside className="flex w-64 shrink-0 flex-col gap-2">
-                {namespaces.length > 1 && (
-                    <Select
-                        value={namespace ?? ""}
-                        // The list changes; what is open does not. A tab holds
-                        // the schema it was opened from, so browsing another one
-                        // is browsing, not a decision to close anything.
-                        onValueChange={(next) => void load(next)}
-                        aria-label={t("bench.schema")}
-                        options={namespaces.map((entry) => ({
-                            value: entry.name,
-                            label:
-                                entry.count === null || entry.count === undefined
-                                    ? entry.name
-                                    : `${entry.name} (${entry.count})`
-                        }))}
-                    />
-                )}
+        <DataSourceProvider source={source}>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
+                <aside className="flex max-h-72 w-full shrink-0 flex-col gap-2 md:max-h-none md:w-64">
+                    {namespaces.length > 1 && (
+                        <Select
+                            value={namespace ?? ""}
+                            // The list changes; what is open does not. A tab holds
+                            // the schema it was opened from, so browsing another one
+                            // is browsing, not a decision to close anything.
+                            onValueChange={(next) => void load(next)}
+                            aria-label={t("bench.schema")}
+                            options={namespaces.map((entry) => ({
+                                value: entry.name,
+                                label:
+                                    entry.count === null || entry.count === undefined
+                                        ? entry.name
+                                        : `${entry.name} (${entry.count})`
+                            }))}
+                        />
+                    )}
 
-                <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        className="pl-9"
-                        placeholder={t("bench.findTable")}
-                        aria-label={t("bench.findTable")}
-                        value={find}
-                        onChange={(event) => setFind(event.target.value)}
-                    />
-                </div>
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            className="pl-9"
+                            placeholder={t("bench.findTable")}
+                            aria-label={t("bench.findTable")}
+                            value={find}
+                            onChange={(event) => setFind(event.target.value)}
+                        />
+                    </div>
 
-                {/* Under the search rather than beside it: the sidebar is narrow,
+                    {/* Under the search rather than beside it: the sidebar is narrow,
                     and two controls on one line there is two controls nobody can
                     read the labels of. */}
-                <div className="flex items-center gap-2 px-1">
-                    <span className="text-xs text-muted-foreground">{t("bench.orderBy")}</span>
-                    <Select
-                        value={order}
-                        onValueChange={(next) => {
-                            const chosen = next as RelationOrder;
-                            setOrder(chosen);
-                            try {
-                                window.localStorage.setItem(ORDER_KEY, chosen);
-                            } catch {
-                                // The list is still ordered; it simply does not
-                                // remember, which is the right thing to lose.
-                            }
-                        }}
-                        aria-label={t("bench.orderTables")}
-                        className="h-7 flex-1 text-xs"
-                        options={RELATION_ORDERS.map((entry) => ({
-                            value: entry.value,
-                            label: t(`bench.orders.${entry.value}`)
-                        }))}
-                    />
-                </div>
+                    <div className="flex items-center gap-2 px-1">
+                        <span className="text-xs text-muted-foreground">{t("bench.orderBy")}</span>
+                        <Select
+                            value={order}
+                            onValueChange={(next) => {
+                                const chosen = next as RelationOrder;
+                                setOrder(chosen);
+                                try {
+                                    window.localStorage.setItem(ORDER_KEY, chosen);
+                                } catch {
+                                    // The list is still ordered; it simply does not
+                                    // remember, which is the right thing to lose.
+                                }
+                            }}
+                            aria-label={t("bench.orderTables")}
+                            className="h-7 flex-1 text-xs"
+                            options={RELATION_ORDERS.map((entry) => ({
+                                value: entry.value,
+                                label: t(`bench.orders.${entry.value}`)
+                            }))}
+                        />
+                    </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-border">
-                    {relations === null ? (
-                        <div className="flex flex-col gap-2 p-3" aria-hidden="true">
-                            {[0, 1, 2, 3, 4].map((row) => (
-                                <Skeleton key={row} className="h-4 w-full" />
-                            ))}
-                        </div>
-                    ) : shown.length === 0 ? (
-                        <p className="p-3 text-xs text-muted-foreground">
-                            {relations.length === 0 ? t("bench.emptyYet") : t("bench.noMatch")}
-                        </p>
-                    ) : (
-                        <ul className="flex flex-col">
-                            {shown.map((entry) => (
-                                <li key={`${entry.namespace}.${entry.name}`}>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            change((was) =>
-                                                openTabs.openTable(was, namespace, entry.name)
-                                            )
-                                        }
-                                        className={cn(
-                                            "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-card-hover",
-                                            // What is in front, rather than
-                                            // everything open: a sidebar with
-                                            // six names lit says nothing about
-                                            // which one is on the screen.
-                                            active?.kind === "table" &&
-                                                active.relation === entry.name &&
-                                                active.namespace === namespace &&
-                                                "bg-muted text-foreground"
-                                        )}
-                                    >
-                                        <Table2 className="size-3.5 shrink-0 text-muted-foreground" />
-                                        <span
-                                            className="min-w-0 flex-1 truncate"
-                                            title={entry.name}
+                    {shape === "sql" && canCreateTable && !readOnly ? (
+                        <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
+                            <Plus className="size-4" />
+                            {t("newTable.open")}
+                        </Button>
+                    ) : null}
+
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-border">
+                        {relations === null ? (
+                            <div className="flex flex-col gap-2 p-3" aria-hidden="true">
+                                {[0, 1, 2, 3, 4].map((row) => (
+                                    <Skeleton key={row} className="h-4 w-full" />
+                                ))}
+                            </div>
+                        ) : shown.length === 0 ? (
+                            <p className="p-3 text-xs text-muted-foreground">
+                                {relations.length === 0 ? t("bench.emptyYet") : t("bench.noMatch")}
+                            </p>
+                        ) : (
+                            <ul className="flex flex-col">
+                                {shown.map((entry) => (
+                                    <li key={`${entry.namespace}.${entry.name}`}>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                change((was) =>
+                                                    openTabs.openTable(was, namespace, entry.name)
+                                                )
+                                            }
+                                            className={cn(
+                                                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-card-hover",
+                                                // What is in front, rather than
+                                                // everything open: a sidebar with
+                                                // six names lit says nothing about
+                                                // which one is on the screen.
+                                                active?.kind === "table" &&
+                                                    active.relation === entry.name &&
+                                                    active.namespace === namespace &&
+                                                    "bg-muted text-foreground"
+                                            )}
                                         >
-                                            {entry.name}
-                                        </span>
-                                        {entry.rows !== null && (
-                                            <span className="shrink-0 text-xs text-muted-foreground">
-                                                {entry.rows}
+                                            <Table2 className="size-3.5 shrink-0 text-muted-foreground" />
+                                            <span
+                                                className="min-w-0 flex-1 truncate"
+                                                title={entry.name}
+                                            >
+                                                {entry.name}
                                             </span>
-                                        )}
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
+                                            {entry.rows !== null && (
+                                                <span className="shrink-0 text-xs text-muted-foreground">
+                                                    {entry.rows}
+                                                </span>
+                                            )}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </aside>
+
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+                    <TabStrip
+                        tabs={tabs}
+                        activeId={activeId}
+                        shape={shape}
+                        onFocus={(id) => change((was) => openTabs.focusTab(was, id))}
+                        onClose={(id) => change((was) => openTabs.closeTab(was, id))}
+                        onCloseOthers={(id) => change((was) => openTabs.closeOthers(was, id))}
+                        onCloseAll={() => change(() => openTabs.NO_TABS)}
+                        onNewQuery={() => change((was) => openTabs.openQuery(was))}
+                        onStats={() => change((was) => openTabs.openStats(was))}
+                    />
+
+                    {readOnly && (
+                        <span className="text-xs text-muted-foreground">{t("bench.readOnly")}</span>
+                    )}
+
+                    {error && (
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
+                            {error}
+                        </p>
+                    )}
+
+                    {tabs.length === 0 ? (
+                        <Card>
+                            <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                                {t("bench.pick")}
+                            </CardBody>
+                        </Card>
+                    ) : (
+                        tabs.map((entry) => {
+                            // Built once it has been looked at, and kept from then
+                            // on. Hidden rather than unmounted is the whole point of
+                            // the strip: coming back to a table means coming back to
+                            // the page, the sort and the filter that were on it.
+                            if (!built.has(entry.id)) return null;
+                            const front = entry.id === activeId;
+                            return (
+                                <div
+                                    key={entry.id}
+                                    className={
+                                        front ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"
+                                    }
+                                >
+                                    {entry.kind === "table" ? (
+                                        <RowsPanel
+                                            namespace={entry.namespace}
+                                            relation={entry.relation}
+                                            shape={shape}
+                                            readOnly={readOnly}
+                                        />
+                                    ) : entry.kind === "stats" ? (
+                                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                                            <StatsPanel />
+                                        </div>
+                                    ) : (
+                                        <QueryPanel
+                                            shape={shape}
+                                            statement={entry.statement}
+                                            onStatement={(text) =>
+                                                change((was) =>
+                                                    openTabs.writeStatement(was, entry.id, text)
+                                                )
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })
                     )}
                 </div>
-            </aside>
-
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-                <TabStrip
-                    tabs={tabs}
-                    activeId={activeId}
-                    shape={shape}
-                    onFocus={(id) => change((was) => openTabs.focusTab(was, id))}
-                    onClose={(id) => change((was) => openTabs.closeTab(was, id))}
-                    onCloseOthers={(id) => change((was) => openTabs.closeOthers(was, id))}
-                    onCloseAll={() => change(() => openTabs.NO_TABS)}
-                    onNewQuery={() => change((was) => openTabs.openQuery(was))}
-                    onStats={() => change((was) => openTabs.openStats(was))}
-                />
-
-                {readOnly && (
-                    <span className="text-xs text-muted-foreground">{t("bench.readOnly")}</span>
-                )}
-
-                {error && (
-                    <p
-                        role="alert"
-                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                    >
-                        {error}
-                    </p>
-                )}
-
-                {tabs.length === 0 ? (
-                    <Card>
-                        <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                            {t("bench.pick")}
-                        </CardBody>
-                    </Card>
-                ) : (
-                    tabs.map((entry) => {
-                        // Built once it has been looked at, and kept from then
-                        // on. Hidden rather than unmounted is the whole point of
-                        // the strip: coming back to a table means coming back to
-                        // the page, the sort and the filter that were on it.
-                        if (!built.has(entry.id)) return null;
-                        const front = entry.id === activeId;
-                        return (
-                            <div
-                                key={entry.id}
-                                className={
-                                    front ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"
-                                }
-                            >
-                                {entry.kind === "table" ? (
-                                    <RowsPanel
-                                        connectionId={connectionId}
-                                        namespace={entry.namespace}
-                                        relation={entry.relation}
-                                        shape={shape}
-                                        readOnly={readOnly}
-                                    />
-                                ) : entry.kind === "stats" ? (
-                                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                                        <StatsPanel connectionId={connectionId} />
-                                    </div>
-                                ) : (
-                                    <QueryPanel
-                                        connectionId={connectionId}
-                                        shape={shape}
-                                        statement={entry.statement}
-                                        onStatement={(text) =>
-                                            change((was) =>
-                                                openTabs.writeStatement(was, entry.id, text)
-                                            )
-                                        }
-                                    />
-                                )}
-                            </div>
-                        );
-                    })
-                )}
             </div>
-        </div>
+            <NewTableDialog
+                open={creating}
+                onOpenChange={setCreating}
+                namespace={namespace}
+                onCreated={(created) => {
+                    void load(namespace).then(() =>
+                        change((was) => openTabs.openTable(was, namespace, created))
+                    );
+                }}
+            />
+        </DataSourceProvider>
     );
 }
 
@@ -541,13 +582,11 @@ function CellEditor({
 
 /** A page of rows, with the controls that move through them. */
 function RowsPanel({
-    connectionId,
     namespace,
     relation,
     shape,
     readOnly
 }: {
-    connectionId: string;
     namespace: string | null;
     relation: string;
     shape: string;
@@ -557,6 +596,7 @@ function RowsPanel({
     readOnly: boolean;
 }) {
     const t = useTranslations("databases");
+    const source = useDataSource();
     const [page, setPage] = useState<DataPage | null>(null);
     const [offset, setOffset] = useState(0);
     const [cursor, setCursor] = useState<string | null>(null);
@@ -577,11 +617,14 @@ function RowsPanel({
     const [editing, setEditing] = useState<{ row: number; column: string } | null>(null);
     const [draft, setDraft] = useState("");
     const [saving, setSaving] = useState(false);
+    const [adding, setAdding] = useState(false);
+    const [removing, setRemoving] = useState(false);
+    const [notice, setNotice] = useState("");
 
     const read = useCallback(async () => {
         setBusy(true);
         setError("");
-        const result = await actions.rowsAction(connectionId, namespace, relation, {
+        const result = await source.rows(namespace, relation, {
             limit: PAGE,
             offset,
             orderBy,
@@ -596,7 +639,7 @@ function RowsPanel({
             return;
         }
         setPage(result.page ?? null);
-    }, [connectionId, namespace, relation, offset, orderBy, descending, applied, cursor]);
+    }, [source, namespace, relation, offset, orderBy, descending, applied, cursor]);
 
     useEffect(() => {
         void read();
@@ -613,6 +656,7 @@ function RowsPanel({
         setFilter("");
         setApplied("");
         setOpened(null);
+        setNotice("");
     }, [relation, namespace]);
 
     // A selection is a set of positions on the page in front of somebody. The
@@ -631,6 +675,9 @@ function RowsPanel({
      *  edit at one row, which is what decides whether editing exists at all. */
     const keyColumns = useMemo(() => columns.filter((column) => column.primaryKey), [columns]);
     const editable = !readOnly && !cursorPaged && keyColumns.length > 0;
+    /** Rows can be added to any table of a SQL engine that is not read-only;
+     *  removing them needs a key to aim at, like editing does. */
+    const insertable = !readOnly && shape === "sql" && columns.length > 0;
 
     /** What a click on a row means, read the way every list in Polaris reads it. */
     const pick = (
@@ -685,6 +732,17 @@ function RowsPanel({
         [page, picked]
     );
 
+    /** The picked rows' primary keys, which is all a removal is told. */
+    const pickedKeys = useMemo(
+        () =>
+            pickedRows.map((row) => {
+                const key: Record<string, unknown> = {};
+                for (const column of keyColumns) key[column.name] = row[column.name];
+                return key;
+            }),
+        [pickedRows, keyColumns]
+    );
+
     const copy = (text: string) => {
         void navigator.clipboard?.writeText(text).catch(() => undefined);
     };
@@ -727,7 +785,7 @@ function RowsPanel({
         setError("");
         const key: Record<string, unknown> = {};
         for (const entry of keyColumns) key[entry.name] = row[entry.name];
-        const result = await actions.updateCellAction(connectionId, {
+        const result = await source.updateCell({
             namespace,
             relation,
             column: target.column,
@@ -770,6 +828,23 @@ function RowsPanel({
                         onChange={(event) => setFilter(event.target.value)}
                     />
                 </form>
+                {insertable ? (
+                    <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
+                        <Plus className="size-4" />
+                        {t("newRow.open")}
+                    </Button>
+                ) : null}
+                {editable && picked.size > 0 ? (
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        title={t("deleteRows.open", { count: picked.size })}
+                        aria-label={t("deleteRows.open", { count: picked.size })}
+                        onClick={() => setRemoving(true)}
+                    >
+                        <Trash2 className="size-4" />
+                    </Button>
+                ) : null}
                 <Button
                     size="icon"
                     variant="ghost"
@@ -841,6 +916,11 @@ function RowsPanel({
                     {error}
                 </p>
             )}
+            {notice && !error ? (
+                <p role="status" className="text-xs text-muted-foreground">
+                    {notice}
+                </p>
+            ) : null}
 
             <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border">
                 {page === null ? (
@@ -896,12 +976,8 @@ function RowsPanel({
                                                 onContextMenu={() => adoptForMenu(index)}
                                                 onClick={(event) => {
                                                     if (cursorPaged) {
-                                                        void actions
-                                                            .redisValueAction(
-                                                                connectionId,
-                                                                namespace,
-                                                                String(row.key)
-                                                            )
+                                                        void source
+                                                            .redisValue(namespace, String(row.key))
                                                             .then((result) => {
                                                                 if (result.error)
                                                                     setError(result.error);
@@ -1031,6 +1107,20 @@ function RowsPanel({
                                                 <Copy className="size-3.5" />
                                                 {t("bench.copyText")}
                                             </ContextMenuItem>
+                                            {editable ? (
+                                                <>
+                                                    <ContextMenuSeparator />
+                                                    <ContextMenuItem
+                                                        className="text-danger"
+                                                        onSelect={() => setRemoving(true)}
+                                                    >
+                                                        <Trash2 className="size-3.5" />
+                                                        {t("deleteRows.open", {
+                                                            count: Math.max(1, picked.size)
+                                                        })}
+                                                    </ContextMenuItem>
+                                                </>
+                                            ) : null}
                                         </ContextMenuContent>
                                     </ContextMenu>
                                 ))
@@ -1041,6 +1131,33 @@ function RowsPanel({
             </div>
 
             {opened && <KeyPanel value={opened} onClose={() => setOpened(null)} />}
+
+            {insertable ? (
+                <NewRowDialog
+                    open={adding}
+                    onOpenChange={setAdding}
+                    namespace={namespace}
+                    relation={relation}
+                    columns={columns}
+                    onAdded={() => {
+                        setNotice(t("newRow.added"));
+                        void read();
+                    }}
+                />
+            ) : null}
+            {editable ? (
+                <DeleteRowsDialog
+                    open={removing && pickedKeys.length > 0}
+                    onOpenChange={setRemoving}
+                    namespace={namespace}
+                    relation={relation}
+                    keys={pickedKeys}
+                    onDeleted={(changed) => {
+                        setNotice(t("deleteRows.done", { count: changed }));
+                        void read();
+                    }}
+                />
+            ) : null}
         </div>
     );
 }
@@ -1138,12 +1255,10 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
 
 /** The statement box, and what came back. */
 function QueryPanel({
-    connectionId,
     shape,
     statement: kept,
     onStatement
 }: {
-    connectionId: string;
     shape: string;
     /** What was in the box last time this tab was on the screen, or when the
      *  page was last loaded. */
@@ -1151,6 +1266,7 @@ function QueryPanel({
     onStatement: (statement: string) => void;
 }) {
     const t = useTranslations("databases");
+    const source = useDataSource();
     const [statement, setStatement] = useState(kept);
     const [results, setResults] = useState<QueryResult[] | null>(null);
     const [running, setRunning] = useState(false);
@@ -1172,7 +1288,7 @@ function QueryPanel({
         if (!statement.trim() || running) return;
         setRunning(true);
         setError("");
-        const result = await actions.runAction(connectionId, statement);
+        const result = await source.run(statement);
         setRunning(false);
         if (result.error) {
             setError(result.error);

@@ -15,7 +15,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { LinkCard } from "@/app/(app)/chat/link-card";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 
 afterEach(cleanup);
 
@@ -93,6 +93,87 @@ describe("a link Polaris can play", () => {
         expect(container.querySelector("iframe")?.getAttribute("src")).toBe(
             `https://player.twitch.tv/?channel=somestreamer&autoplay=true&parent=${window.location.hostname}`
         );
+    });
+});
+
+describe("an upright video's card", () => {
+    it("is as wide as the video, not as a landscape card", async () => {
+        const { container } = render(
+            <LinkCard
+                preview={preview("https://www.tiktok.com/@someone/video/7232918429372394779")}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        const card = container.firstElementChild as HTMLElement;
+        expect(card.className).toContain("w-[calc(min(325px,70dvh*9/16)_+_1rem_+_3px)]");
+        expect(card.className).toContain("max-w-full");
+        expect(card.className).not.toContain("max-w-lg");
+        await userEvent.click(screen.getByRole("button", { name: "Play this on TikTok, here" }));
+        expect(container.querySelector("iframe")?.className).toContain("w-full");
+    });
+
+    it("leaves a landscape player's card as it was", () => {
+        const { container } = render(
+            <LinkCard preview={preview("https://www.youtube.com/watch?v=dQw4w9WgXcQ")} />,
+            { wrapper: MessagesWrapper }
+        );
+        expect((container.firstElementChild as HTMLElement).className).toContain("max-w-lg");
+    });
+});
+
+describe("a TikTok player that could not play", () => {
+    const failure = {
+        type: "onPlayerError",
+        value: { errorCode: 3001, errorType: "PLAYBACK_ERROR" },
+        "x-tiktok-player": true
+    };
+
+    function from(frame: HTMLIFrameElement | null, origin = "https://www.tiktok.com") {
+        act(() => {
+            window.dispatchEvent(
+                new MessageEvent("message", {
+                    data: failure,
+                    origin,
+                    source: frame?.contentWindow ?? null
+                })
+            );
+        });
+    }
+
+    it("is loaded once more, and only once", async () => {
+        const { container } = render(
+            <LinkCard
+                preview={preview("https://www.tiktok.com/@someone/video/7232918429372394779")}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        await userEvent.click(screen.getByRole("button", { name: "Play this on TikTok, here" }));
+        const first = container.querySelector("iframe");
+
+        from(first);
+        const second = container.querySelector("iframe");
+        expect(second).not.toBe(first);
+        expect(second?.getAttribute("src")).toBe(
+            "https://www.tiktok.com/player/v1/7232918429372394779?autoplay=1"
+        );
+
+        from(second);
+        expect(container.querySelector("iframe")).toBe(second);
+    });
+
+    it("is not reloaded by a message from another frame or another site", async () => {
+        const { container } = render(
+            <LinkCard
+                preview={preview("https://www.tiktok.com/@someone/video/7232918429372394779")}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        await userEvent.click(screen.getByRole("button", { name: "Play this on TikTok, here" }));
+        const frame = container.querySelector("iframe");
+
+        from(null);
+        from(frame, "https://evil.example");
+        expect(container.querySelector("iframe")).toBe(frame);
     });
 });
 

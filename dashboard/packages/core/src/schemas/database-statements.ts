@@ -55,7 +55,9 @@ function postgresCreate(grant: DatabaseGrant): string[] {
     const user = quoteIdent(grant.username);
     return [
         `CREATE ROLE ${user} WITH LOGIN PASSWORD ${quoteLiteral(grant.password)}`,
-        grant.privileges === "owner" ? `CREATE DATABASE ${db} OWNER ${user}` : `CREATE DATABASE ${db}`,
+        grant.privileges === "owner"
+            ? `CREATE DATABASE ${db} OWNER ${user}`
+            : `CREATE DATABASE ${db}`,
         `GRANT CONNECT ON DATABASE ${db} TO ${user}`
     ];
 }
@@ -83,7 +85,17 @@ function postgresGrantInDatabase(grant: DatabaseGrant): string[] {
 
 /** A `psql` invocation against one database, running one statement. */
 function psql(grant: DatabaseGrant, database: string, statement: string): string[] {
-    return ["psql", "-v", "ON_ERROR_STOP=1", "-U", grant.adminUser, "-d", database, "-c", statement];
+    return [
+        "psql",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-U",
+        grant.adminUser,
+        "-d",
+        database,
+        "-c",
+        statement
+    ];
 }
 
 function mysqlPrivilegeList(privileges: DbPrivilege): string {
@@ -149,7 +161,13 @@ export function createDatabaseCommands(engine: DbEngine, grant: DatabaseGrant): 
                 // The admin password goes in the argv of a process inside the
                 // container, which is the only channel the client offers without
                 // a config file; the container is not shared with other tenants.
-                argv: [engine === "mysql" ? "mysql" : "mariadb", `-u${grant.adminUser}`, `-p${grant.adminPassword}`, "-e", mysqlCreate(grant).join(" ")],
+                argv: [
+                    engine === "mysql" ? "mysql" : "mariadb",
+                    `-u${grant.adminUser}`,
+                    `-p${grant.adminPassword}`,
+                    "-e",
+                    mysqlCreate(grant).join(" ")
+                ],
                 describe: `Creating database ${grant.database} and user ${grant.username}`
             }
         ];
@@ -200,7 +218,13 @@ export function dropDatabaseCommands(engine: DbEngine, grant: DatabaseGrant): Co
         ];
         return [
             {
-                argv: [engine === "mysql" ? "mysql" : "mariadb", `-u${grant.adminUser}`, `-p${grant.adminPassword}`, "-e", statements.join(" ")],
+                argv: [
+                    engine === "mysql" ? "mysql" : "mariadb",
+                    `-u${grant.adminUser}`,
+                    `-p${grant.adminPassword}`,
+                    "-e",
+                    statements.join(" ")
+                ],
                 describe: `Dropping database ${grant.database} and user ${grant.username}`
             }
         ];
@@ -223,4 +247,119 @@ export function dropDatabaseCommands(engine: DbEngine, grant: DatabaseGrant): Co
             describe: `Dropping database ${grant.database}`
         }
     ];
+}
+
+/** One account's password, changed inside a running instance. */
+export interface PasswordChange {
+    readonly engine: DbEngine;
+    /** The account whose password changes. */
+    readonly username: string;
+    /** The logical database the account lives in, for a hosted one. */
+    readonly database: string;
+    readonly newPassword: string;
+    /** The instance's administrative account and its CURRENT password - for a
+     *  dedicated instance, the account itself before the change. */
+    readonly adminUser: string;
+    readonly adminPassword: string;
+    /** Hosted on another instance: only its own account changes. */
+    readonly hosted: boolean;
+}
+
+/** What a generated password may hold: nothing that could end a literal. */
+const SAFE_PASSWORD = /^[A-Za-z0-9_-]{16,128}$/;
+
+/**
+ * The commands that change one account's password, in order.
+ *
+ * Refuses a password that is not one Polaris generated - letters, digits, `_`
+ * and `-` - because each engine takes it as a literal inside a statement and
+ * that is what keeps the literal unambiguous. A dedicated MySQL or MariaDB
+ * instance gives its root account the same password (see the engine spec), so
+ * root changes with it; signing in to do so uses the current one.
+ */
+export function changePasswordCommands(change: PasswordChange): ContainerCommand[] {
+    if (!SAFE_PASSWORD.test(change.newPassword)) {
+        throw new Error("A new password has to be one Polaris generated.");
+    }
+    const describe = `Changing the password of ${change.username}`;
+    if (change.engine === "postgres") {
+        return [
+            {
+                argv: [
+                    "psql",
+                    "-v",
+                    "ON_ERROR_STOP=1",
+                    "-U",
+                    change.adminUser,
+                    "-d",
+                    "postgres",
+                    "-c",
+                    `ALTER ROLE ${quoteIdent(change.username)} WITH PASSWORD ${quoteLiteral(change.newPassword)}`
+                ],
+                describe
+            }
+        ];
+    }
+    if (change.engine === "mysql" || change.engine === "mariadb") {
+        const statements = [
+            `ALTER USER IF EXISTS ${quoteLiteral(change.username)}@'%' IDENTIFIED BY ${quoteLiteral(change.newPassword)};`
+        ];
+        if (!change.hosted) {
+            statements.push(
+                `ALTER USER IF EXISTS 'root'@'%' IDENTIFIED BY ${quoteLiteral(change.newPassword)};`,
+                `ALTER USER IF EXISTS 'root'@'localhost' IDENTIFIED BY ${quoteLiteral(change.newPassword)};`
+            );
+        }
+        statements.push("FLUSH PRIVILEGES;");
+        return [
+            {
+                argv: [
+                    change.engine === "mysql" ? "mysql" : "mariadb",
+                    "-uroot",
+                    `-p${change.adminPassword}`,
+                    "-e",
+                    statements.join(" ")
+                ],
+                describe
+            }
+        ];
+    }
+    if (change.engine === "mongo") {
+        const where = JSON.stringify(change.hosted ? change.database : "admin");
+        return [
+            {
+                argv: [
+                    "mongosh",
+                    "--quiet",
+                    "-u",
+                    change.adminUser,
+                    "-p",
+                    change.adminPassword,
+                    "--authenticationDatabase",
+                    "admin",
+                    "--eval",
+                    `db.getSiblingDB(${where}).changeUserPassword(${JSON.stringify(change.username)}, ${JSON.stringify(change.newPassword)})`
+                ],
+                describe
+            }
+        ];
+    }
+    if (change.engine === "redis") {
+        return [
+            {
+                argv: [
+                    "redis-cli",
+                    "--no-auth-warning",
+                    "-a",
+                    change.adminPassword,
+                    "CONFIG",
+                    "SET",
+                    "requirepass",
+                    change.newPassword
+                ],
+                describe
+            }
+        ];
+    }
+    throw new Error(`Polaris does not change passwords on ${change.engine}.`);
 }

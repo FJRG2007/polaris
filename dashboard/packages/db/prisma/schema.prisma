@@ -4729,6 +4729,9 @@ model ManagedDatabase {
     // instance can be recovered to any moment inside the kept window.
     pitr                Boolean  @default(false)
     pitrKeepDays        Int      @default(7)
+    // PostgreSQL: start with pg_stat_statements loaded, so the instance records
+    // which statements it spends its time on.
+    statStatements      Boolean  @default(false)
     // A version change asked for: the version, when to run it (null is now), and
     // how it went - scheduled | running | done | failed. The version, image and
     // data volume it ran before stay recorded so a failed upgrade is undone by

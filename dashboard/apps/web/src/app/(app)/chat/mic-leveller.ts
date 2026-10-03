@@ -21,10 +21,11 @@
  * - **The estimate is slow, the gain follows it.** What is chased is the level of
  *   the voice over the last second or two, never one syllable - a gain that
  *   chases syllables is the pumping everybody recognises as a bad call.
- * - **Bounded both ways.** Never below the level the model left (making somebody
- *   quieter is the volume setting's job, not this one's) and never more than
- *   `MAX_GAIN_DB` above it, because past that a voice is mostly amplified room.
- *   The limiter after it catches any peak this pushes over.
+ * - **Bounded both ways.** Never below the fixed makeup it replaced (making
+ *   somebody quieter is the volume setting's job, not this one's) and never more
+ *   than `MAX_GAIN_DB` above what the model left, because past that a voice is
+ *   mostly amplified room. The limiter after it catches any peak this pushes
+ *   over.
  *
  * Pure on purpose: it is a few lines of arithmetic, and the graph that applies it
  * is a GainNode moved by a timer - see `filterMic`.
@@ -43,8 +44,21 @@ export const SPEECH_FLOOR_DB = -58;
  *  from how they did before this existed. */
 export const START_GAIN_DB = 4;
 
-/** Never below what the model left, never more than this above it. */
-export const MIN_GAIN_DB = 0;
+/**
+ * Never below the makeup the fixed stage applied, never more than `MAX_GAIN_DB`
+ * above what the model left.
+ *
+ * The floor was once 0 dB, and that made every ordinary voice quieter than it
+ * had been: the model still takes its few decibels off a voice that is already
+ * at a speaking level, and with nothing below `TARGET_DB` to lift, the gain
+ * walked down from the old makeup to nothing. Measured on a recorded voice
+ * through this stage (100 ms readings of a 2048-sample window, as `filterMic`
+ * takes them), a voice going in at -14 to -18 dBFS active level went out 4 dB
+ * below what it had before, and one at -22 dBFS 2 dB below - which is what the
+ * rest of a call heard as everybody being quieter. Held at the old makeup, the
+ * leveller can only add to what a voice used to get.
+ */
+export const MIN_GAIN_DB = START_GAIN_DB;
 export const MAX_GAIN_DB = 15;
 
 /** How quickly the estimate of the voice follows what is heard. Seconds. */

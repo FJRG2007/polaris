@@ -42,7 +42,11 @@ export interface DatabaseStats {
 }
 
 export async function engineStats(userId: string, connectionId: string): Promise<DatabaseStats> {
-    const address = await addressOf(userId, connectionId);
+    return engineStatsAt(await addressOf(userId, connectionId));
+}
+
+/** `engineStats`, for an address already resolved and authorized by the caller. */
+export async function engineStatsAt(address: DataAddress): Promise<DatabaseStats> {
     switch (address.engine) {
         case "redis":
             return redisStats(address);

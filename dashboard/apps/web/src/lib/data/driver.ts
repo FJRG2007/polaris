@@ -22,9 +22,10 @@
  * exists to be pointed at production.
  */
 
-import type { DbEngine } from "@polaris/core";
-import type { DataTunnel } from "./tunnel";
 import type { DataTls } from "./tls";
+import type { DataTunnel } from "./tunnel";
+import type { DbEngine } from "@polaris/core";
+import type { RowDelete, RowInsert, RowWriteResult, TableDraft } from "./row-edit";
 
 /** The engines the browser can open. The same set Polaris can provision, which
  *  is not a coincidence: a database Polaris made is the first thing anybody
@@ -191,6 +192,12 @@ export interface DataDriver {
      * already opens their value.
      */
     updateCell?(edit: CellEdit): Promise<CellEditResult>;
+    /** Add one row, delete rows by primary key, create a table. Optional for the
+     *  same reason `updateCell` is: a key-value store and a document store have
+     *  no table to add a row to. The statements are `row-edit.ts`. */
+    insertRow?(insert: RowInsert): Promise<RowWriteResult>;
+    deleteRows?(removal: RowDelete): Promise<RowWriteResult>;
+    createTable?(draft: TableDraft): Promise<void>;
     close(): Promise<void>;
 }
 

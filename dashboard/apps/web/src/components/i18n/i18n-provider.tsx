@@ -21,7 +21,14 @@ import { readLocaleCookie, writeLocaleCookie } from "@/lib/i18n/cookie";
 import { UiStringsProvider, type UiStrings } from "@polaris/ui";
 import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { setActionFailureText } from "@/lib/run-action";
-import { createTranslator, DEFAULT_LOCALE, negotiateLocale, type Locale, type Namespaces } from "@polaris/core";
+import { useRouterSettled } from "@/components/use-router-settled";
+import {
+    createTranslator,
+    DEFAULT_LOCALE,
+    negotiateLocale,
+    type Locale,
+    type Namespaces
+} from "@polaris/core";
 
 interface I18nState {
     readonly locale: Locale;
@@ -112,6 +119,9 @@ function UiWords({ children }: { children: ReactNode }) {
  */
 export function LocaleSync({ locale, signedIn }: { locale: Locale; signedIn: boolean }): null {
     const router = useRouter();
+    // The redraw waits until the router has arrived: a refresh while a page's
+    // redirect is still being carried out crashes the tab (see useRouterSettled).
+    const settled = useRouterSettled();
     useEffect(() => {
         document.documentElement.lang = locale;
         const remembered = readLocaleCookie(document.cookie);
@@ -119,14 +129,17 @@ export function LocaleSync({ locale, signedIn }: { locale: Locale; signedIn: boo
             if (remembered !== locale) writeLocaleCookie(locale);
             return;
         }
+        // The rest can end in a redraw, so it waits; nothing above it can.
+        if (!settled) return;
         if (remembered) return;
         const preferred = negotiateLocale(navigator.languages);
         if (!preferred) return;
         writeLocaleCookie(preferred);
         // Only when the cookie took: with cookies refused, the server would draw
         // the same page again and this would ask again, for ever.
-        if (preferred !== locale && readLocaleCookie(document.cookie) === preferred) router.refresh();
-    }, [locale, signedIn, router]);
+        if (preferred !== locale && readLocaleCookie(document.cookie) === preferred)
+            router.refresh();
+    }, [locale, signedIn, router, settled]);
     return null;
 }
 
@@ -134,7 +147,13 @@ export function LocaleSync({ locale, signedIn }: { locale: Locale; signedIn: boo
  * More namespaces for the screens below, on top of the ones above. Rendered by
  * the `<Messages>` server component rather than directly.
  */
-export function MessagesProvider({ messages, children }: { messages: Namespaces; children: ReactNode }) {
+export function MessagesProvider({
+    messages,
+    children
+}: {
+    messages: Namespaces;
+    children: ReactNode;
+}) {
     const parent = useContext(I18nContext);
     const value = useMemo(
         () => ({

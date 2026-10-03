@@ -21,12 +21,17 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useRouterSettled } from "@/components/use-router-settled";
 import { reportTimeZoneAction } from "@/app/(app)/account/preferences/actions";
 
 export function TimeZoneReporter({ reported }: { reported: string | null }) {
     const router = useRouter();
+    // Not during the first visit's own arrival: a server action in flight while
+    // a page's redirect is carried out crashes the tab (see useRouterSettled).
+    const settled = useRouterSettled();
 
     useEffect(() => {
+        if (!settled) return;
         const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
         if (!here || here === reported) return;
         void reportTimeZoneAction(here)
@@ -34,7 +39,7 @@ export function TimeZoneReporter({ reported }: { reported: string | null }) {
             // resolved in the layout, so the screen that is up has to re-read.
             .then((result) => result.changed && router.refresh())
             .catch(() => undefined);
-    }, [reported, router]);
+    }, [reported, router, settled]);
 
     return null;
 }

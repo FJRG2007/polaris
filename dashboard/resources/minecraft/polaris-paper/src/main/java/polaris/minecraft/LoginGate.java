@@ -101,6 +101,8 @@ final class LoginGate implements Listener, CommandExecutor {
     /** Players let go over a hole, and the tick their fall stops being this
      *  gate's fault. Empty on a server where nothing was ever held. */
     private final Map<UUID, Long> landing = new ConcurrentHashMap<>();
+    /** Everything but the prompt, kept off a held player's screen. */
+    private final Unseen unseen = new Unseen();
     private BukkitTask ticker;
     private boolean guarding;
     private long tick;
@@ -179,6 +181,7 @@ final class LoginGate implements Listener, CommandExecutor {
             if (player != null) {
                 lighten(player, entry.getValue());
                 drop(player, entry.getValue());
+                unseen.show(player);
             }
         }
         held.clear();
@@ -198,6 +201,7 @@ final class LoginGate implements Listener, CommandExecutor {
             } else if (tick > waiting.deadline && !waiting.busy) {
                 player.kickPlayer("You took too long to log in.");
             } else {
+                unseen.keepHidden(player);
                 if (tick % SECOND == 0) countdown(waiting);
                 if (tick % (TITLE_TICKS - SECOND) == 0) titleFor(player, waiting);
             }
@@ -257,6 +261,7 @@ final class LoginGate implements Listener, CommandExecutor {
         Player player = event.getPlayer();
         if (!guarding) {
             clearOurs(player);
+            Unseen.clearStale(player);
             return;
         }
         hold(player);
@@ -266,6 +271,9 @@ final class LoginGate implements Listener, CommandExecutor {
         BossBar bar = Bukkit.createBossBar(secondsLeft(LOGIN_TICKS / SECOND), BarColor.YELLOW, BarStyle.SOLID);
         Held waiting = new Held(player.getLocation(), tick + LOGIN_TICKS, bar);
         held.put(player.getUniqueId(), waiting);
+        // Before anything else is said to them: from here on they see the
+        // prompt, and nothing of Polaris's.
+        unseen.hide(player);
         lift(player, waiting);
         if (config.state() != PolarisConfig.State.ON) {
             clearOurs(player);
@@ -303,6 +311,9 @@ final class LoginGate implements Listener, CommandExecutor {
         if (waiting != null) {
             lighten(event.getPlayer(), waiting);
             drop(event.getPlayer(), waiting);
+            // The tag off before they are saved, and their bars back on each
+            // bar's list for their next join.
+            unseen.show(event.getPlayer());
         }
         landing.remove(event.getPlayer().getUniqueId());
     }
@@ -391,6 +402,9 @@ final class LoginGate implements Listener, CommandExecutor {
             lighten(player, waiting);
             drop(player, waiting);
         }
+        // Everything they were kept from comes back now - their bars, the side
+        // panel - not on whatever writes it next.
+        unseen.show(player);
         player.resetTitle();
         player.sendMessage(ChatColor.GREEN + message);
     }
@@ -662,6 +676,16 @@ final class LoginGate implements Listener, CommandExecutor {
         event.setCancelled(true);
         Player player = event.getPlayer();
         onMain(() -> remind(player));
+    }
+
+    /** Nobody's chat reaches a held player: they are not in yet. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onChatSeen(AsyncPlayerChatEvent event) {
+        try {
+            event.getRecipients().removeIf(recipient -> unseen.hides(recipient.getUniqueId()));
+        } catch (UnsupportedOperationException fixed) {
+            // A plugin made the list fixed; the message goes where it says.
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

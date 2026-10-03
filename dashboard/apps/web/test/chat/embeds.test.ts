@@ -14,7 +14,8 @@ import {
     isShareLink,
     landingOf,
     oembedFor,
-    playerAddress
+    playerAddress,
+    playerFailed
 } from "../../src/lib/chat/embeds";
 
 /** Every address in a list frames the same player. */
@@ -607,5 +608,54 @@ describe("asking a site about its link", () => {
         expect(oembedFor("https://example.com/")).toBeNull();
         expect(oembedFor("https://reddit.com.evil.example/r/x")).toBeNull();
         expect(oembedFor("https://notyoutube.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+    });
+});
+
+describe("a player saying it could not play", () => {
+    const tiktok = embedFor("https://www.tiktok.com/@someone/video/7232918429372394779")!;
+    const failed = (errorCode: unknown) => ({
+        type: "onPlayerError",
+        value: { errorCode, errorType: "PLAYBACK_ERROR" },
+        "x-tiktok-player": true
+    });
+
+    it("is TikTok's failure to fetch or play the video, from TikTok's frame", () => {
+        // What TikTok's player posted, word for word, on a first play in a
+        // browser with no TikTok cookie yet (ERR_BLOCKED_BY_ORB on the video).
+        expect(playerFailed(tiktok, "https://www.tiktok.com", failed(3001))).toBe(true);
+        expect(playerFailed(tiktok, "https://www.tiktok.com", failed(2001))).toBe(true);
+    });
+
+    it("is not a failure another load cannot fix", () => {
+        expect(playerFailed(tiktok, "https://www.tiktok.com", failed(1001))).toBe(false);
+        expect(playerFailed(tiktok, "https://www.tiktok.com", failed(3002))).toBe(false);
+    });
+
+    it("is nothing from anywhere else, or shaped any other way", () => {
+        expect(playerFailed(tiktok, "https://evil.example", failed(3001))).toBe(false);
+        expect(playerFailed(tiktok, "https://tiktok.com", failed(3001))).toBe(false);
+        expect(playerFailed(tiktok, "https://www.tiktok.com", "onPlayerError")).toBe(false);
+        expect(playerFailed(tiktok, "https://www.tiktok.com", null)).toBe(false);
+        expect(playerFailed(tiktok, "https://www.tiktok.com", failed("3001"))).toBe(false);
+        expect(
+            playerFailed(tiktok, "https://www.tiktok.com", {
+                ...failed(3001),
+                "x-tiktok-player": false
+            })
+        ).toBe(false);
+        expect(
+            playerFailed(tiktok, "https://www.tiktok.com", {
+                ...failed(3001),
+                type: "onStateChange"
+            })
+        ).toBe(false);
+        expect(
+            playerFailed(tiktok, "https://www.tiktok.com", { ...failed(3001), value: null })
+        ).toBe(false);
+    });
+
+    it("is only ever TikTok's - no other player is reloaded", () => {
+        const youtube = embedFor("https://youtu.be/dQw4w9WgXcQ")!;
+        expect(playerFailed(youtube, "https://www.youtube-nocookie.com", failed(3001))).toBe(false);
     });
 });

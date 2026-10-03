@@ -16,7 +16,7 @@ import { Button, Input } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { LocalPath } from "@/lib/server-local-path";
-import { findLocalPathAction, renameServerAction, useLocalPathAction } from "./actions";
+import { findLocalPathAction, renameServerAction, adoptLocalPathAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
 import type { ServerRow, ServerStatus } from "./types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -58,7 +58,11 @@ export function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed
                     autoCorrect="off"
                     spellCheck={false}
                 />
-                <Button variant="secondary" disabled={!changed || pending} onClick={() => void save()}>
+                <Button
+                    variant="secondary"
+                    disabled={!changed || pending}
+                    onClick={() => void save()}
+                >
                     {pending ? tcommon("actions.saving") : tcommon("actions.save")}
                 </Button>
             </span>
@@ -69,7 +73,13 @@ export function RenameForm({ server, onRenamed }: { server: ServerRow; onRenamed
 
 /** Whether it answered, and how long it took. The local box is never probed - it
  *  is the machine serving this page. */
-export function Reachability({ server, status }: { server: ServerRow; status: ServerStatus | null }) {
+export function Reachability({
+    server,
+    status
+}: {
+    server: ServerRow;
+    status: ServerStatus | null;
+}) {
     const t = useTranslations("servers");
     if (server.kind === "local") {
         return <p className="text-sm text-muted-foreground">{t("reach.local")}</p>;
@@ -148,7 +158,7 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
     const move = async (address: string) => {
         setBusy(true);
         setError("");
-        const result = await runAction(() => useLocalPathAction({ hostId, address }), setError);
+        const result = await runAction(() => adoptLocalPathAction({ hostId, address }), setError);
         setBusy(false);
         if (!result || result.error) {
             if (result?.error) setError(result.error);
@@ -204,19 +214,13 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
                 </p>
             ) : null}
             {path?.kind === "none" ? (
-                <p className="text-sm text-muted-foreground">
-                    {t("lan.none")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("lan.none")}</p>
             ) : null}
             {path?.kind === "unreachable" ? (
-                <p className="text-sm text-muted-foreground">
-                    {t("lan.unreachable")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("lan.unreachable")}</p>
             ) : null}
             {path?.kind === "unknown" ? (
-                <p className="text-sm text-muted-foreground">
-                    {t("lan.unknown")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("lan.unknown")}</p>
             ) : null}
         </div>
     );
@@ -244,15 +248,15 @@ export function Connect({ server }: { server: ServerRow }) {
                     <Field label={t("host.username")} value={server.detail} copyable />
                     <Field
                         label={t("connect.signInWith")}
-                        value={server.authMethod === "key" ? t("host.privateKey") : t("host.password")}
+                        value={
+                            server.authMethod === "key" ? t("host.privateKey") : t("host.password")
+                        }
                     />
                 </dl>
             </div>
 
             <p className="text-xs text-muted-foreground">
-                {server.authMethod === "key"
-                    ? t("connect.keyNote")
-                    : t("connect.passwordNote")}
+                {server.authMethod === "key" ? t("connect.keyNote") : t("connect.passwordNote")}
             </p>
         </div>
     );

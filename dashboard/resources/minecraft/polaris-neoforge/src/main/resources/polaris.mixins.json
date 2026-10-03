@@ -4,7 +4,9 @@
     "package": "polaris.minecraft.mixin",
     "compatibilityLevel": "JAVA_21",
     "server": [
+        "BossEventPacketAccessor",
         "ChunkPacketDataMixin",
+        "HeldPacketMixin",
         "PacketSendMixin",
         "PlayerActionMixin",
         "SectionBlocksUpdateAccessor",
