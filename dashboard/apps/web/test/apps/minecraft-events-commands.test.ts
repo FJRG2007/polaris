@@ -2677,3 +2677,45 @@ describe("the top of a footprint, for what is built in the air", () => {
         expect(commands.highestTop([])).toBeNull();
     });
 });
+
+describe("a parkour course's traps", () => {
+    const options = (difficulty: "easy" | "medium" | "hard") => ({
+        place: { mode: "players" as const },
+        jumps: 30,
+        difficulty,
+        height: 30
+    });
+
+    it("puts slime pads and vanishing platforms on plain jumps only, never two in a row", () => {
+        let traps = 0;
+        for (let seed = 0; seed < 20; seed += 1) {
+            const course = parkour.course(options("hard"), `run-${seed}`, { x: 0, z: 0 }, 100);
+            course.platforms.forEach((one, index) => {
+                if (!one.trap) return;
+                traps += 1;
+                expect(one.role).toBe("jump");
+                expect(course.platforms[index - 1]?.trap).toBeUndefined();
+            });
+            const blocks = course.boxes.map((box) => box.block);
+            for (const one of course.vanishing) expect(blocks).toContain(one.block);
+            for (const box of course.boxes) expect(stage.ARENA_BLOCKS).toContain(box.block);
+        }
+        expect(traps).toBeGreaterThan(20);
+        // The easy course never vanishes from under anybody.
+        for (let seed = 0; seed < 20; seed += 1)
+            expect(
+                parkour.course(options("easy"), `run-${seed}`, { x: 0, z: 0 }, 100).vanishing
+            ).toEqual([]);
+    });
+
+    it("blinks: there most of the time, gone for two seconds in six, only into air and only its own", () => {
+        let course = parkour.course(options("hard"), "run-1", { x: 0, z: 0 }, 100);
+        for (let seed = 2; course.vanishing.length === 0; seed += 1)
+            course = parkour.course(options("hard"), `run-${seed}`, { x: 0, z: 0 }, 100);
+        const there = parkour.blinkLines(course, 1_000);
+        expect(there.every((line) => line.endsWith(" minecraft:orange_concrete keep"))).toBe(true);
+        const gone = parkour.blinkLines(course, parkour.BLINK_MS - 500);
+        expect(gone.every((line) => line.endsWith(" minecraft:air replace minecraft:orange_concrete"))).toBe(true);
+        expect(there).toHaveLength(course.vanishing.length);
+    });
+});

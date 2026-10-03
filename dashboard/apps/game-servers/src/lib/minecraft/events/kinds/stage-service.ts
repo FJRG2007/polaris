@@ -595,6 +595,7 @@ async function parkourTick(
         }
     }
 
+    lines.push(...parkour.blinkLines(course, now));
     const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
     const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
     // What the quick look (`quickLines`) has already marked: each racer's

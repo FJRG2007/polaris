@@ -56,6 +56,8 @@ export const ARENA_BLOCKS = [
     "minecraft:lime_stained_glass",
     "minecraft:yellow_stained_glass",
     "minecraft:red_concrete",
+    "minecraft:orange_concrete",
+    "minecraft:slime_block",
     "minecraft:snow_block"
 ] as const;
 

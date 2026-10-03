@@ -110,4 +110,9 @@ left out.
   each in English and Spanish, by category (mobs, items, world, geography,
   science, history, general). Nothing repeats inside a game, and the
   questions asked in the last games (`RECENT_KEPT`) come after all the others.
+- **Parkour** is laid out from the run's id, so every run is a new course.
+  Past easy, some plain jumps are traps: slime pads that throw the player up
+  again, and orange platforms that vanish for two seconds in every six
+  (`parkour.blinkLines`). Never two in a row, never a checkpoint; a fall is only
+  ever back to the last checkpoint.
 
