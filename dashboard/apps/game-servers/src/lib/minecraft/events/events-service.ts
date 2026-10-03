@@ -407,10 +407,71 @@ export interface EventsView {
     readonly stashFailures: Awaited<ReturnType<typeof stashService.failedStashes>>;
     readonly nextRandomAt: number | null;
     readonly waiting: string | null;
+    /** When the sweep last looked at the draw in this process, or null. */
+    readonly drawCheckedAt: number | null;
+    /** The last event the draw started, among those kept, or null. */
+    readonly lastRandom: { readonly name: string; readonly startedAt: number } | null;
     /** Who is on and who of them is playing, as the last look saw them. Null when
      *  nobody has looked yet. */
     readonly players: { readonly online: number; readonly active: number } | null;
     readonly refusal: string | null;
+}
+
+/** The last event the draw started: the one on now, or the newest kept. */
+function lastRandomOf(state: stored.EventState): { name: string; startedAt: number } | null {
+    if (state.run?.trigger === "random")
+        return { name: state.run.preset.name, startedAt: state.run.startsAt };
+    const found = state.history.find((entry) => entry.trigger === "random");
+    return found ? { name: found.name, startedAt: found.startedAt } : null;
+}
+
+/**
+ * Draw an event now, from the screen: one of the pool whose conditions hold -
+ * switched on, and the players it needs - by weight, not the same kind as last
+ * time when there is another. The hours, the gap and a fight somebody is in do
+ * not hold it back: the operator pressed the button. Says what it picked, and
+ * why each of the others was not.
+ */
+export async function runRandomNow(input: {
+    ownerId: string;
+    installedAppId: string;
+    startedBy: string;
+}): Promise<{ run: stored.EventRun | null; skipped: plan.Skipped[] }> {
+    const row = await readRow(input.installedAppId);
+    if (!row) throw new Error(refused("noServer"));
+    const settings = settingsOf(row.config);
+    const state = stored.readEventState(row.config);
+    if (state.run) throw new Error(gameMessage("minecraft", "events.waiting.anotherOn"));
+    if (settings.settings.random.pool.length === 0)
+        throw new Error(gameMessage("minecraft", "events.skipped.emptyPool"));
+    const seen = await sample(input.ownerId, input.installedAppId);
+    if (seen === null) throw new Error(refused("notRunning"));
+    const now = Date.now();
+    const { choices, skipped } = plan.drawable({
+        settings: settings.settings,
+        presets: settings.presets,
+        lastKind: state.lastKind,
+        activeFor: (preset) =>
+            plan.playersFor(preset, seen, settings.settings.afkMinutes, now).length
+    });
+    const chosen = plan.pickWeighted(choices, Math.random);
+    if (!chosen) return { run: null, skipped };
+    const run = await startEvent({
+        ownerId: input.ownerId,
+        installedAppId: input.installedAppId,
+        presetId: chosen.id,
+        trigger: "random",
+        startedBy: input.startedBy
+    });
+    // The next drawn one a gap after this one, as if the draw had picked it.
+    await updateEventState(input.installedAppId, (current) => ({
+        ...current,
+        nextRandomAt: now + catalog.runMinutes(chosen) * 60_000 + plan.nextGap(settings.settings, Math.random),
+        waiting: null,
+        short: false,
+        readySince: null
+    }));
+    return { run, skipped };
 }
 
 export async function eventsView(installedAppId: string): Promise<EventsView> {
@@ -456,6 +517,8 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
         stashFailures: await stashService.failedStashes(installedAppId).catch(() => []),
         nextRandomAt: state.nextRandomAt,
         waiting: state.waiting,
+        drawCheckedAt: drawChecks.get(installedAppId) ?? null,
+        lastRandom: lastRandomOf(state),
         players: seen
             ? {
                   online: seen.size,
@@ -3852,6 +3915,26 @@ async function sample(
 // ------------------------------------------------------------------ the sweep
 
 /**
+ * When the sweep last looked at each server's draw. Kept in this process rather
+ * than written down: it changes every minute, and what it is for - the screen
+ * showing the draw is alive - is answered by the process that runs the sweep.
+ */
+const drawChecks = new Map<string, number>();
+
+/** An event on while a drawn one is due: said, so the screen says why it waits. */
+async function noteDrawBlocked(
+    installedAppId: string,
+    state: stored.EventState,
+    now: number
+): Promise<void> {
+    drawChecks.set(installedAppId, now);
+    if (state.nextRandomAt === null || now < state.nextRandomAt) return;
+    const reason = gameMessage("minecraft", "events.waiting.anotherOn");
+    if (state.waiting === reason) return;
+    await updateEventState(installedAppId, (current) => ({ ...current, waiting: reason }));
+}
+
+/**
  * The minute sweep, for every Minecraft server with events set up: an event
  * that lost its loop to a restart gets it back, prizes waiting for somebody who
  * is on now are handed over, and a scheduled or drawn event whose moment has
@@ -3906,6 +3989,7 @@ async function sweepOne(
         );
     }
     if (state.run) {
+        if (settings.settings.random.enabled) await noteDrawBlocked(installedAppId, state, now);
         if (loops.has(installedAppId)) return false;
         if (state.run.finishing) await abandon(ownerId, installedAppId, state.run);
         else startLoop(ownerId, installedAppId, state.run, settings.settings);
@@ -3919,7 +4003,15 @@ async function sweepOne(
     if (!wantsPlayers) return false;
 
     const seen = await sample(ownerId, installedAppId).catch(() => null);
-    if (seen === null) return false;
+    if (seen === null) {
+        if (settings.settings.random.enabled) {
+            drawChecks.set(installedAppId, now);
+            const down = gameMessage("minecraft", "events.waiting.serverDown");
+            if (state.waiting !== down)
+                await updateEventState(installedAppId, (current) => ({ ...current, waiting: down }));
+        }
+        return false;
+    }
     if (pending.length > 0 && seen.size > 0) await deliverPending(ownerId, installedAppId, seen);
     const active = plan.activePlayers(seen, settings.settings.afkMinutes, now).length;
     const activeFor = (preset: catalog.EventPreset) =>
@@ -3994,14 +4086,34 @@ async function sweepOne(
         active,
         activeFor,
         busy,
+        short: state.short,
+        readySince: state.readySince,
         now,
         random: Math.random
     });
-    await updateEventState(installedAppId, (current) =>
-        current.nextRandomAt === decision.nextRandomAt && current.waiting === decision.waiting
-            ? current
-            : { ...current, nextRandomAt: decision.nextRandomAt, waiting: decision.waiting }
-    );
+    if (settings.settings.random.enabled) drawChecks.set(installedAppId, now);
+    // Kept across a wait for something else (an event on, the hours): only the
+    // players it waits for, or a start, settle it.
+    const short = decision.start ? false : (decision.short ?? state.short);
+    const readySince = decision.start
+        ? null
+        : decision.short === undefined
+          ? state.readySince
+          : (decision.readySince ?? null);
+    // Written only when something changed: the sweep comes round every minute.
+    if (
+        state.nextRandomAt !== decision.nextRandomAt ||
+        state.waiting !== decision.waiting ||
+        state.short !== short ||
+        state.readySince !== readySince
+    )
+        await updateEventState(installedAppId, (current) => ({
+            ...current,
+            nextRandomAt: decision.nextRandomAt,
+            waiting: decision.waiting,
+            short,
+            readySince
+        }));
     if (!decision.start) return false;
     try {
         await startEvent({

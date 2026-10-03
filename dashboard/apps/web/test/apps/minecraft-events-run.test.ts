@@ -42,6 +42,8 @@ interface World {
     dims: Record<string, string>;
     /** The game's running damage counts, per player. */
     hurt: Record<string, number>;
+    /** Damage each player has dealt, as `pe_hit` counts it. */
+    dealt: Record<string, number>;
     /** Players standing perfectly still, looking the same way. */
     still: string[];
     /** Players in creative or spectator. */
@@ -206,6 +208,7 @@ const world: World = {
     unknownItems: [],
     dims: {},
     hurt: {},
+    dealt: {},
     still: [],
     creative: [],
     difficulty: "Normal",
@@ -1089,7 +1092,7 @@ function answer(sent: string): string {
         return world.online
             .map(
                 (name) =>
-                    `${name} has ${counted[1] === "pe_hurt" ? (world.hurt[name] ?? 0) : 0} [${counted[1]}]`
+                    `${name} has ${(counted[1] === "pe_hurt" ? world.hurt : world.dealt)[name] ?? 0} [${counted[1]}]`
             )
             .join("\n");
     }
@@ -1618,6 +1621,8 @@ const { readEventState } = await import("@polaris-app/game-servers/src/lib/minec
 const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-message");
 const commands = await import("@polaris-app/game-servers/src/lib/minecraft/events/commands");
 const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/events/messages");
+const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/plan");
+const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 
 /** What a player reads of a command's text: the words of its JSON, without the
  *  formatting that splits them into parts (a highlighted name, a number). */
@@ -1692,6 +1697,7 @@ beforeEach(() => {
     world.unknownItems = [];
     world.dims = {};
     world.hurt = {};
+    world.dealt = {};
     world.still = [];
     world.creative = [];
     world.difficulty = "Normal";
@@ -3472,9 +3478,9 @@ describe("where the players are, and what they are doing", () => {
         setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
         await events.sweepEvents();
         await play(15 * 60_000);
-        world.hurt = { Ana: 40 };
+        world.dealt = { Ana: 40 };
         await events.sweepEvents();
-        world.hurt = { Ana: 55 };
+        world.dealt = { Ana: 55 };
         const held = await events.sweepEvents();
         expect(held.started).toBe(0);
         expect(gameMessageIn("en-US", state().waiting ?? "")).toBe(
@@ -3487,6 +3493,68 @@ describe("where the players are, and what they are doing", () => {
         await play(100_000);
         const started = await events.sweepEvents();
         expect(started.started).toBe(1);
+    });
+
+    it("does not take damage taken alone for a fight", async () => {
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
+        world.hurt = { Ana: 40 };
+        await events.sweepEvents();
+        await play(14 * 60_000);
+        await events.sweepEvents();
+        await play(60_000);
+        // Hurt since the last look - hunger, a fall - and the draw still goes.
+        world.hurt = { Ana: 55 };
+        expect((await events.sweepEvents()).started).toBe(1);
+        expect(plan.busy(playing.seenOn(SERVER)!.get("ana")!, Date.now())).toBe(false);
+    });
+
+    it("waits one more look after the players it was short of come, then starts", async () => {
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], { ...draw("fish"), minActive: 3 });
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        expect((await events.sweepEvents()).started).toBe(0);
+        expect(state().short).toBe(true);
+        world.online = ["Ana", "Ben", "Cai"];
+        // Cai is seen, then seen to move: only then is the draw ready.
+        await play(60_000);
+        expect((await events.sweepEvents()).started).toBe(0);
+        await play(60_000);
+        expect((await events.sweepEvents()).started).toBe(0);
+        expect(gameMessageIn("en-US", state().waiting ?? "")).toMatch(/one more check/);
+        await play(100_000);
+        expect((await events.sweepEvents()).started).toBe(1);
+        expect(state().short).toBe(false);
+    });
+
+    it("draws one now from the screen, and says why the others could not", async () => {
+        const duel = { ...newPreset("team-duel", "duel"), minPlayers: 4 };
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }, duel], {
+            ...draw("fish"),
+            random: {
+                ...draw("fish").random,
+                pool: [
+                    { presetId: "fish", weight: 1 },
+                    { presetId: "duel", weight: 1 }
+                ]
+            }
+        });
+        await events.sweepEvents();
+        await play(60_000);
+        await events.sweepEvents();
+        const drawn = await events.runRandomNow({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            startedBy: "user"
+        });
+        expect(drawn.run?.preset.id).toBe("fish");
+        expect(drawn.run?.trigger).toBe("random");
+        expect(drawn.skipped.map((one) => one.presetId)).toEqual(["duel"]);
+        expect(state().nextRandomAt).not.toBeNull();
+        const view = await events.eventsView(SERVER);
+        expect(view.lastRandom?.name).toBe(drawn.run?.preset.name);
+        await expect(
+            events.runRandomNow({ ownerId: "owner", installedAppId: SERVER, startedBy: "user" })
+        ).rejects.toThrow();
     });
 
     it("counts only the Overworld for an event that happens there", async () => {

@@ -1543,7 +1543,7 @@
         "events": "Eventos",
         "addAnEvent": "Añadir evento",
         "noEventsYetAddOne": "Aún no hay eventos. Añade uno arriba.",
-        "saveFirst": "Guarda antes",
+        "saveFirst": "Guarda antes los cambios",
         "theSwitchLetsAnEvent": "El interruptor deja que un evento se programe o salga en el sorteo. Lanzar lo empieza ya, esté quien esté jugando.",
         "automaticEvents": "Eventos automáticos",
         "anAutomaticEventOnlyStarts": "Un evento automático solo empieza mientras juegan de verdad suficientes jugadores - alguien que lleva un rato sin moverse ni girarse no cuenta.",
@@ -1922,7 +1922,9 @@
             "anotherOn": "Otro evento en marcha",
             "busyNow": "Esperando: {reason}",
             "players": "{overworld, select, yes {{needed, plural, one {Esperando a # jugador activo en el mundo normal ({have} ahora)} other {Esperando a # jugadores activos en el mundo normal ({have} ahora)}}} other {{needed, plural, one {Esperando a # jugador activo ({have} ahora)} other {Esperando a # jugadores activos ({have} ahora)}}}}",
-            "couldNotStart": "El evento sorteado no pudo empezar"
+            "couldNotStart": "El evento sorteado no pudo empezar",
+            "settling": "Listo - empieza tras otra comprobación",
+            "serverDown": "El servidor no responde"
         },
         "prizes": {
             "entry": "{place} {reward}",
@@ -1930,7 +1932,25 @@
             "everybody": "Todos: {reward}",
             "none": "Sin premios",
             "trophy": "Trofeo"
-        }
+        },
+        "skipped": {
+            "switchedOff": "Desactivado",
+            "sameAsLast": "Igual que el anterior",
+            "emptyPool": "No hay eventos en el sorteo"
+        },
+        "runRandom": "Evento al azar",
+        "drawnNow": "Elegido: empieza {name}.",
+        "noneCanStart": "Ningún evento del sorteo puede empezar.",
+        "skippedOne": "{name}: {reason}",
+        "nextIn": "Próximo evento aleatorio en {time}.",
+        "drawArming": "El sorteo empieza a contar en la próxima revisión.",
+        "lastDrawn": "Último aleatorio: {name}, {date}.",
+        "noneDrawnYet": "Ningún aleatorio entre los últimos guardados.",
+        "drawChecked": "Sorteo revisado hace {time}.",
+        "drawNotChecked": "Sorteo sin revisar desde que arrancó Polaris.",
+        "anyTimeOfDay": "A cualquier hora",
+        "drawAll": "Todos",
+        "drawNone": "Ninguno"
     },
     "editor": {
         "where": "Dónde",

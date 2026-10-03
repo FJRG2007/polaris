@@ -327,6 +327,11 @@ export const eventStateSchema = z.object({
     nextRandomAt: z.number().nullable().default(null),
     /** Why the one that was due has not started, for the screen. */
     waiting: z.string().nullable().default(null),
+    /** Whether a drawn event that fell due is held back for want of players,
+     *  and when they were first seen there since, while it settles
+     *  (`plan.SETTLE_MS`). */
+    short: z.boolean().default(false),
+    readySince: z.number().nullable().default(null),
     /** The kind the last one was, so two of the same do not come back to back. */
     lastKind: z.enum(EVENT_KINDS).nullable().default(null),
     /** When each scheduled entry last fired, by entry id. */
@@ -360,6 +365,8 @@ export const EMPTY_EVENT_STATE: EventState = {
     pending: [],
     nextRandomAt: null,
     waiting: null,
+    short: false,
+    readySince: null,
     lastKind: null,
     scheduleRuns: {},
     wins: null,

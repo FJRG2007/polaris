@@ -27,6 +27,7 @@ import type { SearchSummary } from "../../lib/minecraft/events/place-search";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     Copy,
+    Dices,
     FastForward,
     Info,
     Loader2,
@@ -74,6 +75,52 @@ const OUTCOME: Readonly<
 };
 
 /** m:ss, or h:mm:ss past an hour. */
+/**
+ * How the draw stands: when the next one comes (a countdown), why a due one
+ * waits, the last one it started, and when the sweep last looked - the proof it
+ * is alive.
+ */
+function DrawStatus({
+    view,
+    now,
+    t,
+    schemaText,
+    dateTime
+}: {
+    view: EventsView;
+    now: number;
+    t: GameText<"minecraft">;
+    schemaText: (text: string | null | undefined) => string | undefined;
+    dateTime: (at: number) => string;
+}): React.ReactElement {
+    const lines: string[] = [];
+    if (view.waiting && (!view.nextRandomAt || view.nextRandomAt <= now))
+        lines.push(t("events.nextDue", { reason: lowerFirst(schemaText(view.waiting) ?? "") }));
+    else if (view.nextRandomAt && view.nextRandomAt > now)
+        lines.push(t("events.nextIn", { time: clock(view.nextRandomAt - now) }));
+    else if (!view.nextRandomAt) lines.push(t("events.drawArming"));
+    lines.push(
+        view.lastRandom
+            ? t("events.lastDrawn", {
+                  name: view.lastRandom.name,
+                  date: dateTime(view.lastRandom.startedAt)
+              })
+            : t("events.noneDrawnYet")
+    );
+    lines.push(
+        view.drawCheckedAt
+            ? t("events.drawChecked", { time: clock(now - view.drawCheckedAt) })
+            : t("events.drawNotChecked")
+    );
+    return (
+        <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            {lines.map((line) => (
+                <p key={line}>{line}</p>
+            ))}
+        </div>
+    );
+}
+
 function clock(ms: number): string {
     const total = Math.max(0, Math.ceil(ms / 1000));
     const hours = Math.floor(total / 3600);
@@ -531,10 +578,11 @@ export function MinecraftEvents({
     }, [note]);
 
     useEffect(() => {
-        if (!running) return;
+        // Ticking for the event on, and for the countdown to the next drawn one.
+        if (!running && !view?.nextRandomAt) return;
         const timer = setInterval(() => setNow(Date.now()), 1_000);
         return () => clearInterval(timer);
-    }, [running]);
+    }, [running, view?.nextRandomAt]);
 
     const checked = useMemo(
         () => (draft ? catalog.eventsConfigSchema.safeParse(draft) : null),
@@ -570,6 +618,26 @@ export function MinecraftEvents({
             }
             accept(answer.view, false);
             setNote(t("events.starting", { name: preset.name }));
+        });
+    }
+
+    /** What the last press of Run a random event left out, and why. */
+    const [skipped, setSkipped] = useState<{ name: string; reason: string }[] | null>(null);
+
+    function runRandom(): void {
+        setError(null);
+        setNote(null);
+        setSkipped(null);
+        startTransition(async () => {
+            const answer = await actions.runRandomAction(installedAppId);
+            if (!answer.view) {
+                setError(answer.error ?? t("events.errors.start"));
+                return;
+            }
+            accept(answer.view, false);
+            setSkipped(answer.skipped ?? []);
+            if (answer.picked) setNote(t("events.drawnNow", { name: answer.picked }));
+            else setError(t("events.noneCanStart"));
         });
     }
 
@@ -769,22 +837,43 @@ export function MinecraftEvents({
                             ))}
                         </ol>
                     )}
-                    {!view?.run &&
-                        view &&
-                        (view.nextRandomAt || view.waiting) &&
-                        settings?.random.enabled && (
-                            <p className="text-xs text-muted-foreground">
-                                {view.waiting
-                                    ? t("events.nextDue", {
-                                          reason: lowerFirst(schemaText(view.waiting) ?? "")
-                                      })
-                                    : view.nextRandomAt
-                                      ? t("events.nextFrom", {
-                                            date: display.dateTime(view.nextRandomAt)
-                                        })
-                                      : null}
-                            </p>
-                        )}
+                    {view && settings?.random.enabled && (
+                        <DrawStatus
+                            view={view}
+                            now={now}
+                            t={t}
+                            schemaText={schemaText}
+                            dateTime={(at) => display.dateTime(at)}
+                        />
+                    )}
+                    {view && !view.run && canManage && settings && settings.random.pool.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                            <div>
+                                <ui.Button
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={pending || dirty}
+                                    title={dirty ? t("events.saveFirst") : undefined}
+                                    onClick={runRandom}
+                                >
+                                    <Dices className="size-4" />
+                                    {t("events.runRandom")}
+                                </ui.Button>
+                            </div>
+                            {skipped && skipped.length > 0 && (
+                                <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                                    {skipped.map((one) => (
+                                        <li key={one.name} className="min-w-0 truncate" title={schemaText(one.reason) ?? ""}>
+                                            {t("events.skippedOne", {
+                                                name: one.name,
+                                                reason: lowerFirst(schemaText(one.reason) ?? "")
+                                            })}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
                 </ui.CardBody>
             </ui.Card>
 
@@ -1104,7 +1193,24 @@ export function MinecraftEvents({
                                             days={settings.random.days}
                                             onChange={(days) => changeRandom({ days })}
                                         />
+                                        <label className="flex items-center gap-3 text-sm">
+                                            <ui.Switch
+                                                checked={settings.random.from === settings.random.to}
+                                                disabled={locked}
+                                                aria-label={t("events.anyTimeOfDay")}
+                                                onChange={(on) =>
+                                                    changeRandom(
+                                                        on
+                                                            ? { from: "00:00", to: "00:00" }
+                                                            : { from: "18:00", to: "23:00" }
+                                                    )
+                                                }
+                                            />
+                                            {t("events.anyTimeOfDay")}
+                                        </label>
                                         <div className="grid gap-3 sm:grid-cols-4">
+                                            {settings.random.from !== settings.random.to && (
+                                            <>
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
                                                     {t("events.from")}
@@ -1131,6 +1237,8 @@ export function MinecraftEvents({
                                                     }
                                                 />
                                             </label>
+                                            </>
+                                            )}
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
                                                     {t("events.timeBetweenEventsAtLeast")}
@@ -1177,9 +1285,40 @@ export function MinecraftEvents({
                                             </label>
                                         </div>
                                         <div className="flex flex-col gap-1">
-                                            <p className="text-sm font-medium">
-                                                {t("events.drawnFrom")}
-                                            </p>
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <p className="text-sm font-medium">
+                                                    {t("events.drawnFrom")}
+                                                </p>
+                                                <div className="flex gap-2">
+                                                    <ui.Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={locked}
+                                                        onClick={() =>
+                                                            changeRandom({
+                                                                pool: presets
+                                                                    .filter((one) => one.enabled)
+                                                                    .map(
+                                                                        (one) =>
+                                                                            settings.random.pool.find(
+                                                                                (entry) => entry.presetId === one.id
+                                                                            ) ?? { presetId: one.id, weight: 1 }
+                                                                    )
+                                                            })
+                                                        }
+                                                    >
+                                                        {t("events.drawAll")}
+                                                    </ui.Button>
+                                                    <ui.Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={locked || settings.random.pool.length === 0}
+                                                        onClick={() => changeRandom({ pool: [] })}
+                                                    >
+                                                        {t("events.drawNone")}
+                                                    </ui.Button>
+                                                </div>
+                                            </div>
                                             {presets.map((preset) => {
                                                 const entry = settings.random.pool.find(
                                                     (one) => one.presetId === preset.id

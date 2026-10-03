@@ -578,8 +578,10 @@ export const randomSchema = z
     .object({
         enabled: z.boolean().default(false),
         days: daysSchema.default([]),
-        from: z.string().regex(TIME, problem("timeFormat")).default("18:00"),
-        to: z.string().regex(TIME, problem("timeFormat")).default("23:00"),
+        /** The same time in both is any time of day, which is the default: each
+         *  event's own conditions decide whether now suits it. */
+        from: z.string().regex(TIME, problem("timeFormat")).default("00:00"),
+        to: z.string().regex(TIME, problem("timeFormat")).default("00:00"),
         minGap: z
             .number()
             .int()

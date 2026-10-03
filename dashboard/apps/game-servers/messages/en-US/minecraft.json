@@ -1543,7 +1543,7 @@
         "events": "Events",
         "addAnEvent": "Add an event",
         "noEventsYetAddOne": "No events yet. Add one above.",
-        "saveFirst": "Save first",
+        "saveFirst": "Save your changes first",
         "theSwitchLetsAnEvent": "The switch lets an event be scheduled or drawn at random. Run starts it now, whoever is playing.",
         "automaticEvents": "Automatic events",
         "anAutomaticEventOnlyStarts": "An automatic event only starts while enough players are actually playing - somebody who has not moved or turned for a while does not count.",
@@ -1922,7 +1922,9 @@
             "anotherOn": "Another event is on",
             "busyNow": "Waiting: {reason}",
             "players": "{overworld, select, yes {{needed, plural, one {Waiting for # active player in the Overworld ({have} now)} other {Waiting for # active players in the Overworld ({have} now)}}} other {{needed, plural, one {Waiting for # active player ({have} now)} other {Waiting for # active players ({have} now)}}}}",
-            "couldNotStart": "The drawn event could not start"
+            "couldNotStart": "The drawn event could not start",
+            "settling": "Ready - starting after one more check",
+            "serverDown": "The server is not answering"
         },
         "prizes": {
             "entry": "{place} {reward}",
@@ -1930,7 +1932,25 @@
             "everybody": "Everybody: {reward}",
             "none": "No prizes",
             "trophy": "Trophy"
-        }
+        },
+        "skipped": {
+            "switchedOff": "Switched off",
+            "sameAsLast": "Same kind as the last one",
+            "emptyPool": "No events are in the draw"
+        },
+        "runRandom": "Run a random event",
+        "drawnNow": "Drawn: {name} is starting.",
+        "noneCanStart": "No event in the draw can start now.",
+        "skippedOne": "{name}: {reason}",
+        "nextIn": "Next drawn event in {time}.",
+        "drawArming": "The draw starts counting on its next check.",
+        "lastDrawn": "Last drawn: {name}, {date}.",
+        "noneDrawnYet": "No drawn event among the last ones kept.",
+        "drawChecked": "Draw checked {time} ago.",
+        "drawNotChecked": "Draw not checked since Polaris started.",
+        "anyTimeOfDay": "Any time of day",
+        "drawAll": "All",
+        "drawNone": "None"
     },
     "editor": {
         "where": "Where",
