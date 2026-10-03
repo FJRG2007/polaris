@@ -21,6 +21,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+    AlarmClock,
     CalendarCheck,
     ChevronLeft,
     ChevronRight,
@@ -621,6 +622,28 @@ export function CalendarScreen({ path }: { path: string[] }) {
             alarms: model.defaultAlarmMinutes(start.allDay, calendar, preferences)
         });
     };
+
+    // `/calendar/new/<when>`: the Time area's meeting planner handing over a
+    // time. Opened once, when the calendars and settings it needs are here.
+    const newAtOpened = useRef(false);
+    useEffect(() => {
+        const at = route.newAt;
+        if (!at || newAtOpened.current || !calendars || !preferencesRead.data) return;
+        newAtOpened.current = true;
+        const finish = new Date(at.getTime() + newEventMinutes(preferences) * 60_000);
+        setAnchor(time.todayIn(zone, at));
+        setEditor({
+            kind: "new",
+            form: newFormFor(
+                { at, day: time.todayIn(zone, at), allDay: false },
+                { at: finish, day: time.todayIn(zone, finish), allDay: false },
+                "",
+                defaultCalendarId(calendars, preferences)
+            )
+        });
+        // Reading `newFormFor` and the settings at the moment the data lands is
+        // the point; later changes must not open a second editor.
+    }, [route.newAt, calendars, preferencesRead.data]);
 
     const startCreate = (start: GridMoment, end: GridMoment, anchorRect: DOMRect | null) => {
         const calendarId = defaultCalendarId(calendars ?? [], preferences);
@@ -1419,6 +1442,15 @@ export function CalendarScreen({ path }: { path: string[] }) {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <Button asChild size="icon-sm" variant="ghost">
+                        <Link
+                            href="/calendar/time"
+                            aria-label={t("header.time")}
+                            title={t("header.time")}
+                        >
+                            <AlarmClock />
+                        </Link>
+                    </Button>
                     <Button asChild size="icon-sm" variant="ghost">
                         <Link
                             href="/calendar/settings"

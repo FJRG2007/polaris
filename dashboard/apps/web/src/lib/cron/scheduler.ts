@@ -28,6 +28,10 @@ const TICK_MS = Number(process.env.POLARIS_CRON_TICK_MS) || 60_000;
 /** The shortest that shorter interval may be, whatever a job asks for. */
 const QUICK_TICK_FLOOR_MS = 1_000;
 
+/** The longest the shorter interval is, so a job that asks for less than a tick
+ *  is looked at that often even when none of Polaris' own does. */
+const APP_QUICK_MS = 15_000;
+
 /** Long enough that boot is over. The first pass on a fresh instance can be the
  *  heaviest one it ever runs - everything is overdue at once - and competing with
  *  the rest of startup for it helps nobody. */
@@ -65,7 +69,12 @@ const STUCK_AFTER_MS = 30 * 60 * 1000;
  * job due every tick was only ever due on every other one, and a minute-grained
  * schedule quietly ran every two.
  */
-export function due(everyMs: number, last: number | undefined, now: number, tickMs: number): boolean {
+export function due(
+    everyMs: number,
+    last: number | undefined,
+    now: number,
+    tickMs: number
+): boolean {
     return last === undefined || now - last >= everyMs - tickMs / 2;
 }
 
@@ -90,7 +99,9 @@ async function run(job: ScheduledJob): Promise<unknown> {
     const now = Date.now();
     if (since !== undefined && now - since < STUCK_AFTER_MS) return null;
     if (since !== undefined) {
-        console.error(`polaris: the ${job.key} pass has been running for ${Math.round((now - since) / 60_000)}m; starting another`);
+        console.error(
+            `polaris: the ${job.key} pass has been running for ${Math.round((now - since) / 60_000)}m; starting another`
+        );
     }
     startedAt.set(job.key, now);
     try {
@@ -145,11 +156,15 @@ export function startScheduledWork(): void {
     setTimeout(tick, FIRST_PASS_MS).unref?.();
     setInterval(tick, TICK_MS).unref?.();
 
-    // Only Polaris' own jobs run quicker than a tick; an app's are a minute or more.
-    const quick = SCHEDULED_JOBS.filter((job) => job.everyMs < TICK_MS);
-    if (quick.length === 0) return;
-    const quickMs = Math.max(QUICK_TICK_FLOOR_MS, Math.min(...quick.map((job) => job.everyMs)));
-    const quickTick = ticker(() => quick, quickMs);
+    // The jobs that ask for less than a tick - Polaris' own and an installed
+    // app's, read on every quick tick for the same reason as above: an app's
+    // arrive with its code, after this has started. The quick interval is the
+    // shortest of Polaris' own, and never longer than `APP_QUICK_MS`, so an
+    // app's job (Calendar ringing alarms and timers) is never waited on for
+    // more than that.
+    const own = SCHEDULED_JOBS.filter((job) => job.everyMs < TICK_MS).map((job) => job.everyMs);
+    const quickMs = Math.max(QUICK_TICK_FLOOR_MS, Math.min(APP_QUICK_MS, ...own));
+    const quickTick = ticker(() => scheduledJobs().filter((job) => job.everyMs < TICK_MS), quickMs);
     setTimeout(() => {
         quickTick();
         setInterval(quickTick, quickMs).unref?.();

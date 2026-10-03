@@ -29,6 +29,7 @@ import {
     visibleGameTabs
 } from "@/app/(app)/apps/installed/[id]/tabs";
 import { runAction } from "@/lib/run-action";
+import { soundGain } from "@/lib/notification-sound";
 import { GameLogo } from "@/components/game-logo";
 import { relativeTime } from "@/lib/relative-time";
 import { IntegrationLogo } from "@/components/logos";
@@ -120,6 +121,7 @@ export const clientHost = {
     logViewer: { LogViewer },
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },
+    notificationSound: { soundGain },
     qrCode: { QRCodeSVG },
     metricsHistory: { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS },
     relativeTime: { RelativeTime, relativeTime },

@@ -6,7 +6,8 @@
     "description": "Calendar: Polaris's own calendars and the ones people link from Google, Microsoft and CalDAV, with invitations and booking pages. An installable Polaris app.",
     "polaris": {
         "id": "calendar",
-        "extension": "src/lib/calendar-extension.ts#calendarExtension"
+        "extension": "src/lib/calendar-extension.ts#calendarExtension",
+        "slot": "src/screens/extension-slot.tsx#CalendarSlot"
     },
     "dependencies": {
         "@fullcalendar/core": "6.1.21",

@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { DEFAULT_POMODORO, pomodoroConfigSchema } from "./clock/model";
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
@@ -23,6 +24,9 @@ const dayHours = z
 
 export const VIEWS = ["day", "week", "month", "year", "list", "days"] as const;
 export type CalendarViewName = (typeof VIEWS)[number];
+
+/** How many cities the world clock keeps. */
+export const WORLD_CLOCK_MAX = 24;
 
 export const SLOT_MINUTES = [5, 10, 15, 20, 30, 60] as const;
 
@@ -44,8 +48,10 @@ const fields = {
     timezone: zone,
     /** A second zone drawn beside the hours in day and week views. */
     secondaryTimezone: zone.nullable(),
-    /** Zones listed as clocks in the sidebar. */
-    worldClock: z.array(zone).max(8),
+    /** The world clock's cities, as zones: the sidebar's clocks, the Time
+     *  area's list and its meeting planner, and the comparison under an event's
+     *  times. */
+    worldClock: z.array(zone).max(WORLD_CLOCK_MAX),
     /** Length of a new event, in minutes. */
     defaultDuration: z
         .number()
@@ -76,7 +82,9 @@ const fields = {
     /** Sidebar sections folded away. */
     collapsed: z.array(z.string().max(40)).max(20),
     /** First-use hints somebody closed, so they stay closed. */
-    dismissedHints: z.array(z.enum(["link-accounts"])).max(10)
+    dismissedHints: z.array(z.enum(["link-accounts"])).max(10),
+    /** The lengths a new focus cycle starts with in the Time area. */
+    pomodoro: pomodoroConfigSchema
 };
 
 type Fields = typeof fields;
@@ -108,7 +116,8 @@ export const DEFAULT_PREFERENCES: CalendarPreferences = {
     defaultCalendarId: null,
     invitationCalendarId: null,
     collapsed: [],
-    dismissedHints: []
+    dismissedHints: [],
+    pomodoro: DEFAULT_POMODORO
 };
 
 /** A change from the settings screen: any subset of the fields, each strict,

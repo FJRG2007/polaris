@@ -237,6 +237,18 @@
             "voice": "Voz",
             "attachment": "Adjunto",
             "saidIn": "{author} en {channel}"
+        },
+        "actions": "Acciones",
+        "clock": {
+            "timer": "Iniciar un temporizador de {length}",
+            "alarm": "Poner una alarma a las {time}",
+            "stopwatch": "Iniciar el cronómetro",
+            "labelled": "{action}: {label}",
+            "hours": "{count} h",
+            "minutes": "{count} min",
+            "seconds": "{count} s",
+            "done": "Iniciado en Hora de Calendario",
+            "failed": "No se pudo iniciar. Prueba otra vez."
         }
     },
     "editor": {

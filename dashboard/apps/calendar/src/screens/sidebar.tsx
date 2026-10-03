@@ -10,6 +10,7 @@
  */
 
 import {
+    AlarmClock,
     AlertTriangle,
     ArrowDown,
     ArrowUp,
@@ -205,6 +206,13 @@ export function Sidebar({
                     </Button>
                 </AddCalendarMenu>
             </div>
+
+            <Button asChild size="sm" variant="ghost" className="-mt-2 w-full justify-start">
+                <Link href="/calendar/time">
+                    <AlarmClock />
+                    <span className="min-w-0 flex-1 truncate text-left">{t("sidebar.time")}</span>
+                </Link>
+            </Button>
 
             {calendarsError && !calendars ? (
                 <div role="alert" className="flex flex-col items-start gap-2 text-xs">

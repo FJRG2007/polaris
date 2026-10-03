@@ -358,6 +358,28 @@ export async function installedPanelSlot(install: ExtensionInstall): Promise<App
     return null;
 }
 
+/**
+ * What the apps this person reaches draw in every screen's header. `appIds` are
+ * the apps the frame already resolved for them - installed, and allowed - so
+ * this asks nothing of the database.
+ */
+export function headerSlots(appIds: readonly string[]): AppSlot[] {
+    const slots: AppSlot[] = [];
+    for (const extension of extensions()) {
+        if (!extension.headerSlot || !appIds.includes(extension.id)) continue;
+        try {
+            const slot = extension.headerSlot();
+            if (slot) slots.push(withBundleSlot(slot));
+        } catch (caught) {
+            console.error(
+                `polaris: ${extension.id} could not say what it draws in the header:`,
+                caught
+            );
+        }
+    }
+    return slots;
+}
+
 /** Whether any installed app keeps sanctions its servers put on players, which
  *  is whether Account standing has a section for them at all. */
 export async function offersGameSanctions(): Promise<boolean> {

@@ -261,7 +261,8 @@
         "today": "Today",
         "todayHint": "Go to today",
         "trash": "Trash",
-        "view": "View"
+        "view": "View",
+        "time": "Alarms, timers and world clock"
     },
     "legend": {
         "busyOnly": "Only the time is shared with you",
@@ -603,7 +604,8 @@
         "toggleFailed": "The calendar was not shown or hidden",
         "unmute": "Unmute reminders",
         "unscheduled": "Tasks without a date",
-        "worldClock": "World clock"
+        "worldClock": "World clock",
+        "time": "Time"
     },
     "tasksPanel": {
         "scheduleFailed": "The task was not given a date",

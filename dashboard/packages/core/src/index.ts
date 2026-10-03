@@ -47,6 +47,7 @@ export * from "./dmarc.js";
 export * from "./deploy-references.js";
 export * from "./env-values.js";
 export * from "./cron.js";
+export * from "./clock-commands.js";
 export * from "./scaling.js";
 export * from "./sleep.js";
 export * from "./service-templates.js";

@@ -1,0 +1,188 @@
+{
+    "time": {
+        "title": "Hora",
+        "description": "Alarmas, temporizadores, cronómetro y reloj mundial. Suenan aquí y donde lleguen tus avisos.",
+        "tabs": {
+            "label": "Herramientas",
+            "alarms": "Alarmas",
+            "timers": "Temporizadores",
+            "stopwatch": "Cronómetro",
+            "world": "Reloj mundial"
+        },
+        "loadFailed": "No se pudieron leer tus alarmas y temporizadores.",
+        "label": "Nombre",
+        "labelTooLong": "El nombre puede tener hasta {max} caracteres.",
+        "sound": "Sonido",
+        "preview": "Escuchar",
+        "sounds": {
+            "chime": "Carillón",
+            "bell": "Campana",
+            "beep": "Pitido",
+            "digital": "Digital",
+            "gentle": "Suave"
+        },
+        "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+        "minutesShort": "{count} min",
+        "start": "Iniciar",
+        "pause": "Pausar",
+        "resume": "Seguir",
+        "reset": "Reiniciar",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "edit": "Editar",
+        "delete": "Eliminar",
+        "more": "Más",
+        "length": {
+            "hours": "{hours} h {minutes} min",
+            "minutes": "{minutes} min",
+            "seconds": "{seconds} s"
+        },
+        "alarms": {
+            "add": "Nueva alarma",
+            "zone": "Suenan en hora de {zone}",
+            "emptyTitle": "Sin alarmas",
+            "emptyBody": "Pon una para que suene una vez o los días que elijas.",
+            "once": "Una vez",
+            "everyDay": "A diario",
+            "weekdays": "Laborables",
+            "weekends": "Fines de semana",
+            "ringsIn": "Suena en {length}",
+            "snoozedUntil": "Pospuesta hasta {time}",
+            "toggle": "Alarma de las {time}",
+            "editOne": "Editar la alarma de las {time}",
+            "skip": "Saltar la próxima",
+            "deleteTitle": "¿Eliminar esta alarma?",
+            "deleteBody": "La alarma de las {time} dejará de sonar para siempre.",
+            "newTitle": "Nueva alarma",
+            "editTitle": "Editar alarma",
+            "time": "Hora",
+            "repeat": "Repetir",
+            "nextOn": "próxima {when}",
+            "labelHint": "Despertar, Medicina",
+            "snooze": "Posponer"
+        },
+        "timers": {
+            "new": "Nuevo temporizador",
+            "hours": "Horas",
+            "minutesField": "Minutos",
+            "secondsField": "Segundos",
+            "tooLong": "Un temporizador puede durar hasta 99 horas, 59 minutos y 59 segundos.",
+            "presets": "Rápidos",
+            "startPreset": "Iniciar uno de {length}",
+            "recent": "Recientes",
+            "labelHint": "Pasta, Colada",
+            "full": "Tienes {max} temporizadores, el máximo. Elimina uno para añadir otro.",
+            "emptyTitle": "Sin temporizadores",
+            "emptyBody": "Inicia uno arriba. Sigue contando aunque cierres la pestaña o cambies de dispositivo.",
+            "untitled": "Temporizador de {length}",
+            "done": "Terminado",
+            "running": "En marcha",
+            "paused": "En pausa",
+            "ready": "Listo",
+            "restart": "Repetir",
+            "addMinute": "1 min",
+            "deleteTitle": "¿Eliminar este temporizador?",
+            "deleteBody": "Sigue contando. Se detendrá y no sonará."
+        },
+        "focus": {
+            "title": "Sesiones de foco",
+            "summary": "{focus} min de foco, descansos de {short} min y uno de {long} min cada {rounds} rondas.",
+            "settings": "Duraciones",
+            "focusMinutes": "Foco (min)",
+            "shortMinutes": "Pausa (min)",
+            "longMinutes": "Pausa larga",
+            "rounds": "Rondas",
+            "auto": "Empezar cada fase sola",
+            "start": "Empezar foco",
+            "skip": "Pasar a la siguiente fase",
+            "round": "Ronda {round} de {rounds}",
+            "phase": {
+                "focus": "Foco",
+                "short": "Pausa corta",
+                "long": "Pausa larga"
+            }
+        },
+        "stopwatch": {
+            "lap": "Vuelta",
+            "lapTime": "Vuelta",
+            "total": "Total",
+            "laps": "{count, plural, one {# vuelta} other {# vueltas}}",
+            "copy": "Copiar",
+            "export": "Exportar vueltas en CSV",
+            "copied": "Copiadas",
+            "copyFailed": "No se pudieron copiar las vueltas.",
+            "copyLine": "Vuelta {lap}: {time} ({total})",
+            "fileName": "vueltas",
+            "fastest": "La más rápida",
+            "slowest": "La más lenta",
+            "spaceKey": "Espacio",
+            "lapKey": "L",
+            "resetKey": "R"
+        },
+        "world": {
+            "here": "Tu hora",
+            "cities": "Ciudades",
+            "add": "Añadir ciudad",
+            "searchHint": "Ciudad, país o zona",
+            "emptyTitle": "Sin ciudades",
+            "emptyBody": "Añade los lugares con los que trabajas para ver su hora y planear reuniones entre ellos.",
+            "today": "Hoy",
+            "yesterday": "Ayer",
+            "tomorrow": "Mañana",
+            "sameTime": "misma hora",
+            "offsetHours": "{sign}{hours} h",
+            "offsetMinutes": "{sign}{minutes} min",
+            "offsetBoth": "{sign}{hours} h {minutes} min",
+            "clocksChange": "Cambio de hora el {when}",
+            "moveUp": "Subir",
+            "moveDown": "Bajar",
+            "remove": "Quitar"
+        },
+        "planner": {
+            "title": "Planificador",
+            "lead": "Elige una hora para verla en todas tus ciudades. Verde es horario laboral allí, ámbar despiertos sin trabajar, gris noche o fin de semana.",
+            "day": "Día",
+            "previousDay": "Día anterior",
+            "nextDay": "Día siguiente",
+            "you": "Tú",
+            "work": "Horario laboral",
+            "edge": "Despierto, libre",
+            "off": "Noche, fin de semana",
+            "createEvent": "Crear evento a esta hora"
+        },
+        "compare": {
+            "title": "En tu reloj mundial"
+        },
+        "indicator": {
+            "timer": "{name}: quedan {left}. Abrir temporizadores",
+            "stopwatch": "Cronómetro en {reading}. Abrir cronómetro"
+        },
+        "ring": {
+            "stop": "Parar",
+            "snooze": "Posponer {minutes} min",
+            "more": "{count, plural, one {Suena # más} other {Suenan # más}}"
+        },
+        "notify": {
+            "alarm": "Alarma",
+            "snoozed": "Alarma (pospuesta)",
+            "alarmBody": "Son las {time}.",
+            "timer": "Temporizador listo",
+            "timerBody": "Se acabó el tiempo.",
+            "phaseDone": {
+                "focus": "Fin del foco",
+                "short": "Fin de pausa",
+                "long": "Fin de pausa larga"
+            },
+            "nextBreak": "Pausa: {minutes} min.",
+            "nextFocus": "Siguiente foco: {minutes} min."
+        },
+        "errors": {
+            "gone": "Esa alarma o temporizador ya no existe. La lista se ha vuelto a leer.",
+            "changed": "Cambió en otro dispositivo. La lista se ha vuelto a leer; prueba otra vez.",
+            "tooManyAlarms": "Tienes 50 alarmas, el máximo. Elimina una para añadir otra.",
+            "tooManyTimers": "Tienes 30 temporizadores, el máximo. Elimina uno para añadir otro.",
+            "tooManyLaps": "El cronómetro guarda 500 vueltas como máximo. Reinícialo para empezar de nuevo.",
+            "notACommand": "Escríbelo como \"temporizador 10m\", \"alarma 7:30\" o \"cronómetro\"."
+        }
+    }
+}

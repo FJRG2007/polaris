@@ -352,6 +352,9 @@ model User {
     calendarBookingPages CalendarBookingPage[]
     calendarProposals    CalendarProposal[]
     calendarPreference   CalendarPreference?
+    clockAlarms          ClockAlarm[]
+    clockTimers          ClockTimer[]
+    clockStopwatch       ClockStopwatch?
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -12096,6 +12099,81 @@ model CalendarPreference {
     userId    String   @id @db.Uuid
     value     String   @default("{}")
     updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// An alarm in Calendar's Time area: a wall time that rings in one zone, once
+/// or on chosen weekdays.
+///
+/// Only the next ring is stored (`nextFireAt`), so the scheduler finds what is
+/// due with one indexed read; ringing works out the one after. Null while the
+/// alarm is off.
+model ClockAlarm {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    userId        String    @db.Uuid
+    /// "HH:mm", read in `zone`.
+    time          String
+    /// Weekdays it repeats on, a bit per day (Sunday = 1 .. Saturday = 64);
+    /// 0 rings once and then turns itself off.
+    days          Int       @default(0)
+    label         String    @default("")
+    sound         String    @default("chime")
+    snoozeMinutes Int       @default(10)
+    enabled       Boolean   @default(true)
+    /// The IANA zone the time is read in: the owner's when it was saved.
+    zone          String
+    nextFireAt    DateTime?
+    /// The next ring is a snooze rather than the alarm's own time.
+    snoozed       Boolean   @default(false)
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([nextFireAt])
+}
+
+/// A countdown in Calendar's Time area. Running, it stores when it ends rather
+/// than what is left, so it keeps running across reloads and devices and the
+/// server can ring it with every tab closed.
+///
+/// One of three states at a time: running (`endsAt`), paused (`remainingMs`),
+/// or rung (`firedAt`, when it reached zero) - or none of them, set and not
+/// started.
+model ClockTimer {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    userId      String    @db.Uuid
+    label       String    @default("")
+    durationMs  Int
+    sound       String    @default("chime")
+    endsAt      DateTime?
+    remainingMs Int?
+    firedAt     DateTime?
+    /// A focus (Pomodoro) cycle: its lengths and where in the cycle it is, as
+    /// JSON. Null for a plain timer.
+    pomodoro    String?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([endsAt])
+}
+
+/// The stopwatch in Calendar's Time area, one per person, kept on the server so
+/// it reads the same on every device.
+model ClockStopwatch {
+    userId    String    @id @db.Uuid
+    /// Running since; null while stopped.
+    startedAt DateTime?
+    /// Time counted before `startedAt`.
+    elapsedMs Float     @default(0)
+    /// Each lap's total at the moment it was taken, in milliseconds, as JSON.
+    laps      String    @default("[]")
+    updatedAt DateTime  @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

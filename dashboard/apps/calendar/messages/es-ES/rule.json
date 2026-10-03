@@ -15,6 +15,11 @@
         "onDay": "El mismo día {one, select, yes {a la} other {a las}} {at}",
         "weeks": "{n, plural, one {# semana} other {# semanas}}"
     },
+    "dayKind": {
+        "day": "día",
+        "weekday": "laborable",
+        "weekend": "fin de semana"
+    },
     "every": {
         "daily": "{interval, plural, one {Cada día} other {Cada # días}}",
         "hourly": "{interval, plural, one {Cada hora} other {Cada # horas}}",

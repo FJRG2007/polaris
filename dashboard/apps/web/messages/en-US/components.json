@@ -237,6 +237,18 @@
             "voice": "Voice",
             "attachment": "Attachment",
             "saidIn": "{author} in {channel}"
+        },
+        "actions": "Actions",
+        "clock": {
+            "timer": "Start a {length} timer",
+            "alarm": "Set an alarm for {time}",
+            "stopwatch": "Start the stopwatch",
+            "labelled": "{action}: {label}",
+            "hours": "{count} h",
+            "minutes": "{count} min",
+            "seconds": "{count} s",
+            "done": "Started in Calendar's Time area",
+            "failed": "That could not be started. Try again."
         }
     },
     "editor": {
