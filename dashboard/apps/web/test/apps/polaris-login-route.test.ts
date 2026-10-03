@@ -93,8 +93,10 @@ const noted = vi.hoisted(
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
     playerAccessRules: vi.fn(async () => rules.value),
     noteRefusal: vi.fn(
-        async (installedAppId: string, refusal: { player: string; address: string | null; why: string }) =>
-            void noted.push({ installedAppId, ...refusal })
+        async (
+            installedAppId: string,
+            refusal: { player: string; address: string | null; why: string }
+        ) => void noted.push({ installedAppId, ...refusal })
     )
 }));
 
@@ -124,7 +126,9 @@ const switchedOn = [
 const env = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("@/lib/env-var-service", () => ({ listEnvVars: env.list, setEnvVars: vi.fn() }));
 
-const route = await import("@polaris-app/game-servers/src/routes/api/minecraft/login/[id]/[action]/route");
+const route = await import(
+    "@polaris-app/game-servers/src/routes/api/minecraft/login/[id]/[action]/route"
+);
 const arrivals = await import("@polaris-app/game-servers/src/lib/minecraft/login-arrivals");
 /** Every player the route said was let in, as whatever shows them things hears it. */
 const arrived: string[] = [];

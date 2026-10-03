@@ -32,7 +32,7 @@ describe("narrowedTarget", () => {
     });
 
     it("keeps a selector's brackets whole", () => {
-        expect(prelogin.narrowedTarget("@a[nbt={Inventory:[{id:\"a\"}]}]")).toBe(
+        expect(prelogin.narrowedTarget('@a[nbt={Inventory:[{id:"a"}]}]')).toBe(
             `@a[nbt={Inventory:[{id:"a"}]},${IN}]`
         );
     });
@@ -60,7 +60,9 @@ describe("hiddenFromPending", () => {
         expect(hidden('tellraw ana {"text":"hi"}')).toBe(
             `execute as ana if entity @s[${IN}] run tellraw @s {"text":"hi"}`
         );
-        expect(hidden("title Ana clear")).toBe(`execute as Ana if entity @s[${IN}] run title @s clear`);
+        expect(hidden("title Ana clear")).toBe(
+            `execute as Ana if entity @s[${IN}] run title @s clear`
+        );
         expect(hidden('tellraw .Bedrock_1 {"text":"hi"}')).toBe(
             `execute as .Bedrock_1 if entity @s[${IN}] run tellraw @s {"text":"hi"}`
         );
@@ -77,12 +79,16 @@ describe("hiddenFromPending", () => {
             `playsound minecraft:ui.toast.in master @a[${IN}] ~ ~ ~ 1 1`
         );
         expect(
-            hidden("execute as @a at @s run playsound minecraft:entity.generic.explode master @s ~ ~ ~ 0.8 0.6")
+            hidden(
+                "execute as @a at @s run playsound minecraft:entity.generic.explode master @s ~ ~ ~ 0.8 0.6"
+            )
         ).toBe(
             `execute as @a[${IN}] at @s run playsound minecraft:entity.generic.explode master @s ~ ~ ~ 0.8 0.6`
         );
         expect(
-            hidden("execute as Ana at @s run playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1")
+            hidden(
+                "execute as Ana at @s run playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1"
+            )
         ).toBe(
             `execute as Ana if entity @s[${IN}] at @s run playsound minecraft:ui.toast.challenge_complete master @s ~ ~ ~ 1 1`
         );
@@ -94,7 +100,7 @@ describe("hiddenFromPending", () => {
     it("narrows each selector execute names on the way to a showing command", () => {
         expect(
             hidden(
-                "execute in minecraft:overworld positioned 1 64 2 as @a[distance=..48] run title @s actionbar {\"text\":\"x\"}"
+                'execute in minecraft:overworld positioned 1 64 2 as @a[distance=..48] run title @s actionbar {"text":"x"}'
             )
         ).toBe(
             `execute in minecraft:overworld positioned 1 64 2 as @a[distance=..48,${IN}] run title @s actionbar {"text":"x"}`
@@ -153,7 +159,9 @@ describe("hiddenFromPending", () => {
     });
 
     it("covers what Polaris actually sends: challenges, events, broadcasts, the chat relay", () => {
-        expect(hidden(events.sound("minecraft:block.bell.use"))).toContain(`execute as @a[${IN}] at @s`);
+        expect(hidden(events.sound("minecraft:block.bell.use"))).toContain(
+            `execute as @a[${IN}] at @s`
+        );
         expect(hidden(challenges.actionBar("Ana", "&aDone"))).toContain(
             `execute as Ana if entity @s[${IN}] run title @s actionbar`
         );
@@ -163,9 +171,9 @@ describe("hiddenFromPending", () => {
         expect(hidden(events.say("&eAn event starts"))).toContain(`tellraw @a[${IN}] `);
         for (const line of events.titleCommands("Event", "Starts now"))
             expect(hidden(line)).toContain(`title @a[${IN}] `);
-        expect(prelogin.hiddenFromPendingArgv(broadcastArgv("java", "Restart in 5 minutes"))[0]).toMatch(
-            new RegExp(`^tellraw @a\\[${IN}\\] `)
-        );
+        expect(
+            prelogin.hiddenFromPendingArgv(broadcastArgv("java", "Restart in 5 minutes"))[0]
+        ).toMatch(new RegExp(`^tellraw @a\\[${IN}\\] `));
         const relayed = relayLine("@a", {
             author: "Ana",
             conversation: "general",
@@ -198,8 +206,7 @@ describe("who is still at the prompt", () => {
     });
 
     it("reads the names out of answers the game runs together", () => {
-        const said =
-            "Ana has the following entity data: 0Ben has the following entity data: 12";
+        const said = "Ana has the following entity data: 0Ben has the following entity data: 12";
         expect(prelogin.pendingNames(said, ["Ana", "Ben", "Cleo"]).sort()).toEqual(["Ana", "Ben"]);
     });
 

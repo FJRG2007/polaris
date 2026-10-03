@@ -146,7 +146,8 @@ export function hiddenFromPending(line: string): string {
                 if (narrowed !== text) replacements.push({ word, text: narrowed });
             } else if (AIMING.has(previous) && PLAYER_NAME.test(text)) {
                 const guard = previous === "as" ? AS_IN : AT_IN;
-                if (!guarded(line, word.end, guard)) replacements.push({ word, text: `${text} ${guard}` });
+                if (!guarded(line, word.end, guard))
+                    replacements.push({ word, text: `${text} ${guard}` });
             }
             previous = text;
         }
@@ -168,7 +169,10 @@ export function hiddenFromPending(line: string): string {
         const text = line.slice(word.start, word.end);
         if (PLAYER_NAME.test(text)) {
             const before = { start: verbWord.start, end: verbWord.start };
-            replacements.push({ word: before, text: `execute as ${text} ${AS_IN} run ` }, { word, text: "@s" });
+            replacements.push(
+                { word: before, text: `execute as ${text} ${AS_IN} run ` },
+                { word, text: "@s" }
+            );
         } else {
             const narrowed = narrowedTarget(text);
             if (narrowed !== text) replacements.push({ word, text: narrowed });
@@ -202,10 +206,9 @@ export function pendingNames(output: string, roster: readonly string[]): string[
 
 /** Who is online as the players see it: the ones still at the login prompt
  *  left out, by name in any case. */
-export function withoutPending<T extends { readonly online: number; readonly players: readonly string[] }>(
-    list: T,
-    pending: readonly string[]
-): T {
+export function withoutPending<
+    T extends { readonly online: number; readonly players: readonly string[] }
+>(list: T, pending: readonly string[]): T {
     if (pending.length === 0) return list;
     const held = new Set(pending.map((name) => name.toLowerCase()));
     const players = list.players.filter((name) => !held.has(name.toLowerCase()));

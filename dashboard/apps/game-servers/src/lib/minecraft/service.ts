@@ -28,7 +28,13 @@ import { readContainerFile } from "../container-files";
 import { gameOfServer, withTimeout } from "@polaris/core";
 import { readsPlayerList, readsServer } from "./text-vars";
 import { sayEachReplies, sayEachScript } from "./say-each";
-import { hiddenFromPending, hiddenFromPendingArgv, PENDING_READ, pendingNames, withoutPending } from "./prelogin";
+import {
+    hiddenFromPending,
+    hiddenFromPendingArgv,
+    PENDING_READ,
+    pendingNames,
+    withoutPending
+} from "./prelogin";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
 import { readCrashLoop, readRestartWatch } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
@@ -708,8 +714,7 @@ async function sendGameLines(
     install: MinecraftInstall,
     given: readonly string[]
 ): Promise<void> {
-    const lines =
-        install.edition === "java" ? given.map((line) => hiddenFromPending(line)) : given;
+    const lines = install.edition === "java" ? given.map((line) => hiddenFromPending(line)) : given;
     for (const line of lines) assertSafeCommand([line]);
     if (install.edition !== "java") {
         for (const line of lines) await sendGameCommand(ports, install, [line]);
