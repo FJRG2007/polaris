@@ -38,6 +38,9 @@ export function FavoriteAppsProvider({
     // The list as of the latest change, read synchronously by the next one: two
     // clicks in one frame must each start from what the other left.
     const latest = useRef<readonly string[]>(initial);
+    // The list the server last accepted: a failed save returns here, never to an
+    // optimistic list that was not saved either.
+    const confirmed = useRef<readonly string[]>(initial);
 
     // A server render that brings a different list (another device saved one)
     // replaces this one.
@@ -45,6 +48,7 @@ export function FavoriteAppsProvider({
     useEffect(() => {
         const next = initialKey ? initialKey.split("\n") : [];
         latest.current = next;
+        confirmed.current = next;
         setFavorites(next);
     }, [initialKey]);
 
@@ -55,17 +59,17 @@ export function FavoriteAppsProvider({
             latest.current = next;
             setFavorites(next);
             // Only undone while nothing newer has replaced it: a later change the
-            // reader made since is theirs and stays.
+            // reader made since is theirs, is saved whole, and reports for itself.
             const rollback = (message: string) => {
-                if (sameOrder(latest.current, next)) {
-                    latest.current = previous;
-                    setFavorites(previous);
-                }
+                if (!sameOrder(latest.current, next)) return;
+                latest.current = confirmed.current;
+                setFavorites(confirmed.current);
                 toast.show({ title: message });
             };
             void saveFavoriteAppsAction([...next])
                 .then((answer) => {
                     if (answer.error) rollback(answer.error);
+                    else confirmed.current = next;
                 })
                 .catch(() => rollback(t("switcher.saveFailed")));
         },

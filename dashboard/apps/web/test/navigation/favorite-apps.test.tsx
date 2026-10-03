@@ -4,8 +4,8 @@
  * The favorites store and the Overview rail that reads it.
  *
  * What is asserted: a change is drawn before the server answers and taken back,
- * with the reason, when it refuses; a later change is not undone by an earlier
- * one failing; an order that did not change sends nothing; and the Overview's
+ * with the reason, when it refuses, back to the last list the server accepted; a
+ * later change is not undone by an earlier one failing; an order that did not change sends nothing; and the Overview's
  * rail lists only the favorites, in their order, with a way to the rest - in
  * both languages.
  */
@@ -95,6 +95,20 @@ describe("the favorites store", () => {
         expect(store.shown()).toBe("mail,chat,drive");
         await act(async () => fail(new Error("offline")));
         expect(store.shown()).toBe("mail,chat,drive");
+        expect(show).not.toHaveBeenCalled();
+    });
+
+    it("returns to the last saved list when every newer save fails too", async () => {
+        const fails: Array<(reason: unknown) => void> = [];
+        save.mockImplementation(() => new Promise((_, reject) => fails.push(reject)));
+        const store = mount(["mail"]);
+        act(() => store.get().toggle("chat"));
+        act(() => store.get().toggle("drive"));
+        await act(async () => fails[0](new Error("offline")));
+        expect(store.shown()).toBe("mail,chat,drive");
+        await act(async () => fails[1](new Error("offline")));
+        expect(store.shown()).toBe("mail");
+        expect(show).toHaveBeenCalledTimes(1);
         expect(show).toHaveBeenCalledWith({
             title: "Your favorites could not be saved. Try again in a moment."
         });

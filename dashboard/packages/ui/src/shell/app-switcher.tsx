@@ -324,7 +324,7 @@ export function AppSwitcher({
         if (event.key === "Tab") {
             const stops = [
                 ...root.querySelectorAll<HTMLElement>(`[${TILE}]:not([data-disabled]), [${STAR}]`)
-            ];
+            ].filter((stop) => stop === target || getComputedStyle(stop).display !== "none");
             const at = stops.indexOf(target);
             const next = stops[at + (event.shiftKey ? -1 : 1)];
             event.preventDefault();

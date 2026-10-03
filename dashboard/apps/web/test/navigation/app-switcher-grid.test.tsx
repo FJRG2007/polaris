@@ -182,6 +182,26 @@ describe("walking the app switcher with the keyboard", () => {
         expect(document.activeElement).toBe(tile("chat"));
     });
 
+    it("skips a star that is not drawn, so tab never stalls on a tile", async () => {
+        const user = userEvent.setup();
+        render(
+            <AppSwitcher
+                apps={APPS}
+                currentAppId="drive"
+                sections={[{ key: "all", label: "", ids: ["drive", "chat", "games"] }]}
+                onTogglePin={() => undefined}
+            />
+        );
+        await openMenu(user, /drive/i);
+        for (const star of document.querySelectorAll<HTMLElement>('[aria-label$="to favorites"]')) {
+            star.style.display = "none";
+        }
+        await user.keyboard("{ArrowDown}");
+        expect(document.activeElement).toBe(tile("drive"));
+        await user.keyboard("{Tab}");
+        expect(document.activeElement).toBe(tile("chat"));
+    });
+
     it("goes on to the options under the grid from the last row and the last tab stop", async () => {
         const user = userEvent.setup();
         render(
