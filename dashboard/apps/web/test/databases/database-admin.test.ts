@@ -64,6 +64,7 @@ vi.mock("@/lib/database-ops/ops", async (original) => {
     };
 });
 
+const ops = await import("@/lib/database-ops/ops");
 const admin = await import("@/lib/database-ops/admin");
 
 beforeEach(() => {
@@ -89,7 +90,7 @@ describe("a new password", () => {
             { scopeType: "application", scopeId: "app-2", isSecret: false, value: "${{other.DATABASE_URL}}" }
         ];
         const restart = vi.fn();
-        const restarted = await admin.regeneratePassword(DB, "owner-1", restart);
+        const restarted = await admin.regeneratePassword(DB, "owner-1", "member-1", restart);
         const argv = state.runIn.mock.calls[0]?.[1] ?? [];
         expect(argv.slice(0, 7)).toEqual(["psql", "-v", "ON_ERROR_STOP=1", "-U", "polaris", "-d", "postgres"]);
         expect(argv.at(-1)).toMatch(/^ALTER ROLE "polaris" WITH PASSWORD '[A-Za-z0-9_-]{32}'$/);
@@ -120,16 +121,42 @@ describe("a new password", () => {
             order.push("stored");
             return {};
         });
-        await Promise.all([admin.regeneratePassword(DB, "owner-1", vi.fn()), admin.regeneratePassword(DB, "owner-1", vi.fn())]);
+        await Promise.all([admin.regeneratePassword(DB, "owner-1", "member-1", vi.fn()), admin.regeneratePassword(DB, "owner-1", "member-1", vi.fn())]);
         expect(order).toEqual(["engine", "stored", "engine", "stored"]);
         state.runIn.mockImplementation(async () => ({ code: 0, output: "" }));
     });
 
     it("puts the old password back in the engine when it cannot be stored", async () => {
         state.update.mockRejectedValueOnce(new Error("database is down"));
-        await expect(admin.regeneratePassword(DB, "owner-1", vi.fn())).rejects.toThrow("database is down");
+        await expect(admin.regeneratePassword(DB, "owner-1", "member-1", vi.fn())).rejects.toThrow("database is down");
         expect(state.runIn).toHaveBeenCalledTimes(2);
         expect(state.runIn.mock.calls[1]?.[1].at(-1)).toBe(`ALTER ROLE "polaris" WITH PASSWORD 'old-password-0123456789'`);
+    });
+
+    it("starts a Redis container again on the new password, so a restart does not bring the old one back", async () => {
+        state.findFirst.mockResolvedValue({ environmentId: "env-1", slug: "cache", name: "Cache" });
+        const base = await vi.mocked(ops.instanceContext)(DB, "owner-1");
+        vi.mocked(ops.instanceContext).mockResolvedValueOnce({ ...base, engine: "redis", container: "cache-redis" });
+        await admin.regeneratePassword(DB, "owner-1", "member-1", vi.fn());
+        expect(state.runIn.mock.calls[0]?.[1].slice(-3)).toEqual(["SET", "requirepass", expect.any(String)]);
+        expect(state.update).toHaveBeenCalledTimes(1);
+        expect(state.deployDatabaseAndWait).toHaveBeenCalledWith(DB, "owner-1", "member-1");
+    });
+
+    it("stores the old Redis password again when the container does not come back on the new one", async () => {
+        state.findFirst.mockResolvedValue({ environmentId: "env-1", slug: "cache", name: "Cache" });
+        const base = await vi.mocked(ops.instanceContext)(DB, "owner-1");
+        vi.mocked(ops.instanceContext).mockResolvedValueOnce({ ...base, engine: "redis", container: "cache-redis" });
+        state.deployDatabaseAndWait.mockResolvedValueOnce("the deploy ended failed");
+        await expect(admin.regeneratePassword(DB, "owner-1", "member-1", vi.fn())).rejects.toThrow(/put back/);
+        expect(state.update).toHaveBeenCalledTimes(2);
+        expect(state.deployDatabaseAndWait).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not redeploy a PostgreSQL instance for a new password", async () => {
+        state.findFirst.mockResolvedValue({ environmentId: "env-1", slug: "shop", name: "Shop" });
+        await admin.regeneratePassword(DB, "owner-1", "member-1", vi.fn());
+        expect(state.deployDatabaseAndWait).not.toHaveBeenCalled();
     });
 });
 

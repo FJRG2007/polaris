@@ -158,9 +158,10 @@ async function applyPassword(context: InstanceContext, password: string, adminPa
 export async function regeneratePassword(
     databaseId: string,
     ownerId: string,
+    userId: string,
     restart: (serviceIds: readonly string[]) => void
 ): Promise<DependentService[]> {
-    await oneChangeAtATime(databaseId, () => changePassword(databaseId, ownerId));
+    await oneChangeAtATime(databaseId, () => changePassword(databaseId, ownerId, userId));
     const dependents = await dependentServices(databaseId, ownerId);
     if (dependents.length > 0) restart(dependents.map((service) => service.id));
     return dependents;
@@ -185,7 +186,7 @@ function oneChangeAtATime(databaseId: string, work: () => Promise<void>): Promis
 }
 
 /** Set a new password in the engine and store it, read from what is stored now. */
-async function changePassword(databaseId: string, ownerId: string): Promise<void> {
+async function changePassword(databaseId: string, ownerId: string, userId: string): Promise<void> {
     const context = await instanceContext(databaseId, ownerId);
     if (!core.isDbEngine(context.engine)) {
         throw new DatabaseOperationError("An object store's keys are managed from its Buckets panel.");
@@ -203,11 +204,7 @@ async function changePassword(databaseId: string, ownerId: string): Promise<void
 
     const stored: DbCredentials = { ...context.own, password };
     try {
-        const blob = encryptCredentials(stored, loadEnv().POLARIS_MASTER_KEY);
-        await prisma.managedDatabase.update({
-            where: { id: context.id },
-            data: { encryptedCredential: blob.ciphertext, credentialNonce: blob.nonce, credentialKeyId: blob.keyId }
-        });
+        await storeCredentials(context.id, stored);
     } catch (error) {
         // Put the engine back on the password that is still stored.
         await applyPassword(context, context.own.password, context.hosted ? adminBefore : password).catch((undo: unknown) =>
@@ -216,11 +213,26 @@ async function changePassword(databaseId: string, ownerId: string): Promise<void
         throw error;
     }
     forgetHealth(context.id);
+    // Redis reads its password from the container's command, which still names
+    // the old one; started again as it is, it would come back on that.
+    if (context.engine === "redis" && !context.hosted) {
+        const failure = await deployDatabaseAndWait(context.id, ownerId, userId);
+        if (failure) {
+            await storeCredentials(context.id, context.own);
+            await deployDatabaseAndWait(context.id, ownerId, userId);
+            forgetHealth(context.id);
+            throw new DatabaseOperationError(`The database did not start that way, so it was put back: ${failure}`);
+        }
+    }
 }
 
-/** Host ports Polaris hands to applications (`hostPortForApp`), which a database
- *  published by hand must stay out of. */
-const APP_PORTS = { from: 20000, to: 39999 } as const;
+async function storeCredentials(databaseId: string, credentials: DbCredentials): Promise<void> {
+    const blob = encryptCredentials(credentials, loadEnv().POLARIS_MASTER_KEY);
+    await prisma.managedDatabase.update({
+        where: { id: databaseId },
+        data: { encryptedCredential: blob.ciphertext, credentialNonce: blob.nonce, credentialKeyId: blob.keyId }
+    });
+}
 
 /**
  * Publish the database on a port of its server, or stop publishing it.
@@ -248,7 +260,7 @@ export async function setPublicPort(
         if (!Number.isInteger(port) || port < 1024 || port > 65535) {
             throw new DatabaseOperationError("Pick a port between 1024 and 65535.");
         }
-        if (port >= APP_PORTS.from && port <= APP_PORTS.to) {
+        if (port >= core.APP_HOST_PORTS.from && port <= core.APP_HOST_PORTS.to) {
             throw new DatabaseOperationError("Ports 20000 to 39999 are kept for services. Pick another.");
         }
         const clash = await prisma.managedDatabase.findFirst({

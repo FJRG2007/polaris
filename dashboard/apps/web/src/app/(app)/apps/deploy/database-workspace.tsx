@@ -137,7 +137,7 @@ export function DatabaseWorkspace({
     database: { id: string; name: string; engine: string };
     /** Whether the instance has a container to talk to yet. */
     deployed: boolean;
-    /** `databases.manage` on the project: everything here needs it. */
+    /** `deploy.manage` and `databases.manage` on the project: everything here needs both. */
     manage: boolean;
     /** Lives inside another instance's container. */
     hosted: boolean;
@@ -683,6 +683,10 @@ function ConfigView({ database, hosted }: { database: { id: string; name: string
         if (result.info) setInfo(result.info);
         else setError(result.error ?? t("workspace.connect.unreadable"));
     }, [database.id]);
+    const retry = () => {
+        setError(null);
+        void load();
+    };
 
     useEffect(() => {
         void load();
@@ -740,7 +744,11 @@ function ConfigView({ database, hosted }: { database: { id: string; name: string
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <Block title={t("workspace.config.connection")}>
                 {!info ? (
-                    <Skeleton className="h-24 w-full" />
+                    error ? (
+                        <RetryButton onClick={retry} />
+                    ) : (
+                        <Skeleton className="h-24 w-full" />
+                    )
                 ) : (
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Labelled label={t("workspace.config.username")}>
@@ -786,6 +794,16 @@ function ConfigView({ database, hosted }: { database: { id: string; name: string
             {database.engine === "postgres" ? <ExtensionsBlock databaseId={database.id} hosted={hosted} ask={ask} /> : null}
             {dialog}
         </div>
+    );
+}
+
+function RetryButton({ onClick }: { onClick: () => void }) {
+    const t = useTranslations("deployData");
+    return (
+        <Button size="sm" variant="secondary" className="self-start" onClick={onClick}>
+            <RefreshCw className="size-4" />
+            {t("workspace.retry")}
+        </Button>
     );
 }
 
@@ -950,9 +968,13 @@ function ConnectView({ database, hosted }: { database: { id: string; name: strin
     useEffect(() => {
         void load();
     }, [load]);
+    const retry = () => {
+        setError(null);
+        void load();
+    };
 
     const portNumber = Number(port);
-    const portValid = /^\d+$/.test(port) && portNumber >= 1024 && portNumber <= 65535 && !(portNumber >= 20000 && portNumber <= 39999);
+    const portValid = /^\d+$/.test(port) && core.isPublishablePort(portNumber);
 
     function publish(next: number | null) {
         ask({
@@ -998,7 +1020,11 @@ function ConnectView({ database, hosted }: { database: { id: string; name: strin
             />
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             {!connection || !info ? (
-                <Skeleton className="h-40 w-full" />
+                error ? (
+                    <RetryButton onClick={retry} />
+                ) : (
+                    <Skeleton className="h-40 w-full" />
+                )
             ) : network === "private" ? (
                 <div className="flex flex-col gap-4">
                     <p className="text-sm text-muted-foreground">{t("workspace.connect.privateIntro")}</p>
@@ -1068,7 +1094,7 @@ function ConnectView({ database, hosted }: { database: { id: string; name: strin
                                     <Input
                                         inputMode="numeric"
                                         value={port}
-                                        placeholder={String(suggestedPort(database.engine))}
+                                        placeholder={String(core.suggestedPublishPort(database.engine))}
                                         aria-label={t("workspace.connect.portLabel")}
                                         aria-invalid={Boolean(port) && !portValid}
                                         onChange={(event) => setPort(event.target.value.replace(/\D/g, "").slice(0, 5))}
@@ -1079,7 +1105,7 @@ function ConnectView({ database, hosted }: { database: { id: string; name: strin
                                     size="sm"
                                     aria-disabled={Boolean(port) && !portValid}
                                     onClick={() => {
-                                        const chosen = port ? portNumber : suggestedPort(database.engine);
+                                        const chosen = port ? portNumber : core.suggestedPublishPort(database.engine);
                                         if (port && !portValid) return;
                                         publish(chosen);
                                     }}
@@ -1094,13 +1120,6 @@ function ConnectView({ database, hosted }: { database: { id: string; name: strin
             {dialog}
         </div>
     );
-}
-
-/** A port to suggest for publishing: the engine's own, moved out of the way of
- *  one the server may already run. */
-function suggestedPort(engine: string): number {
-    const own = core.isDbEngine(engine) ? core.DB_ENGINE_INFO[engine].port : 5432;
-    return own + 10000 > 65535 ? own : own + 10000;
 }
 
 function ReferenceChip({ value, label }: { value: string; label: string }) {

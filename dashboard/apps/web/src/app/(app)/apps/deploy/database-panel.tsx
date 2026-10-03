@@ -57,10 +57,13 @@ interface Confirmation {
 export function DatabaseManageDialog({
     database,
     open,
+    deployManage,
     onOpenChange
 }: {
     database: { id: string; name: string; engine: string };
     open: boolean;
+    /** `deploy.manage`, which every action in the database workspace also asks for. */
+    deployManage: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
     const t = useTranslations("deployData");
@@ -231,7 +234,7 @@ export function DatabaseManageDialog({
                             <DatabaseWorkspace
                                 database={database}
                                 deployed={overview.deployed}
-                                manage={manage}
+                                manage={manage && deployManage}
                                 hosted={overview.hosted}
                             />
                         ) : !overview.deployed && current !== "activity" ? (

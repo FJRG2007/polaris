@@ -300,9 +300,48 @@ describe("the Database tab's four views", () => {
         expect(screen.getByText("PGPASSWORD=s3cret-pass psql -h 203.0.113.10 -p 25432 -U orders_app -d orders")).toBeDefined();
     });
 
-    it("needs databases.manage, and a provisioned instance, before any of this opens", async () => {
+    it("offers Try again instead of a skeleton that never resolves when the account cannot be read", async () => {
+        const user = userEvent.setup();
+        databaseConnectInfoAction.mockResolvedValueOnce({ error: "The database is not answering." });
+        listExtensionsAction.mockResolvedValue({ extensions: [] });
+        await act(async () => mount());
+        await user.click(screen.getByRole("radio", { name: "Config" }));
+        expect(await screen.findByText("The database is not answering.")).toBeDefined();
+
+        databaseConnectInfoAction.mockResolvedValue({ info: CONNECT_INFO });
+        await user.click(screen.getByRole("button", { name: "Try again" }));
+        expect(await screen.findByText("orders_app")).toBeDefined();
+
+        databaseConnectInfoAction.mockResolvedValueOnce({ error: "The database is not answering." });
+        await user.click(screen.getByRole("radio", { name: "Connect" }));
+        expect(await screen.findByText("The database is not answering.")).toBeDefined();
+        await user.click(screen.getByRole("button", { name: "Try again" }));
+        expect(await screen.findByText("${{orders-db.DATABASE_URL}}")).toBeDefined();
+    });
+
+    it("suggests a MongoDB port the server accepts when nothing is typed", async () => {
+        const user = userEvent.setup();
+        databaseConnectInfoAction.mockResolvedValue({
+            info: {
+                ...CONNECT_INFO,
+                connection: { ...CONNECT_INFO.connection, port: 27017, exposedPort: null } as ConnectInfo["connection"],
+                publicHost: null
+            }
+        });
+        setPublicPortAction.mockResolvedValue({});
+        await act(async () => mount({ database: { ...DATABASE, engine: "mongo" } }));
+        await user.click(screen.getByRole("radio", { name: "Connect" }));
+        await screen.findByText("${{orders-db.DATABASE_URL}}");
+        await user.click(screen.getByRole("radio", { name: "Public network" }));
+        expect(screen.getByPlaceholderText("47017")).toBeDefined();
+        await user.click(screen.getByRole("button", { name: "Publish" }));
+        await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Publish" }));
+        expect(setPublicPortAction).toHaveBeenCalledWith(DATABASE.id, 47017);
+    });
+
+    it("needs deploy.manage and databases.manage, and a provisioned instance, before any of this opens", async () => {
         await act(async () => mount({ manage: false }));
-        expect(screen.getByText("Browsing this database needs the right to manage the project's databases.")).toBeDefined();
+        expect(screen.getByText("Browsing this database needs the right to manage Deploy and the project's databases.")).toBeDefined();
 
         cleanup();
         await act(async () => mount({ deployed: false }));

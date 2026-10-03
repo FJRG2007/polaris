@@ -122,7 +122,7 @@ describe("writing", () => {
 
 describe("a new password", () => {
     it("restarts each service that reads it and records which", async () => {
-        mocks.regeneratePassword.mockImplementationOnce(async (_id: string, _owner: string, restart: (ids: string[]) => void) => {
+        mocks.regeneratePassword.mockImplementationOnce(async (_id: string, _owner: string, _user: string, restart: (ids: string[]) => void) => {
             restart(["app-1", "app-2"]);
             return [
                 { id: "app-1", name: "api" },
@@ -131,6 +131,7 @@ describe("a new password", () => {
         });
         const result = await actions.regeneratePasswordAction(DB);
         expect(result.restarted?.map((service) => service.name)).toEqual(["api", "worker"]);
+        expect(mocks.regeneratePassword).toHaveBeenCalledWith(DB, "owner-1", "member-1", expect.any(Function));
         expect(mocks.redeployForEnvScope).toHaveBeenCalledTimes(2);
         expect(mocks.redeployForEnvScope).toHaveBeenCalledWith("application", "app-1", "owner-1", "member-1", expect.anything());
         expect(mocks.recordDeployAudit).toHaveBeenCalledWith(

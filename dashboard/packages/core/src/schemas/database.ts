@@ -476,3 +476,24 @@ export function topologyRequest(topology: DbTopology): Pick<
             return { topology: "single" };
     }
 }
+
+/** Host ports Polaris hands to applications, which a database published by hand
+ *  must stay out of. */
+export const APP_HOST_PORTS = { from: 20000, to: 39999 } as const;
+
+/** Whether a database may be published on this host port. */
+export function isPublishablePort(port: number): boolean {
+    return (
+        Number.isInteger(port) &&
+        port >= 1024 &&
+        port <= 65535 &&
+        !(port >= APP_HOST_PORTS.from && port <= APP_HOST_PORTS.to)
+    );
+}
+
+/** A port to suggest for publishing an engine: its own, moved out of the way of
+ *  one the server may already run, and never one `isPublishablePort` refuses. */
+export function suggestedPublishPort(engine: string): number {
+    const own = isDbEngine(engine) ? DB_ENGINE_INFO[engine].port : DB_ENGINE_INFO.postgres.port;
+    return [own + 10000, own + 20000, own].find(isPublishablePort) ?? DB_ENGINE_INFO.postgres.port + 10000;
+}

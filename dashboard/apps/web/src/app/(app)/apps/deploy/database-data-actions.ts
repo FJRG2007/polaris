@@ -331,7 +331,7 @@ export async function regeneratePasswordAction(
 ): Promise<{ restarted?: admin.DependentService[]; error?: string }> {
     const result = await guard(async () => {
         const opened = await open({ databaseId, writable: true });
-        const restarted = await admin.regeneratePassword(opened.databaseId, opened.ownerId, (ids) => {
+        const restarted = await admin.regeneratePassword(opened.databaseId, opened.ownerId, opened.userId, (ids) => {
             for (const id of ids) {
                 void redeployForEnvScope("application", id, opened.ownerId, opened.userId, {
                     reason: "database-password",

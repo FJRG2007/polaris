@@ -372,7 +372,8 @@
         "use": "Usar esta carpeta"
     },
     "workspace": {
-        "needsManage": "Para ver esta base de datos hace falta poder gestionar las bases de datos del proyecto.",
+        "retry": "Reintentar",
+        "needsManage": "Para ver esta base de datos hace falta poder gestionar Deploy y las bases de datos del proyecto.",
         "section": "Vista de la base",
         "tabs": {
             "data": "Datos",

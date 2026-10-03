@@ -135,6 +135,8 @@
         "portServices": "Los puertos 20000 a 39999 son para los servicios. Elige otro.",
         "portTaken": "Otra base de datos de este servidor ya usa ese puerto.",
         "publicPutBack": "La base de datos no arrancó así, así que se ha dejado como estaba: {reason}",
+        "passwordChange": "No se ha podido cambiar la contraseña de {user}.",
+        "passwordChangeSaid": "No se ha podido cambiar la contraseña de {user}: {reason}",
         "vacuumPostgres": "Vacuum es un comando de PostgreSQL.",
         "extensionsPostgres": "Las extensiones son cosa de PostgreSQL.",
         "databaseNotFound": "Base no encontrada"

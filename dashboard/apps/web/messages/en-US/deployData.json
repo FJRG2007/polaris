@@ -372,7 +372,8 @@
         "use": "Use this folder"
     },
     "workspace": {
-        "needsManage": "Browsing this database needs the right to manage the project's databases.",
+        "retry": "Try again",
+        "needsManage": "Browsing this database needs the right to manage Deploy and the project's databases.",
         "section": "Database view",
         "tabs": {
             "data": "Data",

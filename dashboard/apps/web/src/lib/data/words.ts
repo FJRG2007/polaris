@@ -264,7 +264,9 @@ const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
     [/^That default does not fit the type of (.+)\.$/, "refusals.defaultType", ["column"]],
     [/^There is no column called (.+)\.$/, "refusals.unknownColumn", ["column"]],
     [/^The instance did not start that way, so it was put back: (.+)$/, "refusals.putBack", ["reason"]],
-    [/^The database did not start that way, so it was put back: (.+)$/, "refusals.publicPutBack", ["reason"]]
+    [/^The database did not start that way, so it was put back: (.+)$/, "refusals.publicPutBack", ["reason"]],
+    [/^Changing the password of (.+?) failed: (.+)$/, "refusals.passwordChangeSaid", ["user", "reason"]],
+    [/^Changing the password of (.+) failed$/, "refusals.passwordChange", ["user"]]
 ];
 
 const READ_ONLY =
