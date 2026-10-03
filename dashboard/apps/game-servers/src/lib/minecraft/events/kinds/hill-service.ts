@@ -248,13 +248,14 @@ export function enterLines(
  */
 export const ARRIVAL_MS = 20_000;
 
-/** Since when each run, everybody sent up, has waited for them to be on it.
- *  Lost on a restart, which brings everybody in again and waits afresh. */
-const arriving = new Map<string, number>();
+/** Since when each run, everybody sent up, has waited for them to be on it,
+ *  and who has been seen on it since. Lost on a restart, which brings
+ *  everybody in again and waits afresh. */
+const arriving = new Map<string, { since: number; arrived: Set<string> }>();
 
 /** Everybody sent up: nothing is counted until they all stand on it. */
 export function awaitArrivals(runId: string, now: number): void {
-    arriving.set(runId, now);
+    arriving.set(runId, { since: now, arrived: new Set() });
 }
 
 export function awaitingArrivals(runId: string): boolean {
@@ -278,10 +279,30 @@ export async function arrivalTick(ctx: KindContext, lines: string[]): Promise<vo
     const { radius } = optionsOf(run);
     const names = run.entrants.map((one) => one.name);
     const where = commands.readWhere(await ctx.server.say([commands.IN_OVERWORLD]));
-    const missing = hill.notArrived(names, where, place, radius);
-    lines.push(...hill.protectLines(), ...arena.keepThrown(hill.bounds(place, radius)));
-    const since = arriving.get(run.id) ?? ctx.now;
-    if (missing.length > 0 && ctx.now - since < ARRIVAL_MS) {
+    const wait = arriving.get(run.id) ?? { since: ctx.now, arrived: new Set<string>() };
+    for (const name of names)
+        if (hill.notArrived([name], where, place, radius).length === 0)
+            wait.arrived.add(name.toLowerCase());
+    const missing = names.filter((name) => !wait.arrived.has(name.toLowerCase()));
+    lines.push(
+        ...hill.protectLines(),
+        hill.catchLine(place, radius),
+        ...arena.keepThrown(hill.bounds(place, radius))
+    );
+    const spots = entrySpotsFor(run);
+    const overGround = await ctx.atLeast([1, 19, 4]);
+    const here = new Map(where.map((one) => [one.name.toLowerCase(), one]));
+    for (const one of run.entrants) {
+        const at = here.get(one.name.toLowerCase());
+        if (!at || !wait.arrived.has(one.name.toLowerCase())) continue;
+        if (hill.strayed(at, place, radius))
+            lines.push(
+                ...hill
+                    .enterLines(one.name, spots[one.side % spots.length]!, overGround)
+                    .filter((line) => line.includes(" tp "))
+            );
+    }
+    if (missing.length > 0 && ctx.now - wait.since < ARRIVAL_MS) {
         lines.push(
             arena.actionbarTo(
                 `@a[tag=${arena.IN_ARENA}]`,
@@ -302,8 +323,6 @@ export async function arrivalTick(ctx: KindContext, lines: string[]): Promise<vo
         endsAt: ctx.now + run.preset.minutes * 60_000
     };
     await ctx.persist();
-    const spots = entrySpotsFor(run);
-    const overGround = await ctx.atLeast([1, 19, 4]);
     for (const one of run.entrants)
         lines.push(
             ...hill

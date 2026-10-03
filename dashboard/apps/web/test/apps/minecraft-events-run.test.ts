@@ -6491,6 +6491,44 @@ describe("a king of the hill", () => {
         );
     });
 
+    it("with fists only: brings back whoever falls off while the rest are waited for", async () => {
+        world.online = ["Ana", "Ben"];
+        world.stuck = ["Ben"];
+        setUp([fists()]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "hill",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(30_000);
+        for (
+            let tick = 0;
+            tick < 200 && !world.sent.some((line) => / run tp Ben ~ ~ ~ /.test(line));
+            tick += 1
+        )
+            await play(250);
+        await play(3_000);
+        expect(state().run!.readyAt).toBeNull();
+        const up = world.at.Ana!;
+        world.at.Ana = [up[0], up[1] - 15, up[2]];
+        const fell = world.sent.length;
+        await play(2_000);
+        expect(world.sent.slice(fell).some((line) => / run tp Ana ~ ~ ~ /.test(line))).toBe(true);
+        expect(world.at.Ana![1]).toBe(up[1]);
+        expect(state().run!.readyAt).toBeNull();
+        await play(hillService.ARRIVAL_MS);
+        expect(state().run!.readyAt).not.toBeNull();
+        const without = world.sent.find((line) =>
+            line.includes("Started without waiting longer for")
+        );
+        expect(without).toContain("Ben");
+        expect(without).not.toContain("Ana");
+    });
+
     it("with no untouched ground for the circle, stands on a platform of its own over the sea, taken away after", async () => {
         world.online = ["Ana", "Ben"];
         world.sea = true;
