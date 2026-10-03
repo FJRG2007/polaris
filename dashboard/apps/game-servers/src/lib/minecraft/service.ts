@@ -1060,9 +1060,11 @@ export async function applyFirewallBans(ownerId: string, installedAppId: string)
 }
 
 /**
- * Who is online right now, for the words an announcement fills in. Null for a
- * server that is not meant to be up or did not answer: the caller then writes
- * the fallbacks rather than failing the announcement over a count.
+ * Who is online right now, including anybody still at Polaris login's prompt -
+ * for operator tooling (inventory transfer, X-Ray review) that means every
+ * connected player, not just the ones let in. Null for a server that is not
+ * meant to be up or did not answer. A text shown in the game uses
+ * {@link shownPlayers} instead, which leaves pending players out.
  */
 export async function onlinePlayers(
     ownerId: string,

@@ -21,6 +21,15 @@ that, Polaris is asked whether the name is on the server's player list (and from
 that network, when the list binds names to networks); a name that is not is
 turned away before it can register.
 
+Nothing else of Polaris's reaches them while they wait: no challenge, event,
+broadcast, chat-relay line or panel update is shown to them, and they are left
+out of `{server.online}` and `{server.players}` until they are let in. The
+server's own boss bars and side panel are taken off their screen too, whether
+they were already up or go up while they wait, and come back exactly as they
+were the moment they log in - a bar handed to everybody while they waited is
+not handed out again, so it would otherwise never reach them. Other players'
+chat still reaches them.
+
 ## Anti-xray
 
 The mod also sends every ore no player could see as the rock around it, so an

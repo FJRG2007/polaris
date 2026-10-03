@@ -491,6 +491,23 @@ configured means the machine's own address, as before.
   that software's project guard in its place. `guardAsTemplate` does the same
   unconditionally when a server carrying it is saved as a template, since the
   mod's id and token are that server's alone and a template copies neither.
+- **Nothing of Polaris's reaches a player still at that prompt.** The mod and
+  the plugin tag a held player `polaris_pending` for exactly as long as they
+  are held, and `prelogin.ts` narrows every `tellraw`, `title` and
+  `playsound` line Polaris sends over RCON - a challenge, an event, a
+  broadcast, the chat relay, a panel - to the players without that tag before
+  it reaches the server, and leaves them out of `{server.online}` and
+  `{server.players}` (`shownPlayers` in `service.ts`) the same way. The mod
+  and the plugin take the server's own boss bars and side panel off a held
+  player's screen too, on the client, and give them back exactly as they were
+  the moment the player is let in - a bar handed to everybody while they
+  waited is never handed out again, so it would otherwise never reach them.
+  Other players' chat still reaches a held NeoForge player (each message is a
+  signed chain a client would disconnect over a gap in) but not a held Paper
+  one, whose chat is filtered through the recipient list instead. A player
+  let in is told of it at once (`login-arrivals.ts`): a server's challenges
+  are read and shown within `ARRIVAL_DELAY_MS` rather than on the loop's next
+  turn up to twenty seconds later.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before
