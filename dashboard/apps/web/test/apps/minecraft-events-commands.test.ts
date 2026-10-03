@@ -2992,7 +2992,7 @@ describe("a parkour course's climbs, moving platforms and looks", () => {
         }
         expect(changed).toBeGreaterThan(0);
         expect(stage.EMPTY_STAGE.design).toBe(1);
-        expect(parkour.DESIGN).toBe(2);
+        expect(parkour.DESIGN).toBe(3);
     });
 
     it("draws one of four looks for a run, or the one chosen, keeping checkpoints lime", () => {

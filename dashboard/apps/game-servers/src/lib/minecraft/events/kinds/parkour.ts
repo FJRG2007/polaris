@@ -25,6 +25,7 @@ import { seeded } from "../trivia-bank";
 import { PARKOUR_THEMES, type EventOptions } from "../catalog";
 import { shuffled } from "../trivia-bank";
 import { IN_ARENA, type Box, type Spot, type Volume } from "./stage";
+import * as layout from "./parkour-layout";
 
 export type Role = "start" | "jump" | "checkpoint" | "finish";
 
@@ -43,6 +44,8 @@ export interface Platform {
     readonly trap?: Trap;
     /** Reached by climbing from the platform before: +1 or -1, the way the row runs. */
     readonly climb?: 1 | -1;
+    /** One of the two steps that turn the course into its next row (design 3 on). */
+    readonly turn?: true;
 }
 
 export interface Course {
@@ -64,10 +67,9 @@ export interface Course {
     readonly reach: number;
 }
 
-/** How far a row runs before it turns. */
-const ROW = 22;
+const ROW = layout.ROW;
 /** Every so many platforms, a checkpoint. */
-export const CHECK_EVERY = 6;
+export const CHECK_EVERY = layout.CHECK_EVERY;
 /** How far under the lowest platform the net is. */
 const NET_DROP = 4;
 /** Room above the highest platform for a jump. */
@@ -94,14 +96,15 @@ const SHIFT_CHANCE: Readonly<Record<EventOptions<"parkour">["difficulty"], numbe
     hard: 0.18
 };
 /** How far a moving platform moves, across the row. */
-export const SHIFT_STEP = 1;
+export const SHIFT_STEP = layout.SHIFT_STEP;
 
 /**
  * How courses are laid out now. A course placed before climbs, moving
- * platforms and looks (design 1) is laid out the way it was then, so a race
+ * platforms and looks (design 1), or before the layout rules
+ * (`parkour-layout`, design 2), is laid out the way it was then, so a race
  * running across an update keeps the course it was built as.
  */
-export const DESIGN = 2;
+export const DESIGN = 3;
 
 const TRAP_BLOCKS: Readonly<Record<Trap, Box["block"]>> = {
     slime: "minecraft:slime_block",
@@ -177,8 +180,8 @@ function climbBlock(kind: "ladder" | "vine", direction: 1 | -1): Box["block"] {
 
 const NET: Box["block"] = "minecraft:white_stained_glass";
 
-/** The course laid out around 0 0 0, the rows running between x 0 and `ROW`. */
-function laidOut(options: EventOptions<"parkour">, seed: string, legacy: boolean): Platform[] {
+/** A course placed before design 3, laid out the way it was then. */
+function laidOutBefore(options: EventOptions<"parkour">, seed: string, legacy: boolean): Platform[] {
     const random = seeded(`parkour-${seed}`);
     const step = STEPS[options.difficulty];
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T;
@@ -276,7 +279,7 @@ export function course(
     design: number = DESIGN
 ): Course {
     const legacy = design < 2;
-    const raw = laidOut(options, seed, legacy);
+    const raw = design >= 3 ? layout.laidOut(options, seed) : laidOutBefore(options, seed, legacy);
     const theme = legacy ? "classic" : themeFor(options, seed);
     const look = THEMES[theme];
     const minX = Math.min(...raw.map((one) => one.x)) - 2;
@@ -475,6 +478,39 @@ export function spotOn(course: Course, index: number): Spot {
         ? Math.round((Math.atan2(-(next.x - one.x), next.z - one.z) * 180) / Math.PI)
         : 0;
     return { x: one.x + one.size / 2, y: one.y + 1, z: one.z + one.size / 2, yaw };
+}
+
+/** Standing on the start pad - or jumping on it - before the start. */
+export function onStart(course: Course, at: { x: number; y: number; z: number }): boolean {
+    const pad = course.platforms[0]!;
+    return (
+        at.x >= pad.x - 0.3 &&
+        at.x <= pad.x + pad.size + 0.3 &&
+        at.z >= pad.z - 0.3 &&
+        at.z <= pad.z + pad.size + 0.3 &&
+        at.y >= pad.y + 0.5 &&
+        at.y <= pad.y + 2.5
+    );
+}
+
+/** Marks, for one batch of the quick look, who is off the start pad. */
+const OFF_START = "pe_hold";
+
+/**
+ * The quick look before the start: every racer in the Overworld who is not on
+ * the start pad - a step onto the first platform, a fall - is put back on it,
+ * with selectors alone. Whoever is on it is never moved.
+ */
+export function holdLines(course: Course): string[] {
+    const pad = course.platforms[0]!;
+    const start = spotOn(course, 0);
+    const world = "execute in minecraft:overworld run";
+    return [
+        `${world} tag @a[tag=${IN_ARENA},distance=0..] add ${OFF_START}`,
+        `${world} tag @a[tag=${IN_ARENA},x=${pad.x},y=${pad.y + 1},z=${pad.z},dx=${pad.size - 1},dy=2,dz=${pad.size - 1}] remove ${OFF_START}`,
+        `${world} tp @a[tag=${OFF_START}] ${start.x.toFixed(3)} ${start.y.toFixed(3)} ${start.z.toFixed(3)} ${start.yaw.toFixed(1)} 0.0`,
+        `tag @a remove ${OFF_START}`
+    ];
 }
 
 /** How many checkpoints lie at or before a platform - the finish counted as the last. */
