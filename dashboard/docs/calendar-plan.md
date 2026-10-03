@@ -45,7 +45,7 @@ refreshes it every few hours). The UI says so in those words.
 | ----------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pure engine | `packages/core/src/calendar/*`                          | iCalendar parse/serialize (ical.js), recurrence expansion with RRULE/RDATE/EXDATE/RECURRENCE-ID, time-zone math on `Intl` (no tz database shipped), alarms, free/busy, booking slots, recurrence editing (this / this and following / all), iTIP messages. Every function takes "now" as an argument. |
 | Data        | `packages/db/prisma/schema.prisma` (`Calendar*` models) | iCalendar text is the source of truth per object; indexed columns (`startsAt`, `endsAt`, `summary`) are derived on write for range queries and search.                                                                                                                                                |
-| App server  | `apps/calendar/src/lib/*`                               | calendars, objects, sharing, trash, import/export, public links, reminders job, invitations, booking pages, sync engine (Google, CalDAV, Microsoft Graph, ICS).                                                                                                                                       |
+| App server  | `apps/calendar/src/lib/*`                               | calendars, objects, sharing, trash, import/export, public links, reminders job, invitations, booking pages, sync engine (Google, CalDAV, Microsoft Graph, ICS), the Time area's clock engine (`lib/clock/*`: alarms, timers, focus cycles, stopwatch, world clock).                                   |
 | App screens | `apps/calendar/src/routes/calendar/**`                  | the calendar, its settings, booking and public pages.                                                                                                                                                                                                                                                 |
 | Dashboard   | `apps/web`                                              | catalog + nav entry, catch-all page/route, public surface, permission, notification events, connection flow `scope=calendar`, host services.                                                                                                                                                          |
 
@@ -81,6 +81,15 @@ Decisions:
   with the `.ics` attached) carrying an RSVP link, because Polaris receives no
   mail. On Google/Outlook/CalDAV calendars the provider schedules
   (`sendUpdates=all`, server-side scheduling) and Polaris does not send twice.
+- **The Time area's alarms, timers and stopwatch are server state, not client
+  state.** A running timer stores when it ends and an alarm its next ring,
+  never a countdown, so every device reads the same value and a ring survives
+  a reload. The scheduler's quick tick (`app/api/cron/calendar-clock`) rings
+  what is due as a `calendar.clock` notification with every tab closed; a ring
+  is claimed by a conditional write, so a racing pass never rings it twice. The
+  quick tick itself is generic to any installed app
+  (`lib/app-extensions/types.ts`'s `headerSlot`, `lib/cron/scheduler.ts`), not
+  Calendar-specific - Calendar is its first user.
 
 ## Feature matrix
 
@@ -89,32 +98,32 @@ Phase 1 = this build. Status is tracked in the ledger, not here.
 
 ### Views and navigation
 
-| Feature                                                                                 | Has it      | Polaris plan                                                                                           | Phase |
-| --------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------ | ----- |
-| Day, week, month (+N more), year, list/agenda views (NC-1..5)                           | NC G P TB S | FullCalendar views; agenda = list over the coming 30 days (G "Schedule")                               | 1     |
-| Custom N-day view (G "4 days")                                                          | G           | view option 2-7 days                                                                                   | 1     |
-| Remembered last view, deep links `/calendar/<view>/<date>`, `/calendar/e/<id>` (NC-6,7) | NC G        | URL is the state                                                                                       | 1     |
-| Drag to move, resize from either edge, select to create (NC-8..10)                      | NC G TB     | FullCalendar interaction, optimistic with rollback                                                     | 1     |
-| Click a day / week number to open it (NC-11)                                            | NC G        | nav links                                                                                              | 1     |
-| Participation styling, faded past events, struck-through cancelled (NC-12,13)           | NC G        | event classes                                                                                          | 1     |
-| Screen-reader labels on events (NC-14)                                                  | NC          | aria-label per event                                                                                   | 1     |
-| Locale date formats, first day of week (NC-15)                                          | NC G        | locale + setting                                                                                       | 1     |
-| Live refresh on remote change (NC-16)                                                   | NC G        | refetch on focus + after each sync tick, SSE later                                                     | 1     |
-| Date picker, previous/next, today, new event (NC-17..19)                                | all         | header                                                                                                 | 1     |
-| Filter/search events (NC-20; G advanced search)                                         | NC G TB     | search box over loaded range + server search across all time (title, location, description, attendees) | 1     |
-| Calendar list, reorder, show/hide, colour (NC-21,23)                                    | all         | sidebar                                                                                                | 1     |
-| Shared-with-you / delegated sections and badges (NC-22,24)                              | NC G        | sidebar groups                                                                                         | 1     |
-| Muted-notifications indicator (NC-25)                                                   | NC          | icon                                                                                                   | 1     |
-| Undo while deleting/unsharing a calendar (NC-26)                                        | NC          | toast with Undo                                                                                        | 1     |
-| Loading placeholders (NC-27)                                                            | NC          | skeleton rows only where waiting                                                                       | 1     |
-| Unscheduled tasks panel, drag onto grid (NC-28,130)                                     | NC          | Tasks without due date, drop sets due                                                                  | 1     |
-| Meeting proposals list (NC-29,120-122)                                                  | NC          | proposals with public voting page                                                                      | 1     |
-| Appointment schedules list (NC-30)                                                      | NC G P C    | sidebar section                                                                                        | 1     |
-| Secondary time zone column (G)                                                          | G           | second axis label in day/week                                                                          | 1     |
-| World clock (G)                                                                         | G           | settings list, shown in sidebar                                                                        | 1     |
-| Hide declined, dim past, show weekends, week numbers (G, NC-144)                        | NC G        | settings                                                                                               | 1     |
-| Keyboard shortcuts incl. `?` overview (NC table, G list)                                | NC G        | union of both lists, see below                                                                         | 1     |
-| Print (G: range, orientation; NC print css)                                             | NC G TB     | print view with range + orientation                                                                    | 1     |
+| Feature                                                                                 | Has it      | Polaris plan                                                                                                                                           | Phase |
+| --------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| Day, week, month (+N more), year, list/agenda views (NC-1..5)                           | NC G P TB S | FullCalendar views; agenda = list over the coming 30 days (G "Schedule")                                                                               | 1     |
+| Custom N-day view (G "4 days")                                                          | G           | view option 2-7 days                                                                                                                                   | 1     |
+| Remembered last view, deep links `/calendar/<view>/<date>`, `/calendar/e/<id>` (NC-6,7) | NC G        | URL is the state                                                                                                                                       | 1     |
+| Drag to move, resize from either edge, select to create (NC-8..10)                      | NC G TB     | FullCalendar interaction, optimistic with rollback                                                                                                     | 1     |
+| Click a day / week number to open it (NC-11)                                            | NC G        | nav links                                                                                                                                              | 1     |
+| Participation styling, faded past events, struck-through cancelled (NC-12,13)           | NC G        | event classes                                                                                                                                          | 1     |
+| Screen-reader labels on events (NC-14)                                                  | NC          | aria-label per event                                                                                                                                   | 1     |
+| Locale date formats, first day of week (NC-15)                                          | NC G        | locale + setting                                                                                                                                       | 1     |
+| Live refresh on remote change (NC-16)                                                   | NC G        | refetch on focus + after each sync tick, SSE later                                                                                                     | 1     |
+| Date picker, previous/next, today, new event (NC-17..19)                                | all         | header                                                                                                                                                 | 1     |
+| Filter/search events (NC-20; G advanced search)                                         | NC G TB     | search box over loaded range + server search across all time (title, location, description, attendees)                                                 | 1     |
+| Calendar list, reorder, show/hide, colour (NC-21,23)                                    | all         | sidebar                                                                                                                                                | 1     |
+| Shared-with-you / delegated sections and badges (NC-22,24)                              | NC G        | sidebar groups                                                                                                                                         | 1     |
+| Muted-notifications indicator (NC-25)                                                   | NC          | icon                                                                                                                                                   | 1     |
+| Undo while deleting/unsharing a calendar (NC-26)                                        | NC          | toast with Undo                                                                                                                                        | 1     |
+| Loading placeholders (NC-27)                                                            | NC          | skeleton rows only where waiting                                                                                                                       | 1     |
+| Unscheduled tasks panel, drag onto grid (NC-28,130)                                     | NC          | Tasks without due date, drop sets due                                                                                                                  | 1     |
+| Meeting proposals list (NC-29,120-122)                                                  | NC          | proposals with public voting page                                                                                                                      | 1     |
+| Appointment schedules list (NC-30)                                                      | NC G P C    | sidebar section                                                                                                                                        | 1     |
+| Secondary time zone column (G)                                                          | G           | second axis label in day/week                                                                                                                          | 1     |
+| World clock (G)                                                                         | G           | Time area (below): alarms, timers, focus cycles, a stopwatch and a world clock with a meeting planner; reached from the header, the sidebar and search | 1     |
+| Hide declined, dim past, show weekends, week numbers (G, NC-144)                        | NC G        | settings                                                                                                                                               | 1     |
+| Keyboard shortcuts incl. `?` overview (NC table, G list)                                | NC G        | union of both lists, see below                                                                                                                         | 1     |
+| Print (G: range, orientation; NC print css)                                             | NC G TB     | print view with range + orientation                                                                                                                    | 1     |
 
 ### Calendars, sharing, publishing, subscriptions
 
@@ -202,6 +211,36 @@ account's own routes) and email (notification email channel). Phase 1.
 Automatic or chosen display zone, warning when detected zone is UTC or unknown,
 event zones, secondary zone, zone on booking pages and emails. Phase 1.
 
+### Time: alarms, timers, focus cycles, stopwatch, world clock
+
+A Time area (`/calendar/time`, `lib/clock/*`), reached from the calendar's
+header, its sidebar and the dashboard search, in four tabs:
+
+- **Alarms** - time, repeat days, label, sound, snooze length, on/off, the next
+  ring and "skip next ring"; read in the owner's zone, clock changes settled
+  the RFC 5545 way.
+- **Timers** - several at once, named, presets and recently used lengths, one
+  more minute, pause and resume; focus cycles with configurable focus, short
+  and long breaks and rounds, each phase starting the next by itself or
+  waiting.
+- **Stopwatch** - laps with the fastest and slowest marked, copy and CSV
+  export, keyboard shortcuts.
+- **World clock** - any IANA zone found by city, country (in the reader's
+  language), zone name, abbreviation or offset; day and hours apart, and the
+  next clock change. A meeting planner lines an hour up across the cities with
+  working hours shaded, and opens a new event at that time; the event editor
+  compares the event's time across the world clock's cities.
+
+Everything is kept on the server, rung by the scheduler's quick tick and
+claimed by a conditional write so it never rings twice (see the Decisions
+bullet above). A pill beside the bell (`screens/clock/time-indicator.tsx`,
+drawn through the generic app-host header slot) shows the running timer or
+stopwatch from any screen, and the dashboard search starts one directly from a
+typed command ("timer 10m", "alarm 7:30", "stopwatch", English and Spanish,
+`parseClockCommand` in `@polaris/core`). Not part of the NC/G/P/TB/S/C matrix
+above - a utility the Calendar app carries rather than a calendaring feature -
+so it is tracked here and in the ledger instead of the table. Phase 1.
+
 ### Tasks (NC-127..130)
 
 Tasks with due dates shown in the grid (Tasks-app tasks + VTODO from outside
@@ -257,7 +296,7 @@ Status: `pending`, `done (<verification>)`, `blocked(<reason>)`,
 `deferred(<reason>)`. Update one line at a time.
 
 Verification shorthand used below: **T** = `vitest --maxWorkers=2 test/calendar`
-green (39 files, 377 tests at the last run); **C** = `tsc --noEmit -p .` in
+green (45 files, 568 tests at the last run); **C** = `tsc --noEmit -p .` in
 `apps/calendar` clean (its program includes `apps/web/src`, the app and
 `apps/web/test/calendar`); **B** = the app bundler exits 0 and
 `test/app-bundles` + `test/build` are green; **W** = exercised in a real
@@ -339,4 +378,15 @@ and es-ES.
 - [x] U63 Browser pass - done (W)
 - [x] U67 Linking is findable - done (T: screens/accounts-entry; W): Accounts is the first section of Calendar settings; the sidebar's "Add a calendar" lists Google, Microsoft, CalDAV, subscribe by URL, holidays, import and create; a first-use tip until linked or closed (`dismissedHints`); a provider whose OAuth client is not set up says so - administrators are linked to `/admin/integrations?configure=<provider>`, which opens that setup, everybody else is told to ask one
 - [x] U68 Grid context menu - done (T: screens/grid-menu, server/objects; W): right-click, long press, the menu key or Shift+F10 on a time, a day, the all-day row or an event; new event / all-day / task due here / paste / go to day; open, edit, duplicate, copy (Ctrl/Cmd+C), move to calendar, color, respond, download, delete; a range selected first is the range it creates over; arrows step between day cells, Enter creates on the focused day, Ctrl/Cmd+V pastes there
+
+### Time area
+
+- [x] U69 Clock schema + migration (`ClockAlarm`, `ClockTimer`, `ClockStopwatch`, `20261215000000_calendar_time`) - done (C)
+- [x] U70 Clock engine + service (`lib/clock/model.ts`, `lib/clock/service.ts`, city/zone data in `lib/clock/cities.ts` and `engine/zone-countries.ts`) - done (T: test/calendar/clock, 57 tests)
+- [x] U71 Scheduler job + routes (`app/api/cron/calendar-clock`, `routes/api/calendar/time`, `routes/api/calendar/time/quick`) - done (T)
+- [x] U72 Screens: alarms, timers + focus cycles, stopwatch, world clock + meeting planner, `/calendar/time` (`screens/clock/*`) - done (C). Not driven in a real browser.
+- [x] U73 Header pill + event-editor zone compare (`screens/clock/time-indicator.tsx`, `screens/extension-slot.tsx`, `screens/event-editor.tsx`) - done (C)
+- [x] U74 App-host header slot + sub-minute scheduler tick for an installed app's jobs (`lib/app-extensions/{registry,types}.ts`, `lib/cron/scheduler.ts`, `components/app-host/client.tsx`) - done (T: test/build/app-host-contract, 318 tests). Generic to any app, not Calendar-specific - Calendar is its first user.
+- [x] U75 Clock commands from search: "timer 10m", "alarm 7:30", "stopwatch" (`parseClockCommand` in `@polaris/core`, `command-palette.tsx`, `search-rows.tsx`) - done (T: packages/core/test/clock-commands.test.ts, 7 tests; en-US + es-ES)
+- [x] U76 i18n `time.json` en-US + es-ES; monthly repeat's day/weekday/weekend option labels fixed (`rule.json`, both locales) - done (T: test/i18n, 2052 tests incl. lengths)
 - [ ] U64 CalDAV server for phones and desktop clients - deferred(phase 2, the one item the brief allowed: a WebDAV/CalDAV server with per-user app passwords is a project of its own)
