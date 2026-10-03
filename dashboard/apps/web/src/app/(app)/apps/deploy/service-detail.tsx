@@ -208,6 +208,9 @@ export function ServiceDetail({
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
+                // Its fields, switches and section edges are drawn a step clearer
+                // than the application's (globals.css, "The service panel's controls").
+                data-service-panel=""
                 className={cn(
                     "right-0 left-auto top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
                     full
