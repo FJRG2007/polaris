@@ -16,6 +16,7 @@
 import { z } from "zod";
 import * as login from "../../../../../../lib/minecraft/polaris-login";
 import * as service from "../../../../../../lib/minecraft/polaris-login-service";
+import { arrived } from "../../../../../../lib/minecraft/login-arrivals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -131,7 +132,9 @@ export async function POST(
                     body.data.player,
                     body.data.password
                 );
-                return created ? reply(200, { ok: true }) : reply(409, { error: "registered" });
+                if (!created) return reply(409, { error: "registered" });
+                arrived(server.installedAppId, body.data.player);
+                return reply(200, { ok: true });
             }
             case "login": {
                 const body = BODIES.login.safeParse(json);
@@ -142,9 +145,13 @@ export async function POST(
                     body.data.address
                 );
                 if (turnedAway) return reply(403, { error: "not-listed", refused: turnedAway });
-                return refused(
-                    await service.checkPassword(server, body.data.player, body.data.password)
+                const result = await service.checkPassword(
+                    server,
+                    body.data.player,
+                    body.data.password
                 );
+                if (result.kind === "ok") arrived(server.installedAppId, body.data.player);
+                return refused(result);
             }
             case "password": {
                 const body = BODIES.password.safeParse(json);
