@@ -12,6 +12,7 @@
 import { prisma } from "@polaris/db";
 import type { Language } from "./speech";
 import * as speechService from "./speech-service";
+import { chosenLanguage } from "./events/catalog";
 import { accountAgrees, connectedMinecraftNames } from "../link-agreement";
 
 /** The most of a name a greeting carries. */
@@ -45,10 +46,10 @@ export type WelcomeKind = "login" | "register";
 export function welcomeLine(kind: WelcomeKind, name: string, language: Language): string {
     if (kind === "register")
         return language === "es"
-            ? `Contraseña guardada. ¡Bienvenido, ${name}!`
+            ? `Contraseña guardada. ¡Hola, ${name}!`
             : `Password set. Welcome, ${name}!`;
     return language === "es"
-        ? `Sesión iniciada. ¡Bienvenido de vuelta, ${name}!`
+        ? `Sesión iniciada. ¡Hola de nuevo, ${name}!`
         : `Logged in. Welcome back, ${name}!`;
 }
 
@@ -79,7 +80,15 @@ export async function welcomeFor(
         });
         const name = user ? greetingName(user) : null;
         if (!name) return null;
-        const language = await speechService.accountLanguage(link.userId, "en");
+        const install = await prisma.installedApp.findUnique({
+            where: { id: server.installedAppId },
+            select: { config: true }
+        });
+        const home = await speechService.homeLanguage(
+            server.ownerId,
+            chosenLanguage((install?.config ?? {}) as Record<string, unknown>)
+        );
+        const language = await speechService.accountLanguage(link.userId, home);
         return welcomeLine(kind, name, language);
     } catch (error) {
         console.warn("polaris: the login welcome could not be read", server.installedAppId, String(error));

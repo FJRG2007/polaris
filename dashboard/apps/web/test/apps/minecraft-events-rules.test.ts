@@ -743,6 +743,21 @@ describe("a saved event that no longer reads whole", () => {
         ]);
     });
 
+    it("gives each event that was set back an id of its own", () => {
+        const fishing = catalog.newPreset("fishing", "fish");
+        const { id: _, ...noId } = { ...fishing, minutes: 2 };
+        const config = {
+            [catalog.EVENTS_KEY]: {
+                settings: settings(),
+                presets: [noId, noId, { ...fishing, minutes: 2 }, fishing],
+                schedules: []
+            }
+        };
+        const ids = catalog.readEventsConfig(config).presets.map((one) => one.id);
+        expect(ids).toEqual(["fishing-saved", "fishing-saved-2", "fish-2", "fish"]);
+        expect(catalog.repairedPresets(config).map((one) => one.id)).toEqual(ids.slice(0, 3));
+    });
+
     it("leaves out only what is not an event of a kind this version knows", () => {
         expect(catalog.repairPreset({ kind: "no-such-kind", id: "x" })).toBeNull();
         expect(catalog.repairPreset("nonsense")).toBeNull();

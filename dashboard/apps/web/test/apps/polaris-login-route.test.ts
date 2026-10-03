@@ -234,11 +234,13 @@ describe("registering and logging in", () => {
         expect(arrived).toEqual([`${SERVER}:Steve`, `${SERVER}:Steve`]);
     });
 
-    it("greets by name when Polaris knows who the player is, and says nothing extra when not", async () => {
+    it("greets by name on a matching password when Polaris knows who the player is, never on registering", async () => {
         greeting.value = null;
         const plain = await ask("register", { player: "Steve", password: "correct horse" });
         expect(await plain.json()).toEqual({ ok: true });
         greeting.value = "Logged in. Welcome back, Javier!";
+        const otherJoin = await ask("register", { player: "Alex", password: "correct horse" });
+        expect(await otherJoin.json()).toEqual({ ok: true });
         const named = await ask("login", { player: "Steve", password: "correct horse" });
         expect(await named.json()).toEqual({ ok: true, welcome: "Logged in. Welcome back, Javier!" });
         // A wrong password is never greeted.

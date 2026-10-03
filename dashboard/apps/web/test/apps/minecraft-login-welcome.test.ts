@@ -10,7 +10,8 @@ const db = vi.hoisted(() => ({
     link: null as null | { userId: string; player: string; followSignIns: boolean },
     user: null as null | { firstName: string | null; name: string },
     connected: [] as { userId: string; label: string }[],
-    fail: false
+    fail: false,
+    config: {} as Record<string, unknown>
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -22,12 +23,14 @@ vi.mock("@polaris/db", () => ({
             })
         },
         userConnection: { findMany: vi.fn(async () => db.connected) },
-        user: { findUnique: vi.fn(async () => db.user) }
+        user: { findUnique: vi.fn(async () => db.user) },
+        installedApp: { findUnique: vi.fn(async () => ({ config: db.config })) }
     }
 }));
 
 const locale = vi.hoisted(() => ({ value: "en-US" as string | null }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/speech-service", () => ({
+    homeLanguage: vi.fn(async (_ownerId: string, chosen: string | null) => chosen ?? "en"),
     accountLanguage: vi.fn(async (_userId: string, home: string) =>
         locale.value ? (/^es/.test(locale.value) ? "es" : "en") : home
     )
@@ -41,6 +44,7 @@ beforeEach(() => {
     db.user = { firstName: "Javier", name: "Javier Ruiz" };
     db.connected = [{ userId: "user-1", label: "Javi" }];
     db.fail = false;
+    db.config = {};
     locale.value = "en-US";
 });
 
@@ -70,10 +74,21 @@ describe("the greeting", () => {
         );
         locale.value = "es-ES";
         expect(await welcome.welcomeFor(SERVER, "javi", "login")).toBe(
-            "Sesión iniciada. ¡Bienvenido de vuelta, Javier!"
+            "Sesión iniciada. ¡Hola de nuevo, Javier!"
         );
         expect(await welcome.welcomeFor(SERVER, "Javi", "register")).toBe(
-            "Contraseña guardada. ¡Bienvenido, Javier!"
+            "Contraseña guardada. ¡Hola, Javier!"
+        );
+    });
+
+    it("is in the server's language for an account that has none of its own", async () => {
+        locale.value = null;
+        expect(await welcome.welcomeFor(SERVER, "Javi", "login")).toBe(
+            "Logged in. Welcome back, Javier!"
+        );
+        db.config = { events: { settings: { language: "es" } } };
+        expect(await welcome.welcomeFor(SERVER, "Javi", "login")).toBe(
+            "Sesión iniciada. ¡Hola de nuevo, Javier!"
         );
     });
 

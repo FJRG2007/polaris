@@ -135,10 +135,7 @@ export async function POST(
                 );
                 if (!created) return reply(409, { error: "registered" });
                 arrived(server.installedAppId, body.data.player);
-                // By the name of the Polaris account the player is, when there is one
-                // that agrees; the mod keeps its own line when this is absent.
-                const welcome = await welcomeFor(server, body.data.player, "register");
-                return reply(200, welcome ? { ok: true, welcome } : { ok: true });
+                return reply(200, { ok: true });
             }
             case "login": {
                 const body = BODIES.login.safeParse(json);
@@ -156,6 +153,10 @@ export async function POST(
                 );
                 if (result.kind !== "ok") return refused(result);
                 arrived(server.installedAppId, body.data.player);
+                // By the name of the Polaris account the player is, when there is one
+                // that agrees; the mod keeps its own line when this is absent. Not on
+                // registering: whoever joins first under a name sets its password, so
+                // only a password that matches is greeted by the account's name.
                 const welcome = await welcomeFor(server, body.data.player, "login");
                 return reply(200, welcome ? { ok: true, welcome } : { ok: true });
             }

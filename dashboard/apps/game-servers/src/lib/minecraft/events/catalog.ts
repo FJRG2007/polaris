@@ -1019,12 +1019,29 @@ export function repairedPresets(
 ): { id: string; name: string; reset: string[] }[] {
     const raw = config[EVENTS_KEY];
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return [];
-    const presets = (raw as { presets?: unknown }).presets;
-    return (Array.isArray(presets) ? presets : []).flatMap((entry) => {
+    return readPresets((raw as { presets?: unknown }).presets).flatMap(({ preset, reset }) =>
+        reset.length > 0 ? [{ id: preset.id, name: preset.name, reset }] : []
+    );
+}
+
+/**
+ * Every saved event that can still be read (`repairPreset`), each with an id of
+ * its own: one that had to be set back and shares its id with another - two
+ * left without one, or cut to the same length - takes a numbered one, so
+ * editing, scheduling or drawing it never reaches the other.
+ */
+function readPresets(list: unknown): { preset: EventPreset; reset: string[] }[] {
+    const read = (Array.isArray(list) ? list : []).flatMap((entry) => {
         const repaired = repairPreset(migratePreset(entry));
-        return repaired && repaired.reset.length > 0
-            ? [{ id: repaired.preset.id, name: repaired.preset.name, reset: repaired.reset }]
-            : [];
+        return repaired ? [repaired] : [];
+    });
+    const taken = new Set(read.filter((one) => one.reset.length === 0).map((one) => one.preset.id));
+    return read.map((one) => {
+        if (one.reset.length === 0) return one;
+        let id = one.preset.id;
+        for (let n = 2; taken.has(id); n++) id = `${one.preset.id.slice(0, 63 - String(n).length)}-${n}`;
+        taken.add(id);
+        return id === one.preset.id ? one : { ...one, preset: { ...one.preset, id } };
     });
 }
 
@@ -1112,16 +1129,14 @@ export function readEventsConfig(
     const value = raw as Record<string, unknown>;
     const saved = (value.settings as { defaults?: unknown } | undefined)?.defaults;
     const old = typeof saved !== "number" || saved < DEFAULTS_VERSION;
-    const presets = (Array.isArray(value.presets) ? value.presets : []).flatMap((entry) => {
-        // A king of the hill's own length first (`migratePreset`), then every
-        // kind's defaults, which leave a king of the hill's length to it.
-        // One that no longer reads whole keeps every part that does, the rest
-        // back to its kind's defaults (`repairPreset`), rather than vanishing
-        // from the list and the draw with nothing to say so.
-        const repaired = repairPreset(migratePreset(entry));
-        if (!repaired) return [];
-        return [old ? toKindDefaults(repaired.preset) : repaired.preset];
-    });
+    // A king of the hill's own length first (`migratePreset`), then every
+    // kind's defaults, which leave a king of the hill's length to it.
+    // One that no longer reads whole keeps every part that does, the rest
+    // back to its kind's defaults (`repairPreset`), rather than vanishing
+    // from the list and the draw with nothing to say so.
+    const presets = readPresets(value.presets).map(({ preset }) =>
+        old ? toKindDefaults(preset) : preset
+    );
     const ids = new Set(presets.map((preset) => preset.id));
     const schedules = (Array.isArray(value.schedules) ? value.schedules : []).flatMap((entry) => {
         const parsed = scheduleEntrySchema.safeParse(entry);

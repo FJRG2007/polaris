@@ -928,7 +928,7 @@ export function MinecraftEvents({
                     <p className="font-medium">{t("events.repairedTitle")}</p>
                     <ul className="mt-1 text-muted-foreground">
                         {view.repaired.map((one) => (
-                            <li key={one.name}>
+                            <li key={one.id}>
                                 {t("events.repairedOne", { name: one.name, count: one.count })}
                             </li>
                         ))}
