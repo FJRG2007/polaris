@@ -7,6 +7,12 @@
  * jumped to from the one before: two blocks up is more than anybody jumps. A
  * glass net a few blocks under the lowest row catches every fall, and a fall is
  * undone by sending the player back to their last checkpoint.
+ *
+ * Past the easy course, some jumps are traps: a slime pad that throws whoever
+ * lands on it up again, so the next jump starts in the air, and orange
+ * platforms that vanish for two seconds in every six (`blinkLines`) - wait for
+ * them, or be on them when they go. Never two traps in a row, never the start,
+ * a checkpoint or the finish, and every fall is still only back to a checkpoint.
  */
 
 import { seeded } from "../trivia-bank";
@@ -15,6 +21,9 @@ import { IN_ARENA, type Box, type Spot, type Volume } from "./stage";
 
 export type Role = "start" | "jump" | "checkpoint" | "finish";
 
+/** A jump that is more than a jump. */
+export type Trap = "slime" | "vanish";
+
 /** One platform: its lowest corner, how wide it is each way, what it is for. */
 export interface Platform {
     readonly x: number;
@@ -22,6 +31,7 @@ export interface Platform {
     readonly z: number;
     readonly size: number;
     readonly role: Role;
+    readonly trap?: Trap;
 }
 
 export interface Course {
@@ -30,6 +40,8 @@ export interface Course {
     readonly checkpoints: readonly number[];
     /** What is built, in order: the net, the platforms, the finish plate. */
     readonly boxes: readonly Box[];
+    /** The platforms that vanish and come back (`blinkLines`). */
+    readonly vanishing: readonly Box[];
     /** Everything it takes up, net to headroom: all of it must be air. */
     readonly volume: Volume;
     /** The lowest a player standing on it can be; below this they fell. */
@@ -52,12 +64,17 @@ export const FINISH_BASE = 100_000;
 const STEPS: Readonly<
     Record<
         EventOptions<"parkour">["difficulty"],
-        { size: number; gaps: readonly number[]; shift: number }
+        { size: number; gaps: readonly number[]; shift: number; slime: number; vanish: number }
     >
 > = {
-    easy: { size: 2, gaps: [1, 2], shift: 0 },
-    medium: { size: 1, gaps: [1, 2], shift: 1 },
-    hard: { size: 1, gaps: [2, 3], shift: 1 }
+    easy: { size: 2, gaps: [1, 2], shift: 0, slime: 0.1, vanish: 0 },
+    medium: { size: 1, gaps: [1, 2], shift: 1, slime: 0.15, vanish: 0.2 },
+    hard: { size: 1, gaps: [2, 3], shift: 1, slime: 0.2, vanish: 0.3 }
+};
+
+const TRAP_BLOCKS: Readonly<Record<Trap, Box["block"]>> = {
+    slime: "minecraft:slime_block",
+    vanish: "minecraft:orange_concrete"
 };
 
 const BLOCKS: Readonly<Record<Role, Box["block"]>> = {
@@ -116,7 +133,24 @@ function laidOut(options: EventOptions<"parkour">, seed: string): Platform[] {
             index -= 1;
             continue;
         }
-        platforms.push({ x, y: current.y, z: track - Math.floor(size / 2) + shift, size, role });
+        // A trap now and then, on a plain jump only, never two in a row.
+        const roll = random();
+        const trap: Trap | undefined =
+            role !== "jump" || current.trap || index < 2
+                ? undefined
+                : roll < step.vanish
+                  ? "vanish"
+                  : roll < step.vanish + step.slime
+                    ? "slime"
+                    : undefined;
+        platforms.push({
+            x,
+            y: current.y,
+            z: track - Math.floor(size / 2) + shift,
+            size,
+            role,
+            ...(trap ? { trap } : {})
+        });
     }
     return platforms;
 }
@@ -159,21 +193,19 @@ export function course(
         z2: finish.z + 1,
         block: "minecraft:light_weighted_pressure_plate"
     };
-    const boxes: Box[] = [
-        net,
-        ...platforms.map((one) => ({
-            x1: one.x,
-            y1: one.y,
-            z1: one.z,
-            x2: one.x + one.size - 1,
-            y2: one.y,
-            z2: one.z + one.size - 1,
-            block: BLOCKS[one.role]
-        })),
-        plate
-    ];
+    const boxOf = (one: Platform): Box => ({
+        x1: one.x,
+        y1: one.y,
+        z1: one.z,
+        x2: one.x + one.size - 1,
+        y2: one.y,
+        z2: one.z + one.size - 1,
+        block: one.trap ? TRAP_BLOCKS[one.trap] : BLOCKS[one.role]
+    });
+    const boxes: Box[] = [net, ...platforms.map(boxOf), plate];
     return {
         platforms,
+        vanishing: platforms.filter((one) => one.trap === "vanish").map(boxOf),
         checkpoints: platforms.flatMap((one, index) =>
             one.role === "checkpoint" || one.role === "finish" ? [index] : []
         ),
@@ -189,6 +221,29 @@ export function course(
         floor: y,
         reach: Math.ceil(Math.hypot(maxX - minX, maxZ - minZ) / 2)
     };
+}
+
+/** How long a vanishing platform's cycle is, and how much of it it is gone for. */
+export const BLINK_MS = 6_000;
+export const GONE_MS = 2_000;
+
+/**
+ * The vanishing platforms as they should be now: gone for the last `GONE_MS`
+ * of every `BLINK_MS`, there the rest of the time. Taken out only where they
+ * are still theirs, and put back only into air.
+ */
+export function blinkLines(course: Course, now: number): string[] {
+    if (course.vanishing.length === 0) return [];
+    const gone = now % BLINK_MS >= BLINK_MS - GONE_MS;
+    return course.vanishing.map((box) => (gone ? removeBox(box) : buildBox(box)));
+}
+
+function buildBox(box: Box): string {
+    return `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} ${box.block} keep`;
+}
+
+function removeBox(box: Box): string {
+    return `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`;
 }
 
 /** Standing on a platform: over it, within a little of its edges, feet on its top. */

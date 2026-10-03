@@ -42,6 +42,8 @@ interface World {
     dims: Record<string, string>;
     /** The game's running damage counts, per player. */
     hurt: Record<string, number>;
+    /** Damage each player has dealt, as `pe_hit` counts it. */
+    dealt: Record<string, number>;
     /** Players standing perfectly still, looking the same way. */
     still: string[];
     /** Players in creative or spectator. */
@@ -206,6 +208,7 @@ const world: World = {
     unknownItems: [],
     dims: {},
     hurt: {},
+    dealt: {},
     still: [],
     creative: [],
     difficulty: "Normal",
@@ -1089,7 +1092,7 @@ function answer(sent: string): string {
         return world.online
             .map(
                 (name) =>
-                    `${name} has ${counted[1] === "pe_hurt" ? (world.hurt[name] ?? 0) : 0} [${counted[1]}]`
+                    `${name} has ${(counted[1] === "pe_hurt" ? world.hurt : world.dealt)[name] ?? 0} [${counted[1]}]`
             )
             .join("\n");
     }
@@ -1618,6 +1621,9 @@ const { readEventState } = await import("@polaris-app/game-servers/src/lib/minec
 const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-message");
 const commands = await import("@polaris-app/game-servers/src/lib/minecraft/events/commands");
 const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/events/messages");
+const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/plan");
+const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
+const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 
 /** What a player reads of a command's text: the words of its JSON, without the
  *  formatting that splits them into parts (a highlighted name, a number). */
@@ -1692,6 +1698,7 @@ beforeEach(() => {
     world.unknownItems = [];
     world.dims = {};
     world.hurt = {};
+    world.dealt = {};
     world.still = [];
     world.creative = [];
     world.difficulty = "Normal";
@@ -2323,6 +2330,35 @@ describe("the minute sweep", () => {
 });
 
 describe("trivia", () => {
+    it("remembers what a game asked, and the next game asks other questions first", async () => {
+        const quiz = {
+            ...newPreset("trivia", "quiz"),
+            options: { rounds: 3, seconds: 15, mode: "questions" as const, questions: [] }
+        };
+        setUp([quiz]);
+        const play1 = async () => {
+            await events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "quiz",
+                trigger: "manual",
+                startedBy: null
+            });
+            const run = state().run!;
+            await play(4_100);
+            await events.cancelEvent("owner", SERVER);
+            await play(4_200);
+            return run;
+        };
+        const first = await play1();
+        const asked = state().triviaSeen;
+        expect(asked.length).toBeGreaterThan(0);
+        expect(asked[0]).toBe(triviaBank.ordered(first.id, [])[0]!.id);
+        const second = await play1();
+        expect(second.triviaSkip).toEqual(asked);
+        expect(asked).not.toContain(triviaBank.ordered(second.id, second.triviaSkip)[0]!.id);
+    });
+
     it("reads the chat for the first right answer and scores the rounds", async () => {
         const quiz = {
             ...newPreset("trivia", "quiz"),
@@ -3042,10 +3078,11 @@ describe("the others", () => {
             startedBy: null
         });
         await play(8_100);
+        // On its platform, floating over whatever is under it.
         expect(
             world.sent.some((line) =>
-                line.includes(
-                    "positioned 300.5 70 0.5 as @a[distance=..6,gamemode=!spectator] run scoreboard players add @s pe_score 2"
+                /positioned 300\.5 \d+ 0\.5 as @a\[distance=\.\.6,gamemode=!spectator\] run scoreboard players add @s pe_score 2/.test(
+                    line
                 )
             )
         ).toBe(true);
@@ -3087,66 +3124,54 @@ describe("the others", () => {
 
     it("gives up a place on somebody's build and says it could not find one", async () => {
         world.built = true;
-        const hill = { ...walkInHill(), minutes: 3 };
-        setUp([hill]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
-            presetId: "hill",
+            presetId: "drop",
             trigger: "manual",
             startedBy: null
         });
         await play(150_000);
-        expect(
-            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
-        ).toBe(false);
+        expect(world.sent.some((line) => /setblock .* minecraft:chest/.test(line))).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
-        // Where it looked and what stopped it: on the land, then over the sea.
+        // Where it looked and what stopped it.
         const search = state().history[0]?.search;
-        expect(search?.overSea).toBe(true);
-        // Its own tries on the land and over the sea, and the ones a search that
-        // comes in near a home has besides (NEAR_TRIES).
-        expect(search?.tries).toBe(40);
+        expect(search?.tries).toBeGreaterThan(0);
         expect(search?.from?.near).toMatch(/^(Ana|Ben)$/);
         // This world answers that every column stands on a tree: rough ground, every try.
-        expect(search?.why).toEqual([{ why: "uneven", count: 40 }]);
+        expect(search?.why).toEqual([{ why: "uneven", count: search?.tries }]);
     });
 
     it("judges the ground by older names on a server that refuses the newest", async () => {
         world.built = true;
         world.refusedGround = ["leaf_litter"];
-        const hill = { ...walkInHill(), minutes: 3 };
-        setUp([hill]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
-            presetId: "hill",
+            presetId: "drop",
             trigger: "manual",
             startedBy: null
         });
         await play(150_000);
-        expect(
-            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
-        ).toBe(false);
+        expect(world.sent.some((line) => /setblock .* minecraft:chest/.test(line))).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
     });
 
     it("keeps judging the ground after a column that could not be read", async () => {
         world.built = true;
         world.unsureGround = 2;
-        const hill = { ...walkInHill(), minutes: 3 };
-        setUp([hill]);
+        setUp([{ ...newPreset("supply-drop", "drop"), minutes: 3 }]);
         await events.startEvent({
             ownerId: "owner",
             installedAppId: SERVER,
-            presetId: "hill",
+            presetId: "drop",
             trigger: "manual",
             startedBy: null
         });
         await play(150_000);
-        expect(
-            world.sent.some((line) => line.includes("run scoreboard players add @s pe_score"))
-        ).toBe(false);
+        expect(world.sent.some((line) => /setblock .* minecraft:chest/.test(line))).toBe(false);
         expect(state().history[0]?.outcome).toBe("failed");
     });
 
@@ -3472,9 +3497,9 @@ describe("where the players are, and what they are doing", () => {
         setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
         await events.sweepEvents();
         await play(15 * 60_000);
-        world.hurt = { Ana: 40 };
+        world.dealt = { Ana: 40 };
         await events.sweepEvents();
-        world.hurt = { Ana: 55 };
+        world.dealt = { Ana: 55 };
         const held = await events.sweepEvents();
         expect(held.started).toBe(0);
         expect(gameMessageIn("en-US", state().waiting ?? "")).toBe(
@@ -3487,6 +3512,68 @@ describe("where the players are, and what they are doing", () => {
         await play(100_000);
         const started = await events.sweepEvents();
         expect(started.started).toBe(1);
+    });
+
+    it("does not take damage taken alone for a fight", async () => {
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], draw("fish"));
+        world.hurt = { Ana: 40 };
+        await events.sweepEvents();
+        await play(14 * 60_000);
+        await events.sweepEvents();
+        await play(60_000);
+        // Hurt since the last look - hunger, a fall - and the draw still goes.
+        world.hurt = { Ana: 55 };
+        expect((await events.sweepEvents()).started).toBe(1);
+        expect(plan.busy(playing.seenOn(SERVER)!.get("ana")!, Date.now())).toBe(false);
+    });
+
+    it("waits one more look after the players it was short of come, then starts", async () => {
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }], { ...draw("fish"), minActive: 3 });
+        await events.sweepEvents();
+        await play(15 * 60_000);
+        expect((await events.sweepEvents()).started).toBe(0);
+        expect(state().short).toBe(true);
+        world.online = ["Ana", "Ben", "Cai"];
+        // Cai is seen, then seen to move: only then is the draw ready.
+        await play(60_000);
+        expect((await events.sweepEvents()).started).toBe(0);
+        await play(60_000);
+        expect((await events.sweepEvents()).started).toBe(0);
+        expect(gameMessageIn("en-US", state().waiting ?? "")).toMatch(/one more check/);
+        await play(100_000);
+        expect((await events.sweepEvents()).started).toBe(1);
+        expect(state().short).toBe(false);
+    });
+
+    it("draws one now from the screen, and says why the others could not", async () => {
+        const duel = { ...newPreset("team-duel", "duel"), minPlayers: 4 };
+        setUp([{ ...newPreset("fishing", "fish"), minutes: 5 }, duel], {
+            ...draw("fish"),
+            random: {
+                ...draw("fish").random,
+                pool: [
+                    { presetId: "fish", weight: 1 },
+                    { presetId: "duel", weight: 1 }
+                ]
+            }
+        });
+        await events.sweepEvents();
+        await play(60_000);
+        await events.sweepEvents();
+        const drawn = await events.runRandomNow({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            startedBy: "user"
+        });
+        expect(drawn.run?.preset.id).toBe("fish");
+        expect(drawn.run?.trigger).toBe("random");
+        expect(drawn.skipped.map((one) => one.presetId)).toEqual(["duel"]);
+        expect(state().nextRandomAt).not.toBeNull();
+        const view = await events.eventsView(SERVER);
+        expect(view.lastRandom?.name).toBe(drawn.run?.preset.name);
+        await expect(
+            events.runRandomNow({ ownerId: "owner", installedAppId: SERVER, startedBy: "user" })
+        ).rejects.toThrow();
     });
 
     it("counts only the Overworld for an event that happens there", async () => {
@@ -3800,75 +3887,48 @@ describe("a treasure hunt", () => {
     };
     const at = (chest: { x: number; y: number; z: number }) => `${chest.x} ${chest.y} ${chest.z}`;
 
-    it("hides its chests only into air, tells the clues, points the way and scores whoever opens one", async () => {
+    it("hides one rich treasure only into air, shows where it is to everybody, and scores whoever opens it", async () => {
         world.markFollows = true;
+        // A preset saved with several chests is played with one.
         await start();
         await play(30_000);
         const run = state().run!;
         expect(run.hidden).toBe(true);
-        expect(run.chests).toHaveLength(3);
-        expect(world.chests).toEqual(run.chests.map(at));
-        // Each one on ground judged open, and kept loaded.
-        for (const chest of run.chests)
-            expect(world.sent).toContain(
-                `execute in minecraft:overworld run forceload add ${chest.x} ${chest.z}`
-            );
+        expect(run.chests).toHaveLength(1);
+        const chest = run.chests[0]!;
+        expect(world.chests).toEqual([at(chest)]);
+        // The richest table by default.
+        expect(world.sent.some((line) => line.includes("minecraft:chests/bastion_treasure"))).toBe(
+            true
+        );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run forceload add ${chest.x} ${chest.z}`
+        );
         expect(touchesBlocks(world.sent)).toEqual([]);
-        // Spread round the players, each its own way and apart.
-        for (const [index, one] of run.chests.entries())
-            for (const other of run.chests.slice(index + 1))
-                expect(Math.hypot(one.x - other.x, one.z - other.z)).toBeGreaterThanOrEqual(16);
-        // One line saying how many there are - no clues - a column of light over
-        // every one from the start, and the way in every action bar.
+        // One line saying it is out there, a column of light over it, and the way in
+        // every action bar, always.
         const told = world.sent.filter(
-            (line) =>
-                line.startsWith("tellraw @a") && visible(line).includes("treasures are hidden")
+            (line) => line.startsWith("tellraw @a") && visible(line).includes("treasure is hidden")
         );
         expect(told).toHaveLength(1);
-        expect(visible(told[0]!)).toContain("3 treasures are hidden");
-        expect(world.sent.some((line) => /Treasure \d: /.test(visible(line)))).toBe(false);
-        for (const chest of run.chests)
-            expect(world.sent).toContain(
-                `execute in minecraft:overworld run particle minecraft:end_rod ${chest.x + 0.5} ${chest.y + 8} ${chest.z + 0.5} 0 8 0 0.01 60 force`
-            );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run particle minecraft:end_rod ${chest.x + 0.5} ${chest.y + 8} ${chest.z + 0.5} 0 8 0 0.01 60 force`
+        );
         const bar = world.sent.find((line) => line.startsWith("title Ana actionbar"));
-        expect(visible(bar ?? "")).toMatch(/Treasure: \d+ m \S+ \(3\/3\)/);
+        expect(visible(bar ?? "")).toMatch(/Treasure: \d+ m \S+ \(1\/1\)/);
 
-        world.opened.push(at(run.chests[0]!));
+        world.opened.push(at(chest));
         await play(2_100);
-        expect(state().run?.points).toEqual({ Ana: 1 });
-        expect(state().run?.chests[0]).toMatchObject({ opened: true, by: "Ana" });
-        expect(world.sent).toContain("scoreboard players set Ana pe_score 1");
-
-        // Nothing more is said in the chat until the next is opened.
-        const said = world.sent.filter((line) => line.startsWith("tellraw @a")).length;
-        await play(3 * 60_000);
-        expect(world.sent.filter((line) => line.startsWith("tellraw @a")).length).toBe(said);
-        // The one opened has no column any more.
-        const first = run.chests[0]!;
-        const since = world.sent.lastIndexOf("scoreboard players set Ana pe_score 1");
-        expect(
-            world.sent
-                .slice(since)
-                .some((line) =>
-                    line.includes(
-                        `particle minecraft:end_rod ${first.x + 0.5} ${first.y + 8} ${first.z + 0.5} `
-                    )
-                )
-        ).toBe(false);
-
-        await play(7 * 60_000);
         const after = readEventState(config);
         expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("All 1 treasure found");
         expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
         expect(world.sent).toContain("give Ana minecraft:diamond 5");
-        // The opened chest is Ana's and stays; the two nobody found are gone.
-        expect(world.chests).toEqual([at(run.chests[0]!)]);
-        for (const one of run.chests)
-            expect(world.sent).toContain(
-                `execute in minecraft:overworld run forceload remove ${one.x} ${one.z}`
-            );
-        expect(world.sent.some((line) => line.includes("never found"))).toBe(true);
+        // The opened chest is Ana's and stays.
+        expect(world.chests).toEqual([at(chest)]);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run forceload remove ${chest.x} ${chest.z}`
+        );
     });
 
     it("ends as soon as every chest is open", async () => {
@@ -3878,9 +3938,9 @@ describe("a treasure hunt", () => {
         world.opened.push(...state().run!.chests.map(at));
         await play(2_100);
         const entry = state().history[0];
-        expect(entry?.note).toBe("All 2 treasures found");
-        expect(entry?.podium).toEqual([{ place: 1, name: "Ana", score: 2 }]);
-        expect(world.chests).toHaveLength(2);
+        expect(entry?.note).toBe("All 1 treasure found");
+        expect(entry?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
+        expect(world.chests).toHaveLength(1);
     });
 
     it("called off, takes away exactly the chests it put down and nothing else", async () => {
@@ -3889,7 +3949,7 @@ describe("a treasure hunt", () => {
         await start();
         await play(30_000);
         const placed = state().run!.chests.map(at);
-        expect(placed).toHaveLength(3);
+        expect(placed).toHaveLength(1);
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
         expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
@@ -3906,7 +3966,7 @@ describe("a treasure hunt", () => {
         await play(30_000);
         const run = state().run!;
         expect(run.hidden).toBe(true);
-        expect(run.chests.map((one) => one.was)).toEqual(["short_grass", "short_grass"]);
+        expect(run.chests.map((one) => one.was)).toEqual(["short_grass"]);
         expect(world.chests).toEqual(run.chests.map(at));
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
@@ -4300,11 +4360,17 @@ describe("a horde defense", () => {
         // value written down first.
         expect(world.sent).toContain("gamerule keepInventory true");
         expect(world.sent).toContain("gamerule mobGriefing false");
+        // And night, held, with clear weather: mobs that burn in the sun would
+        // never reach the defenders.
         expect(state().run?.gamerules).toEqual({
             keepInventory: "false",
             mobGriefing: "true",
-            sendCommandFeedback: "true"
+            sendCommandFeedback: "true",
+            doDaylightCycle: "true",
+            doWeatherCycle: "true"
         });
+        expect(world.sent).toContain("time set 18000");
+        expect(world.sent.some((line) => /^weather clear \d+s$/.test(line))).toBe(true);
         expect(state().run?.place).toEqual({ x: 300, y: 70, z: 0 });
         expect(state().run?.chunks).toHaveLength(25);
         const held = holds();
@@ -5034,8 +5100,8 @@ describe("a parkour race", () => {
         expect(world.sent).toContain("gamerule doInsomnia true");
         expect(world.daylightCycle).toBe("true");
         expect(world.insomnia).toBe("true");
-        // The world goes on from midday: the time is not wound back.
-        expect(world.sent.slice(end).some((line) => line.startsWith("time set"))).toBe(false);
+        // The time of day it had before is put back.
+        expect(world.sent.slice(end)).toContain("time set 6000");
     });
 
     it("leaves a day already held, and phantoms already off, just as they were - under their 1.21.11 names too", async () => {
@@ -5141,14 +5207,78 @@ describe("a parkour race", () => {
         await startArena("race");
         await play(2_100);
         chat(["Ana", "join"], ["Ben", "join"]);
-        await play(120_000);
+        await play(600_000);
         const after = state();
         expect(after.history[0]).toMatchObject({ outcome: "failed" });
+        expect(after.history[0]?.note).toBe("No open air was found for it near the players");
         expect(
             world.sent.some((line) => line.endsWith(" keep") && !line.includes("structure_void"))
         ).toBe(false);
         expect(world.sent.some((line) => / tp (Ana|Ben) /.test(line))).toBe(false);
         keptTheRules();
+    });
+});
+
+describe("an event built in the air", () => {
+    const race = () => ({
+        ...newPreset("parkour", "race"),
+        minutes: 5,
+        options: {
+            place: { mode: "players" as const },
+            jumps: 12,
+            difficulty: "medium" as const,
+            height: 30
+        }
+    });
+
+    it("goes up over a densely built area: only the air it takes counts", async () => {
+        // Every column answers that it stands on something built.
+        world.built = true;
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        expect(state().run?.stage?.built).toBe(true);
+        // Measured over the highest thing in its footprint, roofs and crowns included.
+        expect(
+            world.sent.some((line) => line.includes("positioned over motion_blocking run summon"))
+        ).toBe(true);
+        expect(state().run?.placeLog.some((one) => one.why === "built")).toBe(false);
+    });
+
+    it("is held near the players in the Overworld when another is in the Nether", async () => {
+        world.online = ["Ana", "Ben"];
+        world.dims = { Ben: "minecraft:the_nether" };
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        expect(state().run?.stage?.built).toBe(true);
+        expect(state().run?.placeFrom?.near).toBe("Ana");
+        // Ben is brought in from the Nether, his things kept for him like anybody's.
+        expect(
+            state()
+                .run?.stage?.saved.map((one) => one.name)
+                .sort()
+        ).toEqual(["Ana", "Ben"]);
+        expect(
+            world.sent.some((line) => /^execute in minecraft:overworld run tp Ben /.test(line))
+        ).toBe(true);
+    });
+
+    it("says nobody is in the Overworld rather than that there was no ground", async () => {
+        world.online = ["Ana", "Ben"];
+        world.dims = { Ana: "minecraft:the_nether", Ben: "minecraft:the_end" };
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(60_000);
+        expect(state().history[0]?.outcome).toBe("failed");
+        expect(state().history[0]?.note).toBe("Nobody is in the Overworld to hold it near");
     });
 });
 
@@ -5180,10 +5310,10 @@ describe("a parkour race on a server before 1.16", () => {
 });
 
 describe("spleef", () => {
-    const floor = () => ({
+    const floor = (variant: "random" | "shovel" | "decay" | "snowballs" = "shovel") => ({
         ...newPreset("spleef", "floor"),
         minutes: 5,
-        options: { place: { mode: "players" as const }, size: 6, height: 30 }
+        options: { place: { mode: "players" as const }, size: 6, height: 30, variant }
     });
 
     it("hands out a marked shovel, sends whoever falls through home, and the last one standing wins", async () => {
@@ -5207,7 +5337,11 @@ describe("spleef", () => {
         expect(world.sent.some((line) => line.includes("snowball"))).toBe(false);
 
         const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
-        world.at.Ben = [arenaAt.center.x, arenaAt.floor - 3, arenaAt.center.z];
+        // A drop to the floor below is not out; through the lowest one is.
+        world.at.Ben = [arenaAt.center.x, arenaAt.floors[1]! + 1, arenaAt.center.z];
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(true);
+        world.at.Ben = [arenaAt.center.x, arenaAt.floors.at(-1)! - 3, arenaAt.center.z];
         await play(2_100);
         expect(world.inside.has("Ben")).toBe(false);
         expect(
@@ -5215,7 +5349,7 @@ describe("spleef", () => {
                 (line) => line.startsWith("tellraw @a") && visible(line).includes("Ben is out")
             )
         ).toBe(true);
-        world.at.Cy = [arenaAt.center.x, arenaAt.floor - 3, arenaAt.center.z];
+        world.at.Cy = [arenaAt.center.x, arenaAt.floors.at(-1)! - 3, arenaAt.center.z];
         await play(4_100);
 
         const after = state();
@@ -5230,6 +5364,50 @@ describe("spleef", () => {
         expect(world.inside.size).toBe(0);
         keptTheRules();
         expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("in the decay game, turns the snow underfoot red and takes it, and clears every red block at the end", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([floor("decay")]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        await play(8_000);
+        const run = state().run!;
+        // No tool at all: the floor goes by itself.
+        expect(world.sent.some((line) => line.includes("iron_shovel"))).toBe(false);
+        expect(run.stage?.boxes.some((box) => box.block === spleef.WARN)).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes(`if block ~ ~-1 ~ ${spleef.FLOOR}`) &&
+                    line.endsWith(`run setblock ~ ~-1 ~ ${spleef.WARN}`)
+            )
+        ).toBe(true);
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        expect(
+            world.sent.some((line) => line.endsWith(`minecraft:air replace ${spleef.WARN}`))
+        ).toBe(true);
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("in the snowball game, hands out marked snowballs and no shovel", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([floor("snowballs")]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        await play(8_000);
+        expect(world.sent).toContain(
+            "give Ana minecraft:snowball[minecraft:custom_data={polaris_event:1b}] 16"
+        );
+        expect(world.sent.some((line) => line.includes("iron_shovel"))).toBe(false);
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        expect(world.sent).toContain("clear Ana *[minecraft:custom_data={polaris_event:1b}]");
     });
 
     it("is called off before anything is built when too few join, and moves nobody", async () => {
@@ -5474,7 +5652,7 @@ function onlyOurBlocks(): void {
 }
 
 /** A run that joined, built and brought everybody in: countdown, joins, setup. */
-async function joinAndStart(presetId: string): Promise<void> {
+async function joinAndStart(presetId: string, joiners = ["Ana", "Ben"]): Promise<void> {
     await events.startEvent({
         ownerId: "owner",
         installedAppId: SERVER,
@@ -5486,9 +5664,12 @@ async function joinAndStart(presetId: string): Promise<void> {
     // give time to type join.
     expect(state().run!.startsAt - state().run!.createdAt).toBe(catalog.JOIN_SECONDS * 1000);
     await play(2_100);
-    chat(["Ana", "join"], ["Ben", "unirse"], ["Cy", "hello"]);
+    chat(...joiners.map((name): [string, string] => [name, name === "Ben" ? "unirse" : "join"]), [
+        "Dee",
+        "hello"
+    ]);
     await play(30_000);
-    expect(state().run?.joined).toEqual(["Ana", "Ben"]);
+    expect(state().run?.joined).toEqual(joiners);
     await play(20_000);
 }
 
@@ -6070,10 +6251,10 @@ function fakeServer() {
 describe("a king of the hill", () => {
     const fists = () => ({ ...catalog.newPreset("king-of-the-hill", "hill"), minutes: 3 });
 
-    it("is four minutes long and fists only unless the operator says otherwise", () => {
+    it("is three minutes long and fists only unless the operator says otherwise", () => {
         const fresh = catalog.newPreset("king-of-the-hill", "hill");
         expect(fresh.minutes).toBe(catalog.HILL_MINUTES);
-        expect(catalog.HILL_MINUTES).toBe(4);
+        expect(catalog.HILL_MINUTES).toBe(3);
         expect((fresh.options as { fistsOnly: boolean }).fistsOnly).toBe(true);
         expect(catalog.playsInArena(fresh)).toBe(true);
         expect(catalog.takesJoiners(fresh)).toBe(true);
@@ -6081,7 +6262,7 @@ describe("a king of the hill", () => {
         expect(catalog.playsInArena(walkInHill())).toBe(false);
     });
 
-    it("reads one saved on the old ten minutes as four, and leaves any other length alone", () => {
+    it("reads one saved on the old ten or four minutes as three, and leaves any other length alone", () => {
         const old = (
             minutes: number,
             options: Record<string, unknown> = { place: { mode: "players" }, radius: 6 }
@@ -6095,6 +6276,7 @@ describe("a king of the hill", () => {
                 settings: {},
                 presets: [
                     old(10),
+                    old(4),
                     old(15),
                     old(10, { place: { mode: "players" }, radius: 6, fistsOnly: false }),
                     { ...catalog.newPreset("mining-rush", "rush"), minutes: 10 }
@@ -6103,7 +6285,8 @@ describe("a king of the hill", () => {
             }
         });
         expect(read.presets.map((one) => [one.id, one.minutes])).toEqual([
-            ["hill-10", 4],
+            ["hill-10", 3],
+            ["hill-4", 3],
             ["hill-15", 15],
             ["hill-10", 10],
             // Any other kind still on the old ten minutes takes its own default.
@@ -6139,9 +6322,32 @@ describe("a king of the hill", () => {
         // keepInventory held.
         expect(world.sent).toContain("gamerule keepInventory true");
         await play(2_100);
-        // Nobody can die: Resistance V, and hunger never gets there.
-        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 4 true");
-        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:saturation 10 0 true");
+        // The hill wears down whoever is off it - only while they have more than
+        // three hearts - and mends whoever holds it; a punch is softened, its
+        // knockback left whole; a fall off it is slow.
+        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 3 true");
+        expect(world.sent).toContain("scoreboard objectives add pe_khp health");
+        expect(world.sent).toContain(
+            "effect give @a[tag=pe_arena,scores={pe_khp=7..}] minecraft:poison 3 1 true"
+        );
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("minecraft:slow_falling 3 0 true") &&
+                    line.includes("@a[tag=pe_arena,x=")
+            )
+        ).toBe(true);
+        const place0 = state().run!.place!;
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld positioned ${place0.x + 0.5} ${place0.y} ${place0.z + 0.5} as @a[tag=pe_arena,distance=..6] run effect give @s minecraft:regeneration 3 1 true`
+        );
+        expect(world.sent.some((line) => line.includes("resistance 10 4"))).toBe(false);
+        // The side panel reads each time held as a time.
+        world.scores = { Ana: 75 };
+        await play(2_100);
+        expect(world.sent).toContain(
+            'scoreboard players display numberformat Ana pe_score fixed {"text":"1.3 min"}'
+        );
         // Only those it brought score.
         expect(
             world.sent.some((line) =>
@@ -6179,7 +6385,6 @@ describe("a king of the hill", () => {
         await joinAndStart("hill");
         await play(30_000);
         const run = state().run!;
-        expect(run.overSea).toBe(true);
         expect(run.arena?.blocks).toEqual(["minecraft:smooth_stone"]);
         expect(run.readyAt).not.toBeNull();
         // Only into air proven empty.
@@ -6667,17 +6872,15 @@ describe("a treasure hunt on 1.13, which has no `execute if data`", () => {
             trigger: "manual",
             startedBy: null
         });
-        for (let tick = 0; tick < 60 && (state().run?.chests.length ?? 0) < 2; tick += 1)
+        for (let tick = 0; tick < 60 && (state().run?.chests.length ?? 0) < 1; tick += 1)
             await play(2_100);
-        expect(state().run?.chests).toHaveLength(2);
+        expect(state().run?.chests).toHaveLength(1);
         const [first] = state().run!.chests;
-        world.opened.push(`${first!.x} ${first!.y} ${first!.z}`);
-        await play(4_200);
-        expect(state().run?.chests.filter((one) => one.opened)).toHaveLength(1);
         await events.cancelEvent("owner", SERVER);
         await play(4_200);
-        // The unopened one is gone, the opened one is the finder's.
-        expect(world.chests).toEqual([`${first!.x} ${first!.y} ${first!.z}`]);
+        // Nobody opened it: it is gone again.
+        expect(world.chests).toEqual([]);
+        expect(first).toBeDefined();
     });
 });
 
@@ -6861,27 +7064,33 @@ describe("a build battle", () => {
             }
         };
         setUp([battle]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         const run = state().run!;
         expect(run.readyAt).not.toBeNull();
         expect(run.theme).toBe("A lighthouse");
         expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
         expect(
             fills().filter((line) => line.includes("minecraft:white_stained_glass keep"))
-        ).toHaveLength(2);
-        // Their own blocks cannot go down in adventure mode; the kit's glass only on the plot.
+        ).toHaveLength(3);
+        // Their own blocks cannot go down in adventure mode; the kit's blocks only on the plot.
         expect(world.sent).toContain("gamemode adventure Ben");
         const kit = world.sent.filter((line) => line.startsWith("give Ana "));
-        expect(kit).toHaveLength(17);
+        const palette = build.PALETTES[build.paletteFor(run.id)];
+        expect(kit).toHaveLength(palette.blocks.length + 1);
         expect(kit.every((line) => line.includes("minecraft:custom_data={polaris_event:1b}"))).toBe(
             true
         );
         // The brush first, into the hotbar; then the glass.
         expect(kit[0]).toContain("minecraft:stick[");
         expect(kit[1]).toContain('minecraft:can_place_on={blocks:["minecraft:white_stained_glass"');
+        expect(kit[1]).toContain(palette.blocks[0]);
+        // The theme, and the material the round is built in.
         expect(
             world.sent.some(
-                (line) => line.startsWith("title Ana subtitle") && line.includes("A lighthouse")
+                (line) =>
+                    line.startsWith("title Ana subtitle") &&
+                    line.includes("A lighthouse") &&
+                    line.includes(palette.name.en)
             )
         ).toBe(true);
 
@@ -7000,11 +7209,11 @@ describe("a build battle's [Done] button", () => {
         );
 
     it("is offered a minute in, and ends the building at once when every builder pressed it", async () => {
-        world.online = ["Ana", "Ben", "Cy"];
+        world.online = ["Ana", "Ben", "Cy", "Dee"];
         world.links = { Ben: "user-es" };
         world.locales = { "user-es": "es-ES" };
         setUp([battle()]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         const readyAt = state().run!.readyAt!;
         // Not before a minute in: a third of three minutes is longer.
         await play(readyAt + 50_000 - Date.now());
@@ -7014,7 +7223,7 @@ describe("a build battle's [Done] button", () => {
         expect(offers("Ana")[0]).toContain("[Done]");
         // In each builder's own language, and only to builders.
         expect(offers("Ben")[0]).toContain("[Terminado]");
-        expect(offers("Cy")).toEqual([]);
+        expect(offers("Dee")).toEqual([]);
         // Clicked in either spelling of the click the game has had.
         expect(offers("Ana")[0]).toContain(
             '"click_event":{"action":"run_command","command":"/trigger pe_join set 3"}'
@@ -7035,7 +7244,7 @@ describe("a build battle's [Done] button", () => {
                     line.includes("[Undo]")
             )
         ).toBe(true);
-        expect(panel().at(-1)).toContain("Done: 1/2");
+        expect(panel().at(-1)).toContain("Done: 1/3");
         world.pressed = { Ana: 4 };
         await play(2_100);
         expect(state().run?.done).toEqual([]);
@@ -7050,8 +7259,8 @@ describe("a build battle's [Done] button", () => {
             )
         ).toBe(true);
 
-        // The last one done: the vote starts now, with its own time ahead.
-        world.pressed = { Ana: 3 };
+        // The last ones done: the vote starts now, with its own time ahead.
+        world.pressed = { Ana: 3, Cy: 3 };
         await play(2_100);
         const run = state().run!;
         expect(run.voting).toBe(true);
@@ -7067,9 +7276,9 @@ describe("a build battle's [Done] button", () => {
     });
 
     it("is not held up by a builder who left", async () => {
-        world.online = ["Ana", "Ben"];
+        world.online = ["Ana", "Ben", "Cy"];
         setUp([battle()]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         await play(state().run!.readyAt! + 62_000 - Date.now());
         world.online = ["Ana"];
         world.pressed = { Ana: 3 };
@@ -7078,9 +7287,9 @@ describe("a build battle's [Done] button", () => {
     });
 
     it("runs its whole time when somebody never presses it", async () => {
-        world.online = ["Ana", "Ben"];
+        world.online = ["Ana", "Ben", "Cy"];
         setUp([battle()]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         const readyAt = state().run!.readyAt!;
         await play(readyAt + 62_000 - Date.now());
         world.pressed = { Ana: 3 };
@@ -7111,12 +7320,10 @@ describe("each player reads their own language", () => {
         // Each player carries the tag of the language they read.
         expect(world.sent).toContain("tag Ana add pl_es");
         expect(world.sent).toContain("tag Ben add pl_en");
-        const random = triviaBank.seeded(state().run!.id);
-        const spanish = triviaBank.shuffled(triviaBank.QUESTIONS.es, random)[0]!;
-        const english = triviaBank.shuffled(
-            triviaBank.QUESTIONS.en,
-            triviaBank.seeded(state().run!.id)
-        )[0]!;
+        // The same question of the bank, in each reader's language.
+        const first = triviaBank.ordered(state().run!.id, state().run!.triviaSkip)[0]!;
+        const spanish = first.es;
+        const english = first.en;
         expect(sentTo("@a[tag=pl_es]", "Pregunta 1/3")).toBe(true);
         // As the game's JSON writes it: every accent an escape.
         const escaped = (words: string) =>

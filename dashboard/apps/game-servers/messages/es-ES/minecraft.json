@@ -1543,7 +1543,7 @@
         "events": "Eventos",
         "addAnEvent": "Añadir evento",
         "noEventsYetAddOne": "Aún no hay eventos. Añade uno arriba.",
-        "saveFirst": "Guarda antes",
+        "saveFirst": "Guarda antes los cambios",
         "theSwitchLetsAnEvent": "El interruptor deja que un evento se programe o salga en el sorteo. Lanzar lo empieza ya, esté quien esté jugando.",
         "automaticEvents": "Eventos automáticos",
         "anAutomaticEventOnlyStarts": "Un evento automático solo empieza mientras juegan de verdad suficientes jugadores - alguien que lleva un rato sin moverse ni girarse no cuenta.",
@@ -1763,7 +1763,6 @@
             "buildGlass": "Solo se puede colocar el cristal del kit: los constructores juegan en modo aventura, donde sus propios bloques no se pueden poner, así que no se usa ni se deja nada suyo en una parcela. El cristal roto a mano no suelta nada, así que ningún kit sale de una parcela.",
             "buildNeeds": "Necesita Minecraft 1.16 o posterior. Hasta 12 constructores.",
             "arena": "No se toca nada de nadie. La arena solo va donde el aire estaba vacío, y se desmonta tipo de bloque a tipo de bloque; solo se recoge el kit marcado del propio evento; cada jugador vuelve exactamente donde estaba, en su propio modo de juego, con lo que soltara. Quien esté desconectado al final la encuentra aún en pie al entrar, y se le devuelve entonces.",
-            "keepsDay": "Mantiene el día mientras dura, sin phantoms; el ciclo de día y los phantoms vuelven como estaban después.",
             "overworld": "Ocurre en el mundo normal; solo participan los jugadores que están allí.",
             "rankedFrom": "Clasifica desde {score} {unit}; por debajo, ni podio ni premio.",
             "startsWith": "Solo empieza solo con {count} {count, plural, one {jugador jugando} other {jugadores jugando}} de verdad, y no mientras alguien esté en un combate.",
@@ -1793,7 +1792,8 @@
             "bossBeam": "El haz de luz que sube a la arena se anuncia con sus coordenadas, y quien aún no ha subido ve a qué distancia está y hacia dónde.",
             "wavesScaling": "Cada oleada trae el tamaño de la primera, la mitad más por cada oleada anterior y por cada defensor en el punto después del primero (hasta 5), como mucho 60. Cada defensor después del primero da a cada monstruo 4 de vida más (hasta 16), y desde 3 defensores golpean más fuerte.",
             "wavesGear": "La armadura crece oleada a oleada, de nada a cuero, cota de malla, hierro y diamante en la última, con arcos y espadas encantados en las dos últimas. Los jinetes arácnidos llegan desde el 40% de las oleadas, los jinetes de pollo desde el 60% y los jinetes a caballo desde el 80%. Nada de lo que llevan o montan se suelta nunca, y todo se retira.",
-            "gatheringRounds": "{rounds} {rounds, plural, one {ronda} other {rondas}} de {minutes} {minutes, plural, one {minuto} other {minutos}}. Cada objeto vale puntos según lo que cuesta conseguirlo - una piedra 1, un tronco 4, un lingote de hierro 12 - y gana quien más puntos sume en todas las rondas."
+            "gatheringRounds": "{rounds} {rounds, plural, one {ronda} other {rondas}} de {minutes} {minutes, plural, one {minuto} other {minutos}}. Cada objeto vale puntos según lo que cuesta conseguirlo - una piedra 1, un tronco 4, un lingote de hierro 12 - y gana quien más puntos sume en todas las rondas.",
+            "world": "{time, select, day {Mantiene el mediodía} night {Mantiene la medianoche} other {No toca la hora}}{weather, select, clear { y el cielo despejado} rain { y la lluvia} other {}} mientras dura, y luego devuelve la hora y deja que el tiempo vuelva a cambiar."
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -1922,7 +1922,9 @@
             "anotherOn": "Otro evento en marcha",
             "busyNow": "Esperando: {reason}",
             "players": "{overworld, select, yes {{needed, plural, one {Esperando a # jugador activo en el mundo normal ({have} ahora)} other {Esperando a # jugadores activos en el mundo normal ({have} ahora)}}} other {{needed, plural, one {Esperando a # jugador activo ({have} ahora)} other {Esperando a # jugadores activos ({have} ahora)}}}}",
-            "couldNotStart": "El evento sorteado no pudo empezar"
+            "couldNotStart": "El evento sorteado no pudo empezar",
+            "settling": "Listo - empieza tras otra comprobación",
+            "serverDown": "El servidor no responde"
         },
         "prizes": {
             "entry": "{place} {reward}",
@@ -1930,7 +1932,25 @@
             "everybody": "Todos: {reward}",
             "none": "Sin premios",
             "trophy": "Trofeo"
-        }
+        },
+        "skipped": {
+            "switchedOff": "Desactivado",
+            "sameAsLast": "Igual que el anterior",
+            "emptyPool": "No hay eventos en el sorteo"
+        },
+        "runRandom": "Evento al azar",
+        "drawnNow": "Elegido: empieza {name}.",
+        "noneCanStart": "Ningún evento del sorteo puede empezar.",
+        "skippedOne": "{name}: {reason}",
+        "nextIn": "Próximo evento aleatorio en {time}.",
+        "drawArming": "El sorteo empieza a contar en la próxima revisión.",
+        "lastDrawn": "Último aleatorio: {name}, {date}.",
+        "noneDrawnYet": "Ningún aleatorio entre los últimos guardados.",
+        "drawChecked": "Sorteo revisado hace {time}.",
+        "drawNotChecked": "Sorteo sin revisar desde que arrancó Polaris.",
+        "anyTimeOfDay": "A cualquier hora",
+        "drawAll": "Todos",
+        "drawNone": "Ninguno"
     },
     "editor": {
         "where": "Dónde",
@@ -2093,6 +2113,12 @@
             "wavesWinner": {
                 "kills": "Más muertes",
                 "damage": "Más daño"
+            },
+            "spleef": {
+                "random": "Distinto cada vez",
+                "shovel": "Palas: rompe la nieve",
+                "decay": "Suelo fugaz",
+                "snowballs": "Bolas: tíralos abajo"
             }
         },
         "place": {
@@ -2126,8 +2152,6 @@
         "materialHint": "Se sortea en cada ronda, sin repetir uno de una ronda anterior, y se anuncia al empezarla. Solo cuenta lo que se reúna durante la ronda.",
         "theCatch": "La captura",
         "catchHint": "Un tesoro concreto sale más o menos una vez cada 120 capturas, cualquiera de ellos una vez cada 25 - en aguas abiertas, más a menudo con Suerte marina. Dale 20 minutos o más.",
-        "chests": "Cofres",
-        "1To10": "1 a 10",
         "howFarOut": "Distancia (bloques)",
         "howFarOutHint": "De 50 a 1000, desde los jugadores",
         "perKill": "Extra por mob matado",
@@ -2152,7 +2176,8 @@
         "bossTrophy": "Trofeo para el ganador",
         "bossTrophyHint": "Una estrella del Nether con el nombre del jefe, brillo y su dificultad, además de los premios. Solo si el jefe cae.",
         "wavesWinner": "Cómo se decide el ganador",
-        "roundMinutes": "Minutos por ronda"
+        "roundMinutes": "Minutos por ronda",
+        "howItIsPlayed": "Cómo se juega"
     },
     "moderation": {
         "announcements": {

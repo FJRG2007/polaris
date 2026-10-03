@@ -122,6 +122,8 @@ export const HUNT_TARGETS = [
     "spider",
     "enderman"
 ] as const;
+/** The ways a spleef is played: shovels, floors that vanish underfoot, snowballs. */
+export const SPLEEF_VARIANTS = ["shovel", "decay", "snowballs"] as const;
 export const LOOT_TABLES = ["treasure", "dungeon", "bastion", "end-city", "ancient-city"] as const;
 export const BOSS_KINDS = [
     "wither-skeleton",
@@ -310,9 +312,15 @@ export const optionsSchemas = {
             .min(1, problem("atLeast", { count: 1 }))
             .max(10, problem("atMost", { count: 10 }))
             .default(5),
-        /** How far from the players the chests are hidden, at most. */
-        distance: z.number().int().min(50).max(1000).default(300),
-        loot: z.enum(LOOT_TABLES).default("dungeon")
+        /** How far from the players the treasure is hidden, at most. */
+        distance: z
+            .number()
+            .int()
+            .min(50, problem("atLeast", { count: 50 }))
+            .max(1000, problem("atMost", { count: 1000 }))
+            .default(300),
+        /** A bastion's treasure room by default: the richest table there is. */
+        loot: z.enum(LOOT_TABLES).default("bastion")
     }),
     gathering: z.object({
         /** Drawn at the start of each round, from the list, when `random`. */
@@ -427,7 +435,9 @@ export const optionsSchemas = {
             .int()
             .min(25, problem("atLeast", { count: 25 }))
             .max(40, problem("atMost", { count: 40 }))
-            .default(30)
+            .default(30),
+        /** How it is played (`kinds/spleef`): drawn for each run, or always one way. */
+        variant: z.enum(["random", ...SPLEEF_VARIANTS]).default("random")
     }),
     "team-duel": z.object({
         /** The arena is built in the air above ground found here. */
@@ -578,8 +588,10 @@ export const randomSchema = z
     .object({
         enabled: z.boolean().default(false),
         days: daysSchema.default([]),
-        from: z.string().regex(TIME, problem("timeFormat")).default("18:00"),
-        to: z.string().regex(TIME, problem("timeFormat")).default("23:00"),
+        /** The same time in both is any time of day, which is the default: each
+         *  event's own conditions decide whether now suits it. */
+        from: z.string().regex(TIME, problem("timeFormat")).default("00:00"),
+        to: z.string().regex(TIME, problem("timeFormat")).default("00:00"),
         minGap: z
             .number()
             .int()
@@ -892,8 +904,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "build-battle": EPIC
 };
 
-/** A king of the hill's length: a few minutes of pushing is plenty. */
-export const HILL_MINUTES = 4;
+/** A king of the hill's length: three minutes of pushing is plenty. */
+export const HILL_MINUTES = 3;
 
 /**
  * How long each kind runs when it is made, in minutes: what fits it. A trivia
@@ -939,7 +951,11 @@ export function oldDefaultMinutes(kind: EventKind): number {
 export function migratePreset(entry: unknown): unknown {
     if (typeof entry !== "object" || entry === null) return entry;
     const raw = entry as { kind?: unknown; minutes?: unknown; options?: unknown };
-    if (raw.kind !== "king-of-the-hill" || raw.minutes !== 10) return entry;
+    if (raw.kind !== "king-of-the-hill") return entry;
+    // Four was the length every hill started with until it was shortened to
+    // three: nobody's choice either.
+    if (raw.minutes === 4) return { ...raw, minutes: HILL_MINUTES };
+    if (raw.minutes !== 10) return entry;
     const options = raw.options;
     if (typeof options === "object" && options !== null && "fistsOnly" in options) return entry;
     return { ...raw, minutes: HILL_MINUTES };
@@ -1098,7 +1114,7 @@ export function awardsPrizes(preset: EventPreset): boolean {
 export const PRIZE_COMPETITION_FLOOR = 2;
 
 export function activeNeeded(preset: EventPreset, settings: EventSettings): number {
-    const floor = Math.max(settings.minActive, minPlayersOf(preset));
+    const floor = Math.max(settings.minActive, minPlayersOf(preset), joinersFloor(preset));
     return awardsPrizes(preset) ? Math.max(floor, PRIZE_COMPETITION_FLOOR) : floor;
 }
 
@@ -1109,8 +1125,14 @@ export function minPlayersOf(preset: EventPreset): number {
 }
 
 export function defaultMinPlayers(kind: EventKind): number {
+    if (kind === "build-battle") return BUILD_BATTLE_FLOOR;
     return KIND_INFO[kind].competitive ? 2 : 1;
 }
+
+/** A build battle is voted on by the others: with two, each vote is for the
+ *  only other build, and the winner is a coin toss. Three at the least,
+ *  whatever the event's own minimum says. */
+export const BUILD_BATTLE_FLOOR = 3;
 
 /**
  * What each kind asks for before somebody is ranked, in its own unit: enough to
@@ -1350,7 +1372,51 @@ export function hillFistsOnly(preset: EventPreset): boolean {
  * (`commands.DAY_RULES`). Never a blood moon, which is the night.
  */
 export function keepsDay(preset: EventPreset): boolean {
-    return playsInArena(preset) || playsOnStage(preset);
+    return worldNeeds(preset).time === "day";
+}
+
+/** The time of day and the weather an event needs, held for as long as it runs. */
+export interface WorldNeeds {
+    /** Day: what is built can be seen, nothing spawns on it, nobody plays in
+     *  the dark. Night: the mobs it is about come out and do not burn. */
+    readonly time: "day" | "night" | null;
+    /** Clear: no lightning on an arena or a build, no thunderstorm mid-round.
+     *  Rain: a blood moon's own storm. */
+    readonly weather: "clear" | "rain" | null;
+}
+
+/**
+ * What each kind needs of the world, written down once. Held from its start to
+ * its end - the clock and the weather cycle stopped, the time and the weather
+ * set - and put back after: the rules to what they were, the time of day to
+ * what it was. Documented for anybody adding a kind in
+ * `docs/minecraft-events.md` ("World requirements").
+ */
+export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
+    "mining-rush": { time: null, weather: null },
+    "mob-hunt": { time: "night", weather: "clear" },
+    "supply-drop": { time: "day", weather: "clear" },
+    "blood-moon": { time: "night", weather: "rain" },
+    "world-boss": { time: null, weather: "clear" },
+    fishing: { time: null, weather: null },
+    trivia: { time: null, weather: null },
+    explorer: { time: "day", weather: "clear" },
+    "happy-hour": { time: null, weather: null },
+    "king-of-the-hill": { time: "day", weather: "clear" },
+    "treasure-hunt": { time: "day", weather: "clear" },
+    gathering: { time: "day", weather: "clear" },
+    "rare-catch": { time: null, weather: null },
+    "xp-boost": { time: null, weather: null },
+    waves: { time: "night", weather: "clear" },
+    "meteor-shower": { time: "night", weather: "clear" },
+    parkour: { time: "day", weather: "clear" },
+    spleef: { time: "day", weather: "clear" },
+    "team-duel": { time: "day", weather: "clear" },
+    "build-battle": { time: "day", weather: "clear" }
+};
+
+export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {
+    return WORLD_NEEDS[preset.kind];
 }
 
 /** The least countdown an event asked to join gets, whatever the settings say:
@@ -1367,12 +1433,20 @@ export function countdownSecondsFor(preset: EventPreset, settings: EventSettings
 /** How many must join for it to go ahead: the event's own minimum, and never
  *  fewer than two for what one player cannot play - a spleef, a duel, a build
  *  battle voted on by the others - or for any competition with prizes. */
+/** The fewest an event that takes joiners can be played by at all. */
+function joinersFloor(preset: EventPreset): number {
+    return preset.kind === "build-battle" ? BUILD_BATTLE_FLOOR : 1;
+}
+
 export function joinersNeeded(preset: EventPreset): number {
     const floor =
         preset.kind === "spleef" || playsInArena(preset) || awardsPrizes(preset)
             ? PRIZE_COMPETITION_FLOOR
             : 1;
-    return Math.max(floor, minPlayersOf(preset));
+    return Math.max(
+        preset.kind === "build-battle" ? BUILD_BATTLE_FLOOR : floor,
+        minPlayersOf(preset)
+    );
 }
 
 /** The events that bring mobs up near the players, and so hold mob griefing

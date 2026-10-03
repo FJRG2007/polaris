@@ -8,6 +8,7 @@
  */
 
 import type { Heading } from "./commands";
+import * as search from "./place-search";
 import {
     itemName,
     KIND_NAMES,
@@ -298,8 +299,9 @@ export function cancelReason(note: string, language: Language): string {
         "Everybody left in it was on the same team":
             "todos los que quedaban eran del mismo equipo.",
         "Fewer than two players joined": "se apuntaron menos de dos jugadores.",
-        "No dry ground was found for it near the players":
-            "no se encontró un sitio libre y seguro cerca de los jugadores.",
+        [search.NO_GROUND]: "no se encontró un sitio libre y seguro cerca de los jugadores.",
+        [search.NO_AIR]: "no se encontró aire libre para montarlo cerca de los jugadores.",
+        [search.NOBODY_IN_OVERWORLD]: "no hay nadie en el mundo normal cerca de quien montarlo.",
         "The server stopped during the event": "el servidor se paró durante el evento."
     };
     return known[note] ?? (note.endsWith(".") ? note : `${note}.`);
@@ -993,13 +995,26 @@ export function spleefReadyTitle(language: Language): string {
     return language === "es" ? "&ePrepárate" : "&eGet ready";
 }
 
-export function spleefReadySubtitle(language: Language): string {
+export function spleefReadySubtitle(
+    variant: "shovel" | "decay" | "snowballs",
+    language: Language
+): string {
+    if (variant === "decay")
+        return language === "es"
+            ? "&fLa nieve que pisas desaparece: no te pares"
+            : "&fThe snow you stand on vanishes: keep moving";
+    if (variant === "snowballs")
+        return language === "es"
+            ? "&fTira a los demás con bolas de nieve"
+            : "&fKnock the others off with snowballs";
     return language === "es"
         ? "&fRompe la nieve bajo los demás"
         : "&fBreak the snow under the others";
 }
 
-export function spleefGo(language: Language): string {
+export function spleefGo(variant: "shovel" | "decay" | "snowballs", language: Language): string {
+    if (variant === "decay") return language === "es" ? "&a&l¡Corre!" : "&a&lRun!";
+    if (variant === "snowballs") return language === "es" ? "&a&l¡Fuego!" : "&a&lThrow!";
     return language === "es" ? "&a&l¡A cavar!" : "&a&lDig!";
 }
 
@@ -1013,10 +1028,18 @@ export function spleefOutTitle(language: Language): string {
     return language === "es" ? "&cHas caído" : "&cYou are out";
 }
 
-export function spleefBar(left: number, language: Language): string {
+export function spleefBar(
+    left: number,
+    variant: "shovel" | "decay" | "snowballs",
+    language: Language
+): string {
+    if (variant === "decay")
+        return language === "es"
+            ? `&eQuedan &f${left} &7- sigue moviéndote`
+            : `&f${left} &eleft &7- keep moving`;
     return language === "es"
-        ? `&eQuedan &f${left} &7- no pises donde no hay nieve`
-        : `&f${left} &eleft &7- stay on the snow`;
+        ? `&eQuedan &f${left} &7- no te caigas al piso de abajo`
+        : `&f${left} &eleft &7- do not drop to the floor below`;
 }
 
 export function lastStanding(name: string, language: Language): string {
@@ -1234,6 +1257,16 @@ export function voteNoPlot(plot: number, language: Language): string {
     return language === "es"
         ? `${BAD}No hay parcela ${mark(plot, BAD)}.`
         : `${BAD}There is no plot ${mark(plot, BAD)}.`;
+}
+
+/** What the round is built with, in the reader's language. */
+export function materialLine(
+    names: Readonly<Record<Language, string>>,
+    language: Language
+): string {
+    return language === "es"
+        ? `${WARN}Material: ${mark(names.es, WARN)}`
+        : `${WARN}Material: ${mark(names.en, WARN)}`;
 }
 
 export function themeWas(theme: string, language: Language): string {

@@ -7,6 +7,7 @@
  * (`lib/minecraft/challenges/catalog.ts`), picked here by the same language.
  */
 
+import { figureLanguage, formatDuration } from "../../lib/figures";
 import type { Translator } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import * as catalog from "../../lib/minecraft/challenges/catalog";
@@ -42,14 +43,9 @@ export function tierName(t: ChallengesT, layer: catalog.Layer, tier: catalog.Dif
     );
 }
 
-/** How long until something, the way the tab says it. */
-export function durationText(t: ChallengesT, ms: number): string {
-    const minutes = Math.max(1, Math.round(ms / 60_000));
-    const days = Math.floor(minutes / 1440);
-    const hours = Math.floor((minutes % 1440) / 60);
-    if (days > 0) return t("duration.days", { days, hours });
-    if (hours > 0) return t("duration.hours", { hours, minutes: minutes % 60 });
-    return t("duration.minutes", { minutes });
+/** How long until something, short (`figures.formatDuration`), in the reader's language. */
+export function durationText(locale: string, ms: number): string {
+    return formatDuration(Math.max(60_000, ms), figureLanguage(locale));
 }
 
 /** The keys a settings refusal may carry (`settings.ts`), and what else is not one. */

@@ -567,9 +567,7 @@
         "playtimeAllTime": "Playtime, all time",
         "deaths": "Deaths",
         "mobsKilled": "Mobs killed",
-        "underAMinute": "under a minute",
-        "minutes": "{count} min",
-        "hours": "{count} h"
+        "underAMinute": "under a minute"
     },
     "variablesHelp": {
         "whatYouCanWrite": "What you can write",

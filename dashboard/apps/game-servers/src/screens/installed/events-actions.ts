@@ -88,6 +88,46 @@ export async function startEventAction(input: z.input<typeof startSchema>): Prom
     }
 }
 
+/** Draw an event now from the pool: what was picked, and why the rest were not. */
+export async function runRandomAction(installedAppId: string): Promise<
+    Answer & {
+        picked?: string | null;
+        skipped?: { presetId: string; name: string; reason: string }[];
+    }
+> {
+    const t = await gameWords("minecraft");
+    const parsed = serverId.safeParse(installedAppId);
+    if (!parsed.success) return { error: t("events.errors.noServer") };
+    try {
+        const { user, access } = await requireGameServer("games.console", parsed.data);
+        const drawn = await events.runRandomNow({
+            ownerId: access.ownerId,
+            installedAppId: parsed.data,
+            startedBy: user.id
+        });
+        if (drawn.run) {
+            await recordAudit({
+                actorId: user.id,
+                action: "games.events.start",
+                targetType: "installedApp",
+                targetId: parsed.data,
+                metadata: { event: drawn.run.preset.name, kind: drawn.run.preset.kind, drawn: true }
+            });
+        }
+        return {
+            view: await events.eventsView(parsed.data),
+            picked: drawn.run?.preset.name ?? null,
+            skipped: drawn.skipped.map((one) => ({
+                presetId: one.presetId,
+                name: one.name,
+                reason: one.reason
+            }))
+        };
+    } catch (caught) {
+        return { error: await failure(caught, t("events.errors.start")) };
+    }
+}
+
 export async function cancelEventAction(installedAppId: string): Promise<Answer> {
     const t = await gameWords("minecraft");
     const parsed = serverId.safeParse(installedAppId);

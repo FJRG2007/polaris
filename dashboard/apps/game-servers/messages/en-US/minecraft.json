@@ -1543,7 +1543,7 @@
         "events": "Events",
         "addAnEvent": "Add an event",
         "noEventsYetAddOne": "No events yet. Add one above.",
-        "saveFirst": "Save first",
+        "saveFirst": "Save your changes first",
         "theSwitchLetsAnEvent": "The switch lets an event be scheduled or drawn at random. Run starts it now, whoever is playing.",
         "automaticEvents": "Automatic events",
         "anAutomaticEventOnlyStarts": "An automatic event only starts while enough players are actually playing - somebody who has not moved or turned for a while does not count.",
@@ -1763,7 +1763,6 @@
             "buildGlass": "Only the kit's glass can be placed: builders play in adventure mode, where their own blocks cannot be put down at all, so nothing of theirs is used or left on a plot. Glass broken by hand drops nothing, so no kit leaves a plot either.",
             "buildNeeds": "Needs Minecraft 1.16 or later. Up to 12 builders.",
             "arena": "Nothing of anybody's is touched. The arena goes only where the air was empty, and comes down block kind by block kind; only the event's own marked kit is taken back; each player is sent back to exactly where they stood, in their own game mode, with whatever they dropped. Somebody offline at the end finds it still standing when they log in, and is sent back then.",
-            "keepsDay": "Keeps it day while it runs, with no phantoms; the day cycle and phantoms come back as they were afterwards.",
             "overworld": "Happens in the Overworld; only players there take part.",
             "rankedFrom": "Ranked from {score} {unit}; below that, no podium and no prize.",
             "startsWith": "Starts on its own only with {count} {count, plural, one {player} other {players}} actually playing, and not while somebody is in a fight.",
@@ -1793,7 +1792,8 @@
             "bossBeam": "The beam of light up to the arena is announced with its coordinates, and everybody not up yet sees how far it is and which way.",
             "wavesScaling": "Each wave brings the first wave's size, half as many again for every wave before it and for every defender at the point past the first (up to 5), at most 60. Every defender past the first gives each monster 4 more health (up to 16), and from 3 defenders they hit harder.",
             "wavesGear": "Armor grows wave by wave, from none to leather, chainmail, iron and diamond on the last, with enchanted bows and swords on the last two. Spider jockeys come from 40% of the waves, chicken jockeys from 60% and horsemen from 80%. Nothing they wear or ride is ever dropped, and all of it is removed.",
-            "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins."
+            "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins.",
+            "world": "{time, select, day {Holds midday} night {Holds midnight} other {Leaves the time alone}}{weather, select, clear { and clear weather} rain { and rain} other {}} while it runs, then gives the time back and lets the weather change again."
         },
         "errors": {
             "read": "The events could not be read",
@@ -1922,7 +1922,9 @@
             "anotherOn": "Another event is on",
             "busyNow": "Waiting: {reason}",
             "players": "{overworld, select, yes {{needed, plural, one {Waiting for # active player in the Overworld ({have} now)} other {Waiting for # active players in the Overworld ({have} now)}}} other {{needed, plural, one {Waiting for # active player ({have} now)} other {Waiting for # active players ({have} now)}}}}",
-            "couldNotStart": "The drawn event could not start"
+            "couldNotStart": "The drawn event could not start",
+            "settling": "Ready - starting after one more check",
+            "serverDown": "The server is not answering"
         },
         "prizes": {
             "entry": "{place} {reward}",
@@ -1930,7 +1932,25 @@
             "everybody": "Everybody: {reward}",
             "none": "No prizes",
             "trophy": "Trophy"
-        }
+        },
+        "skipped": {
+            "switchedOff": "Switched off",
+            "sameAsLast": "Same kind as the last one",
+            "emptyPool": "No events are in the draw"
+        },
+        "runRandom": "Run a random event",
+        "drawnNow": "Drawn: {name} is starting.",
+        "noneCanStart": "No event in the draw can start now.",
+        "skippedOne": "{name}: {reason}",
+        "nextIn": "Next drawn event in {time}.",
+        "drawArming": "The draw starts counting on its next check.",
+        "lastDrawn": "Last drawn: {name}, {date}.",
+        "noneDrawnYet": "No drawn event among the last ones kept.",
+        "drawChecked": "Draw checked {time} ago.",
+        "drawNotChecked": "Draw not checked since Polaris started.",
+        "anyTimeOfDay": "Any time of day",
+        "drawAll": "All",
+        "drawNone": "None"
     },
     "editor": {
         "where": "Where",
@@ -2093,6 +2113,12 @@
             "wavesWinner": {
                 "kills": "Most kills",
                 "damage": "Most damage"
+            },
+            "spleef": {
+                "random": "A different way each time",
+                "shovel": "Shovels: dig the snow",
+                "decay": "Vanishing floor",
+                "snowballs": "Snowballs: knock them off"
             }
         },
         "place": {
@@ -2126,8 +2152,6 @@
         "materialHint": "Drawn anew for each round, never one an earlier round had, and announced as the round starts. Only what is gathered during the round counts.",
         "theCatch": "The catch",
         "catchHint": "One treasure comes up about once in 120 catches, any of them about once in 25 - in open water, more often with Luck of the Sea. Give it 20 minutes or more.",
-        "chests": "Chests",
-        "1To10": "1 to 10",
         "howFarOut": "How far out (blocks)",
         "howFarOutHint": "50 to 1000, from the players",
         "perKill": "Extra per mob killed",
@@ -2152,7 +2176,8 @@
         "bossTrophy": "Trophy for the winner",
         "bossTrophyHint": "A Nether Star named after the boss, with a glint and its difficulty, on top of the prizes. Only when the boss is defeated.",
         "wavesWinner": "How the winner is decided",
-        "roundMinutes": "Minutes a round"
+        "roundMinutes": "Minutes a round",
+        "howItIsPlayed": "How it is played"
     },
     "moderation": {
         "announcements": {

@@ -18,6 +18,7 @@ import * as catalog from "../catalog";
 import * as speech from "../../speech";
 import * as commands from "../commands";
 import type * as stored from "../state";
+import * as search from "../place-search";
 import * as written from "./boss-messages";
 import * as delivery from "../../delivery";
 import * as eventWritten from "../messages";
@@ -314,8 +315,7 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
     const options = optionsOf(ctx.run);
     if (!state.arena) {
         const found = await ctx.findPlace(options.place, DISTANCE, SPOT_RADIUS);
-        if (found === "failed")
-            throw new EventStopped("No dry ground was found for it near the players");
+        if (found === "failed") throw new EventStopped(search.NO_GROUND);
         if (!found) return;
         const near = commands.readWhere(
             await ctx.server.say([
@@ -340,9 +340,14 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
 
     const origin = stageOf(ctx).origin;
     if (!origin) {
-        const ground = await ctx.findPlace(options.place, DISTANCE, SPOT_RADIUS, "open");
-        if (ground === "failed")
-            throw new EventStopped("No dry ground was found for it near the players");
+        const ground = await ctx.findPlace(
+            options.place,
+            DISTANCE,
+            boss.ARENA_HALF + 1,
+            "air",
+            true
+        );
+        if (ground === "failed") throw new EventStopped(search.NO_AIR);
         if (!ground) return;
         const { top } = await versionOf(ctx, memory);
         let y = ground.y + boss.ARENA_HEIGHT;

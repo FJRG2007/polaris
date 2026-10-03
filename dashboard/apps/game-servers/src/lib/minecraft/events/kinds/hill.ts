@@ -1,19 +1,14 @@
 /**
- * A king of the hill's commands: where its circle goes, the platform of its own
- * it stands on when there is no untouched ground for it, and - with "fists
- * only" - how the players brought to it are kept from harm.
- *
- * The circle wants a patch of the world's own ground as wide as itself. On a
- * small island there is none: a house, a farm, trees. Then it is put on a
- * platform over open water, one layer of one block, built only into air that was
- * proven empty and taken away again - only that block, only inside its own box -
- * so nothing of the island is ever touched.
+ * A king of the hill's commands: the platform it floats on - `LIFT` over the
+ * highest thing under it, built only into air proven empty and taken away
+ * again, only that block, only inside its own box - and how the players brought
+ * to it are kept from harm.
  *
  * With "fists only" players join, their things are kept (`stash`) and they
- * come in empty-handed, in adventure mode. Nobody can die: Resistance V takes
- * every hurt a fall, lava, drowning or a punch can do, fire resistance and water
- * breathing besides, food keeps them fed, and whoever is knocked right off is
- * brought back to the edge of the hill. Knockback is all that is left, so
+ * come in empty-handed, in adventure mode. Off the circle the hill wears them
+ * down (Poison, down to three hearts); in it, it mends them (Regeneration).
+ * Whoever is knocked off falls slowly and is brought back to the edge, the
+ * fire and the water cannot hurt them, and a fist's knockback is left whole:
  * pushing is how the circle is won. keepInventory is held for all of it.
  *
  * Pure; the loop is `hill-service.ts`.
@@ -33,6 +28,9 @@ const HEADROOM = 4;
 
 /** How far from the players its place is looked for. */
 export const DISTANCE = 32;
+
+/** How far over the highest thing under it the platform floats. */
+export const LIFT = 20;
 
 /** How many can play: as many as fit round the circle. */
 export const MOST = 16;
@@ -125,17 +123,42 @@ export function strayed(
     );
 }
 
+/** Each entrant's health, kept by the game as it changes (`health` criterion). */
+export const HEALTH_SCORE = "pe_khp";
+
+/** Health under which the hill stops wearing anybody down: three hearts. */
+const DRAIN_FLOOR = 6;
+
 /**
- * Nothing can kill them, for a moment past each look: Resistance V is every hurt
- * a fall, a fight, lava or drowning does; the fire and the water besides; fed, so
- * hunger - which Resistance does not stop - cannot either.
+ * The hill wears down whoever is off it and mends whoever holds it, for a
+ * moment past each look - and nobody can die of it:
+ * - off the circle, Poison, and only while they have more than three hearts;
+ * - in it, the Poison taken off again and Regeneration instead;
+ * - Resistance IV, so a punch is a fifth of one and keeps its knockback;
+ * - whoever is under the platform - knocked off - falls slowly, so the drop
+ *   never hurts, and is brought back to the edge;
+ * - the fire and the water kept off.
  */
-export function protectLines(): string[] {
+export function protectLines(
+    point?: { x: number; y: number; z: number },
+    radius?: number
+): string[] {
     const who = `@a[tag=${IN_ARENA}]`;
-    return [
-        `effect give ${who} minecraft:resistance 10 4 true`,
+    const lines = [
+        `effect give ${who} minecraft:resistance 10 3 true`,
         `effect give ${who} minecraft:fire_resistance 10 0 true`,
-        `effect give ${who} minecraft:water_breathing 10 0 true`,
-        `effect give ${who} minecraft:saturation 10 0 true`
+        `effect give ${who} minecraft:water_breathing 10 0 true`
+    ];
+    if (!point || radius === undefined) return lines;
+    const reach = radius + MARGIN + 64;
+    const under = `x=${point.x - reach},y=${point.y - 128},z=${point.z - reach},dx=${2 * reach},dy=127,dz=${2 * reach}`;
+    const inside = `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[tag=${IN_ARENA},distance=..${radius}]`;
+    return [
+        ...lines,
+        `scoreboard objectives add ${HEALTH_SCORE} health`,
+        `effect give @a[tag=${IN_ARENA},scores={${HEALTH_SCORE}=${DRAIN_FLOOR + 1}..}] minecraft:poison 3 1 true`,
+        `${inside} run effect clear @s minecraft:poison`,
+        `${inside} run effect give @s minecraft:regeneration 3 1 true`,
+        `execute in minecraft:overworld run effect give @a[tag=${IN_ARENA},${under}] minecraft:slow_falling 3 0 true`
     ];
 }

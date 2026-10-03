@@ -433,6 +433,47 @@ describe("trivia", () => {
             for (const word of trivia.WORDS[language]) expect(word).toMatch(/^[a-z]+$/);
         }
     });
+
+    it("has hundreds of questions, each in both languages, in categories, with ids that never clash", () => {
+        expect(trivia.BANK.length).toBeGreaterThanOrEqual(200);
+        expect(new Set(trivia.BANK.map((one) => one.id)).size).toBe(trivia.BANK.length);
+        const categories = new Set(trivia.BANK.map((one) => one.category));
+        for (const wanted of [
+            "mobs",
+            "items",
+            "world",
+            "geography",
+            "science",
+            "history",
+            "general"
+        ])
+            expect(categories).toContain(wanted);
+        for (const one of trivia.BANK) {
+            expect(one.en.question.endsWith("?")).toBe(true);
+            expect(one.es.question).toMatch(/^¿.*\?$|\?$/);
+            // Every accepted answer still reads as one once compared.
+            for (const answer of [...one.en.answers, ...one.es.answers])
+                expect(trivia.normalizeAnswer(answer).length).toBeGreaterThan(0);
+        }
+        // Readers of either language are asked the same question in the same round.
+        expect(trivia.QUESTIONS.en).toHaveLength(trivia.QUESTIONS.es.length);
+    });
+
+    it("never repeats a question inside a game, and asks what was not asked lately first", () => {
+        const game = trivia.ordered("event-1", []);
+        expect(new Set(game.map((one) => one.id)).size).toBe(trivia.BANK.length);
+        expect(trivia.ordered("event-1", []).map((one) => one.id)).toEqual(
+            game.map((one) => one.id)
+        );
+        const recent = game.slice(0, 20).map((one) => one.id);
+        const next = trivia.ordered("event-2", recent);
+        const firstOnes = next.slice(0, trivia.BANK.length - recent.length).map((one) => one.id);
+        for (const id of recent) expect(firstOnes).not.toContain(id);
+        expect(trivia.remembered(["a", "b"], ["b", "c"])).toEqual(["a", "b", "c"]);
+        const many = Array.from({ length: trivia.RECENT_KEPT + 10 }, (_, index) => `q${index}`);
+        expect(trivia.remembered([], many)).toHaveLength(trivia.RECENT_KEPT);
+        expect(trivia.remembered([], many).at(-1)).toBe(`q${trivia.RECENT_KEPT + 9}`);
+    });
 });
 
 describe("versions", () => {
@@ -1141,7 +1182,7 @@ describe("the new kinds in the catalog", () => {
         expect(catalog.newPreset("treasure-hunt", "t").options).toEqual({
             chests: 5,
             distance: 300,
-            loot: "dungeon"
+            loot: "bastion"
         });
         expect(catalog.newPreset("gathering", "g").options).toEqual({
             material: "random",
@@ -1787,27 +1828,60 @@ describe("a parkour course", () => {
 });
 
 describe("a spleef floor", () => {
-    it("is a snow square walled with glass, a net under it, all inside its volume", () => {
+    it("is floors of snow stacked one under the other, each walled, a net under the lowest", () => {
         const floor = spleef.arena(
             { place: { mode: "players" }, size: 8, height: 30 },
             { x: 10, z: -20 },
             110
         );
-        const snow = floor.boxes.find((box) => box.block === spleef.FLOOR)!;
-        expect(snow).toMatchObject({ x1: 2, x2: 18, z1: -28, z2: -12, y1: 110, y2: 110 });
-        expect(floor.boxes[0]).toMatchObject({ y1: 106, block: "minecraft:white_stained_glass" });
+        expect(floor.floors).toEqual([110, 110 - spleef.LAYER_GAP, 110 - 2 * spleef.LAYER_GAP]);
+        const snows = floor.boxes.filter((box) => box.block === spleef.FLOOR);
+        expect(snows).toHaveLength(spleef.LAYERS);
+        const top = snows.find((box) => box.y1 === 110)!;
+        expect(top).toMatchObject({ x1: 2, x2: 18, z1: -28, z2: -12, y2: 110 });
+        const bottom = floor.floors.at(-1)!;
+        expect(floor.boxes[0]).toMatchObject({
+            y1: bottom - 4,
+            block: "minecraft:white_stained_glass"
+        });
         const walls = floor.boxes.filter(
-            (box) => box.block === "minecraft:light_blue_stained_glass"
+            (box) => box.block !== spleef.FLOOR && box !== floor.boxes[0]
         );
-        expect(walls).toHaveLength(4);
+        expect(walls).toHaveLength(4 * spleef.LAYERS);
         for (const wall of walls) {
-            expect(wall.y1).toBe(111);
-            expect(wall.y2).toBe(113);
-            expect(overlaps(wall, snow)).toBe(false);
+            expect(floor.floors).toContain(wall.y1 - 1);
+            expect(wall.y2).toBe(wall.y1 + 2);
+            for (const snow of snows) expect(overlaps(wall, snow)).toBe(false);
         }
         for (const box of floor.boxes) expect(inside(box, floor.volume)).toBe(true);
+        // Out only through the lowest floor: a fall to the next floor is still in.
         expect(spleef.fell(floor, 111)).toBe(false);
-        expect(spleef.fell(floor, 108)).toBe(true);
+        expect(spleef.fell(floor, 104)).toBe(false);
+        expect(spleef.fell(floor, bottom - 2)).toBe(true);
+    });
+
+    it("plays one of three ways, the same after a restart, and the decay game only eats its own snow", () => {
+        const drawn = new Set(
+            Array.from({ length: 40 }, (_, index) => spleef.variantFor(`r${index}`))
+        );
+        expect([...drawn].sort()).toEqual([...spleef.VARIANTS].sort());
+        expect(spleef.variantFor("r1")).toBe(spleef.variantFor("r1"));
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size: 5, height: 30 },
+            { x: 0, z: 0 },
+            100
+        );
+        const lines = spleef.decayLines(floor, "pe_in");
+        // Last look's red snow gone, only red snow, only on the floors.
+        for (const at of floor.floors)
+            expect(lines).toContain(
+                `execute in minecraft:overworld run fill -5 ${at} -5 5 ${at} 5 minecraft:air replace ${spleef.WARN}`
+            );
+        // Only the arena's snow under somebody in it turns red.
+        expect(lines.at(-1)).toContain(`as @a[tag=pe_in] at @s if block ~ ~-1 ~ ${spleef.FLOOR}`);
+        expect(lines.at(-1)).toContain(`run setblock ~ ~-1 ~ ${spleef.WARN}`);
+        expect(spleef.warnBoxes(floor).map((box) => box.y1)).toEqual([...floor.floors]);
+        expect(stage.ARENA_BLOCKS).toContain(spleef.WARN);
     });
 
     it("spreads players over the snow, never onto a wall", () => {
@@ -1932,9 +2006,14 @@ describe("what an arena sends", () => {
         expect(after).toContain("gamemode adventure Ana");
         expect(after).toContain("tag Ana remove pe_in");
         expect(after).toContain("effect give Ana minecraft:resistance 10 4 true");
-        expect(stage.clearMarked("Ana", "nbt")).toBe(
-            "clear Ana minecraft:iron_shovel{polaris_event:1b}"
-        );
+        expect(stage.clearMarked("Ana", "nbt")).toEqual([
+            "clear Ana minecraft:iron_shovel{polaris_event:1b}",
+            "clear Ana minecraft:snowball{polaris_event:1b}"
+        ]);
+        expect(stage.markedSnowballs("Ana", "components", 16)).toEqual([
+            "clear Ana minecraft:snowball[minecraft:custom_data={polaris_event:1b}]",
+            "give Ana minecraft:snowball[minecraft:custom_data={polaris_event:1b}] 16"
+        ]);
         expect(stage.returned("Teleported Ana to 1.5, 64.0, -2.25")).toBe(true);
         expect(stage.returned("No entity was found")).toBe(false);
     });
@@ -2151,7 +2230,7 @@ describe("the kit is marked, and only it is taken back", () => {
     it("lets the kit's glass go only on the plot and on itself, and its brush break only the glass", () => {
         for (const marker of ["components", "tag"] as const) {
             const lines = build.kitCommands("Ana", marker);
-            expect(lines).toHaveLength(build.KIT_IDS.length);
+            expect(lines).toHaveLength(build.KIT_BLOCKS.length + 1);
             expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
             // The brush first, so it lands in the hotbar; the glass after it.
             const glass = lines[1]!;
@@ -2166,6 +2245,29 @@ describe("the kit is marked, and only it is taken back", () => {
             expect(brush).not.toContain(`"${build.FLOOR}"`);
         }
         expect(build.KIT_BLOCKS).not.toContain(build.FLOOR);
+    });
+
+    it("builds each round in one material drawn for it, the same after a restart", () => {
+        const drawn = new Set(
+            Array.from({ length: 60 }, (_, index) => build.paletteFor(`run-${index}`))
+        );
+        expect(drawn.size).toBeGreaterThan(3);
+        expect(build.paletteFor("run-7")).toBe(build.paletteFor("run-7"));
+        for (const palette of Object.keys(build.PALETTES) as build.Palette[]) {
+            const blocks = build.PALETTES[palette].blocks;
+            const lines = build.kitCommands("Ana", "components", palette);
+            expect(lines).toHaveLength(blocks.length + 1);
+            expect(lines.length).toBeLessThanOrEqual(36);
+            expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
+            // The brush breaks this set and nothing else; all of it is taken back and cleared.
+            for (const id of blocks) {
+                expect(lines[0]).toContain(`"${id}"`);
+                expect(build.KIT_IDS).toContain(id);
+                expect(build.PLATFORM_BLOCKS).toContain(id);
+            }
+            expect(blocks).not.toContain(build.FLOOR);
+        }
+        expect(build.kitCommands("Ana", "tag", "wool")[1]).toContain("minecraft:white_wool");
     });
 
     it("keeps what a player drops theirs, and sends it after them", () => {
@@ -2539,5 +2641,102 @@ describe("a treasure hunt's clock", () => {
         const run = { preset, place: null, meteors: [], round: -1, stage: null, readyAt: null };
         expect(catalog.readyToPlay({ ...run, hidden: false, chests: [] })).toBe(false);
         expect(catalog.readyToPlay({ ...run, hidden: false, chests: [{}] })).toBe(true);
+    });
+});
+
+describe("the world an event holds", () => {
+    it("sets midnight and clear weather for a horde, for its length in seconds and ticks", () => {
+        const needs = catalog.worldNeeds({ kind: "waves" });
+        expect(commands.worldLines(needs, 600)).toEqual([
+            "time set 18000",
+            "weather clear 660",
+            "weather clear 660s"
+        ]);
+        expect(commands.worldRules(needs)).toEqual([
+            ["doDaylightCycle", "advance_time"],
+            ["doWeatherCycle", "advance_weather"]
+        ]);
+    });
+
+    it("turns phantoms off with a held day", () => {
+        expect(commands.worldRules(catalog.worldNeeds({ kind: "spleef" })).flat()).toContain(
+            "doInsomnia"
+        );
+    });
+
+    it("puts the time back at the end, and leaves alone an event that never held it", () => {
+        const spleef = catalog.newPreset("spleef", "s");
+        expect(commands.cleanup(spleef, null, null, {}, 1234)).toContain("time set 1234");
+        const quiz = catalog.newPreset("trivia", "q");
+        expect(commands.cleanup(quiz, null, null, {}, 1234)).not.toContain("time set 1234");
+    });
+});
+
+describe("the top of a footprint, for what is built in the air", () => {
+    it("reads every column, the edges included, a few blocks apart", () => {
+        const columns = commands.footprintColumns({ x: 100, z: -50 }, 10);
+        const xs = [...new Set(columns.map((one) => one.x))].sort((a, b) => a - b);
+        expect(xs[0]).toBe(90);
+        expect(xs.at(-1)).toBe(110);
+        expect(xs.every((x, index) => index === 0 || x - xs[index - 1]! <= commands.TOP_STEP)).toBe(
+            true
+        );
+        expect(columns).toHaveLength(xs.length * xs.length);
+    });
+
+    it("stands each marker on whatever is highest, roofs and crowns included", () => {
+        const [clear, first] = commands.topLines([{ x: 3, z: -4 }]);
+        expect(clear).toBe(commands.CLEAR_SAMPLES);
+        expect(first).toContain("positioned 3.5 0 -3.5 positioned over motion_blocking run summon");
+        expect(first).not.toContain("no_leaves");
+    });
+
+    it("takes the highest top read", () => {
+        expect(commands.highestTop([{ y: 64 }, { y: 140 }, { y: 70 }])).toBe(140);
+        expect(commands.highestTop([])).toBeNull();
+    });
+});
+
+describe("a parkour course's traps", () => {
+    const options = (difficulty: "easy" | "medium" | "hard") => ({
+        place: { mode: "players" as const },
+        jumps: 30,
+        difficulty,
+        height: 30
+    });
+
+    it("puts slime pads and vanishing platforms on plain jumps only, never two in a row", () => {
+        let traps = 0;
+        for (let seed = 0; seed < 20; seed += 1) {
+            const course = parkour.course(options("hard"), `run-${seed}`, { x: 0, z: 0 }, 100);
+            course.platforms.forEach((one, index) => {
+                if (!one.trap) return;
+                traps += 1;
+                expect(one.role).toBe("jump");
+                expect(course.platforms[index - 1]?.trap).toBeUndefined();
+            });
+            const blocks = course.boxes.map((box) => box.block);
+            for (const one of course.vanishing) expect(blocks).toContain(one.block);
+            for (const box of course.boxes) expect(stage.ARENA_BLOCKS).toContain(box.block);
+        }
+        expect(traps).toBeGreaterThan(20);
+        // The easy course never vanishes from under anybody.
+        for (let seed = 0; seed < 20; seed += 1)
+            expect(
+                parkour.course(options("easy"), `run-${seed}`, { x: 0, z: 0 }, 100).vanishing
+            ).toEqual([]);
+    });
+
+    it("blinks: there most of the time, gone for two seconds in six, only into air and only its own", () => {
+        let course = parkour.course(options("hard"), "run-1", { x: 0, z: 0 }, 100);
+        for (let seed = 2; course.vanishing.length === 0; seed += 1)
+            course = parkour.course(options("hard"), `run-${seed}`, { x: 0, z: 0 }, 100);
+        const there = parkour.blinkLines(course, 1_000);
+        expect(there.every((line) => line.endsWith(" minecraft:orange_concrete keep"))).toBe(true);
+        const gone = parkour.blinkLines(course, parkour.BLINK_MS - 500);
+        expect(
+            gone.every((line) => line.endsWith(" minecraft:air replace minecraft:orange_concrete"))
+        ).toBe(true);
+        expect(there).toHaveLength(course.vanishing.length);
     });
 });

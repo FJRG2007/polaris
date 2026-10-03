@@ -59,11 +59,6 @@
         "dealtDoneTitle": "Jugadores que lo terminaron, de los que lo recibieron",
         "refused": "{count, plural, one {# estadística que esta versión no tiene, omitida} other {# estadísticas que esta versión no tiene, omitidas}}"
     },
-    "duration": {
-        "days": "{days} d {hours} h",
-        "hours": "{hours} h {minutes} min",
-        "minutes": "{minutes} min"
-    },
     "tier": {
         "easy": "Fácil",
         "medium": "Media",

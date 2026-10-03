@@ -139,7 +139,7 @@ function PoolTable({
     return (
         <div className="flex flex-col gap-2">
             <p className="text-xs text-muted-foreground">
-                {t("draw.endsIn", { time: durationText(t, pool.endsAt - now) })}
+                {t("draw.endsIn", { time: durationText(language, pool.endsAt - now) })}
             </p>
             <PoolList
                 entries={pool.entries}
@@ -493,7 +493,7 @@ export function MinecraftChallenges({
                             detail={
                                 view?.daily
                                     ? t("draw.endsIn", {
-                                          time: durationText(t, view.daily.endsAt - now)
+                                          time: durationText(locale, view.daily.endsAt - now)
                                       })
                                     : view
                                       ? t("stats.notDrawn")
@@ -506,7 +506,7 @@ export function MinecraftChallenges({
                             detail={
                                 view?.weekly
                                     ? t("draw.endsIn", {
-                                          time: durationText(t, view.weekly.endsAt - now)
+                                          time: durationText(locale, view.weekly.endsAt - now)
                                       })
                                     : view
                                       ? t("stats.notDrawn")

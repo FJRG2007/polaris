@@ -107,9 +107,9 @@ describe("the new leaderboards", () => {
     it("read in their own units, and leave out a player with no counters", () => {
         expect(statsRanking("rank.explorer", players)).toEqual(["1. Steve 2km"]);
         expect(statsRanking("rank.mined", players)).toEqual(["1. Steve 905"]);
-        expect(statsRanking("rank.jumps", players)).toEqual(["1. Steve 12.3k"]);
+        expect(statsRanking("rank.jumps", players)).toEqual(["1. Steve 12.3K"]);
         expect(statsRanking("rank.damage", players)).toEqual(["1. Steve 100"]);
-        expect(statsRanking("rank.alive", players)).toEqual(["1. Steve 1h"]);
+        expect(statsRanking("rank.alive", players)).toEqual(["1. Steve 1 h"]);
         expect(statsRanking("rank.bosses", players)).toEqual(["1. Steve 3"]);
         expect(statsRanking("rank.chests", players)).toEqual(["1. Steve 12"]);
     });
@@ -125,10 +125,10 @@ describe("the new leaderboards", () => {
 
     it("stay short on a line", () => {
         expect(countText(9_999)).toBe("9999");
-        expect(countText(37_403)).toBe("37.4k");
-        expect(countText(17_000)).toBe("17k");
+        expect(countText(37_403)).toBe("37.4K");
+        expect(countText(17_000)).toBe("17K");
         expect(countText(2_500_000)).toBe("2.5M");
-        expect(countText(9_999.6)).toBe("10k");
+        expect(countText(9_999.6)).toBe("10K");
         expect(countText(999_960)).toBe("1M");
         expect(distanceText(85_000)).toBe("850m");
         expect(distanceText(41_250_000)).toBe("412.5km");

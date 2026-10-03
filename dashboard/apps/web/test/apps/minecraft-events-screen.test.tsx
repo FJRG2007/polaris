@@ -292,7 +292,7 @@ describe("the treasure hunt, gathering, rare catch and experience boost", () => 
         await waitFor(() => expect(screen.getByLabelText("What Treasure hunt is")).toBeTruthy());
         for (const name of ["Treasure hunt", "Gathering", "Rare catch", "Experience boost"])
             fireEvent.click(screen.getByLabelText(`What ${name} is`));
-        expect(screen.getByText(/5 chests hidden up to 300 blocks from the players/)).toBeTruthy();
+        expect(screen.getByText(/1 chest hidden up to 300 blocks from the players/)).toBeTruthy();
         expect(screen.getByText(/one nobody opened is taken away at the end/)).toBeTruthy();
         expect(screen.getByText(/3 rounds of 2 minutes/)).toBeTruthy();
         expect(screen.getByText(/Each round's material is drawn from the list/)).toBeTruthy();
@@ -321,13 +321,16 @@ describe("the treasure hunt, gathering, rare catch and experience boost", () => 
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
     });
 
-    it("says beside the field when a hunt asks for too many chests", async () => {
+    it("says beside the field when a hunt's treasure is too far out, and asks no number of chests", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({ view: kinds });
         await waitFor(() => expect(screen.getByLabelText("Edit Treasure hunt")).toBeTruthy());
         fireEvent.click(screen.getByLabelText("Edit Treasure hunt"));
-        fireEvent.change(await screen.findByLabelText(/^Chests/), { target: { value: "11" } });
-        await waitFor(() => expect(screen.getAllByText("At most 10").length).toBeGreaterThan(0));
+        expect(screen.queryByLabelText(/^Chests/)).toBeNull();
+        fireEvent.change(await screen.findByLabelText(/^How far out/), {
+            target: { value: "2000" }
+        });
+        await waitFor(() => expect(screen.getAllByText("At most 1000").length).toBeGreaterThan(0));
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
     });
 });
@@ -606,9 +609,9 @@ describe("the editor in Spanish", () => {
         expect(screen.getByText("No empieza con menos jugadores conectados.")).toBeTruthy();
         expect((screen.getByLabelText(/^Mínimo de jugadores/) as HTMLInputElement).value).toBe("2");
         expect(screen.getAllByText("Ponle un nombre").length).toBeGreaterThan(0);
-        fireEvent.change(screen.getByLabelText(/^Cofres/), { target: { value: "11" } });
+        fireEvent.change(screen.getByLabelText(/^Distancia/), { target: { value: "2000" } });
         await waitFor(() =>
-            expect(screen.getAllByText("Como máximo 10").length).toBeGreaterThan(0)
+            expect(screen.getAllByText("Como máximo 1000").length).toBeGreaterThan(0)
         );
         expect(screen.queryByText(/At most|Give it a name|events\.problems/)).toBeNull();
     });

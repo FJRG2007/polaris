@@ -36,7 +36,7 @@ import * as speech from "../../speech";
 import * as written from "../messages";
 import type * as stored from "../state";
 import type { ServerContainer } from "../../service";
-import type { PlaceRefusal } from "../place-search";
+import { NO_AIR, type PlaceRefusal } from "../place-search";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
@@ -62,10 +62,12 @@ export interface KindContext {
         place: catalog.EventPlace,
         distance: number,
         radius: number,
-        /** `open` for what is built in the air, where open water under it will do. */
-        surface?: "ground" | "open",
+        /** `air` for what is built in the air: over anything, only its air counts. */
+        surface?: "ground" | "open" | "air",
         /** Whether, after a few tries, it may come in closer and near a home. */
-        nearHome?: boolean
+        nearHome?: boolean,
+        /** For `air`: how far over the highest thing in its footprint. */
+        lift?: number
     ): Promise<stored.Point | "failed" | null>;
     /** The place given up, for the reason given, and another looked for; throws
      *  once the tries run out. */
@@ -88,7 +90,6 @@ export class EventStopped extends Error {}
  *  failure - as a spleef with one player is. */
 export class TooFew extends EventStopped {}
 
-const NO_PLACE = "No dry ground was found for it near the players";
 const ONE_SIDED = "Everybody left in it was on the same team";
 /** Why it was called off, as the history keeps it (and `messages.cancelReason`
  *  says it to players). */
@@ -268,8 +269,8 @@ async function raise(ctx: KindContext): Promise<void> {
                 ? duel.DUEL_REACH
                 : build.platformReach(run.joined.length, plotSize(run));
         const options = run.preset.options as { place: catalog.EventPlace };
-        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "open");
-        if (found === "failed") throw new EventStopped(NO_PLACE);
+        const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "air", true);
+        if (found === "failed") throw new EventStopped(NO_AIR);
         return;
     }
     const box = boxFor(run, place);
@@ -460,8 +461,12 @@ async function bringIn(ctx: KindContext): Promise<void> {
                     run.joined.length
                 )
             ),
-            ...build.kitCommands(one.name, marker),
-            ...arena.titleTo(one.name, messages.themeTitle(language), `&f${theme ?? ""}`)
+            ...build.kitCommands(one.name, marker, build.paletteFor(run.id)),
+            ...arena.titleTo(
+                one.name,
+                messages.themeTitle(language),
+                `&f${theme ?? ""} &7- ${speech.pickIn(build.PALETTES[build.paletteFor(run.id)].name, language)}`
+            )
         ];
     };
     // One at a time: what they carry put away, and straight in - nobody left
@@ -483,7 +488,13 @@ async function bringIn(ctx: KindContext): Promise<void> {
         throw new TooFew(ONE_SIDED);
     const out: string[] = [];
     if (theme !== null)
-        out.push(commands.say(messages.tag(language) + messages.themeLine(theme, language)));
+        out.push(
+            commands.say(messages.tag(language) + messages.themeLine(theme, language)),
+            commands.say(
+                messages.tag(language) +
+                    messages.materialLine(build.PALETTES[build.paletteFor(run.id)].name, language)
+            )
+        );
     out.push(commands.sound(commands.SOUNDS.start));
     await ctx.server.sayAll(out);
     const seconds =

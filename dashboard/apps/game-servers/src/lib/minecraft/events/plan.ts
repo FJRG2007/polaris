@@ -101,8 +101,15 @@ export function observe(
     return next;
 }
 
-/** Whether their damage counts went up since the last look, which is what a
- *  fight looks like from outside the game. */
+/**
+ * Whether the damage they dealt went up since the last look, which is what a
+ * fight looks like from outside the game.
+ *
+ * Damage taken alone is not a fight: hunger, a fall, a cactus or a mob nibbling
+ * at somebody who is busy building all raise it, and on a small island it rose
+ * often enough that a drawn event waited all evening for a fight that was never
+ * on. It is still read and kept, for the readers that want it.
+ */
 function fight(
     last: Seen | undefined,
     readings: Readings,
@@ -111,10 +118,7 @@ function fight(
 ): Pick<Seen, "dimension" | "hurt" | "hit" | "fightingAt"> {
     const hurt = readings.hurt?.get(name) ?? null;
     const hit = readings.hit?.get(name) ?? null;
-    const rose =
-        last !== undefined &&
-        ((hurt !== null && last.hurt !== null && hurt > last.hurt) ||
-            (hit !== null && last.hit !== null && hit > last.hit));
+    const rose = last !== undefined && hit !== null && last.hit !== null && hit > last.hit;
     return {
         dimension: readings.dimensions?.get(name) ?? last?.dimension ?? null,
         hurt,
@@ -125,8 +129,8 @@ function fight(
 
 /**
  * Whether somebody is in the middle of something an event should not land on:
- * a fight in the last minute and a half, or the End, where the one thing to do
- * is fight the dragon.
+ * a fight (damage dealt) in the last minute and a half, or the End, where the
+ * one thing to do is fight the dragon.
  */
 export function busy(one: Seen, now: number): boolean {
     if (one.dimension === THE_END) return true;
@@ -258,12 +262,100 @@ export function nextGap(settings: EventSettings, random: () => number): number {
     return Math.round((minGap + random() * Math.max(0, maxGap - minGap)) * 60_000);
 }
 
+/** Why one event of the draw cannot be picked now, for the screen. */
+export interface Skipped {
+    readonly presetId: string;
+    readonly name: string;
+    /** A catalog key (`lib/game-message`). */
+    readonly reason: string;
+}
+
+/**
+ * What the draw can pick from right now: every event in its pool that is
+ * switched on and has the players it needs (in the Overworld, for the ones
+ * that happen there), weighted - and every one it cannot, with why. The same
+ * kind as last time is left out while there is anything else to pick.
+ */
+export function drawable(input: {
+    settings: EventSettings;
+    presets: readonly EventPreset[];
+    lastKind: string | null;
+    activeFor: (preset: EventPreset) => number;
+}): { choices: { preset: EventPreset; weight: number }[]; skipped: Skipped[] } {
+    const skipped: Skipped[] = [];
+    const startable: { preset: EventPreset; weight: number }[] = [];
+    for (const entry of input.settings.random.pool) {
+        const preset = input.presets.find((one) => one.id === entry.presetId);
+        if (!preset) continue;
+        if (!preset.enabled) {
+            skipped.push({
+                presetId: preset.id,
+                name: preset.name,
+                reason: gameMessage("minecraft", "events.skipped.switchedOff")
+            });
+            continue;
+        }
+        const needed = activeNeeded(preset, input.settings);
+        const have = input.activeFor(preset);
+        if (have < needed) {
+            skipped.push({
+                presetId: preset.id,
+                name: preset.name,
+                reason: gameMessage("minecraft", "events.waiting.players", {
+                    needed,
+                    have,
+                    overworld: needsOverworld(preset) ? "yes" : "no"
+                })
+            });
+            continue;
+        }
+        startable.push({ preset, weight: entry.weight });
+    }
+    const fresh = startable.filter((entry) => entry.preset.kind !== input.lastKind);
+    if (fresh.length > 0 && fresh.length < startable.length) {
+        for (const entry of startable)
+            if (entry.preset.kind === input.lastKind)
+                skipped.push({
+                    presetId: entry.preset.id,
+                    name: entry.preset.name,
+                    reason: gameMessage("minecraft", "events.skipped.sameAsLast")
+                });
+    }
+    return { choices: fresh.length > 0 ? fresh : startable, skipped };
+}
+
+/** One of the choices, by weight. */
+export function pickWeighted(
+    choices: readonly { preset: EventPreset; weight: number }[],
+    random: () => number
+): EventPreset | null {
+    if (choices.length === 0) return null;
+    const total = choices.reduce((sum, entry) => sum + entry.weight, 0);
+    let roll = random() * total;
+    for (const entry of choices) {
+        roll -= entry.weight;
+        if (roll < 0) return entry.preset;
+    }
+    return choices[choices.length - 1]!.preset;
+}
+
+/**
+ * How long the conditions must have held before a draw that was kept waiting
+ * starts: an event that lands the instant a second player joins starts on
+ * somebody still loading in, so it waits for one more look.
+ */
+export const SETTLE_MS = 90_000;
+
 export type RandomDecision =
     | { readonly start: EventPreset; readonly nextRandomAt: number; readonly waiting: null }
     | {
           readonly start: null;
           readonly nextRandomAt: number | null;
           readonly waiting: string | null;
+          /** Whether it is held back for want of players, and since when they
+           *  have been there while it settles - carried to the next look. */
+          readonly short?: boolean;
+          readonly readySince?: number | null;
       };
 
 /**
@@ -289,6 +381,10 @@ export function decideRandom(input: {
     activeFor?: (preset: EventPreset) => number;
     /** Why now is a bad moment - somebody in a fight - or null. */
     busy?: string | null;
+    /** Whether the last look held it back for want of players, and when the
+     *  players it needs were first seen there since. */
+    short?: boolean;
+    readySince?: number | null;
     now: number;
     random: () => number;
 }): RandomDecision {
@@ -330,10 +426,13 @@ export function decideRandom(input: {
         };
     }
     const count = input.activeFor ?? (() => input.active);
-    const startable = pool.filter(
-        (entry) => count(entry.preset) >= activeNeeded(entry.preset, settings)
-    );
-    if (startable.length === 0) {
+    const { choices } = drawable({
+        settings,
+        presets,
+        lastKind: input.lastKind,
+        activeFor: count
+    });
+    if (choices.length === 0) {
         // Said for the event closest to starting: what it needs, where, and
         // how many of those there are.
         const nearest = pool
@@ -346,21 +445,25 @@ export function decideRandom(input: {
         return {
             start: null,
             nextRandomAt: input.nextRandomAt,
-            waiting: gameMessage("minecraft", "events.waiting.players", nearest)
+            waiting: gameMessage("minecraft", "events.waiting.players", nearest),
+            short: true,
+            readySince: null
         };
     }
-    const fresh = startable.filter((entry) => entry.preset.kind !== input.lastKind);
-    const choices = fresh.length > 0 ? fresh : startable;
-    const total = choices.reduce((sum, entry) => sum + entry.weight, 0);
-    let roll = random() * total;
-    let chosen = choices[choices.length - 1]!.preset;
-    for (const entry of choices) {
-        roll -= entry.weight;
-        if (roll < 0) {
-            chosen = entry.preset;
-            break;
-        }
+    // Held back for want of players who have now come: one more look first, so
+    // it does not land on somebody who has only just joined.
+    if (input.short) {
+        const readySince = input.readySince ?? now;
+        if (now - readySince < SETTLE_MS)
+            return {
+                start: null,
+                nextRandomAt: input.nextRandomAt,
+                waiting: gameMessage("minecraft", "events.waiting.settling"),
+                short: true,
+                readySince
+            };
     }
+    const chosen = pickWeighted(choices, random)!;
     return {
         start: chosen,
         nextRandomAt: now + runMinutes(chosen) * 60_000 + nextGap(settings, random),

@@ -25,6 +25,13 @@ import type { EventOptions } from "../catalog";
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
 
+/**
+ * How many treasures a hunt hides: one, and a rich one - a race to a single
+ * prize every player can see the way to, rather than several small chests
+ * nobody finds. A preset saved with a number of its own is played with one.
+ */
+export const TREASURES = 1;
+
 /** How far apart two chests must be, so they are found one by one and not as a heap. */
 export const CHEST_GAP = 16;
 /** How near they may come once no place that far apart can be found: a small island. */

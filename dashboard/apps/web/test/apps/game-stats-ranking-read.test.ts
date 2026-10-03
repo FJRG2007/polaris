@@ -121,17 +121,17 @@ describe("the playtime leaderboard, read from the server", () => {
     it("has every player, longest first, and one row for a player filed under two uuids", async () => {
         const figures = await readAllPlayerStats("owner", "examplesmp");
         expect(statsRanking("rank.playtime", figures)).toEqual([
-            "1. PlayerOne 80h",
-            "2. Jeb_04 43h",
-            "3. DINNERBONE 35h",
-            "4. Grumm 33h",
-            "5. Notch 1h"
+            "1. PlayerOne 3.3 d",
+            "2. Jeb_04 1.8 d",
+            "3. DINNERBONE 1.5 d",
+            "4. Grumm 1.4 d",
+            "5. Notch 1.7 h"
         ]);
     });
 
     it("reads the current life from the uuid the player joined under last, not the longer", async () => {
         const figures = await readAllPlayerStats("owner", "examplesmp");
-        expect(statsRanking("rank.alive", figures)).toEqual(["1. PlayerOne 1h"]);
+        expect(statsRanking("rank.alive", figures)).toEqual(["1. PlayerOne 1 h"]);
     });
 
     it("gives one player's figures from every file they are filed under", async () => {
@@ -148,6 +148,6 @@ describe("a server that could not be read", () => {
         expect(await readAllMining("owner", "restarting")).toEqual([]);
         reach.down = false;
         const figures = await readAllPlayerStats("owner", "restarting");
-        expect(statsRanking("rank.playtime", figures)[0]).toBe("1. PlayerOne 80h");
+        expect(statsRanking("rank.playtime", figures)[0]).toBe("1. PlayerOne 3.3 d");
     });
 });

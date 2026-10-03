@@ -223,6 +223,9 @@ export const runSchema = z.object({
     votes: z.record(z.string()).default({}),
     /** A build battle's theme, in the players' language. */
     theme: z.string().nullable().default(null),
+    /** A trivia game: the bank's questions the server asked lately, as it
+     *  started - asked after the others (`trivia-bank.ordered`). */
+    triviaSkip: z.array(z.string()).default([]),
     /** A build battle: the building is over and the vote is on. */
     voting: z.boolean().default(false),
     /** A build battle: the [Done] button has been offered to the builders. */
@@ -327,10 +330,17 @@ export const eventStateSchema = z.object({
     nextRandomAt: z.number().nullable().default(null),
     /** Why the one that was due has not started, for the screen. */
     waiting: z.string().nullable().default(null),
+    /** Whether a drawn event that fell due is held back for want of players,
+     *  and when they were first seen there since, while it settles
+     *  (`plan.SETTLE_MS`). */
+    short: z.boolean().default(false),
+    readySince: z.number().nullable().default(null),
     /** The kind the last one was, so two of the same do not come back to back. */
     lastKind: z.enum(EVENT_KINDS).nullable().default(null),
     /** When each scheduled entry last fired, by entry id. */
     scheduleRuns: z.record(z.number()).default({}),
+    /** The bank's trivia questions asked lately, oldest first. */
+    triviaSeen: z.array(z.string()).default([]),
     /** Events won, by lowercased player name - kept apart from the history,
      *  which forgets. Null on a server that has not finished one since this was
      *  kept, where the history is counted instead. */
@@ -360,8 +370,11 @@ export const EMPTY_EVENT_STATE: EventState = {
     pending: [],
     nextRandomAt: null,
     waiting: null,
+    short: false,
+    readySince: null,
     lastKind: null,
     scheduleRuns: {},
+    triviaSeen: [],
     wins: null,
     stageLeftovers: [],
     arenaLeftovers: []

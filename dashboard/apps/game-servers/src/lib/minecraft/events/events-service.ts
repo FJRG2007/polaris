@@ -214,13 +214,24 @@ const NEAR_AFTER = 4;
 /** How a place is looked for: on land to stand on, or anywhere nothing is built
  *  for what goes up in the air; and whether it may come in near a home. */
 interface PlaceHow {
-    readonly surface?: "ground" | "open";
+    /**
+     * `ground`: on the world's own walkable ground. `open`: the same, with open
+     * water as good as land. `air`: built in the air - nothing under it matters,
+     * a build or the sea, only the air it takes; the point answered stands on
+     * top of the highest thing in its footprint (plus `lift`).
+     */
+    readonly surface?: "ground" | "open" | "air";
+    /** For `air`: how far above the highest thing in its footprint. */
+    readonly lift?: number;
     readonly nearHome?: boolean;
     /** The way to look, in radians from north (`commands.pointAway`). */
     readonly bearing?: number;
     /** Only somewhere the players can walk to from here (`commands.walkable`):
      *  on an island, the island. */
     readonly walkFrom?: { x: number; z: number };
+    /** Nobody in the Overworld answers `failed` instead of ending the event:
+     *  for an event of many places, which can let one of them go. */
+    readonly letGo?: boolean;
 }
 
 /** How many tries a search has, counted from where it starts (`Loop.placeFloor`). */
@@ -407,10 +418,74 @@ export interface EventsView {
     readonly stashFailures: Awaited<ReturnType<typeof stashService.failedStashes>>;
     readonly nextRandomAt: number | null;
     readonly waiting: string | null;
+    /** When the sweep last looked at the draw in this process, or null. */
+    readonly drawCheckedAt: number | null;
+    /** The last event the draw started, among those kept, or null. */
+    readonly lastRandom: { readonly name: string; readonly startedAt: number } | null;
     /** Who is on and who of them is playing, as the last look saw them. Null when
      *  nobody has looked yet. */
     readonly players: { readonly online: number; readonly active: number } | null;
     readonly refusal: string | null;
+}
+
+/** The last event the draw started: the one on now, or the newest kept. */
+function lastRandomOf(state: stored.EventState): { name: string; startedAt: number } | null {
+    if (state.run?.trigger === "random")
+        return { name: state.run.preset.name, startedAt: state.run.startsAt };
+    const found = state.history.find((entry) => entry.trigger === "random");
+    return found ? { name: found.name, startedAt: found.startedAt } : null;
+}
+
+/**
+ * Draw an event now, from the screen: one of the pool whose conditions hold -
+ * switched on, and the players it needs - by weight, not the same kind as last
+ * time when there is another. The hours, the gap and a fight somebody is in do
+ * not hold it back: the operator pressed the button. Says what it picked, and
+ * why each of the others was not.
+ */
+export async function runRandomNow(input: {
+    ownerId: string;
+    installedAppId: string;
+    startedBy: string;
+}): Promise<{ run: stored.EventRun | null; skipped: plan.Skipped[] }> {
+    const row = await readRow(input.installedAppId);
+    if (!row) throw new Error(refused("noServer"));
+    const settings = settingsOf(row.config);
+    const state = stored.readEventState(row.config);
+    if (state.run) throw new Error(gameMessage("minecraft", "events.waiting.anotherOn"));
+    if (settings.settings.random.pool.length === 0)
+        throw new Error(gameMessage("minecraft", "events.skipped.emptyPool"));
+    const seen = await sample(input.ownerId, input.installedAppId);
+    if (seen === null) throw new Error(refused("notRunning"));
+    const now = Date.now();
+    const { choices, skipped } = plan.drawable({
+        settings: settings.settings,
+        presets: settings.presets,
+        lastKind: state.lastKind,
+        activeFor: (preset) =>
+            plan.playersFor(preset, seen, settings.settings.afkMinutes, now).length
+    });
+    const chosen = plan.pickWeighted(choices, Math.random);
+    if (!chosen) return { run: null, skipped };
+    const run = await startEvent({
+        ownerId: input.ownerId,
+        installedAppId: input.installedAppId,
+        presetId: chosen.id,
+        trigger: "random",
+        startedBy: input.startedBy
+    });
+    // The next drawn one a gap after this one, as if the draw had picked it.
+    await updateEventState(input.installedAppId, (current) => ({
+        ...current,
+        nextRandomAt:
+            now +
+            catalog.runMinutes(chosen) * 60_000 +
+            plan.nextGap(settings.settings, Math.random),
+        waiting: null,
+        short: false,
+        readySince: null
+    }));
+    return { run, skipped };
 }
 
 export async function eventsView(installedAppId: string): Promise<EventsView> {
@@ -456,6 +531,8 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
         stashFailures: await stashService.failedStashes(installedAppId).catch(() => []),
         nextRandomAt: state.nextRandomAt,
         waiting: state.waiting,
+        drawCheckedAt: drawChecks.get(installedAppId) ?? null,
+        lastRandom: lastRandomOf(state),
         players: seen
             ? {
                   online: seen.size,
@@ -622,6 +699,7 @@ export async function startEvent(input: {
         startsAt: now + countdown,
         endsAt: now + countdown + catalog.runMinutes(preset) * 60_000,
         participants: [...seen.values()].map((one) => one.name),
+        triviaSkip: preset.kind === "trivia" ? stored.readEventState(row.config).triviaSeen : [],
         place: null,
         target: null,
         placeTries: 0,
@@ -674,11 +752,11 @@ export async function startEvent(input: {
         boss: null
     } satisfies stored.EventRun;
 
-    const stored = await updateEventState(input.installedAppId, (state) => {
+    const written = await updateEventState(input.installedAppId, (state) => {
         if (state.run) throw new Error(refused("anotherOn"));
         return { ...state, run, waiting: null };
     });
-    if (!stored) throw new Error(refused("noServer"));
+    if (!written) throw new Error(refused("noServer"));
     startLoop(row.ownerId, input.installedAppId, run, config.settings);
     return run;
 }
@@ -1312,12 +1390,14 @@ async function begin(
         );
     }
     if (catalog.playsInArena(preset)) lines.push(...arenaService.beginLines(preset, loop.home));
-    if (catalog.keepsDay(preset)) {
-        // Day held still, and no phantoms, for as long as it runs: what each
-        // rule was is written down before it is changed, so whatever ends it -
-        // a restart included - puts back exactly that.
+    const needs = catalog.worldNeeds(preset);
+    if (preset.kind !== "blood-moon" && (needs.time || needs.weather)) {
+        // What it needs of the world - a time of day, a weather - held still for
+        // as long as it runs: what each rule was, and the time of day, written
+        // down before they are changed, so whatever ends it - a restart
+        // included - puts back exactly that.
         const before: Record<string, string> = {};
-        for (const names of commands.DAY_RULES) {
+        for (const names of commands.worldRules(needs)) {
             for (const rule of names) {
                 const value =
                     loop.run.gamerules[rule] ??
@@ -1328,9 +1408,17 @@ async function begin(
                 break;
             }
         }
-        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        const timeBefore = needs.time
+            ? (commands.readDaytime(await server.say([commands.READ_DAYTIME])) ??
+              commands.readDaytime(await server.say([commands.READ_DAY_TIMELINE])))
+            : null;
+        loop.run = {
+            ...loop.run,
+            gamerules: { ...before, ...loop.run.gamerules },
+            timeBefore: loop.run.timeBefore ?? timeBefore
+        };
         await persist(installedAppId, loop);
-        lines.push(commands.MIDDAY);
+        lines.push(...commands.worldLines(needs, seconds));
     }
     if (catalog.takesJoiners(preset)) {
         // Nobody loses what they carry to a fight or a fall: a death keeps all
@@ -1519,7 +1607,11 @@ async function findPlace(
     const limit = placeLimit(loop, how.nearHome === true);
     if (!loop.run.target) {
         const center = await centerFor(server, place);
-        if (!center) return "failed";
+        // Everybody in the Nether or the End: nobody to hold it near, said so.
+        if (!center) {
+            if (how.letGo) return "failed";
+            throw new PlaceNotFound(search.NOBODY_IN_OVERWORLD);
+        }
         loop.run = { ...loop.run, placeFrom: center };
         let point: { x: number; z: number } | null = center;
         if (!chosen) {
@@ -1562,18 +1654,32 @@ async function findPlace(
         // Judged at once: the ground there is loaded by asking about it.
     }
     const { x, z } = loop.run.target!;
-    const point = await dropMark(server, x, z);
+    const air = how.surface === "air";
+    const dropped = await dropMark(server, x, z);
+    // In the air: over the highest thing in the whole footprint, however tall
+    // a build or a tree there is; the arena itself proves its air empty.
+    const top = dropped && air ? await footprintTop(server, dropped, radius) : null;
+    const point =
+        dropped && air
+            ? { ...dropped, y: Math.max(dropped.y, top ?? dropped.y) + (how.lift ?? 0) }
+            : dropped;
     // Across the water from where the players are: they live on an island, and
     // nothing further out will do - the next try comes in at once.
-    const walkable = !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
+    const walkable = air || !how.walkFrom || !point || (await canWalk(server, how.walkFrom, point));
     if (!walkable && how.nearHome)
         loop.run = { ...loop.run, placeTries: Math.max(loop.run.placeTries, NEAR_AFTER - 1) };
     const refused: search.PlaceRefusal | null =
-        !point || chosen
+        !point || chosen || air
             ? null
             : !walkable
               ? "water"
-              : await siteIsOpen(loop, server, point, radius, how.surface ?? "ground");
+              : await siteIsOpen(
+                    loop,
+                    server,
+                    point,
+                    radius,
+                    how.surface === "open" ? "open" : "ground"
+                );
     const why: search.PlaceRefusal = refused ?? "noGround";
     if (point && !refused) {
         // The marker can come down a block or two from the column tried - an
@@ -1600,6 +1706,34 @@ async function findPlace(
     loop.run = { ...noted(loop, x, z, why), target: null, placeTries: loop.run.placeTries + 1 };
     await persist(installedAppId, loop);
     return loop.run.placeTries >= limit ? "failed" : null;
+}
+
+/**
+ * The top of the highest thing over a footprint - roofs, crowns, the sea - read
+ * from a marker on top of each of its columns, all summoned and read at once.
+ * Null on a server too old for the heightmap (before 1.19.4), where the arena's
+ * own proof that its air is empty is what keeps it off anything.
+ */
+async function footprintTop(
+    server: ServerContainer,
+    center: stored.Point,
+    radius: number
+): Promise<number | null> {
+    const reach = radius + 1;
+    const area = `${center.x - reach} ${center.z - reach} ${center.x + reach} ${center.z + reach}`;
+    try {
+        await server.sayAll([
+            `execute in minecraft:overworld run forceload add ${area}`,
+            ...commands.topLines(commands.footprintColumns(center, radius))
+        ]);
+        return commands.highestTop(commands.samplesIn(await server.say([commands.READ_SAMPLES])));
+    } finally {
+        await server.sayAll([
+            commands.CLEAR_SAMPLES,
+            `execute in minecraft:overworld run forceload remove ${area}`,
+            commands.forceload(center.x, center.z)
+        ]);
+    }
 }
 
 /** Whether a place can be walked to from a point (`commands.walkable`), judged
@@ -1916,7 +2050,11 @@ async function retryPlace(
         placeTries: loop.run.placeTries + 1
     };
     await persist(installedAppId, loop);
-    if (loop.run.placeTries >= placeLimit(loop, nearHome)) throw new PlaceNotFound();
+    if (loop.run.placeTries >= placeLimit(loop, nearHome)) {
+        const inAir =
+            catalog.playsInArena(loop.run.preset) || catalog.playsOnStage(loop.run.preset);
+        throw new PlaceNotFound(inAir ? search.NO_AIR : search.NO_GROUND);
+    }
 }
 
 /** Where a walk to an event's place starts: the fixed point, or where most
@@ -1970,7 +2108,7 @@ function kindContext(
             loop.run = next;
         },
         persist: () => persist(installedAppId, loop),
-        findPlace: (place, distance, radius, surface, nearHome) => {
+        findPlace: (place, distance, radius, surface, nearHome, lift) => {
             nearHomeLast = nearHome === true;
             return findPlace(
                 installedAppId,
@@ -1983,7 +2121,8 @@ function kindContext(
                 true,
                 {
                     surface: surface ?? "ground",
-                    nearHome: nearHomeLast
+                    nearHome: nearHomeLast,
+                    lift
                 }
             );
         },
@@ -2245,7 +2384,7 @@ async function hideTreasure(
             false,
             {
                 nearHome: true,
-                bearing: hunt.chestBearing(loop.run.id, index, options.chests),
+                bearing: hunt.chestBearing(loop.run.id, index, hunt.TREASURES),
                 ...(loop.run.origin ? { walkFrom: loop.run.origin } : {})
             }
         );
@@ -2311,7 +2450,7 @@ async function hideTreasure(
             place: null,
             target: null,
             placeTries: loop.placeFloor,
-            hidden: loop.run.chests.length >= options.chests
+            hidden: loop.run.chests.length >= hunt.TREASURES
         };
         await persist(installedAppId, loop);
     }
@@ -2341,7 +2480,7 @@ async function settlePendingChest(
         ...loop.run,
         place: null,
         target: null,
-        hidden: loop.run.chests.length >= options.chests
+        hidden: loop.run.chests.length >= hunt.TREASURES
     };
     await persist(installedAppId, loop);
 }
@@ -2453,12 +2592,11 @@ function roundIn(
     language: catalog.Language
 ): { kind: "question" | "scramble"; asked: string; accepted: string[] } {
     const options = run.preset.options as catalog.EventOptions<"trivia">;
-    const random = trivia.seeded(run.id);
     const questions = [
         ...options.questions,
-        ...trivia.shuffled(trivia.QUESTIONS[language], random)
+        ...trivia.ordered(run.id, run.triviaSkip).map((one) => one[language])
     ];
-    const words = trivia.shuffled(trivia.WORDS[language], random);
+    const words = trivia.shuffled(trivia.WORDS[language], trivia.seeded(run.id));
     const scrambleRound =
         options.mode === "scramble" || (options.mode === "mixed" && run.round % 2 === 1);
     if (scrambleRound) {
@@ -2471,6 +2609,27 @@ function roundIn(
     }
     const question = questions[run.round % questions.length]!;
     return { kind: "question", asked: question.question, accepted: [...question.answers] };
+}
+
+/** The bank's questions a trivia game asked, remembered so the next games ask
+ *  others first. */
+async function rememberAsked(installedAppId: string, run: stored.EventRun): Promise<void> {
+    const options = run.preset.options as catalog.EventOptions<"trivia">;
+    const bank = trivia.ordered(run.id, run.triviaSkip);
+    const asked: string[] = [];
+    for (let round = 0; round <= run.round; round += 1) {
+        const scrambleRound =
+            options.mode === "scramble" || (options.mode === "mixed" && round % 2 === 1);
+        const index = round - options.questions.length;
+        if (!scrambleRound && index >= 0 && index < bank.length) asked.push(bank[index]!.id);
+    }
+    if (asked.length === 0) return;
+    await updateEventState(installedAppId, (state) => ({
+        ...state,
+        triviaSeen: trivia.remembered(state.triviaSeen, asked)
+    })).catch((error: unknown) =>
+        console.warn("polaris: remembering trivia questions failed", installedAppId, String(error))
+    );
 }
 
 /**
@@ -2819,7 +2978,11 @@ async function meteorShower(
             false,
             // Ore put only into air, and taken out again: on an island it comes
             // down on the island, where it can be walked to.
-            { nearHome: true, walkFrom: await walkStart(server, options.place) }
+            {
+                nearHome: true,
+                walkFrom: await walkStart(server, options.place),
+                letGo: true
+            }
         );
         if (found === "failed") {
             // Nowhere for this one: it is let go, and the next looked for afresh.
@@ -3009,13 +3172,14 @@ function stageTools(
                 radius,
                 commands.HOME_CLEARANCE + radius,
                 true,
-                // Built in the air: over the sea as well as over land.
-                { surface: "open" }
+                // Built in the air: over anything, a build or the sea; and in
+                // closer after a few tries, since it changes nothing below.
+                { surface: "air", nearHome: true }
             );
-            if (found === "failed") throw new PlaceNotFound();
+            if (found === "failed") throw new PlaceNotFound(search.NO_AIR);
             return found;
         },
-        giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, false, why),
+        giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, true, why),
         chat: () => newChat(server, loop),
         owed: async () => {
             const row = await readRow(installedAppId);
@@ -3086,8 +3250,8 @@ async function chestTest(
 }
 
 class PlaceNotFound extends Error {
-    constructor() {
-        super("No dry ground was found for it near the players");
+    constructor(why: string = search.NO_GROUND) {
+        super(why);
     }
 }
 
@@ -3130,6 +3294,7 @@ async function finish(
         console.warn("polaris: marking an event finished failed", installedAppId, String(error))
     );
     const { preset } = run;
+    if (preset.kind === "trivia") await rememberAsked(installedAppId, run);
     const language = loop.language;
     const info = catalog.KIND_INFO[preset.kind];
     let placed: plan.Placed[] = [];
@@ -3852,6 +4017,26 @@ async function sample(
 // ------------------------------------------------------------------ the sweep
 
 /**
+ * When the sweep last looked at each server's draw. Kept in this process rather
+ * than written down: it changes every minute, and what it is for - the screen
+ * showing the draw is alive - is answered by the process that runs the sweep.
+ */
+const drawChecks = new Map<string, number>();
+
+/** An event on while a drawn one is due: said, so the screen says why it waits. */
+async function noteDrawBlocked(
+    installedAppId: string,
+    state: stored.EventState,
+    now: number
+): Promise<void> {
+    drawChecks.set(installedAppId, now);
+    if (state.nextRandomAt === null || now < state.nextRandomAt) return;
+    const reason = gameMessage("minecraft", "events.waiting.anotherOn");
+    if (state.waiting === reason) return;
+    await updateEventState(installedAppId, (current) => ({ ...current, waiting: reason }));
+}
+
+/**
  * The minute sweep, for every Minecraft server with events set up: an event
  * that lost its loop to a restart gets it back, prizes waiting for somebody who
  * is on now are handed over, and a scheduled or drawn event whose moment has
@@ -3906,6 +4091,7 @@ async function sweepOne(
         );
     }
     if (state.run) {
+        if (settings.settings.random.enabled) await noteDrawBlocked(installedAppId, state, now);
         if (loops.has(installedAppId)) return false;
         if (state.run.finishing) await abandon(ownerId, installedAppId, state.run);
         else startLoop(ownerId, installedAppId, state.run, settings.settings);
@@ -3919,7 +4105,18 @@ async function sweepOne(
     if (!wantsPlayers) return false;
 
     const seen = await sample(ownerId, installedAppId).catch(() => null);
-    if (seen === null) return false;
+    if (seen === null) {
+        if (settings.settings.random.enabled) {
+            drawChecks.set(installedAppId, now);
+            const down = gameMessage("minecraft", "events.waiting.serverDown");
+            if (state.waiting !== down)
+                await updateEventState(installedAppId, (current) => ({
+                    ...current,
+                    waiting: down
+                }));
+        }
+        return false;
+    }
     if (pending.length > 0 && seen.size > 0) await deliverPending(ownerId, installedAppId, seen);
     const active = plan.activePlayers(seen, settings.settings.afkMinutes, now).length;
     const activeFor = (preset: catalog.EventPreset) =>
@@ -3994,14 +4191,34 @@ async function sweepOne(
         active,
         activeFor,
         busy,
+        short: state.short,
+        readySince: state.readySince,
         now,
         random: Math.random
     });
-    await updateEventState(installedAppId, (current) =>
-        current.nextRandomAt === decision.nextRandomAt && current.waiting === decision.waiting
-            ? current
-            : { ...current, nextRandomAt: decision.nextRandomAt, waiting: decision.waiting }
-    );
+    if (settings.settings.random.enabled) drawChecks.set(installedAppId, now);
+    // Kept across a wait for something else (an event on, the hours): only the
+    // players it waits for, or a start, settle it.
+    const short = decision.start ? false : (decision.short ?? state.short);
+    const readySince = decision.start
+        ? null
+        : decision.short === undefined
+          ? state.readySince
+          : (decision.readySince ?? null);
+    // Written only when something changed: the sweep comes round every minute.
+    if (
+        state.nextRandomAt !== decision.nextRandomAt ||
+        state.waiting !== decision.waiting ||
+        state.short !== short ||
+        state.readySince !== readySince
+    )
+        await updateEventState(installedAppId, (current) => ({
+            ...current,
+            nextRandomAt: decision.nextRandomAt,
+            waiting: decision.waiting,
+            short,
+            readySince
+        }));
     if (!decision.start) return false;
     try {
         await startEvent({

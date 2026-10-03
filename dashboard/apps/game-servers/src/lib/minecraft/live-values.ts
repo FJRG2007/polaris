@@ -17,6 +17,7 @@ import * as replies from "./events/replies";
 import { linkedChannels, readChatLink, type ChatLink } from "./chat-link";
 import { searchContainerTail } from "../container-files";
 import { eventWins, readEventState } from "./events/state";
+import { chosenLanguage } from "./events/catalog";
 import {
     EVENTS_RANKING,
     INLINE_TOP,
@@ -144,7 +145,7 @@ export async function liveContext(
     if (wanted.length > 0 && readFigures) {
         const figures = await readFigures().catch(() => []);
         for (const name of wanted) {
-            const ranked = statsRanking(name, figures);
+            const ranked = statsRanking(name, figures, chosenLanguage(config) ?? "en");
             list(name, ranked, ranked.slice(0, INLINE_TOP));
         }
     }

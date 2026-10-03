@@ -301,6 +301,48 @@ describe("the random draw", () => {
         expect(high.start?.id).toBe("mine");
     });
 
+    it("waits one more look once the players it was short of come, so a join is not landed on", () => {
+        const due = at("20:00");
+        const short = plan.decideRandom({
+            ...base,
+            active: 1,
+            nextRandomAt: due,
+            now: at("20:30")
+        });
+        expect(short.short).toBe(true);
+        const first = plan.decideRandom({ ...base, ...short, nextRandomAt: due, now: at("21:00") });
+        expect(first.start).toBeNull();
+        expect(first.readySince).toBe(at("21:00"));
+        expect(english(first.waiting)).toMatch(/one more check/);
+        const second = plan.decideRandom({
+            ...base,
+            nextRandomAt: due,
+            short: true,
+            readySince: first.readySince,
+            now: at("21:00") + plan.SETTLE_MS
+        });
+        expect(second.start?.id).toBe("fish");
+    });
+
+    it("starts at once when it was never short of players", () => {
+        expect(
+            plan.decideRandom({ ...base, nextRandomAt: at("20:00"), now: at("21:00") }).start?.id
+        ).toBe("fish");
+    });
+
+    it("starts the settling again when the players it waits for leave", () => {
+        const left = plan.decideRandom({
+            ...base,
+            active: 1,
+            nextRandomAt: at("20:00"),
+            short: true,
+            readySince: at("20:30"),
+            now: at("21:00")
+        });
+        expect(left.start).toBeNull();
+        expect(left.readySince).toBeNull();
+    });
+
     it("leaves out an event that is switched off", () => {
         const off = { ...fishing, enabled: false };
         const decided = plan.decideRandom({
@@ -441,6 +483,14 @@ describe("a competition with prizes, on its own", () => {
         expect(catalog.joinersNeeded(practice)).toBe(1);
     });
 
+    it("never plays a build battle with fewer than three, whatever its own minimum", () => {
+        const battle = catalog.newPreset("build-battle", "b");
+        expect(catalog.joinersNeeded({ ...battle, minPlayers: 2 })).toBe(3);
+        expect(catalog.joinersNeeded({ ...battle, minPlayers: 5 })).toBe(5);
+        expect(catalog.minPlayersOf({ ...battle, minPlayers: undefined })).toBe(3);
+        expect(catalog.activeNeeded({ ...battle, minPlayers: 2 }, loose)).toBe(3);
+    });
+
     it("is left out of the draw for one player alone, who still gets the rest", () => {
         const draw = {
             ...loose,
@@ -528,19 +578,121 @@ describe("the least to be ranked", () => {
     });
 });
 
+describe("what each event needs of the world", () => {
+    it("is declared for every kind", () => {
+        for (const kind of catalog.EVENT_KINDS) expect(catalog.WORLD_NEEDS[kind]).toBeDefined();
+    });
+
+    it("holds clear weather on a build and night for a horde", () => {
+        expect(catalog.worldNeeds({ kind: "build-battle" })).toEqual({
+            time: "day",
+            weather: "clear"
+        });
+        expect(catalog.worldNeeds({ kind: "waves" })).toEqual({ time: "night", weather: "clear" });
+        expect(catalog.worldNeeds({ kind: "mob-hunt" }).time).toBe("night");
+    });
+
+    it("keeps every arena and stage in the day", () => {
+        for (const kind of catalog.EVENT_KINDS) {
+            const preset = catalog.newPreset(kind, kind);
+            if (catalog.playsInArena(preset) || catalog.playsOnStage(preset))
+                expect(catalog.keepsDay(preset)).toBe(true);
+        }
+    });
+});
+
+describe("what the draw can pick now", () => {
+    const fishing = catalog.newPreset("fishing", "fish");
+    const duel = catalog.newPreset("team-duel", "duel");
+    const off = { ...catalog.newPreset("trivia", "quiz"), enabled: false };
+    const on = settings({
+        minActive: 1,
+        random: {
+            ...catalog.settingsSchema.parse({}).random,
+            enabled: true,
+            pool: [
+                { presetId: "fish", weight: 1 },
+                { presetId: "duel", weight: 1 },
+                { presetId: "quiz", weight: 1 },
+                { presetId: "gone", weight: 1 }
+            ]
+        }
+    });
+
+    it("says why each one it leaves out cannot start", () => {
+        const { choices, skipped } = plan.drawable({
+            settings: on,
+            presets: [fishing, duel, off],
+            lastKind: null,
+            // Two by the lake, one of them out of the Overworld.
+            activeFor: (preset) => (preset.id === "fish" ? 2 : 1)
+        });
+        expect(choices.map((one) => one.preset.id)).toEqual(["fish"]);
+        expect(skipped.map((one) => [one.presetId, english(one.reason)])).toEqual([
+            ["duel", "Waiting for 2 active players (1 now)"],
+            ["quiz", "Switched off"]
+        ]);
+    });
+
+    it("leaves out the same kind as last time, and says so, while another can start", () => {
+        const { choices, skipped } = plan.drawable({
+            settings: on,
+            presets: [fishing, duel, off],
+            lastKind: "fishing",
+            activeFor: () => 4
+        });
+        expect(choices.map((one) => one.preset.id)).toEqual(["duel"]);
+        expect(skipped.find((one) => one.presetId === "fish")?.reason).toBeDefined();
+        expect(english(skipped.find((one) => one.presetId === "fish")!.reason)).toBe(
+            "Same kind as the last one"
+        );
+    });
+
+    it("picks by weight, and nothing from nothing", () => {
+        const choices = [
+            { preset: fishing, weight: 1 },
+            { preset: duel, weight: 3 }
+        ];
+        expect(plan.pickWeighted(choices, always(0.1))?.id).toBe("fish");
+        expect(plan.pickWeighted(choices, always(0.9))?.id).toBe("duel");
+        expect(plan.pickWeighted([], always(0.5))).toBeNull();
+    });
+
+    it("is open any time of day by default", () => {
+        const fresh = settings();
+        expect(fresh.random.from).toBe(fresh.random.to);
+        for (const time of ["00:00", "03:30", "12:00", "23:59"])
+            expect(plan.randomWindowOpen(fresh, at(time))).toBe(true);
+    });
+});
+
 describe("fights and worlds", () => {
     const here = [{ name: "Ana", x: 0, y: 64, z: 0 }];
     const facing = new Map([["Ana", { yaw: 0, pitch: 0 }]]);
 
-    it("sees a fight in the damage counts going up, and lets it go after a while", () => {
-        const first = plan.observe(new Map(), here, facing, 0, { hurt: new Map([["Ana", 10]]) });
+    it("sees a fight in the damage dealt going up, and lets it go after a while", () => {
+        const first = plan.observe(new Map(), here, facing, 0, { hit: new Map([["Ana", 10]]) });
         const second = plan.observe(first, [{ name: "Ana", x: 5, y: 64, z: 0 }], facing, 60_000, {
-            hurt: new Map([["Ana", 30]])
+            hit: new Map([["Ana", 30]])
         });
         const ana = second.get("ana")!;
         expect(plan.busy(ana, 60_000)).toBe(true);
         expect(plan.busy(ana, 60_000 + plan.FIGHT_COOLDOWN_MS + 1)).toBe(false);
         expect(english(plan.busyReason(second, 5, 60_000))).toBe("Ana is in a fight or in the End");
+    });
+
+    it("does not take damage taken alone for a fight: hunger, a fall, a mob nibbling", () => {
+        // On a small island this held the draw back all evening.
+        const first = plan.observe(new Map(), here, facing, 0, {
+            hurt: new Map([["Ana", 10]]),
+            hit: new Map([["Ana", 0]])
+        });
+        const second = plan.observe(first, [{ name: "Ana", x: 5, y: 64, z: 0 }], facing, 60_000, {
+            hurt: new Map([["Ana", 40]]),
+            hit: new Map([["Ana", 0]])
+        });
+        expect(plan.busy(second.get("ana")!, 60_000)).toBe(false);
+        expect(plan.busyReason(second, 5, 60_000)).toBeNull();
     });
 
     it("takes the End for a fight with the dragon", () => {

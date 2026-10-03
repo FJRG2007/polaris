@@ -20,6 +20,7 @@ import { MATERIAL_LABELS } from "./event-options-gathering";
 import { worldBossFacts } from "./event-options-world-boss";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
+import { figureLanguage, formatCount, formatDuration } from "../../lib/figures";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
@@ -27,6 +28,7 @@ import type { SearchSummary } from "../../lib/minecraft/events/place-search";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     Copy,
+    Dices,
     FastForward,
     Info,
     Loader2,
@@ -72,6 +74,72 @@ const OUTCOME: Readonly<
     skipped: { label: "events.outcomes.skipped", tone: "warning" },
     failed: { label: "events.outcomes.failed", tone: "danger" }
 };
+
+/**
+ * How the draw stands: when the next one comes (a countdown), why a due one
+ * waits, the last one it started, and when the sweep last looked - the proof it
+ * is alive.
+ */
+function DrawStatus({
+    view,
+    now,
+    t,
+    schemaText,
+    dateTime
+}: {
+    view: EventsView;
+    now: number;
+    t: GameText<"minecraft">;
+    schemaText: (text: string | null | undefined) => string | undefined;
+    dateTime: (at: number) => string;
+}): React.ReactElement {
+    const lines: string[] = [];
+    if (view.waiting && (!view.nextRandomAt || view.nextRandomAt <= now))
+        lines.push(t("events.nextDue", { reason: lowerFirst(schemaText(view.waiting) ?? "") }));
+    else if (view.nextRandomAt && view.nextRandomAt > now)
+        lines.push(t("events.nextIn", { time: clock(view.nextRandomAt - now) }));
+    else if (!view.nextRandomAt) lines.push(t("events.drawArming"));
+    lines.push(
+        view.lastRandom
+            ? t("events.lastDrawn", {
+                  name: view.lastRandom.name,
+                  date: dateTime(view.lastRandom.startedAt)
+              })
+            : t("events.noneDrawnYet")
+    );
+    lines.push(
+        view.drawCheckedAt
+            ? t("events.drawChecked", { time: clock(now - view.drawCheckedAt) })
+            : t("events.drawNotChecked")
+    );
+    return (
+        <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            {lines.map((line) => (
+                <p key={line}>{line}</p>
+            ))}
+        </div>
+    );
+}
+
+/** A score's figure: time held as a duration, anything else as a count (`figures`). */
+function scoreFigure(kind: catalog.EventKind, score: number, locale: string): string {
+    const language = figureLanguage(locale);
+    return catalog.KIND_INFO[kind].unit === "seconds"
+        ? formatDuration(score * 1000, language)
+        : formatCount(score, language);
+}
+
+/** A score as the screen shows it: its figure, and a count's unit after it. */
+function scoreText(
+    t: GameText<"minecraft">,
+    kind: catalog.EventKind,
+    score: number,
+    locale: string
+): string {
+    const figure = scoreFigure(kind, score, locale);
+    const unit = catalog.KIND_INFO[kind].unit === "seconds" ? "" : kindUnit(t, kind);
+    return unit ? `${figure} ${unit}` : figure;
+}
 
 /** m:ss, or h:mm:ss past an hour. */
 function clock(ms: number): string {
@@ -274,7 +342,7 @@ function EventExplained({
     if (preset.kind === "treasure-hunt") {
         const options = preset.options as catalog.EventOptions<"treasure-hunt">;
         facts.push(
-            t("events.facts.chestsHidden", { count: options.chests, distance: options.distance }),
+            t("events.facts.chestsHidden", { count: 1, distance: options.distance }),
             t("events.facts.clues"),
             t("events.facts.chestsCleared")
         );
@@ -394,7 +462,17 @@ function EventExplained({
     }
     if (preset.kind === "world-boss")
         facts.push(...worldBossFacts(t, preset.options as catalog.EventOptions<"world-boss">));
-    if (catalog.keepsDay(preset)) facts.push(t("events.facts.keepsDay"));
+    {
+        // What it holds of the world while it runs, and gives back after.
+        const needs = catalog.worldNeeds(preset);
+        if (preset.kind !== "blood-moon" && (needs.time || needs.weather))
+            facts.push(
+                t("events.facts.world", {
+                    time: needs.time ?? "none",
+                    weather: needs.weather ?? "none"
+                })
+            );
+    }
     if (catalog.needsOverworld(preset) && !catalog.playsOnStage(preset))
         facts.push(t("events.facts.overworld"));
     if (catalog.hasMinScore(preset)) {
@@ -455,6 +533,7 @@ export function MinecraftEvents({
 }) {
     const t = useGameText("minecraft");
     const schemaText = useSchemaText();
+    const locale = hostUi.i18nProvider.useLocale();
     const display = useDisplayFormat();
     const [view, setView] = useState<EventsView | null>(null);
     const [draft, setDraft] = useState<catalog.EventsConfig | null>(null);
@@ -531,10 +610,11 @@ export function MinecraftEvents({
     }, [note]);
 
     useEffect(() => {
-        if (!running) return;
+        // Ticking for the event on, and for the countdown to the next drawn one.
+        if (!running && !view?.nextRandomAt) return;
         const timer = setInterval(() => setNow(Date.now()), 1_000);
         return () => clearInterval(timer);
-    }, [running]);
+    }, [running, view?.nextRandomAt]);
 
     const checked = useMemo(
         () => (draft ? catalog.eventsConfigSchema.safeParse(draft) : null),
@@ -570,6 +650,28 @@ export function MinecraftEvents({
             }
             accept(answer.view, false);
             setNote(t("events.starting", { name: preset.name }));
+        });
+    }
+
+    /** What the last press of Run a random event left out, and why. */
+    const [skipped, setSkipped] = useState<
+        { presetId: string; name: string; reason: string }[] | null
+    >(null);
+
+    function runRandom(): void {
+        setError(null);
+        setNote(null);
+        setSkipped(null);
+        startTransition(async () => {
+            const answer = await actions.runRandomAction(installedAppId);
+            if (!answer.view) {
+                setError(answer.error ?? t("events.errors.start"));
+                return;
+            }
+            accept(answer.view, false);
+            setSkipped(answer.skipped ?? []);
+            if (answer.picked) setNote(t("events.drawnNow", { name: answer.picked }));
+            else setError(t("events.noneCanStart"));
         });
     }
 
@@ -763,27 +865,56 @@ export function MinecraftEvents({
                                         {one.name}
                                     </span>
                                     <span className="tabular-nums text-muted-foreground">
-                                        {one.score} {kindUnit(t, view.run!.kind)}
+                                        {scoreText(t, view.run!.kind, one.score, locale)}
                                     </span>
                                 </li>
                             ))}
                         </ol>
                     )}
-                    {!view?.run &&
-                        view &&
-                        (view.nextRandomAt || view.waiting) &&
-                        settings?.random.enabled && (
-                            <p className="text-xs text-muted-foreground">
-                                {view.waiting
-                                    ? t("events.nextDue", {
-                                          reason: lowerFirst(schemaText(view.waiting) ?? "")
-                                      })
-                                    : view.nextRandomAt
-                                      ? t("events.nextFrom", {
-                                            date: display.dateTime(view.nextRandomAt)
-                                        })
-                                      : null}
-                            </p>
+                    {view && settings?.random.enabled && (
+                        <DrawStatus
+                            view={view}
+                            now={now}
+                            t={t}
+                            schemaText={schemaText}
+                            dateTime={(at) => display.dateTime(at)}
+                        />
+                    )}
+                    {view &&
+                        !view.run &&
+                        canManage &&
+                        settings &&
+                        settings.random.pool.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                                <div>
+                                    <ui.Button
+                                        variant="secondary"
+                                        size="sm"
+                                        disabled={pending || dirty}
+                                        title={dirty ? t("events.saveFirst") : undefined}
+                                        onClick={runRandom}
+                                    >
+                                        <Dices className="size-4" />
+                                        {t("events.runRandom")}
+                                    </ui.Button>
+                                </div>
+                                {skipped && skipped.length > 0 && (
+                                    <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                                        {skipped.map((one) => (
+                                            <li
+                                                key={one.presetId}
+                                                className="min-w-0 truncate"
+                                                title={schemaText(one.reason) ?? ""}
+                                            >
+                                                {t("events.skippedOne", {
+                                                    name: one.name,
+                                                    reason: lowerFirst(schemaText(one.reason) ?? "")
+                                                })}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                         )}
                 </ui.CardBody>
             </ui.Card>
@@ -1104,33 +1235,58 @@ export function MinecraftEvents({
                                             days={settings.random.days}
                                             onChange={(days) => changeRandom({ days })}
                                         />
+                                        <label className="flex items-center gap-3 text-sm">
+                                            <ui.Switch
+                                                checked={
+                                                    settings.random.from === settings.random.to
+                                                }
+                                                disabled={locked}
+                                                aria-label={t("events.anyTimeOfDay")}
+                                                onChange={(on) =>
+                                                    changeRandom(
+                                                        on
+                                                            ? { from: "00:00", to: "00:00" }
+                                                            : { from: "18:00", to: "23:00" }
+                                                    )
+                                                }
+                                            />
+                                            {t("events.anyTimeOfDay")}
+                                        </label>
                                         <div className="grid gap-3 sm:grid-cols-4">
-                                            <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">
-                                                    {t("events.from")}
-                                                </span>
-                                                <ui.Input
-                                                    type="time"
-                                                    value={settings.random.from}
-                                                    disabled={locked}
-                                                    onChange={(event) =>
-                                                        changeRandom({ from: event.target.value })
-                                                    }
-                                                />
-                                            </label>
-                                            <label className="flex flex-col gap-1 text-sm">
-                                                <span className="font-medium">
-                                                    {t("events.until")}
-                                                </span>
-                                                <ui.Input
-                                                    type="time"
-                                                    value={settings.random.to}
-                                                    disabled={locked}
-                                                    onChange={(event) =>
-                                                        changeRandom({ to: event.target.value })
-                                                    }
-                                                />
-                                            </label>
+                                            {settings.random.from !== settings.random.to && (
+                                                <>
+                                                    <label className="flex flex-col gap-1 text-sm">
+                                                        <span className="font-medium">
+                                                            {t("events.from")}
+                                                        </span>
+                                                        <ui.Input
+                                                            type="time"
+                                                            value={settings.random.from}
+                                                            disabled={locked}
+                                                            onChange={(event) =>
+                                                                changeRandom({
+                                                                    from: event.target.value
+                                                                })
+                                                            }
+                                                        />
+                                                    </label>
+                                                    <label className="flex flex-col gap-1 text-sm">
+                                                        <span className="font-medium">
+                                                            {t("events.until")}
+                                                        </span>
+                                                        <ui.Input
+                                                            type="time"
+                                                            value={settings.random.to}
+                                                            disabled={locked}
+                                                            onChange={(event) =>
+                                                                changeRandom({
+                                                                    to: event.target.value
+                                                                })
+                                                            }
+                                                        />
+                                                    </label>
+                                                </>
+                                            )}
                                             <label className="flex flex-col gap-1 text-sm">
                                                 <span className="font-medium">
                                                     {t("events.timeBetweenEventsAtLeast")}
@@ -1177,9 +1333,48 @@ export function MinecraftEvents({
                                             </label>
                                         </div>
                                         <div className="flex flex-col gap-1">
-                                            <p className="text-sm font-medium">
-                                                {t("events.drawnFrom")}
-                                            </p>
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <p className="text-sm font-medium">
+                                                    {t("events.drawnFrom")}
+                                                </p>
+                                                <div className="flex gap-2">
+                                                    <ui.Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={locked}
+                                                        onClick={() =>
+                                                            changeRandom({
+                                                                pool: presets
+                                                                    .filter((one) => one.enabled)
+                                                                    .map(
+                                                                        (one) =>
+                                                                            settings.random.pool.find(
+                                                                                (entry) =>
+                                                                                    entry.presetId ===
+                                                                                    one.id
+                                                                            ) ?? {
+                                                                                presetId: one.id,
+                                                                                weight: 1
+                                                                            }
+                                                                    )
+                                                            })
+                                                        }
+                                                    >
+                                                        {t("events.drawAll")}
+                                                    </ui.Button>
+                                                    <ui.Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={
+                                                            locked ||
+                                                            settings.random.pool.length === 0
+                                                        }
+                                                        onClick={() => changeRandom({ pool: [] })}
+                                                    >
+                                                        {t("events.drawNone")}
+                                                    </ui.Button>
+                                                </div>
+                                            </div>
                                             {presets.map((preset) => {
                                                 const entry = settings.random.pool.find(
                                                     (one) => one.presetId === preset.id
@@ -1584,7 +1779,7 @@ export function MinecraftEvents({
                                             ? entry.podium
                                                   .map(
                                                       (one) =>
-                                                          `${one.place}. ${one.name} (${one.score})`
+                                                          `${one.place}. ${one.name} (${entry.kind === "parkour" ? one.score : scoreFigure(entry.kind, one.score, locale)})`
                                                   )
                                                   .join("  ")
                                             : entry.note}

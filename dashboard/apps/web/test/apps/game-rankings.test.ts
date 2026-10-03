@@ -49,13 +49,13 @@ describe("a ranking", () => {
         expect(statsRanking("rank.pvp", figures)).toEqual(["1. Alex 9", "2. Steve 4"]);
     });
 
-    it("reads time played in hours, or minutes under one", () => {
+    it("reads time played stepped up its units: minutes, hours, days and on", () => {
         expect(statsRanking("rank.playtime", figures)).toEqual([
-            "1. Steve 120h",
-            "2. Alex 86h",
-            "3. Zed 40m"
+            "1. Steve 5 d",
+            "2. Alex 3.6 d",
+            "3. Zed 40 min"
         ]);
-        expect(playedText(59 * 60_000)).toBe("59m");
+        expect(playedText(59 * 60_000)).toBe("59 min");
     });
 
     it("orders a tie by name", () => {

@@ -11,6 +11,7 @@
  */
 
 import { miningFigures } from "./xray";
+import { formatCount, formatPlain, formatDuration, type FigureLanguage } from "../figures";
 import type { PlayerStats } from "../games-activity";
 
 /**
@@ -127,32 +128,36 @@ export function addTallies(all: readonly PlayerTallies[]): PlayerTallies | null 
 
 const TICK_MS = 50;
 
-/** A count that stays short on a line: 9999, then 12.3k, then 1.2M. */
-export function countText(value: number): string {
-    const rounded = Math.round(value);
-    if (rounded < 10_000) return String(rounded);
-    const thousands = Number((value / 1_000).toFixed(1));
-    if (thousands < 1_000) return `${thousands}k`;
-    return `${Number((value / 1_000_000).toFixed(1))}M`;
+/** A count that stays short on a line (`figures.formatCount`): 9999, then 12.3K, then 1.2M. */
+export function countText(value: number, language: FigureLanguage = "en"): string {
+    return formatCount(value, language);
 }
 
 /** Distance from centimetres: metres, or kilometres from one. */
-export function distanceText(cm: number): string {
+export function distanceText(cm: number, language: FigureLanguage = "en"): string {
     const metres = cm / 100;
-    return metres < 1_000 ? `${Math.floor(metres)}m` : `${Number((metres / 1_000).toFixed(1))}km`;
+    if (metres < 1_000) return `${Math.floor(metres)}m`;
+    const km = metres / 1_000;
+    return `${km < COMPACT_KM ? formatPlain(km, language) : formatCount(km, language)}km`;
 }
+
+/** Past this many kilometres the distance is written short too. */
+const COMPACT_KM = 10_000;
 
 /** Damage in hearts, from the game's tenths of a health point; a tenth under
  *  one heart, so nobody on the board reads as none. */
-function heartsText(tenths: number): string {
+function heartsText(tenths: number, language: FigureLanguage = "en"): string {
     const hearts = tenths / 20;
-    return hearts < 1 ? String(Number(hearts.toFixed(1)) || 0.1) : countText(Math.round(hearts));
+    return hearts < 1
+        ? String(Number(hearts.toFixed(1)) || 0.1)
+        : countText(Math.round(hearts), language);
 }
 
 interface Ranking {
     readonly label: string;
     readonly of: (figures: PlayerFigures) => number;
-    readonly text?: (value: number) => string;
+    /** How a value reads on the line; a count (`countText`) when not given. */
+    readonly text?: (value: number, language: FigureLanguage) => string;
     /** Two rows, for the editor's preview. */
     readonly sample: readonly [string, string];
 }
@@ -179,8 +184,8 @@ export const RANKINGS = {
     "rank.playtime": {
         label: "Most time played", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: (figures) => figures.stats.playedMs,
-        text: (ms) => playedText(ms),
-        sample: ["1. Steve 120h", "2. Alex 86h"]
+        text: (ms, language) => playedText(ms, language),
+        sample: ["1. Steve 5 d", "2. Alex 3.6 d"]
     },
     "rank.explorer": {
         label: "Furthest traveled", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
@@ -192,7 +197,7 @@ export const RANKINGS = {
         label: "Most blocks mined", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("mined"),
         text: countText,
-        sample: ["1. Steve 37.4k", "2. Alex 17k"]
+        sample: ["1. Steve 37.4K", "2. Alex 17K"]
     },
     "rank.diamonds": {
         label: "Most diamonds mined", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
@@ -208,7 +213,7 @@ export const RANKINGS = {
         label: "Most items crafted", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("crafted"),
         text: countText,
-        sample: ["1. Steve 12.8k", "2. Alex 7.6k"]
+        sample: ["1. Steve 12.8K", "2. Alex 7612"]
     },
     "rank.fish": {
         label: "Most fish caught", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
@@ -229,7 +234,7 @@ export const RANKINGS = {
         label: "Most damage dealt, in hearts", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("damageDealt"),
         text: heartsText,
-        sample: ["1. Alex 2.5k", "2. Steve 1.9k"]
+        sample: ["1. Alex 2512", "2. Steve 1904"]
     },
     "rank.hurt": {
         label: "Most damage taken, in hearts", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
@@ -240,8 +245,8 @@ export const RANKINGS = {
     "rank.alive": {
         label: "Longest alive right now", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("aliveTicks"),
-        text: (ticks) => playedText(ticks * TICK_MS),
-        sample: ["1. Alex 26h", "2. Steve 3h"]
+        text: (ticks, language) => playedText(ticks * TICK_MS, language),
+        sample: ["1. Alex 1.1 d", "2. Steve 3 h"]
     },
     "rank.bosses": {
         label: "Most bosses slain", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
@@ -252,7 +257,7 @@ export const RANKINGS = {
         label: "Most jumps", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
         of: tally("jumps"),
         text: countText,
-        sample: ["1. Alex 64.2k", "2. Steve 41k"]
+        sample: ["1. Alex 64.2K", "2. Steve 41K"]
     },
     "rank.sleep": {
         label: "Most nights slept", // i18n-ignore: also the in-game heading; screens read sidebar.blocks
@@ -302,9 +307,8 @@ export interface PlayerFigures {
 }
 
 /** Time played, the way a leaderboard reads it: hours, or minutes under one. */
-export function playedText(ms: number): string {
-    const minutes = Math.floor(ms / 60_000);
-    return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h`;
+export function playedText(ms: number, language: FigureLanguage = "en"): string {
+    return formatDuration(ms, language);
 }
 
 /**
@@ -323,11 +327,16 @@ export function rankLines(
 }
 
 /** One statistics ranking over every player the world has figures for. */
-export function statsRanking(ranking: StatsRanking, players: readonly PlayerFigures[]): string[] {
+export function statsRanking(
+    ranking: StatsRanking,
+    players: readonly PlayerFigures[],
+    language: FigureLanguage = "en"
+): string[] {
     const chosen: Ranking = RANKINGS[ranking];
+    const text = chosen.text ?? countText;
     return rankLines(
         players.map((one) => ({ name: one.name, value: chosen.of(one) })),
-        chosen.text ?? String
+        (value) => text(value, language)
     );
 }
 
