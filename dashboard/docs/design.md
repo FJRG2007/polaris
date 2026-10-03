@@ -16,12 +16,12 @@ that is.
 the last in the dark theme, each separated by a hairline `border` rather than by
 a shadow.
 
-| Token      | What sits on it                                     |
-| ---------- | --------------------------------------------------- |
-| `background` | The page itself.                                  |
-| `surface`  | The chrome: the top bar and the navigation rail.    |
-| `card`     | Panels, cards, table containers.                    |
-| `elevated` | Menus, selects, dialogs - anything that genuinely floats. |
+| Token        | What sits on it                                           |
+| ------------ | --------------------------------------------------------- |
+| `background` | The page itself.                                          |
+| `surface`    | The chrome: the top bar and the navigation rail.          |
+| `card`       | Panels, cards, table containers.                          |
+| `elevated`   | Menus, selects, dialogs - anything that genuinely floats. |
 
 `elevated` exists because a popover opened over a card has to sit above it, and
 a popover painted in `card` over a card is a rectangle with a border in the
@@ -33,11 +33,11 @@ mean something when one appears.
 
 Three steps, and they are not interchangeable:
 
-| Token                    | For                                                  |
-| ------------------------ | ---------------------------------------------------- |
-| `text-foreground`        | The value. What the reader came for.                 |
-| `text-muted-foreground`  | The label beside it, and body copy.                  |
-| `text-foreground-subtle` | The hint under it, a group heading, a resting icon.  |
+| Token                    | For                                                 |
+| ------------------------ | --------------------------------------------------- |
+| `text-foreground`        | The value. What the reader came for.                |
+| `text-muted-foreground`  | The label beside it, and body copy.                 |
+| `text-foreground-subtle` | The hint under it, a group heading, a resting icon. |
 
 Two steps is what makes a dense screen unreadable: a table row has a value, a
 label and a timestamp, and painting the last two the same grey means the eye has
@@ -83,19 +83,20 @@ so a build needs no network and no visitor is announced to a font service.
 The interface sets at 13px, not 16px. A control plane is a dense instrument and
 16px body text turns a table of eight columns into a table of four:
 
-| Size     | Used for                                              |
-| -------- | ----------------------------------------------------- |
-| 17px     | The page title. One per screen, and one size for it.  |
-| 15px     | A dialog title.                                       |
-| 14px     | A section heading inside a page (`h2`).               |
-| 13px     | Everything: rows, fields, buttons, menus, body copy.  |
-| 11px     | Group headings and badges, uppercase with tracking.   |
+| Size | Used for                                             |
+| ---- | ---------------------------------------------------- |
+| 17px | The page title. One per screen, and one size for it. |
+| 15px | A dialog title.                                      |
+| 14px | A section heading inside a page (`h2`).              |
+| 13px | Everything: rows, fields, buttons, menus, body copy. |
+| 11px | Group headings and badges, uppercase with tracking.  |
 
 A page title is `text-[17px] font-semibold tracking-tight`, whether it comes
 from `PageHeader` or from a screen that writes its own `h1`. It was `text-lg` on
 fifty screens, `text-xl` on seventeen and `text-2xl` on thirteen, which is three
 answers to one question and the fastest way to make a product look assembled
 rather than designed. The public marketing and legal pages are not bound by this
+
 - they are a different kind of page and set their titles large on purpose.
 
 Numbers that are compared down a column - sizes, durations, counts, chart axes -

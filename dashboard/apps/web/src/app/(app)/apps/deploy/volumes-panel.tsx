@@ -143,7 +143,12 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                     <Settings2 className="size-4" />
                                 </Button>
                             )}
-                            <Button asChild variant="ghost" size="sm" title={t("volumes.viewInDrive")}>
+                            <Button
+                                asChild
+                                variant="ghost"
+                                size="sm"
+                                title={t("volumes.viewInDrive")}
+                            >
                                 <Link href={volumeDriveHref(app.id, volume)}>
                                     <HardDrive className="size-4" />
                                 </Link>

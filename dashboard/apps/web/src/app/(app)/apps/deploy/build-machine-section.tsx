@@ -52,7 +52,10 @@ export function BuildMachineSection({ applicationId }: { applicationId: string }
             <Select
                 value={view.value}
                 onValueChange={(value) => void choose(value)}
-                options={view.options.map((option) => ({ value: option.value, label: option.label }))}
+                options={view.options.map((option) => ({
+                    value: option.value,
+                    label: option.label
+                }))}
                 aria-label={t("buildMachine.title")}
             />
             {error && <p className="text-xs text-danger-ink">{error}</p>}

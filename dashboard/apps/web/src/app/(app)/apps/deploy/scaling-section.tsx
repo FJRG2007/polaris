@@ -275,7 +275,9 @@ export function ScalingSection({
                     {draft.autoscale && (
                         <div className="flex flex-wrap gap-3">
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("scaling.fewest")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("scaling.fewest")}
+                                </span>
                                 <Input
                                     type="number"
                                     min={1}
@@ -286,7 +288,9 @@ export function ScalingSection({
                                 />
                             </label>
                             <label className="flex flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("scaling.most")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("scaling.most")}
+                                </span>
                                 <Input
                                     type="number"
                                     min={1}
@@ -343,7 +347,9 @@ export function ScalingSection({
                             </span>
                         </p>
                     )}
-                    <LearnMore>{t("scaling.autoscaleHint", { minutes: core.AUTOSCALE_IDLE_AFTER })}</LearnMore>
+                    <LearnMore>
+                        {t("scaling.autoscaleHint", { minutes: core.AUTOSCALE_IDLE_AFTER })}
+                    </LearnMore>
                     {note("copies")}
                 </fieldset>
             </SettingsCard>
@@ -351,7 +357,11 @@ export function ScalingSection({
             <SettingsCard
                 title={t("scaling.sleep")}
                 description={t("scaling.sleepShort")}
-                badge={view.asleep ? <Badge variant="neutral">{t("scaling.asleepNow")}</Badge> : undefined}
+                badge={
+                    view.asleep ? (
+                        <Badge variant="neutral">{t("scaling.asleepNow")}</Badge>
+                    ) : undefined
+                }
                 learnMore={t("scaling.sleepHint")}
                 actions={
                     <Switch
@@ -363,10 +373,14 @@ export function ScalingSection({
                 }
                 footer={bar("sleep")}
             >
-                {view.sleepBlocked && <p className="text-xs text-warning-ink">{view.sleepBlocked}</p>}
+                {view.sleepBlocked && (
+                    <p className="text-xs text-warning-ink">{view.sleepBlocked}</p>
+                )}
                 {draft.sleeps && (
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("scaling.sleepAfter")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("scaling.sleepAfter")}
+                        </span>
                         <Input
                             type="number"
                             min={core.SLEEP_AFTER_MIN_MINUTES}
@@ -415,12 +429,18 @@ export function ScalingSection({
                 {note("resources")}
             </SettingsCard>
 
-            <SettingsCard title={t("scaling.balancing")} description={t("scaling.balancingShort")} footer={bar("balancing")}>
+            <SettingsCard
+                title={t("scaling.balancing")}
+                description={t("scaling.balancingShort")}
+                footer={bar("balancing")}
+            >
                 <fieldset disabled={kept} className="flex min-w-0 flex-col gap-3">
                     <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
                         <span className="min-w-0">
                             <span className="text-xs font-medium">{t("scaling.sticky")}</span>
-                            <span className="block text-xs text-muted-foreground">{t("scaling.stickyHint")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("scaling.stickyHint")}
+                            </span>
                         </span>
                         <Switch
                             checked={draft.sticky}

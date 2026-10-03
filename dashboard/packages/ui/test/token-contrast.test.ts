@@ -62,7 +62,10 @@ describe.each(Object.entries(themes))("the %s theme", (_name, tokens) => {
         expect(contrast(tokens.ring!, tokens[surface]!)).toBeGreaterThanOrEqual(3);
     });
 
-    it.each(["card", "elevated"] as const)("keeps a section's hairline visible on %s", (surface) => {
-        expect(contrast(tokens.border!, tokens[surface]!)).toBeGreaterThanOrEqual(1.3);
-    });
+    it.each(["card", "elevated"] as const)(
+        "keeps a section's hairline visible on %s",
+        (surface) => {
+            expect(contrast(tokens.border!, tokens[surface]!)).toBeGreaterThanOrEqual(1.3);
+        }
+    );
 });

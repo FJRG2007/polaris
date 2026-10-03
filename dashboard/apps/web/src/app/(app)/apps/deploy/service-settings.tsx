@@ -134,38 +134,48 @@ function ExposureRow({
             )}
             {/* Beside the name when there is room, on a line of their own when not. */}
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            {href && <CopyButton value={href.replace(/^https?:\/\//, "")} className={cn("shrink-0 rounded p-1", reveal)} />}
-            {badge && (
-                <Badge variant={tone} className="shrink-0">
-                    {badge}
-                </Badge>
-            )}
-            <Switch
-                checked={enabled}
-                onChange={onToggle}
-                disabled={pending}
-                aria-label={t(enabled ? "kit.disableNamed" : "kit.enableNamed", { name: label })}
-            />
-            {/* Remove sits to the right of the switch, in a fixed-width slot so the
-                switches still line up across every row whether or not a row has one. */}
-            <span className="flex w-6 shrink-0 items-center justify-center">
-                {onRemove && (
-                    <button
-                        type="button"
-                        title={removeLabel ?? t("menu.remove")}
-                        aria-label={`${removeLabel ?? t("menu.remove")}: ${label}`}
-                        onClick={onRemove}
-                        disabled={pending}
-                        className={cn("rounded p-1 text-muted-foreground transition-colors hover:text-danger-ink disabled:opacity-50", reveal)}
-                    >
-                        {pending ? (
-                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                        ) : (
-                            <X className="size-3.5" aria-hidden />
-                        )}
-                    </button>
+                {href && (
+                    <CopyButton
+                        value={href.replace(/^https?:\/\//, "")}
+                        className={cn("shrink-0 rounded p-1", reveal)}
+                    />
                 )}
-            </span>
+                {badge && (
+                    <Badge variant={tone} className="shrink-0">
+                        {badge}
+                    </Badge>
+                )}
+                <Switch
+                    checked={enabled}
+                    onChange={onToggle}
+                    disabled={pending}
+                    aria-label={t(enabled ? "kit.disableNamed" : "kit.enableNamed", {
+                        name: label
+                    })}
+                />
+                {/* Remove sits to the right of the switch, in a fixed-width slot so the
+                switches still line up across every row whether or not a row has one. */}
+                <span className="flex w-6 shrink-0 items-center justify-center">
+                    {onRemove && (
+                        <button
+                            type="button"
+                            title={removeLabel ?? t("menu.remove")}
+                            aria-label={`${removeLabel ?? t("menu.remove")}: ${label}`}
+                            onClick={onRemove}
+                            disabled={pending}
+                            className={cn(
+                                "rounded p-1 text-muted-foreground transition-colors hover:text-danger-ink disabled:opacity-50",
+                                reveal
+                            )}
+                        >
+                            {pending ? (
+                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            ) : (
+                                <X className="size-3.5" aria-hidden />
+                            )}
+                        </button>
+                    )}
+                </span>
             </div>
         </li>
     );
@@ -739,10 +749,10 @@ export function SettingsTab({
             </SettingsSection>
 
             <SettingsSection {...head(1)}>
+                {configure && <SourceCards app={app} isGit={isGit} onChanged={onChanged} />}
                 {configure && (
-                    <SourceCards app={app} isGit={isGit} onChanged={onChanged} />
+                    <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
                 )}
-                {configure && <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />}
                 <DeployBehaviourSection applicationId={app.id} canConfigure={configure} />
             </SettingsSection>
 
@@ -825,7 +835,9 @@ function ContainerPortCard({ app, onChanged }: { app: ProjectApp; onChanged: () 
             />
             {app.ipUrl && (
                 <div className="flex min-w-0 items-center gap-1.5 text-xs">
-                    <span className="shrink-0 text-foreground-subtle">{t("kit.directAddress")}</span>
+                    <span className="shrink-0 text-foreground-subtle">
+                        {t("kit.directAddress")}
+                    </span>
                     <a
                         href={app.ipUrl}
                         target="_blank"
@@ -863,7 +875,10 @@ function sourceFieldsOf(app: ProjectApp) {
 
 type SourceFields = ReturnType<typeof sourceFieldsOf>;
 
-const SOURCE_KEYS = ["rootDirectory", "dockerfilePath"] as const satisfies readonly (keyof SourceFields)[];
+const SOURCE_KEYS = [
+    "rootDirectory",
+    "dockerfilePath"
+] as const satisfies readonly (keyof SourceFields)[];
 const BUILD_KEYS = [
     "installCommand",
     "buildCommand",
@@ -871,7 +886,12 @@ const BUILD_KEYS = [
     "runtimeVersion",
     "outputDirectory"
 ] as const satisfies readonly (keyof SourceFields)[];
-const AUTO_DEPLOY_KEYS = ["autoDeploy", "branch", "filter", "watchPaths"] as const satisfies readonly (keyof SourceFields)[];
+const AUTO_DEPLOY_KEYS = [
+    "autoDeploy",
+    "branch",
+    "filter",
+    "watchPaths"
+] as const satisfies readonly (keyof SourceFields)[];
 const RELEASE_KEYS = ["keepReleases"] as const satisfies readonly (keyof SourceFields)[];
 
 /**
@@ -880,7 +900,15 @@ const RELEASE_KEYS = ["keepReleases"] as const satisfies readonly (keyof SourceF
  * releases the other), so each card saves its own fields over what is stored for
  * the rest - a pending edit in the card next to it is neither sent nor lost.
  */
-function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolean; onChanged: () => void }) {
+function SourceCards({
+    app,
+    isGit,
+    onChanged
+}: {
+    app: ProjectApp;
+    isGit: boolean;
+    onChanged: () => void;
+}) {
     const t = useTranslations("deployService");
     const form = useCardForm(sourceFieldsOf(app));
     const [errors, setErrors] = useState<Record<string, string | null>>({});
@@ -942,7 +970,12 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
         });
     }
 
-    const bar = (card: string, keys: readonly (keyof SourceFields)[], onSave: () => void, invalid?: string | null) => (
+    const bar = (
+        card: string,
+        keys: readonly (keyof SourceFields)[],
+        onSave: () => void,
+        invalid?: string | null
+    ) => (
         <SaveBar
             dirty={form.dirty(keys)}
             pending={pendingCard === card}
@@ -970,7 +1003,9 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             {t("settings.rootDirectory")}
                             <Input
                                 value={draft.rootDirectory}
-                                onChange={(event) => form.patch({ rootDirectory: event.target.value })}
+                                onChange={(event) =>
+                                    form.patch({ rootDirectory: event.target.value })
+                                }
                                 placeholder="apps/web"
                                 {...plain}
                             />
@@ -979,14 +1014,18 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             {t("settings.dockerfilePath")}
                             <Input
                                 value={draft.dockerfilePath}
-                                onChange={(event) => form.patch({ dockerfilePath: event.target.value })}
+                                onChange={(event) =>
+                                    form.patch({ dockerfilePath: event.target.value })
+                                }
                                 // i18n-ignore: a file name
                                 placeholder="Dockerfile"
                                 {...plain}
                             />
                             <span className="text-foreground-subtle">
                                 {draft.rootDirectory.trim()
-                                    ? t("settings.relativeTo", { directory: draft.rootDirectory.trim() })
+                                    ? t("settings.relativeTo", {
+                                          directory: draft.rootDirectory.trim()
+                                      })
                                     : t("settings.relativeToRoot")}
                             </span>
                         </label>
@@ -999,14 +1038,21 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                     title={t("settings.build")}
                     description={t("settings.buildShort")}
                     learnMore={t("settings.buildIntro")}
-                    footer={bar("build", BUILD_KEYS, () => savePaths("build", BUILD_KEYS), runtimeVersionProblem)}
+                    footer={bar(
+                        "build",
+                        BUILD_KEYS,
+                        () => savePaths("build", BUILD_KEYS),
+                        runtimeVersionProblem
+                    )}
                 >
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
                             {t("settings.installCommand")}
                             <Input
                                 value={draft.installCommand}
-                                onChange={(event) => form.patch({ installCommand: event.target.value })}
+                                onChange={(event) =>
+                                    form.patch({ installCommand: event.target.value })
+                                }
                                 // i18n-ignore: an example command
                                 placeholder="pnpm install --frozen-lockfile"
                                 className="font-mono"
@@ -1017,7 +1063,9 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             {t("settings.buildCommand")}
                             <Input
                                 value={draft.buildCommand}
-                                onChange={(event) => form.patch({ buildCommand: event.target.value })}
+                                onChange={(event) =>
+                                    form.patch({ buildCommand: event.target.value })
+                                }
                                 // i18n-ignore: an example command
                                 placeholder="pnpm run build"
                                 className="font-mono"
@@ -1028,7 +1076,9 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             {t("settings.startCommand")}
                             <Input
                                 value={draft.startCommand}
-                                onChange={(event) => form.patch({ startCommand: event.target.value })}
+                                onChange={(event) =>
+                                    form.patch({ startCommand: event.target.value })
+                                }
                                 // i18n-ignore: an example command
                                 placeholder="next start"
                                 className="font-mono"
@@ -1041,12 +1091,20 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             {t("settings.runtimeVersion")}
                             <Input
                                 value={draft.runtimeVersion}
-                                onChange={(event) => form.patch({ runtimeVersion: event.target.value })}
+                                onChange={(event) =>
+                                    form.patch({ runtimeVersion: event.target.value })
+                                }
                                 placeholder="22, 3.12, 1.23"
                                 aria-invalid={runtimeVersionProblem !== null}
                                 {...plain}
                             />
-                            <span className={runtimeVersionProblem ? "text-danger-ink" : "text-foreground-subtle"}>
+                            <span
+                                className={
+                                    runtimeVersionProblem
+                                        ? "text-danger-ink"
+                                        : "text-foreground-subtle"
+                                }
+                            >
                                 {runtimeVersionProblem ?? t("settings.runtimeVersionHint")}
                             </span>
                         </label>
@@ -1054,11 +1112,15 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             {t("settings.outputDirectory")}
                             <Input
                                 value={draft.outputDirectory}
-                                onChange={(event) => form.patch({ outputDirectory: event.target.value })}
+                                onChange={(event) =>
+                                    form.patch({ outputDirectory: event.target.value })
+                                }
                                 placeholder="dist"
                                 {...plain}
                             />
-                            <span className="text-foreground-subtle">{t("settings.outputDirectoryHint")}</span>
+                            <span className="text-foreground-subtle">
+                                {t("settings.outputDirectoryHint")}
+                            </span>
                         </label>
                     </div>
                 </SettingsCard>
@@ -1080,7 +1142,9 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             aria-label={t("settings.deployOnPush")}
                         />
                     }
-                    footer={bar("autoDeploy", AUTO_DEPLOY_KEYS, () => saveDeploys("autoDeploy", AUTO_DEPLOY_KEYS))}
+                    footer={bar("autoDeploy", AUTO_DEPLOY_KEYS, () =>
+                        saveDeploys("autoDeploy", AUTO_DEPLOY_KEYS)
+                    )}
                 >
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
@@ -1113,7 +1177,9 @@ function SourceCards({ app, isGit, onChanged }: { app: ProjectApp; isGit: boolea
                             className="font-mono"
                             {...plain}
                         />
-                        <span className="text-foreground-subtle">{t("settings.watchPathsShort")}</span>
+                        <span className="text-foreground-subtle">
+                            {t("settings.watchPathsShort")}
+                        </span>
                     </label>
                 </SettingsCard>
             )}
@@ -1147,8 +1213,12 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
     // be removed, marked as the tunnel's name; the tunnel's row has the true state.
     const [tunnelHosts, setTunnelHosts] = useState<Record<string, string | null>>({});
     const reportHost = (kind: string) => (hostname: string | null) =>
-        setTunnelHosts((current) => (current[kind] === hostname ? current : { ...current, [kind]: hostname }));
-    const live = new Set(Object.values(tunnelHosts).filter((host): host is string => host !== null));
+        setTunnelHosts((current) =>
+            current[kind] === hostname ? current : { ...current, [kind]: hostname }
+        );
+    const live = new Set(
+        Object.values(tunnelHosts).filter((host): host is string => host !== null)
+    );
     const [tcpProxies, setTcpProxies] = useState(0);
     // The project page merges a live tunnel's hostname into the domains, for the
     // canvas and the cards. Here each tunnel has a row of its own with its real
@@ -1480,7 +1550,8 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
         subdomainTaken ||
         (needsHostname && !hostname.trim()) ||
         (exposure === "cf-named" && !cfConnected && !connectorToken.trim());
-    const revealOnHover = "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100";
+    const revealOnHover =
+        "md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100";
 
     return (
         <>
@@ -1493,7 +1564,11 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                             size="sm"
                             variant="outline"
                             onClick={() =>
-                                choose(zones.some((entry) => entry.kind !== "base") ? "zone" : "subdomain")
+                                choose(
+                                    zones.some((entry) => entry.kind !== "base")
+                                        ? "zone"
+                                        : "subdomain"
+                                )
                             }
                         >
                             <Globe aria-hidden /> {t("publicNet.generate")}
@@ -1514,7 +1589,8 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                 <ul className="-mx-2 flex flex-col">
                     {own.map((rendered) => {
                         const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
-                        const local = domain.kind === "lan" || domain.hostname.endsWith(".plr.local");
+                        const local =
+                            domain.kind === "lan" || domain.hostname.endsWith(".plr.local");
                         const tunneled = live.has(domain.hostname.toLowerCase());
                         return (
                             <Fragment key={domain.id}>
@@ -1526,8 +1602,12 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                         className={cn(
                                             "size-2 shrink-0 rounded-full",
                                             !domain.enabled && "bg-muted-foreground/30",
-                                            domain.enabled && domain.healthStatus === "up" && "bg-success-solid",
-                                            domain.enabled && domain.healthStatus === "down" && "bg-danger-solid",
+                                            domain.enabled &&
+                                                domain.healthStatus === "up" &&
+                                                "bg-success-solid",
+                                            domain.enabled &&
+                                                domain.healthStatus === "down" &&
+                                                "bg-danger-solid",
                                             domain.enabled &&
                                                 domain.healthStatus !== "up" &&
                                                 domain.healthStatus !== "down" &&
@@ -1553,83 +1633,106 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                         </span>
                                     )}
                                     <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                                    <CopyButton value={domain.hostname} className={cn("shrink-0 rounded p-1", revealOnHover)} />
-                                    {domain.enabled && domain.healthStatus === "down" && (
-                                        <Badge variant="danger" className="hidden shrink-0 sm:inline-flex">
-                                            {t("kit.down")}
-                                        </Badge>
-                                    )}
-                                    {local && (
-                                        <Badge variant="neutral" className="shrink-0">
-                                            {t("settings.local")}
-                                        </Badge>
-                                    )}
-                                    {tunneled && (
-                                        <Badge variant="warning" className="shrink-0" title={t("publicNet.alsoTunnelHint")}>
-                                            {t("publicNet.alsoTunnel")}
-                                        </Badge>
-                                    )}
-                                    {domain.targetPort !== undefined && (
-                                        <Badge
-                                            variant="neutral"
-                                            className="hidden shrink-0 font-mono sm:inline-flex"
-                                            title={t("publicNet.dialsPort", { port: domain.targetPort })}
-                                        >
-                                            :{domain.targetPort}
-                                        </Badge>
-                                    )}
-                                    {domain.targetPort !== undefined && (
-                                        <publicNet.EditDomainButton
-                                            domain={domain}
-                                            applicationId={app.id}
-                                            ports={ports}
-                                            onChanged={onChanged}
+                                        <CopyButton
+                                            value={domain.hostname}
+                                            className={cn("shrink-0 rounded p-1", revealOnHover)}
                                         />
-                                    )}
-                                    <DomainCertificateButton
-                                        domainId={domain.id}
-                                        hostname={domain.hostname}
-                                        supplied={domain.hasCertificate === true}
-                                        onChanged={onChanged}
-                                    />
-                                    {domain.cdn !== undefined && !local && (
-                                        <DomainCdnButton
+                                        {domain.enabled && domain.healthStatus === "down" && (
+                                            <Badge
+                                                variant="danger"
+                                                className="hidden shrink-0 sm:inline-flex"
+                                            >
+                                                {t("kit.down")}
+                                            </Badge>
+                                        )}
+                                        {local && (
+                                            <Badge variant="neutral" className="shrink-0">
+                                                {t("settings.local")}
+                                            </Badge>
+                                        )}
+                                        {tunneled && (
+                                            <Badge
+                                                variant="warning"
+                                                className="shrink-0"
+                                                title={t("publicNet.alsoTunnelHint")}
+                                            >
+                                                {t("publicNet.alsoTunnel")}
+                                            </Badge>
+                                        )}
+                                        {domain.targetPort !== undefined && (
+                                            <Badge
+                                                variant="neutral"
+                                                className="hidden shrink-0 font-mono sm:inline-flex"
+                                                title={t("publicNet.dialsPort", {
+                                                    port: domain.targetPort
+                                                })}
+                                            >
+                                                :{domain.targetPort}
+                                            </Badge>
+                                        )}
+                                        {domain.targetPort !== undefined && (
+                                            <publicNet.EditDomainButton
+                                                domain={domain}
+                                                applicationId={app.id}
+                                                ports={ports}
+                                                onChanged={onChanged}
+                                            />
+                                        )}
+                                        <DomainCertificateButton
                                             domainId={domain.id}
                                             hostname={domain.hostname}
-                                            enabled={domain.cdn}
+                                            supplied={domain.hasCertificate === true}
                                             onChanged={onChanged}
                                         />
-                                    )}
-                                    <Switch
-                                        checked={domain.enabled}
-                                        disabled={rowPending}
-                                        onChange={(next) =>
-                                            startRowTransition(async () => {
-                                                await deployActions.setDomainEnabledAction(domain.id, next);
-                                                onChanged();
-                                            })
-                                        }
-                                        aria-label={
-                                            domain.enabled
-                                                ? t("settings.disableDomainNamed", { hostname: domain.hostname })
-                                                : t("settings.enableDomainNamed", { hostname: domain.hostname })
-                                        }
-                                    />
-                                    <span className="flex w-6 shrink-0 items-center justify-center">
-                                        <RemoveDomainButton
-                                            hostname={domain.hostname}
-                                            className={revealOnHover}
-                                            onRemove={async () => {
-                                                await deployActions.removeDomainAction(domain.id);
-                                                onChanged();
-                                            }}
+                                        {domain.cdn !== undefined && !local && (
+                                            <DomainCdnButton
+                                                domainId={domain.id}
+                                                hostname={domain.hostname}
+                                                enabled={domain.cdn}
+                                                onChanged={onChanged}
+                                            />
+                                        )}
+                                        <Switch
+                                            checked={domain.enabled}
+                                            disabled={rowPending}
+                                            onChange={(next) =>
+                                                startRowTransition(async () => {
+                                                    await deployActions.setDomainEnabledAction(
+                                                        domain.id,
+                                                        next
+                                                    );
+                                                    onChanged();
+                                                })
+                                            }
+                                            aria-label={
+                                                domain.enabled
+                                                    ? t("settings.disableDomainNamed", {
+                                                          hostname: domain.hostname
+                                                      })
+                                                    : t("settings.enableDomainNamed", {
+                                                          hostname: domain.hostname
+                                                      })
+                                            }
                                         />
-                                    </span>
+                                        <span className="flex w-6 shrink-0 items-center justify-center">
+                                            <RemoveDomainButton
+                                                hostname={domain.hostname}
+                                                className={revealOnHover}
+                                                onRemove={async () => {
+                                                    await deployActions.removeDomainAction(
+                                                        domain.id
+                                                    );
+                                                    onChanged();
+                                                }}
+                                            />
+                                        </span>
                                     </div>
                                 </li>
                                 {domain.enabled && readings.has(domain.id) && (
                                     <li className="empty:hidden px-2 pb-1.5">
-                                        <publicNet.DomainReadingView reading={readings.get(domain.id)} />
+                                        <publicNet.DomainReadingView
+                                            reading={readings.get(domain.id)}
+                                        />
                                     </li>
                                 )}
                             </Fragment>
@@ -1676,7 +1779,8 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                     <span className="text-danger-ink">{error}</span>
                                 ) : added ? (
                                     <span className="inline-flex items-center gap-1 text-success-ink">
-                                        <CheckCircle2 className="size-3.5 shrink-0" aria-hidden /> {t("kit.added")}
+                                        <CheckCircle2 className="size-3.5 shrink-0" aria-hidden />{" "}
+                                        {t("kit.added")}
                                     </span>
                                 ) : null}
                             </p>
@@ -1788,7 +1892,10 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                 aria-label={t("settings.subdomain")}
                                 className="min-w-0 flex-1"
                             />
-                            <span className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted-foreground" title={labelSuffix}>
+                            <span
+                                className="max-w-[45%] shrink-0 truncate font-mono text-xs text-muted-foreground"
+                                title={labelSuffix}
+                            >
                                 {labelSuffix}
                             </span>
                         </div>
@@ -1806,7 +1913,9 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                             spellCheck={false}
                         />
                     )}
-                    {hostnameIsTunnel && <p className="text-xs text-danger-ink">{t("settings.tunnelUrl")}</p>}
+                    {hostnameIsTunnel && (
+                        <p className="text-xs text-danger-ink">{t("settings.tunnelUrl")}</p>
+                    )}
                     {exposure === "cf-named" && !cfConnected && (
                         <Input
                             value={connectorToken}
@@ -1850,7 +1959,8 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                             href="/admin/integrations"
                             className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
                         >
-                            {t("settings.setUpDuckdns")} <ArrowUpRight className="size-3" aria-hidden />
+                            {t("settings.setUpDuckdns")}{" "}
+                            <ArrowUpRight className="size-3" aria-hidden />
                         </Link>
                     )}
                     {(isDomainExposure || exposure === "tcp") && (
@@ -1877,7 +1987,12 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
 
 /** What a domain's status dot says, for its tooltip and for a screen reader. */
 function domainHealthLabel(
-    domain: { enabled: boolean; healthStatus?: string | null; healthCode?: number | null; healthDetail?: string | null },
+    domain: {
+        enabled: boolean;
+        healthStatus?: string | null;
+        healthCode?: number | null;
+        healthDetail?: string | null;
+    },
     t: ServiceT
 ): string {
     if (!domain.enabled) return t("settings.domainDisabled");
@@ -1888,7 +2003,9 @@ function domainHealthLabel(
             : t("settings.notReachable");
     }
     if (domain.healthStatus === "up") {
-        return domain.healthCode ? t("settings.reachableCode", { code: domain.healthCode }) : t("settings.reachable");
+        return domain.healthCode
+            ? t("settings.reachableCode", { code: domain.healthCode })
+            : t("settings.reachable");
     }
     return t("settings.checking");
 }
@@ -1911,25 +2028,32 @@ function RemoveDomainButton({
     const [pending, startTransition] = useTransition();
     return (
         <>
-        <button
-            type="button"
-            aria-label={t("settings.removeDomainNamed", { hostname })}
-            title={t("settings.removeDomain")}
-            disabled={pending}
-            onClick={async () => {
-                const yes = await confirm({
-                    title: t("kit.removeDomainTitle", { hostname }),
-                    description: t("kit.removeDomainBody"),
-                    confirmLabel: t("settings.removeDomain"),
-                    danger: true
-                });
-                if (yes) startTransition(onRemove);
-            }}
-            className={cn("rounded p-1 text-muted-foreground transition-colors hover:text-danger-ink disabled:opacity-50", className)}
-        >
-            {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Trash2 className="size-3.5" aria-hidden />}
-        </button>
-        {confirmDialog}
+            <button
+                type="button"
+                aria-label={t("settings.removeDomainNamed", { hostname })}
+                title={t("settings.removeDomain")}
+                disabled={pending}
+                onClick={async () => {
+                    const yes = await confirm({
+                        title: t("kit.removeDomainTitle", { hostname }),
+                        description: t("kit.removeDomainBody"),
+                        confirmLabel: t("settings.removeDomain"),
+                        danger: true
+                    });
+                    if (yes) startTransition(onRemove);
+                }}
+                className={cn(
+                    "rounded p-1 text-muted-foreground transition-colors hover:text-danger-ink disabled:opacity-50",
+                    className
+                )}
+            >
+                {pending ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                ) : (
+                    <Trash2 className="size-3.5" aria-hidden />
+                )}
+            </button>
+            {confirmDialog}
         </>
     );
 }
@@ -2078,9 +2202,16 @@ function DangerSection({
             danger
             title={t("danger.deleteService")}
             description={staged ? t("danger.queued") : t("danger.hint")}
-            badge={staged ? <Badge variant="warning">{t("panel.removalPending")}</Badge> : undefined}
+            badge={
+                staged ? <Badge variant="warning">{t("panel.removalPending")}</Badge> : undefined
+            }
             actions={
-                <Button variant="danger" size="sm" disabled={staged} onClick={() => setConfirming(true)}>
+                <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={staged}
+                    onClick={() => setConfirming(true)}
+                >
                     <Trash2 aria-hidden /> {t("danger.delete")}
                 </Button>
             }

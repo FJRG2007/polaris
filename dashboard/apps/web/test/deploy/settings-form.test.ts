@@ -6,7 +6,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { activeSection, sameSettings, withFields } from "../../src/app/(app)/apps/deploy/settings-form";
+import {
+    activeSection,
+    sameSettings,
+    withFields
+} from "../../src/app/(app)/apps/deploy/settings-form";
 
 describe("sameSettings", () => {
     it("treats a value typed and put back as no change", () => {

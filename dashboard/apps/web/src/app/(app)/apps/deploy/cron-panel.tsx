@@ -16,23 +16,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ServiceCronRunView, ServiceCronView } from "@/lib/deploy/service-cron";
-import {
-    Button,
-    ConfirmDeleteDialog,
-    Input,
-    Switch,
-    Textarea,
-    cn
-} from "@polaris/ui";
-import {
-    ChevronRight,
-    Clock,
-    Loader2,
-    Pencil,
-    Play,
-    Plus,
-    Trash2
-} from "lucide-react";
+import { Button, ConfirmDeleteDialog, Input, Switch, Textarea, cn } from "@polaris/ui";
+import { ChevronRight, Clock, Loader2, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import {
     deleteServiceCronAction,
     listServiceCronRunsAction,
@@ -131,7 +116,8 @@ const STATUS_LABEL = {
 function StatusChip({ status }: { status: string | null }) {
     const t = useTranslations("deployConfig");
     if (!status) return <span className="text-xs text-muted-foreground">{t("cron.neverRun")}</span>;
-    const label = status in STATUS_LABEL ? t(STATUS_LABEL[status as keyof typeof STATUS_LABEL]) : status;
+    const label =
+        status in STATUS_LABEL ? t(STATUS_LABEL[status as keyof typeof STATUS_LABEL]) : status;
     return (
         <span
             className={cn(
@@ -174,9 +160,14 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
 
     function toggle(cron: ServiceCronView, enabled: boolean) {
         // Optimistic: the switch moves at once and goes back if the save fails.
-        setCrons((held) => held?.map((one) => (one.id === cron.id ? { ...one, enabled } : one)) ?? held);
+        setCrons(
+            (held) => held?.map((one) => (one.id === cron.id ? { ...one, enabled } : one)) ?? held
+        );
         startTransition(async () => {
-            const result = await saveServiceCronAction(applicationId, inputOf({ ...draftOf(cron), enabled }));
+            const result = await saveServiceCronAction(
+                applicationId,
+                inputOf({ ...draftOf(cron), enabled })
+            );
             if (result.error) {
                 setError(result.error);
                 setCrons((held) => held?.map((one) => (one.id === cron.id ? cron : one)) ?? held);
@@ -230,7 +221,9 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                             <div className="flex flex-wrap items-center gap-3 p-3">
                                 <button
                                     type="button"
-                                    onClick={() => setOpenRuns((open) => (open === cron.id ? null : cron.id))}
+                                    onClick={() =>
+                                        setOpenRuns((open) => (open === cron.id ? null : cron.id))
+                                    }
                                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                     aria-expanded={openRuns === cron.id}
                                 >
@@ -241,11 +234,19 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                         )}
                                     />
                                     <span className="min-w-0">
-                                        <span className="block truncate text-sm font-medium" title={cron.name}>{cron.name}</span>
+                                        <span
+                                            className="block truncate text-sm font-medium"
+                                            title={cron.name}
+                                        >
+                                            {cron.name}
+                                        </span>
                                         <span className="block truncate text-xs text-muted-foreground">
                                             {cron.scheduleText}
-                                            {/* i18n-ignore: a time zone name */}
-                                            {cron.timezone !== "UTC" ? ` (${cron.timezone})` : " (UTC)"}
+                                            {cron.timezone !== "UTC"
+                                                ? // i18n-ignore: a time zone name
+                                                  ` (${cron.timezone})`
+                                                : // i18n-ignore: a time zone name
+                                                  " (UTC)"}
                                             {cron.enabled && cron.nextRunAt ? (
                                                 <NextRun at={cron.nextRunAt} />
                                             ) : (
@@ -260,7 +261,11 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                         <Switch
                                             checked={cron.enabled}
                                             onChange={(next) => toggle(cron, next)}
-                                            aria-label={cron.enabled ? t("cron.pause", { name: cron.name }) : t("cron.resume", { name: cron.name })}
+                                            aria-label={
+                                                cron.enabled
+                                                    ? t("cron.pause", { name: cron.name })
+                                                    : t("cron.resume", { name: cron.name })
+                                            }
                                         />
                                         <Button
                                             variant="ghost"
@@ -293,7 +298,9 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                                     </div>
                                 )}
                             </div>
-                            {openRuns === cron.id && <CronRuns applicationId={applicationId} cronId={cron.id} />}
+                            {openRuns === cron.id && (
+                                <CronRuns applicationId={applicationId} cronId={cron.id} />
+                            )}
                         </li>
                     ))}
                 </ul>
@@ -331,7 +338,11 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
 function NextRun({ at }: { at: string }) {
     const t = useTranslations("deployConfig");
     const format = useDisplayFormat();
-    return <span title={format.dateTime(at)}>{t("cron.next", { when: relativeTime(at, format) })}</span>;
+    return (
+        <span title={format.dateTime(at)}>
+            {t("cron.next", { when: relativeTime(at, format) })}
+        </span>
+    );
 }
 
 function CronForm({
@@ -367,19 +378,32 @@ function CronForm({
     }, [parsed]);
     const next = useMemo(() => {
         try {
-            return core.nextCronRun(core.parseCron(draft.schedule), new Date(), draft.timezone || "UTC");
+            return core.nextCronRun(
+                core.parseCron(draft.schedule),
+                new Date(),
+                draft.timezone || "UTC"
+            );
         } catch {
             return null;
         }
     }, [draft.schedule, draft.timezone]);
 
-    const set = <K extends keyof Draft>(key: K, value: Draft[K]) => onChange({ ...draft, [key]: value });
+    const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+        onChange({ ...draft, [key]: value });
     const shown = (key: string) => (touched[key] ? issues[key] : undefined);
     const leave = (key: string) => () => setTouched((held) => ({ ...held, [key]: true }));
 
     function save() {
         if (!parsed.success) {
-            setTouched({ name: true, schedule: true, timezone: true, command: true, timeoutSeconds: true, maxAttempts: true, retryDelaySeconds: true });
+            setTouched({
+                name: true,
+                schedule: true,
+                timezone: true,
+                command: true,
+                timeoutSeconds: true,
+                maxAttempts: true,
+                retryDelaySeconds: true
+            });
             return;
         }
         setProblem(null);
@@ -400,7 +424,12 @@ function CronForm({
                 <span className="text-xs font-medium text-muted-foreground">
                     {t("cron.name")} <span aria-hidden>*</span>
                 </span>
-                <Input value={draft.name} onChange={(event) => set("name", event.target.value)} onBlur={leave("name")} placeholder={t("cron.namePlaceholder")} />
+                <Input
+                    value={draft.name}
+                    onChange={(event) => set("name", event.target.value)}
+                    onBlur={leave("name")}
+                    placeholder={t("cron.namePlaceholder")}
+                />
                 {shown("name") && <span className="text-xs text-danger">{shown("name")}</span>}
             </label>
             <div className="flex flex-col gap-1">
@@ -444,7 +473,9 @@ function CronForm({
                     />
                 </div>
                 {shown("schedule") || shown("timezone") ? (
-                    <span className="text-xs text-danger">{shown("schedule") ?? shown("timezone")}</span>
+                    <span className="text-xs text-danger">
+                        {shown("schedule") ?? shown("timezone")}
+                    </span>
                 ) : (
                     <span className="text-xs text-muted-foreground">
                         {core.describeCron(draft.schedule)}
@@ -469,15 +500,31 @@ function CronForm({
                 {shown("command") ? (
                     <span className="text-xs text-danger">{shown("command")}</span>
                 ) : (
-                    <span className="text-xs text-muted-foreground">
-                        {t("cron.commandHint")}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{t("cron.commandHint")}</span>
                 )}
             </label>
             <div className="grid gap-3 sm:grid-cols-3">
-                <NumberField label={t("cron.timeout")} value={draft.timeoutSeconds} error={shown("timeoutSeconds")} onChange={(value) => set("timeoutSeconds", value)} onBlur={leave("timeoutSeconds")} />
-                <NumberField label={t("cron.tries")} value={draft.maxAttempts} error={shown("maxAttempts")} onChange={(value) => set("maxAttempts", value)} onBlur={leave("maxAttempts")} />
-                <NumberField label={t("cron.retryDelay")} value={draft.retryDelaySeconds} error={shown("retryDelaySeconds")} onChange={(value) => set("retryDelaySeconds", value)} onBlur={leave("retryDelaySeconds")} />
+                <NumberField
+                    label={t("cron.timeout")}
+                    value={draft.timeoutSeconds}
+                    error={shown("timeoutSeconds")}
+                    onChange={(value) => set("timeoutSeconds", value)}
+                    onBlur={leave("timeoutSeconds")}
+                />
+                <NumberField
+                    label={t("cron.tries")}
+                    value={draft.maxAttempts}
+                    error={shown("maxAttempts")}
+                    onChange={(value) => set("maxAttempts", value)}
+                    onBlur={leave("maxAttempts")}
+                />
+                <NumberField
+                    label={t("cron.retryDelay")}
+                    value={draft.retryDelaySeconds}
+                    error={shown("retryDelaySeconds")}
+                    onChange={(value) => set("retryDelaySeconds", value)}
+                    onBlur={leave("retryDelaySeconds")}
+                />
             </div>
             {problem && <p className="text-sm text-danger">{problem}</p>}
             <div className="flex justify-end gap-2">
@@ -485,7 +532,11 @@ function CronForm({
                     {t("cron.cancel")}
                 </Button>
                 <Button onClick={save} disabled={pending} aria-disabled={!parsed.success}>
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : <Clock className="size-4" />}
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <Clock className="size-4" />
+                    )}
                     {draft.id ? t("cron.save") : t("cron.scheduleIt")}
                 </Button>
             </div>
@@ -509,7 +560,12 @@ function NumberField({
     return (
         <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-muted-foreground">{label}</span>
-            <Input inputMode="numeric" value={value} onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ""))} onBlur={onBlur} />
+            <Input
+                inputMode="numeric"
+                value={value}
+                onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ""))}
+                onBlur={onBlur}
+            />
             {error && <span className="text-xs text-danger">{error}</span>}
         </label>
     );
@@ -548,14 +604,23 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
         );
     }
     if (runs.length === 0) {
-        return <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">{t("cron.notRunYet")}</p>;
+        return (
+            <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                {t("cron.notRunYet")}
+            </p>
+        );
     }
     return (
         <ul className="divide-y divide-border border-t border-border">
             {runs.map((run) => {
                 const took =
                     run.finishedAt !== null
-                        ? Math.max(0, Math.round((Date.parse(run.finishedAt) - Date.parse(run.startedAt)) / 1000))
+                        ? Math.max(
+                              0,
+                              Math.round(
+                                  (Date.parse(run.finishedAt) - Date.parse(run.startedAt)) / 1000
+                              )
+                          )
                         : null;
                 return (
                     <li key={run.id} className="px-4 py-2">
@@ -566,7 +631,10 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
                             aria-expanded={open === run.id}
                         >
                             <StatusChip status={run.status} />
-                            <span className="text-muted-foreground" title={format.dateTime(run.startedAt)}>
+                            <span
+                                className="text-muted-foreground"
+                                title={format.dateTime(run.startedAt)}
+                            >
                                 {relativeTime(run.startedAt, format)}
                             </span>
                             <span className="text-muted-foreground">
@@ -576,9 +644,15 @@ function CronRuns({ applicationId, cronId }: { applicationId: string; cronId: st
                                       ? t("cron.try", { attempt: run.attempt })
                                       : t("cron.onSchedule")}
                             </span>
-                            {took !== null && <span className="text-muted-foreground">{t("cron.took", { seconds: took })}</span>}
+                            {took !== null && (
+                                <span className="text-muted-foreground">
+                                    {t("cron.took", { seconds: took })}
+                                </span>
+                            )}
                             {run.exitCode !== null && run.exitCode !== 0 && (
-                                <span className="text-muted-foreground">{t("cron.exit", { code: run.exitCode })}</span>
+                                <span className="text-muted-foreground">
+                                    {t("cron.exit", { code: run.exitCode })}
+                                </span>
                             )}
                         </button>
                         {open === run.id && (

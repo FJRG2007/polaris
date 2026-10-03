@@ -20,7 +20,9 @@ export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 const baseClass =
     "flex min-h-[4.5rem] max-h-[50vh] w-full resize-y rounded-md border border-control-edge bg-field px-2.5 py-2 text-[0.8125rem] leading-relaxed text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-muted-foreground focus:border-muted-foreground disabled:cursor-not-allowed disabled:opacity-50";
 
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => (
-    <textarea ref={ref} className={cn(baseClass, className)} {...props} />
-));
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+    ({ className, ...props }, ref) => (
+        <textarea ref={ref} className={cn(baseClass, className)} {...props} />
+    )
+);
 Textarea.displayName = "Textarea";

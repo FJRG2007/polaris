@@ -57,20 +57,27 @@ async function walk(entry: FileSystemEntry, prefix: string, into: PickedFile[]):
         into.push({ path, file });
         return;
     }
-    for (const child of await readChildren(entry as FileSystemDirectoryEntry)) await walk(child, path, into);
+    for (const child of await readChildren(entry as FileSystemDirectoryEntry))
+        await walk(child, path, into);
 }
 
 /** Zip the picked files in the browser, refusing a folder too big to send. */
 /** `empty` is what to say, in the reader's language, when there is nothing to send. */
-async function zipped(files: readonly PickedFile[], name: string, empty: string): Promise<PickedSource> {
+async function zipped(
+    files: readonly PickedFile[],
+    name: string,
+    empty: string
+): Promise<PickedSource> {
     const total = files.reduce((sum, item) => sum + item.file.size, 0);
     if (files.length === 0) throw new Error(empty);
-    if (total > MAX_FOLDER) throw new Error(`That folder holds more than ${formatBytes(MAX_FOLDER)}.`);
+    if (total > MAX_FOLDER)
+        throw new Error(`That folder holds more than ${formatBytes(MAX_FOLDER)}.`);
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
     for (const item of files) zip.file(item.path, item.file);
     const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
-    if (blob.size > MAX_ZIP) throw new Error(`Zipped, that folder is larger than ${formatBytes(MAX_ZIP)}.`);
+    if (blob.size > MAX_ZIP)
+        throw new Error(`Zipped, that folder is larger than ${formatBytes(MAX_ZIP)}.`);
     return { blob, name, files: files.length };
 }
 
@@ -88,11 +95,17 @@ export async function sendSource(
     /** What to say when the request does not get through, in the reader's language. */
     words: { unreachable: string; failed: string }
 ): Promise<{ error?: string; deployError?: string; upload?: UploadedSource }> {
-    const response = await fetch(`/api/deploy/apps/${applicationId}/source${deploy ? "?deploy=1" : ""}`, {
-        method: "POST",
-        headers: { "content-type": "application/zip", "x-polaris-name": encodeURIComponent(picked.name) },
-        body: picked.blob
-    }).catch(() => null);
+    const response = await fetch(
+        `/api/deploy/apps/${applicationId}/source${deploy ? "?deploy=1" : ""}`,
+        {
+            method: "POST",
+            headers: {
+                "content-type": "application/zip",
+                "x-polaris-name": encodeURIComponent(picked.name)
+            },
+            body: picked.blob
+        }
+    ).catch(() => null);
     if (!response) return { error: words.unreachable };
     const body = (await response.json().catch(() => ({}))) as {
         error?: string;
@@ -142,7 +155,9 @@ export function SourceDropZone({
         setOver(false);
         if (disabled) return;
         const items = [...event.dataTransfer.items];
-        const entries = items.map((item) => item.webkitGetAsEntry()).filter((entry) => entry !== null);
+        const entries = items
+            .map((item) => item.webkitGetAsEntry())
+            .filter((entry) => entry !== null);
         const single = entries.length === 1 ? entries[0] : undefined;
         if (single?.isFile && single.name.toLowerCase().endsWith(".zip")) {
             const file = event.dataTransfer.files[0];
@@ -173,7 +188,11 @@ export function SourceDropZone({
             const picked = await desktop.pickFolder();
             if (!picked) return null;
             if (!picked.ok) throw new Error(picked.error);
-            return { blob: new Blob([picked.zip], { type: "application/zip" }), name: picked.name, files: picked.files };
+            return {
+                blob: new Blob([picked.zip], { type: "application/zip" }),
+                name: picked.name,
+                files: picked.files
+            };
         });
     }
 
@@ -185,7 +204,11 @@ export function SourceDropZone({
                 const path = file.webkitRelativePath || file.name;
                 return skipped(path) ? [] : [{ path, file }];
             });
-            return zipped(files, list[0]?.webkitRelativePath.split("/")[0] || "upload", t("upload.noFiles"));
+            return zipped(
+                files,
+                list[0]?.webkitRelativePath.split("/")[0] || "upload",
+                t("upload.noFiles")
+            );
         });
     }
 
@@ -212,7 +235,10 @@ export function SourceDropZone({
                     {picked.name}
                     <span className="block text-xs font-normal text-muted-foreground">
                         {picked.files > 0
-                            ? t("upload.toSendFiles", { count: picked.files, size: formatBytes(picked.blob.size) })
+                            ? t("upload.toSendFiles", {
+                                  count: picked.files,
+                                  size: formatBytes(picked.blob.size)
+                              })
                             : t("upload.toSend", { size: formatBytes(picked.blob.size) })}
                     </span>
                 </span>
@@ -271,7 +297,9 @@ async function readChildren(folder: FileSystemDirectoryEntry): Promise<FileSyste
     const reader = folder.createReader();
     const all: FileSystemEntry[] = [];
     for (;;) {
-        const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
+        const batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+            reader.readEntries(resolve, reject)
+        );
         if (batch.length === 0) return all;
         all.push(...batch);
     }
@@ -322,7 +350,9 @@ export function NewFolderForm({
     return (
         <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">{t("upload.name")}</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                    {t("upload.name")}
+                </span>
                 <Input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -352,9 +382,18 @@ export function NewFolderForm({
 
 /** On a service built from an upload: what it was last built from, and a place
  *  to send a newer folder. Nothing for a service built any other way. */
-export function UploadedSourceSection({ applicationId, onChanged }: { applicationId: string; onChanged: () => void }) {
+export function UploadedSourceSection({
+    applicationId,
+    onChanged
+}: {
+    applicationId: string;
+    onChanged: () => void;
+}) {
     const t = useTranslations("deploy");
-    const [state, setState] = useState<{ upload: UploadedSource | null; uploadable: boolean } | null>(null);
+    const [state, setState] = useState<{
+        upload: UploadedSource | null;
+        uploadable: boolean;
+    } | null>(null);
     const [picked, setPicked] = useState<PickedSource | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -362,7 +401,8 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
     useEffect(() => {
         let active = true;
         void uploadedSourceAction(applicationId).then((result) => {
-            if (active && !result.error) setState({ upload: result.upload ?? null, uploadable: Boolean(result.uploadable) });
+            if (active && !result.error)
+                setState({ upload: result.upload ?? null, uploadable: Boolean(result.uploadable) });
         });
         return () => {
             active = false;
@@ -383,7 +423,9 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
                 setError(sent.error);
                 return;
             }
-            setState((current) => (current ? { ...current, upload: sent.upload ?? current.upload } : current));
+            setState((current) =>
+                current ? { ...current, upload: sent.upload ?? current.upload } : current
+            );
             setPicked(null);
             if (sent.deployError) setError(sent.deployError);
             onChanged();
@@ -418,7 +460,8 @@ export function UploadedSourceSection({ applicationId, onChanged }: { applicatio
                         aria-disabled={pending || !picked}
                         className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
                     >
-                        {pending && <Loader2 className="animate-spin" aria-hidden />} {t("upload.send")}
+                        {pending && <Loader2 className="animate-spin" aria-hidden />}{" "}
+                        {t("upload.send")}
                     </Button>
                 </>
             }

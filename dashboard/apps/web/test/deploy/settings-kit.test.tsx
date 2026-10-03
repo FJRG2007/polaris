@@ -12,7 +12,13 @@ import { Network } from "lucide-react";
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { SaveBar, SettingsCard, SettingsLayout, SettingsSection, useCardForm } from "@/app/(app)/apps/deploy/settings-kit";
+import {
+    SaveBar,
+    SettingsCard,
+    SettingsLayout,
+    SettingsSection,
+    useCardForm
+} from "@/app/(app)/apps/deploy/settings-kit";
 
 afterEach(cleanup);
 
@@ -20,7 +26,12 @@ function NetworkingCard() {
     const form = useCardForm({ port: "3000" });
     return (
         <SettingsLayout sections={[{ id: "networking", label: "Networking", icon: Network }]}>
-            <SettingsSection id="networking" icon={Network} title="Networking" intro="Where the service answers.">
+            <SettingsSection
+                id="networking"
+                icon={Network}
+                title="Networking"
+                intro="Where the service answers."
+            >
                 <SettingsCard
                     title="Port"
                     description="The port the container listens on."
@@ -33,7 +44,11 @@ function NetworkingCard() {
                         />
                     }
                 >
-                    <input aria-label="Port" value={form.draft.port} onChange={(event) => form.patch({ port: event.target.value })} />
+                    <input
+                        aria-label="Port"
+                        value={form.draft.port}
+                        onChange={(event) => form.patch({ port: event.target.value })}
+                    />
                 </SettingsCard>
             </SettingsSection>
         </SettingsLayout>
@@ -46,7 +61,9 @@ describe("the Settings tab's shared section and card shape", () => {
 
         expect(screen.getByRole("heading", { name: "Networking" })).toBeDefined();
         expect(screen.getByText("Port")).toBeDefined();
-        expect(screen.getByRole("button", { name: "Networking" }).getAttribute("aria-current")).toBe("true");
+        expect(
+            screen.getByRole("button", { name: "Networking" }).getAttribute("aria-current")
+        ).toBe("true");
     });
 
     it("blocks Save until the card actually differs from what is stored", () => {
@@ -80,11 +97,24 @@ describe("the Settings tab's shared section and card shape", () => {
     it("blocks a dirty card's Save while a neighbour sharing its write is saving", () => {
         render(
             <SettingsLayout sections={[{ id: "networking", label: "Networking", icon: Network }]}>
-                <SettingsSection id="networking" icon={Network} title="Networking" intro="Where the service answers.">
+                <SettingsSection
+                    id="networking"
+                    icon={Network}
+                    title="Networking"
+                    intro="Where the service answers."
+                >
                     <SettingsCard
                         title="Port"
                         description="The port the container listens on."
-                        footer={<SaveBar dirty pending={false} busy justSaved={false} onSave={() => undefined} />}
+                        footer={
+                            <SaveBar
+                                dirty
+                                pending={false}
+                                busy
+                                justSaved={false}
+                                onSave={() => undefined}
+                            />
+                        }
                     >
                         <p>Port field</p>
                     </SettingsCard>
@@ -93,6 +123,8 @@ describe("the Settings tab's shared section and card shape", () => {
             { wrapper: MessagesWrapper }
         );
 
-        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("true");
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
     });
 });

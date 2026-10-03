@@ -6,7 +6,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ownDomains, primaryDomain, type AppDomain } from "../../src/app/(app)/apps/deploy/domain-rank";
+import {
+    ownDomains,
+    primaryDomain,
+    type AppDomain
+} from "../../src/app/(app)/apps/deploy/domain-rank";
 
 function domain(partial: Partial<AppDomain> & { hostname: string; kind: string }): AppDomain {
     return { id: partial.hostname, enabled: true, ...partial };
@@ -16,15 +20,24 @@ const FREE = domain({ hostname: "invoices-a1b2c3-51-15-20-30.sslip.io", kind: "a
 
 describe("primaryDomain", () => {
     it("keeps the free subdomain over a quick tunnel that is renamed on every deploy", () => {
-        const first = domain({ hostname: "ronald-kent-leg-plate.trycloudflare.com", kind: "tunnel-temp" });
-        const second = domain({ hostname: "olive-badge-rapid-tin.trycloudflare.com", kind: "tunnel-temp" });
+        const first = domain({
+            hostname: "ronald-kent-leg-plate.trycloudflare.com",
+            kind: "tunnel-temp"
+        });
+        const second = domain({
+            hostname: "olive-badge-rapid-tin.trycloudflare.com",
+            kind: "tunnel-temp"
+        });
         expect(primaryDomain([FREE, first])).toBe(FREE);
         expect(primaryDomain([FREE, second])).toBe(FREE);
     });
 
     it("still offers a throwaway tunnel over a name that only resolves on the LAN", () => {
         const lan = domain({ hostname: "invoices-a1b2c3-192-168-1-20.sslip.io", kind: "lan" });
-        const tunnel = domain({ hostname: "ronald-kent-leg-plate.trycloudflare.com", kind: "tunnel-temp" });
+        const tunnel = domain({
+            hostname: "ronald-kent-leg-plate.trycloudflare.com",
+            kind: "tunnel-temp"
+        });
         expect(primaryDomain([lan, tunnel])).toBe(tunnel);
     });
 
@@ -36,7 +49,10 @@ describe("primaryDomain", () => {
     });
 
     it("never presents a service as one of its releases", () => {
-        const release = domain({ hostname: "invoices-a1b2c3-9f8e7d6-51-15-20-30.sslip.io", kind: "release" });
+        const release = domain({
+            hostname: "invoices-a1b2c3-9f8e7d6-51-15-20-30.sslip.io",
+            kind: "release"
+        });
         expect(primaryDomain([release])).toBeNull();
         expect(primaryDomain([FREE, release])).toBe(FREE);
     });
@@ -52,7 +68,11 @@ describe("ownDomains", () => {
     // the merged entry listed the same trycloudflare.com name twice there - once
     // as a domain that could never be checked, once with its real state.
     it("leaves out the tunnel names merged in beside the domains", () => {
-        const quick = domain({ hostname: "ronald-kent-leg-plate.trycloudflare.com", kind: "tunnel-temp", id: "qtunnel:a1" });
+        const quick = domain({
+            hostname: "ronald-kent-leg-plate.trycloudflare.com",
+            kind: "tunnel-temp",
+            id: "qtunnel:a1"
+        });
         const named = domain({ hostname: "app.example.com", kind: "tunnel", id: "ntunnel:a1" });
         const custom = domain({ hostname: "shop.example.com", kind: "custom" });
         expect(ownDomains([FREE, quick, custom, named])).toEqual([FREE, custom]);

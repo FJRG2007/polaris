@@ -29,7 +29,11 @@ export function sameSettings(a: unknown, b: unknown): boolean {
 
 /** Copy only the named fields of `from` over `onto`: what one card saves when its
  *  neighbours share the same server write but have edits of their own pending. */
-export function withFields<T extends object, K extends keyof T>(onto: T, from: T, keys: readonly K[]): T {
+export function withFields<T extends object, K extends keyof T>(
+    onto: T,
+    from: T,
+    keys: readonly K[]
+): T {
     const next = { ...onto };
     for (const key of keys) next[key] = from[key];
     return next;

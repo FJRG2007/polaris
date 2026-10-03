@@ -302,7 +302,9 @@ export function ServiceDetail({
                 <div className="flex-1 overflow-y-auto overscroll-contain bg-background px-5 py-4">
                     {tab !== "Settings" && (
                         <TabFrame tab={tab} id={app.id}>
-                            {tab === "Deployments" && <DeploymentsTab app={app} onChanged={onChanged} />}
+                            {tab === "Deployments" && (
+                                <DeploymentsTab app={app} onChanged={onChanged} />
+                            )}
                             {tab === "Variables" && <VariablesTab app={app} />}
                             {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
                             {tab === "Console" && (
@@ -332,7 +334,10 @@ export function ServiceDetail({
 }
 
 /** Each tab's heading: what it is and what it is for, in one line. */
-const TAB_FRAME: Record<Exclude<Tab, "Settings">, { icon: LucideIcon; intro: NamespaceKey<"deployService">; card: boolean }> = {
+const TAB_FRAME: Record<
+    Exclude<Tab, "Settings">,
+    { icon: LucideIcon; intro: NamespaceKey<"deployService">; card: boolean }
+> = {
     // Tabs whose content is already drawn as cards or as a full-bleed tool are not
     // put in another one; a card inside a card is a box for its own sake.
     Deployments: { icon: Rocket, intro: "tabIntro.deployments", card: false },
@@ -347,11 +352,24 @@ const TAB_FRAME: Record<Exclude<Tab, "Settings">, { icon: LucideIcon; intro: Nam
 
 /** A tab drawn in the same shape as the Settings sections: icon, title, one
  *  line, and the content on one card. */
-function TabFrame({ tab, id, children }: { tab: Exclude<Tab, "Settings">; id: string; children: ReactNode }) {
+function TabFrame({
+    tab,
+    id,
+    children
+}: {
+    tab: Exclude<Tab, "Settings">;
+    id: string;
+    children: ReactNode;
+}) {
     const t = useTranslations("deployService");
     const frame = TAB_FRAME[tab];
     return (
-        <SettingsSection id={`tab-${tab.toLowerCase()}-${id}`} icon={frame.icon} title={t(TAB_LABEL[tab])} intro={t(frame.intro)}>
+        <SettingsSection
+            id={`tab-${tab.toLowerCase()}-${id}`}
+            icon={frame.icon}
+            title={t(TAB_LABEL[tab])}
+            intro={t(frame.intro)}
+        >
             {frame.card ? <Card className="min-w-0 px-4 py-3">{children}</Card> : children}
         </SettingsSection>
     );

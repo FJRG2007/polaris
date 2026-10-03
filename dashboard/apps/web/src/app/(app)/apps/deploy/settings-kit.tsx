@@ -42,7 +42,10 @@ function scrollerOf(node: HTMLElement | null): HTMLElement | null {
 }
 
 function reducedMotion(): boolean {
-    return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    return (
+        typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+    );
 }
 
 /**
@@ -75,7 +78,12 @@ export function SettingsLayout({
                 .map((id) => document.getElementById(id))
                 .filter((node): node is HTMLElement => node !== null)
                 .map((node) => ({ id: node.id, top: node.getBoundingClientRect().top - base }));
-            const reading = activeSection(tops, scroller.scrollTop, scroller.clientHeight, scroller.scrollHeight);
+            const reading = activeSection(
+                tops,
+                scroller.scrollTop,
+                scroller.clientHeight,
+                scroller.scrollHeight
+            );
             // A section picked from the navigator stays marked while the scroll it
             // started runs, and after it when the end of the tab stopped it short -
             // a short last section never reaches the reading line.
@@ -113,8 +121,14 @@ export function SettingsLayout({
         const chip = list?.querySelector<HTMLElement>('[aria-current="true"]');
         if (!list || !chip || list.scrollWidth <= list.clientWidth) return;
         const left = chip.offsetLeft - list.offsetLeft;
-        if (left < list.scrollLeft || left + chip.offsetWidth > list.scrollLeft + list.clientWidth) {
-            list.scrollTo({ left: Math.max(0, left - 16), behavior: reducedMotion() ? "auto" : "smooth" });
+        if (
+            left < list.scrollLeft ||
+            left + chip.offsetWidth > list.scrollLeft + list.clientWidth
+        ) {
+            list.scrollTo({
+                left: Math.max(0, left - 16),
+                behavior: reducedMotion() ? "auto" : "smooth"
+            });
         }
     }, [current]);
 
@@ -123,10 +137,18 @@ export function SettingsLayout({
         const scroller = scrollerOf(content.current);
         if (!target || !scroller) return;
         // Below the chip row on a phone, which stays pinned over the content.
-        const pinned = nav.current && getComputedStyle(nav.current.parentElement!).position === "sticky" && window.innerWidth < 640
-            ? nav.current.parentElement!.getBoundingClientRect().height
-            : 0;
-        const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - pinned - 8;
+        const pinned =
+            nav.current &&
+            getComputedStyle(nav.current.parentElement!).position === "sticky" &&
+            window.innerWidth < 640
+                ? nav.current.parentElement!.getBoundingClientRect().height
+                : 0;
+        const top =
+            target.getBoundingClientRect().top -
+            scroller.getBoundingClientRect().top +
+            scroller.scrollTop -
+            pinned -
+            8;
         jumped.current = id;
         scroller.scrollTo({ top, behavior: reducedMotion() ? "auto" : "smooth" });
         setCurrent(id);
@@ -140,7 +162,10 @@ export function SettingsLayout({
                 aria-label={t("kit.sections")}
                 className="sticky -top-4 z-10 -mx-5 -mt-4 sm:top-0 border-b border-border bg-background px-5 py-2 sm:mx-0 sm:mt-0 sm:w-44 sm:shrink-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-2"
             >
-                <ul ref={nav} className="no-scrollbar flex gap-1 overflow-x-auto sm:flex-col sm:overflow-visible">
+                <ul
+                    ref={nav}
+                    className="no-scrollbar flex gap-1 overflow-x-auto sm:flex-col sm:overflow-visible"
+                >
                     {sections.map((section) => {
                         const Icon = section.icon;
                         const active = section.id === current;
@@ -160,7 +185,11 @@ export function SettingsLayout({
                                     <Icon
                                         className={cn(
                                             "size-4 shrink-0",
-                                            section.danger ? "text-danger-ink" : active ? "text-foreground" : "text-foreground-subtle"
+                                            section.danger
+                                                ? "text-danger-ink"
+                                                : active
+                                                  ? "text-foreground"
+                                                  : "text-foreground-subtle"
                                         )}
                                         aria-hidden
                                     />
@@ -201,7 +230,9 @@ export function SettingsSection({
                 <span
                     className={cn(
                         "flex size-8 shrink-0 items-center justify-center rounded-md border",
-                        danger ? "border-danger-edge bg-danger-soft text-danger-ink" : "border-border bg-card text-muted-foreground"
+                        danger
+                            ? "border-danger-edge bg-danger-soft text-danger-ink"
+                            : "border-border bg-card text-muted-foreground"
                     )}
                     aria-hidden
                 >
@@ -211,7 +242,10 @@ export function SettingsSection({
                     <h2
                         id={`${id}-title`}
                         tabIndex={-1}
-                        className={cn("text-[0.9375rem] font-semibold tracking-tight", danger && "text-danger-ink")}
+                        className={cn(
+                            "text-[0.9375rem] font-semibold tracking-tight",
+                            danger && "text-danger-ink"
+                        )}
                     >
                         {title}
                     </h2>
@@ -254,7 +288,11 @@ export function SettingsCard({
     children?: ReactNode;
 }) {
     return (
-        <Card id={id} aria-busy={busy || undefined} className={cn("flex min-w-0 scroll-mt-16 flex-col", danger && "border-danger-edge")}>
+        <Card
+            id={id}
+            aria-busy={busy || undefined}
+            className={cn("flex min-w-0 scroll-mt-16 flex-col", danger && "border-danger-edge")}
+        >
             <div className="flex min-w-0 flex-col gap-3 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
                     <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
@@ -262,9 +300,15 @@ export function SettingsCard({
                             {title}
                             {badge}
                         </h3>
-                        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+                        {description && (
+                            <p className="text-xs text-muted-foreground">{description}</p>
+                        )}
                     </div>
-                    {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}
+                    {actions && (
+                        <div className="flex max-w-full flex-wrap items-center gap-2">
+                            {actions}
+                        </div>
+                    )}
                 </div>
                 {children}
                 {learnMore && <LearnMore>{learnMore}</LearnMore>}
@@ -284,10 +328,15 @@ export function LearnMore({ children }: { children: ReactNode }) {
     return (
         <details className="group text-xs">
             <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded text-muted-foreground transition-colors duration-fast hover:text-foreground [&::-webkit-details-marker]:hidden">
-                <ChevronRight className="size-3.5 shrink-0 transition-transform duration-fast group-open:rotate-90" aria-hidden />
+                <ChevronRight
+                    className="size-3.5 shrink-0 transition-transform duration-fast group-open:rotate-90"
+                    aria-hidden
+                />
                 {t("kit.learnMore")}
             </summary>
-            <div className="mt-1.5 flex flex-col gap-1.5 pl-[1.125rem] text-muted-foreground">{children}</div>
+            <div className="mt-1.5 flex flex-col gap-1.5 pl-[1.125rem] text-muted-foreground">
+                {children}
+            </div>
         </details>
     );
 }
@@ -383,14 +432,16 @@ export function useCardForm<T extends object>(initial: T) {
         saved,
         draft,
         patch: (next: Partial<T>) => setDraft((current) => ({ ...current, ...next })),
-        dirty: (keys: readonly (keyof T)[] = all) => !sameSettings(pick(draft, keys), pick(saved, keys)),
+        dirty: (keys: readonly (keyof T)[] = all) =>
+            !sameSettings(pick(draft, keys), pick(saved, keys)),
         next: (keys: readonly (keyof T)[] = all) => withFields(saved, draft, keys),
         commit: (next: T, card = "all") => {
             setSaved(next);
             setFlash(card);
         },
         justSaved: (card = "all") => flash === card,
-        discard: (keys: readonly (keyof T)[] = all) => setDraft((current) => withFields(current, saved, keys))
+        discard: (keys: readonly (keyof T)[] = all) =>
+            setDraft((current) => withFields(current, saved, keys))
     };
 }
 
@@ -409,7 +460,11 @@ export function useSavedFlash(): [boolean, () => void] {
 export function CardSkeleton({ title, rows = 2 }: { title?: ReactNode; rows?: number }) {
     return (
         <Card aria-busy="true" className="flex flex-col gap-3 p-4">
-            {title ? <h3 className="text-[0.8125rem] font-semibold leading-5">{title}</h3> : <Skeleton className="h-4 w-36" />}
+            {title ? (
+                <h3 className="text-[0.8125rem] font-semibold leading-5">{title}</h3>
+            ) : (
+                <Skeleton className="h-4 w-36" />
+            )}
             <Skeleton className="h-3 w-64 max-w-full" />
             {Array.from({ length: rows }, (_, index) => (
                 <Skeleton key={index} className="h-8 w-full" />
@@ -419,7 +474,15 @@ export function CardSkeleton({ title, rows = 2 }: { title?: ReactNode; rows?: nu
 }
 
 /** A card whose data could not be read: why, and the way to ask again. */
-export function CardError({ title, message, onRetry }: { title?: ReactNode; message: string; onRetry?: () => void }) {
+export function CardError({
+    title,
+    message,
+    onRetry
+}: {
+    title?: ReactNode;
+    message: string;
+    onRetry?: () => void;
+}) {
     const t = useTranslations("deployService");
     return (
         <Card className="flex flex-col gap-2 p-4">

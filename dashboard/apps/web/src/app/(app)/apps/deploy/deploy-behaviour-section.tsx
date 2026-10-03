@@ -136,7 +136,9 @@ export function DeployBehaviourSection({
             setView(before);
             setNetworkError(result.error);
         } else {
-            setRows(typed.map((entry) => ({ name: entry.name, aliases: entry.aliases.join(", ") })));
+            setRows(
+                typed.map((entry) => ({ name: entry.name, aliases: entry.aliases.join(", ") }))
+            );
             markSaved();
         }
     }
@@ -154,7 +156,9 @@ export function DeployBehaviourSection({
                         <Badge variant="success">{t("behaviour.noGap")}</Badge>
                     )
                 }
-                description={strategy.mode === "restart" ? undefined : t(`behaviour.mode.${strategy.mode}`)}
+                description={
+                    strategy.mode === "restart" ? undefined : t(`behaviour.mode.${strategy.mode}`)
+                }
             >
                 {strategy.mode === "restart" && (
                     <ul className="flex list-disc flex-col gap-1 pl-5 text-xs text-muted-foreground">
@@ -167,7 +171,9 @@ export function DeployBehaviourSection({
                     <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
                         <div className="flex min-w-0 flex-col gap-0.5">
                             <span className="text-xs font-medium">{t("behaviour.overlap")}</span>
-                            <span className="text-xs text-muted-foreground">{t("behaviour.overlapHint")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("behaviour.overlapHint")}
+                            </span>
                         </div>
                         <Switch
                             checked={view.overlapVolumes}
@@ -216,7 +222,9 @@ export function DeployBehaviourSection({
                     ) : undefined
                 }
             >
-                {rows.length === 0 && <p className="text-xs text-foreground-subtle">{t("behaviour.noNetworks")}</p>}
+                {rows.length === 0 && (
+                    <p className="text-xs text-foreground-subtle">{t("behaviour.noNetworks")}</p>
+                )}
                 {rows.map((row, index) => {
                     const nameIssue = issues.get(`${row.name.trim()}:name`);
                     const aliasIssue = issues.get(`${row.name.trim()}:aliases`);
@@ -284,7 +292,9 @@ export function DeployBehaviourSection({
                         {issueText(issues.get("list") ?? "", t)}
                     </p>
                 )}
-                {listProblem && <p className="text-xs text-danger-ink">{issueText(listProblem, t)}</p>}
+                {listProblem && (
+                    <p className="text-xs text-danger-ink">{issueText(listProblem, t)}</p>
+                )}
             </SettingsCard>
         </>
     );
