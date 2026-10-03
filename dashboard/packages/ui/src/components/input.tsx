@@ -33,45 +33,43 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  * application's one ring (tokens.css), so nothing is restated here.
  */
 const baseClass =
-    "flex h-8 w-full rounded-md border border-control-edge bg-field px-2.5 text-[0.8125rem] text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-muted-foreground focus:border-muted-foreground disabled:cursor-not-allowed disabled:opacity-50";
+    "flex h-8 w-full rounded-md border border-border bg-field px-2.5 text-[0.8125rem] text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-50";
 
 /** What a `bare` field turns off. The container is the field, and it is the one
  *  that says where the caret is. */
 const bareClass =
     "border-0 bg-transparent px-0 shadow-none hover:border-0 focus:border-0 focus-visible:outline-none";
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-    ({ className, type, bare, ...props }, ref) => {
-        const [revealed, setRevealed] = useState(false);
-        const words = useUiStrings();
-        const isPassword = type === "password";
+export const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type, bare, ...props }, ref) => {
+    const [revealed, setRevealed] = useState(false);
+    const words = useUiStrings();
+    const isPassword = type === "password";
 
-        const field = (
-            <input
-                ref={ref}
-                type={isPassword && revealed ? "text" : type}
-                className={cn(baseClass, bare && bareClass, isPassword && "pr-9", className)}
-                {...props}
-            />
-        );
+    const field = (
+        <input
+            ref={ref}
+            type={isPassword && revealed ? "text" : type}
+            className={cn(baseClass, bare && bareClass, isPassword && "pr-9", className)}
+            {...props}
+        />
+    );
 
-        if (!isPassword) return field;
+    if (!isPassword) return field;
 
-        return (
-            <div className="relative">
-                {field}
-                <button
-                    type="button"
-                    tabIndex={-1}
-                    onClick={() => setRevealed((value) => !value)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground "
-                    aria-label={revealed ? words.hidePassword : words.showPassword}
-                    title={revealed ? words.hidePassword : words.showPassword}
-                >
-                    {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-            </div>
-        );
-    }
-);
+    return (
+        <div className="relative">
+            {field}
+            <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setRevealed((value) => !value)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground "
+                aria-label={revealed ? words.hidePassword : words.showPassword}
+                title={revealed ? words.hidePassword : words.showPassword}
+            >
+                {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+        </div>
+    );
+});
 Input.displayName = "Input";

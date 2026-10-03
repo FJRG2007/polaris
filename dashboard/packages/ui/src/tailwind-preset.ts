@@ -49,8 +49,6 @@ const preset: Omit<Config, "content"> = {
                 muted: { DEFAULT: withAlpha("muted"), foreground: withAlpha("muted-foreground") },
                 field: withAlpha("field"),
                 border: { DEFAULT: withAlpha("border"), strong: withAlpha("border-strong") },
-                // The 3:1 edge of a control (tokens.css `--control-edge`).
-                "control-edge": withAlpha("control-edge"),
                 ring: withAlpha("ring"),
                 primary: {
                     DEFAULT: withAlpha("primary"),
