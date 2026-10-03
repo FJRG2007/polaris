@@ -157,6 +157,8 @@ export const stageSchema = z.object({
         .nullable()
         .default(null),
     area: areaSchema.nullable().default(null),
+    /** Parkour: how the course was laid out when placed (`parkour.DESIGN`). */
+    design: z.number().int().default(1),
     /** Every box filled so far, in the order it was filled - written down first. */
     boxes: z.array(boxSchema).default([]),
     built: z.boolean().default(false),

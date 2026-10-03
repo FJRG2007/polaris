@@ -110,7 +110,8 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             run.preset.options as catalog.EventOptions<"parkour">,
             run.id,
             site,
-            y
+            y,
+            run.stage?.origin ? run.stage.design : parkour.DESIGN
         );
         return {
             kind: "parkour",
@@ -261,7 +262,12 @@ async function raise(
         const area = stage.areaOf(layoutAt(loop.run, ground, y).volume);
         // Written down before the area is held, so whatever ends the event
         // lets go of it.
-        change(loop, { origin: { x: ground.x, y, z: ground.z }, area, waits: 0 });
+        change(loop, {
+            origin: { x: ground.x, y, z: ground.z },
+            design: parkour.DESIGN,
+            area,
+            waits: 0
+        });
         await tools.persist();
         lines.push(stage.holdArea(area), commands.CLEAR_MARK);
         return;

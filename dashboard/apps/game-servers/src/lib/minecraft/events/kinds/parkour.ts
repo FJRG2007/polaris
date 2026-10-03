@@ -94,7 +94,14 @@ const SHIFT_CHANCE: Readonly<Record<EventOptions<"parkour">["difficulty"], numbe
     hard: 0.18
 };
 /** How far a moving platform moves, across the row. */
-export const SHIFT_STEP = 2;
+export const SHIFT_STEP = 1;
+
+/**
+ * How courses are laid out now. A course placed before climbs, moving
+ * platforms and looks (design 1) is laid out the way it was then, so a race
+ * running across an update keeps the course it was built as.
+ */
+export const DESIGN = 2;
 
 const TRAP_BLOCKS: Readonly<Record<Trap, Box["block"]>> = {
     slime: "minecraft:slime_block",
@@ -171,7 +178,7 @@ function climbBlock(kind: "ladder" | "vine", direction: 1 | -1): Box["block"] {
 const NET: Box["block"] = "minecraft:white_stained_glass";
 
 /** The course laid out around 0 0 0, the rows running between x 0 and `ROW`. */
-function laidOut(options: EventOptions<"parkour">, seed: string): Platform[] {
+function laidOut(options: EventOptions<"parkour">, seed: string, legacy: boolean): Platform[] {
     const random = seeded(`parkour-${seed}`);
     const step = STEPS[options.difficulty];
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T;
@@ -210,7 +217,7 @@ function laidOut(options: EventOptions<"parkour">, seed: string): Platform[] {
         // A climb now and then: a column a block away, three up, its ladder or
         // vine on the near side - never right after another special jump.
         const plain = role === "jump" && index >= 2 && !current.trap && !current.climb;
-        const climbing = plain && random() < CLIMB_CHANCE;
+        const climbing = !legacy && plain && random() < CLIMB_CHANCE;
         const gap = climbing ? 1 : pick(step.gaps);
         // A sideways step only onto a small platform, and only where the jump
         // is not already a long one: a checkpoint stays on the row's line.
@@ -235,7 +242,7 @@ function laidOut(options: EventOptions<"parkour">, seed: string): Platform[] {
         }
         // A trap now and then, on a plain jump only, never two in a row.
         const roll = random();
-        const shifting = SHIFT_CHANCE[options.difficulty];
+        const shifting = legacy ? 0 : SHIFT_CHANCE[options.difficulty];
         const trap: Trap | undefined = !plain
             ? undefined
             : roll < step.vanish
@@ -265,10 +272,12 @@ export function course(
     options: EventOptions<"parkour">,
     seed: string,
     site: { x: number; z: number },
-    y: number
+    y: number,
+    design: number = DESIGN
 ): Course {
-    const raw = laidOut(options, seed);
-    const theme = themeFor(options, seed);
+    const legacy = design < 2;
+    const raw = laidOut(options, seed, legacy);
+    const theme = legacy ? "classic" : themeFor(options, seed);
     const look = THEMES[theme];
     const minX = Math.min(...raw.map((one) => one.x)) - 2;
     const maxX = Math.max(...raw.map((one) => one.x + one.size - 1)) + 2;
@@ -315,8 +324,8 @@ export function course(
     // A moving platform's other place: a step across the row.
     const otherPlace = (one: Platform): Box => ({
         ...boxOf(one),
-        z1: one.z + SHIFT_STEP,
-        z2: one.z + one.size - 1 + SHIFT_STEP
+        z1: one.z - SHIFT_STEP,
+        z2: one.z + one.size - 1 - SHIFT_STEP
     });
     // Each climb: the column under the platform, then - after it, so it has
     // something to hang on - the ladder or vine on its near side.
@@ -346,11 +355,19 @@ export function course(
     }
     // A light under every checkpoint, so it shows from below and far off.
     const lights: Box[] = platforms
-        .filter((one) => one.role === "checkpoint" || one.role === "finish")
+        .filter((one) => !legacy && (one.role === "checkpoint" || one.role === "finish"))
         .map((one) => {
             const cx = one.x + Math.floor(one.size / 2);
             const cz = one.z + Math.floor(one.size / 2);
-            return { x1: cx, y1: one.y - 1, z1: cz, x2: cx, y2: one.y - 1, z2: cz, block: look.light };
+            return {
+                x1: cx,
+                y1: one.y - 1,
+                z1: cz,
+                x2: cx,
+                y2: one.y - 1,
+                z2: cz,
+                block: look.light
+            };
         })
         // Never where a climb's column already stands.
         .filter((light) => !columns.some((col) => inside(light, col)));

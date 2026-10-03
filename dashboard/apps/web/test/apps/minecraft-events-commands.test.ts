@@ -2744,11 +2744,14 @@ describe("a parkour course's traps", () => {
         let course = parkour.course(options("hard"), "run-1", { x: 0, z: 0 }, 100);
         for (let seed = 2; course.vanishing.length === 0; seed += 1)
             course = parkour.course(options("hard"), `run-${seed}`, { x: 0, z: 0 }, 100);
-        const orange = (lines: string[]) => lines.filter((line) => line.includes("orange_concrete"));
+        const orange = (lines: string[]) =>
+            lines.filter((line) => line.includes("orange_concrete"));
         const there = orange(parkour.blinkLines(course, 1_000));
         expect(there.every((line) => line.endsWith(" minecraft:orange_concrete keep"))).toBe(true);
         const gone = orange(parkour.blinkLines(course, parkour.BLINK_MS - 500));
-        expect(gone.every((line) => line.endsWith(" minecraft:air replace minecraft:orange_concrete"))).toBe(true);
+        expect(
+            gone.every((line) => line.endsWith(" minecraft:air replace minecraft:orange_concrete"))
+        ).toBe(true);
         expect(there).toHaveLength(course.vanishing.length);
     });
 });
@@ -2796,7 +2799,8 @@ describe("a parkour course's climbs, moving platforms and looks", () => {
             expect(one.boxes[climbAt]!.block).toContain(kind);
             // Every column is built before any climb hangs on it.
             const lastColumn = one.boxes.reduce(
-                (last, box, at) => (box.y2 - box.y1 === 1 && !/ladder|vine/.test(box.block) ? at : last),
+                (last, box, at) =>
+                    box.y2 - box.y1 === 1 && !/ladder|vine/.test(box.block) ? at : last,
                 -1
             );
             expect(lastColumn).toBeLessThan(climbAt);
@@ -2806,20 +2810,81 @@ describe("a parkour course's climbs, moving platforms and looks", () => {
 
     it("moves a platform between two places a step apart, one there while the other is gone", () => {
         let one = course("hard", "shift-0");
-        for (let seed = 1; one.shifting.length === 0; seed += 1) one = course("hard", `shift-${seed}`);
+        for (let seed = 1; one.shifting.length === 0; seed += 1)
+            one = course("hard", `shift-${seed}`);
         const { a, b } = one.shifting[0]!;
-        expect(b.z1 - a.z1).toBe(parkour.SHIFT_STEP);
+        expect(a.z1 - b.z1).toBe(parkour.SHIFT_STEP);
         const early = parkour.blinkLines(one, 0);
         const later = parkour.blinkLines(one, parkour.SHIFT_MS);
-        const fillOf = (box: typeof a) => `fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2}`;
-        expect(early).toContain(`execute in minecraft:overworld run ${fillOf(a)} minecraft:magenta_concrete keep`);
-        expect(early).toContain(`execute in minecraft:overworld run ${fillOf(b)} minecraft:air replace minecraft:magenta_concrete`);
-        expect(later).toContain(`execute in minecraft:overworld run ${fillOf(b)} minecraft:magenta_concrete keep`);
-        expect(later).toContain(`execute in minecraft:overworld run ${fillOf(a)} minecraft:air replace minecraft:magenta_concrete`);
+        const fillOf = (box: typeof a) =>
+            `fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2}`;
+        expect(early).toContain(
+            `execute in minecraft:overworld run ${fillOf(a)} minecraft:magenta_concrete keep`
+        );
+        expect(early).toContain(
+            `execute in minecraft:overworld run ${fillOf(b)} minecraft:air replace minecraft:magenta_concrete`
+        );
+        expect(later).toContain(
+            `execute in minecraft:overworld run ${fillOf(b)} minecraft:magenta_concrete keep`
+        );
+        expect(later).toContain(
+            `execute in minecraft:overworld run ${fillOf(a)} minecraft:air replace minecraft:magenta_concrete`
+        );
+    });
+
+    it("leaves a moving platform's other place two blocks of headroom, under nobody's feet", () => {
+        let checked = 0;
+        for (let seed = 0; seed < 200; seed += 1)
+            for (const difficulty of ["medium", "hard"] as const) {
+                const one = course(difficulty, `room-${seed}`);
+                const cells = new Set<string>();
+                for (const box of one.boxes)
+                    for (let x = box.x1; x <= box.x2; x += 1)
+                        for (let y = box.y1; y <= box.y2; y += 1)
+                            for (let z = box.z1; z <= box.z2; z += 1) cells.add(`${x},${y},${z}`);
+                for (const { b } of one.shifting) {
+                    checked += 1;
+                    for (let x = b.x1; x <= b.x2; x += 1)
+                        for (let z = b.z1; z <= b.z2; z += 1)
+                            for (const up of [1, 2, -1, -2])
+                                expect(cells.has(`${x},${b.y1 + up},${z}`)).toBe(false);
+                }
+            }
+        expect(checked).toBeGreaterThan(50);
+    });
+
+    it("lays a course placed before climbs and looks out the way it was then", () => {
+        const legacy = (seed: string) =>
+            parkour.course(
+                { place: { mode: "players" }, jumps: 40, difficulty: "hard", height: 30 } as never,
+                seed,
+                { x: 0, z: 0 },
+                100,
+                1
+            );
+        let changed = 0;
+        for (let seed = 0; seed < 30; seed += 1) {
+            const old = legacy(`old-${seed}`);
+            expect(old.theme).toBe("classic");
+            expect(old.shifting).toEqual([]);
+            expect(
+                old.platforms.some((platform) => platform.climb || platform.trap === "shift")
+            ).toBe(false);
+            expect(
+                old.boxes.some((box) => /lantern|glowstone|ladder|vine|quartz/.test(box.block))
+            ).toBe(false);
+            const now = course("hard", `old-${seed}`);
+            if (JSON.stringify(now.platforms) !== JSON.stringify(old.platforms)) changed += 1;
+        }
+        expect(changed).toBeGreaterThan(0);
+        expect(stage.EMPTY_STAGE.design).toBe(1);
+        expect(parkour.DESIGN).toBe(2);
     });
 
     it("draws one of four looks for a run, or the one chosen, keeping checkpoints lime", () => {
-        const looks = new Set(Array.from({ length: 40 }, (_, seed) => course("easy", `look-${seed}`).theme));
+        const looks = new Set(
+            Array.from({ length: 40 }, (_, seed) => course("easy", `look-${seed}`).theme)
+        );
         expect([...looks].sort()).toEqual(["classic", "frost", "jungle", "nether"]);
         const frost = course("easy", "x", "frost");
         expect(frost.theme).toBe("frost");
