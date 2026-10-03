@@ -33,7 +33,9 @@ export function Switch({
             onClick={() => onChange(!checked)}
             className={cn(
                 "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-50",
-                checked ? "bg-primary" : "bg-muted"
+                // Off is the 3:1 control edge filled in, so an unchecked switch is
+                // still a switch on every surface rather than a faint lozenge.
+                checked ? "bg-primary" : "bg-control-edge"
             )}
         >
             <span

@@ -60,7 +60,7 @@ export function SegmentedControl<T extends string>({
             // labels inside a narrow column: without them the track keeps its
             // natural width and runs off the side of whatever holds it.
             className={cn(
-                "inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-md bg-muted p-0.5",
+                "inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-md border border-border-strong bg-muted p-0.5",
                 className
             )}
         >
@@ -105,7 +105,7 @@ export function SegmentedControl<T extends string>({
                             "min-w-0 flex-1 basis-auto truncate rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
                             size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[0.8125rem]",
                             active
-                                ? "border border-border-strong bg-card-hover text-foreground"
+                                ? "border border-control-edge bg-card text-foreground"
                                 : "border border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
