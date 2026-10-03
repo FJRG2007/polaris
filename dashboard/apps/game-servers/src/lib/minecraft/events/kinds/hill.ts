@@ -43,10 +43,22 @@ export function platformDecor(place: Point, radius: number): { box: Box; block: 
         one(x + half, z - half, CORNER_BLOCK),
         one(x - half, z + half, CORNER_BLOCK),
         one(x + half, z + half, CORNER_BLOCK),
-        { box: { x1: x - half + 1, y1: y, z1: z - half, x2: x + half - 1, y2: y, z2: z - half }, block: EDGE_BLOCK },
-        { box: { x1: x - half + 1, y1: y, z1: z + half, x2: x + half - 1, y2: y, z2: z + half }, block: EDGE_BLOCK },
-        { box: { x1: x - half, y1: y, z1: z - half + 1, x2: x - half, y2: y, z2: z + half - 1 }, block: EDGE_BLOCK },
-        { box: { x1: x + half, y1: y, z1: z - half + 1, x2: x + half, y2: y, z2: z + half - 1 }, block: EDGE_BLOCK }
+        {
+            box: { x1: x - half + 1, y1: y, z1: z - half, x2: x + half - 1, y2: y, z2: z - half },
+            block: EDGE_BLOCK
+        },
+        {
+            box: { x1: x - half + 1, y1: y, z1: z + half, x2: x + half - 1, y2: y, z2: z + half },
+            block: EDGE_BLOCK
+        },
+        {
+            box: { x1: x - half, y1: y, z1: z - half + 1, x2: x - half, y2: y, z2: z + half - 1 },
+            block: EDGE_BLOCK
+        },
+        {
+            box: { x1: x + half, y1: y, z1: z - half + 1, x2: x + half, y2: y, z2: z + half - 1 },
+            block: EDGE_BLOCK
+        }
     ];
     // The ring: every block whose middle is within half a block of the circle.
     for (let dx = -radius; dx <= radius; dx += 1)

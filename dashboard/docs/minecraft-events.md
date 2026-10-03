@@ -133,11 +133,11 @@ left out.
 Everything below is part of the arena's own boxes: built into air with
 `keep`, and taken out with the rest.
 
-| Arena | Look |
-|---|---|
-| Spleef | each floor walled in its own color, a sea lantern on every corner post |
-| Parkour | the course's theme, a light under every checkpoint |
-| King of the hill | polished stone edge, sea lanterns at the corners, the circle drawn in yellow |
-| Build battle | a stone curb between plots and glowstone where the lines meet, at floor level |
-| Team duel | a stone rim round the floor and a post of light at each corner |
-| Boss sky arena | glass, with a pillar of sea lantern at each corner |
+| Arena            | Look                                                                          |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Spleef           | each floor walled in its own color, a sea lantern on every corner post        |
+| Parkour          | the course's theme, a light under every checkpoint                            |
+| King of the hill | polished stone edge, sea lanterns at the corners, the circle drawn in yellow  |
+| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level |
+| Team duel        | a stone rim round the floor and a post of light at each corner                |
+| Boss sky arena   | glass, with a pillar of sea lantern at each corner                            |

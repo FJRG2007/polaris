@@ -4928,7 +4928,8 @@ function keptTheRules(): void {
     const holds = (outer: number[], inner: number[]) =>
         [0, 1, 2].every(
             (axis) =>
-                Math.min(outer[axis]!, outer[axis + 3]!) <= Math.min(inner[axis]!, inner[axis + 3]!) &&
+                Math.min(outer[axis]!, outer[axis + 3]!) <=
+                    Math.min(inner[axis]!, inner[axis + 3]!) &&
                 Math.max(outer[axis]!, outer[axis + 3]!) >= Math.max(inner[axis]!, inner[axis + 3]!)
         );
     for (const one of built) {
