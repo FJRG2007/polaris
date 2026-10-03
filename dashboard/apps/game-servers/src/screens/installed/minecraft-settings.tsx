@@ -28,7 +28,6 @@ import type { AppHostTypes } from "@polaris/app-host";
 const { useConfirm } = hostUi.confirmDialog;
 type InstalledAppSetting = AppHostTypes["InstalledAppSetting"];
 
-
 /** The key settings with no group of their own are gathered under; its title is
  *  the reader's word for "Settings". */
 const UNGROUPED = "Settings";
@@ -182,7 +181,8 @@ export function MinecraftSettings({
                 <Card key={group}>
                     <CardBody className="flex flex-col gap-3">
                         <p className="text-sm font-medium">
-                            {fields[0]?.groupLabel ?? (group === UNGROUPED ? t("settings.ungrouped") : group)}
+                            {fields[0]?.groupLabel ??
+                                (group === UNGROUPED ? t("settings.ungrouped") : group)}
                         </p>
                         {fields.map((field) => (
                             <label key={field.key} className="flex flex-col gap-1 text-sm">

@@ -27,7 +27,13 @@ vi.mock("@polaris/db", () => ({
                 {
                     id: APP,
                     slug: "offgrid",
-                    target: { id: "target-1", kind: "local", hostId: null, runtime: "compose", proxyNetwork: null },
+                    target: {
+                        id: "target-1",
+                        kind: "local",
+                        hostId: null,
+                        runtime: "compose",
+                        proxyNetwork: null
+                    },
                     environment: { project: { slug: "marketplace", ownerId: OWNER } }
                 }
             ]
@@ -57,7 +63,11 @@ vi.mock("@/lib/activity/activity", () => ({
 }));
 
 vi.mock("@/lib/deploy-audit", () => ({
-    recordDeployAudit: async (event: { action: string; actorId: string | null; metadata?: unknown }) => {
+    recordDeployAudit: async (event: {
+        action: string;
+        actorId: string | null;
+        metadata?: unknown;
+    }) => {
         audits.push(event);
     }
 }));
@@ -78,14 +88,18 @@ describe("a container running under a stopped service", () => {
         const pass = await runDesiredStatePass();
         expect(pass).toMatchObject({ checked: 1, stopped: 0, adopted: 1 });
         expect(stopped).toEqual([]);
-        expect(lines).toEqual([{ subjectType: "app", subjectId: APP, userId: null, action: "resumed" }]);
+        expect(lines).toEqual([
+            { subjectType: "app", subjectId: APP, userId: null, action: "resumed" }
+        ]);
     });
 
     it("is stopped otherwise - and the service's history and the audit log say so", async () => {
         const pass = await runDesiredStatePass();
         expect(pass).toMatchObject({ stopped: 1, adopted: 0 });
         expect(stopped).toEqual(["marketplace-offgrid-ad8d"]);
-        expect(lines.map((line) => [line.action, line.userId])).toEqual([["stopped-unasked", null]]);
+        expect(lines.map((line) => [line.action, line.userId])).toEqual([
+            ["stopped-unasked", null]
+        ]);
         expect(audits).toEqual([
             {
                 actorId: null,

@@ -9,7 +9,10 @@
 import { describe, expect, it } from "vitest";
 import type { ActivityLine } from "../../src/lib/activity/activity";
 import { webCatalogs } from "../../messages";
-import { describeServiceEvent as describeWith, unresolvedSetupFailure } from "../../src/app/(app)/apps/deploy/service-history";
+import {
+    describeServiceEvent as describeWith,
+    unresolvedSetupFailure
+} from "../../src/app/(app)/apps/deploy/service-history";
 
 const t = webCatalogs.translator("en-US", "deployService");
 const describeServiceEvent = (entry: ActivityLine) => describeWith(entry, t);
@@ -37,7 +40,9 @@ describe("describing what happened to a service", () => {
     });
 
     it("names the variable and never its value", () => {
-        const sentence = describeServiceEvent(line({ action: "variable", toValue: "DATABASE_URL" }));
+        const sentence = describeServiceEvent(
+            line({ action: "variable", toValue: "DATABASE_URL" })
+        );
 
         expect(sentence).toBe("Ana changed the DATABASE_URL variable");
         // The line carries a key, and there is nowhere in it for a value to be.
@@ -55,9 +60,11 @@ describe("describing what happened to a service", () => {
     });
 
     it("says when Polaris stopped a service nobody asked it to, or took one back as running", () => {
-        expect(describeServiceEvent(line({ action: "stopped-unasked", authorName: null, toValue: "1" }))).toBe(
-            "Polaris stopped it: it was running although it was set to stopped"
-        );
+        expect(
+            describeServiceEvent(
+                line({ action: "stopped-unasked", authorName: null, toValue: "1" })
+            )
+        ).toBe("Polaris stopped it: it was running although it was set to stopped");
         expect(describeServiceEvent(line({ action: "resumed", authorName: null }))).toBe(
             "Polaris set it back to running: it was stopped for failing to start and is up again"
         );
@@ -73,11 +80,20 @@ describe("a one-click service's setup", () => {
 
     it("says which step ran and what it printed", () => {
         expect(
-            describeServiceEvent(line({ ...polaris, action: "setup", fromValue: "Create the first bucket", toValue: "uploads" }))
+            describeServiceEvent(
+                line({
+                    ...polaris,
+                    action: "setup",
+                    fromValue: "Create the first bucket",
+                    toValue: "uploads"
+                })
+            )
         ).toBe('Polaris ran "Create the first bucket": uploads');
-        expect(describeServiceEvent(line({ ...polaris, action: "setup", fromValue: "Install FreshRSS" }))).toBe(
-            'Polaris ran "Install FreshRSS"'
-        );
+        expect(
+            describeServiceEvent(
+                line({ ...polaris, action: "setup", fromValue: "Install FreshRSS" })
+            )
+        ).toBe('Polaris ran "Install FreshRSS"');
     });
 
     it("says which step failed and why", () => {
@@ -113,14 +129,18 @@ describe("a change the autoscaler made", () => {
         expect(scaled("autoscaled-traffic", "1", "3")).toBe(
             "Polaris scaled it from 1 to 3 copies: requests were over their target"
         );
-        expect(scaled("autoscaled-cpu", "3", "2")).toBe("Polaris scaled it from 3 to 2 copies: CPU stayed low");
+        expect(scaled("autoscaled-cpu", "3", "2")).toBe(
+            "Polaris scaled it from 3 to 2 copies: CPU stayed low"
+        );
         expect(scaled("autoscaled-both", "2", "1")).toBe(
             "Polaris scaled it from 2 to 1 copy: CPU and requests stayed low"
         );
         expect(scaled("autoscaled-idle", "4", "1")).toBe(
             "Polaris scaled it from 4 to 1 copy after 10 minutes with no requests"
         );
-        expect(scaled("autoscaled-range", "7", "4")).toBe("Polaris scaled it from 7 to 4 copies to fit its range");
+        expect(scaled("autoscaled-range", "7", "4")).toBe(
+            "Polaris scaled it from 7 to 4 copies to fit its range"
+        );
     });
 
     it("still says what happened for a signal this release does not know", () => {
@@ -131,15 +151,30 @@ describe("a change the autoscaler made", () => {
 
 describe("unresolvedSetupFailure", () => {
     // Newest first, the order the history is read in.
-    const failed = line({ id: "f", action: "setup-failed", fromValue: "Install FreshRSS", toValue: "It exited with code 1." });
-    const blocked = line({ id: "b", action: "setup-blocked", fromValue: "its database blog-db", toValue: "no" });
+    const failed = line({
+        id: "f",
+        action: "setup-failed",
+        fromValue: "Install FreshRSS",
+        toValue: "It exited with code 1."
+    });
+    const blocked = line({
+        id: "b",
+        action: "setup-blocked",
+        fromValue: "its database blog-db",
+        toValue: "no"
+    });
 
     it("is the newest setup line when that one failed", () => {
         expect(unresolvedSetupFailure([line({ action: "variable" }), failed])).toBe(failed);
     });
 
     it("is over once a later run of the setup went through", () => {
-        expect(unresolvedSetupFailure([line({ action: "setup", fromValue: "Install FreshRSS" }), failed])).toBeNull();
+        expect(
+            unresolvedSetupFailure([
+                line({ action: "setup", fromValue: "Install FreshRSS" }),
+                failed
+            ])
+        ).toBeNull();
     });
 
     it("stays for a failed setup command after a redeploy, which does not run it", () => {

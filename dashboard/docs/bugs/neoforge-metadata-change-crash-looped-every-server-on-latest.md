@@ -34,7 +34,7 @@ healthy and with a player on.
 On 2026-10-03 NeoForge's repository started answering `maven-metadata.xml`
 with a `modelVersion` attribute that the server image's helper
 (`itzg/mc-image-helper`) could not parse. Left on "latest", the image asks that
-repository which version "latest" is on *every single start* - even when the
+repository which version "latest" is on _every single start_ - even when the
 answer is the version already on disk - so the helper's `install-neoforge` step
 failed before Java ever ran, on every server that had not pinned an exact
 version by hand.

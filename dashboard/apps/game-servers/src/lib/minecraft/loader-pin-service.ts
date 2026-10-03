@@ -147,7 +147,10 @@ export type PinOutcome =
       }
     /** Nothing to hold it at: not a loader, a channel rather than a release, a
      *  loader of somebody's own, or no manifest for this release on disk. */
-    | { readonly state: "unavailable"; readonly reason: "none" | "release" | "custom" | "manifest" };
+    | {
+          readonly state: "unavailable";
+          readonly reason: "none" | "release" | "custom" | "manifest";
+      };
 
 /**
  * Hold this server at the loader its manifest says is installed.
@@ -242,7 +245,10 @@ export async function releaseLoaderOnce(
         pin.unpinVars(env).map((key) => ({ key, value: "", isSecret: false }))
     );
     await patchInstallConfig(install.id, {
-        [LOADER_PIN_KEY]: { triedAt: null, updating: { from: state.version, at: now.toISOString() } }
+        [LOADER_PIN_KEY]: {
+            triedAt: null,
+            updating: { from: state.version, at: now.toISOString() }
+        }
     });
     return { from: state.version };
 }
@@ -275,7 +281,10 @@ export interface LoaderPinSweep {
  * has not failed a read in the last half hour. Once held, a server costs this
  * nothing again.
  */
-export async function sweepLoaderPins(ownerId: string, now: Date = new Date()): Promise<LoaderPinSweep> {
+export async function sweepLoaderPins(
+    ownerId: string,
+    now: Date = new Date()
+): Promise<LoaderPinSweep> {
     const installs = (
         await prisma.installedApp.findMany({
             where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
@@ -286,7 +295,9 @@ export async function sweepLoaderPins(ownerId: string, now: Date = new Date()): 
             gameOfServer(install.catalogId)?.id === "minecraft" &&
             editionOf(install.catalogId) === "java"
     );
-    const ids = installs.flatMap((install) => (install.applicationId ? [install.applicationId] : []));
+    const ids = installs.flatMap((install) =>
+        install.applicationId ? [install.applicationId] : []
+    );
     if (ids.length === 0) return { checked: 0, pinned: 0 };
     const rows = await prisma.envVar.findMany({
         where: {

@@ -129,9 +129,14 @@ export async function afterInstallStarts(installedAppId: string): Promise<void> 
 
 /** Whether an app takes a service recorded as stopped, found running, as running
  *  again. An app that fails to answer is a no. */
-export async function adoptsRunningService(ownerId: string, applicationId: string): Promise<boolean> {
+export async function adoptsRunningService(
+    ownerId: string,
+    applicationId: string
+): Promise<boolean> {
     for (const extension of extensions()) {
-        const adopted = await extension.adoptsRunningService?.(ownerId, applicationId).catch(() => false);
+        const adopted = await extension
+            .adoptsRunningService?.(ownerId, applicationId)
+            .catch(() => false);
         if (adopted) return true;
     }
     return false;

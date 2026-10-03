@@ -2678,12 +2678,16 @@ export async function updateServerSettingsAction(
         // server is up on it.
         if (vars.some((entry) => entry.key === SOFTWARE_KEY || entry.key === "VERSION")) {
             const current = await readCurrent();
-            const next = new Map([...current, ...vars.map((entry) => [entry.key, entry.value] as const)]);
+            const next = new Map([
+                ...current,
+                ...vars.map((entry) => [entry.key, entry.value] as const)
+            ]);
             for (const key of loaderReleasedBy(
                 (name) => current.get(name) ?? "",
                 (name) => next.get(name) ?? ""
             )) {
-                if (!vars.some((entry) => entry.key === key)) vars.push({ key, value: "", isSecret: false });
+                if (!vars.some((entry) => entry.key === key))
+                    vars.push({ key, value: "", isSecret: false });
             }
         }
 

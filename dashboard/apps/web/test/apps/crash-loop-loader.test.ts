@@ -45,7 +45,9 @@ const NEOFORGE_UNREACHABLE = [
 describe("telling it apart", () => {
     it("names the command and the reason, not a library's line", () => {
         const loop = crashLoopOf(LOOPING, NEOFORGE_METADATA);
-        expect(loop.cause).toMatch(/^'install-neoforge' command failed: UnrecognizedPropertyException: Unrecognized field "modelVersion"/);
+        expect(loop.cause).toMatch(
+            /^'install-neoforge' command failed: UnrecognizedPropertyException: Unrecognized field "modelVersion"/
+        );
         // Cut to a status card's length, the way every cause is.
         expect(loop.cause!.endsWith("...")).toBe(true);
         expect(loop.cause!.length).toBeLessThanOrEqual(202);

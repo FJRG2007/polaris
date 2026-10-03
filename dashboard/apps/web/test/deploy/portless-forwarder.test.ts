@@ -55,6 +55,8 @@ describe("where the deploy asks", () => {
         const deploy = await readFile(`${SRC}lib/deploy-service.ts`, "utf8");
         expect(deploy).toContain("speaksHttp(source, await declaredProtocol(app.id, source))");
         expect(deploy).toContain("...(forwards ? { forwardPort: containerPort } : {})");
-        expect(deploy).not.toContain('...(app.target.runtime === "compose" ? { forwardPort: containerPort } : {})');
+        expect(deploy).not.toContain(
+            '...(app.target.runtime === "compose" ? { forwardPort: containerPort } : {})'
+        );
     });
 });

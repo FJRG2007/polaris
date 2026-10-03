@@ -122,7 +122,8 @@ const LOADERS: readonly LoaderSpec[] = [
             const version = versionIn(versions.loader);
             if (!minecraft || !version) return null;
             const installer = versionIn(versions.installer);
-            const chosenInstaller = env("FABRIC_LAUNCHER_VERSION") || env("FABRIC_INSTALLER_VERSION");
+            const chosenInstaller =
+                env("FABRIC_LAUNCHER_VERSION") || env("FABRIC_INSTALLER_VERSION");
             const vars: Record<string, string> = { FABRIC_LOADER_VERSION: version };
             if (installer && isMoving(chosenInstaller, ["", "latest"])) {
                 vars.FABRIC_LAUNCHER_VERSION = installer;
@@ -192,7 +193,12 @@ export function isExactRelease(version: string): boolean {
 /** Where a server's loader stands, as the settings screen shows it. */
 export type LoaderPinState =
     /** Held at a version: a start asks nobody which one to run. */
-    | { readonly state: "held"; readonly loader: string; readonly key: string; readonly version: string }
+    | {
+          readonly state: "held";
+          readonly loader: string;
+          readonly key: string;
+          readonly version: string;
+      }
     /** Following the newest, and able to be held once the server has installed one. */
     | { readonly state: "following"; readonly loader: string; readonly key: string }
     /** Following the newest Minecraft too, so there is no one version to hold. */
@@ -230,7 +236,11 @@ export function loaderToPin(env: EnvReader): LoaderSpec | null {
 export function pinFromManifest(
     env: EnvReader,
     manifestText: string
-): { readonly loader: string; readonly version: string; readonly vars: Readonly<Record<string, string>> } | null {
+): {
+    readonly loader: string;
+    readonly version: string;
+    readonly vars: Readonly<Record<string, string>>;
+} | null {
     const spec = loaderToPin(env);
     return spec ? readManifest(spec, env, manifestText) : null;
 }
@@ -249,7 +259,11 @@ function readManifest(
     spec: LoaderSpec,
     env: EnvReader,
     manifestText: string
-): { readonly loader: string; readonly version: string; readonly vars: Readonly<Record<string, string>> } | null {
+): {
+    readonly loader: string;
+    readonly version: string;
+    readonly vars: Readonly<Record<string, string>>;
+} | null {
     let parsed: unknown;
     try {
         parsed = JSON.parse(manifestText);
@@ -286,7 +300,8 @@ export function loaderReleasedBy(current: EnvReader, next: EnvReader): string[] 
     const spec = loaderSpecOf(next("TYPE"));
     if (!spec) return [];
     const releaseMoved = current("VERSION").trim() !== next("VERSION").trim();
-    const softwareMoved = current("TYPE").trim().toUpperCase() !== next("TYPE").trim().toUpperCase();
+    const softwareMoved =
+        current("TYPE").trim().toUpperCase() !== next("TYPE").trim().toUpperCase();
     if (!releaseMoved && !softwareMoved) return [];
     const held = loaderValue(spec, next);
     if (held !== loaderValue(spec, current) || isMoving(held, spec.moving)) return [];

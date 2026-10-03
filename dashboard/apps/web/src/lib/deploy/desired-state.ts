@@ -127,7 +127,12 @@ export async function runDesiredStatePass(): Promise<DesiredStatePass> {
                 if (await adoptsRunningService(app.environment.project.ownerId, app.id)) {
                     adopted += 1;
                     await activity
-                        .record({ subjectType: "app", subjectId: app.id, userId: null, action: RESUMED_ACTION })
+                        .record({
+                            subjectType: "app",
+                            subjectId: app.id,
+                            userId: null,
+                            action: RESUMED_ACTION
+                        })
                         .catch(() => undefined);
                     continue;
                 }

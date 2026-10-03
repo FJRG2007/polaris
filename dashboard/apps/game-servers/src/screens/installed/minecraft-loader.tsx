@@ -41,7 +41,9 @@ export function MinecraftLoader({
     const t = useGameText("minecraft");
     const [view, setView] = useState<LoaderPinView | null>(null);
     const key = `loader-pin:${installedAppId}`;
-    useKeptSnapshot<LoaderPinView>(key, KEPT_MS, (kept) => setView((current) => current ?? kept.value));
+    useKeptSnapshot<LoaderPinView>(key, KEPT_MS, (kept) =>
+        setView((current) => current ?? kept.value)
+    );
     const heard = useRef(false);
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -71,7 +73,9 @@ export function MinecraftLoader({
     if (!view) {
         return note ? (
             <Card>
-                <CardBody className="py-6 text-center text-sm text-muted-foreground">{note}</CardBody>
+                <CardBody className="py-6 text-center text-sm text-muted-foreground">
+                    {note}
+                </CardBody>
             </Card>
         ) : (
             <Card>
@@ -142,8 +146,17 @@ export function MinecraftLoader({
                 </p>
                 {pin.state === "held" && !view.updating && (
                     <div>
-                        <Button size="sm" variant="secondary" onClick={() => void update()} disabled={pending}>
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void update()}
+                            disabled={pending}
+                        >
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <RefreshCw className="size-4" />
+                            )}
                             {t("loader.update")}
                         </Button>
                     </div>

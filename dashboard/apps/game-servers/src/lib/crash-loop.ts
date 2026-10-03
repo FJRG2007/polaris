@@ -385,9 +385,10 @@ export function loaderCrashOf(
     if (!installer || !name) return null;
     // The repository answered, with something the helper's parser refuses: a
     // format change upstream, which retrying does not fix.
-    const unreadable = /Unrecognized field|Failed to parse response|Unexpected character|JsonParseException|MismatchedInputException/i.test(
-        cause ?? ""
-    );
+    const unreadable =
+        /Unrecognized field|Failed to parse response|Unexpected character|JsonParseException|MismatchedInputException/i.test(
+            cause ?? ""
+        );
     return { installer, name, unreadable };
 }
 

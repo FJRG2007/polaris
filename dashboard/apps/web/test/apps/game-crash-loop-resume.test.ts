@@ -60,7 +60,12 @@ interface Install {
 let install: Install;
 let desiredState = "running";
 let env: Record<string, string> = {};
-let runtime: { status: string; restartCount: number; startedAt: string; restarting?: boolean } | null;
+let runtime: {
+    status: string;
+    restartCount: number;
+    startedAt: string;
+    restarting?: boolean;
+} | null;
 let log = "";
 let inspections = 0;
 let stops = 0;
@@ -75,7 +80,13 @@ vi.mock("@polaris/db", () => ({
         },
         application: {
             findFirst: async () => ({ desiredState }),
-            updateMany: async ({ where, data }: { where: { desiredState: string }; data: { desiredState: string } }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { desiredState: string };
+                data: { desiredState: string };
+            }) => {
                 if (desiredState !== where.desiredState) return { count: 0 };
                 desiredState = data.desiredState;
                 return { count: 1 };
@@ -100,8 +111,14 @@ vi.mock("@/lib/deploy-service", () => ({
 }));
 
 vi.mock("@/lib/env-var-service", () => ({
-    listEnvVars: async () => Object.entries(env).map(([key, value]) => ({ id: key, key, value, isSecret: false })),
-    setEnvVars: async (_scope: string, _id: string, _owner: string, vars: Array<{ key: string; value: string }>) => {
+    listEnvVars: async () =>
+        Object.entries(env).map(([key, value]) => ({ id: key, key, value, isSecret: false })),
+    setEnvVars: async (
+        _scope: string,
+        _id: string,
+        _owner: string,
+        vars: Array<{ key: string; value: string }>
+    ) => {
         for (const item of vars) env[item.key] = item.value;
         return vars.length;
     }
@@ -112,7 +129,10 @@ vi.mock("@/lib/apps/install-config", async (importOriginal) => {
     return {
         ...real,
         patchInstallConfig: async (_id: string, patch: Record<string, unknown>) => {
-            install = { ...install, config: JSON.stringify({ ...JSON.parse(install.config), ...patch }) };
+            install = {
+                ...install,
+                config: JSON.stringify({ ...JSON.parse(install.config), ...patch })
+            };
         }
     };
 });
@@ -135,12 +155,16 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     withServerContainer: async (
         _owner: string,
         _install: string,
-        work: (server: { readFile: (path: string) => Promise<ReadableStream<Uint8Array>> }) => unknown
+        work: (server: {
+            readFile: (path: string) => Promise<ReadableStream<Uint8Array>>;
+        }) => unknown
     ) =>
         work({
             readFile: async (path: string) => {
                 expect(path).toBe("/data/.neoforge-manifest.json");
-                return Readable.toWeb(Readable.from([Buffer.from(MANIFEST)])) as ReadableStream<Uint8Array>;
+                return Readable.toWeb(
+                    Readable.from([Buffer.from(MANIFEST)])
+                ) as ReadableStream<Uint8Array>;
             }
         })
 }));
@@ -196,7 +220,9 @@ describe("a server that cannot download its loader", () => {
             "The loader could not be downloaded: NeoForge's repository answered in a format this server cannot read. Polaris pinned the installed version 21.4.158; press Start."
         );
         expect(notified).toHaveLength(1);
-        expect(notified[0]?.body).toContain("Polaris pinned the installed version 21.4.158; press Start.");
+        expect(notified[0]?.body).toContain(
+            "Polaris pinned the installed version 21.4.158; press Start."
+        );
     });
 
     it("keeps a loader version somebody already set, and promises nothing about it", async () => {
@@ -287,8 +313,9 @@ describe("a server its operator stopped", () => {
 
     it("reads a record from before the flag existed as the guard's own", () => {
         expect(
-            readCrashLoop(JSON.stringify({ crashLoop: { restarts: 4, cause: null, advice: null, at: "x" } }))
-                ?.stoppedByPolaris
+            readCrashLoop(
+                JSON.stringify({ crashLoop: { restarts: 4, cause: null, advice: null, at: "x" } })
+            )?.stoppedByPolaris
         ).toBe(true);
     });
 });

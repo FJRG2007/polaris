@@ -17,7 +17,9 @@ import { AUTOSCALE_IDLE_AFTER, AUTOSCALE_SIGNALS, AUTOSCALED_ACTION_PREFIX } fro
 type ServiceT = NamespaceTranslator<"deployService">;
 
 function autoscaleReason(action: string, up: boolean, t: ServiceT): string {
-    const signal = AUTOSCALE_SIGNALS.find((known) => action === `${AUTOSCALED_ACTION_PREFIX}${known}`);
+    const signal = AUTOSCALE_SIGNALS.find(
+        (known) => action === `${AUTOSCALED_ACTION_PREFIX}${known}`
+    );
     switch (signal) {
         case undefined:
             return "";
@@ -86,12 +88,24 @@ export function describeServiceEvent(line: ActivityLine, t: ServiceT): string {
         // the service's secrets masked, written that way before it was stored.
         case "setup":
             return line.toValue
-                ? t("history.setupWithOutput", { who, step: line.fromValue ?? "", output: line.toValue })
+                ? t("history.setupWithOutput", {
+                      who,
+                      step: line.fromValue ?? "",
+                      output: line.toValue
+                  })
                 : t("history.setup", { who, step: line.fromValue ?? "" });
         case "setup-failed":
-            return t("history.setupFailed", { who, step: line.fromValue ?? "", output: line.toValue ?? "" });
+            return t("history.setupFailed", {
+                who,
+                step: line.fromValue ?? "",
+                output: line.toValue ?? ""
+            });
         case "setup-blocked":
-            return t("history.setupBlocked", { who, companion: line.fromValue ?? "", output: line.toValue ?? "" });
+            return t("history.setupBlocked", {
+                who,
+                companion: line.fromValue ?? "",
+                output: line.toValue ?? ""
+            });
         case "first-deploy-failed":
             return t("history.firstDeployFailed", { who, output: line.toValue ?? "" });
         case "secrets-withheld":

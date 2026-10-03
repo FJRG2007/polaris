@@ -62,12 +62,23 @@ describe("a loader held at the version it installed", () => {
     it("shows the pinned badge, the version, and an Update loader button", async () => {
         readAnswer = {
             view: {
-                pin: { state: "held", loader: "NeoForge", key: "NEOFORGE_VERSION", version: "21.4.158" },
+                pin: {
+                    state: "held",
+                    loader: "NeoForge",
+                    key: "NEOFORGE_VERSION",
+                    version: "21.4.158"
+                },
                 updating: false
             }
         };
         await act(async () => {
-            render(<MinecraftLoader installedAppId={INSTALLED_APP_ID} playersOnline={0} running={true} />);
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={0}
+                    running={true}
+                />
+            );
         });
 
         expect(screen.getByText("Mod loader")).toBeTruthy();
@@ -82,14 +93,25 @@ describe("a loader held at the version it installed", () => {
     it("warns about dropped players and restarts the server once confirmed", async () => {
         readAnswer = {
             view: {
-                pin: { state: "held", loader: "NeoForge", key: "NEOFORGE_VERSION", version: "21.4.158" },
+                pin: {
+                    state: "held",
+                    loader: "NeoForge",
+                    key: "NEOFORGE_VERSION",
+                    version: "21.4.158"
+                },
                 updating: false
             }
         };
         updateAnswer = { restarted: true };
         const user = userEvent.setup();
         await act(async () => {
-            render(<MinecraftLoader installedAppId={INSTALLED_APP_ID} playersOnline={3} running={true} />);
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={3}
+                    running={true}
+                />
+            );
         });
 
         await act(async () => {
@@ -98,11 +120,17 @@ describe("a loader held at the version it installed", () => {
 
         expect(confirmCalls).toHaveLength(1);
         expect(confirmCalls[0]?.title).toBe("Update NeoForge?");
-        expect(confirmCalls[0]?.description).toContain("Mods built for 21.4.158 may not load on the new version.");
-        expect(confirmCalls[0]?.description).toContain("3 players are connected and will be disconnected");
+        expect(confirmCalls[0]?.description).toContain(
+            "Mods built for 21.4.158 may not load on the new version."
+        );
+        expect(confirmCalls[0]?.description).toContain(
+            "3 players are connected and will be disconnected"
+        );
         expect(confirmCalls[0]?.confirmLabel).toBe("Update and restart");
 
-        expect(await screen.findByText("The server is restarting with the newest NeoForge.")).toBeTruthy();
+        expect(
+            await screen.findByText("The server is restarting with the newest NeoForge.")
+        ).toBeTruthy();
     });
 
     it("does not touch the server when the operator backs out of the confirm dialog", async () => {
@@ -121,7 +149,13 @@ describe("a loader held at the version it installed", () => {
 
         const user = userEvent.setup();
         await act(async () => {
-            render(<MinecraftLoader installedAppId={INSTALLED_APP_ID} playersOnline={0} running={false} />);
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={0}
+                    running={false}
+                />
+            );
         });
         await act(async () => {
             await user.click(screen.getByRole("button", { name: /Update loader/ }));
@@ -135,10 +169,19 @@ describe("a loader held at the version it installed", () => {
 describe("a loader still following the newest release", () => {
     it("explains it will be pinned once the server is up, with no button to press yet", async () => {
         readAnswer = {
-            view: { pin: { state: "following", loader: "Fabric", key: "FABRIC_LOADER_VERSION" }, updating: false }
+            view: {
+                pin: { state: "following", loader: "Fabric", key: "FABRIC_LOADER_VERSION" },
+                updating: false
+            }
         };
         await act(async () => {
-            render(<MinecraftLoader installedAppId={INSTALLED_APP_ID} playersOnline={0} running={true} />);
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={0}
+                    running={true}
+                />
+            );
         });
 
         expect(screen.getByText("Fabric, newest version")).toBeTruthy();
@@ -155,12 +198,23 @@ describe("a loader whose update is already installing", () => {
     it("says so instead of offering the button twice", async () => {
         readAnswer = {
             view: {
-                pin: { state: "held", loader: "NeoForge", key: "NEOFORGE_VERSION", version: "21.4.158" },
+                pin: {
+                    state: "held",
+                    loader: "NeoForge",
+                    key: "NEOFORGE_VERSION",
+                    version: "21.4.158"
+                },
                 updating: true
             }
         };
         await act(async () => {
-            render(<MinecraftLoader installedAppId={INSTALLED_APP_ID} playersOnline={0} running={true} />);
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={0}
+                    running={true}
+                />
+            );
         });
 
         expect(
@@ -177,7 +231,13 @@ describe("a server with nothing to hold", () => {
     it("draws nothing at all", async () => {
         readAnswer = { view: { pin: { state: "none" }, updating: false } };
         const { container } = await act(async () =>
-            render(<MinecraftLoader installedAppId={INSTALLED_APP_ID} playersOnline={0} running={true} />)
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={0}
+                    running={true}
+                />
+            )
         );
         expect(container.textContent).toBe("");
     });

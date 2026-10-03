@@ -46,8 +46,9 @@ describe("which servers are held", () => {
         );
         // Forge's own default is the recommended build, which moves just the same.
         expect(
-            loaderPinState(envReader({ TYPE: "FORGE", VERSION: "1.20.1", FORGE_VERSION: "recommended" }))
-                .state
+            loaderPinState(
+                envReader({ TYPE: "FORGE", VERSION: "1.20.1", FORGE_VERSION: "recommended" })
+            ).state
         ).toBe("following");
     });
 
@@ -89,18 +90,25 @@ describe("which servers are held", () => {
 
     it("leaves an installer of somebody's own alone", () => {
         expect(
-            loaderPinState(envReader({ ...INCIDENT, NEOFORGE_INSTALLER: "/data/installer.jar" })).state
+            loaderPinState(envReader({ ...INCIDENT, NEOFORGE_INSTALLER: "/data/installer.jar" }))
+                .state
         ).toBe("custom");
         expect(
             loaderPinState(
-                envReader({ TYPE: "FABRIC", VERSION: "1.21.4", FABRIC_LAUNCHER_URL: "https://x/y.jar" })
+                envReader({
+                    TYPE: "FABRIC",
+                    VERSION: "1.21.4",
+                    FABRIC_LAUNCHER_URL: "https://x/y.jar"
+                })
             ).state
         ).toBe("custom");
     });
 
     it("does not touch plugin servers, whose download API is asked on every start anyway", () => {
         for (const type of ["PAPER", "PURPUR", "VANILLA", "SPIGOT", ""]) {
-            expect(loaderPinState(envReader({ TYPE: type, VERSION: "1.21.4" }))).toEqual({ state: "none" });
+            expect(loaderPinState(envReader({ TYPE: type, VERSION: "1.21.4" }))).toEqual({
+                state: "none"
+            });
         }
     });
 });
@@ -131,19 +139,26 @@ describe("what is written", () => {
             vars: { FABRIC_LOADER_VERSION: "0.16.10", FABRIC_LAUNCHER_VERSION: "1.0.1" }
         });
         expect(
-            pinFromManifest(envReader({ ...env, FABRIC_LAUNCHER_VERSION: "1.0.0" }), manifest("fabric"))?.vars
+            pinFromManifest(
+                envReader({ ...env, FABRIC_LAUNCHER_VERSION: "1.0.0" }),
+                manifest("fabric")
+            )?.vars
         ).toEqual({ FABRIC_LOADER_VERSION: "0.16.10" });
     });
 
     it("holds Quilt", () => {
         expect(
-            pinFromManifest(envReader({ TYPE: "QUILT", VERSION: "1.21.4" }), manifest("quilt"))?.vars
+            pinFromManifest(envReader({ TYPE: "QUILT", VERSION: "1.21.4" }), manifest("quilt"))
+                ?.vars
         ).toEqual({ QUILT_LOADER_VERSION: "0.27.1" });
     });
 
     it("refuses a manifest written for another release: the server is moving to this one", () => {
         expect(
-            pinFromManifest(envReader({ TYPE: "NEOFORGE", VERSION: "1.21.5" }), manifest("neoforge"))
+            pinFromManifest(
+                envReader({ TYPE: "NEOFORGE", VERSION: "1.21.5" }),
+                manifest("neoforge")
+            )
         ).toBeNull();
     });
 
@@ -153,10 +168,16 @@ describe("what is written", () => {
         expect(pinFromManifest(env, "not json")).toBeNull();
         expect(pinFromManifest(env, "[]")).toBeNull();
         expect(
-            pinFromManifest(env, JSON.stringify({ minecraftVersion: "1.21.4", forgeVersion: "21.4.158\nX=1" }))
+            pinFromManifest(
+                env,
+                JSON.stringify({ minecraftVersion: "1.21.4", forgeVersion: "21.4.158\nX=1" })
+            )
         ).toBeNull();
         expect(
-            pinFromManifest(env, JSON.stringify({ minecraftVersion: "1.21.4", forgeVersion: "$(id)" }))
+            pinFromManifest(
+                env,
+                JSON.stringify({ minecraftVersion: "1.21.4", forgeVersion: "$(id)" })
+            )
         ).toBeNull();
         expect(pinFromManifest(env, JSON.stringify({ minecraftVersion: "1.21.4" }))).toBeNull();
     });
@@ -182,7 +203,10 @@ describe("letting it go", () => {
     it("lets a held loader go when the release moves, so the new release resolves its own", () => {
         const current = envReader({ ...INCIDENT, NEOFORGE_VERSION: "21.4.158" });
         expect(
-            loaderReleasedBy(current, envReader({ ...INCIDENT, VERSION: "1.21.5", NEOFORGE_VERSION: "21.4.158" }))
+            loaderReleasedBy(
+                current,
+                envReader({ ...INCIDENT, VERSION: "1.21.5", NEOFORGE_VERSION: "21.4.158" })
+            )
         ).toEqual(["NEOFORGE_VERSION"]);
     });
 
@@ -190,11 +214,14 @@ describe("letting it go", () => {
         const current = envReader({ ...INCIDENT, NEOFORGE_VERSION: "21.4.158" });
         expect(loaderReleasedBy(current, current)).toEqual([]);
         expect(
-            loaderReleasedBy(current, envReader({ ...INCIDENT, VERSION: "1.21.5", NEOFORGE_VERSION: "21.5.3" }))
+            loaderReleasedBy(
+                current,
+                envReader({ ...INCIDENT, VERSION: "1.21.5", NEOFORGE_VERSION: "21.5.3" })
+            )
         ).toEqual([]);
         // Nothing held, nothing to let go.
-        expect(loaderReleasedBy(envReader(INCIDENT), envReader({ ...INCIDENT, VERSION: "1.21.5" }))).toEqual(
-            []
-        );
+        expect(
+            loaderReleasedBy(envReader(INCIDENT), envReader({ ...INCIDENT, VERSION: "1.21.5" }))
+        ).toEqual([]);
     });
 });

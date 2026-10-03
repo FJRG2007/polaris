@@ -38,7 +38,11 @@ vi.mock("@polaris/db", () => ({
             findMany: async () => [
                 { id: INSTALL, applicationId: APP, catalogId, config: JSON.stringify(config) }
             ],
-            findFirst: async () => ({ id: INSTALL, applicationId: APP, config: JSON.stringify(config) })
+            findFirst: async () => ({
+                id: INSTALL,
+                applicationId: APP,
+                config: JSON.stringify(config)
+            })
         },
         envVar: {
             findMany: async ({ where }: { where: { key: { in: string[] } } }) =>
@@ -50,8 +54,14 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/env-var-service", () => ({
-    listEnvVars: async () => Object.entries(env).map(([key, value]) => ({ id: key, key, value, isSecret: false })),
-    setEnvVars: async (_scope: string, _id: string, _owner: string, vars: Array<{ key: string; value: string }>) => {
+    listEnvVars: async () =>
+        Object.entries(env).map(([key, value]) => ({ id: key, key, value, isSecret: false })),
+    setEnvVars: async (
+        _scope: string,
+        _id: string,
+        _owner: string,
+        vars: Array<{ key: string; value: string }>
+    ) => {
         for (const item of vars) env[item.key] = item.value;
         return vars.length;
     }
@@ -75,13 +85,17 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     withServerContainer: async (
         _owner: string,
         _install: string,
-        work: (server: { readFile: (path: string) => Promise<ReadableStream<Uint8Array>> }) => unknown
+        work: (server: {
+            readFile: (path: string) => Promise<ReadableStream<Uint8Array>>;
+        }) => unknown
     ) =>
         work({
             readFile: async () => {
                 manifestReads += 1;
                 if (manifest === null) throw new Error("no such file");
-                return Readable.toWeb(Readable.from([Buffer.from(manifest)])) as ReadableStream<Uint8Array>;
+                return Readable.toWeb(
+                    Readable.from([Buffer.from(manifest)])
+                ) as ReadableStream<Uint8Array>;
             }
         })
 }));

@@ -64,7 +64,11 @@ import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
 import { findBlueprint, hasCrossplay } from "../../lib/minecraft/blueprints";
-import { pinLoaderAndStartAction, resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
+import {
+    pinLoaderAndStartAction,
+    resetServerConfigAction,
+    saveWorldAction
+} from "./minecraft-actions";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn, ScrollRow, Skeleton } from "@polaris/ui";
 import type {
@@ -917,7 +921,10 @@ function ConnectCard({
         setFixing(false);
         setFixed(
             result.error ??
-                t("panel.loaderPinned", { loader: result.loader ?? "", version: result.version ?? "" })
+                t("panel.loaderPinned", {
+                    loader: result.loader ?? "",
+                    version: result.version ?? ""
+                })
         );
     }
 

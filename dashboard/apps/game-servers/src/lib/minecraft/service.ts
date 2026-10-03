@@ -885,9 +885,11 @@ async function readLivePlayers(
     // is simply off is not asked anything.
     const back =
         !install.running && halted?.stoppedByPolaris
-            ? await readAppContainerRuntime(install.applicationId, ownerId, containerOf(install)).catch(
-                  () => null
-              )
+            ? await readAppContainerRuntime(
+                  install.applicationId,
+                  ownerId,
+                  containerOf(install)
+              ).catch(() => null)
             : null;
     if (!install.running && back?.status !== "running") {
         // A server Polaris stopped because it could not start is stopped for a
@@ -964,9 +966,11 @@ async function readLivePlayers(
         // goes, and a stop that was Polaris's is taken back, here rather than a
         // health pass later - a server with people on it is not "stopped".
         if (halted) {
-            await resumeAfterCrashLoop(install.installedAppId, install.applicationId, "answering").catch(
-                () => false
-            );
+            await resumeAfterCrashLoop(
+                install.installedAppId,
+                install.applicationId,
+                "answering"
+            ).catch(() => false);
         }
         return { answering: true, players, message: null, containerRunning, crashLoop: null };
     } catch (caught) {
