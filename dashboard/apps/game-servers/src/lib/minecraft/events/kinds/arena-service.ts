@@ -180,6 +180,9 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
     if (ctx.run.readyAt === null) {
         if (!ctx.run.enrolled) await enroll(ctx, lines);
         else if (!ctx.run.arena) await raise(ctx);
+        // The hill counts nothing until everybody stands on it.
+        else if (hillService.awaitingArrivals(ctx.run.id))
+            await hillService.arrivalTick(ctx, lines);
         else await bringIn(ctx);
         return null;
     }
@@ -486,6 +489,11 @@ async function bringIn(ctx: KindContext): Promise<void> {
     // Everybody left on the one team: nobody to play against.
     if (duelling && [0, 1].some((side) => !ctx.run.entrants.some((one) => one.side === side)))
         throw new TooFew(ONE_SIDED);
+    // The hill's clock, and its "Go!", wait for everybody to be on it.
+    if (hillside) {
+        hillService.awaitArrivals(ctx.run.id, ctx.now);
+        return;
+    }
     const out: string[] = [];
     if (theme !== null)
         out.push(
@@ -1004,6 +1012,7 @@ export async function closeArena(
     language: speech.Speech | null = null
 ): Promise<stored.ArenaLeftover | null> {
     memories.delete(left.id);
+    hillService.forgetArrivals(left.id);
     let rules = left.gamerules;
     const remaining: stored.Entrant[] = [];
     let index = 0;

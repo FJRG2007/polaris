@@ -25,3 +25,27 @@ export function enterLine(language: Language): string {
 export function backOnHill(language: Language): string {
     return language === "es" ? "&eDe vuelta a la colina" : "&eBack on the hill";
 }
+
+/** Above the hotbar of whoever is in while the rest are still brought in. */
+export function waitingForAll(arrived: number, total: number, language: Language): string {
+    return language === "es"
+        ? `&eEsperando a todos: &f${arrived}/${total}`
+        : `&eWaiting for everybody: &f${arrived}/${total}`;
+}
+
+export function goTitle(language: Language): string {
+    return language === "es" ? "&a¡Ya!" : "&aGo!";
+}
+
+export function goSubtitle(language: Language): string {
+    return language === "es"
+        ? "&fAguanta el círculo más que nadie"
+        : "&fHold the circle longest to win";
+}
+
+/** Said when the wait ran out before everybody was on the platform. */
+export function startedWithout(names: readonly string[], language: Language): string {
+    return language === "es"
+        ? `&eEmpieza sin esperar más a: &f${names.join(", ")}`
+        : `&eStarted without waiting longer for: &f${names.join(", ")}`;
+}

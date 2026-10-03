@@ -157,6 +157,40 @@ export function enterLines(name: string, spot: Spot, overGround: boolean): strin
     return [`tag ${name} add ${IN_ARENA}`, tp, `gamemode adventure ${name}`];
 }
 
+/**
+ * Whether somebody stands on the platform: over its floor, at the circle's own
+ * height - a jump allowed - rather than still on the way in, or under it.
+ */
+export function onPlatform(
+    at: { x: number; y: number; z: number },
+    place: Point,
+    radius: number
+): boolean {
+    const half = radius + MARGIN;
+    return (
+        at.y >= place.y - 0.5 &&
+        at.y <= place.y + 1.5 &&
+        at.x >= place.x - half &&
+        at.x < place.x + half + 1 &&
+        at.z >= place.z - half &&
+        at.z < place.z + half + 1
+    );
+}
+
+/** Who of `names` is not on the platform yet - not on, or not there. */
+export function notArrived(
+    names: readonly string[],
+    where: readonly { name: string; x: number; y: number; z: number }[],
+    place: Point,
+    radius: number
+): string[] {
+    const here = new Map(where.map((one) => [one.name.toLowerCase(), one]));
+    return names.filter((name) => {
+        const at = here.get(name.toLowerCase());
+        return !at || !onPlatform(at, place, radius);
+    });
+}
+
 /** Knocked right off - into the sea, down a slope, far out: time to come back. */
 export function strayed(
     at: { x: number; y: number; z: number },
