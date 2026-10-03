@@ -990,7 +990,8 @@ export function repairPreset(entry: unknown): { preset: EventPreset; reset: stri
     const raw = entry as Record<string, unknown>;
     if (!EVENT_KINDS.includes(raw.kind as EventKind)) return null;
     const kind = raw.kind as EventKind;
-    const id = typeof raw.id === "string" && raw.id.length > 0 ? raw.id.slice(0, 64) : `${kind}-saved`;
+    const id =
+        typeof raw.id === "string" && raw.id.length > 0 ? raw.id.slice(0, 64) : `${kind}-saved`;
     let current: Record<string, unknown> = { ...newPreset(kind, id) };
     const reset: string[] = [];
     const reads = (candidate: Record<string, unknown>) => presetSchema.safeParse(candidate).success;
@@ -1039,7 +1040,8 @@ function readPresets(list: unknown): { preset: EventPreset; reset: string[] }[] 
     return read.map((one) => {
         if (one.reset.length === 0) return one;
         let id = one.preset.id;
-        for (let n = 2; taken.has(id); n++) id = `${one.preset.id.slice(0, 63 - String(n).length)}-${n}`;
+        for (let n = 2; taken.has(id); n++)
+            id = `${one.preset.id.slice(0, 63 - String(n).length)}-${n}`;
         taken.add(id);
         return id === one.preset.id ? one : { ...one, preset: { ...one.preset, id } };
     });

@@ -728,7 +728,11 @@ describe("a saved event that no longer reads whole", () => {
             [catalog.EVENTS_KEY]: {
                 settings: {
                     ...settings(),
-                    random: { ...settings().random, enabled: true, pool: [{ presetId: "fish", weight: 1 }] }
+                    random: {
+                        ...settings().random,
+                        enabled: true,
+                        pool: [{ presetId: "fish", weight: 1 }]
+                    }
                 },
                 presets: [saved],
                 schedules: []
@@ -765,4 +769,3 @@ describe("a saved event that no longer reads whole", () => {
         expect(catalog.repairPreset(fine)?.reset).toEqual([]);
     });
 });
-

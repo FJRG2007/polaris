@@ -91,7 +91,11 @@ export async function welcomeFor(
         const language = await speechService.accountLanguage(link.userId, home);
         return welcomeLine(kind, name, language);
     } catch (error) {
-        console.warn("polaris: the login welcome could not be read", server.installedAppId, String(error));
+        console.warn(
+            "polaris: the login welcome could not be read",
+            server.installedAppId,
+            String(error)
+        );
         return null;
     }
 }

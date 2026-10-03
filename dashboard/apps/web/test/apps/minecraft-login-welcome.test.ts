@@ -101,9 +101,9 @@ describe("the greeting", () => {
         db.connected = [];
         expect(await welcome.welcomeFor(SERVER, "Javi", "login")).toBeNull();
         // Its own server, or a link that follows its sign-ins, agrees.
-        expect(
-            await welcome.welcomeFor({ ...SERVER, ownerId: "user-1" }, "Javi", "login")
-        ).toBe("Logged in. Welcome back, Javier!");
+        expect(await welcome.welcomeFor({ ...SERVER, ownerId: "user-1" }, "Javi", "login")).toBe(
+            "Logged in. Welcome back, Javier!"
+        );
         db.link = { userId: "user-1", player: "Javi", followSignIns: true };
         expect(await welcome.welcomeFor(SERVER, "Javi", "login")).not.toBeNull();
     });

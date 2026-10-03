@@ -242,7 +242,10 @@ describe("registering and logging in", () => {
         const otherJoin = await ask("register", { player: "Alex", password: "correct horse" });
         expect(await otherJoin.json()).toEqual({ ok: true });
         const named = await ask("login", { player: "Steve", password: "correct horse" });
-        expect(await named.json()).toEqual({ ok: true, welcome: "Logged in. Welcome back, Javier!" });
+        expect(await named.json()).toEqual({
+            ok: true,
+            welcome: "Logged in. Welcome back, Javier!"
+        });
         // A wrong password is never greeted.
         const wrong = await ask("login", { player: "Steve", password: "wrong horse" });
         expect(await wrong.json()).toEqual({ error: "wrong-password" });
