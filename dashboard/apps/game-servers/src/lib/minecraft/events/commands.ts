@@ -1411,6 +1411,15 @@ export function hostilesOut(box: {
  */
 export const FEEDBACK_RULES = ["sendCommandFeedback", "send_command_feedback"] as const;
 
+/**
+ * What the side panel shows beside a player instead of their bare score, from
+ * 1.20.3: the score stays the number the panel sorts by, and reads as `text` -
+ * a time held as `2.5 min`, a large count as `12K` (`figures`).
+ */
+export function scoreShownAs(name: string, objective: string, text: string): string {
+    return `scoreboard players display numberformat ${name} ${objective} fixed ${asciiJson(JSON.stringify({ text }))}`;
+}
+
 export function readRule(name: string): string {
     return `gamerule ${name}`;
 }

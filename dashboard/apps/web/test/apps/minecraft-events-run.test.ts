@@ -6328,6 +6328,12 @@ describe("a king of the hill", () => {
             `execute in minecraft:overworld positioned ${place0.x + 0.5} ${place0.y} ${place0.z + 0.5} as @a[tag=pe_arena,distance=..6] run effect give @s minecraft:regeneration 3 1 true`
         );
         expect(world.sent.some((line) => line.includes("resistance 10 4"))).toBe(false);
+        // The side panel reads each time held as a time.
+        world.scores = { Ana: 75 };
+        await play(2_100);
+        expect(world.sent).toContain(
+            'scoreboard players display numberformat Ana pe_score fixed {"text":"1.3 min"}'
+        );
         // Only those it brought score.
         expect(
             world.sent.some((line) =>

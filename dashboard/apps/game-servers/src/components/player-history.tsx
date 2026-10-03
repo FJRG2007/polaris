@@ -18,19 +18,15 @@ import type { PlayerStats } from "../lib/games-activity";
 import { useGameText, type GameText } from "../screens/game-text";
 import type { PlayerRecord } from "../lib/games-activity-service";
 import { hostUi } from "@polaris/app-host/client";
+import { figureLanguage, formatCount, formatDuration } from "../lib/figures";
 
 const { useDisplayFormat } = hostUi.displayFormat;
 
-/** How long somebody has played, in the largest unit that still says something. */
-export function playedFor(t: GameText<"games">, ms: number): string {
-    const minutes = Math.floor(ms / 60_000);
-    if (minutes < 1) return t("history.underAMinute");
-    if (minutes < 60) return t("history.minutes", { count: minutes });
-    const hours = minutes / 60;
-    // One decimal below a day, because "1.5 h" is a real difference from "1 h".
-    // Past that the fraction is noise.
-    if (hours < 24) return t("history.hours", { count: Number(hours.toFixed(1)) });
-    return t("history.hours", { count: Math.round(hours) });
+/** How long somebody has played, in the largest unit that still says something
+ *  (`figures.formatDuration`): `45 min`, `3.5 h`, `1.1 d`, `6.4 wk`. */
+export function playedFor(t: GameText<"games">, ms: number, locale: string): string {
+    if (ms < 60_000) return t("history.underAMinute");
+    return formatDuration(ms, figureLanguage(locale));
 }
 
 /** One figure with its label. */
@@ -58,6 +54,8 @@ export function PlayerRecordPanel({
 }) {
     const t = useGameText("games");
     const format = useDisplayFormat();
+    const locale = hostUi.i18nProvider.useLocale();
+    const count = (value: number) => formatCount(value, figureLanguage(locale));
     const history = record?.history;
     const seen = (history?.visits ?? 0) > 0;
     // For somebody on, when the visit they are on began: the last moment they were
@@ -76,8 +74,8 @@ export function PlayerRecordPanel({
         <div className="space-y-2">
             {seen && history && (
                 <div className="grid grid-cols-2 gap-2">
-                    <Figure label={t("history.played")} value={playedFor(t, history.playedMs)} />
-                    <Figure label={t("history.visits")} value={String(history.visits)} />
+                    <Figure label={t("history.played")} value={playedFor(t, history.playedMs, locale)} />
+                    <Figure label={t("history.visits")} value={count(history.visits)} />
                     <Figure
                         label={t("history.firstSeen")}
                         value={history.firstSeen ? format.date(history.firstSeen) : "-"}
@@ -94,10 +92,10 @@ export function PlayerRecordPanel({
                         the whole life of the world. */}
                     <Figure
                         label={t("history.playtimeAllTime")}
-                        value={playedFor(t, stats.playedMs)}
+                        value={playedFor(t, stats.playedMs, locale)}
                     />
-                    <Figure label={t("history.deaths")} value={String(stats.deaths)} />
-                    <Figure label={t("history.mobsKilled")} value={String(stats.mobKills)} />
+                    <Figure label={t("history.deaths")} value={count(stats.deaths)} />
+                    <Figure label={t("history.mobsKilled")} value={count(stats.mobKills)} />
                 </div>
             )}
         </div>

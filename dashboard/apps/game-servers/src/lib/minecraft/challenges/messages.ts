@@ -6,6 +6,7 @@
  * variables to that writer.
  */
 
+import { formatDuration } from "../../figures";
 import * as catalog from "./catalog";
 import type { Language } from "./catalog";
 import { PALETTE, mark } from "../events/messages";
@@ -24,16 +25,9 @@ export function tag(language: Language): string {
     return pick(TAG, language);
 }
 
-/** `3 h 12 min`, `12 min`, `2 d 4 h`. */
+/** How long, short (`figures.formatDuration`): `12 min`, `3.2 h`, `2.2 d`; never under a minute. */
 export function duration(ms: number, language: Language): string {
-    const minutes = Math.max(1, Math.round(ms / 60_000));
-    const days = Math.floor(minutes / 1440);
-    const hours = Math.floor((minutes % 1440) / 60);
-    const rest = minutes % 60;
-    const d = language === "es" ? "d" : "d";
-    if (days > 0) return `${days} ${d} ${hours} h`;
-    if (hours > 0) return `${hours} h ${rest} min`;
-    return `${rest} min`;
+    return formatDuration(Math.max(60_000, ms), language);
 }
 
 export const LABELS = {

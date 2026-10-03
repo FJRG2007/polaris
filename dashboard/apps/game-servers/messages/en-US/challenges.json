@@ -59,11 +59,6 @@
         "dealtDoneTitle": "Players who finished it, of those dealt it",
         "refused": "{count, plural, one {# statistic} other {# statistics}} this server version does not have, left out"
     },
-    "duration": {
-        "days": "{days} d {hours} h",
-        "hours": "{hours} h {minutes} min",
-        "minutes": "{minutes} min"
-    },
     "tier": {
         "easy": "Easy",
         "medium": "Medium",

@@ -20,6 +20,7 @@ import { MATERIAL_LABELS } from "./event-options-gathering";
 import { worldBossFacts } from "./event-options-world-boss";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
+import { figureLanguage, formatCount, formatDuration } from "../../lib/figures";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
@@ -119,6 +120,20 @@ function DrawStatus({
             ))}
         </div>
     );
+}
+
+/** A score as the screen shows it: time held as a duration, anything else as
+ *  a count with its unit (`figures`). */
+function scoreText(
+    t: GameText<"minecraft">,
+    kind: catalog.EventKind,
+    score: number,
+    locale: string
+): string {
+    const language = figureLanguage(locale);
+    if (catalog.KIND_INFO[kind].unit === "seconds") return formatDuration(score * 1000, language);
+    const unit = kindUnit(t, kind);
+    return unit ? `${formatCount(score, language)} ${unit}` : formatCount(score, language);
 }
 
 function clock(ms: number): string {
@@ -512,6 +527,7 @@ export function MinecraftEvents({
 }) {
     const t = useGameText("minecraft");
     const schemaText = useSchemaText();
+    const locale = hostUi.i18nProvider.useLocale();
     const display = useDisplayFormat();
     const [view, setView] = useState<EventsView | null>(null);
     const [draft, setDraft] = useState<catalog.EventsConfig | null>(null);
@@ -841,7 +857,7 @@ export function MinecraftEvents({
                                         {one.name}
                                     </span>
                                     <span className="tabular-nums text-muted-foreground">
-                                        {one.score} {kindUnit(t, view.run!.kind)}
+                                        {scoreText(t, view.run!.kind, one.score, locale)}
                                     </span>
                                 </li>
                             ))}
@@ -1733,7 +1749,7 @@ export function MinecraftEvents({
                                             ? entry.podium
                                                   .map(
                                                       (one) =>
-                                                          `${one.place}. ${one.name} (${one.score})`
+                                                          `${one.place}. ${one.name} (${entry.kind === "parkour" ? one.score : formatCount(one.score, figureLanguage(locale))})`
                                                   )
                                                   .join("  ")
                                             : entry.note}

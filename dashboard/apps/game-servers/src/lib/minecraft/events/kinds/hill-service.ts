@@ -6,6 +6,7 @@
  * and sends them back; this plays it).
  */
 
+import { formatDuration } from "../../../figures";
 import * as hill from "./hill";
 import * as arena from "./arena";
 import * as catalog from "../catalog";
@@ -288,6 +289,16 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         if (score !== undefined) points[one.name] = score;
     }
     if (JSON.stringify(points) !== JSON.stringify(run.points) && Object.keys(points).length > 0) {
+        // The side panel reads each time held as a time, not a count of
+        // seconds, where the game can show text beside a score (1.20.3).
+        if (await ctx.atLeast([1, 20, 3])) {
+            const shown = Object.entries(points)
+                .filter(([name, score]) => run.points?.[name] !== score)
+                .map(([name, score]) =>
+                    commands.scoreShownAs(name, commands.SCORE, formatDuration(score * 1000, ctx.home))
+                );
+            if (shown.length > 0) await ctx.server.sayAll(shown);
+        }
         ctx.run = { ...ctx.run, points: { ...run.points, ...points } };
         await ctx.persist();
     }

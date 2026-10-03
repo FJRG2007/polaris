@@ -353,7 +353,8 @@ describe("the commands", () => {
         ).toBe("+20 pts, 2 levels, 1 diamond block");
         expect(messages.rewardText({ points: 0, levels: 1, items: [] }, "es")).toBe("1 nivel");
         expect(messages.joinLine(2, "es")).toContain("quedan");
-        expect(messages.duration(3 * 3_600_000 + 12 * 60_000, "en")).toBe("3 h 12 min");
+        expect(messages.duration(3 * 3_600_000 + 12 * 60_000, "en")).toBe("3.2 h");
+        expect(messages.duration(30 * 3_600_000, "es")).toBe("1,3 d");
     });
 });
 

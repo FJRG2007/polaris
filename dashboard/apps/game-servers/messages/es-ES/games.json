@@ -567,9 +567,7 @@
         "playtimeAllTime": "Tiempo de juego total",
         "deaths": "Muertes",
         "mobsKilled": "Criaturas",
-        "underAMinute": "menos de un minuto",
-        "minutes": "{count} min",
-        "hours": "{count} h"
+        "underAMinute": "menos de un minuto"
     },
     "variablesHelp": {
         "whatYouCanWrite": "Lo que puedes escribir",
