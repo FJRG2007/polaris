@@ -636,67 +636,70 @@ dialog.pdfSlick-dialog .dialogButton {
  * and nothing outside it changes.
  *
  * Inside it a field is identified by its fill - a step above the card rather
- * than below it - and a quiet edge of its own, clearer on hover and focus, with
- * the application's focus ring on top. Section hairlines move a step up so one
- * card is told from the next, and stay well under a field's edge so the cards do
- * not read as boxes. An unchecked switch is a solid track at 3:1 against the
- * card and the page (WCAG 1.4.11): it is a small control with no other boundary.
+ * than below it - and an edge that holds the control edge's 3:1 (WCAG 1.4.11),
+ * clearer on hover and focus, with the application's focus ring on top. Section
+ * hairlines move a step up from the application's so one card is told from the
+ * next, and stay well under a field's edge so the cards do not read as boxes. An
+ * unchecked switch is a solid track a step past the control edge, at 3:1 against
+ * the card and the page: it is a small control with no other boundary.
  * test/deploy/service-panel-contrast.test.ts measures every pair per theme.
  *
- * `bg-field` is what every field in the application is filled with, so it is
- * also what finds one here; a field drawn in a status colour keeps that colour.
+ * `bg-field` is what every field in the application is filled with, so on an
+ * input, a textarea or a select trigger it is also what finds one here; a
+ * checkbox keeps its own box, and a field drawn in a status colour keeps that
+ * colour.
  */
 [data-service-panel] {
     --field: 225 11% 12%;
-    --field-edge: 225 10% 26%;
-    --border: 225 10% 19%;
+    --field-edge: 225 9% 46%;
+    --border: 225 10% 25%;
     --border-strong: 225 10% 36%;
-    --switch-off: 225 9% 41%;
+    --switch-off: 225 9% 50%;
 }
 
 :root.light [data-service-panel] {
     --field: 225 24% 97%;
-    --field-edge: 225 14% 79%;
-    --border: 225 16% 86%;
+    --field-edge: 225 10% 54%;
+    --border: 225 16% 81%;
     --border-strong: 225 12% 64%;
-    --switch-off: 225 10% 57%;
+    --switch-off: 225 10% 50%;
 }
 
 @media (prefers-color-scheme: light) {
     :root.system [data-service-panel] {
         --field: 225 24% 97%;
-        --field-edge: 225 14% 79%;
-        --border: 225 16% 86%;
+        --field-edge: 225 10% 54%;
+        --border: 225 16% 81%;
         --border-strong: 225 12% 64%;
-        --switch-off: 225 10% 57%;
+        --switch-off: 225 10% 50%;
     }
 }
 
 :root.midnight [data-service-panel] {
     --field: 225 12% 10%;
-    --field-edge: 225 10% 23%;
-    --border: 225 12% 16%;
+    --field-edge: 225 9% 44%;
+    --border: 225 12% 23%;
     --border-strong: 225 10% 33%;
-    --switch-off: 225 9% 40%;
+    --switch-off: 225 9% 48%;
 }
 
 :root.graphite [data-service-panel] {
     --field: 220 4% 14%;
-    --field-edge: 220 4% 28%;
-    --border: 220 4% 21%;
+    --field-edge: 220 4% 46%;
+    --border: 220 4% 26%;
     --border-strong: 220 4% 38%;
-    --switch-off: 220 4% 41%;
+    --switch-off: 220 4% 50%;
 }
 
-[data-service-panel] .bg-field:not([aria-invalid="true"]) {
+[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]) {
     border-color: hsl(var(--field-edge));
 }
 
-[data-service-panel] .bg-field:not([aria-invalid="true"]):hover,
-[data-service-panel] .bg-field:not([aria-invalid="true"]):focus,
-[data-service-panel] .bg-field:not([aria-invalid="true"]):focus-within,
-[data-service-panel] .bg-field:not([aria-invalid="true"])[data-state="open"] {
-    border-color: hsl(var(--border-strong));
+[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):hover,
+[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):focus,
+[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):focus-within,
+[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"])[data-state="open"] {
+    border-color: hsl(var(--muted-foreground));
 }
 
 [data-service-panel] [role="switch"][aria-checked="false"] {

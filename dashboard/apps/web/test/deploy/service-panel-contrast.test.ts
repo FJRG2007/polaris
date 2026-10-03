@@ -8,12 +8,13 @@
  * What is asserted is what identifies a control, not a raw outline:
  *
  *   - A field differs from the card it sits on by its fill (1.05:1, enough to
- *     read as a well in every theme) and by an edge of its own (1.5:1 against
- *     the card and the fill, the level Primer and Radix give a field border).
- *   - Section hairlines stay below a field's edge, so cards are separated
- *     without reading as boxes.
+ *     read as a well in every theme) and by an edge of its own that holds the
+ *     3:1 of WCAG 1.4.11, never weaker than the application's control edge.
+ *   - Section hairlines are stronger than the application's and stay below a
+ *     field's edge, so cards are separated without reading as boxes.
  *   - An unchecked switch is a track with no other boundary, so it holds the
- *     3:1 of WCAG 1.4.11 against the card and the page.
+ *     3:1 of WCAG 1.4.11 against the card and the page, and is never weaker
+ *     than the switch everywhere else.
  *   - The focus ring holds 3:1 on a field and a card; text in a field 4.5:1.
  */
 
@@ -83,18 +84,24 @@ describe("service panel controls", () => {
 
         it(`${theme}: a field is told from its card by fill and by edge`, () => {
             expect(contrast(tone("field"), tone("card"))).toBeGreaterThanOrEqual(1.05);
-            expect(contrast(tone("field-edge"), tone("card"))).toBeGreaterThanOrEqual(1.5);
-            expect(contrast(tone("field-edge"), tone("field"))).toBeGreaterThanOrEqual(1.5);
-            expect(contrast(tone("field-edge"), tone("background"))).toBeGreaterThanOrEqual(1.5);
+            expect(contrast(tone("field-edge"), tone("card"))).toBeGreaterThanOrEqual(3);
+            expect(contrast(tone("field-edge"), tone("field"))).toBeGreaterThanOrEqual(3);
+            expect(contrast(tone("field-edge"), tone("background"))).toBeGreaterThanOrEqual(3);
+            expect(contrast(tone("field-edge"), tone("card"))).toBeGreaterThanOrEqual(
+                contrast(base["control-edge"]!, base.card!)
+            );
         });
 
         it(`${theme}: hover and focus make the edge clearer`, () => {
-            expect(contrast(tone("border-strong"), tone("field"))).toBeGreaterThan(
+            expect(contrast(tone("muted-foreground"), tone("field"))).toBeGreaterThan(
                 contrast(tone("field-edge"), tone("field"))
             );
         });
 
-        it(`${theme}: section hairlines are quieter than a field's edge`, () => {
+        it(`${theme}: section hairlines are a step up and quieter than a field's edge`, () => {
+            expect(contrast(tone("border"), tone("card"))).toBeGreaterThan(
+                contrast(base.border!, base.card!)
+            );
             expect(contrast(tone("border"), tone("card"))).toBeLessThan(
                 contrast(tone("field-edge"), tone("card"))
             );
@@ -104,6 +111,9 @@ describe("service panel controls", () => {
         it(`${theme}: an unchecked switch holds 3:1 on the card and the page`, () => {
             expect(contrast(tone("switch-off"), tone("card"))).toBeGreaterThanOrEqual(3);
             expect(contrast(tone("switch-off"), tone("background"))).toBeGreaterThanOrEqual(3);
+            expect(contrast(tone("switch-off"), tone("card"))).toBeGreaterThanOrEqual(
+                contrast(base["control-edge"]!, base.card!)
+            );
         });
 
         it(`${theme}: focus ring and text stay readable on a field`, () => {
@@ -113,6 +123,11 @@ describe("service panel controls", () => {
             expect(contrast(tone("muted-foreground"), tone("field"))).toBeGreaterThanOrEqual(4.5);
         });
     }
+
+    it("leaves a checkbox its own control edge", () => {
+        expect(GLOBALS).not.toContain("[data-service-panel] .bg-field");
+        expect(GLOBALS).toContain("[data-service-panel] :is(input, textarea, button).bg-field");
+    });
 
     it("follows the machine with the light theme's own values", () => {
         const media = GLOBALS.slice(GLOBALS.indexOf(":root.system [data-service-panel] {"));
