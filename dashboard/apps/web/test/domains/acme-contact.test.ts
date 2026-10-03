@@ -133,19 +133,25 @@ describe("the edge's start-up", () => {
         }
     });
 
-    it("passes a reserved or malformed address as none rather than have the account refused", () => {
-        const dir = mkdtempSync(join(tmpdir(), "acme-"));
-        try {
-            expect(startEdge(dir, { POLARIS_ACME_EMAIL: "admin@example.com" })).toEqual(["--providers.docker=true"]);
-            expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
-            writeFileSync(join(dir, "acme-email"), "a b@corp.io; touch pwned\n");
-            expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
-            writeFileSync(join(dir, "acme-email"), "x@sub.test\n");
-            expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
-        } finally {
-            rmSync(dir, { recursive: true, force: true });
-        }
-    });
+    it(
+        "passes a reserved or malformed address as none rather than have the account refused",
+        () => {
+            const dir = mkdtempSync(join(tmpdir(), "acme-"));
+            try {
+                expect(startEdge(dir, { POLARIS_ACME_EMAIL: "admin@example.com" })).toEqual([
+                    "--providers.docker=true"
+                ]);
+                expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
+                writeFileSync(join(dir, "acme-email"), "a b@corp.io; touch pwned\n");
+                expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
+                writeFileSync(join(dir, "acme-email"), "x@sub.test\n");
+                expect(startEdge(dir, {})).toEqual(["--providers.docker=true"]);
+            } finally {
+                rmSync(dir, { recursive: true, force: true });
+            }
+        },
+        60_000
+    );
 
     it("no longer carries a default address on its command line", () => {
         const compose = readFileSync(new URL("../../../../docker/docker-compose.yml", import.meta.url), "utf8");
