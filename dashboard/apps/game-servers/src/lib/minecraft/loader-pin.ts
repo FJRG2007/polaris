@@ -232,7 +232,24 @@ export function pinFromManifest(
     manifestText: string
 ): { readonly loader: string; readonly version: string; readonly vars: Readonly<Record<string, string>> } | null {
     const spec = loaderToPin(env);
-    if (!spec) return null;
+    return spec ? readManifest(spec, env, manifestText) : null;
+}
+
+/**
+ * The loader version a manifest says is installed for the server's release,
+ * whatever the server is set to run. What tells a held version that is on disk
+ * from one a start would still have to download.
+ */
+export function installedFromManifest(env: EnvReader, manifestText: string): string | null {
+    const spec = loaderSpecOf(env("TYPE"));
+    return spec ? (readManifest(spec, env, manifestText)?.version ?? null) : null;
+}
+
+function readManifest(
+    spec: LoaderSpec,
+    env: EnvReader,
+    manifestText: string
+): { readonly loader: string; readonly version: string; readonly vars: Readonly<Record<string, string>> } | null {
     let parsed: unknown;
     try {
         parsed = JSON.parse(manifestText);

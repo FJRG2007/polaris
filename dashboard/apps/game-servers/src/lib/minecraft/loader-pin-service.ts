@@ -22,7 +22,8 @@ import * as pin from "./loader-pin";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { reachedReady } from "../crash-loop";
-import { withServerContainer } from "./service";
+import { gameOfServer } from "@polaris/core";
+import { editionOf, withServerContainer } from "./service";
 import { readContainerBytes } from "../container-files";
 
 const { listEnvVars, setEnvVars } = host.envVarService;
@@ -38,8 +39,9 @@ export const LOADER_PIN_KEY = "loaderPin";
  *  has nothing to say. */
 const RETRY_MS = 30 * 60 * 1000;
 
-/** How long after "Update loader" the old version is not taken back: long enough
- *  for the update's own start to install the new one and write its manifest. */
+/** How long after "Update loader" the old version is not taken back, for a server
+ *  whose container this side cannot inspect: long enough for the update's own
+ *  start to install the new one and write its manifest. */
 const UPDATE_GRACE_MS = 30 * 60 * 1000;
 
 /** A run older than this has long finished installing its loader, even when its
@@ -83,6 +85,27 @@ async function installOf(ownerId: string, installedAppId: string) {
     return install?.applicationId ? { ...install, applicationId: install.applicationId } : null;
 }
 
+/**
+ * Whether the update somebody asked for is still waiting for a start: the
+ * container has not started since it was asked for. A stopped server keeps it
+ * waiting for as long as it stays stopped, rather than having it taken back on
+ * a timer before it ever ran. Only a container this side cannot inspect falls
+ * back to the timer.
+ */
+async function updatePending(
+    updating: PinRecord["updating"],
+    applicationId: string,
+    ownerId: string,
+    now: Date
+): Promise<boolean> {
+    if (!updating) return false;
+    const state = await readAppContainerRuntime(applicationId, ownerId).catch(() => null);
+    if (!state) return sinceMs(updating.at, now) < UPDATE_GRACE_MS;
+    const started = state.startedAt ? Date.parse(state.startedAt) : Number.NaN;
+    if (Number.isNaN(started) || started <= 0) return true;
+    return started <= Date.parse(updating.at);
+}
+
 async function envOf(applicationId: string, ownerId: string): Promise<(key: string) => string> {
     const rows = await listEnvVars("application", applicationId, ownerId);
     const values: Record<string, string> = {};
@@ -108,13 +131,20 @@ export async function readLoaderPin(
     const record = pinRecordOf(install.config);
     return {
         pin: pin.loaderPinState(env),
-        updating: record.updating !== null && sinceMs(record.updating.at, now) < UPDATE_GRACE_MS
+        updating: await updatePending(record.updating, install.applicationId, ownerId, now)
     };
 }
 
 export type PinOutcome =
     | { readonly state: "pinned"; readonly loader: string; readonly version: string }
-    | { readonly state: "held"; readonly loader: string; readonly version: string }
+    /** Held at a version somebody set; `installed` when the manifest on disk
+     *  names that same version, so a start runs it without downloading. */
+    | {
+          readonly state: "held";
+          readonly loader: string;
+          readonly version: string;
+          readonly installed: boolean;
+      }
     /** Nothing to hold it at: not a loader, a channel rather than a release, a
      *  loader of somebody's own, or no manifest for this release on disk. */
     | { readonly state: "unavailable"; readonly reason: "none" | "release" | "custom" | "manifest" };
@@ -135,24 +165,31 @@ export async function pinInstalledLoader(
     if (!install) return { state: "unavailable", reason: "none" };
     const env = await envOf(install.applicationId, ownerId);
     const state = pin.loaderPinState(env);
-    if (state.state === "held") return { state: "held", loader: state.loader, version: state.version };
+    if (state.state === "held") {
+        const spec = pin.loaderSpecOf(env("TYPE"));
+        const manifest = spec ? await readManifest(ownerId, installedAppId, spec) : null;
+        const installed = manifest ? pin.installedFromManifest(env, manifest) : null;
+        return {
+            state: "held",
+            loader: state.loader,
+            version: state.version,
+            installed: installed === state.version.trim()
+        };
+    }
     if (state.state !== "following") {
         return { state: "unavailable", reason: state.state === "none" ? "none" : state.state };
     }
     const spec = pin.loaderToPin(env);
     if (!spec) return { state: "unavailable", reason: "none" };
-    const manifest = await withServerContainer(ownerId, installedAppId, (server) =>
-        readContainerBytes(server, pin.manifestPath(spec))
-    ).catch(() => null);
-    const found = manifest ? pin.pinFromManifest(env, manifest.toString("utf8")) : null;
+    const manifest = await readManifest(ownerId, installedAppId, spec);
+    const found = manifest ? pin.pinFromManifest(env, manifest) : null;
     const record = pinRecordOf(install.config);
     // The update somebody asked for has not installed yet: the manifest still
     // names the version they let go of, and holding it would undo the update.
     const stale =
         found !== null &&
-        record.updating !== null &&
-        record.updating.from === found.version &&
-        sinceMs(record.updating.at, now) < UPDATE_GRACE_MS;
+        record.updating?.from === found.version &&
+        (await updatePending(record.updating, install.applicationId, ownerId, now));
     if (!found || stale) {
         await patchInstallConfig(install.id, {
             [LOADER_PIN_KEY]: { triedAt: now.toISOString(), updating: record.updating }
@@ -167,6 +204,18 @@ export async function pinInstalledLoader(
     );
     await patchInstallConfig(install.id, { [LOADER_PIN_KEY]: null }).catch(() => undefined);
     return { state: "pinned", loader: found.loader, version: found.version };
+}
+
+/** The manifest the loader's installer wrote, read off the server's volumes. */
+async function readManifest(
+    ownerId: string,
+    installedAppId: string,
+    spec: NonNullable<ReturnType<typeof pin.loaderSpecOf>>
+): Promise<string | null> {
+    const bytes = await withServerContainer(ownerId, installedAppId, (server) =>
+        readContainerBytes(server, pin.manifestPath(spec))
+    ).catch(() => null);
+    return bytes ? bytes.toString("utf8") : null;
 }
 
 /**
@@ -227,10 +276,16 @@ export interface LoaderPinSweep {
  * nothing again.
  */
 export async function sweepLoaderPins(ownerId: string, now: Date = new Date()): Promise<LoaderPinSweep> {
-    const installs = await prisma.installedApp.findMany({
-        where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
-        select: { id: true, applicationId: true, config: true }
-    });
+    const installs = (
+        await prisma.installedApp.findMany({
+            where: { ownerId, status: { not: "removed" }, applicationId: { not: null } },
+            select: { id: true, applicationId: true, catalogId: true, config: true }
+        })
+    ).filter(
+        (install) =>
+            gameOfServer(install.catalogId)?.id === "minecraft" &&
+            editionOf(install.catalogId) === "java"
+    );
     const ids = installs.flatMap((install) => (install.applicationId ? [install.applicationId] : []));
     if (ids.length === 0) return { checked: 0, pinned: 0 };
     const rows = await prisma.envVar.findMany({

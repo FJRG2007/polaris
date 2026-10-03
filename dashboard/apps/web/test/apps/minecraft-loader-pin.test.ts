@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
     envReader,
+    installedFromManifest,
     isExactRelease,
     loaderPinState,
     loaderReleasedBy,
@@ -61,6 +62,14 @@ describe("which servers are held", () => {
         });
         expect(loaderToPin(held)).toBeNull();
         expect(pinFromManifest(held, manifest("neoforge"))).toBeNull();
+        // But whether that version is the one on disk can still be read.
+        expect(installedFromManifest(held, manifest("neoforge"))).toBe("21.4.158");
+        expect(
+            installedFromManifest(
+                envReader({ ...INCIDENT, VERSION: "1.21.1" }),
+                manifest("neoforge")
+            )
+        ).toBeNull();
     });
 
     it("reads Forge's older spelling the way the image does", () => {

@@ -364,9 +364,15 @@ export async function resumeAfterCrashLoop(
  * Whether a container found running under a service recorded as stopped is one
  * Polaris stopped for looping and somebody has since brought up - in which case
  * it is taken as running rather than stopped again. For the pass that halts what
- * should be off, which would otherwise undo the repair.
+ * should be off, which would otherwise undo the repair. Only once it is up for
+ * real (`cameUp`): one still going round is a guard's stop that did not land,
+ * and is left for that pass to halt.
  */
-export async function adoptsRunningService(ownerId: string, applicationId: string): Promise<boolean> {
+export async function adoptsRunningService(
+    ownerId: string,
+    applicationId: string,
+    now: Date = new Date()
+): Promise<boolean> {
     const install = await prisma.installedApp
         .findFirst({
             where: { ownerId, applicationId, status: { not: "removed" } },
@@ -375,6 +381,8 @@ export async function adoptsRunningService(ownerId: string, applicationId: strin
         .catch(() => null);
     if (!install || !isGameServerApp(install.catalogId)) return false;
     if (!readCrashLoop(install.config)?.stoppedByPolaris) return false;
+    const state = await readAppContainerRuntime(applicationId, ownerId).catch(() => null);
+    if (!state || !(await cameUp(state, applicationId, ownerId, now))) return false;
     return resumeAfterCrashLoop(install.id, applicationId, "running");
 }
 

@@ -865,9 +865,9 @@
             "worldLocked": "The server is not allowed to write into its own world folder, so it cannot claim the world.",
             "portTaken": "Something else already holds the port this server was given.",
             "memory": "The server ran out of memory for what it has been asked to load. Give it a larger heap or install less.",
-            "loaderUnreadable": "The loader could not be downloaded: {loader}'s repository answered in a format the image cannot read.",
+            "loaderUnreadable": "The loader could not be downloaded: {loader}'s repository answered in a format this server cannot read.",
             "loaderUnreachable": "The loader could not be downloaded: {loader}'s repository did not answer.",
-            "loaderUnreadablePinned": "The loader could not be downloaded: {loader}'s repository answered in a format the image cannot read. Polaris pinned the installed version {version}; press Start.",
+            "loaderUnreadablePinned": "The loader could not be downloaded: {loader}'s repository answered in a format this server cannot read. Polaris pinned the installed version {version}; press Start.",
             "loaderUnreachablePinned": "The loader could not be downloaded: {loader}'s repository did not answer. Polaris pinned the installed version {version}; press Start."
         },
         "consolePasswordRule": "12 to 64 letters and digits, and nothing else",

@@ -865,9 +865,9 @@
             "worldLocked": "El servidor no tiene permiso para escribir en su propia carpeta del mundo, así que no puede tomar el mundo.",
             "portTaken": "Otra cosa ya ocupa el puerto que se dio a este servidor.",
             "memory": "El servidor se quedó sin memoria para lo que se le pide cargar. Dale más memoria o instala menos.",
-            "loaderUnreadable": "No se pudo descargar el cargador: el repositorio de {loader} respondió en un formato que la imagen no sabe leer.",
+            "loaderUnreadable": "No se pudo descargar el cargador: el repositorio de {loader} respondió en un formato que este servidor no sabe leer.",
             "loaderUnreachable": "No se pudo descargar el cargador: el repositorio de {loader} no respondió.",
-            "loaderUnreadablePinned": "No se pudo descargar el cargador: el repositorio de {loader} respondió en un formato que la imagen no sabe leer. Polaris fijó la versión instalada {version}; pulsa Iniciar.",
+            "loaderUnreadablePinned": "No se pudo descargar el cargador: el repositorio de {loader} respondió en un formato que este servidor no sabe leer. Polaris fijó la versión instalada {version}; pulsa Iniciar.",
             "loaderUnreachablePinned": "No se pudo descargar el cargador: el repositorio de {loader} no respondió. Polaris fijó la versión instalada {version}; pulsa Iniciar."
         },
         "consolePasswordRule": "De 12 a 64 letras y dígitos, nada más",

@@ -2152,6 +2152,14 @@ export async function pinLoaderAndStartAction(
         if (!access.install.applicationId) throw new Error(words("errors.thisServerHasNotBeen"));
         const pinned = await pinInstalledLoader(access.ownerId, parsed.data);
         if (pinned.state === "unavailable") return { error: words("errors.noInstalledLoader") };
+        if (pinned.state === "held" && !pinned.installed) {
+            return {
+                error: words("errors.heldLoaderNotInstalled", {
+                    loader: pinned.loader,
+                    version: pinned.version
+                })
+            };
+        }
         // Cleared before the start, for the same reason the settings reset does.
         await clearCrashLoop(parsed.data);
         await setApplicationRunning(access.install.applicationId, access.ownerId, true, user.id);

@@ -25,6 +25,7 @@ const NEOFORGE = readFileSync(
 );
 
 let config: Record<string, unknown> = {};
+let catalogId = "minecraft";
 let env: Record<string, string> = {};
 let manifest: string | null = NEOFORGE;
 let manifestReads = 0;
@@ -34,7 +35,9 @@ let log = "";
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
-            findMany: async () => [{ id: INSTALL, applicationId: APP, config: JSON.stringify(config) }],
+            findMany: async () => [
+                { id: INSTALL, applicationId: APP, catalogId, config: JSON.stringify(config) }
+            ],
             findFirst: async () => ({ id: INSTALL, applicationId: APP, config: JSON.stringify(config) })
         },
         envVar: {
@@ -68,6 +71,7 @@ vi.mock("@/lib/app-container-metrics", () => ({ readAppContainerRuntime: async (
 vi.mock("@/lib/deploy-service", () => ({ readAppRuntimeLog: async () => log }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
+    editionOf: (catalogId: string) => (catalogId === "minecraft-bedrock" ? "bedrock" : "java"),
     withServerContainer: async (
         _owner: string,
         _install: string,
@@ -90,6 +94,7 @@ const NOW = new Date("2026-10-03T18:00:00.000Z");
 
 beforeEach(() => {
     config = {};
+    catalogId = "minecraft";
     env = { TYPE: "NEOFORGE", VERSION: "1.21.4" };
     manifest = NEOFORGE;
     manifestReads = 0;
@@ -140,6 +145,15 @@ describe("the sweep", () => {
         expect(await sweepLoaderPins(OWNER, NOW)).toEqual({ checked: 0, pinned: 0 });
         expect(manifestReads).toBe(0);
     });
+
+    it("never reads an app that is not a Java Minecraft server", async () => {
+        catalogId = "nextcloud";
+        expect(await sweepLoaderPins(OWNER, NOW)).toEqual({ checked: 0, pinned: 0 });
+        catalogId = "minecraft-bedrock";
+        expect(await sweepLoaderPins(OWNER, NOW)).toEqual({ checked: 0, pinned: 0 });
+        expect(manifestReads).toBe(0);
+        expect(config).toEqual({});
+    });
 });
 
 describe("updating the loader", () => {
@@ -154,12 +168,50 @@ describe("updating the loader", () => {
         expect((await pinInstalledLoader(OWNER, INSTALL, NOW)).state).toBe("unavailable");
         expect(env.NEOFORGE_VERSION).toBe("");
 
-        // Installed: the manifest names the new version, and that is what is held.
+        // Installed: the update's start ran, the manifest names the new version,
+        // and that is what is held.
         manifest = NEOFORGE.replaceAll("21.4.158", "21.4.160");
         const later = new Date(NOW.getTime() + 31 * 60_000);
+        runtime = { status: "running", restartCount: 0, startedAt: "2026-10-03T18:01:00.000Z" };
         expect((await sweepLoaderPins(OWNER, later)).pinned).toBe(1);
         expect(env.NEOFORGE_VERSION).toBe("21.4.160");
         expect((await readLoaderPin(OWNER, INSTALL, later))?.updating).toBe(false);
+    });
+
+    it("waits for the next start of a stopped server, however long that is", async () => {
+        runtime = { status: "exited", restartCount: 0, startedAt: "2026-10-03T17:00:00.000Z" };
+        env.NEOFORGE_VERSION = "21.4.158";
+        await releaseLoaderOnce(OWNER, INSTALL, NOW);
+
+        const nextDay = new Date(NOW.getTime() + 24 * 60 * 60_000);
+        await sweepLoaderPins(OWNER, nextDay);
+        expect(env.NEOFORGE_VERSION).toBe("");
+        expect((await readLoaderPin(OWNER, INSTALL, nextDay))?.updating).toBe(true);
+
+        // Started, and the repository failed: what is on disk is held again.
+        runtime = { status: "exited", restartCount: 3, startedAt: "2026-10-04T19:00:00.000Z" };
+        const afterStart = new Date("2026-10-04T19:05:00.000Z");
+        expect((await pinInstalledLoader(OWNER, INSTALL, afterStart)).state).toBe("pinned");
+        expect(env.NEOFORGE_VERSION).toBe("21.4.158");
+    });
+
+    it("says whether a version somebody held is the one on disk", async () => {
+        env.NEOFORGE_VERSION = "21.4.158";
+        expect(await pinInstalledLoader(OWNER, INSTALL, NOW)).toMatchObject({
+            state: "held",
+            installed: true
+        });
+        env.NEOFORGE_VERSION = "21.4.150";
+        expect(await pinInstalledLoader(OWNER, INSTALL, NOW)).toMatchObject({
+            state: "held",
+            installed: false
+        });
+        manifest = null;
+        env.NEOFORGE_VERSION = "21.4.158";
+        expect(await pinInstalledLoader(OWNER, INSTALL, NOW)).toMatchObject({
+            state: "held",
+            installed: false
+        });
     });
 
     it("refuses a server that is not held", async () => {

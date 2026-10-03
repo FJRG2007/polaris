@@ -131,6 +131,7 @@ vi.mock("@/lib/audit-service", () => ({
 
 // The server's files, as the daemon serves them from a stopped container's volume.
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
+    editionOf: (catalogId: string) => (catalogId === "minecraft-bedrock" ? "bedrock" : "java"),
     withServerContainer: async (
         _owner: string,
         _install: string,
@@ -192,7 +193,7 @@ describe("a server that cannot download its loader", () => {
         const record = readCrashLoop(install.config);
         expect(record?.stoppedByPolaris).toBe(true);
         expect(english(record?.advice ?? null)).toBe(
-            "The loader could not be downloaded: NeoForge's repository answered in a format the image cannot read. Polaris pinned the installed version 21.4.158; press Start."
+            "The loader could not be downloaded: NeoForge's repository answered in a format this server cannot read. Polaris pinned the installed version 21.4.158; press Start."
         );
         expect(notified).toHaveLength(1);
         expect(notified[0]?.body).toContain("Polaris pinned the installed version 21.4.158; press Start.");
@@ -203,7 +204,7 @@ describe("a server that cannot download its loader", () => {
         await caughtLooping();
         expect(env.NEOFORGE_VERSION).toBe("21.4.150");
         expect(english(readCrashLoop(install.config)?.advice ?? null)).toBe(
-            "The loader could not be downloaded: NeoForge's repository answered in a format the image cannot read."
+            "The loader could not be downloaded: NeoForge's repository answered in a format this server cannot read."
         );
     });
 });
@@ -245,9 +246,18 @@ describe("the same server, brought back up", () => {
 
     it("is taken back by the pass that halts stopped services, instead of halted", async () => {
         await caughtLooping();
-        expect(await adoptsRunningService(OWNER, APP)).toBe(true);
+        runtime = { status: "running", restartCount: 0, startedAt: "2026-10-03T17:38:00.000Z" };
+        log = HEALTHY;
+        expect(await adoptsRunningService(OWNER, APP, at("2026-10-03T17:39:00.000Z"))).toBe(true);
         expect(desiredState).toBe("running");
         expect(readCrashLoop(install.config)).toBeNull();
+    });
+
+    it("is left to that pass while it is still going round", async () => {
+        await caughtLooping();
+        expect(await adoptsRunningService(OWNER, APP, at("2026-10-03T17:19:40.000Z"))).toBe(false);
+        expect(desiredState).toBe("stopped");
+        expect(readCrashLoop(install.config)?.stoppedByPolaris).toBe(true);
     });
 });
 

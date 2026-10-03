@@ -52,7 +52,7 @@ describe("telling it apart", () => {
         expect(loaderInstallFailure(NEOFORGE_METADATA)).toBe("install-neoforge");
     });
 
-    it("says the repository answered in a format the image cannot read", () => {
+    it("says the repository answered in a format this server cannot read", () => {
         const loop = crashLoopOf(LOOPING, NEOFORGE_METADATA);
         expect(loaderCrashOf(loop.cause)).toEqual({
             installer: "install-neoforge",
@@ -60,7 +60,7 @@ describe("telling it apart", () => {
             unreadable: true
         });
         expect(english(loop.advice)).toBe(
-            "The loader could not be downloaded: NeoForge's repository answered in a format the image cannot read."
+            "The loader could not be downloaded: NeoForge's repository answered in a format this server cannot read."
         );
     });
 
