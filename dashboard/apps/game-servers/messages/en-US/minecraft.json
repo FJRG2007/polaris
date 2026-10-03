@@ -1763,7 +1763,6 @@
             "buildGlass": "Only the kit's glass can be placed: builders play in adventure mode, where their own blocks cannot be put down at all, so nothing of theirs is used or left on a plot. Glass broken by hand drops nothing, so no kit leaves a plot either.",
             "buildNeeds": "Needs Minecraft 1.16 or later. Up to 12 builders.",
             "arena": "Nothing of anybody's is touched. The arena goes only where the air was empty, and comes down block kind by block kind; only the event's own marked kit is taken back; each player is sent back to exactly where they stood, in their own game mode, with whatever they dropped. Somebody offline at the end finds it still standing when they log in, and is sent back then.",
-            "keepsDay": "Keeps it day while it runs, with no phantoms; the day cycle and phantoms come back as they were afterwards.",
             "overworld": "Happens in the Overworld; only players there take part.",
             "rankedFrom": "Ranked from {score} {unit}; below that, no podium and no prize.",
             "startsWith": "Starts on its own only with {count} {count, plural, one {player} other {players}} actually playing, and not while somebody is in a fight.",
@@ -1793,7 +1792,8 @@
             "bossBeam": "The beam of light up to the arena is announced with its coordinates, and everybody not up yet sees how far it is and which way.",
             "wavesScaling": "Each wave brings the first wave's size, half as many again for every wave before it and for every defender at the point past the first (up to 5), at most 60. Every defender past the first gives each monster 4 more health (up to 16), and from 3 defenders they hit harder.",
             "wavesGear": "Armor grows wave by wave, from none to leather, chainmail, iron and diamond on the last, with enchanted bows and swords on the last two. Spider jockeys come from 40% of the waves, chicken jockeys from 60% and horsemen from 80%. Nothing they wear or ride is ever dropped, and all of it is removed.",
-            "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins."
+            "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins.",
+            "world": "{time, select, day {Holds midday} night {Holds midnight} other {Leaves the time alone}}{weather, select, clear { and clear weather} rain { and rain} other {}} while it runs, then puts the time and weather back."
         },
         "errors": {
             "read": "The events could not be read",

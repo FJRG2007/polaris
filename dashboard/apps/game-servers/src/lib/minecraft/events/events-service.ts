@@ -1375,12 +1375,14 @@ async function begin(
         );
     }
     if (catalog.playsInArena(preset)) lines.push(...arenaService.beginLines(preset, loop.home));
-    if (catalog.keepsDay(preset)) {
-        // Day held still, and no phantoms, for as long as it runs: what each
-        // rule was is written down before it is changed, so whatever ends it -
-        // a restart included - puts back exactly that.
+    const needs = catalog.worldNeeds(preset);
+    if (preset.kind !== "blood-moon" && (needs.time || needs.weather)) {
+        // What it needs of the world - a time of day, a weather - held still for
+        // as long as it runs: what each rule was, and the time of day, written
+        // down before they are changed, so whatever ends it - a restart
+        // included - puts back exactly that.
         const before: Record<string, string> = {};
-        for (const names of commands.DAY_RULES) {
+        for (const names of commands.worldRules(needs)) {
             for (const rule of names) {
                 const value =
                     loop.run.gamerules[rule] ??
@@ -1391,9 +1393,17 @@ async function begin(
                 break;
             }
         }
-        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        const timeBefore = needs.time
+            ? (commands.readDaytime(await server.say([commands.READ_DAYTIME])) ??
+              commands.readDaytime(await server.say([commands.READ_DAY_TIMELINE])))
+            : null;
+        loop.run = {
+            ...loop.run,
+            gamerules: { ...before, ...loop.run.gamerules },
+            timeBefore: loop.run.timeBefore ?? timeBefore
+        };
         await persist(installedAppId, loop);
-        lines.push(commands.MIDDAY);
+        lines.push(...commands.worldLines(needs, seconds));
     }
     if (catalog.takesJoiners(preset)) {
         // Nobody loses what they carry to a fight or a fall: a death keeps all

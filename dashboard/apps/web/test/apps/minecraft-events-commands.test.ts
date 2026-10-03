@@ -2541,3 +2541,26 @@ describe("a treasure hunt's clock", () => {
         expect(catalog.readyToPlay({ ...run, hidden: false, chests: [{}] })).toBe(true);
     });
 });
+
+describe("the world an event holds", () => {
+    it("sets midnight and clear weather for a horde, for its length in seconds and ticks", () => {
+        const needs = catalog.worldNeeds({ kind: "waves" });
+        expect(commands.worldLines(needs, 600)).toEqual([
+            "time set 18000",
+            "weather clear 660",
+            "weather clear 660s"
+        ]);
+        expect(commands.worldRules(needs)).toEqual([["doDaylightCycle", "advance_time"], ["doWeatherCycle", "advance_weather"]]);
+    });
+
+    it("turns phantoms off with a held day", () => {
+        expect(commands.worldRules(catalog.worldNeeds({ kind: "spleef" })).flat()).toContain("doInsomnia");
+    });
+
+    it("puts the time back at the end, and leaves alone an event that never held it", () => {
+        const spleef = catalog.newPreset("spleef", "s");
+        expect(commands.cleanup(spleef, null, null, {}, 1234)).toContain("time set 1234");
+        const quiz = catalog.newPreset("trivia", "q");
+        expect(commands.cleanup(quiz, null, null, {}, 1234)).not.toContain("time set 1234");
+    });
+});

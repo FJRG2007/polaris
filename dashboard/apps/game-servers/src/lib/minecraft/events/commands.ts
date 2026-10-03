@@ -16,7 +16,7 @@ import * as speech from "../speech";
 import { stripFormatting } from "../parse";
 import { duelTeardown } from "./kinds/team-duel";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
-import type { EventKind, EventOptions, EventPreset } from "./catalog";
+import { worldNeeds, type EventKind, type EventOptions, type EventPreset, type WorldNeeds } from "./catalog";
 
 export const SCORE = "pe_score";
 export const SUM = "pe_sum";
@@ -1270,8 +1270,50 @@ export const DAY_RULES = [
  */
 export const GRIEF_RULES = ["mobGriefing", "mob_griefing"] as const;
 
-/** Midday: the day held still at its brightest. The world goes on from there. */
+/** Midday: the day held still at its brightest. */
 export const MIDDAY = "time set 6000";
+
+/** Midnight: as dark as it gets, so whatever spawns does and nothing burns. */
+export const MIDNIGHT = "time set 18000";
+
+/** The rule that turns the weather, under each name it has had. */
+export const WEATHER_RULES = ["doWeatherCycle", "advance_weather"] as const;
+
+/**
+ * The rules an event holds for what it needs of the world (`catalog.worldNeeds`):
+ * the clock for a time of day, and phantoms off with a day (a player who has
+ * not slept brings them down on an arena); the weather cycle for a weather.
+ * Each group is listed under every name it has had.
+ */
+export function worldRules(needs: WorldNeeds): (readonly string[])[] {
+    return [
+        ...(needs.time ? [DAY_RULES[0]] : []),
+        ...(needs.time === "day" ? [DAY_RULES[1]] : []),
+        ...(needs.weather ? [WEATHER_RULES] : [])
+    ];
+}
+
+/**
+ * The time and the weather set for an event of `seconds`. The weather's length
+ * is sent as seconds and as ticks, like `nightfall`: an older server takes the
+ * bare number as seconds and refuses the second line; a newer one reads it as
+ * ticks and the second line puts it right.
+ */
+export function worldLines(needs: WorldNeeds, seconds: number): string[] {
+    const lasting = Math.max(60, Math.round(seconds) + 60);
+    return [
+        ...(needs.time === "day" ? [MIDDAY] : needs.time === "night" ? [MIDNIGHT] : []),
+        ...(needs.weather
+            ? [`weather ${needs.weather} ${lasting}`, `weather ${needs.weather} ${lasting}s`]
+            : [])
+    ];
+}
+
+/** The time of day put back as it was before the event; the weather goes on
+ *  turning from the rule being given back. */
+export function worldBack(needs: WorldNeeds, timeBefore: number | null): string[] {
+    return needs.time && timeBefore !== null ? [`time set ${timeBefore}`] : [];
+}
 
 /**
  * The hostile creatures that can reach something built in the sky: whatever
@@ -2016,6 +2058,7 @@ export function cleanup(
         lines.push(`scoreboard objectives remove ${one.objective}`);
     if (preset.kind === "world-boss") lines.push(BOSS_BANISH, BOSS_GONE);
     if (preset.kind === "blood-moon") lines.push(...daybreak(rules, timeBefore));
+    else lines.push(...worldBack(worldNeeds(preset), timeBefore));
     if (preset.kind === "happy-hour")
         lines.push(...happyEffectsClear(preset.options as EventOptions<"happy-hour">));
     if (preset.kind === "supply-drop" && place) lines.push(...removeChestLines(place));

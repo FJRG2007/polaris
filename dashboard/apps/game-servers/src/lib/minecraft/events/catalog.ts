@@ -1352,7 +1352,51 @@ export function hillFistsOnly(preset: EventPreset): boolean {
  * (`commands.DAY_RULES`). Never a blood moon, which is the night.
  */
 export function keepsDay(preset: EventPreset): boolean {
-    return playsInArena(preset) || playsOnStage(preset);
+    return worldNeeds(preset).time === "day";
+}
+
+/** The time of day and the weather an event needs, held for as long as it runs. */
+export interface WorldNeeds {
+    /** Day: what is built can be seen, nothing spawns on it, nobody plays in
+     *  the dark. Night: the mobs it is about come out and do not burn. */
+    readonly time: "day" | "night" | null;
+    /** Clear: no lightning on an arena or a build, no thunderstorm mid-round.
+     *  Rain: a blood moon's own storm. */
+    readonly weather: "clear" | "rain" | null;
+}
+
+/**
+ * What each kind needs of the world, written down once. Held from its start to
+ * its end - the clock and the weather cycle stopped, the time and the weather
+ * set - and put back after: the rules to what they were, the time of day to
+ * what it was. Documented for anybody adding a kind in
+ * `docs/minecraft-events.md` ("World requirements").
+ */
+export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
+    "mining-rush": { time: null, weather: null },
+    "mob-hunt": { time: "night", weather: "clear" },
+    "supply-drop": { time: "day", weather: "clear" },
+    "blood-moon": { time: "night", weather: "rain" },
+    "world-boss": { time: null, weather: "clear" },
+    fishing: { time: null, weather: null },
+    trivia: { time: null, weather: null },
+    explorer: { time: "day", weather: "clear" },
+    "happy-hour": { time: null, weather: null },
+    "king-of-the-hill": { time: "day", weather: "clear" },
+    "treasure-hunt": { time: "day", weather: "clear" },
+    gathering: { time: "day", weather: "clear" },
+    "rare-catch": { time: null, weather: null },
+    "xp-boost": { time: null, weather: null },
+    waves: { time: "night", weather: "clear" },
+    "meteor-shower": { time: "night", weather: "clear" },
+    parkour: { time: "day", weather: "clear" },
+    spleef: { time: "day", weather: "clear" },
+    "team-duel": { time: "day", weather: "clear" },
+    "build-battle": { time: "day", weather: "clear" }
+};
+
+export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {
+    return WORLD_NEEDS[preset.kind];
 }
 
 /** The least countdown an event asked to join gets, whatever the settings say:

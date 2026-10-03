@@ -565,6 +565,26 @@ describe("the least to be ranked", () => {
     });
 });
 
+describe("what each event needs of the world", () => {
+    it("is declared for every kind", () => {
+        for (const kind of catalog.EVENT_KINDS) expect(catalog.WORLD_NEEDS[kind]).toBeDefined();
+    });
+
+    it("holds clear weather on a build and night for a horde", () => {
+        expect(catalog.worldNeeds({ kind: "build-battle" })).toEqual({ time: "day", weather: "clear" });
+        expect(catalog.worldNeeds({ kind: "waves" })).toEqual({ time: "night", weather: "clear" });
+        expect(catalog.worldNeeds({ kind: "mob-hunt" }).time).toBe("night");
+    });
+
+    it("keeps every arena and stage in the day", () => {
+        for (const kind of catalog.EVENT_KINDS) {
+            const preset = catalog.newPreset(kind, kind);
+            if (catalog.playsInArena(preset) || catalog.playsOnStage(preset))
+                expect(catalog.keepsDay(preset)).toBe(true);
+        }
+    });
+});
+
 describe("what the draw can pick now", () => {
     const fishing = catalog.newPreset("fishing", "fish");
     const duel = catalog.newPreset("team-duel", "duel");

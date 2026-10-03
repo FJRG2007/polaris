@@ -4368,11 +4368,17 @@ describe("a horde defense", () => {
         // value written down first.
         expect(world.sent).toContain("gamerule keepInventory true");
         expect(world.sent).toContain("gamerule mobGriefing false");
+        // And night, held, with clear weather: mobs that burn in the sun would
+        // never reach the defenders.
         expect(state().run?.gamerules).toEqual({
             keepInventory: "false",
             mobGriefing: "true",
-            sendCommandFeedback: "true"
+            sendCommandFeedback: "true",
+            doDaylightCycle: "true",
+            doWeatherCycle: "true"
         });
+        expect(world.sent).toContain("time set 18000");
+        expect(world.sent.some((line) => /^weather clear \d+s$/.test(line))).toBe(true);
         expect(state().run?.place).toEqual({ x: 300, y: 70, z: 0 });
         expect(state().run?.chunks).toHaveLength(25);
         const held = holds();
@@ -5102,8 +5108,8 @@ describe("a parkour race", () => {
         expect(world.sent).toContain("gamerule doInsomnia true");
         expect(world.daylightCycle).toBe("true");
         expect(world.insomnia).toBe("true");
-        // The world goes on from midday: the time is not wound back.
-        expect(world.sent.slice(end).some((line) => line.startsWith("time set"))).toBe(false);
+        // The time of day it had before is put back.
+        expect(world.sent.slice(end)).toContain("time set 6000");
     });
 
     it("leaves a day already held, and phantoms already off, just as they were - under their 1.21.11 names too", async () => {

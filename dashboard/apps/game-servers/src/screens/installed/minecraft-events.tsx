@@ -441,7 +441,17 @@ function EventExplained({
     }
     if (preset.kind === "world-boss")
         facts.push(...worldBossFacts(t, preset.options as catalog.EventOptions<"world-boss">));
-    if (catalog.keepsDay(preset)) facts.push(t("events.facts.keepsDay"));
+    {
+        // What it holds of the world while it runs, and gives back after.
+        const needs = catalog.worldNeeds(preset);
+        if (preset.kind !== "blood-moon" && (needs.time || needs.weather))
+            facts.push(
+                t("events.facts.world", {
+                    time: needs.time ?? "none",
+                    weather: needs.weather ?? "none"
+                })
+            );
+    }
     if (catalog.needsOverworld(preset) && !catalog.playsOnStage(preset))
         facts.push(t("events.facts.overworld"));
     if (catalog.hasMinScore(preset)) {
