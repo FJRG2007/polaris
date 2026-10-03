@@ -351,12 +351,14 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                             {user.isAdmin ? (
                                                                                 <UpdateIndicator />
                                                                             ) : null}
-                                                                            {appHeader.map((slot) => (
-                                                                                <AppSlotView
-                                                                                    key={`${slot.app}:${slot.kind}`}
-                                                                                    slot={slot}
-                                                                                />
-                                                                            ))}
+                                                                            {appHeader.map(
+                                                                                (slot) => (
+                                                                                    <AppSlotView
+                                                                                        key={`${slot.app}:${slot.kind}`}
+                                                                                        slot={slot}
+                                                                                    />
+                                                                                )
+                                                                            )}
                                                                             <NotificationBell />
                                                                             <AccountMenu
                                                                                 id={user.id}
