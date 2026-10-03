@@ -142,7 +142,8 @@
             "custom": "Custom domain",
             "customHint": "Leave blank for a free subdomain.",
             "targetPort": "Target port",
-            "add": "Add domain"
+            "add": "Add domain",
+            "tunnel": "Tunnel"
         },
         "status": "Status: {status}",
         "metricCpu": "{percent}% cpu",

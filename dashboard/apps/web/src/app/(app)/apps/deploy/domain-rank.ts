@@ -66,3 +66,19 @@ export function primaryDomain<T extends AppDomain>(domains: readonly T[]): T | n
     }
     return best;
 }
+
+/**
+ * Whether an entry is a tunnel's hostname rather than one of the service's own
+ * domains. The project page merges live tunnels into `domains` so the canvas, the
+ * card and the deployments header can name them; they have no domain row behind
+ * them, so nothing that acts on a domain (enable, remove, certificate, port) can
+ * act on one.
+ */
+export function isTunnelEntry(domain: { kind: string }): boolean {
+    return domain.kind === "tunnel" || domain.kind === "tunnel-temp";
+}
+
+/** The service's own domains, without the tunnel hostnames merged in beside them. */
+export function ownDomains<T extends { kind: string }>(domains: readonly T[]): T[] {
+    return domains.filter((domain) => !isTunnelEntry(domain));
+}

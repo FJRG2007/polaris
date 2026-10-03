@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { primaryDomain, type AppDomain } from "../../src/app/(app)/apps/deploy/domain-rank";
+import { ownDomains, primaryDomain, type AppDomain } from "../../src/app/(app)/apps/deploy/domain-rank";
 
 function domain(partial: Partial<AppDomain> & { hostname: string; kind: string }): AppDomain {
     return { id: partial.hostname, enabled: true, ...partial };
@@ -43,5 +43,23 @@ describe("primaryDomain", () => {
 
     it("ignores a disabled domain", () => {
         expect(primaryDomain([{ ...FREE, enabled: false }])).toBeNull();
+    });
+});
+
+describe("ownDomains", () => {
+    // The project page merges each live tunnel's hostname into the service's
+    // domains. The Settings panel also draws each tunnel as a row of its own, so
+    // the merged entry listed the same trycloudflare.com name twice there - once
+    // as a domain that could never be checked, once with its real state.
+    it("leaves out the tunnel names merged in beside the domains", () => {
+        const quick = domain({ hostname: "ronald-kent-leg-plate.trycloudflare.com", kind: "tunnel-temp", id: "qtunnel:a1" });
+        const named = domain({ hostname: "app.example.com", kind: "tunnel", id: "ntunnel:a1" });
+        const custom = domain({ hostname: "shop.example.com", kind: "custom" });
+        expect(ownDomains([FREE, quick, custom, named])).toEqual([FREE, custom]);
+    });
+
+    it("keeps every real domain, disabled ones included", () => {
+        const off = { ...FREE, enabled: false };
+        expect(ownDomains([off])).toEqual([off]);
     });
 });

@@ -142,7 +142,8 @@
             "custom": "Dominio propio",
             "customHint": "Déjalo en blanco para un subdominio gratuito.",
             "targetPort": "Puerto destino",
-            "add": "Nuevo dominio"
+            "add": "Nuevo dominio",
+            "tunnel": "Túnel"
         },
         "status": "Estado: {status}",
         "metricCpu": "{percent} % cpu",
