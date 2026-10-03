@@ -2085,6 +2085,7 @@ export function cleanup(
         ...SHOTS.map((objective) => `scoreboard objectives remove ${objective}`),
         `scoreboard objectives remove ${JOIN_TRIGGER}`,
         `scoreboard objectives remove ${JOIN_LIST}`,
+        ...(preset.kind === "king-of-the-hill" ? ["scoreboard objectives remove pe_khp"] : []),
         CLEAR_MARK
     ];
     for (const one of components(preset))

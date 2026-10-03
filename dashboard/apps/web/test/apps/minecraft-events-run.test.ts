@@ -6312,10 +6312,17 @@ describe("a king of the hill", () => {
         // keepInventory held.
         expect(world.sent).toContain("gamerule keepInventory true");
         await play(2_100);
-        // The hill wears down whoever is off it (Poison never kills) and mends
-        // whoever holds it; a punch is softened, its knockback left whole.
-        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 1 true");
-        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:poison 3 1 true");
+        // The hill wears down whoever is off it - only while they have more than
+        // three hearts - and mends whoever holds it; a punch is softened, its
+        // knockback left whole; a fall off it is slow.
+        expect(world.sent).toContain("effect give @a[tag=pe_arena] minecraft:resistance 10 3 true");
+        expect(world.sent).toContain("scoreboard objectives add pe_khp health");
+        expect(world.sent).toContain(
+            "effect give @a[tag=pe_arena,scores={pe_khp=7..}] minecraft:poison 3 1 true"
+        );
+        expect(
+            world.sent.some((line) => line.includes("minecraft:slow_falling 3 0 true") && line.includes("@a[tag=pe_arena,x="))
+        ).toBe(true);
         const place0 = state().run!.place!;
         expect(world.sent).toContain(
             `execute in minecraft:overworld positioned ${place0.x + 0.5} ${place0.y} ${place0.z + 0.5} as @a[tag=pe_arena,distance=..6] run effect give @s minecraft:regeneration 3 1 true`

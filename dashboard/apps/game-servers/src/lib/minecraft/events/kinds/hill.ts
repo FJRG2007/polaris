@@ -6,8 +6,8 @@
  *
  * With "fists only" players join, their things are kept (`stash`) and they
  * come in empty-handed, in adventure mode. Off the circle the hill wears them
- * down (Poison, which never kills); in it, it mends them (Regeneration).
- * Whoever is knocked off is brought back to the edge before they land, the
+ * down (Poison, down to three hearts); in it, it mends them (Regeneration).
+ * Whoever is knocked off falls slowly and is brought back to the edge, the
  * fire and the water cannot hurt them, and a fist's knockback is left whole:
  * pushing is how the circle is won. keepInventory is held for all of it.
  *
@@ -123,13 +123,21 @@ export function strayed(
     );
 }
 
+/** Each entrant's health, kept by the game as it changes (`health` criterion). */
+export const HEALTH_SCORE = "pe_khp";
+
+/** Health under which the hill stops wearing anybody down: three hearts. */
+const DRAIN_FLOOR = 6;
+
 /**
  * The hill wears down whoever is off it and mends whoever holds it, for a
- * moment past each look: Poison, which never takes the last half heart, on
- * every entrant, and for those inside the circle the Poison taken off again
- * and Regeneration instead. Resistance II softens a punch without making
- * anybody untouchable, the fire and the water are kept off, and a fist's
- * knockback is left whole - pushing is how the circle is won.
+ * moment past each look - and nobody can die of it:
+ * - off the circle, Poison, and only while they have more than three hearts;
+ * - in it, the Poison taken off again and Regeneration instead;
+ * - Resistance IV, so a punch is a fifth of one and keeps its knockback;
+ * - whoever is under the platform - knocked off - falls slowly, so the drop
+ *   never hurts, and is brought back to the edge;
+ * - the fire and the water kept off.
  */
 export function protectLines(
     point?: { x: number; y: number; z: number },
@@ -137,16 +145,20 @@ export function protectLines(
 ): string[] {
     const who = `@a[tag=${IN_ARENA}]`;
     const lines = [
-        `effect give ${who} minecraft:resistance 10 1 true`,
+        `effect give ${who} minecraft:resistance 10 3 true`,
         `effect give ${who} minecraft:fire_resistance 10 0 true`,
         `effect give ${who} minecraft:water_breathing 10 0 true`
     ];
     if (!point || radius === undefined) return lines;
+    const reach = radius + MARGIN + 64;
+    const under = `x=${point.x - reach},y=${point.y - 128},z=${point.z - reach},dx=${2 * reach},dy=127,dz=${2 * reach}`;
     const inside = `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[tag=${IN_ARENA},distance=..${radius}]`;
     return [
         ...lines,
-        `effect give ${who} minecraft:poison 3 1 true`,
+        `scoreboard objectives add ${HEALTH_SCORE} health`,
+        `effect give @a[tag=${IN_ARENA},scores={${HEALTH_SCORE}=${DRAIN_FLOOR + 1}..}] minecraft:poison 3 1 true`,
         `${inside} run effect clear @s minecraft:poison`,
-        `${inside} run effect give @s minecraft:regeneration 3 1 true`
+        `${inside} run effect give @s minecraft:regeneration 3 1 true`,
+        `execute in minecraft:overworld run effect give @a[tag=${IN_ARENA},${under}] minecraft:slow_falling 3 0 true`
     ];
 }

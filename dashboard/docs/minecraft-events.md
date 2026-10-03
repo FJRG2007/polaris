@@ -100,9 +100,11 @@ left out.
   snow), a vanishing floor (the snow underfoot turns red, then goes on the
   next look - Fall Guys' Hex-A-Gone), or snowballs (knock the others off).
 - **King of the hill** with fists only is a platform floating `hill.LIFT` over
-  whatever is under it. Off the circle Poison wears a player down (it never
-  kills); in it Regeneration mends them; a punch keeps its knockback. Three
-  minutes. Walked to (fists only off), it stays on the ground.
+  whatever is under it. Off the circle Poison wears a player down, only while
+  they have more than three hearts; in it Regeneration mends them; Resistance
+  IV makes a punch a fifth of one and keeps its knockback; a fall off the
+  platform is slow, so nobody can die. Three minutes. Walked to (fists only
+  off), it stays on the ground.
 - **Treasure hunt** hides one treasure, a bastion's treasure room by default,
   under a column of light, with every player's action bar giving its distance
   and direction for the whole hunt.
