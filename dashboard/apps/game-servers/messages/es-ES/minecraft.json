@@ -269,7 +269,12 @@
         "couldNotSendTheInventory": "No se pudo enviar el inventario",
         "thatIsNotAWaiting": "Esa no es una acción pendiente de este servidor",
         "couldNotCancelThat": "No se pudo cancelar",
-        "noInventoryAnswer": "El servidor no respondió con un inventario: {said}"
+        "noInventoryAnswer": "El servidor no respondió con un inventario: {said}",
+        "noInstalledLoader": "No hay una versión instalada en la que fijar este servidor, así que aún tiene que descargar su cargador. Prueba de nuevo cuando responda el repositorio del cargador.",
+        "couldNotPinTheLoader": "No se pudo fijar la versión instalada",
+        "loaderNotHeld": "El cargador de este servidor no está fijado",
+        "couldNotUpdateTheLoader": "No se pudo actualizar el cargador",
+        "couldNotReadTheLoader": "No se pudo leer el cargador"
     },
     "world": {
         "world": "Mundo",
@@ -1037,7 +1042,9 @@
         "setupLeft": "{name}: lo que queda por hacer",
         "pluginDocs": "Las instrucciones del plugin",
         "mapBuiltBy": "Creado por {author}, para Minecraft {version}.",
-        "manageNamed": "Gestionar a {name}"
+        "manageNamed": "Gestionar a {name}",
+        "pinAndStart": "Fijar la versión instalada e iniciar",
+        "loaderPinned": "Fijado {loader} {version}. El servidor está arrancando."
     },
     "joinPassword": {
         "restartOntoPolarisLogin": "¿Reiniciar con Polaris login?",
@@ -2248,5 +2255,25 @@
             "lastWarning": "Una más y quedarás fuera {minutes} min.",
             "timeoutReason": "Fuera {minutes} min por incumplir las reglas del chat."
         }
+    },
+    "loader": {
+        "title": "Cargador",
+        "pinned": "Fijado",
+        "held": "{loader} {version}",
+        "heldHint": "Cada arranque usa esta versión sin preguntar al repositorio de {loader}.",
+        "following": "{loader}, última versión",
+        "followingHint": "Cada arranque pregunta al repositorio de {loader} por la última versión. Polaris fija la instalada cuando el servidor está en pie.",
+        "releaseHint": "Minecraft está en la última versión, así que no hay una versión de {loader} que fijar. Elige una versión en Ajustes para fijarla.",
+        "custom": "{loader} con tu propio instalador",
+        "customHint": "El instalador es tuyo, así que no hay nada que fijar.",
+        "updating": "El próximo arranque instala el último {loader}, y Polaris lo vuelve a fijar cuando el servidor está en pie.",
+        "update": "Actualizar",
+        "confirmTitle": "¿Actualizar {loader}?",
+        "confirmBody": "El servidor descarga el último {loader} de su repositorio en el próximo arranque. Si ese repositorio está caído o responde en un formato que la imagen no sabe leer, el servidor no arrancará hasta que se recupere. Los mods hechos para {version} pueden no cargar en la nueva versión.",
+        "confirmRestartEmpty": "Se reinicia ahora.",
+        "updateAndRestart": "Actualizar y reiniciar",
+        "updateOnly": "Actualizar",
+        "updateQueued": "El último {loader} se instala la próxima vez que arranque el servidor.",
+        "updateStarted": "El servidor se está reiniciando con el último {loader}."
     }
 }

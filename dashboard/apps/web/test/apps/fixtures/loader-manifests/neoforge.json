@@ -1,0 +1,8 @@
+{
+    "@type": "me.itzg.helpers.forge.ForgeManifest",
+    "timestamp": "2026-09-14T10:02:11.482Z",
+    "files": ["run.sh", "libraries/net/neoforged/neoforge/21.4.158"],
+    "minecraftVersion": "1.21.4",
+    "forgeVersion": "21.4.158",
+    "serverEntry": "/data/run.sh"
+}

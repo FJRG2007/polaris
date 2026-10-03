@@ -16,6 +16,7 @@
 import { RestartPlanner } from "./restart-planner";
 import { useGameText, useSchemaText } from "../game-text";
 import { MinecraftMemory } from "./minecraft-memory";
+import { MinecraftLoader } from "./minecraft-loader";
 import { Loader2, RotateCw, Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { updateServerSettingsAction } from "./minecraft-actions";
@@ -166,6 +167,16 @@ export function MinecraftSettings({
             {/* Above the fields, because it decides whether one of them is still
                 the thing that settles the heap. */}
             {withMemory && <MinecraftMemory installedAppId={installedAppId} refresh={saves} />}
+            {/* The same tab, and only on Minecraft: which loader version every
+                start runs. Draws nothing on a server without a mod loader. */}
+            {withMemory && (
+                <MinecraftLoader
+                    installedAppId={installedAppId}
+                    playersOnline={playersOnline}
+                    running={running}
+                    refresh={saves}
+                />
+            )}
 
             {groups.map(({ group, fields }) => (
                 <Card key={group}>

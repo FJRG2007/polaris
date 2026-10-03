@@ -16,6 +16,13 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { runArkCommand } from "../../lib/ark/service";
 import { clearCrashLoop } from "../../lib/games-health";
+import { loaderReleasedBy } from "../../lib/minecraft/loader-pin";
+import {
+    pinInstalledLoader,
+    readLoaderPin,
+    releaseLoaderOnce,
+    type LoaderPinView
+} from "../../lib/minecraft/loader-pin-service";
 import { GAME_MODES } from "../../lib/minecraft/players";
 import { runFivemCommand } from "../../lib/fivem/service";
 import { findGameIdentity } from "../../lib/game-identity";
@@ -2126,6 +2133,110 @@ export async function resetServerConfigAction(
     }
 }
 
+/**
+ * Hold the loader at the version on disk, and start the server.
+ *
+ * The fix for a server that could not download its own loader: what it already
+ * installed runs, and nothing is asked of the repository that failed. Offered on
+ * the banner that names that crash. A server with no installed version to hold
+ * is refused rather than started into the same loop.
+ */
+export async function pinLoaderAndStartAction(
+    installedAppId: string
+): Promise<{ loader?: string; version?: string; error?: string }> {
+    const words = await gameWords("minecraft");
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: words("errors.thatServerDoesNotExist") };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data);
+        if (!access.install.applicationId) throw new Error(words("errors.thisServerHasNotBeen"));
+        const pinned = await pinInstalledLoader(access.ownerId, parsed.data);
+        if (pinned.state === "unavailable") return { error: words("errors.noInstalledLoader") };
+        // Cleared before the start, for the same reason the settings reset does.
+        await clearCrashLoop(parsed.data);
+        await setApplicationRunning(access.install.applicationId, access.ownerId, true, user.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.loader-pinned",
+            targetType: "installedApp",
+            targetId: parsed.data,
+            metadata: { loader: pinned.loader, version: pinned.version }
+        });
+        revalidatePath(`/apps/installed/${parsed.data}`);
+        return { loader: pinned.loader, version: pinned.version };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.couldNotPinTheLoader")
+        };
+    }
+}
+
+/** Where this server's mod loader stands, for the card under Settings. */
+export async function readLoaderPinAction(
+    installedAppId: string
+): Promise<{ view?: LoaderPinView; error?: string }> {
+    const words = await gameWords("minecraft");
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: words("errors.thatServerDoesNotExist") };
+    try {
+        const { access } = await requireGameServer("games.read", parsed.data);
+        const view = await readLoaderPin(access.ownerId, parsed.data);
+        return view ? { view } : { error: words("errors.thisServerHasNotBeen") };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.couldNotReadTheLoader")
+        };
+    }
+}
+
+/**
+ * Let the held loader go once, so the next start installs the newest one - and
+ * restart now when the server is up. Pinned again by the health sweep once the
+ * new version is installed and the server is up.
+ */
+export async function updateLoaderAction(
+    installedAppId: string
+): Promise<{ restarted?: boolean; error?: string }> {
+    const words = await gameWords("minecraft");
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: words("errors.thatServerDoesNotExist") };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data);
+        const applicationId = access.install.applicationId;
+        if (!applicationId) throw new Error(words("errors.thisServerHasNotBeen"));
+        const released = await releaseLoaderOnce(access.ownerId, parsed.data);
+        if (!released) return { error: words("errors.loaderNotHeld") };
+        const app = await prisma.application.findFirst({
+            where: { id: applicationId },
+            select: { desiredState: true }
+        });
+        const restart = app?.desiredState === "running";
+        if (restart) await deployApplication(applicationId, access.ownerId, user.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.loader-update",
+            targetType: "installedApp",
+            targetId: parsed.data,
+            metadata: { from: released.from, restarted: restart }
+        });
+        revalidatePath(`/apps/installed/${parsed.data}`);
+        return { restarted: restart };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.couldNotUpdateTheLoader")
+        };
+    }
+}
+
 /** Generate a new map, optionally carrying what every player is holding. */
 export async function newWorldAction(
     input: NewWorldInput
@@ -2547,11 +2658,26 @@ export async function updateServerSettingsAction(
                   (entry) => entry.key === MEMORY_KEY
               )?.value ?? "")
             : "";
-        const moved = await guardForSave(vars, async () => {
-            const current = await listEnvVars("application", applicationId, access.ownerId);
-            return new Map(current.map((entry) => [entry.key, entry.value ?? ""]));
-        });
+        let currentEnv: Promise<ReadonlyMap<string, string>> | null = null;
+        const readCurrent = () =>
+            (currentEnv ??= listEnvVars("application", applicationId, access.ownerId).then(
+                (current) => new Map(current.map((entry) => [entry.key, entry.value ?? ""]))
+            ));
+        const moved = await guardForSave(vars, readCurrent);
         for (const entry of moved) vars.push({ ...entry, isSecret: false });
+        // A loader held for the old release is the wrong one for a new release or
+        // new software: it is let go, and the new release's own is held once the
+        // server is up on it.
+        if (vars.some((entry) => entry.key === SOFTWARE_KEY || entry.key === "VERSION")) {
+            const current = await readCurrent();
+            const next = new Map([...current, ...vars.map((entry) => [entry.key, entry.value] as const)]);
+            for (const key of loaderReleasedBy(
+                (name) => current.get(name) ?? "",
+                (name) => next.get(name) ?? ""
+            )) {
+                if (!vars.some((entry) => entry.key === key)) vars.push({ key, value: "", isSecret: false });
+            }
+        }
 
         await setEnvVars("application", install.applicationId, access.ownerId, vars);
 

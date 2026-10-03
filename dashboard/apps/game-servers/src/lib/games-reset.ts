@@ -24,6 +24,7 @@
 import { gameMessage } from "./game-message";
 import { prisma } from "@polaris/db";
 import { PROJECTS_KEY } from "./minecraft/join-guard";
+import { loaderReleasedBy } from "./minecraft/loader-pin";
 import { findMap, pinnedRelease } from "./minecraft/maps";
 import { editionOf } from "./minecraft/service";
 import { formatMemory, hasCrossplay } from "./minecraft/blueprints";
@@ -171,6 +172,14 @@ export async function resetMinecraftServer(
     // Only what actually moved. Writing the whole environment back would rewrite
     // every value this server holds on every reset, which is how a variable
     // somebody set by hand gets quietly restored to what it was.
+    // A loader held for the release this server leaves is let go with it, so the
+    // release it lands on resolves its own (see `loaderReleasedBy`).
+    for (const key of loaderReleasedBy(
+        (name) => current.get(name) ?? "",
+        (name) => env.get(name) ?? ""
+    )) {
+        if (env.get(key) === current.get(key)) env.set(key, "");
+    }
     const changed = [...env.entries()].filter(([key, value]) => current.get(key) !== value);
     if (changed.length > 0) {
         await setEnvVars(

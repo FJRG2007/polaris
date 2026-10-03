@@ -42,7 +42,7 @@ import { MinecraftWorld } from "./minecraft-world";
 import { findMap } from "../../lib/minecraft/maps";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
-import { isConfigCrash } from "../../lib/crash-loop";
+import { isConfigCrash, isLoaderCrash } from "../../lib/crash-loop";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { withLiveSince, type PlayerSeen } from "../../lib/games-activity";
@@ -64,7 +64,7 @@ import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
 import { findBlueprint, hasCrossplay } from "../../lib/minecraft/blueprints";
-import { resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
+import { pinLoaderAndStartAction, resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
 import { FolderOpen, Loader2, Save, ShieldAlert, UserPlus } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn, ScrollRow, Skeleton } from "@polaris/ui";
 import type {
@@ -502,6 +502,7 @@ export function MinecraftPanel({
                     reach={shownReach}
                     access={reading.access}
                     canSaveWorld={held.includes("games.moderate")}
+                    canManage={canManage}
                     onOpenPlayers={() => openTab("players")}
                     onOpenConsole={() => openTab("console")}
                 />
@@ -846,6 +847,7 @@ function ConnectCard({
     reach,
     access,
     canSaveWorld,
+    canManage,
     onOpenPlayers,
     onOpenConsole
 }: {
@@ -867,6 +869,9 @@ function ConnectCard({
     /** Flushing the world writes to it, so it is the moderator grant rather than
      *  something every reader is offered. */
     canSaveWorld: boolean;
+    /** Starting the server and changing what it runs is the manager grant, so the
+     *  fixes on the crash banner are only offered to somebody who holds it. */
+    canManage: boolean;
     onOpenPlayers: () => void;
     onOpenConsole: () => void;
 }) {
@@ -896,6 +901,23 @@ function ConnectCard({
         setFixing(false);
         setFixed(
             result.error ?? (result.moved ? t("panel.settingsMoved") : t("panel.nothingToMove"))
+        );
+    }
+
+    /**
+     * Hold the loader at the version on disk and start the server.
+     *
+     * The fix for a server that could not download its own loader: the one it
+     * already installed runs, and nothing is asked of the repository that failed.
+     */
+    async function pinAndStart(): Promise<void> {
+        setFixing(true);
+        setFixed(null);
+        const result = await pinLoaderAndStartAction(installedAppId);
+        setFixing(false);
+        setFixed(
+            result.error ??
+                t("panel.loaderPinned", { loader: result.loader ?? "", version: result.version ?? "" })
         );
     }
 
@@ -991,11 +1013,11 @@ function ConnectCard({
                                     {schemaText(status.crashLoop.advice)}
                                 </p>
                             )}
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 {/* Only offered for the crash where it is the
                                     answer. On any other one it would be a button
                                     that throws away settings and changes nothing. */}
-                                {isConfigCrash(status.crashLoop.cause) && (
+                                {canManage && isConfigCrash(status.crashLoop.cause) && (
                                     <button
                                         type="button"
                                         onClick={() => void resetConfig()}
@@ -1004,6 +1026,19 @@ function ConnectCard({
                                     >
                                         {fixing && <Loader2 className="size-3 animate-spin" />}
                                         {t("panel.resetTheSettingsAndStart")}
+                                    </button>
+                                )}
+                                {/* The same for a server that could not download its
+                                    loader: what it installed runs, offline. */}
+                                {canManage && isLoaderCrash(status.crashLoop.cause) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => void pinAndStart()}
+                                        disabled={fixing}
+                                        className="inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60"
+                                    >
+                                        {fixing && <Loader2 className="size-3 animate-spin" />}
+                                        {t("panel.pinAndStart")}
                                     </button>
                                 )}
                                 <button

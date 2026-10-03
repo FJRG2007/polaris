@@ -283,6 +283,14 @@ function shorten(line: string): string {
  * already far better than the panel saying "starting".
  */
 export function crashAdvice(cause: string): string | null {
+    const loader = loaderCrashOf(cause);
+    if (loader) {
+        return gameMessage(
+            "games",
+            loader.unreadable ? "lib.crash.loaderUnreadable" : "lib.crash.loaderUnreachable",
+            { loader: loader.name }
+        );
+    }
     if (isConfigCrash(cause)) {
         return gameMessage("games", "lib.crash.config");
     }
@@ -314,8 +322,84 @@ export function isConfigCrash(cause: string | null): boolean {
     return cause !== null && /NumberFormatException/.test(cause) && /"default"/.test(cause);
 }
 
+/** What the image's helper prints when one of its commands fails
+ *  (`ExceptionHandler` in itzg/mc-image-helper). */
+const HELPER_FAILED = /'(install-[a-z-]+)' command failed/;
+
+/** The helper's own prefix on a line, which the cause does not need. */
+const HELPER_PREFIX = /^\[mc-image-helper\]\s+[\d:.]+\s+[A-Z]+\s*:\s*/;
+
+/** The installers the helper runs for a server's software, by command, and the
+ *  name a person knows each one by. */
+const INSTALLERS: Readonly<Record<string, string>> = {
+    "install-neoforge": "NeoForge",
+    "install-forge": "Forge",
+    "install-fabric-loader": "Fabric",
+    "install-quilt": "Quilt",
+    "install-paper": "Paper",
+    "install-purpur": "Purpur"
+};
+
+/**
+ * The installer that failed in the run the log ends on, if one did.
+ *
+ * The server's software is fetched before the game is, so a failure here is a
+ * run that never got as far as Java: nothing in the world is involved, and
+ * restarting cannot help until whatever answered the download answers
+ * differently. Only after the last time the server was up, for the same reason
+ * `crashCause` drops what came before it.
+ */
+export function loaderInstallFailure(log: string): string | null {
+    const all = meaningfulLines(log);
+    let ready = -1;
+    for (const [index, line] of all.entries()) if (READY_MARKER.test(line)) ready = index;
+    let found: string | null = null;
+    for (const line of all.slice(ready + 1)) {
+        const failed = HELPER_FAILED.exec(line);
+        if (failed?.[1] && INSTALLERS[failed[1]]) found = failed[1];
+    }
+    return found;
+}
+
+/** A failed installer's cause, as the card shows it: which command, then the
+ *  deepest reason the log gives for it. */
+function loaderCause(installer: string, root: string | null): string {
+    const reason = root?.replace(HELPER_PREFIX, "") ?? null;
+    if (reason && HELPER_FAILED.test(reason)) return shorten(reason);
+    return shorten(`'${installer}' command failed${reason ? `: ${reason}` : ""}`);
+}
+
+/**
+ * Whether this is a server that could not download its own software.
+ *
+ * Read from the cause, as `isConfigCrash` is, so the banner offers its button
+ * on exactly the crashes the advice describes, from a record written before the
+ * button existed as much as from a live reading.
+ */
+export function loaderCrashOf(
+    cause: string | null
+): { readonly installer: string; readonly name: string; readonly unreadable: boolean } | null {
+    const failed = cause ? HELPER_FAILED.exec(cause) : null;
+    const installer = failed?.[1];
+    const name = installer ? INSTALLERS[installer] : undefined;
+    if (!installer || !name) return null;
+    // The repository answered, with something the helper's parser refuses: a
+    // format change upstream, which retrying does not fix.
+    const unreadable = /Unrecognized field|Failed to parse response|Unexpected character|JsonParseException|MismatchedInputException/i.test(
+        cause ?? ""
+    );
+    return { installer, name, unreadable };
+}
+
+/** Whether this is the crash holding the installed loader fixes. */
+export function isLoaderCrash(cause: string | null): boolean {
+    return loaderCrashOf(cause) !== null;
+}
+
 /** The whole reading, for a container that has been judged to be looping. */
 export function crashLoopOf(state: RestartFacts, log: string): CrashLoop {
-    const cause = crashCause(log);
+    const root = crashCause(log);
+    const installer = loaderInstallFailure(log);
+    const cause = installer ? loaderCause(installer, root) : root;
     return { restarts: state.restartCount, cause, advice: cause ? crashAdvice(cause) : null };
 }
