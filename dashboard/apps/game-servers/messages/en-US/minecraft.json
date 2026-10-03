@@ -1950,7 +1950,9 @@
         "drawNotChecked": "Draw not checked since Polaris started.",
         "anyTimeOfDay": "Any time of day",
         "drawAll": "All",
-        "drawNone": "None"
+        "drawNone": "None",
+        "repairedTitle": "Some saved events had settings Polaris could not read",
+        "repairedOne": "{name}: {count, plural, one {# setting is} other {# settings are}} back to the default. Check it and save."
     },
     "editor": {
         "where": "Where",

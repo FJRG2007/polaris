@@ -464,7 +464,7 @@ final class LoginGate {
             } else if (!reply.text("refused").isEmpty()) {
                 waiting.kick = reply.text("refused");
             } else if (reply.status() == 200) {
-                release(current, "Password set. Welcome!");
+                release(current, greeting(reply, "Password set. Welcome!"));
             } else if (reply.status() == 409) {
                 waiting.registered = true;
                 tell(current, "You already have a password here. Log in with /login <password>.");
@@ -492,7 +492,7 @@ final class LoginGate {
                 return;
             }
             switch (reply.status()) {
-                case 200 -> release(current, "Logged in. Welcome back!");
+                case 200 -> release(current, greeting(reply, "Logged in. Welcome back!"));
                 case 403 -> {
                     waiting.wrong++;
                     int left = MAX_WRONG - waiting.wrong;
@@ -564,6 +564,13 @@ final class LoginGate {
         if (password.length() < MIN_PASSWORD) return "A password needs at least " + MIN_PASSWORD + " characters.";
         if (password.length() > MAX_PASSWORD) return "A password can have at most " + MAX_PASSWORD + " characters.";
         return null;
+    }
+
+    /** What Polaris says to greet them - by the name of their Polaris account,
+     *  in its language - or this mod's own line when it says nothing. */
+    private static String greeting(Reply reply, String fallback) {
+        String welcome = reply.text("welcome");
+        return welcome.isEmpty() ? fallback : welcome;
     }
 
     private static String throttled(Reply reply) {

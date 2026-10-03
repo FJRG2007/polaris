@@ -508,6 +508,19 @@ configured means the machine's own address, as before.
   let in is told of it at once (`login-arrivals.ts`): a server's challenges
   are read and shown within `ARRIVAL_DELAY_MS` rather than on the loop's next
   turn up to twenty seconds later.
+- **Greeted by name, in their language, only where a link agrees.**
+  `welcomeFor` (`login-welcome.ts`) looks up the Polaris account a logging-in
+  player's name is linked to, and only speaks when `accountAgrees` says that
+  link is not one made by mistake; it then greets by the account's first or
+  display name, cleaned of formatting codes and control characters and capped
+  at `NAME_MAX`, in the language `speech-service` resolves for that account
+  (falling back through the event catalog's chosen language to the owner's).
+  The `login` action answers with a `welcome` string the mod and the plugin
+  show instead of their own line (`greeting` in `LoginGate.java`, mod/plugin
+  0.3.0); `register` never does, since whoever joins first under a name is the
+  one who sets its password, before any link to an account can be trusted.
+  Nothing here can block the login itself: a failed lookup is logged and
+  answered as no greeting.
 - **Its own permissions.** `games.read`, `games.moderate` and `games.manage`, so
   a moderator can kick and whitelist without being able to deploy anything.
   `deploy.manage` carries all three, which is what keeps roles written before
