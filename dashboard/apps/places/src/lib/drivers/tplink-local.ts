@@ -43,7 +43,7 @@ function addressOf(credentials: Credentials): tplink.TplinkAddress {
     const typed = credentials.host?.trim();
     if (!typed) throw new HomeError("That connection is missing the device's address");
     const host = deviceHost(typed);
-    if (!host) throw new HomeError("Write the address as 10.0.1.30, with no path");
+    if (!host) throw new HomeError("Write the address as 192.168.1.30, with no path");
     return {
         host,
         username: credentials.email?.trim() ?? "",

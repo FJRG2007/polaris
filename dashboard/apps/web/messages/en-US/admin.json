@@ -2554,7 +2554,7 @@
             "useThis": "Use this one",
             "address": "Address",
             "addressHint": "Checked by who answers there before it is saved.",
-            "addressFormat": "Write an address on this network, like 10.0.1.30",
+            "addressFormat": "Write an address on this network, like 192.168.1.30",
             "different": "A different device answers at {address} ({device}), so the password of {name} is not sent there.",
             "silent": "Nothing answers at {address}.",
             "unproven": "{device} answers at {address}. Polaris has no record of who {name} is, so it cannot prove this is it, and its password will be sent there. Use it?",

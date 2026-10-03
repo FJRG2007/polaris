@@ -36,7 +36,7 @@ function addressOf(credentials: Credentials): shelly.ShellyAddress {
         credentials.username?.trim() ?? "",
         credentials.password ?? ""
     );
-    if (!address) throw new HomeError("Write the address as 10.0.1.30, with no path");
+    if (!address) throw new HomeError("Write the address as 192.168.1.30, with no path");
     return address;
 }
 

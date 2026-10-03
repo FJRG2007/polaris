@@ -140,7 +140,7 @@ export function HostDialog() {
                         <Input
                             name="address"
                             required
-                            placeholder="10.0.1.10"
+                            placeholder="192.168.1.10"
                             onChange={(event) => {
                                 if (environmentPicked) return;
                                 setEnvironment(environmentFromAddress(event.target.value));

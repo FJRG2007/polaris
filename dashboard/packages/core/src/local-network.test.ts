@@ -47,7 +47,7 @@ describe("what counts as local", () => {
 describe("the same piece of wire", () => {
     it("is the first three octets", () => {
         expect(sameLocalNetwork("10.0.1.7", "10.0.1.50")).toBe(true);
-        expect(sameLocalNetwork("10.0.1.7", "192.168.2.50")).toBe(false);
+        expect(sameLocalNetwork("10.0.1.7", "10.0.2.50")).toBe(false);
     });
 
     it("is never true of an address that is not local at all", () => {

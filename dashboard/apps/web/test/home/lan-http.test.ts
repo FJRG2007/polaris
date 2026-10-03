@@ -31,7 +31,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-address", async (original)
 });
 
 const FORBIDDEN =
-    "Polaris does not connect to that address. Use the device's address on your network, such as 10.0.1.30.";
+    "Polaris does not connect to that address. Use the device's address on your network, such as 192.168.1.30.";
 
 // Test-only certificates, generated for this file and used nowhere else. The
 // first is its own authority and names itself like a Hue bridge id.

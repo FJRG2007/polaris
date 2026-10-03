@@ -592,7 +592,7 @@ export function CameraDialog({
                                 <Input
                                     value={form.address}
                                     onChange={(event) => set("address", event.target.value)}
-                                    placeholder="10.0.1.50"
+                                    placeholder="192.168.1.50"
                                 />
                             </Field>
                             {usesRtsp ? (

@@ -2554,7 +2554,7 @@
             "useThis": "Usar este",
             "address": "Dirección",
             "addressHint": "Antes de guardarla se comprueba quién responde ahí.",
-            "addressFormat": "Escribe una dirección de esta red, como 10.0.1.30",
+            "addressFormat": "Escribe una dirección de esta red, como 192.168.1.30",
             "different": "Otro dispositivo responde en {address} ({device}), así que la contraseña de {name} no se envía ahí.",
             "silent": "Nada responde en {address}.",
             "unproven": "{device} responde en {address}. Polaris no sabe quién es {name}, así que no puede probar que sea él, y se le enviará la contraseña. ¿Usarlo?",

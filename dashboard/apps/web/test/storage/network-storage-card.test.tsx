@@ -108,7 +108,7 @@ describe("storage on the network", () => {
             target: { value: "8.8.8.8" }
         });
         expect(
-            screen.getByText("Write an address on this network, like 10.0.1.30")
+            screen.getByText("Write an address on this network, like 192.168.1.30")
         ).toBeTruthy();
         expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(
             true
