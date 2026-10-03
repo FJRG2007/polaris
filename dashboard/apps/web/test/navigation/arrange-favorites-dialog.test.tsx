@@ -60,10 +60,18 @@ describe("the arrange favorites dialog", () => {
             expect.stringContaining("Drive"),
             expect.stringContaining("Game servers")
         ]);
-        expect(screen.getByRole("button", { name: "Move Chat earlier" }).getAttribute("aria-disabled")).toBe("true");
-        expect(screen.getByRole("button", { name: "Move Drive later" }).getAttribute("aria-disabled")).toBe("true");
-        expect(screen.getByRole("button", { name: "Move Chat later" }).getAttribute("aria-disabled")).toBeNull();
-        expect(screen.getByRole("button", { name: "Move Drive earlier" }).getAttribute("aria-disabled")).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Move Chat earlier" }).getAttribute("aria-disabled")
+        ).toBe("true");
+        expect(
+            screen.getByRole("button", { name: "Move Drive later" }).getAttribute("aria-disabled")
+        ).toBe("true");
+        expect(
+            screen.getByRole("button", { name: "Move Chat later" }).getAttribute("aria-disabled")
+        ).toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Move Drive earlier" }).getAttribute("aria-disabled")
+        ).toBeNull();
     });
 
     it("moves a favorite later and keeps the rest in place", async () => {

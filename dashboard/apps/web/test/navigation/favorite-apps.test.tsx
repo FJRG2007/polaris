@@ -129,11 +129,23 @@ describe("the favorites store", () => {
 });
 
 describe("the Overview rail", () => {
-    const appIds = ["overview", "drive", "vault", "apps", "tasks", "chat", "mail", "notes", "office"];
+    const appIds = [
+        "overview",
+        "drive",
+        "vault",
+        "apps",
+        "tasks",
+        "chat",
+        "mail",
+        "notes",
+        "office"
+    ];
 
     it("lists only the favorites, in their order, then a way to every other app", () => {
         mount(["mail", "drive"], <AppSidebar appIds={appIds} />);
-        const links = [...document.querySelectorAll("nav a")].map((link) => link.getAttribute("href"));
+        const links = [...document.querySelectorAll("nav a")].map((link) =>
+            link.getAttribute("href")
+        );
         expect(links).toEqual(["/mail", "/drive"]);
         expect(screen.getByText("Favorites")).toBeTruthy();
         expect(screen.getByRole("button", { name: "More apps" })).toBeTruthy();
@@ -143,13 +155,17 @@ describe("the Overview rail", () => {
         save.mockReturnValue(new Promise(() => undefined));
         const store = mount(["mail"], <AppSidebar appIds={appIds} />);
         act(() => store.get().toggle("notes"));
-        const links = [...document.querySelectorAll("nav a")].map((link) => link.getAttribute("href"));
+        const links = [...document.querySelectorAll("nav a")].map((link) =>
+            link.getAttribute("href")
+        );
         expect(links).toEqual(["/mail", "/notes"]);
     });
 
     it("never lists an app the account cannot open, even a favorite", () => {
         mount(["admin", "mail"], <AppSidebar appIds={appIds} />);
-        const links = [...document.querySelectorAll("nav a")].map((link) => link.getAttribute("href"));
+        const links = [...document.querySelectorAll("nav a")].map((link) =>
+            link.getAttribute("href")
+        );
         expect(links).toEqual(["/mail"]);
     });
 

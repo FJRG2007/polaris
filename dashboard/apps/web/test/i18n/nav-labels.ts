@@ -35,7 +35,9 @@ export function navLabels(): Set<string> {
         name: "Example",
         tabs: GAME_TABS.map((tab) => tab.slug),
         labels: Object.fromEntries(
-            GAME_TABS.flatMap((tab) => Object.values(tab.labelByGame ?? {}).map((label) => [tab.slug, label]))
+            GAME_TABS.flatMap((tab) =>
+                Object.values(tab.labelByGame ?? {}).map((label) => [tab.slug, label])
+            )
         )
     });
     if (game) {

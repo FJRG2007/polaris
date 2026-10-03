@@ -21,7 +21,8 @@ export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: 
     const parsed = favoriteAppsSchema.safeParse(input);
     // The schema's own words are English and name internals; the reader gets
     // the sentence in their language, and the menu puts their list back.
-    if (!parsed.success) return { error: (await getTranslations("nav"))("errors.favoritesNotSaved") };
+    if (!parsed.success)
+        return { error: (await getTranslations("nav"))("errors.favoritesNotSaved") };
     await saveFavoriteApps(user.id, parsed.data);
     return {};
 }

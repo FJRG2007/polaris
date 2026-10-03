@@ -29,7 +29,12 @@ export { SizeField, type SizeFieldProps } from "./components/size-field";
 export { Textarea, type TextareaProps } from "./components/textarea";
 export { Badge, statusChipClass, type BadgeProps } from "./components/badge";
 export { CopyButton } from "./components/copy-button";
-export { ENGLISH_UI_STRINGS, UiStringsProvider, useUiStrings, type UiStrings } from "./lib/ui-strings";
+export {
+    ENGLISH_UI_STRINGS,
+    UiStringsProvider,
+    useUiStrings,
+    type UiStrings
+} from "./lib/ui-strings";
 export {
     DnsRecordTable,
     type DnsRecordRow,

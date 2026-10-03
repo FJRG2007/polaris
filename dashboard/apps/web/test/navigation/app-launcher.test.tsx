@@ -146,13 +146,18 @@ describe("the launcher's layout", () => {
 describe("the Overview rail", () => {
     it("lists only the favorites, in their order, never the Overview itself", () => {
         expect(
-            railApps({ available: ["overview", "drive", "chat", "mail"], favorites: ["mail", "overview", "drive"] })
+            railApps({
+                available: ["overview", "drive", "chat", "mail"],
+                favorites: ["mail", "overview", "drive"]
+            })
         ).toEqual(["mail", "drive"]);
     });
 
     it("falls back to the first apps for somebody with no favorites they can open", () => {
         const available = ["overview", "drive", "vault", "apps", "tasks", "chat", "mail", "notes"];
-        expect(railApps({ available, favorites: ["admin"] })).toEqual(available.slice(1, 1 + LAUNCHER_ROW_SIZE));
+        expect(railApps({ available, favorites: ["admin"] })).toEqual(
+            available.slice(1, 1 + LAUNCHER_ROW_SIZE)
+        );
     });
 });
 
@@ -166,12 +171,9 @@ describe("arranging favorites", () => {
 
     it("keeps favorites this account cannot open in their slots", () => {
         // "admin" is a favorite from a role somebody held last week.
-        expect(arrangeFavorites(["mail", "admin", "drive", "chat"], ["chat", "mail", "drive"])).toEqual([
-            "chat",
-            "admin",
-            "mail",
-            "drive"
-        ]);
+        expect(
+            arrangeFavorites(["mail", "admin", "drive", "chat"], ["chat", "mail", "drive"])
+        ).toEqual(["chat", "admin", "mail", "drive"]);
     });
 
     it("tells an unchanged order from a changed one", () => {
