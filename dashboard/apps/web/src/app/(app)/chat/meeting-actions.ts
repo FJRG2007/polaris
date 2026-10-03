@@ -186,10 +186,16 @@ export async function joinAsGuestAction(
     input: unknown
 ): Promise<{ meetingId?: string; admission?: string; error?: string }> {
     const parsed = guestJoinSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.didNotWork") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.didNotWork")
+        };
 
     const result = await guard(() => meetings.joinAsGuest(parsed.data.token, parsed.data.name));
-    if (result.error || !result.value) return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
+    if (result.error || !result.value)
+        return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
     const seat = result.value;
     if (seat.guestKey) {
@@ -259,23 +265,6 @@ export async function callTokenAction(
 
     const token = await calls.joinToken(endpoint, meetingId, seat.participantId);
     return { url: endpoint.url, token };
-}
-
-/**
- * A call this account is already in, on some other device.
- *
- * Asked by a browser that is not in one, so it can offer to take it over rather
- * than leave somebody looking at a phone that says nothing while their computer
- * holds a live microphone in another room.
- *
- * It answers about the account rather than about a conversation, which is what
- * makes it safe to ask from anywhere: the only thing it can tell you is where
- * your own seat is.
- */
-export async function callElsewhereAction(): Promise<meetings.CallElsewhere | null> {
-    const user = await requirePermission("chat.use");
-    if (!(await can(user.id, "chat.call"))) return null;
-    return meetings.callElsewhere(user.id);
 }
 
 /**
@@ -429,7 +418,11 @@ export async function createMeetingAction(
 
     const parsed = newMeetingSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notCreated") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notCreated")
+        };
     }
 
     const result = await guard(() =>
@@ -501,7 +494,8 @@ export async function inviteToMeetingAction(
     const result = await guard(() =>
         meetings.inviteToMeeting({ id: user.id }, parsed.data.meetingId, parsed.data.userIds)
     );
-    if (result.error || !result.value) return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
+    if (result.error || !result.value)
+        return { error: result.error ?? (await getTranslations("chat"))("errors.didNotWork") };
 
     for (const userId of result.value.invited) {
         // Written for whoever is invited, who reads it later, in their language.
@@ -509,7 +503,10 @@ export async function inviteToMeetingAction(
         await createNotification({
             userId,
             type: "chat.meeting.invited",
-            title: words("meetingNotice.invitedTitle", { name: user.name, meeting: result.value.title }),
+            title: words("meetingNotice.invitedTitle", {
+                name: user.name,
+                meeting: result.value.title
+            }),
             body: words("meetingNotice.invitedBody"),
             href: `/chat/meetings/${parsed.data.meetingId}`
         });
@@ -624,7 +621,11 @@ const pollSchema = z.object({
 export async function pollInMeetingAction(input: unknown): Promise<{ error?: string }> {
     const parsed = pollSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notAsked") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notAsked")
+        };
 
     const seat = await resolveSeat(parsed.data.meetingId);
     if (!seat) return { error: (await getTranslations("chat"))("errors.youAreNotInMeeting") };

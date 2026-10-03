@@ -58,7 +58,7 @@ vi.mock("@/lib/call-sounds", () => ({
     willBeHeard: async () => audible
 }));
 
-vi.mock("@/app/(app)/chat/meeting-actions", () => ({ callElsewhereAction: async () => null }));
+vi.mock("@/lib/chat/call-elsewhere-request", () => ({ askCallElsewhere: async () => null }));
 
 /** Every claim this tab asked its device for. */
 let claims: string[] = [];

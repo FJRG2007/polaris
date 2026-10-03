@@ -109,7 +109,31 @@ const nextConfig = {
         { source: "/inbox", destination: "/admin/inbox", permanent: false },
         { source: "/inbox/:path*", destination: "/admin/inbox/:path*", permanent: false },
         { source: "/favorites", destination: "/drive/favorites", permanent: false },
-        { source: "/trash", destination: "/drive/trash", permanent: false }
+        { source: "/trash", destination: "/drive/trash", permanent: false },
+        // Screens that moved and used to forward from a page of their own.
+        // A page in the signed-in group that only redirects is answered inside
+        // that group's loading boundary, so on a first visit the redirect is
+        // carried out mid-hydration - and that crashed the tab (see
+        // src/app/page.tsx). Here it is a 307 before any page is drawn.
+        //
+        // Notes are their own app now; links to a note are written into other
+        // notes, tasks and old chat messages, and the query is carried across,
+        // so `?note=` still opens that note.
+        { source: "/account/notes", destination: "/notes", permanent: false },
+        // Reported messages are on the safety queue, beside reports about people.
+        // The address is in bookmarks and in old alerts.
+        { source: "/admin/reports", destination: "/admin/safety", permanent: false },
+        // Model keys belong to the account, not to the Agents app. People
+        // bookmark the screen they keep credentials on.
+        { source: "/apps/agents/keys", destination: "/account/ai-keys", permanent: false },
+        // A project's firewall is the firewall screen scoped to that project. The
+        // destination refuses an id that is not the caller's with a 404, so
+        // forwarding blindly says nothing about whether the project exists.
+        {
+            source: "/apps/deploy/:projectId/firewall",
+            destination: "/apps/firewall?scope=project&id=:projectId",
+            permanent: false
+        }
     ],
     /**
      * The vault's Bitwarden-compatible surface.
