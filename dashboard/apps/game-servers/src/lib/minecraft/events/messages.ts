@@ -1236,6 +1236,16 @@ export function voteNoPlot(plot: number, language: Language): string {
         : `${BAD}There is no plot ${mark(plot, BAD)}.`;
 }
 
+/** What the round is built with, in the reader's language. */
+export function materialLine(
+    names: Readonly<Record<Language, string>>,
+    language: Language
+): string {
+    return language === "es"
+        ? `${WARN}Material: ${mark(names.es, WARN)}`
+        : `${WARN}Material: ${mark(names.en, WARN)}`;
+}
+
 export function themeWas(theme: string, language: Language): string {
     return language === "es"
         ? `${INFO}El tema era ${mark(theme, INFO)}`

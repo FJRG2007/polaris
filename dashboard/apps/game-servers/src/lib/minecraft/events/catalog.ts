@@ -1100,7 +1100,7 @@ export function awardsPrizes(preset: EventPreset): boolean {
 export const PRIZE_COMPETITION_FLOOR = 2;
 
 export function activeNeeded(preset: EventPreset, settings: EventSettings): number {
-    const floor = Math.max(settings.minActive, minPlayersOf(preset));
+    const floor = Math.max(settings.minActive, minPlayersOf(preset), joinersFloor(preset));
     return awardsPrizes(preset) ? Math.max(floor, PRIZE_COMPETITION_FLOOR) : floor;
 }
 
@@ -1111,8 +1111,14 @@ export function minPlayersOf(preset: EventPreset): number {
 }
 
 export function defaultMinPlayers(kind: EventKind): number {
+    if (kind === "build-battle") return BUILD_BATTLE_FLOOR;
     return KIND_INFO[kind].competitive ? 2 : 1;
 }
+
+/** A build battle is voted on by the others: with two, each vote is for the
+ *  only other build, and the winner is a coin toss. Three at the least,
+ *  whatever the event's own minimum says. */
+export const BUILD_BATTLE_FLOOR = 3;
 
 /**
  * What each kind asks for before somebody is ranked, in its own unit: enough to
@@ -1413,12 +1419,20 @@ export function countdownSecondsFor(preset: EventPreset, settings: EventSettings
 /** How many must join for it to go ahead: the event's own minimum, and never
  *  fewer than two for what one player cannot play - a spleef, a duel, a build
  *  battle voted on by the others - or for any competition with prizes. */
+/** The fewest an event that takes joiners can be played by at all. */
+function joinersFloor(preset: EventPreset): number {
+    return preset.kind === "build-battle" ? BUILD_BATTLE_FLOOR : 1;
+}
+
 export function joinersNeeded(preset: EventPreset): number {
     const floor =
         preset.kind === "spleef" || playsInArena(preset) || awardsPrizes(preset)
             ? PRIZE_COMPETITION_FLOOR
             : 1;
-    return Math.max(floor, minPlayersOf(preset));
+    return Math.max(
+        preset.kind === "build-battle" ? BUILD_BATTLE_FLOOR : floor,
+        minPlayersOf(preset)
+    );
 }
 
 /** The events that bring mobs up near the players, and so hold mob griefing

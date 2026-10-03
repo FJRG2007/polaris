@@ -2151,7 +2151,7 @@ describe("the kit is marked, and only it is taken back", () => {
     it("lets the kit's glass go only on the plot and on itself, and its brush break only the glass", () => {
         for (const marker of ["components", "tag"] as const) {
             const lines = build.kitCommands("Ana", marker);
-            expect(lines).toHaveLength(build.KIT_IDS.length);
+            expect(lines).toHaveLength(build.KIT_BLOCKS.length + 1);
             expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
             // The brush first, so it lands in the hotbar; the glass after it.
             const glass = lines[1]!;
@@ -2166,6 +2166,29 @@ describe("the kit is marked, and only it is taken back", () => {
             expect(brush).not.toContain(`"${build.FLOOR}"`);
         }
         expect(build.KIT_BLOCKS).not.toContain(build.FLOOR);
+    });
+
+    it("builds each round in one material drawn for it, the same after a restart", () => {
+        const drawn = new Set(
+            Array.from({ length: 60 }, (_, index) => build.paletteFor(`run-${index}`))
+        );
+        expect(drawn.size).toBeGreaterThan(3);
+        expect(build.paletteFor("run-7")).toBe(build.paletteFor("run-7"));
+        for (const palette of Object.keys(build.PALETTES) as build.Palette[]) {
+            const blocks = build.PALETTES[palette].blocks;
+            const lines = build.kitCommands("Ana", "components", palette);
+            expect(lines).toHaveLength(blocks.length + 1);
+            expect(lines.length).toBeLessThanOrEqual(36);
+            expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
+            // The brush breaks this set and nothing else; all of it is taken back and cleared.
+            for (const id of blocks) {
+                expect(lines[0]).toContain(`"${id}"`);
+                expect(build.KIT_IDS).toContain(id);
+                expect(build.PLATFORM_BLOCKS).toContain(id);
+            }
+            expect(blocks).not.toContain(build.FLOOR);
+        }
+        expect(build.kitCommands("Ana", "tag", "wool")[1]).toContain("minecraft:white_wool");
     });
 
     it("keeps what a player drops theirs, and sends it after them", () => {

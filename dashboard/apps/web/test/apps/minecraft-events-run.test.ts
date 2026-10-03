@@ -1622,6 +1622,7 @@ const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-m
 const commands = await import("@polaris-app/game-servers/src/lib/minecraft/events/commands");
 const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/events/messages");
 const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/plan");
+const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 
 /** What a player reads of a command's text: the words of its JSON, without the
@@ -5548,7 +5549,7 @@ function onlyOurBlocks(): void {
 }
 
 /** A run that joined, built and brought everybody in: countdown, joins, setup. */
-async function joinAndStart(presetId: string): Promise<void> {
+async function joinAndStart(presetId: string, joiners = ["Ana", "Ben"]): Promise<void> {
     await events.startEvent({
         ownerId: "owner",
         installedAppId: SERVER,
@@ -5560,9 +5561,12 @@ async function joinAndStart(presetId: string): Promise<void> {
     // give time to type join.
     expect(state().run!.startsAt - state().run!.createdAt).toBe(catalog.JOIN_SECONDS * 1000);
     await play(2_100);
-    chat(["Ana", "join"], ["Ben", "unirse"], ["Cy", "hello"]);
+    chat(
+        ...joiners.map((name): [string, string] => [name, name === "Ben" ? "unirse" : "join"]),
+        ["Dee", "hello"]
+    );
     await play(30_000);
-    expect(state().run?.joined).toEqual(["Ana", "Ben"]);
+    expect(state().run?.joined).toEqual(joiners);
     await play(20_000);
 }
 
@@ -6935,27 +6939,33 @@ describe("a build battle", () => {
             }
         };
         setUp([battle]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         const run = state().run!;
         expect(run.readyAt).not.toBeNull();
         expect(run.theme).toBe("A lighthouse");
         expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
         expect(
             fills().filter((line) => line.includes("minecraft:white_stained_glass keep"))
-        ).toHaveLength(2);
-        // Their own blocks cannot go down in adventure mode; the kit's glass only on the plot.
+        ).toHaveLength(3);
+        // Their own blocks cannot go down in adventure mode; the kit's blocks only on the plot.
         expect(world.sent).toContain("gamemode adventure Ben");
         const kit = world.sent.filter((line) => line.startsWith("give Ana "));
-        expect(kit).toHaveLength(17);
+        const palette = build.PALETTES[build.paletteFor(run.id)];
+        expect(kit).toHaveLength(palette.blocks.length + 1);
         expect(kit.every((line) => line.includes("minecraft:custom_data={polaris_event:1b}"))).toBe(
             true
         );
         // The brush first, into the hotbar; then the glass.
         expect(kit[0]).toContain("minecraft:stick[");
         expect(kit[1]).toContain('minecraft:can_place_on={blocks:["minecraft:white_stained_glass"');
+        expect(kit[1]).toContain(palette.blocks[0]);
+        // The theme, and the material the round is built in.
         expect(
             world.sent.some(
-                (line) => line.startsWith("title Ana subtitle") && line.includes("A lighthouse")
+                (line) =>
+                    line.startsWith("title Ana subtitle") &&
+                    line.includes("A lighthouse") &&
+                    line.includes(palette.name.en)
             )
         ).toBe(true);
 
@@ -7074,11 +7084,11 @@ describe("a build battle's [Done] button", () => {
         );
 
     it("is offered a minute in, and ends the building at once when every builder pressed it", async () => {
-        world.online = ["Ana", "Ben", "Cy"];
+        world.online = ["Ana", "Ben", "Cy", "Dee"];
         world.links = { Ben: "user-es" };
         world.locales = { "user-es": "es-ES" };
         setUp([battle()]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         const readyAt = state().run!.readyAt!;
         // Not before a minute in: a third of three minutes is longer.
         await play(readyAt + 50_000 - Date.now());
@@ -7088,7 +7098,7 @@ describe("a build battle's [Done] button", () => {
         expect(offers("Ana")[0]).toContain("[Done]");
         // In each builder's own language, and only to builders.
         expect(offers("Ben")[0]).toContain("[Terminado]");
-        expect(offers("Cy")).toEqual([]);
+        expect(offers("Dee")).toEqual([]);
         // Clicked in either spelling of the click the game has had.
         expect(offers("Ana")[0]).toContain(
             '"click_event":{"action":"run_command","command":"/trigger pe_join set 3"}'
@@ -7109,7 +7119,7 @@ describe("a build battle's [Done] button", () => {
                     line.includes("[Undo]")
             )
         ).toBe(true);
-        expect(panel().at(-1)).toContain("Done: 1/2");
+        expect(panel().at(-1)).toContain("Done: 1/3");
         world.pressed = { Ana: 4 };
         await play(2_100);
         expect(state().run?.done).toEqual([]);
@@ -7124,8 +7134,8 @@ describe("a build battle's [Done] button", () => {
             )
         ).toBe(true);
 
-        // The last one done: the vote starts now, with its own time ahead.
-        world.pressed = { Ana: 3 };
+        // The last ones done: the vote starts now, with its own time ahead.
+        world.pressed = { Ana: 3, Cy: 3 };
         await play(2_100);
         const run = state().run!;
         expect(run.voting).toBe(true);
@@ -7141,9 +7151,9 @@ describe("a build battle's [Done] button", () => {
     });
 
     it("is not held up by a builder who left", async () => {
-        world.online = ["Ana", "Ben"];
+        world.online = ["Ana", "Ben", "Cy"];
         setUp([battle()]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         await play(state().run!.readyAt! + 62_000 - Date.now());
         world.online = ["Ana"];
         world.pressed = { Ana: 3 };
@@ -7152,9 +7162,9 @@ describe("a build battle's [Done] button", () => {
     });
 
     it("runs its whole time when somebody never presses it", async () => {
-        world.online = ["Ana", "Ben"];
+        world.online = ["Ana", "Ben", "Cy"];
         setUp([battle()]);
-        await joinAndStart("build");
+        await joinAndStart("build", ["Ana", "Ben", "Cy"]);
         const readyAt = state().run!.readyAt!;
         await play(readyAt + 62_000 - Date.now());
         world.pressed = { Ana: 3 };

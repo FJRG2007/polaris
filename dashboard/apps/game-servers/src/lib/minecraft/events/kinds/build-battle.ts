@@ -46,20 +46,77 @@ const COLOURS = [
     "black"
 ];
 
-/** What there is to build with: clear glass and fifteen colors. */
-export const KIT_BLOCKS = [
-    "minecraft:glass",
-    ...COLOURS.map((color) => `minecraft:${color}_stained_glass`)
-];
+/**
+ * What there is to build with: one material per round, drawn from these, each
+ * in every color it comes in. Every id has been in the game since 1.13, which
+ * every version events run on is past (`quartz_bricks` since 1.16, which the
+ * quartz set carries as one block among several, so an older server loses
+ * that one only).
+ */
+export const PALETTES = {
+    glass: {
+        name: { en: "Glass", es: "Cristal" },
+        blocks: ["minecraft:glass", ...COLOURS.map((color) => `minecraft:${color}_stained_glass`)]
+    },
+    wool: {
+        name: { en: "Wool", es: "Lana" },
+        blocks: ["white", ...COLOURS].map((color) => `minecraft:${color}_wool`)
+    },
+    concrete: {
+        name: { en: "Concrete", es: "Hormigón" },
+        blocks: ["white", ...COLOURS].map((color) => `minecraft:${color}_concrete`)
+    },
+    terracotta: {
+        name: { en: "Terracotta", es: "Terracota" },
+        blocks: [
+            "minecraft:terracotta",
+            ...["white", ...COLOURS].map((color) => `minecraft:${color}_terracotta`)
+        ]
+    },
+    quartz: {
+        name: { en: "Quartz and glass", es: "Cuarzo y cristal" },
+        blocks: [
+            "minecraft:quartz_block",
+            "minecraft:chiseled_quartz_block",
+            "minecraft:quartz_pillar",
+            "minecraft:smooth_quartz",
+            "minecraft:quartz_bricks",
+            "minecraft:quartz_stairs",
+            "minecraft:quartz_slab",
+            "minecraft:glass",
+            "minecraft:glass_pane",
+            "minecraft:sea_lantern",
+            ...COLOURS.slice(0, 8).map((color) => `minecraft:${color}_stained_glass`)
+        ]
+    }
+} as const satisfies Record<
+    string,
+    { name: Readonly<Record<Language, string>>; blocks: readonly string[] }
+>;
 
-/** The brush: breaks the kit's glass, and only it. */
+export type Palette = keyof typeof PALETTES;
+
+/** The material of one run - the same for the same run, so a restart does not
+ *  change it. */
+export function paletteFor(runId: string): Palette {
+    const names = Object.keys(PALETTES) as Palette[];
+    return shuffled(names, seeded(`${runId}-palette`))[0] as Palette;
+}
+
+/** The glass set: what a run from before materials were drawn built with. */
+export const KIT_BLOCKS: readonly string[] = PALETTES.glass.blocks;
+
+/** Every block any material has, for what is taken back and cleared. */
+const ALL_KIT_BLOCKS = [...new Set(Object.values(PALETTES).flatMap((one) => one.blocks))];
+
+/** The brush: breaks the kit's blocks, and only them. */
 export const TOOL = "minecraft:stick";
 
-/** Every item the kit is, for taking it back. */
-export const KIT_IDS = [...KIT_BLOCKS, TOOL];
+/** Every item a kit can be, for taking it back. */
+export const KIT_IDS = [...ALL_KIT_BLOCKS, TOOL];
 
 /** Every kind of block that is ever on the platform. */
-export const PLATFORM_BLOCKS = ["minecraft:barrier", FLOOR, ...KIT_BLOCKS];
+export const PLATFORM_BLOCKS = ["minecraft:barrier", FLOOR, ...ALL_KIT_BLOCKS];
 
 /** How many plots one platform has at most. */
 export const MAX_PLOTS = 12;
@@ -188,11 +245,12 @@ export function airAt(spot: { x: number; y: number; z: number }, above = 0): str
  *  glass, placeable only on the plot and on itself. The brush first, so it lands
  *  in the first free slot of the hotbar - handed out last, it went to the bag
  *  behind sixteen stacks of glass, or at the feet of anybody whose bag was full. */
-export function kitCommands(name: string, marker: Marker): string[] {
-    const placeOn = [FLOOR, ...KIT_BLOCKS];
+export function kitCommands(name: string, marker: Marker, palette: Palette = "glass"): string[] {
+    const blocks = PALETTES[palette].blocks;
+    const placeOn = [FLOOR, ...blocks];
     return [
-        giveMarked(name, TOOL, 1, marker, { breaks: KIT_BLOCKS }),
-        ...KIT_BLOCKS.map((id) => giveMarked(name, id, STACK, marker, { placeOn }))
+        giveMarked(name, TOOL, 1, marker, { breaks: blocks }),
+        ...blocks.map((id) => giveMarked(name, id, STACK, marker, { placeOn }))
     ];
 }
 

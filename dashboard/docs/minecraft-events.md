@@ -65,3 +65,17 @@ Rare catch) leave the world alone.
 "Run a random event" on the screen draws one now among those whose conditions
 hold, ignoring the hours, the gap and fights, and lists why the others were
 left out.
+
+## Kind notes
+
+- **Build battle** needs three builders at the least, whatever the event's own
+  minimum (`catalog.BUILD_BATTLE_FLOOR`): with two, each vote can only go to the
+  other build. Each round is built in one material drawn for it
+  (`build-battle.PALETTES`: glass, wool, concrete, terracotta, quartz and glass),
+  said in the theme title and the chat; the brush breaks only that material.
+- **World boss** health grows with every fighter:
+  `effective = base x level.health x (1 + level.perFighter x (fighters - 1))`,
+  with `level` Normal (1.25, 0.5), Hard (1.75, 0.65) or Epic (2.5, 0.8)
+  (`boss.effectiveHealth`). Above the game's cap of 1024 the rest is carried as
+  Resistance levels (`boss.splitHealth`). A fighter who arrives mid-fight raises
+  it, keeping the share already lost (`boss.rescaled`).

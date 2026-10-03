@@ -460,8 +460,12 @@ async function bringIn(ctx: KindContext): Promise<void> {
                     run.joined.length
                 )
             ),
-            ...build.kitCommands(one.name, marker),
-            ...arena.titleTo(one.name, messages.themeTitle(language), `&f${theme ?? ""}`)
+            ...build.kitCommands(one.name, marker, build.paletteFor(run.id)),
+            ...arena.titleTo(
+                one.name,
+                messages.themeTitle(language),
+                `&f${theme ?? ""} &7- ${speech.pickIn(build.PALETTES[build.paletteFor(run.id)].name, language)}`
+            )
         ];
     };
     // One at a time: what they carry put away, and straight in - nobody left
@@ -483,7 +487,13 @@ async function bringIn(ctx: KindContext): Promise<void> {
         throw new TooFew(ONE_SIDED);
     const out: string[] = [];
     if (theme !== null)
-        out.push(commands.say(messages.tag(language) + messages.themeLine(theme, language)));
+        out.push(
+            commands.say(messages.tag(language) + messages.themeLine(theme, language)),
+            commands.say(
+                messages.tag(language) +
+                    messages.materialLine(build.PALETTES[build.paletteFor(run.id)].name, language)
+            )
+        );
     out.push(commands.sound(commands.SOUNDS.start));
     await ctx.server.sayAll(out);
     const seconds =

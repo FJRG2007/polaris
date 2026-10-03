@@ -478,6 +478,14 @@ describe("a competition with prizes, on its own", () => {
         expect(catalog.joinersNeeded(practice)).toBe(1);
     });
 
+    it("never plays a build battle with fewer than three, whatever its own minimum", () => {
+        const battle = catalog.newPreset("build-battle", "b");
+        expect(catalog.joinersNeeded({ ...battle, minPlayers: 2 })).toBe(3);
+        expect(catalog.joinersNeeded({ ...battle, minPlayers: 5 })).toBe(5);
+        expect(catalog.minPlayersOf({ ...battle, minPlayers: undefined })).toBe(3);
+        expect(catalog.activeNeeded({ ...battle, minPlayers: 2 }, loose)).toBe(3);
+    });
+
     it("is left out of the draw for one player alone, who still gets the rest", () => {
         const draw = {
             ...loose,
