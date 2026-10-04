@@ -160,6 +160,14 @@ export async function updateShare(
     await prisma.share.updateMany({ where: { id: shareId, ownerId }, data });
 }
 
+/** Where a share the caller owns points, or null when it is not theirs. */
+export async function findOwnedShareTarget(ownerId: string, shareId: string) {
+    return prisma.share.findFirst({
+        where: { id: shareId, ownerId },
+        select: { connectionId: true, path: true }
+    });
+}
+
 /** Access-log entries for a share the caller owns, newest first (owner-visible). */
 export async function listShareAccessLogs(ownerId: string, shareId: string) {
     const owns = await prisma.share.count({ where: { id: shareId, ownerId } });

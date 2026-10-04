@@ -175,7 +175,7 @@ async function callerFor(request: Request): Promise<McpCaller | null> {
     // Never an administrator, whoever started it. A session acts inside one
     // person's work; the instance-wide reach an admin has is not something an
     // agent should inherit by being started by one.
-    return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES };
+    return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES, sessionId: session.id };
 }
 
 /**
@@ -201,7 +201,8 @@ async function overBudget(
 
     // Every tool, for every credential: a model in a loop is the ordinary way
     // this gets called far too often, and each call reaches the database.
-    const credential = caller.keyId ?? caller.grantId ?? `user:${caller.userId}`;
+    const credential =
+        caller.keyId ?? caller.grantId ?? (caller.sessionId ? `session:${caller.sessionId}` : `user:${caller.userId}`);
     for (const [bucket, limit] of [
         [`mcp-call:${credential}`, CALLS_PER_MINUTE],
         ...(tool.readOnly ? [] : [[`mcp-change:${credential}`, CHANGES_PER_MINUTE] as const])

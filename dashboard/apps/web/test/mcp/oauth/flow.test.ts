@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
         viewingAs?: unknown;
     },
     rateLimited: false,
+    buckets: [] as string[],
     audit: [] as { action: string; actorId: string | null }[],
     db: null as unknown as ReturnType<typeof import("./fake-db").createFakeDb>
 }));
@@ -58,7 +59,10 @@ vi.mock("@/lib/deploy/api/http", () => ({
 }));
 vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.5" }));
 vi.mock("@/lib/rate-limit-service", () => ({
-    rateLimit: async () => (state.rateLimited ? { ok: false, retryAfterMs: 30_000 } : { ok: true, retryAfterMs: 0 })
+    rateLimit: async (bucket: string) => {
+        state.buckets.push(bucket);
+        return state.rateLimited ? { ok: false, retryAfterMs: 30_000 } : { ok: true, retryAfterMs: 0 };
+    }
 }));
 vi.mock("@/lib/audit-service", () => ({
     recordAudit: async (event: { action: string; actorId: string | null }) => {
@@ -66,7 +70,10 @@ vi.mock("@/lib/audit-service", () => ({
     }
 }));
 vi.mock("@/lib/network-rules", () => ({ evaluateAccountAccess: async () => ({ allowed: true }) }));
-vi.mock("@/lib/agents/session-service", () => ({ sessionForToken: async () => null, sessionOwner: async () => null }));
+vi.mock("@/lib/agents/session-service", () => ({
+    sessionForToken: async (token: string) => (token.startsWith("session-token-") ? { id: token.slice(14) } : null),
+    sessionOwner: async () => ADA.id
+}));
 vi.mock("@/lib/api-key-auth", () => ({
     authenticateApiKey: async (request: Request) =>
         request.headers.get("authorization") === "Bearer plk_test.good"
@@ -465,6 +472,16 @@ describe("calling /api/mcp with the token", () => {
         });
         expect(answer.body?.result.isError).toBe(true);
         expect(answer.body?.result.content[0].text).toContain("Too many calls");
+    });
+
+    it("gives each agent session its own budget, not one per person", async () => {
+        const whoami = { method: "tools/call", params: { name: "polaris_whoami", arguments: {} } };
+        state.buckets = [];
+        await mcpCall("session-token-one", whoami);
+        await mcpCall("session-token-two", whoami);
+        expect(state.buckets).toContain("mcp-call:session:one");
+        expect(state.buckets).toContain("mcp-call:session:two");
+        expect(state.buckets.some((bucket) => bucket.includes("user:"))).toBe(false);
     });
 
     it("still accepts an API key, as before", async () => {

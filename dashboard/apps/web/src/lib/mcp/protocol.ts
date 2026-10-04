@@ -54,6 +54,9 @@ export interface McpCaller {
      *  is an access token rather than a key. Exactly one of this and `keyId` is
      *  set for a person's own client; neither for a session's token. */
     readonly grantId?: string | null;
+    /** The agent session whose own token is calling. Set only when neither
+     *  `keyId` nor `grantId` is, so each session spends its own budget. */
+    readonly sessionId?: string | null;
 }
 
 /** What a tool gives back. Text because that is what a model reads; `structured`

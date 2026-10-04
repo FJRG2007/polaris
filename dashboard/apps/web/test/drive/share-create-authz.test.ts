@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => {
         DriveAccessError,
         DriveLockedError,
         authorizeDrive: vi.fn(),
-        createShare: vi.fn(async () => ({ id: "33333333-3333-4333-8333-333333333333", token: "tok" }))
+        createShare: vi.fn(async () => ({ id: "33333333-3333-4333-8333-333333333333", token: "tok" })),
+        findOwnedShareTarget: vi.fn(),
+        updateShare: vi.fn()
     };
 });
 
@@ -27,7 +29,11 @@ vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string
 vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: async () => "https://share.example.test" }));
 vi.mock("@/lib/public-reach", () => ({ ensureShareReachability: async () => undefined }));
 vi.mock("@/lib/session", () => ({ requirePermission: async () => ({ id: "user-1" }) }));
-vi.mock("@/lib/share-service", () => ({ createShare: mocks.createShare }));
+vi.mock("@/lib/share-service", () => ({
+    createShare: mocks.createShare,
+    findOwnedShareTarget: mocks.findOwnedShareTarget,
+    updateShare: mocks.updateShare
+}));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn() }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: vi.fn(), resetRateLimit: vi.fn() }));
 vi.mock("@/lib/request-context", () => ({ clientIp: vi.fn(), hashForLog: vi.fn() }));
@@ -37,9 +43,10 @@ vi.mock("@/lib/drive-authz", () => ({
     authorizeDrive: mocks.authorizeDrive
 }));
 
-const { createShareAction } = await import("@/app/(app)/drive/share-actions");
+const { createShareAction, updateShareAction } = await import("@/app/(app)/drive/share-actions");
 
 const CONNECTION = "11111111-1111-4111-8111-111111111111";
+const SHARE = "33333333-3333-4333-8333-333333333333";
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -78,5 +85,49 @@ describe("createShareAction", () => {
         const result = await createShareAction({ connectionId: CONNECTION, path: "/docs/a.pdf", kind: "public" });
         expect(result.url).toBe("https://share.example.test/s/tok");
         expect(mocks.authorizeDrive).toHaveBeenCalledWith("user-1", CONNECTION, "/docs/a.pdf", "download");
+    });
+
+    it.each([
+        ["allowDelete", "delete"],
+        ["allowRename", "rename"],
+        ["allowCreateFolder", "write"],
+        ["allowOverwrite", "write"]
+    ])("asks for %s's verb before handing it out", async (power, action) => {
+        mocks.authorizeDrive.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new mocks.DriveAccessError("no"));
+        const result = await createShareAction({
+            connectionId: CONNECTION,
+            path: "/inbox",
+            kind: "public",
+            [power]: true
+        });
+        expect(result.error).toBe("errors.locationDenied");
+        expect(mocks.authorizeDrive).toHaveBeenLastCalledWith("user-1", CONNECTION, "/inbox", action);
+        expect(mocks.createShare).not.toHaveBeenCalled();
+    });
+});
+
+describe("updateShareAction", () => {
+    it("refuses to turn on a power the owner does not hold on the shared path", async () => {
+        mocks.findOwnedShareTarget.mockResolvedValueOnce({ connectionId: CONNECTION, path: "/docs" });
+        mocks.authorizeDrive.mockRejectedValueOnce(new mocks.DriveAccessError("no"));
+        const result = await updateShareAction(SHARE, { allowDelete: true });
+        expect(result).toEqual({ error: "errors.locationDenied" });
+        expect(mocks.authorizeDrive).toHaveBeenCalledWith("user-1", CONNECTION, "/docs", "delete");
+        expect(mocks.updateShare).not.toHaveBeenCalled();
+    });
+
+    it("refuses a share the caller does not own", async () => {
+        mocks.findOwnedShareTarget.mockResolvedValueOnce(null);
+        const result = await updateShareAction(SHARE, { allowUpload: true });
+        expect(result).toEqual({ error: "errors.invalidShare" });
+        expect(mocks.updateShare).not.toHaveBeenCalled();
+    });
+
+    it("saves guardrail edits and powers being switched off without a Drive check", async () => {
+        mocks.findOwnedShareTarget.mockResolvedValueOnce({ connectionId: CONNECTION, path: "/docs" });
+        const result = await updateShareAction(SHARE, { allowDelete: false, maxDownloads: 3 });
+        expect(result).toEqual({});
+        expect(mocks.authorizeDrive).not.toHaveBeenCalled();
+        expect(mocks.updateShare).toHaveBeenCalledWith("user-1", SHARE, expect.objectContaining({ allowDelete: false, maxDownloads: 3 }));
     });
 });
