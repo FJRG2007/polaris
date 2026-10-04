@@ -353,6 +353,13 @@ function KeyRow({
                     >
                         {entry.name}
                     </Link>
+                    {/* Which keys a terminal is holding, so somebody cleaning up
+                        the list can tell a laptop's sign-in from a pipeline's key. */}
+                    {entry.kind === "cli" ? (
+                        <Badge variant="neutral" title={t("apiKeys.list.cli.title")}>
+                            {t("apiKeys.list.cli.badge")}
+                        </Badge>
+                    ) : null}
                     {/* Only when it is not what a key normally is. A row that
                         says "Active" on every line says nothing on any of
                         them. */}

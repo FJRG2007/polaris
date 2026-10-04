@@ -258,7 +258,11 @@
             "comingSoon": "Próximamente",
             "menuFor": "Qué hacer con {name}",
             "more": "Más",
-            "edit": "Editar"
+            "edit": "Editar",
+            "cli": {
+                "badge": "CLI",
+                "title": "Creada por plr login en un equipo. plr logout la revoca."
+            }
         },
         "form": {
             "neverExpires": "No caduca",
@@ -997,6 +1001,42 @@
             "pointIt": "Abre la extensión y apúntala a este Polaris. Pide permiso para hablar con esta dirección y con ninguna otra.",
             "caveatChromium": "Se queda hasta que la quites, y no se actualiza sola. Para que coja una versión nueva, sustituye los archivos en la misma carpeta y pulsa la flecha de recargar.",
             "caveatFirefox": "Temporal quiere decir temporal: Firefox la descarta al cerrarse, así que hay que volver a cargarla la próxima vez."
+        }
+    },
+    "cli": {
+        "page": {
+            "title": "Conectar la línea de comandos",
+            "intro": "Escribe el código que muestra plr login. No se inicia nada hasta que tú lo digas."
+        },
+        "code": "Código {code}",
+        "device": "Equipo",
+        "system": "Sistema",
+        "version": "Versión CLI",
+        "askedFrom": "Pedido desde",
+        "on": "En",
+        "unknown": "Sin datos",
+        "asksTo": "Pide permiso para",
+        "scope": {
+            "deployRead": "Ver tus apps, sus despliegues y sus registros",
+            "deployManage": "Desplegar, revertir, reiniciar y detener tus apps"
+        },
+        "consent": "Si dices que sí, este equipo recibe una clave que actúa en nombre de tu cuenta durante un año, limitada a lo que aparece arriba. Aparece en Claves de API, donde puedes revocarla, y plr logout también la revoca.",
+        "working": "Procesando",
+        "approve": "Aprobar",
+        "deny": "Rechazarla",
+        "signedIn": "Sesión iniciada.",
+        "signedInHint": "Vuelve a la terminal; continúa sola. La clave aparece en <link>Claves de API</link>.",
+        "turnedAway": "Rechazada.",
+        "turnedAwayHint": "No se ha entregado nada. La terminal lo indica y se detiene.",
+        "codeLabel": "El código que muestra la terminal",
+        "looking": "Buscando",
+        "find": "Buscarla",
+        "errors": {
+            "tooMany": "Se han probado demasiados códigos. Espera unos minutos.",
+            "notACode": "Eso no es un código de plr login.",
+            "nothingWaiting": "No hay nada esperando con ese código. Vuelve a ejecutar plr login para obtener uno nuevo.",
+            "cannotAnswer": "No se puede responder a esa solicitud.",
+            "noScopes": "Tu cuenta no puede usar Deploy, que es todo lo que hace la línea de comandos. Pide acceso a un administrador."
         }
     }
 }

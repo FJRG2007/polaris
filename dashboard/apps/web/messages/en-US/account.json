@@ -258,7 +258,11 @@
             "comingSoon": "Coming soon",
             "menuFor": "What to do with {name}",
             "more": "More",
-            "edit": "Edit"
+            "edit": "Edit",
+            "cli": {
+                "badge": "CLI",
+                "title": "Made by plr login on a computer. plr logout revokes it."
+            }
         },
         "form": {
             "neverExpires": "Never expires",
@@ -997,6 +1001,42 @@
             "pointIt": "Open the extension and point it at this Polaris. It asks for permission to talk to this address and no other.",
             "caveatChromium": "It stays until you remove it, and it does not update itself. Replacing the files in the same folder and pressing the refresh arrow is how it takes a new version.",
             "caveatFirefox": "Temporary is literal: Firefox lets it go when it closes, so it has to be loaded again next time."
+        }
+    },
+    "cli": {
+        "page": {
+            "title": "Sign in the command line",
+            "intro": "Type the code plr login is showing. Nothing is signed in until you say so."
+        },
+        "code": "Code {code}",
+        "device": "Computer",
+        "system": "System",
+        "version": "CLI version",
+        "askedFrom": "Asked from",
+        "on": "On",
+        "unknown": "Unknown",
+        "asksTo": "It is asking to",
+        "scope": {
+            "deployRead": "See your apps, their deployments and their logs",
+            "deployManage": "Deploy, roll back, restart and stop your apps"
+        },
+        "consent": "Saying yes gives this computer a key that acts for your account for a year, limited to what is listed above. It is listed under API keys, where you can revoke it, and plr logout revokes it too.",
+        "working": "Working",
+        "approve": "Sign it in",
+        "deny": "Turn it away",
+        "signedIn": "Signed in.",
+        "signedInHint": "Go back to the terminal; it carries on by itself. The key is listed under <link>API keys</link>.",
+        "turnedAway": "Turned away.",
+        "turnedAwayHint": "Nothing was handed over. The terminal says so and stops.",
+        "codeLabel": "The code the terminal is showing",
+        "looking": "Looking",
+        "find": "Find it",
+        "errors": {
+            "tooMany": "Too many codes tried. Wait a few minutes.",
+            "notACode": "That is not a code from plr login.",
+            "nothingWaiting": "Nothing is waiting on that code. Run plr login again for a new one.",
+            "cannotAnswer": "That request cannot be answered.",
+            "noScopes": "Your account cannot use Deploy, which is all the command line does. Ask an administrator for access."
         }
     }
 }

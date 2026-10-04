@@ -10,7 +10,7 @@
  * it exists are all the caller's problem, not information to hand out.
  */
 
-import { touchApiKey, verifyApiKey } from "@polaris/auth";
+import { touchApiKey, verifyApiKey, type ApiKeyKind } from "@polaris/auth";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { userAgentAllowed, type Permission } from "@polaris/core";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
@@ -23,6 +23,8 @@ export interface ApiKeyPrincipal {
     /** Set on a token minted from a Deploy project's settings. The Deploy API and
      *  its MCP tools confine such a key to that project. */
     projectId: string | null;
+    /** What issued it; "cli" for the credential `plr login` holds. */
+    kind: ApiKeyKind;
 }
 
 /** Extract the presented key, or null when the header is absent or malformed. */
@@ -62,7 +64,8 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
         keyId: verified.id,
         userId: verified.userId,
         scopes: verified.scopes,
-        projectId: verified.projectId
+        projectId: verified.projectId,
+        kind: verified.kind
     };
 }
 

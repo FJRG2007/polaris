@@ -62,6 +62,9 @@ export interface ApiKeyView {
      *  carries its owner's permissions like any other key. */
     projectId: string | null;
     projectName: string | null;
+    /** What issued it: "cli" for the credential `plr login` was handed, "key"
+     *  for everything else. See `ApiKeyKind`. */
+    kind: ApiKeyKind;
     /** Calls answered today, and over the window the counter keeps. Two numbers
      *  because one of them answers "is this still in use" and the other answers
      *  "was it ever" - a key used once in April and one answering a call a
@@ -69,6 +72,13 @@ export interface ApiKeyView {
     usedToday: number;
     usedRecently: number;
 }
+
+/**
+ * What issued a key. Every key is the same kind of bearer - scoped, listed,
+ * revocable and narrowed to its owner the same way; the kind only says where it
+ * came from, so the list can label it and the CLI can end its own sign-in.
+ */
+export type ApiKeyKind = "key" | "cli";
 
 /** A verified key: who it acts as, what it may do, and where it may be used from. */
 export interface VerifiedApiKey {
@@ -83,6 +93,7 @@ export interface VerifiedApiKey {
     /** The Deploy project the key was minted from, or null for an account key.
      *  Surfaces that reach projects narrow such a key to this one. */
     projectId: string | null;
+    kind: ApiKeyKind;
 }
 
 /** The public half of a key: "plk_" plus 8 URL-safe characters. */
@@ -127,7 +138,8 @@ function expiryFor(input: CreateApiKeyInput): Date | null {
  */
 export async function createApiKey(
     userId: string,
-    input: CreateApiKeyInput
+    input: CreateApiKeyInput,
+    options: { readonly kind?: ApiKeyKind } = {}
 ): Promise<{ id: string; prefix: string; secret: string }> {
     const prefix = generatePrefix();
     const secret = `${prefix}.${generateToken()}`;
@@ -151,6 +163,7 @@ export async function createApiKey(
             allowedUserAgents: stringifyList(input.allowedUserAgents),
             deniedUserAgents: stringifyList(input.deniedUserAgents),
             expiresAt: expiryFor(input),
+            kind: options.kind ?? "key",
             groups: { createMany: { data: owned.map((group) => ({ groupId: group.id })) } }
         },
         select: { id: true }
@@ -200,6 +213,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
         createdAt: row.createdAt.toISOString(),
         projectId: row.projectId,
         projectName: row.project?.name ?? null,
+        kind: row.kind === "cli" ? "cli" : "key",
         usedToday: row.usage.find((day) => day.day === today)?.calls ?? 0,
         usedRecently: row.usage.reduce((total, day) => total + day.calls, 0)
     }));
@@ -320,7 +334,8 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
             allowedUserAgents: parseStringList(row.allowedUserAgents),
             deniedUserAgents: parseStringList(row.deniedUserAgents)
         },
-        projectId: row.projectId
+        projectId: row.projectId,
+        kind: row.kind === "cli" ? "cli" : "key"
     };
 }
 
