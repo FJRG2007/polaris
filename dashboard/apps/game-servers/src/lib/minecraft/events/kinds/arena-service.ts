@@ -372,11 +372,12 @@ async function bringIn(ctx: KindContext): Promise<void> {
     const duelling = run.preset.kind === "team-duel";
     const hillside = run.preset.kind === "king-of-the-hill";
     const marker: stored.Marker = run.marker ?? (await kitMarker(ctx));
-    // Nothing in the hands on the hill: fists only.
+    // Nothing in the hands on the hill: fists only. Its kit is the crown the
+    // one ahead wears (`hill-service`), taken back with the rest.
     const kit = duelling
         ? duel.duelKit((run.preset.options as catalog.EventOptions<"team-duel">).kit)
         : hillside
-          ? []
+          ? [hill.CROWN]
           : build.KIT_IDS;
     const moved = new Set(
         [...run.entrants, ...(run.sentOut ?? []), ...(run.keptOut ?? [])].map((one) =>

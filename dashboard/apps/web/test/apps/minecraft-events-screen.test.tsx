@@ -133,6 +133,24 @@ describe("the Events tab", () => {
         retried.length = 0;
     });
 
+    it("does not offer to run an event with fewer on the server than it needs, and says why", async () => {
+        const build = catalog.newPreset("build-battle", "build");
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                players: { online: 2, active: 2 },
+                config: { ...config, presets: [build, catalog.newPreset("fishing", "fish")] }
+            }
+        });
+        const run = (await screen.findByLabelText("Run Build battle now")) as HTMLButtonElement;
+        expect(run.disabled).toBe(true);
+        expect(run.title).toBe("Only 2 players are on the server; this event needs 3");
+        expect(
+            (screen.getByLabelText("Run Fishing contest now") as HTMLButtonElement).disabled
+        ).toBe(false);
+    });
+
     it("explains an event from its row", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({ view });
@@ -356,6 +374,62 @@ describe("setting up a horde defense", () => {
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
         fireEvent.change(waves, { target: { value: "7" } });
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false);
+    });
+});
+
+describe("setting up a king of the ring", () => {
+    it("offers rounds, shrinking and moving with fists only, and hides them without", () => {
+        const saved: catalog.EventPreset[] = [];
+        render(
+            <EventEditor
+                preset={catalog.newPreset("king-of-the-hill", "ring")}
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+        const rounds = screen.getByLabelText(/^Rounds/) as HTMLInputElement;
+        expect(rounds.value).toBe("3");
+        for (const label of ["The ring shrinks", "The ring moves"])
+            expect(screen.getByLabelText(label).getAttribute("aria-checked")).toBe("true");
+        fireEvent.change(rounds, { target: { value: "6" } });
+        expect(screen.getAllByText("At most 5").length).toBeGreaterThan(0);
+        fireEvent.change(rounds, { target: { value: "2" } });
+        fireEvent.click(screen.getByLabelText("The ring moves"));
+        fireEvent.click(screen.getByText("Done"));
+        const options = saved.at(-1)!.options as catalog.EventOptions<"king-of-the-hill">;
+        expect([options.rounds, options.shrinks, options.moves]).toEqual([2, true, false]);
+        fireEvent.click(screen.getByLabelText("Fists only, nobody dies"));
+        expect(screen.queryByLabelText(/^Rounds/)).toBeNull();
+    });
+});
+
+describe("setting up a spleef", () => {
+    it("offers every way to play switched on, and never lets the last one go", () => {
+        const saved: catalog.EventPreset[] = [];
+        render(
+            <EventEditor
+                preset={catalog.newPreset("spleef", "spleef")}
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+        expect(screen.getByText("Ways it is played")).toBeTruthy();
+        const way = (label: string) => screen.getByLabelText(label) as HTMLButtonElement;
+        for (const label of [
+            "Shovels: dig the snow",
+            "Vanishing floor",
+            "Snowballs: break their floor"
+        ])
+            expect(way(label).getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(way("Snowballs: break their floor"));
+        fireEvent.click(way("Vanishing floor"));
+        // The one left on cannot be switched off.
+        expect(way("Shovels: dig the snow").disabled).toBe(true);
+        fireEvent.click(screen.getByText("Done"));
+        const options = saved.at(-1)!.options as catalog.EventOptions<"spleef">;
+        expect(options.variants).toEqual(["shovel"]);
     });
 });
 

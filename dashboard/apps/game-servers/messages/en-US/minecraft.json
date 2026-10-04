@@ -1654,8 +1654,8 @@
                 "summary": "Haste, luck and other effects for everybody for a while. No winner - a good filler between competitions."
             },
             "king-of-the-hill": {
-                "label": "King of the hill",
-                "summary": "A marked circle appears. The longest time spent inside it wins - so it is worth defending.",
+                "label": "King of the ring",
+                "summary": "Who joins is brought to a ring floating in the air, fists only, where nobody can die. Only time alone in the ring counts, so the others have to be pushed out; over each round it shrinks and moves, and the one ahead wears a crown.",
                 "unit": "seconds"
             },
             "treasure-hunt": {
@@ -1693,7 +1693,7 @@
             },
             "spleef": {
                 "label": "Spleef",
-                "summary": "The floor is lava: a snow floor is built high in the air and players who type join get a shovel that only breaks that snow. Dig it out from under the others - whoever falls through is out and sent back - and the last one standing wins.",
+                "summary": "The floor is lava: a snow floor is built high in the air, and each run is played one of the ways switched on - shovels that break only that snow, a floor that vanishes under your feet, or snowballs that break it. Whoever falls through is out and sent back; the last one standing wins.",
                 "unit": "points"
             },
             "team-duel": {
@@ -1908,6 +1908,7 @@
             "chooseEffect": "Choose at least one effect",
             "witherArenaOnly": "The Wither fights only in the sky arena",
             "chooseBoss": "Choose at least one boss that can fight here",
+            "chooseSpleefWay": "Choose at least one way to play",
             "killsOrOres": "Give something for kills, ores or both",
             "wavesAtLeast": "{count, plural, one {At least # wave} other {At least # waves}}",
             "wavesAtMost": "{count, plural, one {At most # wave} other {At most # waves}}",
@@ -2003,6 +2004,12 @@
         "circleRadiusBlocks": "Circle radius (blocks)",
         "fistsOnly": "Fists only, nobody dies",
         "fistsOnlyHint": "Players join and come with nothing: their things are kept and given back after, nobody can die, and pushing wins the circle.",
+        "ringRounds": "Rounds",
+        "ringRoundsHint": "1 to 5. The time is split between them; each starts with the ring whole, everybody back on their spot, and its end counts double.",
+        "ringShrinks": "The ring shrinks",
+        "ringShrinksHint": "A block at a time over each round, down to what the players need: two blocks round the middle for two, four for sixteen.",
+        "ringMoves": "The ring moves",
+        "ringMovesHint": "It drifts over the platform a block every few seconds, so nobody holds it standing still.",
         "between3And20": "Between 3 and 20.",
         "waves": "Waves",
         "3To10": "3 to 10",
@@ -2125,7 +2132,6 @@
                 "damage": "Most damage"
             },
             "spleef": {
-                "random": "A different way each time",
                 "shovel": "Shovels: dig the snow",
                 "decay": "Vanishing floor",
                 "snowballs": "Snowballs: break their floor"
@@ -2194,7 +2200,8 @@
         "bossTrophyHint": "A Nether Star named after the boss, with a glint and its difficulty, on top of the prizes. Only when the boss is defeated.",
         "wavesWinner": "How the winner is decided",
         "roundMinutes": "Minutes a round",
-        "howItIsPlayed": "How it is played",
+        "spleefWays": "Ways it is played",
+        "spleefWaysHint": "One of those switched on is drawn each time it runs.",
         "courseLook": "Look"
     },
     "moderation": {

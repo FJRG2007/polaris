@@ -7,7 +7,7 @@
 import type { Language } from "../catalog";
 
 export function enterTitle(language: Language): string {
-    return language === "es" ? "&6Rey de la colina" : "&6King of the hill";
+    return language === "es" ? "&6Rey del ring" : "&6King of the ring";
 }
 
 export function enterSubtitle(language: Language): string {
@@ -23,7 +23,7 @@ export function enterLine(language: Language): string {
 }
 
 export function backOnHill(language: Language): string {
-    return language === "es" ? "&eDe vuelta a la colina" : "&eBack on the hill";
+    return language === "es" ? "&eDe vuelta al ring" : "&eBack in the ring";
 }
 
 export function goTitle(language: Language): string {
@@ -32,6 +32,46 @@ export function goTitle(language: Language): string {
 
 export function goSubtitle(language: Language): string {
     return language === "es"
-        ? "&fAguanta el círculo más que nadie"
-        : "&fHold the circle longest to win";
+        ? "&fSolo cuenta el tiempo a solas en el ring"
+        : "&fOnly time alone in the ring counts";
+}
+
+export function roundTitle(round: number, rounds: number, language: Language): string {
+    return language === "es" ? `&6Ronda ${round}/${rounds}` : `&6Round ${round}/${rounds}`;
+}
+
+/** What the ring does this game, under each round's title. */
+export function roundSubtitle(shrinks: boolean, moves: boolean, language: Language): string {
+    const es = language === "es";
+    if (shrinks && moves)
+        return es ? "&fEl ring se encoge y se mueve" : "&fThe ring shrinks and moves";
+    if (shrinks) return es ? "&fEl ring se encoge" : "&fThe ring shrinks";
+    if (moves) return es ? "&fEl ring se mueve" : "&fThe ring moves";
+    return es ? "&fEchadlos del ring" : "&fPush them out of the ring";
+}
+
+export function sprintTitle(language: Language): string {
+    return language === "es" ? "&e¡Puntos dobles!" : "&eDouble points!";
+}
+
+export function sprintSubtitle(language: Language): string {
+    return language === "es" ? "&fHasta el final de la ronda" : "&fUntil the round ends";
+}
+
+/** In the ring with somebody else: nobody scores until one is out. */
+export function contested(language: Language): string {
+    return language === "es"
+        ? "&cRing disputado: &fecha a los demás para sumar"
+        : "&cRing contested: &fpush the others out to score";
+}
+
+export function nextRound(language: Language): string {
+    return language === "es" ? "&eSiguiente ronda..." : "&eNext round...";
+}
+
+/** Said in the chat when somebody new is ahead. */
+export function leads(name: string, language: Language): string {
+    return language === "es"
+        ? `&b&l${name}&e lleva la corona: va primero`
+        : `&b&l${name}&e wears the crown: in the lead`;
 }

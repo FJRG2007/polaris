@@ -73,9 +73,8 @@ const THEME_LABELS: Readonly<
 };
 
 const SPLEEF_LABELS: Readonly<
-    Record<"random" | (typeof catalog.SPLEEF_VARIANTS)[number], GameKey<"minecraft">>
+    Record<(typeof catalog.SPLEEF_VARIANTS)[number], GameKey<"minecraft">>
 > = {
-    random: "editor.labels.spleef.random",
     shovel: "editor.labels.spleef.shovel",
     decay: "editor.labels.spleef.decay",
     snowballs: "editor.labels.spleef.snowballs"
@@ -645,6 +644,51 @@ function OptionsFields({
                             aria-label={t("editor.fistsOnly")}
                         />
                     </label>
+                    {value.fistsOnly ? (
+                        <>
+                            <Field
+                                label={t("editor.ringRounds")}
+                                hint={t("editor.ringRoundsHint")}
+                                problem={problemAt(issues, "options", "rounds")}
+                            >
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={5}
+                                    value={Number.isFinite(value.rounds) ? value.rounds : ""}
+                                    onChange={(event) =>
+                                        onChange({ ...value, rounds: numberOf(event.target.value) })
+                                    }
+                                />
+                            </Field>
+                            <label className="flex items-center justify-between gap-3 text-sm">
+                                <span className="min-w-0">
+                                    <span className="font-medium">{t("editor.ringShrinks")}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {t("editor.ringShrinksHint")}
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={value.shrinks}
+                                    onChange={(on) => onChange({ ...value, shrinks: on })}
+                                    aria-label={t("editor.ringShrinks")}
+                                />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 text-sm">
+                                <span className="min-w-0">
+                                    <span className="font-medium">{t("editor.ringMoves")}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {t("editor.ringMovesHint")}
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={value.moves}
+                                    onChange={(on) => onChange({ ...value, moves: on })}
+                                    aria-label={t("editor.ringMoves")}
+                                />
+                            </label>
+                        </>
+                    ) : null}
                 </>
             );
         }
@@ -938,16 +982,40 @@ function OptionsFields({
                             />
                         </Field>
                     </div>
-                    <Field label={t("editor.howItIsPlayed")}>
-                        <Select
-                            value={value.variant}
-                            onValueChange={(variant) =>
-                                onChange({ ...value, variant: variant as typeof value.variant })
-                            }
-                            options={options(t, SPLEEF_LABELS)}
-                            aria-label={t("editor.howItIsPlayed")}
-                        />
-                    </Field>
+                    <fieldset className="flex flex-col gap-2 text-sm">
+                        <legend className="font-medium">{t("editor.spleefWays")}</legend>
+                        <span className="text-xs text-muted-foreground">
+                            {t("editor.spleefWaysHint")}
+                        </span>
+                        {catalog.SPLEEF_VARIANTS.map((way) => {
+                            const on = value.variants.includes(way);
+                            return (
+                                <label
+                                    key={way}
+                                    className="flex items-center justify-between gap-3"
+                                >
+                                    <span className="min-w-0">{t(SPLEEF_LABELS[way])}</span>
+                                    <Switch
+                                        checked={on}
+                                        // Never none: the last way switched on stays on.
+                                        disabled={on && value.variants.length === 1}
+                                        onChange={(next) =>
+                                            onChange({
+                                                ...value,
+                                                variants: catalog.SPLEEF_VARIANTS.filter((one) =>
+                                                    one === way
+                                                        ? next
+                                                        : value.variants.includes(one)
+                                                )
+                                            })
+                                        }
+                                        aria-label={t(SPLEEF_LABELS[way])}
+                                    />
+                                </label>
+                            );
+                        })}
+                        <Problem text={problemAt(issues, "options", "variants")} />
+                    </fieldset>
                 </>
             );
         }

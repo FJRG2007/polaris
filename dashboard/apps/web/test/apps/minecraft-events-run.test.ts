@@ -2328,6 +2328,24 @@ describe("the minute sweep", () => {
         expect(state().run?.trigger).toBe("random");
     });
 
+    it("does not open an event players join with fewer on the server than must join it", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([{ ...newPreset("build-battle", "build"), minutes: 10 }]);
+        const refused = await refusal(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "build",
+                trigger: "manual",
+                startedBy: null
+            })
+        );
+        // Three builders at the least: with two on, nobody is asked to join.
+        expect(refused).toBe("Only 2 players are on the server; this event needs 3");
+        expect(state().run).toBeNull();
+        expect(world.sent.some((line) => line.includes("bossbar add"))).toBe(false);
+    });
+
     it("does not start with fewer players on than its minimum, and says why", async () => {
         world.online = ["Ana"];
         setUp([{ ...newPreset("mining-rush", "rush"), minutes: 3 }]);
@@ -5199,10 +5217,18 @@ function builtAndRemoved(): { built: string[]; removed: string[] } {
  *  cleared but the event's marked items; nothing that burns or floods. */
 function keptTheRules(): void {
     const fills = world.sent.filter((line) => line.includes(" fill "));
+    // The ring is drawn again as it shrinks and moves: its floor's own block
+    // painted over its own ring block and back, never anything else.
+    const repaint = new RegExp(
+        ` (${hill.PLATFORM_BLOCK}|${hill.RING_BLOCK}) replace (${hill.RING_BLOCK}|${hill.PLATFORM_BLOCK})$`
+    );
     for (const line of fills)
-        expect(line.endsWith(" keep") || / minecraft:air replace minecraft:\S+$/.test(line)).toBe(
-            true
-        );
+        expect(
+            line.endsWith(" keep") ||
+                / minecraft:air replace minecraft:\S+$/.test(line) ||
+                (repaint.test(line) &&
+                    !line.includes(`${hill.RING_BLOCK} replace ${hill.RING_BLOCK}`))
+        ).toBe(true);
     // Everything built is taken out again: by its own box, or by a larger one
     // of the same block that holds it (an arena comes down a block at a time
     // over its whole box).
@@ -6761,6 +6787,36 @@ describe("a king of the hill", () => {
         expect((read.presets[0]!.options as { fistsOnly: boolean }).fistsOnly).toBe(true);
     });
 
+    it("is called King of the ring now, and one saved under the old default name reads as the new one", () => {
+        expect(catalog.KIND_NAMES["king-of-the-hill"]).toEqual({
+            en: "King of the ring",
+            es: "Rey del ring"
+        });
+        const named = (id: string, name: string) => ({
+            ...catalog.newPreset("king-of-the-hill", id),
+            name
+        });
+        const read = catalog.readEventsConfig({
+            [catalog.EVENTS_KEY]: {
+                settings: {},
+                presets: [
+                    named("en", "King of the hill"),
+                    named("es", "Rey de la colina"),
+                    named("own", "Friday hill"),
+                    { ...catalog.newPreset("mining-rush", "rush"), name: "King of the hill" }
+                ],
+                schedules: []
+            }
+        });
+        // A name the operator typed, or another kind's, is left as it is.
+        expect(read.presets.map((one) => [one.id, one.name])).toEqual([
+            ["en", "King of the ring"],
+            ["es", "Rey del ring"],
+            ["own", "Friday hill"],
+            ["rush", "King of the hill"]
+        ]);
+    });
+
     it("with fists only: who joined is brought to the circle empty-handed, cannot die, and gets it all back", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         world.inv = {
@@ -6814,12 +6870,14 @@ describe("a king of the hill", () => {
         expect(world.sent).toContain(
             'scoreboard players display numberformat Ana pe_score fixed {"text":"1.3 min"}'
         );
-        // Only those it brought score.
+        // Only those it brought score, and only one standing in the ring alone.
         expect(
-            world.sent.some((line) =>
-                line.includes(
-                    "gamemode=!spectator,tag=pe_arena] run scoreboard players add @s pe_score 2"
-                )
+            world.sent.some(
+                (line) =>
+                    line.startsWith("execute if score #inside pe_kin matches 1 ") &&
+                    line.endsWith(
+                        "as @a[tag=pe_arena,distance=..6,gamemode=!spectator] run scoreboard players add @s pe_score 2"
+                    )
             )
         ).toBe(true);
         // Knocked off, far down: brought back to the edge.
@@ -6950,6 +7008,69 @@ describe("a king of the hill", () => {
         );
         expect(without).toContain("Ben");
         expect(without).not.toContain("Ana");
+    });
+
+    it("with fists only: plays in rounds, the ring shrinking and moving, double at the end, the leader crowned", async () => {
+        world.online = ["Ana", "Ben"];
+        world.sea = true;
+        setUp([fists()]);
+        await joinAndStart("hill");
+        await play(30_000);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(run.kit).toEqual([hill.CROWN]);
+        const from = world.sent.length;
+        world.scores = { Ana: 10, Ben: 4 };
+        await play(2_100);
+        // Ana is ahead: she glows, wears the crown, and everybody is told.
+        expect(world.sent.slice(from)).toContain("effect give Ana minecraft:glowing 3 0 true");
+        expect(
+            world.sent
+                .slice(from)
+                .some((line) =>
+                    /^item replace entity Ana armor\.head with minecraft:golden_helmet/.test(line)
+                )
+        ).toBe(true);
+        expect(world.sent.slice(from).some((line) => line.includes("wears the crown"))).toBe(true);
+        // Overtaken: the crown changes heads.
+        world.scores = { Ana: 10, Ben: 20 };
+        const overtaken = world.sent.length;
+        await play(2_100);
+        const after = world.sent.slice(overtaken);
+        expect(after).toContain("effect clear Ana minecraft:glowing");
+        expect(after.some((line) => /^clear Ana minecraft:golden_helmet/.test(line))).toBe(true);
+        expect(
+            after.some((line) =>
+                /^item replace entity Ben armor\.head with minecraft:golden_helmet/.test(line)
+            )
+        ).toBe(true);
+        // Through the first round: the ring drawn again smaller, and double at its end.
+        const first = world.sent.length;
+        await play(50_000);
+        expect(state().run!.ring!.radius).toBeLessThan(6);
+        expect(world.sent.some((line) => line.includes("Double points!"))).toBe(true);
+        expect(
+            world.sent.some((line) =>
+                / minecraft:yellow_concrete replace minecraft:smooth_stone$/.test(line)
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some((line) => / run scoreboard players add @s pe_score 4$/.test(line))
+        ).toBe(true);
+        // The second round: everybody back on their spot, nothing counted for a moment.
+        await play(10_000);
+        expect(state().run!.ring!.round).toBe(2);
+        const later = world.sent.slice(first);
+        const round = later.findIndex((line) => line.includes("Round 2/3"));
+        expect(round).toBeGreaterThan(-1);
+        expect(later.slice(0, round).some((line) => / run tp Ana ~ ~ ~ /.test(line))).toBe(true);
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        expect(world.sent.some((line) => /^clear Ben minecraft:golden_helmet/.test(line))).toBe(
+            true
+        );
+        expect(world.sent).toContain("scoreboard objectives remove pe_kin");
+        keptTheRules();
     });
 
     it("with no untouched ground for the circle, stands on a platform of its own over the sea, taken away after", async () => {
@@ -7933,11 +8054,21 @@ describe("each player reads their own language", () => {
         world.sent.some(
             (line) => line.startsWith(`tellraw ${selector} `) && visible(line).includes(words)
         );
+    /** The run's random id shuffles the bank: with every true-or-false item
+     *  asked lately, the first round is a question whatever the id comes out as. */
+    const questionFirst = () => {
+        config[catalog.EVENT_STATE_KEY] = {
+            triviaSeen: triviaBank.BANK.filter((one) => triviaBank.truthOf(one.en) !== null).map(
+                (one) => one.id
+            )
+        };
+    };
 
     it("asks a Spanish account's player in Spanish and everybody else in English, and takes either answer", async () => {
         world.links = { Ana: "user-es" };
         world.locales = { "user-es": "es-ES" };
         setUp([quiz()]);
+        questionFirst();
         await startArena("quiz");
         await play(4_100);
         // Each player carries the tag of the language they read.
@@ -8034,6 +8165,7 @@ describe("each player reads their own language", () => {
         const settings = (config[catalog.EVENTS_KEY] as { settings: Record<string, unknown> })
             .settings;
         delete settings.language;
+        questionFirst();
         await startArena("quiz");
         await play(4_100);
         // Nobody linked: everybody reads the owner's language, sent to all at once.

@@ -1654,8 +1654,8 @@
                 "summary": "Prisa, suerte y otros efectos para todos durante un rato. Sin ganador - un buen relleno entre competiciones."
             },
             "king-of-the-hill": {
-                "label": "Rey de la colina",
-                "summary": "Aparece un círculo marcado. Gana quien más tiempo pase dentro - así que vale la pena defenderlo.",
+                "label": "Rey del ring",
+                "summary": "Quien se apunta sube a un ring flotante, solo con los puños y sin poder morir. Solo cuenta el tiempo a solas dentro, así que hay que echar a los demás; en cada ronda se encoge y se mueve, y quien va primero lleva corona.",
                 "unit": "segundos"
             },
             "treasure-hunt": {
@@ -1693,7 +1693,7 @@
             },
             "spleef": {
                 "label": "Spleef",
-                "summary": "El suelo es lava: se construye un suelo de nieve en lo alto y quien escribe join recibe una pala que solo rompe esa nieve. Cávala bajo los demás - quien cae queda fuera y vuelve - y gana el último en pie.",
+                "summary": "El suelo es lava: se construye un suelo de nieve en lo alto y cada partida se juega de una de las formas activadas - palas que solo rompen esa nieve, un suelo que desaparece bajo los pies o bolas de nieve que lo rompen. Quien cae queda fuera y vuelve; gana el último en pie.",
                 "unit": "puntos"
             },
             "team-duel": {
@@ -1908,6 +1908,7 @@
             "chooseEffect": "Elige al menos un efecto",
             "witherArenaOnly": "El Wither solo lucha en la arena aérea",
             "chooseBoss": "Elige al menos un jefe que pueda luchar aquí",
+            "chooseSpleefWay": "Elige al menos una forma de jugar",
             "killsOrOres": "Da algo por muertes, por menas o por ambas",
             "wavesAtLeast": "{count, plural, one {Al menos # oleada} other {Al menos # oleadas}}",
             "wavesAtMost": "{count, plural, one {Como máximo # oleada} other {Como máximo # oleadas}}",
@@ -2003,6 +2004,12 @@
         "circleRadiusBlocks": "Radio del círculo (bloques)",
         "fistsOnly": "Solo puños, nadie muere",
         "fistsOnlyHint": "Quien se apunta entra sin nada: sus cosas se guardan y se devuelven, nadie puede morir y se gana a empujones.",
+        "ringRounds": "Rondas",
+        "ringRoundsHint": "De 1 a 5. El tiempo se reparte entre ellas; cada una empieza con el ring entero, todos en su sitio, y su final puntúa doble.",
+        "ringShrinks": "El ring se encoge",
+        "ringShrinksHint": "Un bloque cada vez a lo largo de la ronda, hasta lo que necesitan los jugadores: dos bloques de radio para dos, cuatro para dieciséis.",
+        "ringMoves": "El ring se mueve",
+        "ringMovesHint": "Se desplaza por la plataforma un bloque cada pocos segundos, así nadie lo aguanta quieto.",
         "between3And20": "Entre 3 y 20.",
         "waves": "Oleadas",
         "3To10": "3 a 10",
@@ -2125,7 +2132,6 @@
                 "damage": "Más daño"
             },
             "spleef": {
-                "random": "Distinto cada vez",
                 "shovel": "Palas: rompe la nieve",
                 "decay": "Suelo fugaz",
                 "snowballs": "Bolas: rompe su suelo"
@@ -2194,7 +2200,8 @@
         "bossTrophyHint": "Una estrella del Nether con el nombre del jefe, brillo y su dificultad, además de los premios. Solo si el jefe cae.",
         "wavesWinner": "Cómo se decide el ganador",
         "roundMinutes": "Minutos por ronda",
-        "howItIsPlayed": "Cómo se juega",
+        "spleefWays": "Formas de jugar",
+        "spleefWaysHint": "Cada vez que se juega sale una de las activadas.",
         "courseLook": "Aspecto"
     },
     "moderation": {

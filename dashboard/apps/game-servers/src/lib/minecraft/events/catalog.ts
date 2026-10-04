@@ -224,6 +224,16 @@ function legacyWorldBoss(value: unknown): unknown {
     return { choice: "chosen", difficulty: "normal", arena: false, ...value };
 }
 
+/** A spleef saved with one `variant` - "random", or always one way - reads as
+ *  the ways that allowed: random is every way, drawn the same as before. */
+function legacySpleef(value: unknown): unknown {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+    if ("variants" in value || !("variant" in value)) return value;
+    const { variant, ...rest } = value as { variant: unknown };
+    const one = SPLEEF_VARIANTS.find((way) => way === variant);
+    return { ...rest, variants: one ? [one] : [...SPLEEF_VARIANTS] };
+}
+
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
 export const optionsSchemas = {
@@ -305,7 +315,20 @@ export const optionsSchemas = {
         /** Played by who joins, brought to it with nothing in their hands - their
          *  things kept and given back after - where nobody can die, and pushing
          *  is how the circle is won (`kinds/hill`). */
-        fistsOnly: z.boolean().default(true)
+        fistsOnly: z.boolean().default(true),
+        /** With fists only: the game split into rounds, the ring whole and in
+         *  the middle again at the start of each (`kinds/hill`, the ring). */
+        rounds: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(5, problem("atMost", { count: 5 }))
+            .default(3),
+        /** With fists only: the ring shrinks over each round, down to what the
+         *  players need (`hill.leastRadius`). */
+        shrinks: z.boolean().default(true),
+        /** With fists only: the ring drifts over the platform. */
+        moves: z.boolean().default(true)
     }),
     "treasure-hunt": z.object({
         chests: z
@@ -425,24 +448,33 @@ export const optionsSchemas = {
             .max(40, problem("atMost", { count: 40 }))
             .default(30)
     }),
-    spleef: z.object({
-        place: placeSchema.default({ mode: "players" }),
-        /** Blocks from the middle of the floor to its edge. */
-        size: z
-            .number()
-            .int()
-            .min(5, problem("atLeast", { count: 5 }))
-            .max(15, problem("atMost", { count: 15 }))
-            .default(8),
-        height: z
-            .number()
-            .int()
-            .min(25, problem("atLeast", { count: 25 }))
-            .max(40, problem("atMost", { count: 40 }))
-            .default(30),
-        /** How it is played (`kinds/spleef`): drawn for each run, or always one way. */
-        variant: z.enum(["random", ...SPLEEF_VARIANTS]).default("random")
-    }),
+    spleef: z.preprocess(
+        legacySpleef,
+        z.object({
+            place: placeSchema.default({ mode: "players" }),
+            /** Blocks from the middle of the floor to its edge. */
+            size: z
+                .number()
+                .int()
+                .min(5, problem("atLeast", { count: 5 }))
+                .max(15, problem("atMost", { count: 15 }))
+                .default(8),
+            height: z
+                .number()
+                .int()
+                .min(25, problem("atLeast", { count: 25 }))
+                .max(40, problem("atMost", { count: 40 }))
+                .default(30),
+            /** The ways it may be played (`kinds/spleef`): one of them is drawn for
+             *  each run, so a single one is always that way. */
+            variants: z
+                .array(z.enum(SPLEEF_VARIANTS))
+                .min(1, problem("chooseSpleefWay"))
+                .max(SPLEEF_VARIANTS.length)
+                .transform((ways) => SPLEEF_VARIANTS.filter((way) => ways.includes(way)))
+                .default([...SPLEEF_VARIANTS])
+        })
+    ),
     "team-duel": z.object({
         /** The arena is built in the air above ground found here. */
         place: placeSchema.default({ mode: "players" }),
@@ -697,7 +729,7 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     trivia: { en: "Trivia", es: "Trivia" },
     explorer: { en: "Explorer", es: "Explorador" },
     "happy-hour": { en: "Happy hour", es: "Hora feliz" },
-    "king-of-the-hill": { en: "King of the hill", es: "Rey de la colina" },
+    "king-of-the-hill": { en: "King of the ring", es: "Rey del ring" },
     "treasure-hunt": { en: "Treasure hunt", es: "Búsqueda del tesoro" },
     gathering: { en: "Gathering", es: "Recolección" },
     "rare-catch": { en: "Rare catch", es: "Pesca rara" },
@@ -908,6 +940,13 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "build-battle": EPIC
 };
 
+/** The names a king of the ring was given by default while it was a hill, and
+ *  what each reads as now. */
+const OLD_HILL_NAMES: ReadonlyMap<unknown, string> = new Map([
+    ["King of the hill", "King of the ring"],
+    ["Rey de la colina", "Rey del ring"]
+]);
+
 /** A king of the hill's length: three minutes of pushing is plenty. */
 export const HILL_MINUTES = 3;
 
@@ -954,14 +993,22 @@ export function oldDefaultMinutes(kind: EventKind): number {
  */
 export function migratePreset(entry: unknown): unknown {
     if (typeof entry !== "object" || entry === null) return entry;
-    const raw = entry as { kind?: unknown; minutes?: unknown; options?: unknown };
-    if (raw.kind !== "king-of-the-hill") return entry;
+    const named = entry as { kind?: unknown; name?: unknown };
+    if (named.kind !== "king-of-the-hill") return entry;
+    // Named "King of the hill" when it was added, before it became a ring
+    // floating in the air: the name it was given, not one anybody chose.
+    const renamed = OLD_HILL_NAMES.get(named.name);
+    const raw = (renamed ? { ...entry, name: renamed } : entry) as {
+        kind?: unknown;
+        minutes?: unknown;
+        options?: unknown;
+    };
     // Four was the length every hill started with until it was shortened to
     // three: nobody's choice either.
     if (raw.minutes === 4) return { ...raw, minutes: HILL_MINUTES };
-    if (raw.minutes !== 10) return entry;
+    if (raw.minutes !== 10) return raw;
     const options = raw.options;
-    if (typeof options === "object" && options !== null && "fistsOnly" in options) return entry;
+    if (typeof options === "object" && options !== null && "fistsOnly" in options) return raw;
     return { ...raw, minutes: HILL_MINUTES };
 }
 

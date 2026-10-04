@@ -37,7 +37,7 @@ const base = {
     pending: [],
     nextRandomAt: null,
     waiting: null,
-    players: { online: 1, active: 1 },
+    players: { online: 2, active: 2 },
     refusal: null
 };
 const running = (phase: "countdown" | "running") => ({

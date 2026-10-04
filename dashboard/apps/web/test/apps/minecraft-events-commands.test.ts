@@ -1994,12 +1994,47 @@ describe("a spleef floor", () => {
         expect(spleef.fell(floor, bottom - 2)).toBe(true);
     });
 
+    it("leaves every way on by default, and reads an event saved with one way as that way alone", () => {
+        const fresh = catalog.optionsSchemas.spleef.parse({});
+        expect(fresh.variants).toEqual(["shovel", "decay", "snowballs"]);
+        expect(catalog.optionsSchemas.spleef.parse({ variant: "random" }).variants).toEqual([
+            "shovel",
+            "decay",
+            "snowballs"
+        ]);
+        expect(catalog.optionsSchemas.spleef.parse({ variant: "decay" }).variants).toEqual([
+            "decay"
+        ]);
+        // Kept in one order, whatever order the screen sent them in, and never none.
+        expect(
+            catalog.optionsSchemas.spleef.parse({ variants: ["snowballs", "shovel"] }).variants
+        ).toEqual(["shovel", "snowballs"]);
+        expect(catalog.optionsSchemas.spleef.safeParse({ variants: [] }).success).toBe(false);
+    });
+
+    it("draws the same way for a run saved as random before ways could be left out", () => {
+        // What `variantFor(runId, "random")` drew: the first of all three shuffled.
+        const before = (runId: string) =>
+            trivia.shuffled(spleef.VARIANTS, trivia.seeded(`${runId}-spleef`))[0];
+        for (let index = 0; index < 40; index += 1)
+            expect(spleef.variantFor(`r${index}`)).toBe(before(`r${index}`));
+    });
+
     it("plays one of three ways, the same after a restart, and the decay game only eats its own snow", () => {
         const drawn = new Set(
             Array.from({ length: 40 }, (_, index) => spleef.variantFor(`r${index}`))
         );
         expect([...drawn].sort()).toEqual([...spleef.VARIANTS].sort());
         expect(spleef.variantFor("r1")).toBe(spleef.variantFor("r1"));
+        // Only the ways the event leaves on are ever drawn.
+        const twoWays = new Set(
+            Array.from({ length: 40 }, (_, index) =>
+                spleef.variantFor(`r${index}`, ["shovel", "decay"])
+            )
+        );
+        expect([...twoWays].sort()).toEqual(["decay", "shovel"]);
+        for (let index = 0; index < 20; index += 1)
+            expect(spleef.variantFor(`r${index}`, ["snowballs"])).toBe("snowballs");
         const floor = spleef.arena(
             { place: { mode: "players" }, size: 5, height: 30 },
             { x: 0, z: 0 },
