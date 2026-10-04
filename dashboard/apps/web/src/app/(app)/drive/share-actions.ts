@@ -67,7 +67,12 @@ export interface ShareLogRow {
 export async function createShareAction(input: unknown): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("shares.create");
     const parsed = createShareSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidShare") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidShare")
+        };
     const { id, token } = await createShare(user.id, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -110,7 +115,10 @@ export async function updateShareAction(
     const user = await requirePermission("shares.create");
     const cidrs = (input.allowedCidrs ?? []).map((value) => value.trim()).filter(Boolean);
     const invalid = cidrs.find((value) => !isCidr(value) && !isIpAddress(value));
-    if (invalid) return { error: (await getTranslations("drive"))("errors.invalidCidr", { value: invalid }) };
+    if (invalid)
+        return {
+            error: (await getTranslations("drive"))("errors.invalidCidr", { value: invalid })
+        };
     await updateShare(user.id, shareId, {
         password: input.password === undefined ? undefined : input.password || null,
         maxDownloads: input.maxDownloads === undefined ? undefined : input.maxDownloads || null,
@@ -180,7 +188,8 @@ export async function unlockShareAction(
 ): Promise<{ error?: string }> {
     const share = await resolveShareByToken(token);
     if (!share) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
-    if (!shareUsability(share).ok) return { error: (await getTranslations("drive"))("errors.linkGone") };
+    if (!shareUsability(share).ok)
+        return { error: (await getTranslations("drive"))("errors.linkGone") };
 
     const limitKey = `share-unlock:${share.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {

@@ -181,7 +181,9 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                           count: share.downloadCount,
                                                           max: share.maxDownloads
                                                       })
-                                                    : t("sharedLinks.downloads", { count: share.downloadCount })}
+                                                    : t("sharedLinks.downloads", {
+                                                          count: share.downloadCount
+                                                      })}
                                                 {share.expiresAt
                                                     ? ` - ${t("sharedLinks.expires", { date: format.date(share.expiresAt) })}`
                                                     : ""}
@@ -530,18 +532,28 @@ function ShareLogsDialog({
                 </DialogHeader>
                 <div className="mb-2 flex flex-wrap gap-2 text-xs">
                     <Badge variant="neutral">{t("sharedLinks.views", { count: views })}</Badge>
-                    <Badge variant="neutral">{t("sharedLinks.downloads", { count: downloads })}</Badge>
-                    <Badge variant="neutral">{t("sharedLinks.uniqueIps", { count: uniqueIps })}</Badge>
+                    <Badge variant="neutral">
+                        {t("sharedLinks.downloads", { count: downloads })}
+                    </Badge>
+                    <Badge variant="neutral">
+                        {t("sharedLinks.uniqueIps", { count: uniqueIps })}
+                    </Badge>
                     {signedIn > 0 ? (
-                        <Badge variant="neutral">{t("linkVisitor.signedIn", { count: signedIn })}</Badge>
+                        <Badge variant="neutral">
+                            {t("linkVisitor.signedIn", { count: signedIn })}
+                        </Badge>
                     ) : null}
                     {denied > 0 ? (
-                        <Badge variant="warning">{t("sharedLinks.denied", { count: denied })}</Badge>
+                        <Badge variant="warning">
+                            {t("sharedLinks.denied", { count: denied })}
+                        </Badge>
                     ) : null}
                 </div>
                 <div className="max-h-[55vh] overflow-auto overscroll-contain">
                     {logs === null ? (
-                        <p className="p-6 text-center text-sm text-muted-foreground">{t("sharedLinks.loading")}</p>
+                        <p className="p-6 text-center text-sm text-muted-foreground">
+                            {t("sharedLinks.loading")}
+                        </p>
                     ) : logs.length === 0 ? (
                         <p className="p-6 text-center text-sm text-muted-foreground">
                             {t("sharedLinks.noAccess")}
@@ -550,9 +562,13 @@ function ShareLogsDialog({
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">{t("sharedLinks.when")}</th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("sharedLinks.when")}
+                                    </th>
                                     <th className="py-1 pr-3 font-medium">{t("sharedLinks.ip")}</th>
-                                    <th className="py-1 pr-3 font-medium">{t("linkVisitor.who")}</th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("linkVisitor.who")}
+                                    </th>
                                     <th className="py-1 font-medium">{t("sharedLinks.action")}</th>
                                 </tr>
                             </thead>
@@ -572,7 +588,9 @@ function ShareLogsDialog({
                                             {row.reason ? (
                                                 <span className="text-danger">
                                                     {t("sharedLinks.actionDenied", {
-                                                        action: LOG_ACTIONS[row.action] ? t(LOG_ACTIONS[row.action]!) : row.action,
+                                                        action: LOG_ACTIONS[row.action]
+                                                            ? t(LOG_ACTIONS[row.action]!)
+                                                            : row.action,
                                                         reason: row.reason
                                                     })}
                                                 </span>

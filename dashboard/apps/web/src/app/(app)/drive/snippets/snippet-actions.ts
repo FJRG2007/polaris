@@ -53,7 +53,12 @@ export async function createSnippetAction(
 ): Promise<{ id?: string; url?: string | null; error?: string }> {
     const user = await requirePermission("snippets.write");
     const parsed = createSnippetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSnippet") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidSnippet")
+        };
 
     const { id, token } = await snippetService.createSnippet(user.id, parsed.data);
     await recordAudit({
@@ -86,7 +91,12 @@ export async function updateSnippetAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("snippets.write");
     const parsed = updateSnippetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSnippet") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidSnippet")
+        };
     if (!(await snippetService.updateSnippet(user.id, snippetId, parsed.data))) {
         return { error: (await getTranslations("drive"))("errors.snippetNotYours") };
     }
@@ -107,7 +117,12 @@ export async function shareSnippetAction(
 ): Promise<{ url?: string | null; error?: string }> {
     const user = await requirePermission("snippets.write");
     const parsed = shareSnippetSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSharing") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidSharing")
+        };
 
     const result = await snippetService.shareSnippet(user.id, snippetId, parsed.data);
     if (!result.ok) return { error: (await getTranslations("drive"))("errors.snippetNotYours") };
@@ -199,7 +214,8 @@ export async function openBurnSnippetAction(
 ): Promise<{ files?: PublicSnippetFile[]; error?: string }> {
     const gate = await gateSnippetRequest(token, "open");
     if (!gate.ok) return { error: await snippetDenialMessage(gate.reason) };
-    if (!gate.snippet.burnAfterRead) return { error: (await getTranslations("drive"))("errors.notOneTime") };
+    if (!gate.snippet.burnAfterRead)
+        return { error: (await getTranslations("drive"))("errors.notOneTime") };
 
     if (!(await snippetService.registerSnippetView(gate.snippet.id))) {
         return { error: await snippetDenialMessage("exhausted") };
