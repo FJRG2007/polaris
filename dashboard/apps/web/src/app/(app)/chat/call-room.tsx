@@ -48,7 +48,7 @@ import {
     type BackgroundScene,
     type CameraBackground
 } from "./camera-background";
-import { searchPeopleAction } from "./actions";
+import { ChatPeoplePicker } from "./chat-people-picker";
 import { NoAudioNotice } from "./no-audio-notice";
 import { QuietMicNotice } from "./quiet-mic-notice";
 import { SlowConnectionNotice } from "@/components/connection-banner";
@@ -75,7 +75,7 @@ import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import type { SeatModeration } from "./call-moderation-menu";
 import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
-import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import type { PickedPerson } from "@/components/people-picker";
 import {
     arrivedKeys,
     LOCAL_SCREEN_KEY,
@@ -1266,6 +1266,7 @@ export function CallRoom({
                     // the picker is the host's own and answers to nothing here:
                     // it adds nobody to the conversation.
                     mayInvite={mayInvite}
+                    forGroup={place === "direct"}
                     onOpenChange={setInviting}
                     meetingId={meetingId}
                     already={(admitted ?? [])
@@ -2499,11 +2500,15 @@ function InviteToCallDialog({
     canShare,
     guestToken,
     onShared,
-    onDone
+    onDone,
+    forGroup
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     meetingId: string;
+    /** Whether whoever is brought in ends up in a group - a call in a direct
+     *  message or a group, where only friends and colleagues may be picked. */
+    forGroup: boolean;
     /** Who is in the call, so nobody is offered a person that picking would do
      *  nothing about. */
     already: readonly string[];
@@ -2598,11 +2603,12 @@ function InviteToCallDialog({
                 </DialogHeader>
 
                 {mayInvite && (
-                    <PeoplePicker
+                    <ChatPeoplePicker
+                        forGroup={forGroup}
+                        meetingId={meetingId}
                         picked={picked}
                         onChange={setPicked}
                         exclude={already}
-                        search={searchPeopleAction}
                     />
                 )}
 

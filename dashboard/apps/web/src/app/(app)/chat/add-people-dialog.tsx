@@ -13,8 +13,9 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { addChannelMembersAction, listMembersAction, searchPeopleAction } from "./actions";
+import type { PickedPerson } from "@/components/people-picker";
+import { ChatPeoplePicker } from "./chat-people-picker";
+import { addChannelMembersAction, listMembersAction } from "./actions";
 import {
     Button,
     Dialog,
@@ -81,11 +82,11 @@ export function AddPeopleDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <PeoplePicker
+                <ChatPeoplePicker
+                    forGroup={channel.kind === "group"}
                     picked={picked}
                     onChange={setPicked}
                     exclude={already}
-                    search={searchPeopleAction}
                 />
 
                 {error && (

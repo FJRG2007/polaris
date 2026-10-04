@@ -35,7 +35,13 @@ import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-ser
 import { chatAlertShelf } from "./isolation";
 import { chatWordsFor } from "./text";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { ChatAccessError, channelAccess, requireChannel, type ChatActor, type ChatErrorText } from "./access";
+import {
+    ChatAccessError,
+    channelAccess,
+    requireChannel,
+    type ChatActor,
+    type ChatErrorText
+} from "./access";
 
 /** How many browsers one call holds.
  *
@@ -216,6 +222,29 @@ export async function startOrJoin(
 }
 
 /**
+ * Who is in the conversation a call lives in, for somebody who is in it too.
+ *
+ * The people `inviteToCall` rings without adding anybody - they are already
+ * there - so a picker can offer them on the same terms the server takes them.
+ */
+export async function callConversationMembers(
+    actor: ChatActor,
+    meetingId: string
+): Promise<Set<string>> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true }
+    });
+    if (!meeting?.channelId) return new Set();
+    await requireChannel(actor, meeting.channelId);
+    const rows = await prisma.chatChannelMember.findMany({
+        where: { channelId: meeting.channelId },
+        select: { userId: true }
+    });
+    return new Set(rows.map((row) => row.userId));
+}
+
+/**
  * Bring somebody else into a call that is already running.
  *
  * In a group or a channel this is what it sounds like: they are added to the
@@ -241,8 +270,9 @@ export async function inviteToCall(
      *  module's neighbours, and a cycle between the two is the one thing that
      *  would make either untestable. */
     addMembers: (channelId: string, userIds: readonly string[]) => Promise<void>,
-    /** Opening the group the call moves into. Same reason. */
-    openGroup: (userIds: readonly string[]) => Promise<string>
+    /** Opening the group the call moves into. Same reason. `kept` is who was
+     *  already in the conversation, who are not being added by anybody. */
+    openGroup: (userIds: readonly string[], kept: readonly string[]) => Promise<string>
 ): Promise<{ meetingId: string; channelId: string; moved: boolean }> {
     const wanted = [...new Set(userIds)].filter((id) => id !== actor.id);
     if (wanted.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToAdd" });
@@ -251,7 +281,8 @@ export async function inviteToCall(
         where: { id: meetingId },
         select: { channelId: true, endedAt: true }
     });
-    if (!meeting?.channelId || meeting.endedAt) throw new ChatAccessError({ key: "errors.callEnded" });
+    if (!meeting?.channelId || meeting.endedAt)
+        throw new ChatAccessError({ key: "errors.callEnded" });
     const from = meeting.channelId;
     await requireChannel(actor, from);
 
@@ -283,8 +314,12 @@ export async function inviteToCall(
     // conversation rather than from the call: somebody who stepped out a minute
     // ago is still part of it, and a group that left them behind would be a
     // second conversation nobody asked for.
-    const everyone = [...new Set([...channel.members.map((row) => row.userId), ...wanted])];
-    const groupId = await openGroup(everyone.filter((id) => id !== actor.id));
+    const talking = channel.members.map((row) => row.userId);
+    const everyone = [...new Set([...talking, ...wanted])];
+    const groupId = await openGroup(
+        everyone.filter((id) => id !== actor.id),
+        talking
+    );
 
     const seat = await startOrJoin(actor, groupId);
     // The person still sitting in the old room, told where it went. Their own
@@ -1473,7 +1508,9 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                 return notify({
                     userId,
                     event: "chat.callMissed",
-                    title: words("notices.missedCall", { name: caller?.name || words("notices.somebody") }),
+                    title: words("notices.missedCall", {
+                        name: caller?.name || words("notices.somebody")
+                    }),
                     body: missedCallBody(meeting.channel, words),
                     href: `/chat/c/${channelId}`,
                     shelf
@@ -1542,7 +1579,8 @@ export async function createMeeting(
     if (!title) throw new ChatAccessError({ key: "errors.meetingNameRequired" });
     if (input.scheduledAt) {
         const ahead = input.scheduledAt.getTime() - Date.now();
-        if (ahead > MAX_SCHEDULE_AHEAD_MS) throw new ChatAccessError({ key: "errors.scheduleTooFar" });
+        if (ahead > MAX_SCHEDULE_AHEAD_MS)
+            throw new ChatAccessError({ key: "errors.scheduleTooFar" });
     }
 
     const guestToken = randomBytes(24).toString("base64url");
@@ -1824,7 +1862,8 @@ export async function setMeetingOptions(
 ): Promise<void> {
     await requireHost(actor, meetingId);
     const title = options.title?.trim().slice(0, MAX_MEETING_TITLE);
-    if (options.title !== undefined && !title) throw new ChatAccessError({ key: "errors.meetingNameRequired" });
+    if (options.title !== undefined && !title)
+        throw new ChatAccessError({ key: "errors.meetingNameRequired" });
 
     await prisma.meeting.update({
         where: { id: meetingId },

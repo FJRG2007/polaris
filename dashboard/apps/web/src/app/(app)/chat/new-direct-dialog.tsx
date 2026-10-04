@@ -25,9 +25,10 @@ import { runAction } from "@/lib/run-action";
 import { chatAvatarUrl } from "@/lib/avatar-url";
 import { useEffect, useRef, useState } from "react";
 import { MAX_CHAT_CHANNEL_NAME } from "@polaris/core";
-import { openDirectAction, searchPeopleAction } from "./actions";
+import { openDirectAction } from "./actions";
+import { ChatPeoplePicker } from "./chat-people-picker";
 import { ImagePlus, Loader2, MessageSquare, Users } from "lucide-react";
-import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import type { PickedPerson } from "@/components/people-picker";
 import { CROP_ACCEPTED, FACE_CROP, ImageCropDialog } from "@/components/image-cropper";
 import {
     Button,
@@ -152,14 +153,16 @@ export function NewDirectDialog({
                                 ) : (
                                     <Users className="size-3.5" />
                                 )}
-                                {option === "direct" ? t("newDirect.directMessage") : t("newDirect.group")}
+                                {option === "direct"
+                                    ? t("newDirect.directMessage")
+                                    : t("newDirect.group")}
                             </button>
                         ))}
                     </div>
                 )}
 
-                <PeoplePicker
-                    search={searchPeopleAction}
+                <ChatPeoplePicker
+                    forGroup={kind === "group"}
                     picked={kind === "group" ? picked : []}
                     onChange={(next) => {
                         if (kind === "group") {
@@ -189,9 +192,15 @@ export function NewDirectDialog({
                             onClick={() => file.current?.click()}
                             className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:border-primary"
                             aria-label={
-                                picture ? t("newDirect.changeTheGroupPicture") : t("newDirect.addAGroupPicture")
+                                picture
+                                    ? t("newDirect.changeTheGroupPicture")
+                                    : t("newDirect.addAGroupPicture")
                             }
-                            title={picture ? t("newDirect.changeTheGroupPicture") : t("newDirect.addAGroupPicture")}
+                            title={
+                                picture
+                                    ? t("newDirect.changeTheGroupPicture")
+                                    : t("newDirect.addAGroupPicture")
+                            }
                         >
                             {preview ? (
                                 <img src={preview} alt="" className="size-full object-cover" />

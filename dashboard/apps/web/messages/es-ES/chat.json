@@ -96,6 +96,7 @@
         "groupFull": "Un grupo admite {count} personas. Crea un canal en su lugar.",
         "chatOff": "Alguien de ahí no tiene el chat activado",
         "cannotStartConversation": "No puedes iniciar esa conversación",
+        "groupNotFriends": "{others, plural, =0 {Aún no tienes amistad con {name}.} one {Aún no tienes amistad con {name} ni con otra persona.} other {Aún no tienes amistad con {name} ni con # personas más.}} Solo puedes añadir a un grupo a tus amigos y a gente de tu organización. Envía antes una solicitud de amistad.",
         "meetingSignInFirst": "Esta reunión solo está abierta a quien haya iniciado sesión en Polaris",
         "voiceChannelFull": "Este canal de voz está lleno. Admite {count, plural, one {# persona} other {# personas}} a la vez.",
         "blockedRecipient": "Has bloqueado a {name}. Desbloquéalo para enviarle un mensaje.",
@@ -1221,6 +1222,16 @@
         "noReasonGiven": "Sin motivo",
         "letBackIn": "Dejar volver",
         "title": "Vetados de {name}"
+    },
+    "groupPicker": {
+        "stranger": "Aún no sois amigos",
+        "pending": "Solicitud pendiente",
+        "blocked": "No se puede añadir",
+        "sendRequest": "Añadir amigo",
+        "sendRequestTo": "Enviar una solicitud de amistad a {name}",
+        "requestSent": "Solicitud enviada",
+        "cannotAsk": "No puedes enviar esa solicitud",
+        "requestFailed": "No se pudo enviar la solicitud. Inténtalo de nuevo."
     },
     "addPeople": {
         "addPeople": "Añadir gente",
