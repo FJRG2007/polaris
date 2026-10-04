@@ -73,7 +73,9 @@ export const ARENA_BLOCKS = [
     "minecraft:ladder[facing=east]",
     "minecraft:vine[east=true]",
     "minecraft:vine[west=true]",
-    "minecraft:snow_block"
+    "minecraft:snow_block",
+    "minecraft:tnt",
+    "minecraft:glass"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];

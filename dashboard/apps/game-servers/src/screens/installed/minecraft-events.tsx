@@ -361,6 +361,52 @@ function DayPicker({
     );
 }
 
+/** What a stage kind is, said in one line or two: its map and how it is won. */
+function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): string[] {
+    switch (preset.kind) {
+        case "parkour": {
+            const options = preset.options as catalog.EventOptions<"parkour">;
+            return [
+                t("events.facts.parkour", {
+                    jumps: options.jumps,
+                    difficulty: t(
+                        `events.difficulties.${options.difficulty}` as GameKey<"minecraft">
+                    ),
+                    height: options.height
+                })
+            ];
+        }
+        case "tnt-run": {
+            const options = preset.options as catalog.EventOptions<"tnt-run">;
+            return [
+                t("events.facts.tntRun", {
+                    layers: options.layers,
+                    size: options.size * 2 + 1,
+                    height: options.height
+                })
+            ];
+        }
+        default: {
+            const options = preset.options as catalog.EventOptions<"spleef">;
+            return [
+                t("events.facts.spleef", { size: options.size * 2 + 1, height: options.height })
+            ];
+        }
+    }
+}
+
+/** What a stage kind does with players' things, and the versions it needs. */
+function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): string {
+    switch (preset.kind) {
+        case "spleef":
+            return t("events.facts.spleefShovel");
+        case "tnt-run":
+            return t("events.facts.tntRunSafe");
+        default:
+            return t("events.facts.parkourItems");
+    }
+}
+
 /**
  * What one event is, said in full: what it is, and what this one is set to -
  * how long, where it happens, what it takes to be ranked, when it will start on
@@ -463,25 +509,11 @@ function EventExplained({
         );
     }
     if (catalog.playsOnStage(preset)) {
-        const options = preset.options as { height: number };
         facts.push(
-            preset.kind === "parkour"
-                ? t("events.facts.parkour", {
-                      jumps: (preset.options as catalog.EventOptions<"parkour">).jumps,
-                      difficulty: t(
-                          `events.difficulties.${(preset.options as catalog.EventOptions<"parkour">).difficulty}` as GameKey<"minecraft">
-                      ),
-                      height: options.height
-                  })
-                : t("events.facts.spleef", {
-                      size: (preset.options as catalog.EventOptions<"spleef">).size * 2 + 1,
-                      height: options.height
-                  }),
+            ...stageFacts(t, preset),
             t("events.facts.joinCountdown", { seconds: catalog.JOIN_SECONDS }),
             t("events.facts.stageBuilt"),
-            preset.kind === "spleef"
-                ? t("events.facts.spleefShovel")
-                : t("events.facts.parkourItems")
+            stageItemsFact(t, preset)
         );
     }
     if (preset.kind === "team-duel") {

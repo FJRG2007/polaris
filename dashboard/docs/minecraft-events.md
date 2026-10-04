@@ -104,6 +104,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hot potato                                                     | day   | clear   |
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
+| TNT run                                                        | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -150,6 +151,21 @@ left out.
   editor (`variants`, all three by default): shovels (break the snow), a
   vanishing floor (the snow underfoot turns red, then goes on the next look -
   Fall Guys' Hex-A-Gone), or snowballs (each one breaks the snow it hits).
+- **TNT run** is spleef's arena with TNT for snow and no tool: `layers` floors
+  (2-4) `LAYER_GAP` apart, one wall round all of them - a colored concrete rim
+  at each floor's height, lit at the corners, clear glass between - so the only
+  ledge anywhere is TNT, and a net under the lowest. A block a player stands on
+  goes `tnt-run.FUSE_TICKS` (8, two fifths of a second) after they stepped on
+  it: the events data pack lights a fuse (an invisible marker stand with a
+  count) under each corner of every player's feet each tick, and sets the
+  block to air when it runs out, only if it is still TNT. Nothing primes TNT
+  here: blocks only ever go to air, nothing in the arena is fire or redstone,
+  the weather is held clear, players come in empty-handed (from 1.17) and in
+  adventure mode, and any TNT lit in or near the arena anyway (a flaming arrow
+  from the ground) is taken out by the pack the tick it appears, and over RCON
+  every tick as well. The pack goes on before anything is built; a server
+  where it cannot is called off, never left with a floor that does not go.
+  Scored as spleef: by the order players went out.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -476,6 +492,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Arena            | Look                                                                                                                                |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                              |
+| TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                        |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                  |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                        |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                       |

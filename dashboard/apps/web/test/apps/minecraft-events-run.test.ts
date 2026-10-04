@@ -5245,8 +5245,9 @@ function builtAndRemoved(): { built: string[]; removed: string[] } {
 
 /** The rules every one of these must keep, whatever happened: blocks go up only
  *  into air and come down only where they are still the event's; nothing is
- *  cleared but the event's marked items; nothing that burns or floods. */
-function keptTheRules(): void {
+ *  cleared but the event's marked items; nothing that burns or floods - but for
+ *  what a kind is made of (`allowed`: a TNT run's floors, a dropper's pool). */
+function keptTheRules(allowed: readonly ("tnt" | "water")[] = []): void {
     const fills = world.sent.filter((line) => line.includes(" fill "));
     // The ring is drawn again as it shrinks and moves: its floor's own block
     // painted over its own ring block and back, never anything else.
@@ -5289,13 +5290,15 @@ function keptTheRules(): void {
         expect(line).toContain("custom_data={polaris_event:1b}");
     // Never put down; asking whether a column is open water is only asking.
     expect(
-        world.sent.some(
+        world.sent.filter(
             (line) =>
-                /minecraft:(lava|fire|tnt|water)\b/.test(line) &&
+                [...line.matchAll(/minecraft:(lava|fire|tnt|water)\b/g)].some(
+                    (found) => !allowed.includes(found[1] as "tnt" | "water")
+                ) &&
                 !/ if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line) &&
                 !/ if block ~ ~-1 ~ minecraft:water run data get entity @s Pos$/.test(line)
         )
-    ).toBe(false);
+    ).toEqual([]);
 }
 
 describe("a parkour race", () => {
@@ -6224,6 +6227,218 @@ describe("spleef", () => {
             );
         }
         expect(state().stageLeftovers).toEqual([]);
+    });
+});
+
+const tntRun = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/tnt-run");
+const stageKit = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage");
+
+describe("a TNT run", () => {
+    const run = () => ({
+        ...newPreset("tnt-run", "tnt"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, size: 6, layers: 3, height: 30 }
+    });
+    const arenaNow = () => {
+        const origin = state().run!.stage!.origin!;
+        return tntRun.arena(run().options, origin, origin.y);
+    };
+    const tntPlaced = () =>
+        world.sent.findIndex(
+            (line) => line.endsWith(" minecraft:tnt keep") && line.includes(" fill ")
+        );
+
+    it("puts its pack on before a block is built, arms it only at Go, and plays to the last one standing", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"], ["Cy", "join"]);
+        await play(44_000);
+        expect(state().run?.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben", "Cy"]);
+        // The pack went on before anything was built: taking it in pauses the game.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        expect(enabled).toBeGreaterThan(-1);
+        expect(tntPlaced()).toBeGreaterThan(enabled);
+        expect(world.sent.some((line) => /^(minecraft:)?reload\b/.test(line))).toBe(false);
+        const arena = arenaNow();
+        // Three floors of TNT, each built only into air.
+        for (const at of arena.floors)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${arena.center.x - 6} ${at} ${arena.center.z - 6} ${arena.center.x + 6} ${at} ${arena.center.z + 6} minecraft:tnt keep`
+            );
+        await play(8_000);
+        // Armed only after the countdown, and nothing handed out at all.
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const armed = world.sent.indexOf("scoreboard players set #on polaris_tntrun 1");
+        expect(one).toBeGreaterThan(-1);
+        expect(armed).toBeGreaterThan(one);
+        for (const line of tntRun.armLines(arena)) expect(world.sent).toContain(line);
+        expect(world.sent.some((line) => /^give /.test(line))).toBe(false);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title Ana title") && visible(line).endsWith("Run!")
+            )
+        ).toBe(true);
+        // A lit TNT anywhere near is put out over RCON as well, every tick.
+        expect(world.sent).toContain(tntRun.primedOut(arena.volume));
+
+        // Down to the next floor is not out; through the last one is.
+        world.at.Ben = [arena.center.x, arena.floors[1]! + 1, arena.center.z];
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("title Ben actionbar") && visible(line).includes("floor 2/3")
+            )
+        ).toBe(true);
+        world.at.Ben = [arena.center.x, arena.floors.at(-1)! - 3, arena.center.z];
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(false);
+        world.at.Cy = [arena.center.x, arena.floors.at(-1)! - 3, arena.center.z];
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        expect(after.history[0]?.podium).toEqual([
+            { place: 1, name: "Ana", score: 3 },
+            { place: 2, name: "Cy", score: 2 },
+            { place: 3, name: "Ben", score: 1 }
+        ]);
+        // The pack is switched off for this arena, its fuses out, the floors gone.
+        for (const line of tntRun.stopLines(arena.boxes)) expect(world.sent).toContain(line);
+        for (const box of tntRun.floorBoxes(arena))
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace minecraft:tnt`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["tnt"]);
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("is called off before anything is built, and its pack never written, when too few join", async () => {
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(34_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+        expect(world.writes).toEqual([]);
+    });
+
+    it("is called off with nothing built and nobody moved when its pack cannot be put on", async () => {
+        world.properties = "level-name=../elsewhere\n";
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(36_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Its data pack could not be put on"
+        });
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("TNT run cannot be played")
+            )
+        ).toBe(true);
+    });
+
+    it("called off mid-game, puts its fuses out and takes every floor down", async () => {
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const arena = arenaNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_tntrun 1");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of tntRun.stopLines(arena.boxes)) expect(world.sent).toContain(line);
+        for (const box of arena.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["tnt"]);
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("picked up after a restart mid-game, goes on to its last one standing and still switches its pack off", async () => {
+        const preset = run();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 100, z: 0 };
+        const arena = tntRun.arena(preset.options, site, site.y);
+        world.inside = new Set(["Ana", "Ben"]);
+        world.at = { Ana: [301, 101, 1], Ben: [299, 101, -1] };
+        const saved = (name: string, x: number) => ({
+            name,
+            dimension: "minecraft:overworld",
+            x,
+            y: 64,
+            z: 2,
+            yaw: 0,
+            pitch: 0,
+            mode: "survival"
+        });
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-tnt",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 120_000,
+                readyAt: now - 20_000,
+                participants: ["Ana", "Ben"],
+                place: { x: 300, y: 70, z: 0 },
+                stage: {
+                    origin: site,
+                    area: stageKit.areaOf(arena.volume),
+                    boxes: arena.boxes,
+                    built: true,
+                    armed: true,
+                    goAt: now - 20_000,
+                    saved: [saved("Ana", 1), saved("Ben", 5)],
+                    racers: [
+                        { name: "Ana", since: now - 20_000 },
+                        { name: "Ben", since: now - 20_000 }
+                    ]
+                }
+            }
+        };
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        // Not armed again, nor its floors built again: it goes on as it was.
+        expect(world.sent).not.toContain("scoreboard players set #on polaris_tntrun 1");
+        expect(tntPlaced()).toBe(-1);
+        world.at.Ben = [300, arena.floors.at(-1)! - 3, 0];
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        for (const line of tntRun.stopLines(arena.boxes)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ben 5.000 64.000 2.000 0.0 0.0"
+        );
+        expect(after.stageLeftovers).toEqual([]);
     });
 });
 

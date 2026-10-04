@@ -1655,6 +1655,7 @@ async function play(
             break;
         case "parkour":
         case "spleef":
+        case "tnt-run":
             decided = await stageService.stageTick(
                 loop,
                 server,

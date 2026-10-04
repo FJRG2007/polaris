@@ -25,6 +25,7 @@
  */
 
 import type { Box } from "./stage";
+import * as tntRun from "./tnt-run";
 import { FLOOR, type Arena } from "./spleef";
 
 /** The pack's folder under the world's `datapacks`, and its id in `/datapack`. */
@@ -115,6 +116,17 @@ const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     ]
 };
 
+/**
+ * Every game the pack plays, by its folder under `polaris:`: the snowballs that
+ * break a spleef floor, and the floor a TNT run takes from under its players
+ * (`tnt-run.ts`). Each has a `tick` function, which the game runs every tick and
+ * which does nothing while that game's own switch is off.
+ */
+const GAMES: readonly (readonly [string, Readonly<Record<string, readonly string[]>>])[] = [
+    ["spleef", FUNCTIONS],
+    ["tntrun", tntRun.FUNCTIONS]
+];
+
 /** The pack's files, by their path inside its folder. Both spellings of the
  *  function folders, because 1.21 renamed them (`functions` to `function`) and
  *  each release reads only its own; the format range covers 1.13 onwards. */
@@ -132,11 +144,15 @@ export function packFiles(): ReadonlyMap<string, string> {
             }
         })}\n`
     );
-    const tick = `${JSON.stringify({ values: ["polaris:spleef/tick"] })}\n`;
+    const tick = `${JSON.stringify({ values: GAMES.map(([game]) => `polaris:${game}/tick`) })}\n`;
     for (const folder of ["functions", "function"]) {
         files.set(`data/minecraft/tags/${folder}/tick.json`, tick);
-        for (const [name, lines] of Object.entries(FUNCTIONS))
-            files.set(`data/polaris/${folder}/spleef/${name}.mcfunction`, `${lines.join("\n")}\n`);
+        for (const [game, functions] of GAMES)
+            for (const [name, lines] of Object.entries(functions))
+                files.set(
+                    `data/polaris/${folder}/${game}/${name}.mcfunction`,
+                    `${lines.join("\n")}\n`
+                );
     }
     return files;
 }

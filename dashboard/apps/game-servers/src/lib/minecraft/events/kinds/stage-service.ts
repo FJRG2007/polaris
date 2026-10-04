@@ -14,6 +14,8 @@ import * as spleef from "./spleef";
 import * as snowballPack from "./snowball-pack";
 import * as snowballPackService from "./snowball-pack-service";
 import * as parkour from "./parkour";
+import * as tntRun from "./tnt-run";
+import * as tntRunSaid from "./tnt-run-messages";
 import * as stash from "./stash";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
@@ -27,6 +29,7 @@ import type { PlaceRefusal } from "../place-search";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
+const tntRunMessages = speech.spoken(tntRunSaid);
 
 /** The event cannot go ahead - too few joined, the structure would not stand -
  *  and ends as called off, with everything undone. */
@@ -100,7 +103,8 @@ type Layout =
           readonly reach: number;
       }
     | {
-          readonly kind: "spleef";
+          /** Spleef, and TNT run: floors stacked in the air, the last one standing wins. */
+          readonly kind: "spleef" | "tnt-run";
           readonly arena: spleef.Arena;
           readonly boxes: readonly stage.Box[];
           readonly volume: stage.Volume;
@@ -124,9 +128,12 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             reach: course.reach
         };
     }
-    const floor = spleef.arena(run.preset.options as catalog.EventOptions<"spleef">, site, y);
+    const floor =
+        run.preset.kind === "tnt-run"
+            ? tntRun.arena(run.preset.options as catalog.EventOptions<"tnt-run">, site, y)
+            : spleef.arena(run.preset.options as catalog.EventOptions<"spleef">, site, y);
     return {
-        kind: "spleef",
+        kind: run.preset.kind === "tnt-run" ? "tnt-run" : "spleef",
         arena: floor,
         boxes: floor.boxes,
         volume: floor.volume,
@@ -251,6 +258,24 @@ async function raise(
     const options = preset.options as { place: catalog.EventPlace; height: number };
 
     const origin = state(loop).origin;
+    // A TNT run's floor is taken from under its players by the data pack
+    // (`tnt-run.ts`), so the pack is put on before anything is built or anybody
+    // moved: taking it in pauses the game for a moment, and without it the
+    // floor would never go.
+    if (!origin && preset.kind === "tnt-run" && loop.snowballPack !== true) {
+        loop.snowballPack = await snowballPackService.ensurePack(server).catch((error) => {
+            console.warn("polaris: the event pack could not be put on", String(error));
+            return false;
+        });
+        if (!loop.snowballPack) {
+            // Said now: a call-off drops whatever this tick had still to say.
+            await server.sayAll([
+                ...lines.splice(0, lines.length),
+                commands.say(messages.tag(language) + tntRunMessages.cannotPlay(language))
+            ]);
+            throw new CalledOff("Its data pack could not be put on");
+        }
+    }
     if (!origin) {
         const reach = layoutAt(loop.run, { x: 0, z: 0 }, 0).reach;
         const ground = await tools.findSite(options.place, reach);
@@ -355,6 +380,25 @@ async function provedEmpty(
     return false;
 }
 
+/** What a player reads under "Get ready" as they are brought in. */
+function readySubtitle(loop: StageLoop, layout: Layout): string {
+    const language = loop.language;
+    switch (layout.kind) {
+        case "parkour":
+            return messages.parkourSubtitle(language);
+        case "tnt-run":
+            return tntRunMessages.readySubtitle(language);
+        case "spleef":
+            return messages.spleefReadySubtitle(
+                spleef.variantFor(
+                    loop.run.id,
+                    (loop.run.preset.options as catalog.EventOptions<"spleef">).variants
+                ),
+                language
+            );
+    }
+}
+
 /**
  * Bring players in: where each of them is written down first, then they are
  * moved. Anybody offline, or in creative or spectator, is left out. Answers how
@@ -416,7 +460,10 @@ async function admit(
     // empty-handed at home, free to put their armor back on, while everybody
     // else's is put away.
     const stashing = await tools.canStash();
-    const places = layout.kind === "spleef" ? spleef.spots(layout.arena, fresh.length) : [];
+    const places =
+        layout.kind === "spleef" || layout.kind === "tnt-run"
+            ? spleef.spots(layout.arena, fresh.length)
+            : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
     const brought: string[] = [];
     for (const [index, one] of fresh.entries()) {
@@ -429,9 +476,7 @@ async function admit(
         await server.sayAll([
             ...stage.admitLines(one.name, spot),
             `title ${one.name} times 5 50 15`,
-            layout.kind === "parkour"
-                ? `title ${one.name} subtitle ${commands.text(messages.parkourSubtitle(loop.language))}`
-                : `title ${one.name} subtitle ${commands.text(messages.spleefReadySubtitle(spleef.variantFor(loop.run.id, (loop.run.preset.options as catalog.EventOptions<"spleef">).variants), loop.language))}`,
+            `title ${one.name} subtitle ${commands.text(readySubtitle(loop, layout))}`,
             // "Go!" only to a late racer joining a race already on; everybody
             // else waits for the rest, and the countdown.
             `title ${one.name} title ${commands.text(
@@ -707,7 +752,7 @@ async function holdTick(
     // The start, written down: a spleef's tick hands out the shovels from it.
     change(loop, { goAt: now });
     await tools.persist();
-    if (layout.kind === "spleef")
+    if (layout.kind === "spleef" || layout.kind === "tnt-run")
         return spleefTick(loop, server, tools, layout.arena, layout.volume, [], now, lines);
     return null;
 }
@@ -967,10 +1012,15 @@ async function spleefTick(
     let dirty = false;
 
     const current = state(loop);
-    const variant = spleef.variantFor(
-        loop.run.id,
-        (loop.run.preset.options as catalog.EventOptions<"spleef">).variants
-    );
+    // A TNT run plays as a spleef with no tool, whose floor the data pack takes
+    // from under its players (`tnt-run.ts`).
+    const tnt = loop.run.preset.kind === "tnt-run";
+    const variant = tnt
+        ? null
+        : spleef.variantFor(
+              loop.run.id,
+              (loop.run.preset.options as catalog.EventOptions<"spleef">).variants
+          );
     // Snowballs break the floor through a data pack, put on while everybody is
     // still getting ready: taking it in pauses the game for a moment.
     if (!current.armed && variant === "snowballs" && loop.snowballPack === undefined) {
@@ -994,13 +1044,17 @@ async function spleefTick(
                 lines.push(...stage.markedSnowballs(racer.name, items, spleef.SNOWBALLS));
             lines.push(
                 `title ${racer.name} subtitle ${commands.text(" ")}`,
-                `title ${racer.name} title ${commands.text(messages.spleefGo(variant, language))}`,
+                `title ${racer.name} title ${commands.text(variant ? messages.spleefGo(variant, language) : tntRunMessages.goTitle(language))}`,
                 soundFor(racer.name, commands.SOUNDS.start)
             );
         }
         if (variant === "snowballs") lines.push(...snowballPack.armLines(floor));
+        if (tnt) lines.push(...tntRun.armLines(floor));
         change(loop, { armed: true });
         dirty = true;
+    } else if (current.armed && tnt) {
+        // A primed block taken out over RCON too, should the pack miss one.
+        lines.push(tntRun.primedOut(volume));
     } else if (current.armed && variant === "decay") {
         lines.push(...spleef.decayLines(floor, stage.IN_ARENA));
     } else if (current.armed && variant === "snowballs" && Math.floor(now / 1000) % 10 < 2) {
@@ -1043,12 +1097,20 @@ async function spleefTick(
 
     const standing = state(loop).racers.filter((one) => one.outAt === null);
     for (const racer of standing) {
+        const at = where.find((one) => same(one.name, racer.name));
         lines.push(
             commands.actionbarFor(
                 racer.name,
-                state(loop).armed
-                    ? messages.spleefBar(standing.length, variant, language)
-                    : messages.spleefReadyTitle(language)
+                !state(loop).armed
+                    ? messages.spleefReadyTitle(language)
+                    : variant
+                      ? messages.spleefBar(standing.length, variant, language)
+                      : tntRunMessages.bar(
+                            standing.length,
+                            at ? tntRun.floorOf(floor, at.y) : 1,
+                            floor.floors.length,
+                            language
+                        )
             )
         );
     }
@@ -1056,6 +1118,7 @@ async function spleefTick(
     if (!state(loop).armed || standing.length > 1) return null;
     const winner = standing[0];
     if (variant === "snowballs") lines.push(...snowballPack.stopLines(floor.boxes));
+    if (tnt) lines.push(...tntRun.stopLines(floor.boxes));
     if (!winner) {
         lines.push(commands.say(messages.tag(language) + messages.nobodyStanding(language)));
         return "Nobody was left standing";
@@ -1115,9 +1178,10 @@ export async function settle(
     let boxes = leftover.boxes;
     let area = leftover.area;
     if (boxes.length > 0) {
-        // Snowballs stop breaking a spleef floor before it goes: nothing for
-        // any other arena, or for a spleef whose game already ended.
-        const stop = snowballPack.stopLines(boxes);
+        // Snowballs stop breaking a spleef floor, and a TNT run's fuses go out,
+        // before it goes: nothing for any other arena, or for a game that
+        // already ended.
+        const stop = [...snowballPack.stopLines(boxes), ...tntRun.stopLines(boxes)];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
         // Whatever is still standing on it - a pet, a mob - floats down
@@ -1189,7 +1253,7 @@ export function scoreText(
         if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
         return speech.pickIn({ en: `${score} jumps`, es: `${score} saltos` }, language);
     }
-    if (kind === "spleef")
+    if (kind === "spleef" || kind === "tnt-run")
         return speech.pickIn(
             { en: `${score} ${score === 1 ? "point" : "points"}`, es: `${score} puntos` },
             language
