@@ -3557,7 +3557,7 @@ async function keepVillager(
         ({
             name: village.villagerName(loop.run.id),
             summoned: false,
-            provoke: await serverAtLeast(server, [1, 19, 4]),
+            provoke: await serverAtLeast(server, village.LURE_SINCE),
             warned: 0,
             missing: 0,
             lost: false

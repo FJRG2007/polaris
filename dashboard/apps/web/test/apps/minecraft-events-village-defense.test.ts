@@ -4,6 +4,7 @@ import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/co
 import * as waves from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/waves";
 import * as village from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/village-defense";
 import * as say from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/village-defense-messages";
+import { atLeast } from "@polaris-app/game-servers/src/lib/minecraft/events/events-service";
 import {
     COMMAND_BYTES_MAX,
     commandBytes
@@ -115,6 +116,16 @@ describe("the villager", () => {
         expect(line).toMatch(
             / run damage @s 0\.01 minecraft:generic by @e\[type=minecraft:villager,tag=pe_villager,limit=1\]$/
         );
+    });
+
+    it("is turned on only from 1.21, where its generic touch pushes nothing back", () => {
+        // `generic` joined `#minecraft:no_knockback` in 24w18a (1.21); on
+        // 1.19.4-1.20.6 every touch would knock the wave away from it.
+        expect(village.LURE_SINCE).toEqual([1, 21]);
+        expect(atLeast("1.20.6", village.LURE_SINCE)).toBe(false);
+        expect(atLeast("1.19.4", village.LURE_SINCE)).toBe(false);
+        expect(atLeast("1.21", village.LURE_SINCE)).toBe(true);
+        expect(atLeast("1.21.4", village.LURE_SINCE)).toBe(true);
     });
 
     it("warns once under half its health and once under a quarter", () => {

@@ -190,11 +190,15 @@ left out.
       (`village-defense.VILLAGE_MOBS`): zombies, husks and zombie villagers,
       vindicators and pillagers; never a skeleton, a stray, a spider or a
       witch, which ignore villagers. Each still goes for a player it sees
-      first, so from 1.19.4 the wave is turned on the villager: every monster
+      first, so from 1.21 the wave is turned on the villager: every monster
       no defender stands next to is touched by the villager with `/damage`
-      (`generic`, which pushes nothing back), and goes for whoever hit it.
-      Striking it draws it off again. Before 1.19.4 there is no such command
-      and they go for the villager only when no player is in sight.
+      (`generic`), and a mob keeps whoever last hurt it (any type but
+      `#no_anger`) as the one it goes for. Striking it draws it off again.
+      `generic` pushes nothing back only since it joined `#no_knockback` in
+      1.21 (24w18a): on 1.19.4-1.20.6 every touch would knock the wave away
+      from the villager, so there, and before 1.19.4 (no `/damage`), it is
+      left to vanilla's aim and they go for the villager only when no player
+      is in sight (`LURE_SINCE`).
     - Its health is the boss bar (red), with where the waves stand beside it;
       everybody is told once under half and once under a quarter.
     - Missing for two looks in a row (`LOST_AFTER`: a restarted server loads

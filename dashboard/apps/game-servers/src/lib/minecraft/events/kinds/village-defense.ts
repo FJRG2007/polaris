@@ -21,12 +21,17 @@
  * included), a vindicator and a pillager hunt villagers; a skeleton, a stray,
  * a spider and a witch never do, so none of those come (`VILLAGE_MOBS`). Each
  * of them goes for a player it sees before a villager, though - its target
- * goals rank players first. From 1.19.4 a wave is turned on the villager
+ * goals rank players first. From 1.21 a wave is turned on the villager
  * (`provokeLine`): every monster no defender stands right next to is touched
- * by the villager with `/damage`, which is what a mob takes for being hit, and
- * makes it go for whoever hit it ahead of any player. A defender who strikes
- * it draws it off again. Before 1.19.4 there is no such command, and the
- * monsters go for the villager only when no player is in their sight.
+ * by the villager with `/damage`, and a mob keeps whoever last hurt it unless
+ * the damage type is `#no_anger` (`mob_attack_no_aggro` only) - the source a
+ * zombie, a vindicator or a pillager retaliates against, ahead of any player.
+ * A defender who strikes it draws it off again. The touch is `generic`, which
+ * pushes nothing back only since `generic` joined `#no_knockback` in 1.21
+ * (24w18a); before that it would knock every monster away from the villager
+ * at each touch, so on an older server - and before 1.19.4, which has no
+ * `/damage` - the monsters go for the villager only when no player is in
+ * their sight (`LURE_SINCE`).
  */
 
 import { z } from "zod";
@@ -45,6 +50,14 @@ export const LOST_AFTER = 2;
 
 /** Its health, as a share, under which everybody is warned - once each. */
 export const WARN_AT = [0.5, 0.25] as const;
+
+/**
+ * The first version whose `generic` damage pushes nothing back: it joined the
+ * `#minecraft:no_knockback` damage type tag in 1.21 (24w18a). On 1.19.4-1.20.6
+ * `/damage` exists but the touch would knock each monster away from the
+ * villager, so the wave is left to vanilla's own aim there.
+ */
+export const LURE_SINCE = [1, 21] as const;
 
 /** How many ticks apart the wave is turned on the villager again. */
 export const PROVOKE_EVERY = 3;
@@ -83,7 +96,8 @@ export const villagerSchema = z.object({
     /** Whether it is known to be in the world: false while written down and
      *  not yet summoned - a restart then looks before summoning another. */
     summoned: z.boolean().default(false),
-    /** Whether this server has `/damage` (1.19.4) to turn a wave on it. */
+    /** Whether this server can turn a wave on it without knocking the wave
+     *  back (`LURE_SINCE`). */
     provoke: z.boolean().default(false),
     /** How many of `WARN_AT` have been said. */
     warned: z.number().int().default(0),
@@ -130,8 +144,9 @@ export function summonVillager(point: Point, name: string, modernText: boolean):
 
 /**
  * Every monster of the wave that no defender is right next to turned on the
- * villager, from 1.19.4: hurt by it for next to nothing, with a damage type
- * that does not knock back, so it goes for the villager ahead of any player.
+ * villager, from `LURE_SINCE`: hurt by it for next to nothing, with a damage
+ * type that does not knock back, so it goes for the villager ahead of any
+ * player.
  * Never a mount, which fights nobody.
  */
 export function provokeLine(): string {

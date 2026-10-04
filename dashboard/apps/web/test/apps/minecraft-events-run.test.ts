@@ -8585,16 +8585,30 @@ describe("a villager defense", () => {
         expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 288 0");
     });
 
-    it("leaves the wave to vanilla's own aim on a server too old to turn it", async () => {
-        world.version = "1.19.2";
+    it.each(["1.20.6", "1.19.2"])(
+        "leaves the wave to vanilla's own aim on %s, where a touch would knock it back or cannot be given",
+        async (version) => {
+            world.version = version;
+            world.defenders = ["Ana"];
+            world.waveAlive = 3;
+            setUp([preset()]);
+            await start();
+            await play(10_100 + 46_000 + 6_100);
+            expect(state().run?.villager).toMatchObject({ summoned: true, provoke: false });
+            expect(summonedIds().length).toBeGreaterThan(0);
+            expect(provoked()).toEqual([]);
+        }
+    );
+
+    it("turns the wave on the villager from 1.21", async () => {
+        world.version = "1.21";
         world.defenders = ["Ana"];
         world.waveAlive = 3;
         setUp([preset()]);
         await start();
         await play(10_100 + 46_000 + 6_100);
-        expect(state().run?.villager).toMatchObject({ summoned: true, provoke: false });
-        expect(summonedIds().length).toBeGreaterThan(0);
-        expect(provoked()).toEqual([]);
+        expect(state().run?.villager).toMatchObject({ summoned: true, provoke: true });
+        expect(provoked().length).toBeGreaterThan(0);
     });
 
     it("does not start with fewer players on than its minimum", async () => {
