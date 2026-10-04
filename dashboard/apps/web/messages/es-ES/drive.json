@@ -1101,5 +1101,30 @@
         "storageUsage": "Uso del disco",
         "theDiskYourFilesSit": "El disco donde están tus archivos, no lo que ocupa tu propio drive.",
         "thisBackendDoesNotReport": "Este almacenamiento no informa de su uso."
+    },
+    "conflicts": {
+        "checkFailed": "No se ha podido comprobar si esta carpeta ya tiene elementos con esos nombres. Inténtalo de nuevo.",
+        "titleOne": "Este nombre ya está en uso",
+        "title": "{count, plural, one {# nombre ya está} other {# nombres ya están}} en uso aquí",
+        "existsFile": "Ya hay un archivo llamado «{name}» en esta carpeta.",
+        "existsFolder": "Ya hay una carpeta llamada «{name}» en esta carpeta.",
+        "late": "Alguien ha añadido «{name}» a esta carpeta mientras se subía el tuyo.",
+        "position": "{current} de {total}",
+        "replace": "Reemplazar",
+        "merge": "Combinar carpetas",
+        "keepBoth": "Conservar ambos",
+        "skip": "Omitir",
+        "replaceToBin": "Reemplazar: el archivo actual va a la papelera, desde donde puedes restaurarlo.",
+        "replaceForGood": "Reemplazar: esta ubicación no tiene papelera, así que el archivo actual se sobrescribe para siempre.",
+        "mergeHint": "Combinar: el contenido acaba en una sola carpeta. Se te preguntará por cada archivo que esté en las dos.",
+        "keepBothHint": "Conservar ambos: el nuevo lleva un número, como «{name}».",
+        "alsoTaken": "También en uso ({count}):",
+        "applyToAll": "Hacer lo mismo con los {count} elementos",
+        "blocked": {
+            "permission": "No puedes reemplazarlo: no tienes permiso para cambiar {kind, select, dir {la carpeta} other {el archivo}} que ya existe.",
+            "locked": "No puedes reemplazarlo: {kind, select, dir {la carpeta} other {el archivo}} que ya existe está bloqueado.",
+            "kind": "No puedes reemplazarlo: uno es un archivo y el otro una carpeta.",
+            "merge": "Al mover o copiar una carpeta sobre otra con el mismo nombre se conservan ambas."
+        }
     }
 }

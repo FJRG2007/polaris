@@ -7,6 +7,7 @@
  * the per-folder rules and the locks on it.
  */
 
+import { StorageError } from "@polaris/storage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authorizeDrive = vi.fn();
@@ -39,7 +40,13 @@ beforeEach(() => {
     authorizeDrive.mockResolvedValue(undefined);
     getDriverForConnection.mockReset();
     getDriverForConnection.mockResolvedValue({
+        id: "conn-1",
         mkdir: async () => undefined,
+        // Nothing is there yet, so the name is free to take.
+        stat: async (path: string) => {
+            throw new StorageError("not_found", path);
+        },
+        delete: async () => undefined,
         writeStream,
         dispose: async () => undefined
     });

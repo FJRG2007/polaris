@@ -157,7 +157,7 @@ function SaveCopyDialog({
         setError(null);
         const blob = await exportAs(parsed.data).catch(() => null);
         const message = blob
-            ? await saveFileBytes(target, parsed.data, blob)
+            ? await saveFileBytes(target, parsed.data, blob, replaces ? "replace" : "fail")
             : "Could not prepare this file.";
         setSaving(false);
         if (message) {

@@ -54,16 +54,20 @@ export function withExtension(name: string, extension: string): string {
 }
 
 /**
- * Write bytes to `name` in the target's folder, overwriting whatever is there.
+ * Write bytes to `name` in the target's folder. `conflict` is what happens to a
+ * file already holding the name: `overwrite` for the file being saved in place,
+ * `replace` (old one to the bin) for a copy the person agreed may replace one,
+ * and `fail` for a copy under a name they were told is free.
  * Returns a human-readable error, or null on success.
  */
 export async function saveFileBytes(
     target: ViewerTarget,
     name: string,
-    body: Blob
+    body: Blob,
+    conflict: "overwrite" | "replace" | "fail" = "overwrite"
 ): Promise<string | null> {
     if (!target.connectionId) return "This file cannot be saved from here.";
-    const query = new URLSearchParams({ c: target.connectionId, name });
+    const query = new URLSearchParams({ c: target.connectionId, name, conflict });
     const parent = parentPath(target.path);
     if (parent) query.set("p", parent);
     try {
@@ -73,6 +77,7 @@ export async function saveFileBytes(
         if (sent.ok) return null;
         if (sent.status === 403) return "Could not save - you may not have write access here.";
         if (sent.status === 423) return "This file is locked.";
+        if (sent.status === 409) return "A file with that name was just added here. Pick another name.";
         return "Could not save this file.";
     } catch {
         return "Could not save this file.";
