@@ -9,7 +9,10 @@ import { getTranslations } from "@/lib/i18n/request";
 import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { ApiKeysView } from "./api-keys-view";
+import { ConnectedApps } from "./connected-apps";
 import { isClientKey } from "@/lib/vault/client-key";
+import { Messages } from "@/components/i18n/messages";
+import { listConnectedApps } from "@/lib/mcp/oauth/grants";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +26,8 @@ export default async function ApiKeysPage() {
     // that appeared on its own is a credential nobody can explain later - which is
     // the kind people leave alone rather than manage. Connected apps are listed,
     // and disconnected, under Account > Sessions.
-    const keys = (await listApiKeys(user.id)).filter((key) => !isClientKey(key.description));
+    const [all, connected] = await Promise.all([listApiKeys(user.id), listConnectedApps(user.id)]);
+    const keys = all.filter((key) => !isClientKey(key.description));
 
     return (
         // Wider than the rest of the account screens, because this one is a
@@ -35,6 +39,12 @@ export default async function ApiKeysPage() {
                 <p className="text-sm text-muted-foreground">{t("apiKeys.page.intro")}</p>
             </div>
             <ApiKeysView keys={keys} />
+            {/* The assistants that signed in through the consent screen. The
+                same kind of credential as a key, made by a different door, so
+                they are listed and revoked here too. */}
+            <Messages namespaces={["mcp"]}>
+                <ConnectedApps apps={connected} />
+            </Messages>
         </div>
     );
 }

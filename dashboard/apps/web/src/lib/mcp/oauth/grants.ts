@@ -1,0 +1,428 @@
+/**
+ * Grants, codes and tokens: everything a person's yes turns into.
+ *
+ * The rules, from OAuth 2.1 and the MCP authorization spec:
+ *
+ *   - Every secret is random, 256 bits, and stored only as its SHA-256. Looking
+ *     one up is by that hash, so nothing compares a presented value byte by
+ *     byte against a stored one.
+ *   - A code is single use, five minutes long, and bound to the PKCE challenge,
+ *     the client, the exact redirect address and the resource. Exchanged twice,
+ *     it was intercepted, and every token issued under the grant is ended.
+ *   - An access token lasts an hour and is good for one resource: this
+ *     instance's MCP endpoint. Nothing else in Polaris reads it.
+ *   - A refresh token is rotated on every use (required for public clients).
+ *     One presented again after it was rotated has been copied, and the whole
+ *     grant is ended - the thief and the app both have to come back through the
+ *     consent screen, which only the person can pass.
+ *   - What a token may do is what was approved, cut to what its person holds at
+ *     the moment of the call. A grant never outlives the permission behind it.
+ */
+
+import { prisma } from "@polaris/db";
+import { recordAudit } from "@/lib/audit-service";
+import { sameResource } from "./urls";
+import { scopeString } from "./scopes";
+import { verifierMatches } from "./pkce";
+import { getUserPermissions } from "@polaris/auth";
+import type { OAuthClientRecord } from "./clients";
+import { generateToken, hashToken } from "@polaris/core/tokens";
+import { hasPermission, parseStringList, stringifyList, type Permission } from "@polaris/core";
+
+export const ACCESS_TOKEN_PREFIX = "pmo_";
+const REFRESH_TOKEN_PREFIX = "pmr_";
+const CODE_PREFIX = "pma_";
+
+export const ACCESS_TTL_MS = 60 * 60 * 1000;
+export const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const CODE_TTL_MS = 5 * 60 * 1000;
+/** How long a rotated refresh token is remembered, so a replay of it is still
+ *  recognised as one rather than as an unknown token. */
+const ROTATED_MEMORY_MS = 7 * 24 * 60 * 60 * 1000;
+/** A grant's last-used stamp is written at most this often. */
+const TOUCH_INTERVAL_MS = 60 * 1000;
+
+/** The token endpoint's answer, success or the RFC 6749 section 5.2 error. */
+export type TokenOutcome =
+    | {
+          ok: true;
+          body: {
+              access_token: string;
+              token_type: "Bearer";
+              expires_in: number;
+              refresh_token: string;
+              scope: string;
+          };
+      }
+    | { ok: false; error: "invalid_grant" | "invalid_request" | "invalid_scope" | "invalid_target"; description: string };
+
+function refused(
+    error: "invalid_grant" | "invalid_request" | "invalid_scope" | "invalid_target",
+    description: string
+): TokenOutcome {
+    return { ok: false, error, description };
+}
+
+/**
+ * End a grant because something presented under it was a copy: a code
+ * exchanged twice, or a refresh token used after it was rotated. Written to the
+ * person's activity, because it means somebody else held one of their tokens.
+ */
+async function endReplayedGrant(grantId: string, what: "code" | "refresh-token"): Promise<void> {
+    const grant = await prisma.oAuthGrant.findUnique({
+        where: { id: grantId },
+        select: { userId: true, client: { select: { name: true } } }
+    });
+    await endGrant(grantId);
+    await recordAudit({
+        actorId: grant?.userId ?? null,
+        action: "account.oauth.replay-detected",
+        targetType: "oauthGrant",
+        targetId: grantId,
+        metadata: { app: grant?.client.name ?? null, replayed: what }
+    });
+}
+
+/** End a grant: every token and code under it is deleted and the grant is
+ *  marked revoked, which is what the connected-apps list shows. */
+async function endGrant(grantId: string): Promise<void> {
+    await prisma.$transaction([
+        prisma.oAuthToken.deleteMany({ where: { grantId } }),
+        prisma.oAuthCode.deleteMany({ where: { grantId } }),
+        prisma.oAuthGrant.updateMany({ where: { id: grantId, revokedAt: null }, data: { revokedAt: new Date() } })
+    ]);
+}
+
+/**
+ * Record a person's approval and hand back the code for the app.
+ *
+ * One grant per person and app: approving the same app again replaces what it
+ * may do with what was approved now, and brings a revoked grant back.
+ */
+export async function approve(input: {
+    userId: string;
+    client: OAuthClientRecord;
+    redirectUri: string;
+    codeChallenge: string;
+    resource: string;
+    scopes: readonly Permission[];
+}): Promise<{ code: string; grantId: string }> {
+    const scopes = stringifyList([...input.scopes]);
+    const grant = await prisma.oAuthGrant.upsert({
+        where: { userId_clientId: { userId: input.userId, clientId: input.client.id } },
+        create: { userId: input.userId, clientId: input.client.id, scopes, resource: input.resource },
+        update: { scopes, resource: input.resource, revokedAt: null },
+        select: { id: true }
+    });
+    const code = `${CODE_PREFIX}${generateToken()}`;
+    const now = Date.now();
+    await prisma.$transaction([
+        prisma.oAuthCode.deleteMany({ where: { grantId: grant.id, expiresAt: { lt: new Date(now) } } }),
+        prisma.oAuthCode.create({
+            data: {
+                codeHash: hashToken(code),
+                grantId: grant.id,
+                redirectUri: input.redirectUri,
+                codeChallenge: input.codeChallenge,
+                resource: input.resource,
+                scopes,
+                expiresAt: new Date(now + CODE_TTL_MS)
+            }
+        })
+    ]);
+    return { code, grantId: grant.id };
+}
+
+/** Mint an access and refresh token pair under a grant, and tidy what has
+ *  expired under it while there. */
+async function issue(grantId: string, scopes: readonly string[], resource: string): Promise<TokenOutcome> {
+    const access = `${ACCESS_TOKEN_PREFIX}${generateToken()}`;
+    const refresh = `${REFRESH_TOKEN_PREFIX}${generateToken()}`;
+    const now = Date.now();
+    const stored = stringifyList([...scopes]);
+    await prisma.$transaction([
+        prisma.oAuthToken.deleteMany({
+            where: {
+                grantId,
+                OR: [
+                    { expiresAt: { lt: new Date(now) } },
+                    { usedAt: { lt: new Date(now - ROTATED_MEMORY_MS) } }
+                ]
+            }
+        }),
+        prisma.oAuthToken.create({
+            data: {
+                grantId,
+                kind: "access",
+                tokenHash: hashToken(access),
+                scopes: stored,
+                resource,
+                expiresAt: new Date(now + ACCESS_TTL_MS)
+            }
+        }),
+        prisma.oAuthToken.create({
+            data: {
+                grantId,
+                kind: "refresh",
+                tokenHash: hashToken(refresh),
+                scopes: stored,
+                resource,
+                expiresAt: new Date(now + REFRESH_TTL_MS)
+            }
+        })
+    ]);
+    return {
+        ok: true,
+        body: {
+            access_token: access,
+            token_type: "Bearer",
+            expires_in: Math.floor(ACCESS_TTL_MS / 1000),
+            refresh_token: refresh,
+            scope: scopeString(scopes)
+        }
+    };
+}
+
+/** Whether a grant's person can still be acted for at all. */
+async function grantStands(grant: { revokedAt: Date | null; user: { bannedAt: Date | null } }): Promise<boolean> {
+    return grant.revokedAt === null && grant.user.bannedAt === null;
+}
+
+/** Exchange an authorization code (RFC 6749 section 4.1.3, RFC 7636 section 4.6). */
+export async function exchangeCode(input: {
+    client: OAuthClientRecord;
+    code: string | null;
+    redirectUri: string | null;
+    verifier: string | null;
+    resource: string | null;
+}): Promise<TokenOutcome> {
+    if (!input.code || !input.verifier || !input.redirectUri) {
+        return refused("invalid_request", "code, code_verifier and redirect_uri are required");
+    }
+    if (input.code.length > 200 || !input.code.startsWith(CODE_PREFIX)) {
+        return refused("invalid_grant", "The code is not valid");
+    }
+    const row = await prisma.oAuthCode.findUnique({
+        where: { codeHash: hashToken(input.code) },
+        include: { grant: { select: { id: true, clientId: true, revokedAt: true, user: { select: { bannedAt: true } } } } }
+    });
+    // One answer for every way a code can be wrong, so a guess learns nothing.
+    const invalid = refused("invalid_grant", "The code is not valid, has expired, or was already used");
+    if (!row || row.grant.clientId !== input.client.id) return invalid;
+    if (row.usedAt) {
+        // Exchanged once already: whoever is presenting it now, one of the two
+        // copies was not the app's. RFC 6749 section 4.1.2 says to revoke what
+        // the code produced; ending the grant does that and more.
+        await endReplayedGrant(row.grantId, "code");
+        return invalid;
+    }
+    if (row.expiresAt.getTime() <= Date.now()) return invalid;
+    if (row.redirectUri !== input.redirectUri) return invalid;
+    if (!verifierMatches(input.verifier, row.codeChallenge)) return invalid;
+    if (input.resource !== null && !sameResource(input.resource, row.resource)) {
+        return refused("invalid_target", "resource does not match the one that was authorized");
+    }
+    if (!(await grantStands(row.grant))) return invalid;
+
+    // Spent before anything is issued, and only by the one request that finds it
+    // unspent: two exchanges racing each other get one pair between them.
+    const spent = await prisma.oAuthCode.updateMany({
+        where: { id: row.id, usedAt: null },
+        data: { usedAt: new Date() }
+    });
+    if (spent.count !== 1) {
+        await endReplayedGrant(row.grantId, "code");
+        return invalid;
+    }
+    return issue(row.grantId, parseStringList(row.scopes), row.resource);
+}
+
+/** Exchange a refresh token for a new pair (RFC 6749 section 6), rotating it. */
+export async function refresh(input: {
+    client: OAuthClientRecord;
+    refreshToken: string | null;
+    scope: string | null;
+    resource: string | null;
+}): Promise<TokenOutcome> {
+    if (!input.refreshToken) return refused("invalid_request", "refresh_token is required");
+    const invalid = refused("invalid_grant", "The refresh token is not valid or has expired");
+    if (input.refreshToken.length > 200 || !input.refreshToken.startsWith(REFRESH_TOKEN_PREFIX)) return invalid;
+
+    const row = await prisma.oAuthToken.findUnique({
+        where: { tokenHash: hashToken(input.refreshToken) },
+        include: { grant: { select: { id: true, clientId: true, revokedAt: true, user: { select: { bannedAt: true } } } } }
+    });
+    if (!row || row.kind !== "refresh" || row.grant.clientId !== input.client.id) return invalid;
+    if (row.usedAt) {
+        // Rotated already. The app holds the newer one, so this is a copy.
+        await endReplayedGrant(row.grantId, "refresh-token");
+        return invalid;
+    }
+    if (row.expiresAt.getTime() <= Date.now()) return invalid;
+    if (!(await grantStands(row.grant))) return invalid;
+    if (input.resource !== null && !sameResource(input.resource, row.resource)) {
+        return refused("invalid_target", "resource does not match the one that was authorized");
+    }
+
+    // A refresh may ask for less than the grant, never for more.
+    const held = parseStringList(row.scopes);
+    let scopes = held;
+    if (input.scope?.trim()) {
+        const asked = [...new Set(input.scope.trim().split(/\s+/))];
+        if (asked.some((scope) => !held.includes(scope))) {
+            return refused("invalid_scope", "A refresh cannot add scopes that were not approved");
+        }
+        scopes = held.filter((scope) => asked.includes(scope));
+    }
+
+    const spent = await prisma.oAuthToken.updateMany({
+        where: { id: row.id, usedAt: null },
+        data: { usedAt: new Date() }
+    });
+    if (spent.count !== 1) {
+        await endReplayedGrant(row.grantId, "refresh-token");
+        return invalid;
+    }
+    return issue(row.grantId, scopes, row.resource);
+}
+
+/**
+ * Revoke a token an app holds (RFC 7009). An access token goes on its own; a
+ * refresh token takes the grant with it, because an app revoking its refresh
+ * token is an app disconnecting. A token that is unknown, or another app's, is
+ * answered the same as one that was revoked - the RFC says so, and it keeps the
+ * endpoint from telling anybody which tokens exist.
+ */
+export async function revokeToken(client: OAuthClientRecord, token: string): Promise<void> {
+    if (!token || token.length > 200) return;
+    const row = await prisma.oAuthToken.findUnique({
+        where: { tokenHash: hashToken(token) },
+        select: { id: true, kind: true, grantId: true, grant: { select: { clientId: true } } }
+    });
+    if (!row || row.grant.clientId !== client.id) return;
+    if (row.kind === "refresh") await endGrant(row.grantId);
+    else await prisma.oAuthToken.deleteMany({ where: { id: row.id } });
+}
+
+/** A verified access token: who it acts for and what it may do right now. */
+export interface VerifiedAccess {
+    readonly grantId: string;
+    readonly userId: string;
+    readonly isAdmin: boolean;
+    readonly scopes: Permission[];
+}
+
+/**
+ * Resolve an access token presented to the MCP endpoint, or null.
+ *
+ * Refused unless it was issued for exactly this resource - a token is not a
+ * key to anything else in Polaris, and one minted for another address of this
+ * instance does not open this one.
+ */
+export async function verifyAccessToken(token: string, resource: string): Promise<VerifiedAccess | null> {
+    if (!token.startsWith(ACCESS_TOKEN_PREFIX) || token.length > 200) return null;
+    const row = await prisma.oAuthToken.findUnique({
+        where: { tokenHash: hashToken(token) },
+        select: {
+            kind: true,
+            scopes: true,
+            resource: true,
+            expiresAt: true,
+            grant: {
+                select: {
+                    id: true,
+                    userId: true,
+                    revokedAt: true,
+                    lastUsedAt: true,
+                    user: { select: { bannedAt: true, isAdmin: true } }
+                }
+            }
+        }
+    });
+    if (!row || row.kind !== "access") return null;
+    if (row.expiresAt.getTime() <= Date.now()) return null;
+    if (row.grant.revokedAt || row.grant.user.bannedAt) return null;
+    if (!sameResource(row.resource, resource)) return null;
+
+    const requested = parseStringList(row.scopes) as Permission[];
+    const granted = await getUserPermissions(row.grant.userId);
+    const scopes = row.grant.user.isAdmin
+        ? requested
+        : requested.filter((scope) => hasPermission(granted, scope));
+    return { grantId: row.grant.id, userId: row.grant.userId, isAdmin: row.grant.user.isAdmin, scopes };
+}
+
+/** Stamp a grant as used, at most once a minute. Never throws. */
+export async function touchGrant(grantId: string, ip: string | undefined): Promise<void> {
+    try {
+        await prisma.oAuthGrant.updateMany({
+            where: {
+                id: grantId,
+                OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: new Date(Date.now() - TOUCH_INTERVAL_MS) } }]
+            },
+            data: { lastUsedAt: new Date(), lastUsedIp: ip ?? null }
+        });
+    } catch {
+        // A usage stamp is not worth failing an authorized call over.
+    }
+}
+
+/** One connected app, as the account screen lists it. */
+export interface ConnectedAppView {
+    readonly id: string;
+    readonly name: string;
+    readonly clientUri: string | null;
+    /** Where it sends people back to, which is what identifies it. */
+    readonly redirectHost: string | null;
+    readonly scopes: string[];
+    readonly createdAt: string;
+    readonly lastUsedAt: string | null;
+    readonly lastUsedIp: string | null;
+}
+
+/** The apps a person has connected and not disconnected, most recent first. */
+export async function listConnectedApps(userId: string): Promise<ConnectedAppView[]> {
+    const rows = await prisma.oAuthGrant.findMany({
+        where: { userId, revokedAt: null },
+        orderBy: { updatedAt: "desc" },
+        take: 100,
+        select: {
+            id: true,
+            scopes: true,
+            createdAt: true,
+            lastUsedAt: true,
+            lastUsedIp: true,
+            client: { select: { name: true, clientUri: true, clientId: true, redirectUris: true } }
+        }
+    });
+    return rows.map((row) => {
+        const first = parseStringList(row.client.redirectUris)[0];
+        let redirectHost: string | null = null;
+        try {
+            redirectHost = first ? new URL(first).hostname : null;
+        } catch {
+            redirectHost = null;
+        }
+        return {
+            id: row.id,
+            name: row.client.name,
+            clientUri: row.client.clientUri,
+            redirectHost,
+            scopes: parseStringList(row.scopes),
+            createdAt: row.createdAt.toISOString(),
+            lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+            lastUsedIp: row.lastUsedIp
+        };
+    });
+}
+
+/** Disconnect an app a person connected. False when it is not theirs. */
+export async function revokeConnectedApp(userId: string, grantId: string): Promise<boolean> {
+    const grant = await prisma.oAuthGrant.findFirst({
+        where: { id: grantId, userId, revokedAt: null },
+        select: { id: true }
+    });
+    if (!grant) return false;
+    await endGrant(grant.id);
+    return true;
+}
