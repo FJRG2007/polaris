@@ -25,12 +25,13 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
+import { CliSection } from "./cli-section";
 import { ExtensionSteps } from "./extension-steps";
 import { McpAssistants } from "./mcp-assistants";
 import { getTranslations } from "@/lib/i18n/request";
 import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
-import { Puzzle, Smartphone, Terminal } from "lucide-react";
+import { Puzzle, Smartphone } from "lucide-react";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
 import { Badge, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
 
@@ -125,6 +126,8 @@ export default async function DownloadsPage() {
 
             <McpAssistants />
 
+            <CliSection />
+
             <Card>
                 <CardHeader>
                     <CardTitle>{t("downloads.later.title")}</CardTitle>
@@ -141,13 +144,6 @@ export default async function DownloadsPage() {
                             <p className="text-muted-foreground">
                                 {t("downloads.later.mobileHint")}
                             </p>
-                        </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                        <Terminal className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                        <div>
-                            <p className="font-medium">{t("downloads.later.cli")}</p>
-                            <p className="text-muted-foreground">{t("downloads.later.cliHint")}</p>
                         </div>
                     </div>
                 </CardBody>

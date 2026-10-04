@@ -977,15 +977,12 @@
         "later": {
             "title": "Aún no está",
             "mobile": "Android e iOS",
-            "mobileHint": "Todavía no hay app. Instalar Polaris como app, arriba, lo pone en tu pantalla de inicio desde el navegador, que es casi lo mismo.",
-            "cli": "Terminal",
-            "cliHint": "Para gestionar tus cosas desde tu propio ordenador y abrir desde él un túnel a un servicio de aquí. Todavía no hay nada que instalar, así que no hay ningún comando que copiar."
+            "mobileHint": "Todavía no hay app. Instalar Polaris como app, arriba, lo pone en tu pantalla de inicio desde el navegador, que es casi lo mismo."
         },
         "command": {
             "title": "Una línea, y se mantiene al día sola",
             "system": "En qué sistema la instalas",
-            "hint": "Pégala en {shell}. La primera vez, pulsa Cargar descomprimida y elige la carpeta que indica. Después busca una versión nueva cada pocas horas y la extensión se reinicia en ella sola. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día.",
-            "unix": "macOS y Linux"
+            "hint": "Pégala en {shell}. La primera vez, pulsa Cargar descomprimida y elige la carpeta que indica. Después busca una versión nueva cada pocas horas y la extensión se reinicia en ella sola. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día."
         },
         "steps": {
             "yourBrowser": "Tu navegador",
@@ -1001,6 +998,17 @@
             "pointIt": "Abre la extensión y apúntala a este Polaris. Pide permiso para hablar con esta dirección y con ninguna otra.",
             "caveatChromium": "Se queda hasta que la quites, y no se actualiza sola. Para que coja una versión nueva, sustituye los archivos en la misma carpeta y pulsa la flecha de recargar.",
             "caveatFirefox": "Temporal quiere decir temporal: Firefox la descarta al cerrarse, así que hay que volver a cargarla la próxima vez."
+        },
+        "cli": {
+            "title": "Terminal",
+            "description": "Despliega, lee registros y reinicia tus apps desde una terminal. Inicia sesión una vez desde el navegador; cada comando posterior usa esa sesión.",
+            "install": "Instalar",
+            "system": "En qué sistema la instalas",
+            "hint": "Pégala en {shell}. Necesita Node.js 20 o posterior e instala la versión que corresponde a este Polaris, como plr y polaris.",
+            "signIn": "Inicia sesión",
+            "signInHint": "Abre este Polaris en el navegador para aprobarlo. En un equipo sin navegador muestra un código para escribirlo aquí.",
+            "server": "No se instala en un equipo que ejecuta un servidor Polaris: ambos responden a plr y polaris.",
+            "next": "Prueba"
         }
     },
     "cli": {

@@ -18,6 +18,7 @@
 import { Select } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { BrowserMark } from "@/components/client-marks";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     BROWSER_GUIDES,
@@ -97,7 +98,10 @@ export function ExtensionSteps() {
                         }}
                         options={BROWSER_GUIDES.map((entry) => ({
                             value: entry.id,
-                            label: entry.label
+                            label: entry.label,
+                            // Each browser's own mark, which is what somebody
+                            // scanning the list looks for before its name.
+                            icon: <BrowserMark browser={entry.label} />
                         }))}
                     />
                 </label>

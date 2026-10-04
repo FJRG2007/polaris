@@ -977,15 +977,12 @@
         "later": {
             "title": "Not here yet",
             "mobile": "Android and iOS",
-            "mobileHint": "No app yet. Installing Polaris as an app above puts it on your home screen from the browser, which is most of the way there.",
-            "cli": "Command line",
-            "cliHint": "For managing your things from your own computer, and for opening a tunnel from it to a service here. Nothing to install yet, so there is no command to copy."
+            "mobileHint": "No app yet. Installing Polaris as an app above puts it on your home screen from the browser, which is most of the way there."
         },
         "command": {
             "title": "One line, and it keeps itself up to date",
             "system": "Which system you are installing on",
-            "hint": "Paste it into {shell}. The first time, press Load unpacked and choose the folder it names. After that it checks for a new version every few hours and the extension restarts into it by itself. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current.",
-            "unix": "macOS and Linux"
+            "hint": "Paste it into {shell}. The first time, press Load unpacked and choose the folder it names. After that it checks for a new version every few hours and the extension restarts into it by itself. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current."
         },
         "steps": {
             "yourBrowser": "Your browser",
@@ -1001,6 +998,17 @@
             "pointIt": "Open the extension and point it at this Polaris. It asks for permission to talk to this address and no other.",
             "caveatChromium": "It stays until you remove it, and it does not update itself. Replacing the files in the same folder and pressing the refresh arrow is how it takes a new version.",
             "caveatFirefox": "Temporary is literal: Firefox lets it go when it closes, so it has to be loaded again next time."
+        },
+        "cli": {
+            "title": "Command line",
+            "description": "Deploy, read logs and restart your apps from a terminal. Sign in once from your browser; every command after that uses that sign-in.",
+            "install": "Install",
+            "system": "Which system you are installing on",
+            "hint": "Paste it into {shell}. It needs Node.js 20 or newer and installs the version that matches this Polaris, as plr and polaris.",
+            "signIn": "Then sign in",
+            "signInHint": "Opens this Polaris in your browser to approve it. On a machine with no browser it shows a code to type here instead.",
+            "server": "It will not install on a computer that runs a Polaris server: both answer to plr and polaris.",
+            "next": "Then try"
         }
     },
     "cli": {
