@@ -574,22 +574,58 @@ async function device(): Promise<{ identifier: string; name: string }> {
     return { identifier, name: system === null ? browser : `${browser} on ${system}` };
 }
 
-/** A live access token, refreshed when it is close to expiring. */
+/**
+ * When a refresh last could not reach Polaris, for the session in front - null
+ * once one has. Session storage, beside the token it is about.
+ */
+const UNREACHABLE = storage.defineItem<number | null>("session:vault.unreachableSince", {
+    fallback: null
+});
+
+/**
+ * A live access token, refreshed when it is close to expiring.
+ *
+ * Null when there is none to be had. Only the server refusing the refresh
+ * token ends the session; a refresh that never got an answer keeps it, marks
+ * the vault unreachable, and is tried again on the next request and by the
+ * minute alarm.
+ */
 async function token(base: string): Promise<string | null> {
     const held = await ACCESS.getValue();
     if (held && held.expiresAt > Date.now()) return held.token;
 
     const refreshToken = await REFRESH.getValue();
     if (!refreshToken) return null;
-    const fresh = await protocol.refresh(base, refreshToken, (await device()).name);
-    if (!fresh) {
+    const outcome = await protocol.refresh(base, refreshToken, (await device()).name);
+    if (outcome.kind === "rejected") {
         // The server rotates refresh tokens, so a refusal is the end of this
         // session rather than something to retry: whatever we hold is spent.
-        await Promise.all([REFRESH.setValue(null), ACCESS.setValue(null)]);
+        await Promise.all([
+            REFRESH.setValue(null),
+            ACCESS.setValue(null),
+            UNREACHABLE.setValue(null)
+        ]);
         return null;
     }
-    await remember(fresh);
-    return fresh.accessToken;
+    if (outcome.kind === "unreachable") {
+        // Kept: the server did not say the session is over, only that it could
+        // not be asked. The time of the first failure is kept, not the latest.
+        if ((await UNREACHABLE.getValue()) === null) await UNREACHABLE.setValue(Date.now());
+        return null;
+    }
+    await Promise.all([remember(outcome.token), UNREACHABLE.setValue(null)]);
+    return outcome.token.accessToken;
+}
+
+/** The refusal for a write that found no live token: signed out, or only out of
+ *  reach - which the vault survives, so it is not told to sign in again. */
+async function noToken(): Promise<messages.Reply> {
+    return {
+        ok: false,
+        error: await say(
+            (await REFRESH.getValue()) ? "errors.vaultUnreachable" : "errors.serverSilentSignIn"
+        )
+    };
 }
 
 async function remember(issued: protocol.VaultToken): Promise<void> {
@@ -1643,6 +1679,7 @@ async function clearActive(): Promise<void> {
         LOCK_AT.setValue(null),
         REFRESH.setValue(null),
         ACCESS.setValue(null),
+        UNREACHABLE.setValue(null),
         WRAPPED.setValue(null),
         CIPHERS.setValue(null),
         SYNCED_AT.setValue(null),
@@ -1700,6 +1737,8 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
         SYNCED_AT.setValue(null),
         REVISION.setValue(null),
         LOCK_AT.setValue(alive ? (held?.lockAt ?? null) : null),
+        // Whether Polaris could be reached is learnt again for this account.
+        UNREACHABLE.setValue(null),
         // And its connection, which is the credential that says whose extension
         // this is while that account is in front. Null where it has none, so the
         // popup asks an account signed in before connections existed to connect
@@ -1818,7 +1857,8 @@ async function status(): Promise<messages.VaultStatus> {
         linkOrgs,
         faces,
         shelf,
-        waiting
+        waiting,
+        unreachableSince
     ] = await Promise.all([
         currentOrigin(),
         EMAIL.getValue(),
@@ -1834,7 +1874,8 @@ async function status(): Promise<messages.VaultStatus> {
         LINK_ORGS.getValue(),
         LINK_FACES.getValue(),
         LINK_SHELF.getValue(),
-        WAITING.getValue()
+        WAITING.getValue(),
+        UNREACHABLE.getValue()
     ]);
     // Only worth asking for once there is a session to ask about: a browser that
     // has not been let in yet would spend a request on every poll of a screen
@@ -1870,6 +1911,7 @@ async function status(): Promise<messages.VaultStatus> {
         linkedAccount: linkAccount,
         canVault,
         connected: refreshToken !== null,
+        unreachable: refreshToken !== null && unreachableSince !== null,
         // Only ever left behind by an approval on the dashboard. A vault opened
         // with the master password alone has a token and no account, which is the
         // state the popup now refuses to go any further from.
@@ -2513,7 +2555,7 @@ async function save(item: {
     if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
     const base = vaultBase(origin);
     const access = await token(base);
-    if (!access) return { ok: false, error: await say("errors.serverSilentSignIn") };
+    if (!access) return noToken();
 
     const { login } = intent;
     const key = opened.key;
@@ -2576,7 +2618,7 @@ async function changePassword(id: string, password: string): Promise<messages.Re
     if (!origin) return { ok: false, error: await say("errors.whichPolaris") };
     const base = vaultBase(origin);
     const access = await token(base);
-    if (!access) return { ok: false, error: await say("errors.serverSilentSignIn") };
+    if (!access) return noToken();
 
     // What goes out is built by `lib/item.ts`: the item as it arrived, with the
     // password replaced, the old one moved into its history and the revision this
@@ -3135,8 +3177,10 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             }
 
             case "sync":
-                return (await inTurn(() => sync(true)))
-                    ? { ok: true, status: await status() }
+                if (await inTurn(() => sync(true))) return { ok: true, status: await status() };
+                // Out of reach rather than empty-handed: said so, session kept.
+                return (await UNREACHABLE.getValue()) && (await REFRESH.getValue())
+                    ? { ok: false, error: await say("errors.vaultUnreachable") }
                     : { ok: false, error: await say("errors.nothingBack") };
 
             case "itemsFor": {
@@ -3810,6 +3854,9 @@ export default defineBackground(() => {
             // And, while it is open, whatever changed elsewhere: a browser left on
             // one page all afternoon still has today's logins when it is used.
             void freshen();
+            // A session kept through a refresh that could not reach Polaris is
+            // asked about again, open or locked, until it gets an answer.
+            if (await UNREACHABLE.getValue()) void sync(false);
             // The accounts set aside keep their own deadlines, and nothing else
             // ever looks at them: a switch that never comes refuses an expired
             // vault it is not holding, which is not the same as not holding it.

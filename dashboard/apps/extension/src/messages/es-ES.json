@@ -42,7 +42,8 @@
         "wentWrong": "Algo ha fallado.",
         "silentWorker": "Polaris no respondió. Vuelve a abrir esto.",
         "unknownServer": "Ese host ya no está en la lista.",
-        "serverNameTooLong": "Un nombre puede tener hasta {max} caracteres."
+        "serverNameTooLong": "Un nombre puede tener hasta {max} caracteres.",
+        "vaultUnreachable": "No se pudo contactar con Polaris. Sigues con la sesión iniciada; inténtalo de nuevo en un momento."
     },
     "menu": {
         "fill": "Rellenar el acceso de este sitio",
@@ -111,6 +112,7 @@
         "notConnected": "Aún sin conectar",
         "locked": "Bloqueada",
         "open": "Abierta",
+        "unreachable": "No se puede contactar con Polaris",
         "apps": "Apps",
         "vault": "Vault",
         "backLabel": "Volver al inicio",
@@ -150,6 +152,7 @@
             "differentPolaris": "Usar otro Polaris"
         },
         "cancel": "Cancelar",
+        "unreachable": "Ahora mismo no se puede contactar con Polaris. Sigues con la sesión iniciada y la bóveda lo vuelve a intentar cada minuto.",
         "signIn": {
             "nothingUntil": "No se entrega nada hasta que alguien con la bóveda abierta diga que sí. Puedes cerrar esto; sigue sin ello.",
             "noVault": "Esta cuenta no tiene bóveda en {host}, así que aquí no hay accesos que rellenar.",

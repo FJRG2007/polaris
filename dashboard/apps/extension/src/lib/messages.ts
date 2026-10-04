@@ -72,6 +72,12 @@ export interface VaultStatus {
     /** Signed in, in the sense that there is a token: the vault may still be locked. */
     readonly connected: boolean;
     /**
+     * Signed in, but the last refresh could not reach Polaris - no answer, a
+     * timeout, a server error. The session is kept and tried again; this is what
+     * the popup says instead of asking somebody to sign in again.
+     */
+    readonly unreachable: boolean;
+    /**
      * Whether this session also carries a Polaris account credential.
      *
      * One approval on the dashboard leaves both behind - the vault's key and the

@@ -440,6 +440,8 @@ export function greeting(t: Words, date: Date, name: string): string {
 export function vaultState(status: VaultStatus, t: Words = ENGLISH): string {
     if (!status.canVault) return t("shell.noVault");
     if (!status.connected || !status.polarisSession) return t("shell.notConnected");
+    // Still signed in: the server only could not be asked.
+    if (status.unreachable) return t("shell.unreachable");
     if (!status.unlocked) return t("shell.locked");
     return t("shell.open");
 }

@@ -26,6 +26,7 @@ const STATUS: VaultStatus = {
     linkedAccount: { id: "u1", name: "Ada Lovelace", email: "ada@example.com" },
     canVault: true,
     connected: true,
+    unreachable: false,
     polarisSession: true,
     unlocked: false,
     syncedAt: null,

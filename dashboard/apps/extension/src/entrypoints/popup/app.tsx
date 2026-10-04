@@ -293,6 +293,11 @@ export function App(): React.JSX.Element {
             ) : (
                 <>
                     <SectionBar title={t("shell.vault")} onBack={() => setSection("home")} />
+                    {status.unreachable ? (
+                        <p className="notice" role="status">
+                            {t("popup.unreachable")}
+                        </p>
+                    ) : null}
                     {shown === "signIn" || (shown === "unlock" && onApproval) ? (
                         <SignIn
                             server={status.server}

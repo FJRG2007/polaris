@@ -42,7 +42,8 @@
         "wentWrong": "Something went wrong.",
         "silentWorker": "Polaris did not answer. Open this again.",
         "unknownServer": "That host is not on the list any more.",
-        "serverNameTooLong": "A name can be up to {max} characters."
+        "serverNameTooLong": "A name can be up to {max} characters.",
+        "vaultUnreachable": "Polaris could not be reached. You are still signed in; try again in a moment."
     },
     "menu": {
         "fill": "Fill the login for this site",
@@ -111,6 +112,7 @@
         "notConnected": "Not connected yet",
         "locked": "Locked",
         "open": "Open",
+        "unreachable": "Polaris can't be reached",
         "apps": "Apps",
         "vault": "Vault",
         "backLabel": "Back to the home screen",
@@ -150,6 +152,7 @@
             "differentPolaris": "Use a different Polaris"
         },
         "cancel": "Cancel",
+        "unreachable": "Polaris can't be reached right now. You are still signed in, and the vault tries again every minute.",
         "signIn": {
             "nothingUntil": "Nothing is handed over until somebody with the vault open says yes. You can close this; it carries on without it.",
             "noVault": "This account does not have a vault on {host}, so there are no logins to fill here.",

@@ -17,6 +17,7 @@ const STATUS: VaultStatus = {
     linkedAccount: { id: "u1", name: "Ada Lovelace", email: "ada@example.com" },
     canVault: true,
     connected: true,
+    unreachable: false,
     polarisSession: true,
     unlocked: false,
     syncedAt: null,
@@ -94,6 +95,11 @@ describe("the home screen", () => {
         expect(vaultState({ ...STATUS, connected: false })).toBe("Not connected yet");
         expect(vaultState(STATUS)).toBe("Locked");
         expect(vaultState({ ...STATUS, unlocked: true })).toBe("Open");
+        // Signed in, only out of reach: never "not connected", never a sign-in.
+        expect(vaultState({ ...STATUS, unreachable: true })).toBe("Polaris can't be reached");
+        expect(vaultState({ ...STATUS, unlocked: true, unreachable: true })).toBe(
+            "Polaris can't be reached"
+        );
     });
 
     it("does not list the hosts as if they were an app", () => {
