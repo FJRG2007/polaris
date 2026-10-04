@@ -151,6 +151,21 @@ function stepped(day: string, key: string, timeColumns: boolean): string | null 
     return null;
 }
 
+/**
+ * Whether what the choice opened (the new-event card, an event's card, an
+ * editor) already holds the focus.
+ *
+ * A menu that closes hands the focus back to where it was before it opened -
+ * the day pressed. A panel opened by the choice has taken it by then, and the
+ * new-event card is not modal: focus leaving it reads as the reader moving on,
+ * and it closed the instant it opened. So the menu leaves the focus where the
+ * panel put it, and hands it back only when nothing took it.
+ */
+function focusTakenByPanel(): boolean {
+    const active = typeof document === "undefined" ? null : document.activeElement;
+    return active instanceof Element && active.closest('[role="dialog"]') !== null;
+}
+
 /** Whether a key press asks for the context menu. */
 function asksForMenu(event: { key: string; shiftKey: boolean }): boolean {
     return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
@@ -321,7 +336,13 @@ export function GridMenu(props: GridMenuProps) {
                     {props.children}
                 </div>
             </ContextMenuTrigger>
-            <ContextMenuContent className="w-60" aria-label={t("gridMenu.label")}>
+            <ContextMenuContent
+                className="w-60"
+                aria-label={t("gridMenu.label")}
+                onCloseAutoFocus={(event) => {
+                    if (focusTakenByPanel()) event.preventDefault();
+                }}
+            >
                 {target ? <MenuBody target={target} {...props} /> : null}
             </ContextMenuContent>
         </ContextMenu>
