@@ -216,6 +216,17 @@ describe("the project canvas", () => {
         expect(saveLayoutAction).not.toHaveBeenCalled();
     });
 
+    it("tells how to zoom with a wheel only where there is a pointer to hold Ctrl with", () => {
+        mount(<DeployCanvas environment={environment()} canManage />);
+        const zoom = screen.getByText(/Hold Ctrl \(Cmd on a Mac\) and scroll to zoom/);
+        // Hidden on a touch screen, which pinches instead: shown only for a fine pointer.
+        expect(zoom.className).toContain("hidden");
+        expect(zoom.className).toContain("[@media(pointer:fine)]:inline");
+        expect(screen.getByText(/Drag nodes to arrange them/).textContent).not.toMatch(
+            /Hold Ctrl.*Hold Ctrl/
+        );
+    });
+
     it("offers to add the first service from an empty board", () => {
         mount(
             <DeployCanvas environment={environment({ applications: [], layout: "{}" })} canManage />

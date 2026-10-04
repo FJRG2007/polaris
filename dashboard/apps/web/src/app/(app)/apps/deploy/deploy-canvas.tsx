@@ -1397,7 +1397,14 @@ export function DeployCanvas({
                 </div>
             )}
             {canManage && (
-                <p className="mt-2 text-xs text-muted-foreground/70">{t("canvas.hint")}</p>
+                <p className="mt-2 text-xs text-muted-foreground/70">
+                    {t("canvas.hint")}
+                    {/* Only where there is a wheel to scroll: a touch screen pinches. */}
+                    <span className="hidden [@media(pointer:fine)]:inline">
+                        {" "}
+                        {t("canvas.hintZoom")}
+                    </span>
+                </p>
             )}
 
             <ConfirmDeleteDialog
