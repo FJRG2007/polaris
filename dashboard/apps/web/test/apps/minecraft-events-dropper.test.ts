@@ -5,6 +5,12 @@
  */
 
 import { describe, expect, it } from "vitest";
+import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
+import {
+    COMMAND_BYTES_MAX,
+    commandBytes
+} from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import * as said from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper-messages";
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
 import * as dropper from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper";
 import * as snowballPack from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack";
@@ -414,5 +420,42 @@ describe("the dropper's data pack", () => {
             'execute as @a[tag=pe_in,scores={pe_back=1..}] run tellraw @s "x"',
             "scoreboard players set @a[tag=pe_in,scores={pe_back=1..}] pe_back 0"
         ]);
+    });
+});
+
+describe("what a dropper says", () => {
+    it("is in both languages, and every line it sends is one command", () => {
+        for (const language of ["en", "es"] as const) {
+            const words = [
+                said.readySubtitle(language),
+                said.goSubtitle(language),
+                said.bar(20, 20, 20, language),
+                said.backToTop(language),
+                said.cannotPlay(language)
+            ];
+            for (const line of words) {
+                expect(line).toMatch(/^&[0-9a-f]/);
+                expect(
+                    commandBytes(`tellraw Maximilian_1234 ${commands.text(line)}`)
+                ).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+            }
+            expect(said.backToTop("en")).not.toBe(said.backToTop("es"));
+        }
+        const shaft = dropper.shaft(
+            { levels: 20, difficulty: "hard" },
+            "far",
+            { x: -29_999_000, z: 29_999_000 },
+            60
+        );
+        for (const line of [
+            ...dropper.armLines(shaft),
+            ...dropper.stopLines(shaft.boxes),
+            ...dropper.racerScores("Maximilian_1234", shaft),
+            ...dropper.backLines(commands.text(said.backToTop("es"))),
+            dropper.lidGone(shaft),
+            dropper.READ_LOWEST,
+            dropper.READ_FINISHED
+        ])
+            expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
     });
 });

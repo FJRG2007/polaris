@@ -7,6 +7,12 @@
  */
 
 import { describe, expect, it } from "vitest";
+import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
+import {
+    COMMAND_BYTES_MAX,
+    commandBytes
+} from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import * as said from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/boat-race-messages";
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
 import * as boatRace from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/boat-race";
 import * as snowballPack from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack";
@@ -335,5 +341,47 @@ describe("boats", () => {
         expect(lines.some((line) => line.includes("kill @e[type=minecraft:oak_boat,"))).toBe(true);
         expect(lines.some((line) => line.includes("kill @e[type=minecraft:boat,"))).toBe(true);
         expect(lines.at(-1)).toContain('nbt={Item:{id:"minecraft:oak_boat"}}');
+    });
+});
+
+describe("what a boat race says", () => {
+    it("is in both languages, and every line it sends is one command", () => {
+        for (const language of ["en", "es"] as const) {
+            const words = [
+                said.readySubtitle(language),
+                said.goSubtitle(5, language),
+                said.bar(5, 5, 10, 10, language),
+                said.fell(language),
+                said.lost(language),
+                said.cut(language),
+                said.cannotPlay(language)
+            ];
+            for (const line of words) {
+                expect(line).toMatch(/^&[0-9a-f]/);
+                expect(
+                    commandBytes(`tellraw Maximilian_1234 ${commands.text(line)}`)
+                ).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+            }
+            expect(said.cut("en")).not.toBe(said.cut("es"));
+        }
+        const track = boatRace.track({ laps: 5 }, "far", { x: -29_999_000, z: 29_999_000 }, 300);
+        const told = {
+            fell: commands.text(said.fell("es")),
+            cut: commands.text(said.cut("es")),
+            lost: commands.text(said.lost("es"))
+        };
+        for (const way of ["oak_boat", "boat", "item", "item_components"] as const)
+            for (const line of [
+                ...boatRace.quickLines(track, way, told),
+                ...boatRace.boatLines("Maximilian_1234", way)
+            ])
+                expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+        for (const line of [
+            ...boatRace.armLines(track),
+            ...boatRace.stopLines(track.boxes),
+            ...boatRace.boatsGone(track.volume),
+            ...boatRace.racerScores("Maximilian_1234")
+        ])
+            expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
     });
 });

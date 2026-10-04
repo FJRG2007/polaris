@@ -5,6 +5,12 @@
  */
 
 import { describe, expect, it } from "vitest";
+import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
+import {
+    COMMAND_BYTES_MAX,
+    commandBytes
+} from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import * as said from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/tnt-run-messages";
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
 import * as spleef from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef";
 import * as tntRun from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/tnt-run";
@@ -239,5 +245,32 @@ describe("the TNT run's data pack", () => {
             tntRun.stopLines(spleef.arena({ size: 5 } as never, { x: 0, z: 0 }, 100).boxes)
         ).toEqual([]);
         expect(stage.ARENA_BLOCKS).toContain(tntRun.FLOOR);
+    });
+});
+
+describe("what a TNT run says", () => {
+    it("is in both languages, and every line it sends is one command", () => {
+        for (const language of ["en", "es"] as const) {
+            const words = [
+                said.readySubtitle(language),
+                said.goTitle(language),
+                said.bar(99, 4, 4, language),
+                said.cannotPlay(language)
+            ];
+            for (const line of words) {
+                expect(line).toMatch(/^&[0-9a-f]/);
+                expect(
+                    commandBytes(`tellraw Maximilian_1234 ${commands.text(line)}`)
+                ).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+            }
+            expect(said.goTitle("en")).not.toBe(said.goTitle("es"));
+        }
+        const arena = arenaOf(15, 4, { x: -29_999_000, z: 29_999_000 }, 300);
+        for (const line of [
+            ...tntRun.armLines(arena),
+            ...tntRun.stopLines(arena.boxes),
+            tntRun.primedOut(arena.volume)
+        ])
+            expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
     });
 });
