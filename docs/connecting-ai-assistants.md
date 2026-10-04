@@ -46,12 +46,21 @@ servers, so your Polaris must be reachable from the internet for this one.
 
 ### ChatGPT
 
-Needs a Plus, Pro, Business, Enterprise or Education plan, on the web.
+Needs a Plus, Pro, Business, Enterprise or Education plan, on the web. In a
+Business, Enterprise or Education workspace, an admin may have to allow
+Developer mode first.
 
 1. Open **Settings > Security and login** and turn on **Developer mode**.
-2. In **Plugins**, select **+** and create an app with the server URL. Choose
-   OAuth.
-3. Sign in to Polaris when ChatGPT asks.
+2. Open **Plugins**, select **Add**, then **Create MCP App**.
+3. Name it Polaris. Under **Connection**, keep **Server URL** and paste the
+   server URL.
+4. Set **Authentication** to **OAuth**. No client ID or secret is needed:
+   Polaris registers ChatGPT itself.
+5. Check **I understand and want to continue**, then select **Create**.
+6. Sign in to Polaris when ChatGPT asks.
+
+If **Add** only offers **Create plugin** and **Upload plugin**, Developer mode
+is off. Those two are for packaged plugins and do not take a server URL.
 
 Like Claude on the web, ChatGPT connects from its own servers and needs Polaris
 reachable from the internet.

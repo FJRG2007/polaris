@@ -160,7 +160,13 @@ export async function McpAssistants() {
                             <li>{t("assistants.chatgpt.step1")}</li>
                             <li>{t("assistants.chatgpt.step2")}</li>
                             <li>{t("assistants.chatgpt.step3")}</li>
+                            <li>{t("assistants.chatgpt.step4")}</li>
+                            <li>{t("assistants.chatgpt.step5")}</li>
+                            <li>{t("assistants.chatgpt.step6")}</li>
                         </ol>
+                        <p className="text-xs text-muted-foreground">
+                            {t("assistants.chatgpt.missing")}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                             {t("assistants.chatgpt.plans")}
                         </p>

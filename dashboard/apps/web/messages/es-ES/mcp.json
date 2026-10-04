@@ -109,9 +109,13 @@
         "chatgpt": {
             "name": "ChatGPT",
             "step1": "Abre Configuración > Seguridad e inicio de sesión y activa el modo desarrollador.",
-            "step2": "En Plugins, selecciona + y crea una app con la URL del servidor. Elige OAuth.",
-            "step3": "Inicia sesión aquí cuando ChatGPT te lo pida.",
-            "plans": "Requiere un plan Plus, Pro, Business, Enterprise o Education, en la web."
+            "step2": "Abre Plugins, selecciona Añadir y luego Crear app MCP.",
+            "step3": "Llámala Polaris. En Conexión, deja URL del servidor y pega la URL del servidor.",
+            "step4": "En Autenticación, elige OAuth. No hace falta ID ni secreto de cliente.",
+            "step5": "Marca Entiendo y quiero continuar y selecciona Crear.",
+            "step6": "Inicia sesión aquí cuando ChatGPT te lo pida.",
+            "missing": "Si Añadir solo ofrece Crear plugin y Subir plugin, el modo desarrollador está desactivado. Esas dos opciones son para plugins empaquetados, no para una URL de servidor.",
+            "plans": "Requiere un plan Plus, Pro, Business, Enterprise o Education, en la web. En un espacio de trabajo Business, Enterprise o Education, puede que un administrador tenga que permitir antes el modo desarrollador."
         },
         "cursor": {
             "name": "Cursor",

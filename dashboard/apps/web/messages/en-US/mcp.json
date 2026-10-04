@@ -109,9 +109,13 @@
         "chatgpt": {
             "name": "ChatGPT",
             "step1": "Open Settings > Security and login and turn on Developer mode.",
-            "step2": "In Plugins, select + and create an app with the server URL. Choose OAuth.",
-            "step3": "Sign in here when ChatGPT asks.",
-            "plans": "Needs a Plus, Pro, Business, Enterprise or Education plan, on the web."
+            "step2": "Open Plugins, select Add, then Create MCP App.",
+            "step3": "Name it Polaris. Under Connection, keep Server URL and paste the server URL.",
+            "step4": "Set Authentication to OAuth. No client ID or secret is needed.",
+            "step5": "Check I understand and want to continue, then select Create.",
+            "step6": "Sign in here when ChatGPT asks.",
+            "missing": "If Add only offers Create plugin and Upload plugin, Developer mode is off. Those two are for packaged plugins, not for a server URL.",
+            "plans": "Needs a Plus, Pro, Business, Enterprise or Education plan, on the web. In a Business, Enterprise or Education workspace, an admin may have to allow Developer mode first."
         },
         "cursor": {
             "name": "Cursor",
