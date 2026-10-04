@@ -174,8 +174,14 @@ export function SessionsView({
             title: t("sessions.disconnect.title"),
             description:
                 extension.vaultClients > 0
-                    ? t("sessions.disconnect.withVault", { browser: extension.browser, os: extension.os })
-                    : t("sessions.disconnect.description", { browser: extension.browser, os: extension.os }),
+                    ? t("sessions.disconnect.withVault", {
+                          browser: extension.browser,
+                          os: extension.os
+                      })
+                    : t("sessions.disconnect.description", {
+                          browser: extension.browser,
+                          os: extension.os
+                      }),
             confirmLabel: t("sessions.disconnect.confirm"),
             danger: true
         });
@@ -224,7 +230,10 @@ export function SessionsView({
             title: t("sessions.others.title"),
             description:
                 extensions.length > 0
-                    ? t("sessions.others.withExtensions", { sessions: others.length, extensions: extensions.length })
+                    ? t("sessions.others.withExtensions", {
+                          sessions: others.length,
+                          extensions: extensions.length
+                      })
                     : t("sessions.others.description", { sessions: others.length }),
             confirmLabel: t("sessions.others.confirm"),
             danger: true
@@ -245,7 +254,9 @@ export function SessionsView({
                     <CardBody className="flex flex-col gap-3">
                         <div>
                             <h2 className="text-sm font-medium">{t("sessions.pending.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("sessions.pending.hint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("sessions.pending.hint")}
+                            </p>
                         </div>
                         {pending.map((session) => (
                             <div

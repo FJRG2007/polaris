@@ -49,7 +49,9 @@ export default async function SessionsPage() {
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("sessions.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("sessions.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("sessions.page.intro")}</p>
             </div>
             <SessionsView

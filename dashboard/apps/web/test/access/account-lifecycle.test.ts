@@ -48,13 +48,22 @@ vi.mock("@polaris/db", () => ({
         },
         userSecurity: {
             findUnique: async () => security,
-            upsert: async (args: { create: Record<string, unknown>; update: Record<string, unknown> }) => {
-                security = { ...(security ?? { lockdownAt: null, lockdownNote: null }), ...args.update } as typeof security;
+            upsert: async (args: {
+                create: Record<string, unknown>;
+                update: Record<string, unknown>;
+            }) => {
+                security = {
+                    ...(security ?? { lockdownAt: null, lockdownNote: null }),
+                    ...args.update
+                } as typeof security;
                 void args.create;
                 return security;
             },
             updateMany: async (args: { data: Record<string, unknown> }) => {
-                security = { ...(security ?? { lockdownAt: null, lockdownNote: null }), ...args.data } as typeof security;
+                security = {
+                    ...(security ?? { lockdownAt: null, lockdownNote: null }),
+                    ...args.data
+                } as typeof security;
                 return { count: 1 };
             }
         },

@@ -39,7 +39,13 @@ vi.mock("@polaris/db", () => ({
                 updated.push({ where, data });
                 return {};
             },
-            updateMany: async ({ where, data }: { where: unknown; data: Record<string, unknown> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: unknown;
+                data: Record<string, unknown>;
+            }) => {
                 updated.push({ where, data });
                 return { count: 1 };
             }
@@ -52,7 +58,10 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/session-directory", () => ({ describeOrigin: () => "" }));
 vi.mock("@/lib/extension/sessions", () => ({ revokeExtensionSessions: async () => 0 }));
-vi.mock("@/lib/cli/sessions", () => ({ revokeCliSessions: async () => 0, revokeCliSession: async () => false }));
+vi.mock("@/lib/cli/sessions", () => ({
+    revokeCliSessions: async () => 0,
+    revokeCliSession: async () => false
+}));
 vi.mock("@/lib/request-context", () => ({
     clientHost: async () => null,
     clientIp: async () => undefined,
@@ -61,7 +70,11 @@ vi.mock("@/lib/request-context", () => ({
 }));
 vi.mock("@polaris/auth", () => ({
     markPrincipalsMoved: async () => undefined,
-    resolveSignInRules: async () => ({ allowedCidrs: [], allowedCountries: [], allowedContinents: [] }),
+    resolveSignInRules: async () => ({
+        allowedCidrs: [],
+        allowedCountries: [],
+        allowedContinents: []
+    }),
     updateEnforcedRules: async () => undefined
 }));
 
@@ -89,10 +102,12 @@ describe("banUser", () => {
     });
 
     it("refuses a length nobody meant", async () => {
-        expect(await admin.banUser("root", "ada", "", -1)).toEqual({ error: "That is not a length." });
-        expect(
-            await admin.banUser("root", "ada", "", admin.MAX_SUSPENSION_MINUTES + 1)
-        ).toEqual({ error: "That is not a length." });
+        expect(await admin.banUser("root", "ada", "", -1)).toEqual({
+            error: "That is not a length."
+        });
+        expect(await admin.banUser("root", "ada", "", admin.MAX_SUSPENSION_MINUTES + 1)).toEqual({
+            error: "That is not a length."
+        });
         expect(updated).toEqual([]);
     });
 

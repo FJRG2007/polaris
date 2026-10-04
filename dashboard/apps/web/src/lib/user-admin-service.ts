@@ -213,10 +213,12 @@ export async function banUser(
     if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.banSelf") };
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!target) return { error: (await readerWords("drive"))("errors.userNotFound") };
-    if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
+    if (await wouldStrandInstance(userId))
+        return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
 
     const length = Math.trunc(minutes ?? 0);
-    if (length < 0 || length > MAX_SUSPENSION_MINUTES) return { error: (await readerWords("api"))("refusals.users.notALength") };
+    if (length < 0 || length > MAX_SUSPENSION_MINUTES)
+        return { error: (await readerWords("api"))("refusals.users.notALength") };
     // Both from one instant: taken separately, a suspension's length is off by
     // however long the two calls were apart, which is the sort of thing that is
     // fine until somebody is comparing the two columns.
@@ -288,8 +290,10 @@ export async function setAdminAccess(
     isAdmin: boolean
 ): Promise<{ error?: string }> {
     if (!isAdmin) {
-        if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.ownAdmin") };
-        if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
+        if (userId === actorId)
+            return { error: (await readerWords("api"))("refusals.users.ownAdmin") };
+        if (await wouldStrandInstance(userId))
+            return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
     }
     await prisma.user.update({ where: { id: userId }, data: { isAdmin } });
     await recordAudit({
@@ -454,7 +458,8 @@ export async function revokeSessionForUser(
     sessionId: string
 ): Promise<{ error?: string }> {
     const result = await prisma.session.deleteMany({ where: { id: sessionId, userId } });
-    if (result.count === 0) return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
+    if (result.count === 0)
+        return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
     await recordAudit({
         actorId,
         action: "user.session.revoke",
@@ -502,10 +507,12 @@ export async function revokeCliSessionForUser(
  * out of - your own account, and the last administrator.
  */
 export async function deleteUser(actorId: string, userId: string): Promise<{ error?: string }> {
-    if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.deleteSelf") };
+    if (userId === actorId)
+        return { error: (await readerWords("api"))("refusals.users.deleteSelf") };
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (!target) return { error: (await readerWords("drive"))("errors.userNotFound") };
-    if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
+    if (await wouldStrandInstance(userId))
+        return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
 
     // Their face and their banner, before the rows that say where those are
     // cascade away with the account. A cascade takes rows, not bytes, so without

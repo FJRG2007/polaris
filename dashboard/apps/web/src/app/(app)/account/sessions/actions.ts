@@ -84,9 +84,13 @@ export async function noteSignOutAction(): Promise<void> {
     await notifySessionsClosed({
         userId: user.id,
         count: 1,
-        reason: translate(await getUserLocale(user.id), "accountSecurity.sessions.signedItselfOut", {
-            name: sessionName(user.sessionId)
-        })
+        reason: translate(
+            await getUserLocale(user.id),
+            "accountSecurity.sessions.signedItselfOut",
+            {
+                name: sessionName(user.sessionId)
+            }
+        )
     });
 }
 
@@ -259,7 +263,11 @@ export async function decideLoginApprovalAction(
         );
         if (!throttle.ok) {
             const t = await getTranslations("accountSecurity");
-            return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
+            return {
+                error: t("errors.tooManyAttempts", {
+                    minutes: Math.ceil(throttle.retryAfterMs / 60000)
+                })
+            };
         }
     }
     const result = await decideLoginApproval(
@@ -360,7 +368,10 @@ export async function signOutCliSessionAction(id: unknown): Promise<{ error?: st
 
 /** Tie one CLI sign-in to its address, untie it, or hand it back to the
  *  account's rule - the same three answers, and the same gate, as a session. */
-export async function pinCliSessionAction(id: unknown, pinned: unknown): Promise<{ error?: string }> {
+export async function pinCliSessionAction(
+    id: unknown,
+    pinned: unknown
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });

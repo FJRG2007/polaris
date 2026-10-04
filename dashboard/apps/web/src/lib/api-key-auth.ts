@@ -85,9 +85,16 @@ export async function requireApiKey(
     required?: Permission
 ): Promise<ApiKeyPrincipal | Response> {
     const principal = await authenticateApiKey(request);
-    if (!principal) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
+    if (!principal)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.unauthorized") },
+            { status: 401 }
+        );
     if (required && !principal.scopes.includes(required)) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden"), requiredScope: required }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden"), requiredScope: required },
+            { status: 403 }
+        );
     }
     return principal;
 }

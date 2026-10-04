@@ -238,7 +238,10 @@ export async function revokeUserSessionAction(
 }
 
 /** End one of somebody's command-line sign-ins without ending the rest. */
-export async function revokeUserCliSessionAction(userId: unknown, keyId: unknown): Promise<{ error?: string }> {
+export async function revokeUserCliSessionAction(
+    userId: unknown,
+    keyId: unknown
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const target = idSchema.safeParse(userId);
     const key = idSchema.safeParse(keyId);

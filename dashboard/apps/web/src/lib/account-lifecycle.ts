@@ -141,10 +141,7 @@ export async function liftLockdown(userId: string): Promise<void> {
  * asking goes with the rest - the browser is about to be signed out anyway, and
  * leaving one behind would be leaving the one that could undo it.
  */
-export async function closeAccount(
-    userId: string,
-    closure: core.AccountClosure
-): Promise<void> {
+export async function closeAccount(userId: string, closure: core.AccountClosure): Promise<void> {
     const now = new Date();
     await prisma.user.update({
         where: { id: userId },
