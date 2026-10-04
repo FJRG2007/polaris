@@ -107,7 +107,9 @@ function spotOf(run: stored.EventRun, entrant: stored.Entrant): arena.Spot {
 async function goLines(ctx: KindContext, syntax: ItemSyntax): Promise<string[]> {
     const run = ctx.run;
     const first = firstRound(run, ctx.now);
-    const out: string[] = [];
+    // No hit from before "Go!" - or from another arena's fight - read as one
+    // of this game's.
+    const out: string[] = [...hits.TAGS_OFF];
     for (const one of run.entrants)
         out.push(
             arena.moveTo(one.name, spotOf(run, one)),

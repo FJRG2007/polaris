@@ -121,7 +121,8 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const seconds = optionsOf(run).hideSeconds;
     const seekers = firstSeekers(run).map(lower);
     const mirror = await mirrorOf(ctx);
-    const out: string[] = [];
+    // No hit from before "Go!" - or from another arena's fight - read as a find.
+    const out: string[] = [...hits.TAGS_OFF];
     for (const one of run.entrants) {
         const seeking = seekers.includes(lower(one.name));
         out.push(

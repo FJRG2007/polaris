@@ -10432,6 +10432,24 @@ describe("hot potato", () => {
         expect(await holderNow()).toBe(far);
     });
 
+    it("reads no hit from before Go - another arena's fight - as one of the game's", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        // Tagged by the pack in an earlier fight, and never taken.
+        world.tags.pe_hit_struck = new Set(["Ana", "Ben", "Cy"]);
+        world.tags.pe_hit_hurt = new Set(["Ana", "Ben", "Cy"]);
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        // Cleared with "Go!", before the first holder is handed it.
+        const cleared = world.sent.indexOf("tag @a remove pe_hit_hurt");
+        const handed = world.sent.findIndex((line) =>
+            line.includes("armor.head with minecraft:tnt")
+        );
+        expect(cleared).toBeGreaterThan(-1);
+        expect(cleared).toBeLessThan(handed);
+        expect(world.tags.pe_hit_hurt.size).toBe(0);
+        expect(world.tags.pe_hit_struck.size).toBe(0);
+    });
+
     it("by the game's statistics where the pack is not on, passes on the holder's first punch", async () => {
         world.properties = "pvp=true\ndifficulty=normal\nlevel-name=../elsewhere\n";
         world.online = ["Ana", "Ben", "Cy"];
