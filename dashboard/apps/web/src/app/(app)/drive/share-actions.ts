@@ -16,6 +16,7 @@ import { sharingBaseUrl } from "@/lib/domain-service";
 import { ensureShareReachability } from "@/lib/public-reach";
 import { createShareSchema, isCidr, isIpAddress } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
+import { toLinkVisitor, type LinkVisitor } from "@/lib/link-visitor";
 import {
     createShare,
     listShareAccessLogs,
@@ -58,6 +59,8 @@ export interface ShareLogRow {
     ip: string | null;
     action: string;
     reason: string | null;
+    /** The visitor's Polaris account when they were signed in, else null. */
+    visitor: LinkVisitor | null;
 }
 
 /** Create a share and return the absolute link to hand out (once). */
@@ -146,7 +149,8 @@ export async function getShareLogsAction(shareId: string): Promise<{ logs: Share
             at: row.at.toISOString(),
             ip: row.ip,
             action: row.action,
-            reason: row.reason
+            reason: row.reason,
+            visitor: toLinkVisitor(row.user)
         }))
     };
 }

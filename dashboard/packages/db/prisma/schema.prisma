@@ -228,11 +228,13 @@ model User {
     hostGroups        HostGroup[]
     shares            Share[]
     shareInvites      ShareInvite[]
+    shareVisits       ShareAccessLog[]
     fileRequests      FileRequest[]
     submissions       FileRequestSubmission[]
     snippets           Snippet[]
     snippetsSubmitted  Snippet[]              @relation("SnippetSubmitter")
     snippetInvites     SnippetInvite[]
+    snippetVisits      SnippetAccessLog[]
     textRequests       TextRequest[]
     vault              VaultAccount?
     dropPointVisits   FileRequestVisit[]
@@ -2463,10 +2465,17 @@ model ShareAccessLog {
     userAgentHash String?
     action        String
     reason        String?
+    // The Polaris account the visitor was signed in to, read from their own
+    // session on the server - never from anything the request claims. Null for
+    // anybody signed out, and for every row written before this was recorded.
+    // Deleting the account clears it rather than the row.
+    userId        String?  @db.Uuid
 
     share Share @relation(fields: [shareId], references: [id], onDelete: Cascade)
+    user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
     @@index([shareId])
+    @@index([userId])
 }
 
 // ---------------------------------------------------------------------------
@@ -2704,10 +2713,14 @@ model SnippetAccessLog {
     userAgentHash String?
     action        String
     reason        String?
+    // The signed-in visitor, as on ShareAccessLog. Null when signed out.
+    userId        String?  @db.Uuid
 
     snippet Snippet @relation(fields: [snippetId], references: [id], onDelete: Cascade)
+    user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
     @@index([snippetId])
+    @@index([userId])
 }
 
 // The inverse of a snippet link: a URL that asks somebody for text.

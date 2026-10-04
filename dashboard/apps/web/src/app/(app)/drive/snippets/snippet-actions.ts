@@ -17,6 +17,7 @@ import { loadEnv } from "@polaris/config";
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { requirePermission } from "@/lib/session";
+import { toLinkVisitor, type LinkVisitor } from "@/lib/link-visitor";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import * as snippetService from "@/lib/snippet-service";
 import { ensureShareReachability } from "@/lib/public-reach";
@@ -36,6 +37,8 @@ export interface SnippetLogRow {
     ip: string | null;
     action: string;
     reason: string | null;
+    /** The visitor's Polaris account when they were signed in, else null. */
+    visitor: LinkVisitor | null;
 }
 
 /** The screens a change to a snippet can be seen on. */
@@ -168,7 +171,8 @@ export async function getSnippetLogsAction(snippetId: string): Promise<{ logs: S
             at: row.at.toISOString(),
             ip: row.ip,
             action: row.action,
-            reason: row.reason
+            reason: row.reason,
+            visitor: toLinkVisitor(row.user)
         }))
     };
 }

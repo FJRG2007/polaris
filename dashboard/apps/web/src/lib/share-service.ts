@@ -24,6 +24,7 @@ import {
     verifyUnlock,
     type LinkUsability
 } from "@/lib/link-guards";
+import { linkVisitorId, linkVisitorSelect } from "@/lib/link-visitor";
 
 /** The unlock-cookie namespace shares are signed under. */
 const SHARE_LINK_SCOPE = "share";
@@ -167,7 +168,14 @@ export async function listShareAccessLogs(ownerId: string, shareId: string) {
         where: { shareId },
         orderBy: { at: "desc" },
         take: 500,
-        select: { id: true, at: true, ip: true, action: true, reason: true }
+        select: {
+            id: true,
+            at: true,
+            ip: true,
+            action: true,
+            reason: true,
+            user: { select: linkVisitorSelect }
+        }
     });
 }
 
@@ -274,7 +282,12 @@ export async function registerDownload(shareId: string): Promise<boolean> {
     return result.count === 1;
 }
 
-/** Append an access-log entry for a share. Never throws; logging must not block. */
+/**
+ * Append an access-log entry for a share. Never throws; logging must not block.
+ * The visitor's account, when they are signed in, is read from this request's
+ * own session here rather than passed in, so every route that logs records it
+ * and none of them can be handed one.
+ */
 export async function logShareAccess(entry: {
     shareId: string;
     action: string;
@@ -291,7 +304,8 @@ export async function logShareAccess(entry: {
                 reason: entry.reason,
                 ip: entry.ip,
                 ipHash: entry.ipHash,
-                userAgentHash: entry.userAgentHash
+                userAgentHash: entry.userAgentHash,
+                userId: await linkVisitorId()
             }
         });
     } catch {
