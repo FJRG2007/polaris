@@ -43,6 +43,7 @@ import {
     type ShareLogRow
 } from "../share-actions";
 import { useConfirm } from "@/components/confirm-dialog";
+import { LinkVisitorCell, signedInVisitors } from "../link-visitor-cell";
 import { useDisplayFormat } from "@/components/display-format";
 import { useFormChanged } from "@/lib/use-form-changed";
 
@@ -516,6 +517,7 @@ function ShareLogsDialog({
     const downloads = logs?.filter((row) => row.action === "download" && !row.reason).length ?? 0;
     const denied = logs?.filter((row) => row.reason).length ?? 0;
     const uniqueIps = new Set((logs ?? []).map((row) => row.ip).filter(Boolean)).size;
+    const signedIn = signedInVisitors(logs ?? []);
 
     return (
         <Dialog open={share !== null} onOpenChange={onOpenChange}>
@@ -530,6 +532,9 @@ function ShareLogsDialog({
                     <Badge variant="neutral">{t("sharedLinks.views", { count: views })}</Badge>
                     <Badge variant="neutral">{t("sharedLinks.downloads", { count: downloads })}</Badge>
                     <Badge variant="neutral">{t("sharedLinks.uniqueIps", { count: uniqueIps })}</Badge>
+                    {signedIn > 0 ? (
+                        <Badge variant="neutral">{t("linkVisitor.signedIn", { count: signedIn })}</Badge>
+                    ) : null}
                     {denied > 0 ? (
                         <Badge variant="warning">{t("sharedLinks.denied", { count: denied })}</Badge>
                     ) : null}
@@ -547,6 +552,7 @@ function ShareLogsDialog({
                                 <tr>
                                     <th className="py-1 pr-3 font-medium">{t("sharedLinks.when")}</th>
                                     <th className="py-1 pr-3 font-medium">{t("sharedLinks.ip")}</th>
+                                    <th className="py-1 pr-3 font-medium">{t("linkVisitor.who")}</th>
                                     <th className="py-1 font-medium">{t("sharedLinks.action")}</th>
                                 </tr>
                             </thead>
@@ -558,6 +564,9 @@ function ShareLogsDialog({
                                         </td>
                                         <td className="py-1 pr-3 font-mono text-xs">
                                             {row.ip ?? "-"}
+                                        </td>
+                                        <td className="py-1 pr-3">
+                                            <LinkVisitorCell visitor={row.visitor} />
                                         </td>
                                         <td className="py-1">
                                             {row.reason ? (

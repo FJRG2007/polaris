@@ -700,6 +700,12 @@
         "addressDifferent": "Otro dispositivo responde en {address} ({device}). La contraseña sigue con este almacenamiento, así que la dirección no cambió.",
         "addressSilent": "Nada responde en {address}, así que Polaris no puede comprobar que sea este almacenamiento. La dirección no cambió."
     },
+    "linkVisitor": {
+        "who": "Quién",
+        "anonymous": "Anónimo",
+        "openProfile": "Abrir el perfil de {name}",
+        "signedIn": "{count, plural, one {# persona con sesión} other {# personas con sesión}}"
+    },
     "sharedLinks": {
         "status": {
             "revoked": "Revocado",

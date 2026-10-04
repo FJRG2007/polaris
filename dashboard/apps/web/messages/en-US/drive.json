@@ -700,6 +700,12 @@
         "addressDifferent": "A different device answers at {address} ({device}). The password stays with this storage, so the address was not changed.",
         "addressSilent": "Nothing answers at {address}, so Polaris cannot check it is this storage. The address was not changed."
     },
+    "linkVisitor": {
+        "who": "Who",
+        "anonymous": "Anonymous",
+        "openProfile": "Open {name}'s profile",
+        "signedIn": "{count, plural, one {# signed-in viewer} other {# signed-in viewers}}"
+    },
     "sharedLinks": {
         "status": {
             "revoked": "Revoked",
