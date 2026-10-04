@@ -224,6 +224,16 @@ function legacyWorldBoss(value: unknown): unknown {
     return { choice: "chosen", difficulty: "normal", arena: false, ...value };
 }
 
+/** A spleef saved with one `variant` - "random", or always one way - reads as
+ *  the ways that allowed: random is every way, drawn the same as before. */
+function legacySpleef(value: unknown): unknown {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+    if ("variants" in value || !("variant" in value)) return value;
+    const { variant, ...rest } = value as { variant: unknown };
+    const one = SPLEEF_VARIANTS.find((way) => way === variant);
+    return { ...rest, variants: one ? [one] : [...SPLEEF_VARIANTS] };
+}
+
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
 export const optionsSchemas = {
@@ -425,24 +435,33 @@ export const optionsSchemas = {
             .max(40, problem("atMost", { count: 40 }))
             .default(30)
     }),
-    spleef: z.object({
-        place: placeSchema.default({ mode: "players" }),
-        /** Blocks from the middle of the floor to its edge. */
-        size: z
-            .number()
-            .int()
-            .min(5, problem("atLeast", { count: 5 }))
-            .max(15, problem("atMost", { count: 15 }))
-            .default(8),
-        height: z
-            .number()
-            .int()
-            .min(25, problem("atLeast", { count: 25 }))
-            .max(40, problem("atMost", { count: 40 }))
-            .default(30),
-        /** How it is played (`kinds/spleef`): drawn for each run, or always one way. */
-        variant: z.enum(["random", ...SPLEEF_VARIANTS]).default("random")
-    }),
+    spleef: z.preprocess(
+        legacySpleef,
+        z.object({
+            place: placeSchema.default({ mode: "players" }),
+            /** Blocks from the middle of the floor to its edge. */
+            size: z
+                .number()
+                .int()
+                .min(5, problem("atLeast", { count: 5 }))
+                .max(15, problem("atMost", { count: 15 }))
+                .default(8),
+            height: z
+                .number()
+                .int()
+                .min(25, problem("atLeast", { count: 25 }))
+                .max(40, problem("atMost", { count: 40 }))
+                .default(30),
+            /** The ways it may be played (`kinds/spleef`): one of them is drawn for
+             *  each run, so a single one is always that way. */
+            variants: z
+                .array(z.enum(SPLEEF_VARIANTS))
+                .min(1, problem("chooseSpleefWay"))
+                .max(SPLEEF_VARIANTS.length)
+                .transform((ways) => SPLEEF_VARIANTS.filter((way) => ways.includes(way)))
+                .default([...SPLEEF_VARIANTS])
+        })
+    ),
     "team-duel": z.object({
         /** The arena is built in the air above ground found here. */
         place: placeSchema.default({ mode: "players" }),

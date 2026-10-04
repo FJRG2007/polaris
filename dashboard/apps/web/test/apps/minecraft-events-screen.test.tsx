@@ -359,6 +359,35 @@ describe("setting up a horde defense", () => {
     });
 });
 
+describe("setting up a spleef", () => {
+    it("offers every way to play switched on, and never lets the last one go", () => {
+        const saved: catalog.EventPreset[] = [];
+        render(
+            <EventEditor
+                preset={catalog.newPreset("spleef", "spleef")}
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+        expect(screen.getByText("Ways it is played")).toBeTruthy();
+        const way = (label: string) => screen.getByLabelText(label) as HTMLButtonElement;
+        for (const label of [
+            "Shovels: dig the snow",
+            "Vanishing floor",
+            "Snowballs: break their floor"
+        ])
+            expect(way(label).getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(way("Snowballs: break their floor"));
+        fireEvent.click(way("Vanishing floor"));
+        // The one left on cannot be switched off.
+        expect(way("Shovels: dig the snow").disabled).toBe(true);
+        fireEvent.click(screen.getByText("Done"));
+        const options = saved.at(-1)!.options as catalog.EventOptions<"spleef">;
+        expect(options.variants).toEqual(["shovel"]);
+    });
+});
+
 describe("setting up a world boss", () => {
     it("asks how hard, whether in the sky arena, and which bosses it draws from", () => {
         const saved: catalog.EventPreset[] = [];

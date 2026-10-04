@@ -1693,7 +1693,7 @@
             },
             "spleef": {
                 "label": "Spleef",
-                "summary": "El suelo es lava: se construye un suelo de nieve en lo alto y quien escribe join recibe una pala que solo rompe esa nieve. Cávala bajo los demás - quien cae queda fuera y vuelve - y gana el último en pie.",
+                "summary": "El suelo es lava: se construye un suelo de nieve en lo alto y cada partida se juega de una de las formas activadas - palas que solo rompen esa nieve, un suelo que desaparece bajo los pies o bolas de nieve que lo rompen. Quien cae queda fuera y vuelve; gana el último en pie.",
                 "unit": "puntos"
             },
             "team-duel": {
@@ -1908,6 +1908,7 @@
             "chooseEffect": "Elige al menos un efecto",
             "witherArenaOnly": "El Wither solo lucha en la arena aérea",
             "chooseBoss": "Elige al menos un jefe que pueda luchar aquí",
+            "chooseSpleefWay": "Elige al menos una forma de jugar",
             "killsOrOres": "Da algo por muertes, por menas o por ambas",
             "wavesAtLeast": "{count, plural, one {Al menos # oleada} other {Al menos # oleadas}}",
             "wavesAtMost": "{count, plural, one {Como máximo # oleada} other {Como máximo # oleadas}}",
@@ -2125,7 +2126,6 @@
                 "damage": "Más daño"
             },
             "spleef": {
-                "random": "Distinto cada vez",
                 "shovel": "Palas: rompe la nieve",
                 "decay": "Suelo fugaz",
                 "snowballs": "Bolas: rompe su suelo"
@@ -2194,7 +2194,8 @@
         "bossTrophyHint": "Una estrella del Nether con el nombre del jefe, brillo y su dificultad, además de los premios. Solo si el jefe cae.",
         "wavesWinner": "Cómo se decide el ganador",
         "roundMinutes": "Minutos por ronda",
-        "howItIsPlayed": "Cómo se juega",
+        "spleefWays": "Formas de jugar",
+        "spleefWaysHint": "Cada vez que se juega sale una de las activadas.",
         "courseLook": "Aspecto"
     },
     "moderation": {

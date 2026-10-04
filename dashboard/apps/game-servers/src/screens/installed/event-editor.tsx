@@ -73,9 +73,8 @@ const THEME_LABELS: Readonly<
 };
 
 const SPLEEF_LABELS: Readonly<
-    Record<"random" | (typeof catalog.SPLEEF_VARIANTS)[number], GameKey<"minecraft">>
+    Record<(typeof catalog.SPLEEF_VARIANTS)[number], GameKey<"minecraft">>
 > = {
-    random: "editor.labels.spleef.random",
     shovel: "editor.labels.spleef.shovel",
     decay: "editor.labels.spleef.decay",
     snowballs: "editor.labels.spleef.snowballs"
@@ -938,16 +937,40 @@ function OptionsFields({
                             />
                         </Field>
                     </div>
-                    <Field label={t("editor.howItIsPlayed")}>
-                        <Select
-                            value={value.variant}
-                            onValueChange={(variant) =>
-                                onChange({ ...value, variant: variant as typeof value.variant })
-                            }
-                            options={options(t, SPLEEF_LABELS)}
-                            aria-label={t("editor.howItIsPlayed")}
-                        />
-                    </Field>
+                    <fieldset className="flex flex-col gap-2 text-sm">
+                        <legend className="font-medium">{t("editor.spleefWays")}</legend>
+                        <span className="text-xs text-muted-foreground">
+                            {t("editor.spleefWaysHint")}
+                        </span>
+                        {catalog.SPLEEF_VARIANTS.map((way) => {
+                            const on = value.variants.includes(way);
+                            return (
+                                <label
+                                    key={way}
+                                    className="flex items-center justify-between gap-3"
+                                >
+                                    <span className="min-w-0">{t(SPLEEF_LABELS[way])}</span>
+                                    <Switch
+                                        checked={on}
+                                        // Never none: the last way switched on stays on.
+                                        disabled={on && value.variants.length === 1}
+                                        onChange={(next) =>
+                                            onChange({
+                                                ...value,
+                                                variants: catalog.SPLEEF_VARIANTS.filter((one) =>
+                                                    one === way
+                                                        ? next
+                                                        : value.variants.includes(one)
+                                                )
+                                            })
+                                        }
+                                        aria-label={t(SPLEEF_LABELS[way])}
+                                    />
+                                </label>
+                            );
+                        })}
+                        <Problem text={problemAt(issues, "options", "variants")} />
+                    </fieldset>
                 </>
             );
         }

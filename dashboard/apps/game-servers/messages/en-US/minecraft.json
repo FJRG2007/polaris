@@ -1693,7 +1693,7 @@
             },
             "spleef": {
                 "label": "Spleef",
-                "summary": "The floor is lava: a snow floor is built high in the air and players who type join get a shovel that only breaks that snow. Dig it out from under the others - whoever falls through is out and sent back - and the last one standing wins.",
+                "summary": "The floor is lava: a snow floor is built high in the air, and each run is played one of the ways switched on - shovels that break only that snow, a floor that vanishes under your feet, or snowballs that break it. Whoever falls through is out and sent back; the last one standing wins.",
                 "unit": "points"
             },
             "team-duel": {
@@ -1908,6 +1908,7 @@
             "chooseEffect": "Choose at least one effect",
             "witherArenaOnly": "The Wither fights only in the sky arena",
             "chooseBoss": "Choose at least one boss that can fight here",
+            "chooseSpleefWay": "Choose at least one way to play",
             "killsOrOres": "Give something for kills, ores or both",
             "wavesAtLeast": "{count, plural, one {At least # wave} other {At least # waves}}",
             "wavesAtMost": "{count, plural, one {At most # wave} other {At most # waves}}",
@@ -2125,7 +2126,6 @@
                 "damage": "Most damage"
             },
             "spleef": {
-                "random": "A different way each time",
                 "shovel": "Shovels: dig the snow",
                 "decay": "Vanishing floor",
                 "snowballs": "Snowballs: break their floor"
@@ -2194,7 +2194,8 @@
         "bossTrophyHint": "A Nether Star named after the boss, with a glint and its difficulty, on top of the prizes. Only when the boss is defeated.",
         "wavesWinner": "How the winner is decided",
         "roundMinutes": "Minutes a round",
-        "howItIsPlayed": "How it is played",
+        "spleefWays": "Ways it is played",
+        "spleefWaysHint": "One of those switched on is drawn each time it runs.",
         "courseLook": "Look"
     },
     "moderation": {

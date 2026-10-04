@@ -431,7 +431,7 @@ async function admit(
             `title ${one.name} times 5 50 15`,
             layout.kind === "parkour"
                 ? `title ${one.name} subtitle ${commands.text(messages.parkourSubtitle(loop.language))}`
-                : `title ${one.name} subtitle ${commands.text(messages.spleefReadySubtitle(spleef.variantFor(loop.run.id, (loop.run.preset.options as catalog.EventOptions<"spleef">).variant), loop.language))}`,
+                : `title ${one.name} subtitle ${commands.text(messages.spleefReadySubtitle(spleef.variantFor(loop.run.id, (loop.run.preset.options as catalog.EventOptions<"spleef">).variants), loop.language))}`,
             // "Go!" only to a late racer joining a race already on; everybody
             // else waits for the rest, and the countdown.
             `title ${one.name} title ${commands.text(
@@ -957,7 +957,7 @@ async function spleefTick(
     const current = state(loop);
     const variant = spleef.variantFor(
         loop.run.id,
-        (loop.run.preset.options as catalog.EventOptions<"spleef">).variant
+        (loop.run.preset.options as catalog.EventOptions<"spleef">).variants
     );
     // Snowballs break the floor through a data pack, put on while everybody is
     // still getting ready: taking it in pauses the game for a moment.

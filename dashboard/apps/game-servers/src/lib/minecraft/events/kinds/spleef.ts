@@ -6,7 +6,8 @@
  * to where they were. No lava anywhere: falling through the last floor is the
  * lava.
  *
- * Each run plays one of three ways, drawn for it (`variantFor`):
+ * Each run plays one of three ways, drawn for it among those the event allows
+ * (`variantFor`):
  * - shovel: everybody has a shovel that breaks the snow and nothing else;
  * - decay: no tools - the snow a player stands on turns red, and is gone on the
  *   next look, so standing still is falling;
@@ -44,11 +45,12 @@ const HEADROOM = 5;
 export const VARIANTS = SPLEEF_VARIANTS;
 export type Variant = (typeof VARIANTS)[number];
 
-/** How a run plays: the operator's choice, or drawn for it - the same for the
- *  same run, so a restart does not change it. */
-export function variantFor(runId: string, chosen: Variant | "random" = "random"): Variant {
-    if (chosen !== "random") return chosen;
-    return shuffled(VARIANTS, seeded(`${runId}-spleef`))[0] as Variant;
+/** How a run plays: drawn among the ways the event allows - the same for the
+ *  same run, so a restart does not change it. The ways are drawn in `VARIANTS`
+ *  order, so with all three a run plays as it did before ways could be left out. */
+export function variantFor(runId: string, allowed: readonly Variant[] = VARIANTS): Variant {
+    const ways = VARIANTS.filter((way) => allowed.includes(way));
+    return shuffled(ways.length > 0 ? ways : VARIANTS, seeded(`${runId}-spleef`))[0] as Variant;
 }
 
 export interface Arena {
