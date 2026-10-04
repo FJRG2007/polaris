@@ -18,6 +18,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
 import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { LinkVisitorCell } from "../link-visitor-cell";
 import { ShareSnippetDialog, type SnippetSharing } from "./share-snippet-dialog";
 import {
     Code2,
@@ -205,13 +206,17 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                                 {row.clientSealed ? (
                                                     <EyeOff
                                                         className="size-3 shrink-0 text-muted-foreground"
-                                                        aria-label={t("snippets.sealedPolarisCannotReadThis")}
+                                                        aria-label={t(
+                                                            "snippets.sealedPolarisCannotReadThis"
+                                                        )}
                                                     />
                                                 ) : null}
                                                 {row.burnAfterRead ? (
                                                     <Flame
                                                         className="size-3 shrink-0 text-muted-foreground"
-                                                        aria-label={t("snippets.deletedAfterItIsRead")}
+                                                        aria-label={t(
+                                                            "snippets.deletedAfterItIsRead"
+                                                        )}
                                                     />
                                                 ) : null}
                                             </p>
@@ -227,7 +232,9 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                                 size="sm"
                                                 variant="ghost"
                                                 title={t("snippets.copyTheLink")}
-                                                aria-label={t("snippets.copyLinkTo", { name: row.title })}
+                                                aria-label={t("snippets.copyLinkTo", {
+                                                    name: row.title
+                                                })}
                                                 onClick={() => onCopyLink(row)}
                                                 disabled={busy === row.id}
                                             >
@@ -242,7 +249,9 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                             size="sm"
                                             variant="ghost"
                                             title={t("snippets.sharing")}
-                                            aria-label={t("snippets.changeSharing", { name: row.title })}
+                                            aria-label={t("snippets.changeSharing", {
+                                                name: row.title
+                                            })}
                                             onClick={() =>
                                                 setSharing({
                                                     id: row.id,
@@ -260,7 +269,9 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                             size="sm"
                                             variant="ghost"
                                             title={t("snippets.whoOpenedIt")}
-                                            aria-label={t("snippets.accessLogFor", { name: row.title })}
+                                            aria-label={t("snippets.accessLogFor", {
+                                                name: row.title
+                                            })}
                                             onClick={() => setLogsFor(row)}
                                         >
                                             <ScrollText className="size-4" />
@@ -269,7 +280,9 @@ export function SnippetsView({ snippets }: { snippets: SnippetRow[] }) {
                                             size="sm"
                                             variant="ghost"
                                             title={t("snippets.delete")}
-                                            aria-label={t("snippets.deleteNamed", { name: row.title })}
+                                            aria-label={t("snippets.deleteNamed", {
+                                                name: row.title
+                                            })}
                                             onClick={() => onDelete(row)}
                                             disabled={pending && busy === row.id}
                                         >
@@ -346,7 +359,9 @@ function SnippetLogsDialog({
                     <DialogDescription>{snippet?.title}</DialogDescription>
                 </DialogHeader>
                 {logs === null ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">{t("snippets.loading")}</p>
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                        {t("snippets.loading")}
+                    </p>
                 ) : logs.length === 0 ? (
                     <p className="py-6 text-center text-sm text-muted-foreground">
                         {t("snippets.nobodyHasOpenedThisLink")}
@@ -357,7 +372,12 @@ function SnippetLogsDialog({
                             <thead className="text-muted-foreground">
                                 <tr>
                                     <th className="py-1 pr-3 font-medium">{t("snippets.when")}</th>
-                                    <th className="py-1 pr-3 font-medium">{t("snippets.address")}</th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("snippets.address")}
+                                    </th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("linkVisitor.who")}
+                                    </th>
                                     <th className="py-1 font-medium">{t("snippets.what")}</th>
                                 </tr>
                             </thead>
@@ -368,6 +388,9 @@ function SnippetLogsDialog({
                                             {format.dateTime(log.at)}
                                         </td>
                                         <td className="py-1 pr-3 font-mono">{log.ip ?? "-"}</td>
+                                        <td className="py-1 pr-3">
+                                            <LinkVisitorCell visitor={log.visitor} />
+                                        </td>
                                         <td className="py-1">
                                             {log.action}
                                             {log.reason ? ` (${log.reason})` : ""}

@@ -27,6 +27,7 @@ import {
     verifyUnlock,
     type LinkUsability
 } from "@/lib/link-guards";
+import { linkVisitorId, linkVisitorSelect } from "@/lib/link-visitor";
 
 /** The unlock-cookie namespace snippet links are signed under. */
 const SNIPPET_LINK_SCOPE = "snippet";
@@ -546,7 +547,11 @@ export function verifySnippetUnlock(
     return verifyUnlock(SNIPPET_LINK_SCOPE, snippetId, value, { passwordHash }, secret);
 }
 
-/** Append an access-log entry. Never throws; logging must not block a read. */
+/**
+ * Append an access-log entry. Never throws; logging must not block a read. The
+ * signed-in visitor, if any, comes from this request's own session, as on a
+ * share link (see `logShareAccess`).
+ */
 export async function logSnippetAccess(entry: {
     snippetId: string;
     action: string;
@@ -556,7 +561,7 @@ export async function logSnippetAccess(entry: {
     userAgentHash?: string;
 }): Promise<void> {
     try {
-        await prisma.snippetAccessLog.create({ data: entry });
+        await prisma.snippetAccessLog.create({ data: { ...entry, userId: await linkVisitorId() } });
     } catch {
         // Swallow: a log failure must not break the page it was recording.
     }
@@ -570,6 +575,13 @@ export async function listSnippetAccessLogs(ownerId: string, snippetId: string) 
         where: { snippetId },
         orderBy: { at: "desc" },
         take: 500,
-        select: { id: true, at: true, ip: true, action: true, reason: true }
+        select: {
+            id: true,
+            at: true,
+            ip: true,
+            action: true,
+            reason: true,
+            user: { select: linkVisitorSelect }
+        }
     });
 }

@@ -16,6 +16,7 @@ import { sharingBaseUrl } from "@/lib/domain-service";
 import { ensureShareReachability } from "@/lib/public-reach";
 import { createShareSchema, isCidr, isIpAddress } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
+import { toLinkVisitor, type LinkVisitor } from "@/lib/link-visitor";
 import {
     createShare,
     listShareAccessLogs,
@@ -58,13 +59,20 @@ export interface ShareLogRow {
     ip: string | null;
     action: string;
     reason: string | null;
+    /** The visitor's Polaris account when they were signed in, else null. */
+    visitor: LinkVisitor | null;
 }
 
 /** Create a share and return the absolute link to hand out (once). */
 export async function createShareAction(input: unknown): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("shares.create");
     const parsed = createShareSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidShare") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidShare")
+        };
     const { id, token } = await createShare(user.id, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -107,7 +115,10 @@ export async function updateShareAction(
     const user = await requirePermission("shares.create");
     const cidrs = (input.allowedCidrs ?? []).map((value) => value.trim()).filter(Boolean);
     const invalid = cidrs.find((value) => !isCidr(value) && !isIpAddress(value));
-    if (invalid) return { error: (await getTranslations("drive"))("errors.invalidCidr", { value: invalid }) };
+    if (invalid)
+        return {
+            error: (await getTranslations("drive"))("errors.invalidCidr", { value: invalid })
+        };
     await updateShare(user.id, shareId, {
         password: input.password === undefined ? undefined : input.password || null,
         maxDownloads: input.maxDownloads === undefined ? undefined : input.maxDownloads || null,
@@ -146,7 +157,8 @@ export async function getShareLogsAction(shareId: string): Promise<{ logs: Share
             at: row.at.toISOString(),
             ip: row.ip,
             action: row.action,
-            reason: row.reason
+            reason: row.reason,
+            visitor: toLinkVisitor(row.user)
         }))
     };
 }
@@ -176,7 +188,8 @@ export async function unlockShareAction(
 ): Promise<{ error?: string }> {
     const share = await resolveShareByToken(token);
     if (!share) return { error: (await getTranslations("drive"))("errors.linkUnavailable") };
-    if (!shareUsability(share).ok) return { error: (await getTranslations("drive"))("errors.linkGone") };
+    if (!shareUsability(share).ok)
+        return { error: (await getTranslations("drive"))("errors.linkGone") };
 
     const limitKey = `share-unlock:${share.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
