@@ -65,5 +65,30 @@ else
     bad "ensure_networks: an existing network aborted the install"
 fi
 
+# The developer CLI (`plr`) is found by the marker its installer writes, never by
+# name: this installer's own `polaris`/`plr` must not be mistaken for it, and a
+# machine without it must not be refused.
+eval "$(extract developer_cli)"
+fake_home=$(mktemp -d)
+saved_home=$HOME
+saved_path=$PATH
+HOME=$fake_home
+PATH="/usr/bin:/bin"
+mkdir -p "$fake_home/.local/share/polaris-cli" "$fake_home/.local/bin"
+if developer_cli >/dev/null; then bad "developer_cli: found a CLI on a clean machine"; else ok "developer_cli: nothing on a clean machine"; fi
+printf '#!/bin/sh\n# polaris - manage a Polaris dashboard deployment\n' >"$fake_home/.local/bin/plr"
+chmod +x "$fake_home/.local/bin/plr"
+PATH="$fake_home/.local/bin:/usr/bin:/bin"
+if developer_cli >/dev/null; then bad "developer_cli: mistook the server's own plr for the CLI"; else ok "developer_cli: the server's own plr is not the CLI"; fi
+printf '#!/bin/sh\n# polaris-developer-cli: launcher for the Polaris CLI\n' >"$fake_home/.local/bin/plr"
+if developer_cli >/dev/null; then ok "developer_cli: finds the CLI's launcher on PATH"; else bad "developer_cli: missed the CLI's launcher on PATH"; fi
+rm "$fake_home/.local/bin/plr"
+PATH="/usr/bin:/bin"
+printf '{"marker": "polaris-developer-cli"}\n' >"$fake_home/.local/share/polaris-cli/polaris-cli.json"
+if developer_cli >/dev/null; then ok "developer_cli: finds an install that is not on PATH"; else bad "developer_cli: missed an install that is not on PATH"; fi
+HOME=$saved_home
+PATH=$saved_path
+rm -rf "$fake_home"
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
