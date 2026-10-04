@@ -14,6 +14,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 afterEach(cleanup);
 
+/** Where a press would go; these tests read what is drawn. */
+const revoke = vi.fn();
+
 const SIGN_IN: CliSessionView = {
     id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
     name: "ada-laptop",
@@ -35,7 +38,7 @@ describe("a CLI sign-in on the sessions table", () => {
                 sessions={[]}
                 cliSessions={[SIGN_IN]}
                 busyId={null}
-                onRevoke={() => undefined}
+                onRevoke={revoke}
                 emptyLabel="Nothing"
             />,
             { wrapper: MessagesWrapper }
@@ -57,7 +60,7 @@ describe("a CLI sign-in on the sessions table", () => {
                 sessions={[]}
                 cliSessions={[{ ...SIGN_IN, lastUsedAt: null, lastUsedIp: null }]}
                 busyId={null}
-                onRevoke={() => undefined}
+                onRevoke={revoke}
                 emptyLabel="Nothing"
             />,
             { wrapper: MessagesWrapper }
@@ -73,7 +76,7 @@ describe("a CLI sign-in on the sessions table", () => {
                 sessions={[]}
                 cliSessions={[SIGN_IN]}
                 busyId={null}
-                onRevoke={() => undefined}
+                onRevoke={revoke}
                 onSignOutCli={signOut}
                 onPinCli={pin}
                 emptyLabel="Nothing"
@@ -97,8 +100,8 @@ describe("a CLI sign-in on the sessions table", () => {
                 sessions={[]}
                 cliSessions={[SIGN_IN]}
                 busyId={null}
-                onRevoke={() => undefined}
-                onSignOutCli={() => undefined}
+                onRevoke={revoke}
+                onSignOutCli={revoke}
                 emptyLabel="Nothing"
             />,
             { wrapper: MessagesWrapper }
