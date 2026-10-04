@@ -1,21 +1,19 @@
 /**
- * The service panel draws its fields, switches and section edges a step clearer
- * than the rest of the application (globals.css, "The service panel's
- * controls"). These are the pairs that decide whether that works, measured with
- * the WCAG 2.x contrast formula in every theme against the global tokens the
- * panel sits on.
+ * The service panel is drawn the way every other side panel is - on the
+ * dialog's own surface, with the application's own fields, borders and tabs -
+ * and keeps two things of its own (globals.css, "The service panel's surface
+ * and switches"). These are the pairs that decide whether that works, measured
+ * with the WCAG 2.x contrast formula in every theme against the global tokens.
  *
- * What is asserted is what identifies a control, not a raw outline:
- *
- *   - A field differs from the card it sits on by its fill (1.05:1, enough to
- *     read as a well in every theme) and by an edge of its own that holds the
- *     3:1 of WCAG 1.4.11, never weaker than the application's control edge.
- *   - Section hairlines are stronger than the application's and stay below a
- *     field's edge, so cards are separated without reading as boxes.
+ *   - Nothing about a field is overridden: its fill, its edge and its hover are
+ *     the application's, so a field here looks like a field anywhere else.
+ *   - A card is the dialog's surface with its hairline, never a darker tone that
+ *     reads as a hole in it, and the panel's body is not the page ground.
  *   - An unchecked switch is a track with no other boundary, so it holds the
- *     3:1 of WCAG 1.4.11 against the card and the page, and is never weaker
+ *     3:1 of WCAG 1.4.11 against the surface and the page, and is never weaker
  *     than the switch everywhere else.
- *   - The focus ring holds 3:1 on a field and a card; text in a field 4.5:1.
+ *   - A field still differs from the surface by its fill, and the focus ring
+ *     and the text in a field stay readable.
  */
 
 import { readFileSync } from "node:fs";
@@ -26,6 +24,10 @@ const TOKENS = readFileSync(
     "utf8"
 );
 const GLOBALS = readFileSync(new URL("../../src/app/globals.css", import.meta.url), "utf8");
+const SERVICE_DETAIL = readFileSync(
+    new URL("../../src/app/(app)/apps/deploy/service-detail.tsx", import.meta.url),
+    "utf8"
+);
 
 type Hsl = [number, number, number];
 
@@ -74,40 +76,32 @@ const THEMES: Record<string, { base: Record<string, Hsl>; panel: Record<string, 
     }
 };
 
-describe("service panel controls", () => {
+describe("service panel", () => {
     for (const [theme, { base, panel }] of Object.entries(THEMES)) {
+        // Inside the panel a card is the dialog's own surface.
         const tone = (name: string): Hsl => {
-            const value = panel[name] ?? base[name];
-            if (!value) throw new Error(`${theme} has no --${name}`);
+            const key = name === "card" ? "elevated" : name;
+            const value = panel[key] ?? base[key];
+            if (!value) throw new Error(`${theme} has no --${key}`);
             return value;
         };
 
-        it(`${theme}: a field is told from its card by fill and by edge`, () => {
+        it(`${theme}: overrides nothing about a field or a border`, () => {
+            for (const name of ["field", "field-edge", "border", "border-strong"]) {
+                expect(panel[name]).toBeUndefined();
+            }
+        });
+
+        it(`${theme}: a field is told from the surface by its fill`, () => {
             expect(contrast(tone("field"), tone("card"))).toBeGreaterThanOrEqual(1.05);
-            expect(contrast(tone("field-edge"), tone("card"))).toBeGreaterThanOrEqual(3);
-            expect(contrast(tone("field-edge"), tone("field"))).toBeGreaterThanOrEqual(3);
-            expect(contrast(tone("field-edge"), tone("background"))).toBeGreaterThanOrEqual(3);
         });
 
-        it(`${theme}: hover and focus make the edge clearer`, () => {
-            expect(contrast(tone("muted-foreground"), tone("field"))).toBeGreaterThan(
-                contrast(tone("field-edge"), tone("field"))
-            );
-        });
-
-        it(`${theme}: section hairlines are a step up and quieter than a field's edge`, () => {
-            expect(contrast(tone("border"), tone("card"))).toBeGreaterThan(
-                contrast(base.border!, base.card!)
-            );
-            expect(contrast(tone("border"), tone("card"))).toBeLessThan(
-                contrast(tone("field-edge"), tone("card"))
-            );
-            expect(contrast(tone("border"), tone("background"))).toBeGreaterThanOrEqual(1.25);
-        });
-
-        it(`${theme}: an unchecked switch holds 3:1 on the card and the page`, () => {
+        it(`${theme}: an unchecked switch holds 3:1 on the surface and the page`, () => {
             expect(contrast(tone("switch-off"), tone("card"))).toBeGreaterThanOrEqual(3);
             expect(contrast(tone("switch-off"), tone("background"))).toBeGreaterThanOrEqual(3);
+            expect(contrast(tone("switch-off"), tone("card"))).toBeGreaterThan(
+                contrast(base.muted!, tone("card"))
+            );
         });
 
         it(`${theme}: focus ring and text stay readable on a field`, () => {
@@ -118,9 +112,15 @@ describe("service panel controls", () => {
         });
     }
 
-    it("leaves a checkbox its own control edge", () => {
-        expect(GLOBALS).not.toContain("[data-service-panel] .bg-field");
-        expect(GLOBALS).toContain("[data-service-panel] :is(input, textarea, button).bg-field");
+    it("draws a card as the dialog's surface, not as a darker tone under it", () => {
+        const rules = GLOBALS.slice(GLOBALS.indexOf("[data-service-panel] {"));
+        expect(rules.slice(0, rules.indexOf("}"))).toContain("--card: var(--elevated);");
+    });
+
+    it("keeps its body on the dialog's surface rather than the page ground", () => {
+        const body = SERVICE_DETAIL.slice(SERVICE_DETAIL.indexOf("flex-1 overflow-y-auto"));
+        expect(body.slice(0, body.indexOf('"'))).not.toContain("bg-background");
+        expect(GLOBALS).not.toContain("[data-service-panel] :is(input, textarea, button).bg-field");
     });
 
     it("follows the machine with the light theme's own values", () => {
