@@ -166,8 +166,7 @@ export function AppLauncher({
     alert?: boolean;
 }) {
     const t = useTranslations("nav");
-    const { favorites, order, toggle, arrangeApps, launcherOpen, setLauncherOpen } =
-        useFavoriteApps();
+    const { favorites, order, arrangeApps, launcherOpen, setLauncherOpen } = useFavoriteApps();
     const [arranging, setArranging] = useState(false);
     const ids = launcherOrder({
         available: apps.map((app) => app.id),
@@ -189,13 +188,9 @@ export function AppLauncher({
                 strings={{
                     search: t("switcher.search"),
                     noMatch: (query) => t("switcher.noMatch", { query }),
-                    pin: (app) => t("switcher.pin", { app }),
-                    unpin: (app) => t("switcher.unpin", { app }),
                     moved: (app, position, total) => t("switcher.moved", { app, position, total }),
                     more: t("switcher.more")
                 }}
-                pinned={favorites}
-                onTogglePin={toggle}
                 onArrange={arrangeApps}
                 // Icons only, so the options take one short row under the grid;
                 // the words stay as the accessible name and the hover tooltip.

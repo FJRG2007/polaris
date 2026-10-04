@@ -10,13 +10,12 @@
 import { createContext, useContext } from "react";
 
 export interface FavoriteApps {
-    /** Every stored favorite, in order - including any this account cannot open
-     *  today, which are kept for when it can again. */
+    /** The favorites an older app menu saved with its star, in order - kept, and
+     *  read as before, until the menu is arranged; see `arrangedPrefs`. */
     readonly favorites: readonly string[];
     /** The order the app menu was arranged in, kept the same way; empty until
      *  somebody arranges it. */
     readonly order: readonly string[];
-    readonly toggle: (appId: string) => void;
     /** Put the app menu in this order; apps not on screen keep their slots. */
     readonly arrangeApps: (visible: readonly string[]) => void;
     /** Forget the arrangement: favorites first and the rest by use again. */
@@ -31,7 +30,6 @@ export interface FavoriteApps {
 const NONE: FavoriteApps = {
     favorites: [],
     order: [],
-    toggle: () => undefined,
     arrangeApps: () => undefined,
     resetOrder: () => undefined,
     launcherOpen: false,

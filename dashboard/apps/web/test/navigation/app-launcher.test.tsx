@@ -331,8 +331,6 @@ describe("the switcher", () => {
                 apps={apps}
                 currentAppId="games"
                 order={["games"]}
-                pinned={["games"]}
-                onTogglePin={() => undefined}
             />
         );
         expect(html).toContain("Game servers");

@@ -248,6 +248,25 @@ export function arrangeApps(stored: readonly string[], visible: readonly string[
     return [...arrangeFavorites(stored, visible), ...visible.slice(slots)];
 }
 
+/**
+ * The preferences after somebody arranged the menu into `visible`.
+ *
+ * Arranging is the one way to say what comes first now that there is no star,
+ * so the first arrangement folds the favorites into the order and retires them:
+ * the order already drew them first, so nothing moves on screen. A favorite this
+ * account cannot open today keeps its place in the stored order, and comes back
+ * where it was. Until somebody arranges, favorites saved by an older menu are
+ * kept exactly as they were - the menu and the Overview's rail read them the
+ * same way they always did.
+ */
+export function arrangedPrefs(stored: LauncherPrefs, visible: readonly string[]): LauncherPrefs {
+    const kept = [...stored.order, ...stored.favorites.filter((id) => !stored.order.includes(id))];
+    const order = arrangeApps(kept, visible);
+    // Nothing moved: nothing to save, and nothing to retire either.
+    if (stored.order.length > 0 && sameOrder(order, kept)) return stored;
+    return { favorites: [], order };
+}
+
 export function sameOrder(left: readonly string[], right: readonly string[]): boolean {
     return left.length === right.length && left.every((id, at) => id === right[at]);
 }

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * The apps somebody chose as favorites and the order they arranged the app menu
- * in, shared by everything that draws them: the app menu, the Overview's rail
- * and the dialog that arranges them.
+ * The order somebody arranged the app menu in - and the favorites an older menu
+ * saved, kept until they arrange it - shared by everything that draws them: the
+ * app menu, the Overview's rail and the dialog that arranges them.
  *
- * One store rather than a copy each, so a star pressed in the menu moves the
+ * One store rather than a copy each, so a tile dragged in the menu moves the
  * rail on the same frame. Every change is optimistic - drawn at once, saved
  * whole, and put back with a note if the server refuses it. Both lists are sent
  * whole so two quick changes cannot interleave into lists neither meant, and a
@@ -17,7 +17,7 @@
 
 import { useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { arrangeApps, sameOrder, type LauncherPrefs } from "@/lib/app-launcher";
+import { arrangedPrefs, sameOrder, type LauncherPrefs } from "@/lib/app-launcher";
 import { saveFavoriteAppsAction } from "@/app/(app)/app-launcher-actions";
 import { FavoriteAppsContext, type FavoriteApps } from "@/components/favorite-apps-context";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -92,17 +92,7 @@ export function FavoriteAppsProvider({
         () => ({
             favorites: prefs.favorites,
             order: prefs.order,
-            toggle: (appId) => {
-                const current = latest.current;
-                save({
-                    ...current,
-                    favorites: current.favorites.includes(appId)
-                        ? current.favorites.filter((id) => id !== appId)
-                        : [...current.favorites, appId]
-                });
-            },
-            arrangeApps: (visible) =>
-                save({ ...latest.current, order: arrangeApps(latest.current.order, visible) }),
+            arrangeApps: (visible) => save(arrangedPrefs(latest.current, visible)),
             resetOrder: () => save({ ...latest.current, order: [] }),
             launcherOpen,
             setLauncherOpen,
