@@ -22,7 +22,12 @@
  */
 
 import { seeded } from "../trivia-bank";
-import { PARKOUR_SHAPES, PARKOUR_THEMES, type EventOptions } from "../catalog";
+import {
+    FINISH_BASE as RACE_FINISH,
+    PARKOUR_SHAPES,
+    PARKOUR_THEMES,
+    type EventOptions
+} from "../catalog";
 import { shuffled } from "../trivia-bank";
 import { IN_ARENA, type Box, type Spot, type Volume } from "./stage";
 import * as layout from "./parkour-layout";
@@ -75,7 +80,7 @@ const NET_DROP = 4;
 /** Room above the highest platform for a jump. */
 const HEADROOM = 4;
 /** A finish is scored above this, so any finish beats any progress. */
-export const FINISH_BASE = 100_000;
+export const FINISH_BASE = RACE_FINISH;
 
 const STEPS: Readonly<
     Record<

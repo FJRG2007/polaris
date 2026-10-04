@@ -423,11 +423,12 @@ left out.
 - **SkyWars** needs 1.17 (`catalog.stashesFirst`): its loot is fought over,
   so it must never sit beside what a player brought, and only from 1.17 is
   that put away first; an older server is refused before anything starts.
-  Each player starts in a glass cage on an island of their own in a ring
-  round a bigger middle island (see "Building a map"); the cages come down
-  at "Go!", only their glass, only in their own boxes. The chests are filled
-  once the islands stand (`ArenaGame.decorate`), each stack marked as the
-  kit, in slots drawn from the run's id, `item replace block` from 1.17
+  Each player starts in an invisible cage (barrier, so nothing hides the
+  island from them) on an island of their own in a ring round a bigger
+  middle island (see "Building a map"); the cages come down at "Go!", only
+  their barrier, only in their own boxes. The chests are filled once the
+  islands stand (`ArenaGame.decorate`), each stack marked as the kit, in
+  slots drawn from the run's id, `item replace block` from 1.17
   (`replaceitem` before): an island's first chest its bridging blocks, a
   sword and food, its second more blocks, two pieces of armor and maybe a
   bow and arrows, snowballs or a golden apple; the middle's four better -
@@ -438,14 +439,14 @@ left out.
   on: food is in the chests. A player is out - never dead - when the duel's
   shield catches them at two hearts (`OUT_HEALTH`), when they die anyway,
   fall under the islands, cross the play area's edge, or are off the server
-  two ticks running; their kit is taken and they watch from a glass gallery
-  over the middle. The quick look takes whoever crosses the play area's edge
-  up to the gallery at once, and kills any arrow stuck in a block before it
-  can be picked up as nobody's. Each hit is credited to whoever struck
-  nearest (within six blocks) or else drew a bow; whoever hit someone in the
-  ten seconds before they went out has the elimination. The last one left
-  wins; everybody else is ranked by when they went out, a tie broken by
-  eliminations.
+  two ticks running; their kit is taken and they watch from an invisible
+  gallery over the middle. The quick look takes whoever crosses the play
+  area's edge up to the gallery at once, and kills any arrow stuck in a
+  block before it can be picked up as nobody's. Each hit is credited to
+  whoever struck nearest (within six blocks) or else drew a bow; whoever
+  hit someone in the ten seconds before they went out has the elimination.
+  The last one left wins; everybody else is ranked by when they went out,
+  a tie broken by eliminations.
 
 ## Building a map
 
@@ -586,7 +587,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Team duel        | a stone rim round the floor and a post of light at each corner                                                                      |
 | Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                      |
 | Hide and seek    | stone brick walls under a glass roof, sea lanterns in the floor and up the corners, a spruce gallery on log posts with a fence rail |
-| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, glass cages, a glass gallery over the middle, barrier walls  |
+| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls   |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone           |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                  |
 
@@ -621,6 +622,11 @@ A new kind follows all of them. A change to an old kind must not undo one.
   the naive way paid nobody's podium (`0896c370e`, `a6960fd77`).
 - **An empty answer to a ground check means natural ground**, because that is
   what a real server gives (`8b21a38fb`).
+- **Who rides what is asked of the vehicle itself** (`execute on passengers`,
+  from 1.19.4 like `ride`), never read from its saved data. A player is
+  never written into a boat's own `Passengers`, so every occupied race boat
+  read as empty, was taken away, and its racer put back in a new one - on
+  every look, a loop of teleports (`4bd9b0bd1`).
 - **Never trust `give`'s "Gave".** A full inventory drops the prize on the
   floor. Count the item and read the level before and after, and record what
   was dropped (`3e2adca59`). A prize is handed over once, however the
@@ -850,3 +856,11 @@ A new kind follows all of them. A change to an old kind must not undo one.
 - **Every refusal and waiting reason is written in the reader's language**,
   and the draw's state (next draw, why it waits, the last drawn event) is on
   screen (`04155e870`, `ec91d0ca2`).
+- **A score kept as a sentinel is shown as what it means, never as the
+  number.** A race's finish (`catalog.finishedIn`) is kept above any
+  progress so it always ranks first; shown back raw it read as a count of
+  seconds in the thousands instead of the time it took (`1715ffef0`).
+- **Done on a new event saves it as it opens.** The same guard that holds
+  Done disabled until a saved event is changed also held it disabled for
+  one just added, where nothing has to change first - its defaults are a
+  choice too (`EventEditor`'s `isNew`) (`1715ffef0`).

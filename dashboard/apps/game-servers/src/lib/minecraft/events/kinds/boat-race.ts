@@ -956,6 +956,9 @@ export const READ_FINISHED = `execute as @a[tag=pe_in,scores={${FINISH_SCORE}=1.
  *  a boat. */
 const RESET_TAG = "pe_reset";
 const MOUNT_TAG = "pe_mount";
+/** For one quick look: a race boat somebody sits in, and a racer in no race boat. */
+const HELD_TAG = "pe_held";
+const AFOOT_TAG = "pe_afoot";
 /** Racers put in a new boat in one quick look. */
 const MOUNTS_PER_LOOK = 4;
 
@@ -980,10 +983,21 @@ export function quickLines(
     const racing = `tag=pe_in,scores={${FINISH_SCORE}=0}`;
     const world = "execute in minecraft:overworld";
     const lines: string[] = [];
-    if (rides(way))
+    // Who sits in which boat, asked of the boats themselves (`execute on`, from
+    // 1.19.4 like `ride`). Never their saved data: a player is never written
+    // into a vehicle's `Passengers`, so every boat with a racer in it read as
+    // empty, was taken away, and its racer put back in a new one - on every
+    // look, a loop of teleports.
+    if (rides(way)) {
+        const boats = `@e[type=${boatEntity(way)},tag=${BOAT_TAG}]`;
         lines.push(
-            `${world} run kill @e[type=${boatEntity(way)},tag=${BOAT_TAG},nbt=!{Passengers:[{}]}]`
+            `tag @a[${racing}] add ${AFOOT_TAG}`,
+            `${world} as ${boats} on passengers run tag @s remove ${AFOOT_TAG}`,
+            `${world} as ${boats} on passengers on vehicle run tag @s add ${HELD_TAG}`,
+            `${world} run kill @e[type=${boatEntity(way)},tag=${BOAT_TAG},tag=!${HELD_TAG}]`,
+            `${world} run tag @e[type=${boatEntity(way)},tag=${HELD_TAG}] remove ${HELD_TAG}`
         );
+    }
     lines.push(
         `${world} as @a[${racing},${under}] run tellraw @s ${told.fell}`,
         `${world} run tag @a[${racing},${under}] add ${RESET_TAG}`,
@@ -992,8 +1006,9 @@ export function quickLines(
     );
     if (rides(way))
         lines.push(
-            `execute as @a[${racing},tag=!${RESET_TAG},nbt=!{RootVehicle:{}}] run tellraw @s ${told.lost}`,
-            `tag @a[${racing},nbt=!{RootVehicle:{}}] add ${RESET_TAG}`
+            `execute as @a[${racing},tag=!${RESET_TAG},tag=${AFOOT_TAG}] run tellraw @s ${told.lost}`,
+            `tag @a[${racing},tag=${AFOOT_TAG}] add ${RESET_TAG}`,
+            `tag @a remove ${AFOOT_TAG}`
         );
     const back = [grid(track, 1)[0]!, ...track.respawns];
     back.forEach((spot, index) =>

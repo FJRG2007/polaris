@@ -6797,7 +6797,7 @@ describe("an ice boat race", () => {
         expect(
             world.sent.some((line) =>
                 line.startsWith(
-                    "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,nbt=!{Passengers:[{}]}]"
+                    "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,tag=!pe_held]"
                 )
             )
         ).toBe(true);
@@ -10369,7 +10369,7 @@ describe("SkyWars", () => {
             fills().filter(
                 (line) =>
                     !line.endsWith(" keep") &&
-                    !line.endsWith(" minecraft:air replace minecraft:glass")
+                    !line.endsWith(" minecraft:air replace minecraft:barrier")
             )
         ).toEqual([]);
         const loot = world.sent.filter((line) => / run item replace block /.test(line));
@@ -10379,7 +10379,8 @@ describe("SkyWars", () => {
         ).toBe(true);
         expect(loot.some((line) => line.includes("minecraft:can_place_on="))).toBe(true);
         expect(world.sent.some((line) => /^give (Ana|Ben|Cy) /.test(line))).toBe(false);
-        // The cages down at "Go!", by their glass alone.
+        // The cages down at "Go!", by their own barrier alone - invisible, so
+        // nothing hides an island from its player.
         for (const line of sw.cagesDown(layout, at)) expect(world.sent).toContain(line);
         expect(world.sent).toContain("gamerule keepInventory true");
         await play(500);

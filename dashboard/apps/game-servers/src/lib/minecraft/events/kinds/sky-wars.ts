@@ -4,7 +4,7 @@
  * One island per player in a ring round a bigger one in the middle, all drawn
  * from the run's id (`layoutFor`). Each is a blob with a wavy edge - grass on
  * top, dirt under it, stone tapering to a point below, flecked with andesite
- * and ore - with a tree or a mossy boulder and flowers on it, a glass cage
+ * and ore - with a tree or a mossy boulder and flowers on it, an invisible cage
  * round its start that comes down at "Go!", and two chests; the middle one is
  * wider, has a tree at its heart and four chests with better loot. What every
  * chest holds is drawn from the run's id too (`lootFor`), so a restart fills
@@ -19,7 +19,7 @@
  * blocks in its own chests cannot bridge it to the middle.
  *
  * Out is out, never dead: brought low (the duel's shield first), fallen under
- * the islands or gone past the play area, a player is taken up to a glass
+ * the islands or gone past the play area, a player is taken up to an invisible
  * gallery over the middle to watch, their kit taken. The box the arena takes
  * reaches `MARGIN` past the play area on every side but the top's gallery, and
  * a player is put out the moment they cross it (the quick look): blocks are
@@ -68,7 +68,6 @@ const GALLERY_HALF = 3;
 const BRIDGE_SPARE = 8;
 
 const BARRIER = "minecraft:barrier";
-const GLASS = "minecraft:glass";
 const GRASS = "minecraft:grass_block";
 const DIRT = "minecraft:dirt";
 const STONE = "minecraft:stone";
@@ -111,7 +110,6 @@ export const PLACE_ON: readonly string[] = [
 export const ARENA_BLOCKS: readonly string[] = [
     ...FLOWERS,
     BARRIER,
-    GLASS,
     GRASS,
     DIRT,
     STONE,
@@ -673,7 +671,8 @@ export function baseOver(layout: Layout, ground: number, height: number): number
     return ground + Math.max(height, below + 2);
 }
 
-/** A cage round an island's start, in the world: glass three high and a lid. */
+/** A cage round an island's start, in the world: invisible barrier three
+ *  high and a lid, so nothing hides the island from its player. */
 export function cageBox(island: Island, at: Placed): Box {
     const spawn = island.spawn!;
     return {
@@ -686,13 +685,13 @@ export function cageBox(island: Island, at: Placed): Box {
     };
 }
 
-/** Every island's cage taken down: its glass, only inside its own box. */
+/** Every island's cage taken down: its barrier, only inside its own box. */
 export function cagesDown(layout: Layout, at: Placed): string[] {
     return layout.islands
         .filter((one) => one.spawn)
         .map((one) => {
             const cage = cageBox(one, at);
-            return `execute in minecraft:overworld run fill ${cage.x1} ${cage.y1} ${cage.z1} ${cage.x2} ${cage.y2} ${cage.z2} minecraft:air replace ${GLASS}`;
+            return `execute in minecraft:overworld run fill ${cage.x1} ${cage.y1} ${cage.z1} ${cage.x2} ${cage.y2} ${cage.z2} minecraft:air replace ${BARRIER}`;
         });
 }
 
@@ -779,14 +778,14 @@ export function arenaFills(layout: Layout, at: Placed): Fill[] {
             const cage = cageBox(island, at);
             const ring = (x1: number, z1: number, x2: number, z2: number): Fill => ({
                 box: { x1, y1: cage.y1, z1, x2, y2: cage.y2 - 1, z2 },
-                block: GLASS
+                block: BARRIER
             });
             fills.push(
                 ring(cage.x1, cage.z1, cage.x2, cage.z1),
                 ring(cage.x1, cage.z2, cage.x2, cage.z2),
                 ring(cage.x1, cage.z1 + 1, cage.x1, cage.z2 - 1),
                 ring(cage.x2, cage.z1 + 1, cage.x2, cage.z2 - 1),
-                { box: { ...cage, y1: cage.y2 }, block: GLASS }
+                { box: { ...cage, y1: cage.y2 }, block: BARRIER }
             );
         }
     }
@@ -798,13 +797,14 @@ export function arenaFills(layout: Layout, at: Placed): Fill[] {
         x2: gallery.x2 + 1,
         z2: gallery.z2 + 1
     };
-    // The gallery: a glass floor, glass walls two high round it, a barrier lid.
+    // The gallery: an invisible floor, walls two high round it and a lid, all
+    // barrier - who is out sees the whole fight, nothing in the way.
     const side = (x1: number, z1: number, x2: number, z2: number): Fill => ({
         box: { x1, y1: gallery.y1 + 1, z1, x2, y2: gallery.y1 + 2, z2 },
-        block: GLASS
+        block: BARRIER
     });
     fills.push(
-        { box: { ...walls, y1: gallery.y1, y2: gallery.y1 }, block: GLASS },
+        { box: { ...walls, y1: gallery.y1, y2: gallery.y1 }, block: BARRIER },
         side(walls.x1, walls.z1, walls.x2, walls.z1),
         side(walls.x1, walls.z2, walls.x2, walls.z2),
         side(walls.x1, walls.z1 + 1, walls.x1, walls.z2 - 1),
