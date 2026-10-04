@@ -33,7 +33,8 @@ import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
 import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
-import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
+import type { DeviceView } from "../../lib/device-kinds";
+import { useDeviceAct } from "./use-device-act";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
 import { FilterChip } from "./air-controls";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Skeleton, cn } from "@polaris/ui";
@@ -111,7 +112,6 @@ export function DevicesView({
     const [opened, setOpened] = useState<DeviceView | null>(null);
     const [disconnecting, setDisconnecting] = useState<DeviceAccountView | null>(null);
     const [refreshing, setRefreshing] = useState(false);
-    const [busy, setBusy] = useState<{ id: string; action: DeviceAction } | null>(null);
     const [error, setError] = useState("");
     const groups = useMemo(() => groupDevices(devices ?? [], t), [devices, t]);
 
@@ -267,80 +267,16 @@ export function DevicesView({
         onReady: () => void reread()
     });
 
-    /** Put a device back into both lists it can be in, so the row and the open
+    /** Put a change into both lists a device can be in, so the row and the open
      *  panel never disagree about what a door is doing. */
-    const settle = (device: DeviceView) => {
-        setDevices((current) =>
-            (current ?? []).map((entry) => (entry.id === device.id ? device : entry))
-        );
-        setOpened((current) => (current && current.id === device.id ? device : current));
-    };
+    const update = useCallback((change: (entry: DeviceView) => DeviceView) => {
+        setDevices((current) => (current ?? []).map(change));
+        setOpened((current) => (current ? change(current) : current));
+    }, []);
+    const settle = (device: DeviceView) =>
+        update((entry) => (entry.id === device.id ? device : entry));
 
-    /**
-     * Tell a device to do something.
-     *
-     * Where the outcome is known before anything answers - a switch told to go
-     * on is on or it failed - the row moves there at once and moves back if the
-     * answer is a refusal, so a switch flips under the finger rather than a
-     * second later. A lock is left alone until it reports: it is turning, and
-     * where it gets to is the vendor's to say.
-     */
-    const act = async (device: DeviceView, action: DeviceAction, command?: DeviceCommand) => {
-        setBusy({ id: device.id, action });
-        setError("");
-        const settled = kinds.settledState(action);
-        // A setting lands where it was told, like a switch: the row shows it now
-        // and puts the old one back if the unit refuses. An air conditioner keeps
-        // its room temperature beside its settings; a purifier's are whole.
-        const applied = command
-            ? kinds.applyCommand(
-                  {
-                      kind: device.kind,
-                      climate: device.climate ?? null,
-                      air: device.air ?? null
-                  },
-                  command
-              )
-            : null;
-        const climate =
-            applied && "climate" in applied && device.climate
-                ? { ...device.climate, ...applied.climate }
-                : null;
-        const air = applied && "air" in applied ? applied.air : null;
-        if (climate) settle({ ...device, climate });
-        else if (air) settle({ ...device, air });
-        else if (settled) settle({ ...device, state: settled });
-        const result = await runAction(
-            () => actions.operateDeviceAction(device.id, action, command),
-            setError
-        );
-        setBusy(null);
-        if (!result || result.error) {
-            // Only what this press changed is put back, and only while it is
-            // still what this press made it: a later press, or a sync, wins.
-            const restore = (entry: DeviceView): DeviceView => {
-                if (entry.id !== device.id) return entry;
-                if (climate && entry.climate === climate)
-                    return { ...entry, climate: device.climate };
-                if (air && entry.air === air) return { ...entry, air: device.air };
-                if (!climate && !air && settled && entry.state === settled)
-                    return { ...entry, state: device.state };
-                return entry;
-            };
-            if (climate || air || settled) {
-                setDevices((current) => (current ?? []).map(restore));
-                setOpened((current) => (current ? restore(current) : current));
-            }
-            if (!result) return;
-            setError(result.error ?? "");
-            throw new Error(result.error);
-        }
-        if (result.device) settle(result.device);
-        // The lock answers before the door has finished moving, so the state that
-        // matters is the one after it. Asked for once, a few seconds later, rather
-        // than left saying "moving" until the minute is up.
-        setTimeout(() => void sync(true), 4000);
-    };
+    const { busy, act } = useDeviceAct({ update, setError, resync: () => void sync(true) });
 
     // Stable across renders, so a row whose device did not change is not
     // redrawn because the screen around it was.

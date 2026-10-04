@@ -176,6 +176,77 @@
         "automations": {
             "title": "Automatizaciones",
             "description": "Lo que este sitio hace solo: apagar lo que se quedó encendido, cerrar lo que se quedó abierto y avisarte."
+        },
+        "overview": {
+            "description": "Cómo está este sitio ahora mismo: qué está encendido, qué necesita atención y qué han visto las cámaras."
+        },
+        "live": {
+            "title": "Directo"
+        }
+    },
+    "placeOverview": {
+        "open": "Abrir {name}",
+        "summary": {
+            "label": "De un vistazo",
+            "devices": "Equipos",
+            "online": "{online} de {total} en línea",
+            "offline": "{count} sin conexión",
+            "allOnline": "En línea",
+            "lights": "Luces",
+            "lightsOn": "{count, plural, one {# encendida} other {# encendidas}}",
+            "allOff": "Apagado",
+            "ofTotal": "de {total}",
+            "climate": "Clima",
+            "running": "{count} en marcha",
+            "temperatureRange": "{min} a {max}",
+            "security": "Seguridad",
+            "unlocked": "{count} sin cerrar",
+            "allLocked": "Todo cerrado",
+            "doorsOpen": "{count, plural, one {# puerta abierta} other {# puertas abiertas}}",
+            "cameras": "Cámaras",
+            "cameraCount": "{count, plural, one {# cámara} other {# cámaras}}",
+            "attention": "Atención",
+            "needYou": "{count, plural, one {# requiere atención} other {# requieren atención}}",
+            "allGood": "Todo bien"
+        },
+        "attention": {
+            "title": "Requiere atención",
+            "reasons": {
+                "jammed": "Atascado",
+                "offline": "No responde",
+                "battery": "Batería baja",
+                "door-open": "Abierta"
+            }
+        },
+        "rooms": {
+            "title": "Salas",
+            "unplaced": "Sin sala",
+            "count": "{count, plural, one {# dispositivo} other {# dispositivos}}",
+            "on": "{count, plural, one {# encendido} other {# encendidos}}",
+            "emptyTitle": "Sin dispositivos",
+            "emptyManage": "Conecta tus cerraduras, luces e interruptores y aparecerán aquí, estancia por estancia.",
+            "emptyView": "Aún no se ha conectado nada en este sitio.",
+            "connect": "Añadir dispositivos"
+        },
+        "cameras": {
+            "title": "Cámaras",
+            "empty": "Aún no hay cámaras en este sitio.",
+            "add": "Añadir cámara",
+            "more": "{count, plural, one {# cámara más} other {# cámaras más}}",
+            "watch": "Ver {name}",
+            "noPicture": "Sin imagen"
+        },
+        "routines": {
+            "title": "Rutinas",
+            "empty": "Aún no hay automatizaciones en este sitio.",
+            "create": "Crear una",
+            "started": "Iniciada",
+            "off": "Parada"
+        },
+        "events": {
+            "title": "Eventos recientes",
+            "empty": "No se ha detectado nada últimamente.",
+            "new": "Sin ver"
         }
     },
     "placeDialog": {

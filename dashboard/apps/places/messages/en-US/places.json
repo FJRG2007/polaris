@@ -176,6 +176,77 @@
         "automations": {
             "title": "Device automations",
             "description": "What this place does by itself: switch off what was left on, lock what was left open, and tell you when."
+        },
+        "overview": {
+            "description": "How this place is doing right now: what is on, what needs you, and what the cameras saw."
+        },
+        "live": {
+            "title": "Live"
+        }
+    },
+    "placeOverview": {
+        "open": "Open {name}",
+        "summary": {
+            "label": "At a glance",
+            "devices": "Devices",
+            "online": "{online} of {total} online",
+            "offline": "{count} offline",
+            "allOnline": "All online",
+            "lights": "Lights",
+            "lightsOn": "{count} on",
+            "allOff": "All off",
+            "ofTotal": "of {total}",
+            "climate": "Climate",
+            "running": "{count} running",
+            "temperatureRange": "{min} to {max}",
+            "security": "Security",
+            "unlocked": "{count} unlocked",
+            "allLocked": "All locked",
+            "doorsOpen": "{count, plural, one {# door open} other {# doors open}}",
+            "cameras": "Cameras",
+            "cameraCount": "{count, plural, one {# camera} other {# cameras}}",
+            "attention": "Attention",
+            "needYou": "{count, plural, one {# needs you} other {# need you}}",
+            "allGood": "All good"
+        },
+        "attention": {
+            "title": "Needs attention",
+            "reasons": {
+                "jammed": "Stuck",
+                "offline": "Not answering",
+                "battery": "Battery low",
+                "door-open": "Door open"
+            }
+        },
+        "rooms": {
+            "title": "Rooms",
+            "unplaced": "Not in a room",
+            "count": "{count, plural, one {# device} other {# devices}}",
+            "on": "{count} on",
+            "emptyTitle": "No devices yet",
+            "emptyManage": "Connect your locks, lights and switches and they show up here, room by room.",
+            "emptyView": "Nothing at this place has been connected yet.",
+            "connect": "Connect devices"
+        },
+        "cameras": {
+            "title": "Cameras",
+            "empty": "No cameras at this place yet.",
+            "add": "Add a camera",
+            "more": "{count, plural, one {# more camera} other {# more cameras}}",
+            "watch": "Watch {name}",
+            "noPicture": "No picture"
+        },
+        "routines": {
+            "title": "Automations",
+            "empty": "No automations at this place yet.",
+            "create": "Create one",
+            "started": "Started",
+            "off": "Off"
+        },
+        "events": {
+            "title": "Recent events",
+            "empty": "Nothing noticed lately.",
+            "new": "Not seen yet"
         }
     },
     "placeDialog": {

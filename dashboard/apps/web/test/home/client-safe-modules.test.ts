@@ -29,6 +29,7 @@ const CLIENT_SAFE = [
     "lib/automation-words.ts",
     "lib/device-connections.ts",
     "lib/place-kinds.ts",
+    "lib/overview.ts",
     "lib/integrations/tuya-regions.ts",
     "lib/drivers/contract.ts"
 ];
