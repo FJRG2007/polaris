@@ -456,7 +456,7 @@ export function AppSwitcher({
                 {footer ? (
                     <div
                         data-launcher-footer=""
-                        className="mt-2 flex flex-col gap-0.5 border-t border-border pt-2"
+                        className="mt-2 flex flex-wrap items-center justify-end gap-1 border-t border-border pt-2"
                     >
                         {footer}
                     </div>
