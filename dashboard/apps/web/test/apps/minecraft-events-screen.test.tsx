@@ -106,6 +106,35 @@ afterEach(() => {
 });
 
 describe("the Events tab", () => {
+    it("groups the events by where they are played", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                config: {
+                    ...config,
+                    presets: [
+                        catalog.newPreset("fishing", "fish"),
+                        catalog.newPreset("sky-wars", "sky"),
+                        catalog.newPreset("supply-drop", "drop")
+                    ]
+                }
+            }
+        });
+        const sky = await screen.findByRole("region", { name: "Built in the sky" });
+        expect(sky.textContent).toContain("SkyWars");
+        expect(sky.textContent).not.toContain("Fishing contest");
+        const world = screen.getByRole("region", { name: "Somewhere in the world" });
+        expect(world.textContent).toContain("Supply drop");
+        const anywhere = screen.getByRole("region", { name: "Wherever players are" });
+        expect(anywhere.textContent).toContain("Fishing contest");
+        // In the order the groups are shown: the sky first.
+        const regions = screen
+            .getAllByRole("region")
+            .map((one) => one.getAttribute("aria-labelledby"));
+        expect(regions).toEqual(["held-sky", "held-world", "held-anywhere"]);
+    });
+
     it("shows a player's things an event could not give back, and gives them back from there", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({
