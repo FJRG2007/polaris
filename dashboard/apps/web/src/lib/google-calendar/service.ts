@@ -70,6 +70,24 @@ export const GOOGLE_DRIVE_SCOPES = [
  */
 export const GOOGLE_MAIL_SCOPES = ["openid", "email", "https://mail.google.com/"];
 
+/**
+ * What linking Google Drive to Office asks for.
+ *
+ * `drive.readonly` lists and exports the Docs, Sheets and Slides somebody
+ * already has, which is what importing them means; `drive.file` lets Polaris
+ * write the copies it creates when a document is saved back - and nothing else
+ * of theirs. Asked for on its own consent screen, like mail and calendars:
+ * reading somebody's whole Drive is a different thing to agree to.
+ */
+export const GOOGLE_DRIVE_READ_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+export const GOOGLE_DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+export const GOOGLE_OFFICE_SCOPES = [
+    "openid",
+    "email",
+    GOOGLE_DRIVE_READ_SCOPE,
+    GOOGLE_DRIVE_FILE_SCOPE
+];
+
 /** Reading and writing every calendar an account holds. */
 export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 
@@ -132,7 +150,7 @@ export function googleAuthorizeUrl(
     client: GoogleOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" | "storage" | "mail" | "calendar" = "link",
+    flow: "link" | "signin" | "storage" | "mail" | "calendar" | "office" = "link",
     /** The account this is being authorized FOR, when something downstream
      *  knows - a mailbox address somebody typed. Google opens on that account
      *  instead of on whichever one the browser happens to be signed into, which
@@ -149,7 +167,9 @@ export function googleAuthorizeUrl(
             ? GOOGLE_MAIL_SCOPES
             : flow === "calendar"
               ? GOOGLE_CALENDAR_SCOPES
-              : GOOGLE_SCOPES;
+              : flow === "office"
+                ? GOOGLE_OFFICE_SCOPES
+                : GOOGLE_SCOPES;
     const url = new URL(OAUTH_AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);

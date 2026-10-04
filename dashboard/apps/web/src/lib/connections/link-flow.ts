@@ -65,6 +65,8 @@ const CONNECTIONS_SCREEN = "/account/connections";
 const MAIL_SCREEN = "/mail/settings/accounts";
 /** Where a link started from the Calendar app comes back to. */
 const CALENDAR_SCREEN = "/calendar/settings/accounts";
+/** Where a link started from Office - Google Drive, for importing - comes back to. */
+const OFFICE_SCREEN = "/office";
 
 /** The services the Calendar links accounts of. A calendar link is exempt from
  *  the per-person cap, so it is honoured for these and no others. */
@@ -93,13 +95,14 @@ const SIGN_IN_WINDOW_MS = 10 * 60 * 1000;
 /** `storage` is a link that also asks for access to the files Polaris creates,
  *  and `mail` one that asks for the mailbox. Everything downstream treats both
  *  as a link; only the consent screen and where it lands afterwards differ. */
-type ConnectionMode = "link" | "signin" | "storage" | "mail" | "calendar";
+type ConnectionMode = "link" | "signin" | "storage" | "mail" | "calendar" | "office";
 
 /** The screen a link trip returns to, when it is not the account's own list.
  *  `calendar` is a link that asks to read and write the account's calendars. */
 function screenFor(mode: ConnectionMode | undefined): string | undefined {
     if (mode === "mail") return MAIL_SCREEN;
     if (mode === "calendar") return CALENDAR_SCREEN;
+    if (mode === "office") return OFFICE_SCREEN;
     return undefined;
 }
 
@@ -368,6 +371,8 @@ export async function startConnectionLink(request: Request, provider: string): P
     const scope = url.searchParams.get("scope");
     if (scope === "calendar" && linksCalendars(provider))
         return begin(request, provider, "calendar");
+    // Google Drive for Office: reading the Docs, Sheets and Slides somebody has.
+    if (scope === "office" && provider === "google") return begin(request, provider, "office");
     if (scope !== "mail") {
         return begin(request, provider, scope === "storage" ? "storage" : "link");
     }
@@ -717,7 +722,8 @@ function readState(request: Request): FlowState | null {
                 held.mode === "signin" ||
                 held.mode === "storage" ||
                 held.mode === "mail" ||
-                held.mode === "calendar"
+                held.mode === "calendar" ||
+                held.mode === "office"
                     ? held.mode
                     : "link",
             state: held.state,
