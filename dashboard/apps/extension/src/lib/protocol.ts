@@ -267,13 +267,6 @@ export async function claimAuthorization(
 }
 
 /**
- * Trade the refresh token for a new access token.
- *
- * The server rotates it - the one presented is revoked as the new one is issued -
- * so whatever comes back has to be stored in place of what was sent, and a
- * failure means this session is over rather than that it should be retried.
- */
-/**
  * What became of a refresh.
  *
  * `rejected` is the server saying this session is over, and the only answer
@@ -297,6 +290,12 @@ async function sessionRefused(reply: Response): Promise<boolean> {
     return body?.["error"] === "invalid_grant";
 }
 
+/**
+ * Trade the refresh token for a new access token.
+ *
+ * The server rotates it - the one presented is revoked as the new one is
+ * issued - so whatever comes back has to be stored in place of what was sent.
+ */
 export async function refresh(
     base: string,
     refreshToken: string,
