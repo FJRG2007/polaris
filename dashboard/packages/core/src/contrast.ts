@@ -27,10 +27,28 @@ export const READABLE_CONTRAST = 4.5;
  *  does. */
 export const READABLE_CONTRAST_LARGE = 3;
 
+/** `hsl(h s% l%)`, with spaces or commas and an alpha that is ignored - the form
+ *  every generated tint in Polaris is written in (`tintFor`). */
+const HSL =
+    /^hsla?\(\s*(-?[\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%(?:\s*[,/]\s*[\d.]+%?)?\s*\)$/i;
+
+/** An `hsl()` colour as red, green and blue fractions, by the CSS conversion. */
+function hslChannels(hue: number, saturation: number, lightness: number): [number, number, number] {
+    const h = ((hue % 360) + 360) % 360;
+    const s = Math.min(100, saturation) / 100;
+    const l = Math.min(100, lightness) / 100;
+    const k = (n: number): number => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number): number => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    return [f(0), f(8), f(4)];
+}
+
 /** One colour, as the fractions the formula wants. Accepts `#rgb`, `#rrggbb`
- *  and anything else is treated as black, which is the safe direction: an
- *  unreadable answer is better than a confident wrong one. */
+ *  and `hsl()`; anything else is treated as black, which is the safe direction:
+ *  an unreadable answer is better than a confident wrong one. */
 function channelsOf(color: string): [number, number, number] {
+    const hsl = HSL.exec(color.trim());
+    if (hsl) return hslChannels(Number(hsl[1]), Number(hsl[2]), Number(hsl[3]));
     const hex = color.trim().replace(/^#/, "");
     const full =
         hex.length === 3

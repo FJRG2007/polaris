@@ -7,7 +7,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VaultStatus } from "../src/lib/messages";
-import { Home, SectionBar, TopBar, vaultState } from "../src/entrypoints/popup/shell";
+import { initialsInk, tintFor } from "@polaris/core/faces";
+import { Face, Home, SectionBar, TopBar, vaultState } from "../src/entrypoints/popup/shell";
 
 const STATUS: VaultStatus = {
     server: "https://polaris.example",
@@ -110,5 +111,25 @@ describe("a section", () => {
         expect(renderToStaticMarkup(<SectionBar title="Vault" onBack={() => {}} />)).toContain(
             "Back to the home screen"
         );
+    });
+});
+
+describe("a face with no picture", () => {
+    /** An id whose tint needs this ink, found rather than hard-coded. */
+    const needing = (ink: string): string => {
+        for (let n = 0; n < 10_000; n += 1) {
+            if (initialsInk(tintFor(`id-${n}`)) === ink) return `id-${n}`;
+        }
+        throw new Error(ink);
+    };
+
+    it("writes the initials in whichever ink reads on its tint", () => {
+        for (const ink of ["#000000", "#ffffff"]) {
+            const markup = renderToStaticMarkup(
+                <Face image={null} name="Ada Lovelace" tint={needing(ink)} size={30} />
+            );
+            expect(markup).toContain(`color:${ink}`);
+            expect(markup).toContain("AL");
+        }
     });
 });

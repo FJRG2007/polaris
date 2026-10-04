@@ -16,7 +16,7 @@ import { grant } from "./servers";
 import { useWords } from "./words";
 import { describeAccount, accountHost } from "@/lib/accounts";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { firstName, initials, tintFor } from "@polaris/core/faces";
+import { firstName, initials, initialsInk, tintFor } from "@polaris/core/faces";
 import { describeServer, type ServerRef } from "@/lib/servers";
 import { ENGLISH, type Words } from "@/lib/words";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
@@ -86,10 +86,11 @@ export function Face({
             />
         );
     }
+    const fill = tintFor(tint);
     return (
         <span
             className={square ? "face square" : "face"}
-            style={{ ...style, background: tintFor(tint) }}
+            style={{ ...style, background: fill, color: initialsInk(fill) }}
             aria-hidden="true"
         >
             {initials(name)}
