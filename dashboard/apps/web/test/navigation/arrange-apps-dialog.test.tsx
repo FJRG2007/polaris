@@ -8,7 +8,8 @@
  * What is asserted: every app is listed in the menu's order with move-up and
  * move-down buttons that call `arrangeApps` with the reordered list and disable
  * at each end; a star pins or unpins through `toggle`, and a locked app has
- * none; the way back to the automatic order shows only once the menu was
+ * none; a star keeps the rows where they are while the menu is not arranged,
+ * and a move reorders them; the way back to the automatic order shows only once the menu was
  * arranged; and it reads in Spanish.
  */
 
@@ -101,6 +102,27 @@ describe("the arrange apps dialog", () => {
         expect(toggle).toHaveBeenLastCalledWith("drive");
         expect(screen.queryByRole("button", { name: "Add Mail to favorites" })).toBeNull();
         expect(arrangeApps).not.toHaveBeenCalled();
+    });
+
+    it("keeps the rows in place when a star moves an app in the menu, until a move", () => {
+        const value = store();
+        const tree = (order: string[], arranged: readonly string[] = value.order) =>
+            withMessages(
+                <FavoriteAppsContext.Provider value={{ ...value, order: arranged }}>
+                    <ArrangeAppsDialog
+                        open
+                        onOpenChange={() => undefined}
+                        apps={APPS}
+                        order={order}
+                    />
+                </FavoriteAppsContext.Provider>
+            );
+        const labels = () => screen.getAllByRole("listitem").map((row) => row.textContent);
+        const { rerender } = render(tree(ORDER));
+        rerender(tree(["games", "chat", "drive", "mail"]));
+        expect(labels()).toEqual(["Chat", "Drive", "Game servers", "Mail"]);
+        rerender(tree(["drive", "chat", "games", "mail"], ["drive", "chat", "games", "mail"]));
+        expect(labels()).toEqual(["Drive", "Chat", "Game servers", "Mail"]);
     });
 
     it("offers the automatic order back only once the menu was arranged", () => {

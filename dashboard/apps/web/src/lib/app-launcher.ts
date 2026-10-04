@@ -43,8 +43,6 @@ const appListSchema = z
     .max(MAX_FAVORITE_APPS)
     .refine((ids) => new Set(ids).size === ids.length, "An app can only be pinned once.");
 
-export const favoriteAppsSchema = appListSchema;
-
 /** What an account keeps about its app menu: the favorites, and the order it
  *  arranged the menu in - empty until it arranges it. */
 export interface LauncherPrefs {
@@ -87,11 +85,6 @@ export function parseLauncherPrefs(raw: string | null | undefined): LauncherPref
     } catch {
         return NO_LAUNCHER_PREFS;
     }
-}
-
-/** The favorites alone, from either stored shape. */
-export function parseFavoriteApps(raw: string | null | undefined): string[] {
-    return [...parseLauncherPrefs(raw).favorites];
 }
 
 /** The stored form: the old bare list while nothing has been arranged, so an

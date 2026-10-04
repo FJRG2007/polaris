@@ -24,12 +24,10 @@ import {
     LAUNCHER_ROW_SIZE,
     arrangeApps,
     arrangeFavorites,
-    favoriteAppsSchema,
     launcherOrder,
     launcherPrefsSchema,
     moveFavorite,
     parseAppUsage,
-    parseFavoriteApps,
     parseLauncherPrefs,
     railApps,
     recordAppOpen,
@@ -251,22 +249,22 @@ describe("arranging favorites", () => {
 
 describe("stored favorites", () => {
     it("accepts real apps in the account's order", () => {
-        expect(favoriteAppsSchema.parse(["mail", "drive"])).toEqual(["mail", "drive"]);
+        expect(launcherPrefsSchema.parse(["mail", "drive"])).toEqual(["mail", "drive"]);
     });
 
     it("refuses an app that does not exist, a hidden one, or one twice", () => {
-        expect(favoriteAppsSchema.safeParse(["nope"]).success).toBe(false);
-        expect(favoriteAppsSchema.safeParse(["account"]).success).toBe(false);
-        expect(favoriteAppsSchema.safeParse(["mail", "mail"]).success).toBe(false);
-        expect(favoriteAppsSchema.safeParse("mail").success).toBe(false);
+        expect(launcherPrefsSchema.safeParse(["nope"]).success).toBe(false);
+        expect(launcherPrefsSchema.safeParse(["account"]).success).toBe(false);
+        expect(launcherPrefsSchema.safeParse(["mail", "mail"]).success).toBe(false);
+        expect(launcherPrefsSchema.safeParse("mail").success).toBe(false);
     });
 
     it("reads anything unusable as nothing pinned", () => {
-        expect(parseFavoriteApps(null)).toEqual([]);
-        expect(parseFavoriteApps("{not json")).toEqual([]);
-        expect(parseFavoriteApps('["nope"]')).toEqual([]);
-        expect(parseFavoriteApps('["chat"]')).toEqual(["chat"]);
-        expect(parseFavoriteApps('["nope","chat","chat"]')).toEqual(["chat"]);
+        expect(parseLauncherPrefs(null).favorites).toEqual([]);
+        expect(parseLauncherPrefs("{not json").favorites).toEqual([]);
+        expect(parseLauncherPrefs('["nope"]').favorites).toEqual([]);
+        expect(parseLauncherPrefs('["chat"]').favorites).toEqual(["chat"]);
+        expect(parseLauncherPrefs('["nope","chat","chat"]').favorites).toEqual(["chat"]);
     });
 
     it("keeps a list stored before the menu could be arranged, in its order", () => {

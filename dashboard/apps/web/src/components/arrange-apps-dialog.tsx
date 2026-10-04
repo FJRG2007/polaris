@@ -11,7 +11,7 @@
  * confirm and nothing to lose by closing it.
  */
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { PolarisApp } from "@polaris/ui";
 import { moveFavorite } from "@/lib/app-launcher";
 import { ArrowDown, ArrowUp, Star } from "lucide-react";
@@ -45,8 +45,17 @@ export function ArrangeAppsDialog({
 }) {
     const t = useTranslations("nav");
     const { favorites, order: arranged, toggle, arrangeApps, resetOrder } = useFavoriteApps();
+    const synced = open ? arranged : null;
+    const [shownFor, setShownFor] = useState(synced);
+    const [shown, setShown] = useState(order);
+    if (shownFor !== synced) {
+        setShownFor(synced);
+        setShown(order);
+    }
     const byId = new Map(apps.map((app) => [app.id, app]));
-    const listed = order.flatMap((id) => byId.get(id) ?? []);
+    const listed = [...shown, ...order.filter((id) => !shown.includes(id))].flatMap((id) =>
+        order.includes(id) ? (byId.get(id) ?? []) : []
+    );
     const ids = listed.map((app) => app.id);
 
     return (
