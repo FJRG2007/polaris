@@ -30,7 +30,7 @@ import { ChevronRight, Search, X } from "lucide-react";
 import { Badge, Button, Checkbox, Input, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
-import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS } from "@/lib/api-key-scopes";
+import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS, scopeGroupKey } from "@/lib/api-key-scopes";
 
 /** Which held scope pulled an implied one in, for the "Included with" note. */
 function includedBy(scope: Permission, selected: readonly Permission[]): Permission | null {
@@ -234,9 +234,8 @@ export function ScopePicker({
     );
 }
 
-/** An area's name in the reader's words: `SCOPE_GROUPS` names each in English,
- *  and the catalog holds the same names by that English, camel-cased. */
+/** An area's name in the reader's words, falling back to its English. */
 function scopeGroupTitle(t: ReturnType<typeof useTranslations<"account">>, title: string): string {
-    const key = `apiKeys.scopes.groups.${title.replace(/ (\w)/g, (_, letter: string) => letter.toUpperCase()).replace(/^\w/, (letter) => letter.toLowerCase())}`;
+    const key = scopeGroupKey(title);
     return t.has(key) ? t(key as NamespaceKey<"account">) : title;
 }

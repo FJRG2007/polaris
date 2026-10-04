@@ -16,7 +16,7 @@
         "allow": "Allow",
         "deny": "Deny",
         "allowing": "Connecting...",
-        "later": "You can disconnect it at any time under Account > API keys.",
+        "later": "You can change or disconnect it at any time under Account > AI assistants.",
         "errorTitle": "This connection cannot continue",
         "errors": {
             "client": "This link does not name an app Polaris can identify. Start the connection again from the app.",
@@ -71,10 +71,14 @@
         "settings_manage": "Change instance settings",
         "system_manage": "Run updates and system operations"
     },
+    "page": {
+        "title": "AI assistants",
+        "intro": "See what each connected assistant may do, change it, or connect another."
+    },
     "connectedApps": {
         "title": "Connected assistants",
         "intro": "Assistants and editors you allowed to act for you over MCP. Each one can do only what you approved, and never more than your account.",
-        "empty": "No apps connected. Connect one from Account > Downloads.",
+        "empty": "No assistants connected yet. Connect one with the steps below.",
         "returnsTo": "Returns to {host}",
         "connected": "Connected {time}",
         "lastUsed": "Last used {time}",
@@ -84,11 +88,25 @@
         "disconnectTitle": "Disconnect {app}?",
         "disconnectDescription": "It stops working at once. To use it again, connect it from the app.",
         "failed": "That app could not be disconnected. Reload and try again.",
-        "scopeCount": "{count, plural, one {# permission} other {# permissions}}"
+        "scopeCount": "{count, plural, one {# permission} other {# permissions}}",
+        "search": "Search assistants",
+        "noMatch": "No assistant matches \"{query}\".",
+        "recent": "Used in the last 7 days",
+        "idle": "Not used in the last 7 days",
+        "showScopes": "Show its permissions",
+        "edit": "Change permissions",
+        "editNamed": "Change permissions for {app}",
+        "disconnectNamed": "Disconnect {app}",
+        "editTitle": "What {app} may do",
+        "editHint": "Changes apply on its next call. Only what it asked for when it connected is listed.",
+        "save": "Save",
+        "pickOne": "Choose at least one permission, or disconnect it.",
+        "changeFailed": "The permissions could not be changed. Reload and try again.",
+        "loading": "Loading connected assistants"
     },
     "assistants": {
-        "title": "AI assistants (MCP)",
-        "intro": "Let Claude, ChatGPT, Cursor, VS Code and other assistants work with your Polaris. They sign in here, you choose what each one may do, and you can disconnect them under Account > API keys.",
+        "title": "Connect an assistant",
+        "intro": "Each assistant signs in here and asks before it gets anything. Pick yours for the steps.",
         "serverUrl": "Server URL",
         "commandLabel": "command",
         "configLabel": "configuration",

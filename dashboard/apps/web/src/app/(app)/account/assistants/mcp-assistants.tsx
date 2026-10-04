@@ -1,11 +1,11 @@
 /**
- * Downloads > AI assistants (MCP): connecting Claude, ChatGPT, Cursor, VS Code
- * and the rest to this instance.
+ * Account > AI assistants, "Connect an assistant": connecting Claude, ChatGPT,
+ * Cursor, VS Code and the rest to this instance.
  *
  * One server URL, and per client the exact thing that client wants: a command,
  * a click-to-install link where the client documents one, or the steps in its
  * own settings. Nothing here carries a credential - every one of these signs in
- * through the consent screen, and is listed under Account > API keys after.
+ * through the consent screen, and is listed above it on this page after.
  *
  * Each client is a disclosure rather than a card: six cards of steps is a page
  * nobody finds their own client on, and the name with its mark is what people

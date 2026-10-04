@@ -143,11 +143,15 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     // somebody else held it.
     "account.oauth.connected": {
         key: "security.account_oauth_connected",
-        href: "/account/api-keys"
+        href: "/account/assistants"
+    },
+    "account.oauth.updated": {
+        key: "security.account_oauth_updated",
+        href: "/account/assistants"
     },
     "account.oauth.replay-detected": {
         key: "security.account_oauth_replay_detected",
-        href: "/account/api-keys"
+        href: "/account/assistants"
     }
 };
 

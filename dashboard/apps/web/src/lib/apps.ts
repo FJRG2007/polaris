@@ -1404,6 +1404,28 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["tokens", "developers", "integrations"],
             group: DEVELOPERS_GROUP
         },
+        // Assistants connected over MCP: the list of what each may do, and how
+        // to connect one. Their own screen rather than a card under API keys,
+        // because nobody connecting ChatGPT thinks of it as making a key.
+        {
+            label: "AI assistants", // i18n-ignore
+            href: "/account/assistants",
+            icon: Bot,
+            keywords: [
+                "mcp",
+                "claude",
+                "claude code",
+                "chatgpt",
+                "openai",
+                "cursor",
+                "vs code",
+                "codex",
+                "connected apps",
+                "connectors",
+                "oauth"
+            ],
+            group: DEVELOPERS_GROUP
+        },
         {
             label: "AI provider keys", // i18n-ignore
             href: "/account/ai-keys",

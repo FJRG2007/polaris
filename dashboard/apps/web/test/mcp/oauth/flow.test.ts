@@ -93,6 +93,7 @@ vi.mock("@/lib/mcp/oauth/origin", () => ({
     currentOrigin: async () => state.origin
 }));
 vi.mock("@/lib/session", () => ({ requireUser: async () => state.user }));
+vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("@/lib/device-grace", () => ({ newDeviceRefusal: async () => null }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/app/(app)/account/security/action-messages", () => ({
@@ -120,6 +121,9 @@ const serverMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
+const { changeAppScopesAction } = await import(
+    "@/app/(app)/account/assistants/connected-app-actions"
+);
 
 const REDIRECT = "http://127.0.0.1/callback";
 
@@ -709,5 +713,124 @@ describe("revocation and the connected-apps list", () => {
         });
         // A read is not written to the activity log.
         expect(state.audit.map((entry) => entry.action)).not.toContain("mcp.tool.called");
+    });
+});
+
+describe("changing what a connected app may do", () => {
+    async function whoami(accessToken: string) {
+        const answer = await mcpCall(accessToken, {
+            method: "tools/call",
+            params: { name: "polaris_whoami", arguments: {} }
+        });
+        return answer.body?.result.structuredContent.scopes as string[] | undefined;
+    }
+
+    it("takes a scope away on the app's very next call, and refresh cannot bring it back", async () => {
+        const { client, tokens } = await connect();
+        const access = String(tokens.body.access_token);
+        const [app] = await listConnectedApps(ADA.id);
+
+        const result = await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] });
+        expect(result).toEqual({ scopes: ["tasks.read"] });
+
+        const refused = await mcpCall(access, {
+            method: "tools/call",
+            params: { name: "deploy_projects", arguments: {} }
+        });
+        expect(refused.body?.result.isError).toBe(true);
+        expect(refused.body?.result.content[0].text).toContain("deploy.read");
+        expect(await whoami(access)).toEqual(["tasks.read"]);
+
+        const next = await tokenCall({
+            grant_type: "refresh_token",
+            refresh_token: String(tokens.body.refresh_token),
+            client_id: client.client_id!
+        });
+        expect(next.body.scope).toBe("tasks.read");
+        const widened = await tokenCall({
+            grant_type: "refresh_token",
+            refresh_token: String(next.body.refresh_token),
+            client_id: client.client_id!,
+            scope: "tasks.read deploy.read"
+        });
+        expect(widened.body.error).toBe("invalid_scope");
+        expect(state.audit.map((entry) => entry.action)).toContain("account.oauth.updated");
+    });
+
+    it("gives back a scope the app asked for, on the token it already holds", async () => {
+        const { tokens } = await connect(["tasks.read"], "tasks.read deploy.read");
+        const access = String(tokens.body.access_token);
+        expect(await whoami(access)).toEqual(["tasks.read"]);
+        const [app] = await listConnectedApps(ADA.id);
+        expect([...app!.requestable].sort()).toEqual(["deploy.read", "tasks.read"]);
+
+        const result = await changeAppScopesAction({
+            id: app!.id,
+            scopes: ["tasks.read", "deploy.read"]
+        });
+        expect(result.scopes?.sort()).toEqual(["deploy.read", "tasks.read"]);
+        expect((await whoami(access))?.sort()).toEqual(["deploy.read", "tasks.read"]);
+    });
+
+    it("never adds what the app did not ask for or the person does not hold", async () => {
+        state.permissions = new Set(["tasks.read", "tasks.manage", "deploy.read"]);
+        const { tokens } = await connect(["tasks.read"], "tasks.read");
+        const [app] = await listConnectedApps(ADA.id);
+
+        // Not asked for: dropped, so nothing is left to grant but what it had.
+        const result = await changeAppScopesAction({
+            id: app!.id,
+            scopes: ["tasks.read", "deploy.read", "users.manage"]
+        });
+        expect(result.scopes).toEqual(["tasks.read"]);
+        expect(await whoami(String(tokens.body.access_token))).toEqual(["tasks.read"]);
+
+        // Asked for but not held: refused the same way.
+        state.permissions = new Set(["tasks.read"]);
+        const second = await connect(["tasks.read"], "tasks.read tasks.manage");
+        const apps = await listConnectedApps(ADA.id);
+        const latest = apps.find((entry) => entry.requestable.includes("tasks.manage"))!;
+        const narrowed = await changeAppScopesAction({
+            id: latest.id,
+            scopes: ["tasks.manage"]
+        });
+        expect(narrowed.scopes).toEqual(["tasks.read"]);
+        expect(await whoami(String(second.tokens.body.access_token))).toEqual(["tasks.read"]);
+    });
+
+    it("refuses an empty set, somebody else's app, and a disconnected one", async () => {
+        await connect();
+        const [app] = await listConnectedApps(ADA.id);
+        expect((await changeAppScopesAction({ id: app!.id, scopes: [] })).error).toBe(
+            "connectedApps.pickOne"
+        );
+
+        state.user = { ...state.user, id: BOB.id };
+        expect(
+            (await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] })).error
+        ).toBe("connectedApps.changeFailed");
+
+        state.user = { ...state.user, id: ADA.id };
+        await revokeConnectedApp(ADA.id, app!.id);
+        expect(
+            (await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] })).error
+        ).toBe("connectedApps.changeFailed");
+        expect(
+            (await changeAppScopesAction({ id: "not-a-uuid", scopes: ["tasks.read"] })).error
+        ).toBe("connectedApps.changeFailed");
+    });
+
+    it("treats a grant from before requests were kept as narrow-only", async () => {
+        const { tokens } = await connect(["tasks.read"], "tasks.read deploy.read");
+        const grant = state.db.tables.oAuthGrant![0]!;
+        grant.requestedScopes = null;
+        const [app] = await listConnectedApps(ADA.id);
+        expect(app!.requestable).toEqual(["tasks.read"]);
+        const result = await changeAppScopesAction({
+            id: app!.id,
+            scopes: ["tasks.read", "deploy.read"]
+        });
+        expect(result.scopes).toEqual(["tasks.read"]);
+        expect(await whoami(String(tokens.body.access_token))).toEqual(["tasks.read"]);
     });
 });

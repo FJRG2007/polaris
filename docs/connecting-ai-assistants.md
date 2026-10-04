@@ -5,9 +5,9 @@ that speaks remote MCP over HTTP can connect to it, sign in as you, and work wit
 your tasks, deployments, notes, chat, Drive and calendar. Each assistant can do
 only what you approve when it connects, and never more than your own account.
 
-The quickest way in is **Account > Downloads > AI assistants (MCP)**, which shows
-your server URL and the setup for each client with copy buttons and install
-links. This page is the same information, plus how it works.
+The quickest way in is **Account > AI assistants**, which shows your server URL
+and the setup for each client with copy buttons and install links. This page is
+the same information, plus how it works.
 
 ## Your server URL
 
@@ -144,15 +144,22 @@ Only the permissions your account holds are offered.
 
 ## Managing connected assistants
 
-**Account > API keys > Connected assistants** lists every assistant you have
-connected, what it may do, and when it was last used. **Disconnect** stops it at
-once: every token it holds is ended, and it has to be connected again through
-the consent screen.
+**Account > AI assistants** lists every assistant you have connected, what it
+may do, and when and from where it was last used.
+
+- **Change permissions** opens the same boxes as the consent screen. A
+  permission you take away is refused on the assistant's next call; one you add
+  works on its next call too. You can only add what the assistant asked for
+  when it connected, and never more than your own account holds. An assistant
+  connected before this was recorded can be narrowed, but to widen it, connect
+  it again.
+- **Disconnect** stops it at once: every token it holds is ended, and it has to
+  be connected again through the consent screen.
 
 Connecting an assistant raises the same security alert as creating an API key,
-and so does a connection Polaris ends on its own because one of its tokens was
-presented twice - which means somebody else held it. Both open **Account > API
-keys**.
+and so do changing what one may do and a connection Polaris ends on its own
+because one of its tokens was presented twice - which means somebody else held
+it. All of them open **Account > AI assistants**.
 
 If you go through the consent screen again for an app you already connected and
 untick a permission, every token it holds - including ones already issued - is

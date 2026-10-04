@@ -16,7 +16,7 @@
         "allow": "Permitir",
         "deny": "Denegar",
         "allowing": "Conectando...",
-        "later": "Puedes desconectarla cuando quieras en Cuenta > Claves API.",
+        "later": "Puedes cambiarla o desconectarla cuando quieras en Cuenta > Asistentes de IA.",
         "errorTitle": "Esta conexión no puede continuar",
         "errors": {
             "client": "Este enlace no indica una app que Polaris pueda identificar. Vuelve a iniciar la conexión desde la app.",
@@ -71,10 +71,14 @@
         "settings_manage": "Cambiar ajustes",
         "system_manage": "Actualizar y operar el sistema"
     },
+    "page": {
+        "title": "Asistentes de IA",
+        "intro": "Mira qué puede hacer cada asistente conectado, cámbialo o conecta otro."
+    },
     "connectedApps": {
         "title": "Asistentes conectados",
         "intro": "Asistentes y editores a los que has permitido actuar por ti mediante MCP. Cada uno solo puede hacer lo que aprobaste, y nunca más que tu cuenta.",
-        "empty": "No hay apps conectadas. Conecta una desde Cuenta > Descargas.",
+        "empty": "Aún no hay asistentes conectados. Conecta uno con los pasos de abajo.",
         "returnsTo": "Vuelve a {host}",
         "connected": "Conectada {time}",
         "lastUsed": "Último uso {time}",
@@ -84,11 +88,25 @@
         "disconnectTitle": "¿Desconectar {app}?",
         "disconnectDescription": "Deja de funcionar al momento. Para volver a usarla, conéctala desde la app.",
         "failed": "No se ha podido desconectar la app. Recarga e inténtalo de nuevo.",
-        "scopeCount": "{count, plural, one {# permiso} other {# permisos}}"
+        "scopeCount": "{count, plural, one {# permiso} other {# permisos}}",
+        "search": "Buscar asistentes",
+        "noMatch": "Ningún asistente coincide con \"{query}\".",
+        "recent": "Usado en los últimos 7 días",
+        "idle": "Sin usar en los últimos 7 días",
+        "showScopes": "Ver sus permisos",
+        "edit": "Cambiar permisos",
+        "editNamed": "Cambiar los permisos de {app}",
+        "disconnectNamed": "Desconectar {app}",
+        "editTitle": "Qué puede hacer {app}",
+        "editHint": "Los cambios se aplican en su siguiente llamada. Solo aparece lo que pidió al conectarse.",
+        "save": "Guardar",
+        "pickOne": "Elige al menos un permiso, o desconéctala.",
+        "changeFailed": "No se han podido cambiar los permisos. Recarga e inténtalo de nuevo.",
+        "loading": "Cargando asistentes conectados"
     },
     "assistants": {
-        "title": "Asistentes de IA (MCP)",
-        "intro": "Deja que Claude, ChatGPT, Cursor, VS Code y otros asistentes trabajen con tu Polaris. Inician sesión aquí, tú eliges qué puede hacer cada uno y los desconectas en Cuenta > Claves API.",
+        "title": "Conectar un asistente",
+        "intro": "Cada asistente inicia sesión aquí y pide permiso antes de recibir nada. Elige el tuyo para ver los pasos.",
         "serverUrl": "Dirección",
         "commandLabel": "comando",
         "configLabel": "configuración",

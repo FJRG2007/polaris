@@ -1493,20 +1493,24 @@ model OAuthClient {
 // when. This is what Account > API keys lists as a connected app, and revoking
 // it ends every token issued under it at once.
 model OAuthGrant {
-    id         String    @id @default(uuid(7)) @db.Uuid
-    userId     String    @db.Uuid
-    clientId   String    @db.Uuid
+    id              String    @id @default(uuid(7)) @db.Uuid
+    userId          String    @db.Uuid
+    clientId        String    @db.Uuid
     // JSON array of permission keys the person approved. Narrowed again by what
     // they hold at the moment of every call, never widened by it.
-    scopes     String    @default("[]")
+    scopes          String    @default("[]")
+    // JSON array of what the app asked for when it was approved: the ceiling
+    // when the person changes its permissions later. Null on grants made before
+    // it was kept, read as "only what was approved".
+    requestedScopes String?
     // The MCP endpoint the tokens are for (RFC 8707). A token is refused anywhere
     // else.
-    resource   String
-    createdAt  DateTime  @default(now())
-    updatedAt  DateTime  @updatedAt
-    lastUsedAt DateTime?
-    lastUsedIp String?
-    revokedAt  DateTime?
+    resource        String
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+    lastUsedAt      DateTime?
+    lastUsedIp      String?
+    revokedAt       DateTime?
 
     user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
     client OAuthClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
