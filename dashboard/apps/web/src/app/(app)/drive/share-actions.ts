@@ -14,11 +14,12 @@ import { revalidatePath } from "next/cache";
 import { loadEnv } from "@polaris/config";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import { ensureShareReachability } from "@/lib/public-reach";
-import { createShareSchema, isCidr, isIpAddress } from "@polaris/core";
+import { createShareSchema, isCidr, isIpAddress, type DriveAction } from "@polaris/core";
 import { requirePermission } from "@/lib/session";
 import { toLinkVisitor, type LinkVisitor } from "@/lib/link-visitor";
 import {
     createShare,
+    findOwnedShareTarget,
     listShareAccessLogs,
     resolveShareByToken,
     revealShareLink,
@@ -30,6 +31,7 @@ import {
     verifySharePassword
 } from "@/lib/share-service";
 import { recordAudit } from "@/lib/audit-service";
+import { DriveAccessError, DriveLockedError, authorizeDrive } from "@/lib/drive-authz";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 
@@ -50,6 +52,46 @@ export interface UpdateShareInput {
     allowCreateFolder?: boolean;
     allowOverwrite?: boolean;
     allowedCidrs?: string[];
+}
+
+/** The powers a link hands its holder, and the Drive verb each one exercises. */
+type SharePowers = Pick<
+    UpdateShareInput,
+    "allowUpload" | "allowRename" | "allowDelete" | "allowCreateFolder" | "allowOverwrite"
+>;
+
+const SHARE_POWER_ACTION: Record<keyof SharePowers, DriveAction> = {
+    allowUpload: "write",
+    allowCreateFolder: "write",
+    allowOverwrite: "write",
+    allowRename: "rename",
+    allowDelete: "delete"
+};
+
+/**
+ * Assert the caller may do, on this path, everything the link lets its holder
+ * do. A share acts through the connection with no second look at who made it,
+ * so a power the maker does not hold is one they could hand to anybody.
+ */
+async function authorizeSharePowers(
+    userId: string,
+    connectionId: string,
+    path: string,
+    powers: SharePowers
+): Promise<void> {
+    const keys = Object.keys(SHARE_POWER_ACTION) as (keyof SharePowers)[];
+    const actions = new Set(
+        keys.filter((key) => powers[key]).map((key) => SHARE_POWER_ACTION[key])
+    );
+    for (const action of actions) await authorizeDrive(userId, connectionId, path, action);
+}
+
+/** The error a refused Drive check reads as, or null when it was something else. */
+async function driveRefusal(caught: unknown): Promise<string | null> {
+    const t = await getTranslations("drive");
+    if (caught instanceof DriveLockedError) return t("errors.locationLocked");
+    if (caught instanceof DriveAccessError) return t("errors.locationDenied");
+    return null;
 }
 
 /** One access-log row as shown to the share owner. */
@@ -73,6 +115,24 @@ export async function createShareAction(input: unknown): Promise<{ url?: string;
                 parsed.error.issues[0]?.message ??
                 (await getTranslations("drive"))("errors.invalidShare")
         };
+    // A share link serves the path through the connection itself, with no
+    // second look at who made it - so the person making it has to be able to
+    // download it now, through the same check the Drive screens make. Holding
+    // shares.create is permission to share what you can read, not anything a
+    // connection id can name.
+    try {
+        await authorizeDrive(user.id, parsed.data.connectionId, parsed.data.path, "download");
+        await authorizeSharePowers(
+            user.id,
+            parsed.data.connectionId,
+            parsed.data.path,
+            parsed.data
+        );
+    } catch (caught) {
+        const error = await driveRefusal(caught);
+        if (error) return { error };
+        throw caught;
+    }
     const { id, token } = await createShare(user.id, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -119,6 +179,15 @@ export async function updateShareAction(
         return {
             error: (await getTranslations("drive"))("errors.invalidCidr", { value: invalid })
         };
+    const target = await findOwnedShareTarget(user.id, shareId);
+    if (!target) return { error: (await getTranslations("drive"))("errors.invalidShare") };
+    try {
+        await authorizeSharePowers(user.id, target.connectionId, target.path, input);
+    } catch (caught) {
+        const error = await driveRefusal(caught);
+        if (error) return { error };
+        throw caught;
+    }
     await updateShare(user.id, shareId, {
         password: input.password === undefined ? undefined : input.password || null,
         maxDownloads: input.maxDownloads === undefined ? undefined : input.maxDownloads || null,

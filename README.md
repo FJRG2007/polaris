@@ -187,7 +187,10 @@ with one thing does not get the rest.
 
 Passwords, passkeys, two-factor, trusted devices, QR sign-in from another device,
 sessions, API keys, access rules, privacy settings, notification preferences, and
-a record of where your account stands.
+a record of where your account stands. Claude, ChatGPT, Cursor, VS Code and any
+other MCP client can connect as you, with your own consent screen deciding what
+each one may touch - see
+[`docs/connecting-ai-assistants.md`](docs/connecting-ai-assistants.md).
 
 What is built versus in progress is tracked in
 [`dashboard/ROADMAP.md`](dashboard/ROADMAP.md).

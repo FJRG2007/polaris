@@ -176,6 +176,20 @@ const nextConfig = {
                 },
                 { key: "X-Frame-Options", value: "SAMEORIGIN" }
             ]
+        },
+        // The consent screen an AI assistant sends somebody to: not even Polaris
+        // frames it. An Allow button that can be drawn inside another page is a
+        // button that can be clicked through one. Later in the list, so these
+        // values replace the ones above for this path.
+        {
+            source: "/oauth/authorize",
+            headers: [
+                {
+                    key: "Content-Security-Policy",
+                    value: `frame-ancestors 'none'; frame-src 'self' ${PLAYER_ORIGINS.join(" ")}`
+                },
+                { key: "X-Frame-Options", value: "DENY" }
+            ]
         }
     ],
     rewrites: async () => [

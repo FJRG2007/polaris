@@ -162,6 +162,8 @@ const listInput = z.object({
 
 const listTasksTool: McpTool<z.infer<typeof listInput>> = {
     name: "tasks_list",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List tasks",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Find tasks this key can reach. Returns a summary of each - reference, name, status, assignees - not the full description; use tasks_get for that.",
@@ -220,6 +222,8 @@ const getInput = z.object({ task: taskRef });
 
 const getTaskTool: McpTool<z.infer<typeof getInput>> = {
     name: "tasks_get",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Read a task",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Read one task in full: its description, status, assignees, subtasks and comments.",
@@ -267,12 +271,15 @@ const createInput = z.object({
 
 const createTaskTool: McpTool<z.infer<typeof createInput>> = {
     name: "tasks_create",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Create a task",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Create a task. Use this for work you found that is out of scope for what you were asked to do, rather than doing it unasked.",
     input: createInput,
     scope: "tasks.manage",
     readOnly: false,
+    destructive: false,
     async run(input, caller) {
         const actor = await actorFor(caller);
         const scope = await access.visibleScope(actor);
@@ -323,12 +330,15 @@ const updateInput = z.object({
 
 const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
     name: "tasks_update",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Change a task",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Change a task: move it to another status, rename it, set its priority, take it. Only the fields you send are written.",
     input: updateInput,
     scope: "tasks.manage",
     readOnly: false,
+    idempotent: true,
     async run(input, caller) {
         const actor = await actorFor(caller);
         const { id, spaceId } = await resolveTask(caller, input.task);
@@ -365,12 +375,15 @@ const commentInput = z.object({
 
 const commentTaskTool: McpTool<z.infer<typeof commentInput>> = {
     name: "tasks_comment",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Comment on a task",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Leave a comment on a task. This is where what you found, what you changed and what you could not do belong - not in the task description.",
     input: commentInput,
     scope: "tasks.manage",
     readOnly: false,
+    destructive: false,
     async run(input, caller) {
         const actor = await actorFor(caller);
         const { id } = await resolveTask(caller, input.task);
@@ -389,6 +402,8 @@ const spacesInput = z.object({});
 
 const listSpacesTool: McpTool<z.infer<typeof spacesInput>> = {
     name: "tasks_spaces",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List task spaces",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "The spaces, lists and statuses this key can reach. Call this once if you need to know what a status or a list is called before using it.",

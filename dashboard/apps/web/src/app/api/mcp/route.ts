@@ -13,6 +13,12 @@
  * that key's scopes intersected with what its owner holds right now, so a key
  * never outlives the permission behind it.
  *
+ * Or an OAuth access token, which is how an assistant that cannot be handed a
+ * key connects (Claude, ChatGPT, editors that sign in themselves): a call with
+ * no credential is answered 401 with a pointer to the resource metadata, the
+ * assistant sends its person through the consent screen, and comes back with a
+ * token bound to this endpoint. See `lib/mcp/oauth`.
+ *
  * Stateless: no session id, no stream to hold open, nothing to reap after a
  * client that went away. See `lib/mcp/protocol.ts` for why that is the right
  * trade here.
@@ -27,6 +33,14 @@ import { DEPLOY_TOOLS } from "@/lib/mcp/tools/deploy";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 import { throttleDeployKey, tooManyCalls } from "@/lib/deploy/api/http";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
+import { clientIp } from "@/lib/request-context";
+import { recordAudit } from "@/lib/audit-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { mcpScopes } from "@/lib/mcp/oauth/scopes";
+import { originOf } from "@/lib/mcp/oauth/origin";
+import { evaluateAccountAccess } from "@/lib/network-rules";
+import { mcpResource, wwwAuthenticate } from "@/lib/mcp/oauth/urls";
+import { ACCESS_TOKEN_PREFIX, touchGrant, verifyAccessToken } from "@/lib/mcp/oauth/grants";
 import {
     MCP_PROTOCOL_VERSION,
     RPC_INVALID_REQUEST,
@@ -104,16 +118,45 @@ const envelopeSchema = z.union([
  */
 const SESSION_SCOPES: Permission[] = ["tasks.read", "tasks.manage", "agents.read"];
 
+/** A connected app carries no address rules of its own; its person's still
+ *  apply, through `evaluateAccountAccess`. */
+const NO_RULES_OF_ITS_OWN = { allowedCidrs: [], allowedCountries: [], allowedContinents: [] };
+
 /**
  * Resolve the caller from whatever they presented.
  *
- * Two credentials, and the second is what makes this usable at all. An API key is
+ * Three credentials. An OAuth access token is an assistant its person connected
+ * through the consent screen. Of the other two, the second is what makes this
+ * usable for agents at all. An API key is
  * a person deliberately connecting their own client. A session's reporting token
  * is the agent Polaris started, which was handed these tools in its own
  * configuration before it ran - so "connect your agent to Polaris" is not a setup
  * step anybody has to know about, and nothing has to be minted for it.
  */
 async function callerFor(request: Request): Promise<McpCaller | null> {
+    const header = request.headers.get("authorization") ?? "";
+    const [scheme, ...rest] = header.trim().split(/\s+/);
+    if (scheme?.toLowerCase() !== "bearer") return null;
+    const token = rest.join("");
+
+    // An app somebody connected through the consent screen. Its token is good
+    // for this endpoint at the address it was issued for and nowhere else, and
+    // the account's network rules apply to it exactly as to a key.
+    if (token.startsWith(ACCESS_TOKEN_PREFIX)) {
+        const access = await verifyAccessToken(token, mcpResource(originOf(request)));
+        if (!access) return null;
+        const ip = await clientIp();
+        const decision = await evaluateAccountAccess(access.userId, ip, NO_RULES_OF_ITS_OWN);
+        if (!decision.allowed) return null;
+        await touchGrant(access.grantId, ip);
+        return {
+            userId: access.userId,
+            isAdmin: access.isAdmin,
+            scopes: access.scopes,
+            grantId: access.grantId
+        };
+    }
+
     const principal = await authenticateApiKey(request);
     if (principal) {
         const user = await prisma.user.findUnique({
@@ -130,17 +173,14 @@ async function callerFor(request: Request): Promise<McpCaller | null> {
         };
     }
 
-    const header = request.headers.get("authorization") ?? "";
-    const [scheme, ...rest] = header.trim().split(/\s+/);
-    if (scheme?.toLowerCase() !== "bearer") return null;
-    const session = await sessionForToken(rest.join(""));
+    const session = await sessionForToken(token);
     if (!session) return null;
     const owner = await sessionOwner(session.id);
     if (!owner) return null;
     // Never an administrator, whoever started it. A session acts inside one
     // person's work; the instance-wide reach an admin has is not something an
     // agent should inherit by being started by one.
-    return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES };
+    return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES, sessionId: session.id };
 }
 
 /**
@@ -155,24 +195,102 @@ async function overBudget(
     message: Record<string, unknown>,
     caller: McpCaller
 ): Promise<JsonRpcResponse | null> {
-    if (!caller.keyId || message.method !== "tools/call") return null;
+    if (message.method !== "tools/call") return null;
     const id = message.id;
     // A notification is answered with nothing and runs nothing, and a malformed
     // id is the handler's to refuse.
     if (typeof id !== "string" && typeof id !== "number" && id !== null) return null;
     const name = (message.params as { name?: unknown } | undefined)?.name;
-    const tool = DEPLOY_TOOLS.find((candidate) => candidate.name === name);
+    const tool = MCP_TOOLS.find((candidate) => candidate.name === name);
     if (!tool) return null;
-    const wait = await throttleDeployKey(caller.keyId, !tool.readOnly);
+
+    // Every tool, for every credential: a model in a loop is the ordinary way
+    // this gets called far too often, and each call reaches the database.
+    const credential =
+        caller.keyId ??
+        caller.grantId ??
+        (caller.sessionId ? `session:${caller.sessionId}` : `user:${caller.userId}`);
+    for (const [bucket, limit] of [
+        [`mcp-call:${credential}`, CALLS_PER_MINUTE],
+        ...(tool.readOnly ? [] : [[`mcp-change:${credential}`, CHANGES_PER_MINUTE] as const])
+    ] as const) {
+        const throttle = await rateLimit(bucket, limit, 60_000);
+        if (!throttle.ok)
+            return toolFailure(
+                id,
+                tooManyCalls(Math.max(1, Math.ceil(throttle.retryAfterMs / 1000)))
+            );
+    }
+
+    // And the deploy tools spend the Deploy API's own budgets on top, keyed the
+    // same way a REST call with this credential would be.
+    const deployKey = caller.keyId ?? caller.grantId;
+    if (!deployKey || !DEPLOY_TOOLS.some((candidate) => candidate.name === name)) return null;
+    const wait = await throttleDeployKey(deployKey, !tool.readOnly);
     return wait === null ? null : toolFailure(id, tooManyCalls(wait));
 }
 
-/** One message, answered after its deploy budget is spent. */
+/** How many tool calls one credential may make a minute, and how many of them
+ *  may change something. Generous for an assistant working a task, and well
+ *  short of what a runaway loop would make. */
+const CALLS_PER_MINUTE = 120;
+const CHANGES_PER_MINUTE = 30;
+
+/**
+ * Write a tool call that changed something to the person's activity, saying
+ * which credential made it. Centrally rather than per tool, so a tool added
+ * later cannot forget to - and only for calls that went through, since a
+ * refusal changed nothing.
+ */
+async function auditChange(
+    message: Record<string, unknown>,
+    reply: JsonRpcResponse | null,
+    caller: McpCaller
+): Promise<void> {
+    if (message.method !== "tools/call" || !reply || reply.error) return;
+    const name = (message.params as { name?: unknown } | undefined)?.name;
+    const tool = MCP_TOOLS.find((candidate) => candidate.name === name);
+    if (!tool || tool.readOnly) return;
+    if ((reply.result as { isError?: boolean } | undefined)?.isError) return;
+    await recordAudit({
+        actorId: caller.userId,
+        action: "mcp.tool.called",
+        targetType: "mcpTool",
+        metadata: {
+            tool: tool.name,
+            via: caller.grantId ? "oauth" : caller.keyId ? "api-key" : "agent-session",
+            ...(caller.grantId ? { grantId: caller.grantId } : {}),
+            ...(caller.keyId ? { keyId: caller.keyId } : {})
+        }
+    });
+}
+
+/** One message, answered after its budgets are spent, and audited if it
+ *  changed something. */
 async function answer(
     message: Record<string, unknown>,
     caller: McpCaller
 ): Promise<JsonRpcResponse | null> {
-    return (await overBudget(message, caller)) ?? handleMcpMessage(message, MCP_TOOLS, caller, SERVER);
+    const refused = await overBudget(message, caller);
+    if (refused) return refused;
+    const reply = await handleMcpMessage(message, MCP_TOOLS, caller, SERVER);
+    await auditChange(message, reply, caller);
+    return reply;
+}
+
+/** What tells a client how to get a credential: a 401 that points at the
+ *  resource metadata (RFC 9728 section 5.1), which is where an assistant
+ *  starts the OAuth flow. Clients holding an API key never see it. */
+function unauthorized(request: Request, hadToken: boolean): Response {
+    const origin = originOf(request);
+    return Response.json(
+        // i18n-ignore read by a machine, not shown to a person
+        { error: "Unauthorized" },
+        {
+            status: 401,
+            headers: { "WWW-Authenticate": wwwAuthenticate(origin, mcpScopes(), hadToken) }
+        }
+    );
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -180,10 +298,15 @@ export async function POST(request: Request): Promise<Response> {
     // A 401 here rather than a JSON-RPC error: the call never reached the
     // protocol, and an MCP client that sees a 401 knows to fix its credential
     // rather than reporting a tool failure to the model.
-    // i18n-ignore read by a machine, not shown to a person
-    if (!caller) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    // It carries the challenge that tells an assistant where to sign in.
+    if (!caller)
+        return unauthorized(
+            request,
+            /^bearer\s+\S/i.test(request.headers.get("authorization") ?? "")
+        );
 
-    const tooLarge = () => jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
+    const tooLarge = () =>
+        jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
     const declared = Number(request.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > BODY_MAX) return tooLarge();
     const bytes = await readCappedBody(request, BODY_MAX);

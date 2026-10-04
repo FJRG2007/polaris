@@ -27,6 +27,8 @@ const listInput = z.object({
 
 const listSessionsTool: McpTool<z.infer<typeof listInput>> = {
     name: "agent_sessions_list",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List agent sessions",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "The coding-agent sessions this key can reach, and what each is doing. A session marked as needing somebody is blocked on a question.",
@@ -61,6 +63,8 @@ const getInput = z.object({ sessionId: z.string().uuid() });
 
 const getSessionTool: McpTool<z.infer<typeof getInput>> = {
     name: "agent_session_get",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Read an agent session",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "What one session has been asked, what it has done, and whether it is waiting on anybody.",
@@ -102,12 +106,15 @@ const promptInput = z.object({
 
 const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
     name: "agent_session_prompt",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Prompt an agent session",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Send a running session the next thing, or the answer to what it asked. It goes into the agent's own prompt, so write it as you would say it.",
     input: promptInput,
     scope: "agents.manage",
     readOnly: false,
+    destructive: false,
     async run(input, caller) {
         const session = await sessions.getSession(input.sessionId, caller.userId);
         if (!session) throw new McpRefusal("No session with that id that this key can reach.");
@@ -133,12 +140,15 @@ const startInput = z.object({
 
 const startSessionTool: McpTool<z.infer<typeof startInput>> = {
     name: "agent_session_start",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Start an agent session",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Put a coding agent on a piece of work in its own branch. Use this to hand off something separable from what you are doing - not to split the work you were asked to do yourself.",
     input: startInput,
     scope: "agents.manage",
     readOnly: false,
+    destructive: false,
     async run(input, caller) {
         const repo = await prisma.agentRepo.findFirst({
             where: { ownerId: caller.userId, repoFullName: input.repo, enabled: true },

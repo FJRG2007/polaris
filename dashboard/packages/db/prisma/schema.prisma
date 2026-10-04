@@ -251,6 +251,7 @@ model User {
     accessGroups        AccessGroup[]
     accessGroupBindings UserAccessGroup[]
     apiKeys             ApiKey[]
+    oauthGrants         OAuthGrant[]
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
     extensionSessions    ExtensionSession[]
@@ -1437,6 +1438,108 @@ model ApiKeyUsage {
     apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
 
     @@id([apiKeyId, day])
+}
+
+// An application that asked to act for people over MCP - an AI assistant, an
+// editor. Nobody creates these by hand: an app registers itself (RFC 7591) or
+// names itself by the address of its metadata document (a Client ID Metadata
+// Document), and a person decides on the consent screen whether it may act for
+// them. A row grants nothing on its own; the grants below do.
+model OAuthClient {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    // What the app presents as client_id: a random identifier issued at
+    // registration, or the https address of its metadata document.
+    clientId        String    @unique
+    // What the app calls itself. Its own claim, shown on the consent screen next
+    // to the address it will be sent back to, which is the part that is checked.
+    name            String
+    clientUri       String?
+    // JSON array of the exact addresses an authorization may be returned to.
+    redirectUris    String    @default("[]")
+    // none for an app that holds no secret (every assistant and editor);
+    // client_secret_post or client_secret_basic for one that asked for a secret.
+    tokenAuthMethod String    @default("none")
+    // SHA-256 of the secret, for the second kind. Never the secret.
+    secretHash      String?
+    // registered (RFC 7591) or metadata (a document fetched from clientId).
+    source          String    @default("registered")
+    // When a metadata document was last read, so a stale copy is read again.
+    fetchedAt       DateTime?
+    createdAt       DateTime  @default(now())
+
+    grants OAuthGrant[]
+
+    @@index([createdAt])
+}
+
+// One person's yes to one app: what it may do, for which resource, and until
+// when. This is what Account > API keys lists as a connected app, and revoking
+// it ends every token issued under it at once.
+model OAuthGrant {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    userId     String    @db.Uuid
+    clientId   String    @db.Uuid
+    // JSON array of permission keys the person approved. Narrowed again by what
+    // they hold at the moment of every call, never widened by it.
+    scopes     String    @default("[]")
+    // The MCP endpoint the tokens are for (RFC 8707). A token is refused anywhere
+    // else.
+    resource   String
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    lastUsedAt DateTime?
+    lastUsedIp String?
+    revokedAt  DateTime?
+
+    user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    client OAuthClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+    codes  OAuthCode[]
+    tokens OAuthToken[]
+
+    @@unique([userId, clientId])
+    @@index([clientId])
+}
+
+// An authorization code: single use, minutes long, bound to the PKCE challenge
+// and the exact redirect address it was issued for. Stored as a hash.
+model OAuthCode {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    codeHash      String    @unique
+    grantId       String    @db.Uuid
+    redirectUri   String
+    codeChallenge String
+    resource      String
+    scopes        String    @default("[]")
+    expiresAt     DateTime
+    // Set when it is exchanged. A second exchange is somebody replaying it.
+    usedAt        DateTime?
+    createdAt     DateTime  @default(now())
+
+    grant OAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+    @@index([grantId])
+}
+
+// An access or refresh token issued under a grant. Only the SHA-256 is kept, so
+// a database dump yields nothing that can be presented.
+model OAuthToken {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    grantId   String    @db.Uuid
+    // access or refresh.
+    kind      String
+    tokenHash String    @unique
+    scopes    String    @default("[]")
+    resource  String
+    expiresAt DateTime
+    // For a refresh token: when it was exchanged for the next one. Presented
+    // again after that, it has been copied, and the whole grant is ended.
+    usedAt    DateTime?
+    createdAt DateTime  @default(now())
+
+    grant OAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+    @@index([grantId])
+    @@index([expiresAt])
 }
 
 // Polaris-owned state for one better-auth session: whether the sign-in has been

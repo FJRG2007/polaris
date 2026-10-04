@@ -69,6 +69,8 @@
         "account_api_key_deleted": "Clave de API eliminada",
         "account_ai_key_added": "Se ha añadido una clave de IA",
         "account_ai_key_deleted": "Se ha quitado una clave de IA",
+        "account_oauth_connected": "Se ha conectado un asistente de IA a tu cuenta",
+        "account_oauth_replay_detected": "Se ha desconectado un asistente porque su token se usó dos veces",
         "advice": "Si no has sido tú, cambia tu contraseña y cierra la sesión en todos los demás dispositivos."
     },
     "friends": {

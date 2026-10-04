@@ -35,6 +35,14 @@ describe("Polaris's framing headers", () => {
         }
     });
 
+    it("refuse every frame, Polaris's own included, on the OAuth consent screen", async () => {
+        const headers = await headersFor("/oauth/authorize");
+        expect(headers["X-Frame-Options"]).toBe("DENY");
+        expect(headers["Content-Security-Policy"]).toMatch(/^frame-ancestors 'none';/);
+        // And only that page: the sign-in screens next to it keep the default.
+        expect((await headersFor("/oauth/login"))["X-Frame-Options"]).toBe("SAMEORIGIN");
+    });
+
     it("leave a published calendar's embed frameable by any site", async () => {
         expect(await headersFor("/cal/embed/abc123")).toEqual({});
     });

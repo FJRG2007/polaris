@@ -43,22 +43,52 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     "account.recovery.completed": { key: "security.account_recovery_completed", href: SECURITY },
     "account.pin.set": { key: "security.account_pin_set", href: SECURITY },
     "account.pin.cleared": { key: "security.account_pin_cleared", href: SECURITY },
-    "account.security-questions.set": { key: "security.account_security_questions_set", href: SECURITY },
-    "account.security-questions.cleared": { key: "security.account_security_questions_cleared", href: SECURITY },
+    "account.security-questions.set": {
+        key: "security.account_security_questions_set",
+        href: SECURITY
+    },
+    "account.security-questions.cleared": {
+        key: "security.account_security_questions_cleared",
+        href: SECURITY
+    },
     "account.phone.set": { key: "security.account_phone_set", href: SECURITY },
     "account.phone.verified": { key: "security.account_phone_verified", href: SECURITY },
     "account.phone.removed": { key: "security.account_phone_removed", href: SECURITY },
     "account.2fa.methods-updated": { key: "security.account_2fa_methods_updated", href: SECURITY },
-    "account.2fa.backup-codes-issued": { key: "security.account_2fa_backup_codes_issued", href: SECURITY },
-    "account.2fa.trusted-device-revoked": { key: "security.account_2fa_trusted_device_revoked", href: SESSIONS },
-    "account.2fa.trusted-devices-revoked": { key: "security.account_2fa_trusted_devices_revoked", href: SESSIONS },
+    "account.2fa.backup-codes-issued": {
+        key: "security.account_2fa_backup_codes_issued",
+        href: SECURITY
+    },
+    "account.2fa.trusted-device-revoked": {
+        key: "security.account_2fa_trusted_device_revoked",
+        href: SESSIONS
+    },
+    "account.2fa.trusted-devices-revoked": {
+        key: "security.account_2fa_trusted_devices_revoked",
+        href: SESSIONS
+    },
     "account.passkey.removed": { key: "security.account_passkey_removed", href: SECURITY },
     "account.passkey.added": { key: "security.account_passkey_added", href: SECURITY },
-    "account.login-approval.enabled": { key: "security.account_login_approval_enabled", href: SECURITY },
-    "account.login-approval.disabled": { key: "security.account_login_approval_disabled", href: SECURITY },
-    "account.new-device-grace.updated": { key: "security.account_new_device_grace_updated", href: SECURITY },
-    "account.session-limits.updated": { key: "security.account_session_limits_updated", href: SECURITY },
-    "account.session-binding.updated": { key: "security.account_session_binding_updated", href: SECURITY },
+    "account.login-approval.enabled": {
+        key: "security.account_login_approval_enabled",
+        href: SECURITY
+    },
+    "account.login-approval.disabled": {
+        key: "security.account_login_approval_disabled",
+        href: SECURITY
+    },
+    "account.new-device-grace.updated": {
+        key: "security.account_new_device_grace_updated",
+        href: SECURITY
+    },
+    "account.session-limits.updated": {
+        key: "security.account_session_limits_updated",
+        href: SECURITY
+    },
+    "account.session-binding.updated": {
+        key: "security.account_session_binding_updated",
+        href: SECURITY
+    },
     // The pin itself, not the refusal it later causes. A session being refused
     // has its own alert, with the whole account of who turned up - see
     // notifications/session-breach.
@@ -68,19 +98,57 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     "account.successor.cleared": { key: "security.account_successor_cleared", href: SECURITY },
     "connection.signin.allowed": { key: "security.connection_signin_allowed", href: SECURITY },
     "connection.signin.refused": { key: "security.connection_signin_refused", href: SECURITY },
-    "account.signin-rules.updated": { key: "security.account_signin_rules_updated", href: "/account/access" },
-    "account.access-group.created": { key: "security.account_access_group_created", href: "/account/access" },
-    "account.access-group.updated": { key: "security.account_access_group_updated", href: "/account/access" },
-    "account.access-group.deleted": { key: "security.account_access_group_deleted", href: "/account/access" },
+    "account.signin-rules.updated": {
+        key: "security.account_signin_rules_updated",
+        href: "/account/access"
+    },
+    "account.access-group.created": {
+        key: "security.account_access_group_created",
+        href: "/account/access"
+    },
+    "account.access-group.updated": {
+        key: "security.account_access_group_updated",
+        href: "/account/access"
+    },
+    "account.access-group.deleted": {
+        key: "security.account_access_group_deleted",
+        href: "/account/access"
+    },
     "account.email.added": { key: "security.account_email_added", href: "/account/details" },
     "account.email.removed": { key: "security.account_email_removed", href: "/account/details" },
-    "account.email.primary-changed": { key: "security.account_email_primary_changed", href: "/account/details" },
-    "account.api-key.created": { key: "security.account_api_key_created", href: "/account/api-keys" },
-    "account.api-key.updated": { key: "security.account_api_key_updated", href: "/account/api-keys" },
-    "account.api-key.revoked": { key: "security.account_api_key_revoked", href: "/account/api-keys" },
-    "account.api-key.deleted": { key: "security.account_api_key_deleted", href: "/account/api-keys" },
+    "account.email.primary-changed": {
+        key: "security.account_email_primary_changed",
+        href: "/account/details"
+    },
+    "account.api-key.created": {
+        key: "security.account_api_key_created",
+        href: "/account/api-keys"
+    },
+    "account.api-key.updated": {
+        key: "security.account_api_key_updated",
+        href: "/account/api-keys"
+    },
+    "account.api-key.revoked": {
+        key: "security.account_api_key_revoked",
+        href: "/account/api-keys"
+    },
+    "account.api-key.deleted": {
+        key: "security.account_api_key_deleted",
+        href: "/account/api-keys"
+    },
     "account.ai-key.added": { key: "security.account_ai_key_added", href: "/account/ai-keys" },
-    "account.ai-key.deleted": { key: "security.account_ai_key_deleted", href: "/account/ai-keys" }
+    "account.ai-key.deleted": { key: "security.account_ai_key_deleted", href: "/account/ai-keys" },
+    // An assistant connected over MCP is a credential like a key, made by a
+    // different door; one ended because its token turned up twice means
+    // somebody else held it.
+    "account.oauth.connected": {
+        key: "security.account_oauth_connected",
+        href: "/account/api-keys"
+    },
+    "account.oauth.replay-detected": {
+        key: "security.account_oauth_replay_detected",
+        href: "/account/api-keys"
+    }
 };
 
 /** What the alert says under the headline. The same line every time, because the
