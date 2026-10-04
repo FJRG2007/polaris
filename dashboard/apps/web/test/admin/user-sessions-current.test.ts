@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const listUserSessions = vi.fn(async () => []);
+const listCliSessions = vi.fn(async () => []);
 
 vi.mock("@/lib/session", () => ({
     requireAdmin: vi.fn(async () => ({
@@ -19,6 +20,7 @@ vi.mock("@/lib/session", () => ({
     }))
 }));
 vi.mock("@/lib/session-directory", () => ({ listUserSessions }));
+vi.mock("@/lib/cli/sessions", () => ({ listCliSessions }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 // The rest of the module's neighbours reach the database; nothing here calls them.
 vi.mock("@/lib/audit-service", () => ({}));
@@ -34,7 +36,10 @@ vi.mock("@/lib/user-admin-service", () => ({}));
 const { userSessionsAction } = await import("@/app/(app)/admin/users/actions");
 
 describe("an administrator's read of somebody's sessions", () => {
-    beforeEach(() => listUserSessions.mockClear());
+    beforeEach(() => {
+        listUserSessions.mockClear();
+        listCliSessions.mockClear();
+    });
 
     it("is read with the administrator's own session as the current one", async () => {
         await userSessionsAction("11111111-1111-4111-8111-111111111111");
@@ -42,11 +47,13 @@ describe("an administrator's read of somebody's sessions", () => {
             "11111111-1111-4111-8111-111111111111",
             "admin-session"
         );
+        expect(listCliSessions).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111");
     });
 
     it("reads nothing for an id that is not one", async () => {
         const result = await userSessionsAction("not-an-id");
         expect(listUserSessions).not.toHaveBeenCalled();
+        expect(listCliSessions).not.toHaveBeenCalled();
         expect(result.error).toBeTruthy();
     });
 });
