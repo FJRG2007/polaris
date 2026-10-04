@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { MARKETPLACE_PROJECT_SLUG } from "@/lib/deploy/managed-projects";
 import { randomBytes } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { slugify } from "@polaris/deploy";
@@ -87,7 +88,7 @@ async function availableInstanceName(environmentId: string, wanted: string): Pro
 /** The owner's Marketplace environment id, creating the project on first use. */
 async function ensureMarketplaceEnvironment(ownerId: string): Promise<string> {
     const existing = await prisma.project.findFirst({
-        where: { ownerId, slug: "marketplace" },
+        where: { ownerId, slug: MARKETPLACE_PROJECT_SLUG },
         include: { environments: { orderBy: { isDefault: "desc" }, take: 1 } }
     });
     const current = existing?.environments[0];

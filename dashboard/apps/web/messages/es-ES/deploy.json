@@ -341,7 +341,11 @@
         "newTitle": "Nuevo proyecto",
         "name": "Nombre",
         "cancel": "Cancelar",
-        "create": "Crear"
+        "create": "Crear",
+        "showManaged": "Mostrar las apps que Polaris gestiona",
+        "showManagedCount": "{count, plural, one {Mostrar # app de Polaris} other {Mostrar # apps de Polaris}}",
+        "onlyManaged": "{count, plural, one {El único proyecto aquí lo gestiona Polaris.} other {Los # proyectos de aquí los gestiona Polaris.}}",
+        "showThem": "Mostrarlos"
     },
     "observability": {
         "requests": "Peticiones",
