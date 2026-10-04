@@ -3606,6 +3606,9 @@ async function hordeDefense(
  * its health, or `lost` once it has been missing `village.LOST_AFTER` looks in
  * a row (written down at once).
  */
+/** Each run's villager health as last read, for a look that cannot read it. */
+const villagerHealths = new Map<string, number>();
+
 async function keepVillager(
     installedAppId: string,
     loop: Loop,
@@ -3649,9 +3652,15 @@ async function keepVillager(
         }
         await change({ missing: kept.missing + 1 }, false);
     } else if (kept.missing > 0) await change({ missing: 0 }, false);
-    const health =
-        commands.readHealth(await server.say([village.VILLAGER_HEALTH_READ])) ??
-        village.VILLAGER_HEALTH;
+    // A look that cannot read it - missing for a moment, or dying - keeps
+    // what was read last: whole, the bar showed a dying villager healed.
+    const read = commands.readHealth(await server.say([village.VILLAGER_HEALTH_READ]));
+    if (read !== null) {
+        if (villagerHealths.size >= 16)
+            villagerHealths.delete(villagerHealths.keys().next().value!);
+        villagerHealths.set(loop.run.id, read);
+    }
+    const health = read ?? villagerHealths.get(loop.run.id) ?? village.VILLAGER_HEALTH;
     // Everybody told once as it falls under half, and once under a quarter.
     const due = village.warningsDue(health);
     if (due > kept.warned) {

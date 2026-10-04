@@ -9491,9 +9491,16 @@ describe("a villager defense", () => {
         await start();
         await play(10_100 + 46_000);
         expect(state().run?.round).toBe(0);
-        // Missed once - loading after a restart - and back: still on.
+        // Hurt, then missed once - loading after a restart - and back: still
+        // on, and the bar never shows it whole while it cannot be read.
+        world.kinds.villager.health = 7;
+        await play(2_000);
+        world.sent = [];
         world.kinds.villager.alive = false;
         await play(2_000);
+        const bar = world.sent.filter((line) => line.startsWith("bossbar set polaris:event value"));
+        expect(bar.length).toBeGreaterThan(0);
+        expect(bar.some((line) => line.endsWith(" value 20"))).toBe(false);
         world.kinds.villager.alive = true;
         await play(2_000);
         expect(state().run).not.toBeNull();
