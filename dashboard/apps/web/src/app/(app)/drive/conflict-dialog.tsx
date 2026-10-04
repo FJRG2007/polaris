@@ -151,7 +151,7 @@ function ConflictBody({
                     <p className="text-xs font-medium text-muted-foreground">
                         {t("conflicts.alsoTaken", { count: others.length })}
                     </p>
-                    <ul className="max-h-28 space-y-0.5 overflow-y-auto text-sm">
+                    <ul className="max-h-28 space-y-0.5 overflow-y-auto overscroll-contain text-sm">
                         {others.map((clash) => (
                             <li key={clash.path} className="truncate" title={clash.path}>
                                 {clash.path}
