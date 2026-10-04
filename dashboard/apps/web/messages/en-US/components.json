@@ -668,6 +668,8 @@
         "scannedBy": "Code scanned by",
         "allowedBy": "Allowed by",
         "thisDevice": "This device",
+        "activeNow": "Active now",
+        "activeNowHint": "Used in the last few minutes",
         "signedOutSince": "Signed out since",
         "device": "Device",
         "app": "App",

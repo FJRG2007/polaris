@@ -668,6 +668,8 @@
         "scannedBy": "Escaneado por",
         "allowedBy": "Permitido por",
         "thisDevice": "Este equipo",
+        "activeNow": "Activo ahora",
+        "activeNowHint": "Usado en los últimos minutos",
         "signedOutSince": "Ya cerrada",
         "device": "Equipo",
         "app": "App",

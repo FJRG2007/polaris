@@ -26,6 +26,7 @@ import type { SessionView } from "@/lib/session-directory";
 import { readClientDevice } from "@/lib/vault/client-device";
 import { clientKindText, signInText } from "@/lib/sign-in-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { isOnline, OnlineDot, useNow } from "@/components/presence";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { addressLine, DeviceAddress } from "@/components/device-address";
 import { BrowserMark, ClientKindMark, SystemMark } from "@/components/client-marks";
@@ -50,6 +51,43 @@ function LastActive({ iso }: { iso: string }) {
  * "Last active <time></time>", markup and all.
  */
 const timeTag = (iso: string) => () => <LastActive key="time" iso={iso} />;
+
+/**
+ * Whether a row is in use right now: the reader's own session always is, and
+ * any other by the window the rest of Polaris calls somebody online
+ * (`ONLINE_WINDOW_MS`, three minutes - a session records activity at most once
+ * a minute, so a shorter window would blink off between two writes).
+ */
+export function inUseNow(row: { lastSeenAt: string; current?: boolean }, now: number): boolean {
+    return row.current === true || isOnline(row.lastSeenAt, now);
+}
+
+/**
+ * The rows in use first, the reader's own at the very top, and otherwise in the
+ * order they came - newest first, as the directory reads them. Stable, so a row
+ * does not jump past its neighbours when nothing about it changed.
+ */
+export function inUseFirst<T extends { lastSeenAt: string; current?: boolean }>(
+    rows: readonly T[],
+    now: number
+): T[] {
+    const rank = (row: T) => (row.current ? 0 : inUseNow(row, now) ? 1 : 2);
+    return rows
+        .map((row, index) => ({ row, index, rank: rank(row) }))
+        .sort((a, b) => a.rank - b.rank || a.index - b.index)
+        .map(({ row }) => row);
+}
+
+/** The green mark on a row in use right now. */
+function ActiveNowBadge() {
+    const t = useTranslations("components");
+    return (
+        <Badge variant="success" title={t("sessionsTable.activeNowHint")}>
+            <OnlineDot />
+            {t("sessionsTable.activeNow")}
+        </Badge>
+    );
+}
 
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
@@ -200,6 +238,11 @@ export function SessionsTable({
     compact?: boolean;
 }) {
     const t = useTranslations("components");
+    // A clock that ticks, so a row stops reading "Active now" once it is not
+    // without the page having to be reloaded - and starts when it is.
+    const now = useNow();
+    const sessionRows = inUseFirst(sessions, now);
+    const extensionRows = inUseFirst(extensions, now);
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-sm">
@@ -248,7 +291,7 @@ export function SessionsTable({
                             </td>
                         </tr>
                     ) : (
-                        sessions.map((session) => (
+                        sessionRows.map((session) => (
                             <tr
                                 key={session.id}
                                 className={cn(
@@ -276,6 +319,7 @@ export function SessionsTable({
                                                 {session.current ? (
                                                     <Badge variant="primary">{t("sessionsTable.thisDevice")}</Badge>
                                                 ) : null}
+                                                {inUseNow(session, now) ? <ActiveNowBadge /> : null}
                                                 {session.locked ? <Badge>{t("sessionsTable.locked")}</Badge> : null}
                                                 {/* How it got in, beside what it is: the two questions a
                                                     person scanning this list is asking at once. */}
@@ -386,7 +430,7 @@ export function SessionsTable({
                     {/* The extensions, between the browsers and the apps: each is
                         a connection Polaris made and watches, so it carries the same
                         columns a session does and the same way of ending it. */}
-                    {extensions.map((extension) => (
+                    {extensionRows.map((extension) => (
                         <tr
                             key={`extension-${extension.id}`}
                             className={cn(
@@ -406,6 +450,7 @@ export function SessionsTable({
                                                 {extension.os}
                                             </span>
                                             <Badge variant="neutral">{t("sessionsTable.extension")}</Badge>
+                                            {inUseNow(extension, now) ? <ActiveNowBadge /> : null}
                                             {(extension.pinToAddress ?? extension.pinnedByRule) ? (
                                                 <Badge title={t("sessionsTable.extensionLockedHint")}>
                                                     {t("sessionsTable.addressLocked")}

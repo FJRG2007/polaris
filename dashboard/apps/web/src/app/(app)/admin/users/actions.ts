@@ -183,13 +183,15 @@ export async function revokeUserSessionsAction(userId: string): Promise<{ error?
  * the directory: most rows are never expanded, and the list is the one part of a
  * person's record that changes while you are looking at it.
  *
- * Nothing here is the caller's own session, so none is flagged as current.
+ * The caller's own session is the one flagged as current, which only ever
+ * matches when the account being read is the caller's own - and there it is the
+ * row an administrator must not sign out by mistake.
  */
 export async function userSessionsAction(userId: unknown): Promise<{ sessions?: SessionView[]; error?: string }> {
-    await requireAdmin();
+    const admin = await requireAdmin();
     const parsed = idSchema.safeParse(userId);
     if (!parsed.success) return { error: (await getTranslations("admin"))("users.errors.unknownAccount") };
-    return { sessions: await listUserSessions(parsed.data, "") };
+    return { sessions: await listUserSessions(parsed.data, admin.sessionId) };
 }
 
 /** End one session of somebody else's without ending the rest. */
