@@ -2442,5 +2442,25 @@
         "updateOnly": "Update loader",
         "updateQueued": "The newest {loader} installs the next time the server starts.",
         "updateStarted": "The server is restarting with the newest {loader}."
+    },
+    "disconnect": {
+        "refused": "Turned away",
+        "serverSaid": "The server said: {raw}",
+        "reasons": {
+            "quit": "Left the game",
+            "timeout": "Timed out",
+            "kicked": "Kicked",
+            "banned": "Banned",
+            "whitelist": "Not whitelisted",
+            "outdated": "Wrong version",
+            "full": "Server full",
+            "duplicate": "Signed in elsewhere",
+            "idle": "Idle too long",
+            "auth": "Not verified",
+            "flying": "Flying not allowed",
+            "shutdown": "Server stopped",
+            "network": "Connection lost",
+            "other": "Other reason"
+        }
     }
 }

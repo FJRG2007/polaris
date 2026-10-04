@@ -20,7 +20,12 @@
 const LOG_TIMESTAMP = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)/;
 
 /** How a line reads, before it is folded into the events around it. */
-type LineKind = "login" | "join" | "lost" | "leave";
+type LineKind = "login" | "join" | "lost" | "leave" | "refused" | "kicked";
+
+/** A name as Java prints it before the player is in the world: bare, or inside
+ *  the authlib profile it logs for a connection that never got that far. */
+const PROFILE_NAME =
+    "(?:com\\.mojang\\.authlib\\.GameProfile@\\w+\\[[^\\]]*?name=([A-Za-z0-9_]{1,16})[^\\]]*\\]|([A-Za-z0-9_]{1,16}))";
 
 /**
  * The lines a session is read from, newest format first.
@@ -39,7 +44,32 @@ const EVENT_PATTERNS: readonly {
     readonly pattern: RegExp;
     /** Which capture holds the address, when the line carries one. */
     readonly address?: number;
+    /** Which capture holds the server's own words about why, when it says. */
+    readonly reason?: number;
+    /** A second capture the name may be in: the profile form puts it in one
+     *  and the bare form in the other. */
+    readonly altName?: number;
 }[] = [
+    // A connection turned away before it reached the world, with the server's
+    // reason: not on the whitelist, banned, an outdated client, a full server.
+    // Older servers say "Disconnecting <who> (/address): <why>"; newer ones say
+    // "<who> (/address) lost connection: <why>". Either way the address in
+    // brackets is what tells it from a player who was in the game.
+    {
+        kind: "refused",
+        pattern: new RegExp(`\\]:\\s+Disconnecting ${PROFILE_NAME}\\s*\\(\\/[^)]*\\):\\s*(.*)$`),
+        altName: 2,
+        reason: 3
+    },
+    {
+        kind: "refused",
+        pattern: new RegExp(`\\]:\\s+${PROFILE_NAME}\\s*\\(\\/[^)]*\\) lost connection:\\s*(.*)$`),
+        altName: 2,
+        reason: 3
+    },
+    // An operator's kick, with its message. Not an event of its own: it is why
+    // the "lost connection" that follows it happened.
+    { kind: "kicked", pattern: /\]:\s+Kicked ([A-Za-z0-9_]{1,16}): (.*)$/, reason: 2 },
     {
         kind: "login",
         pattern: /([A-Za-z0-9_]{1,16})\[\/((?:\d{1,3}\.){3}\d{1,3}):\d+\]\s+logged in/,
@@ -49,7 +79,7 @@ const EVENT_PATTERNS: readonly {
     { kind: "join", pattern: /Player connected:\s*([^,]{1,32})/ },
     // After the logger's own "]: ", so a connection dropped before it had a name -
     // "/203.0.113.9:5555 lost connection" - is not read as a player.
-    { kind: "lost", pattern: /\]:\s+([A-Za-z0-9_]{1,16}) lost connection: / },
+    { kind: "lost", pattern: /\]:\s+([A-Za-z0-9_]{1,16}) lost connection: (.*)$/, reason: 2 },
     { kind: "leave", pattern: /([A-Za-z0-9_ ]{1,32}) left the game/ },
     { kind: "leave", pattern: /Player disconnected:\s*([^,]{1,32})/ }
 ];
@@ -68,13 +98,92 @@ const SERVER_BOUNDARY = /Starting minecraft server version|\]:\s+Stopping server
  *  server that is struggling, not a window anything real fits inside. */
 const SAME_EVENT_MS = 30_000;
 
-export type PlayerSessionKind = "join" | "leave";
+/**
+ * An arrival, a departure, or an attempt the server turned away before the
+ * player was in the world. "refused" is not part of any visit: whoever it names
+ * never got in.
+ */
+export type PlayerSessionKind = "join" | "leave" | "refused";
+
+/**
+ * Why somebody went, or why the server would not let them in - the reasons a
+ * Minecraft server actually prints, each with a label an operator can read.
+ * `other` is anything it printed that is none of these (a plugin's own kick
+ * message, say); the raw words are always kept beside it.
+ */
+export const DISCONNECT_REASONS = [
+    "quit",
+    "timeout",
+    "kicked",
+    "banned",
+    "whitelist",
+    "outdated",
+    "full",
+    "duplicate",
+    "idle",
+    "auth",
+    "flying",
+    "shutdown",
+    "network",
+    "other"
+] as const;
+
+export type DisconnectReasonKind = (typeof DISCONNECT_REASONS)[number];
+
+export interface DisconnectReason {
+    readonly kind: DisconnectReasonKind;
+    /** Exactly what the server printed, for the reader who wants the detail. */
+    readonly raw: string;
+}
+
+/** The server's words, most specific first. Matched without case: the same
+ *  message is capitalised differently across versions. */
+const REASON_WORDS: readonly [DisconnectReasonKind, RegExp][] = [
+    ["whitelist", /white-?listed|not on the whitelist/i],
+    ["banned", /\bbanned\b/i],
+    ["outdated", /outdated (client|server)|incompatible client|multiplayer\.disconnect\.(outdated|incompatible)/i],
+    ["full", /server is full|multiplayer\.disconnect\.server_full/i],
+    ["duplicate", /logged in from another location|duplicate_login|duplicate login/i],
+    ["idle", /idle for too long|multiplayer\.disconnect\.idling/i],
+    ["auth", /failed to verify username|invalid session|unverified_username|failed to log in|authentication/i],
+    ["flying", /flying is not enabled|multiplayer\.disconnect\.flying/i],
+    ["kicked", /kicked by an operator|you have been kicked|multiplayer\.disconnect\.kicked/i],
+    ["shutdown", /server closed|server shutting down|multiplayer\.disconnect\.server_shutdown/i],
+    ["timeout", /timed out|readtimeoutexception|took too long to log in|disconnect\.timeout/i],
+    ["quit", /^\s*disconnected\s*$|disconnect\.quitting|^\s*quitting\s*$/i],
+    ["network", /internal exception|connection reset|end of stream|disconnect\.genericreason|broken pipe/i]
+];
+
+/**
+ * What one line of the server's says about why.
+ *
+ * `kickedWith` is an operator's kick message printed just before: a kick's
+ * "lost connection" carries the message the operator typed, which is free text
+ * and could be anything, so the kick line is what says it was a kick.
+ */
+export function classifyDisconnect(raw: string, kickedWith: string | null = null): DisconnectReason {
+    const text = stripCodes(raw).trim();
+    if (kickedWith !== null) return { kind: "kicked", raw: text || stripCodes(kickedWith).trim() };
+    for (const [kind, words] of REASON_WORDS) {
+        if (words.test(text)) return { kind, raw: text };
+    }
+    return { kind: "other", raw: text };
+}
+
+/** The section-sign colour codes a reason can carry, which are formatting and
+ *  not words. */
+function stripCodes(text: string): string {
+    return text.replace(/\u00a7[0-9a-fk-or]/gi, "");
+}
 
 /** One arrival or one departure, as the log recorded it. */
 export interface PlayerSessionEvent {
     /** As the server spelled it on that line. */
     readonly name: string;
     readonly kind: PlayerSessionKind;
+    /** Why they went or were turned away, when the server said. Absent on an
+     *  arrival and on a departure the log gives no reason for. */
+    readonly reason?: DisconnectReason;
     /** When it happened, ISO 8601. Null when the log carried no timestamp - some
      *  engines hand lines back without one, and an invented time is worse than
      *  none on a screen somebody reads to work out what happened. */
@@ -110,8 +219,13 @@ export function parsePlayerSessions(log: string): PlayerSessionEvent[] {
     const last = new Map<string, { readonly index: number; readonly line: LineKind }>();
     /** Who the log has in the world right now, by lowercase name. */
     const inGame = new Map<string, string>();
+    /** An operator's kick waiting for the "lost connection" it causes. */
+    const kicks = new Map<string, { readonly message: string; readonly at: string | null }>();
 
-    for (const line of log.split("\n")) {
+    for (const raw of log.split("\n")) {
+        // A terminal ends each line with a return as well; the reasons are read
+        // to the end of the line, so it goes before anything is matched.
+        const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
         const at = LOG_TIMESTAMP.exec(line)?.[1] ?? null;
         if (SERVER_BOUNDARY.test(line)) {
             for (const [key, name] of inGame) {
@@ -124,12 +238,44 @@ export function parsePlayerSessions(log: string): PlayerSessionEvent[] {
         for (const entry of EVENT_PATTERNS) {
             const match = entry.pattern.exec(line);
             if (!match) continue;
-            const name = match[1]?.trim();
+            const name = (match[1] ?? (entry.altName ? match[entry.altName] : undefined))?.trim();
             if (!name) break;
             const key = name.toLowerCase();
             const previous = last.get(key);
             const held = previous ? events[previous.index] : undefined;
             const address = entry.address ? (match[entry.address] ?? null) : null;
+            const said = entry.reason ? (match[entry.reason] ?? "") : "";
+
+            if (entry.kind === "kicked") {
+                kicks.set(key, { message: said, at });
+                break;
+            }
+            /** Why, from this line - a kick printed just before it wins. */
+            const why = (): DisconnectReason => {
+                const kick = kicks.get(key);
+                kicks.delete(key);
+                return classifyDisconnect(
+                    said,
+                    kick && sameMoment(kick.at, at) ? kick.message : null
+                );
+            };
+
+            if (entry.kind === "refused" || (entry.kind === "lost" && !inGame.has(key))) {
+                // The second line about one departure - the stop already ended
+                // it, or "left the game" came first - is its reason.
+                if (held && sameMoment(held.at, at) && (held.kind === "leave" || held.kind === "refused")) {
+                    if (!held.reason && said) events[previous!.index] = { ...held, reason: why() };
+                    break;
+                }
+                // Only the server turning somebody away is a refusal. A client
+                // that went on its own before reaching the world - "Disconnected"
+                // - was never refused, and nothing said is nothing to record.
+                const reason = why();
+                if (!said.trim() || reason.kind === "quit") break;
+                last.set(key, { index: events.length, line: "refused" });
+                events.push({ name, kind: "refused", at, address: null, reason });
+                break;
+            }
 
             if (entry.kind === "login" || entry.kind === "join") {
                 // The join line after its own login is the same arrival. It
@@ -150,10 +296,6 @@ export function parsePlayerSessions(log: string): PlayerSessionEvent[] {
                 break;
             }
 
-            // A "lost connection" is only a departure for somebody the log has in
-            // the world: the same words are printed for a connection dropped
-            // before it ever got there, and that is not somebody leaving.
-            if (entry.kind === "lost" && !inGame.has(key)) break;
             // The second line of one departure, or the line printed for somebody
             // already counted as gone when the server stopped.
             if (previous && held?.kind === "leave" && !inGame.has(key) && sameMoment(held.at, at)) {
@@ -162,7 +304,13 @@ export function parsePlayerSessions(log: string): PlayerSessionEvent[] {
             }
             last.set(key, { index: events.length, line: entry.kind });
             inGame.delete(key);
-            events.push({ name, kind: "leave", at, address: null });
+            // Only the network layer's line carries the reason; "left the game"
+            // never does.
+            events.push(
+                entry.kind === "lost" && said.trim()
+                    ? { name, kind: "leave", at, address: null, reason: why() }
+                    : { name, kind: "leave", at, address: null }
+            );
             break;
         }
     }
@@ -190,6 +338,8 @@ export function logConnection(events: readonly PlayerSessionEvent[]): LogConnect
     let since: string | null = null;
     let lastLeft: string | null = null;
     for (const event of events) {
+        // Turned away at the door is not a visit, and ends none.
+        if (event.kind === "refused") continue;
         if (event.kind === "join") {
             online = true;
             since = event.at;
@@ -240,6 +390,9 @@ export function playerActivity(
     online: boolean,
     now: number
 ): PlayerActivity {
+    // Attempts the server turned away are not visits: somebody only ever
+    // refused has never played here.
+    events = events.filter((event) => event.kind !== "refused");
     const last = events.at(-1) ?? null;
     if (online) {
         // Only the start of the connection they are on. A log whose last word
