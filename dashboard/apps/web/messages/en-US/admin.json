@@ -751,7 +751,7 @@
             "title": "How should traffic reach this server?",
             "hint": "Everything below follows from this answer, and either way can be changed later.",
             "routerTitle": "What you have to do in the router",
-            "routerBody": "Forward ports 80 and 443 to this server{games, select, range {, plus the range your game servers answer in} port {, plus the port your game servers answer on} ports {, plus the ports your game servers answer on} other {}}. Pick your brand for the exact menu names and the values to type - the rest of the setup works either way, so this can be done afterwards.",
+            "routerBody": "Forward ports 80 and 443 to this server{games, select, range {, plus the range your game servers answer in} port {, plus the port your game servers answer on} ports {, plus the ports your game servers answer on} other {}}. Pick your brand for the exact menu names and the values to type - the rest of the setup works either way, so this can be done afterward.",
             "whichTunnel": "Which tunnel?",
             "whichDomain": "Which domain do the hostnames come from?",
             "ordered": "Ordered by what costs least and depends on the fewest others.",
@@ -1186,7 +1186,7 @@
                 "messageContent": "Without it, messages the bot receives in server channels arrive empty."
             },
             "switchOn": "Switch them on under Bot > Privileged Gateway Intents",
-            "reconnectAfter": "Reconnect the channel afterwards - the intents are chosen when the bot logs in.",
+            "reconnectAfter": "Reconnect the channel afterward - the intents are chosen when the bot logs in.",
             "botPermissions": "view channels, send messages, embed links, attach files, read message history"
         },
         "errors": {
@@ -1656,7 +1656,7 @@
                 "summary": "Let people connect their Google account, sign in with it, and show their calendar.",
                 "description": "Connect a Google Cloud OAuth client and everyone here gets a Connect button for their own Google account. Their events then appear in the Tasks calendar, read-only, and they can sign in with the account they linked if you allow it. Polaris never holds a credential that reaches everybody's calendar - only the access each person granted.",
                 "apiKeyLabel": "Client secret",
-                "apiKeyHelp": "Shown once when the client is created, and downloadable from the client afterwards.",
+                "apiKeyHelp": "Shown once when the client is created, and downloadable from the client afterward.",
                 "links": {
                     "0": {
                         "label": "Fill in the consent screen",
@@ -2439,7 +2439,7 @@
         },
         "connection": {
             "title": "Ask again after a connected account",
-            "hint": "Signing in with GitHub or Google answers that service first. With this on, Polaris asks for the second step afterwards as well.",
+            "hint": "Signing in with GitHub or Google answers that service first. With this on, Polaris asks for the second step afterward as well.",
             "off": "With this off, the service that signed them in is the whole sign-in. Anyone who wants the extra step can still turn it on for their own account."
         },
         "playerAddresses": {
@@ -2912,7 +2912,7 @@
         },
         "where": {
             "title": "Where they may connect from",
-            "hint": "Bounds the invite and stays on the account afterwards, as a limit they cannot lift themselves. Leave empty for no restriction."
+            "hint": "Bounds the invite and stays on the account afterward, as a limit they cannot lift themselves. Leave empty for no restriction."
         },
         "summaryNone": "No one-time password, no address or country limits.",
         "summarySet": "One-time password or connection limits are set.",

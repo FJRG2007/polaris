@@ -170,7 +170,7 @@
         "otherLogin": "Another login",
         "noServers": "No servers are connected yet. Add one under Servers, or use another login here.",
         "server": "Server",
-        "serverGone": "The server this connection tunnelled through was removed from Servers. Pick another.",
+        "serverGone": "The server this connection tunneled through was removed from Servers. Pick another.",
         "tunnelServer": "Server to tunnel through",
         "sshHost": "SSH host",
         "sshUser": "SSH user",

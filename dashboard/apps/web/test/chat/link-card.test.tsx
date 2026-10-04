@@ -14,8 +14,8 @@
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { LinkCard } from "@/app/(app)/chat/link-card";
-import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 afterEach(cleanup);
 
@@ -174,6 +174,96 @@ describe("a TikTok player that could not play", () => {
         from(null);
         from(frame, "https://evil.example");
         expect(container.querySelector("iframe")).toBe(frame);
+    });
+});
+
+describe("a TikTok player's sound", () => {
+    const said = (type: string, value: unknown) => ({ type, value, "x-tiktok-player": true });
+
+    function from(frame: HTMLIFrameElement | null, data: unknown) {
+        act(() => {
+            window.dispatchEvent(
+                new MessageEvent("message", {
+                    data,
+                    origin: "https://www.tiktok.com",
+                    source: frame?.contentWindow ?? null
+                })
+            );
+        });
+    }
+
+    async function play() {
+        const rendered = render(
+            <LinkCard
+                preview={preview("https://www.tiktok.com/@someone/video/7232918429372394779")}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        await userEvent.click(screen.getByRole("button", { name: "Play this on TikTok, here" }));
+        const frame = rendered.container.querySelector("iframe");
+        const told = vi.spyOn(frame!.contentWindow!, "postMessage").mockImplementation(() => {});
+        return { frame, told };
+    }
+
+    // This runtime's jsdom has no local storage of its own.
+    beforeEach(() => {
+        const kept = new Map<string, string>();
+        Object.defineProperty(window, "localStorage", {
+            configurable: true,
+            value: {
+                getItem: (key: string) => kept.get(key) ?? null,
+                setItem: (key: string, value: string) => void kept.set(key, value),
+                removeItem: (key: string) => void kept.delete(key),
+                clear: () => kept.clear()
+            }
+        });
+    });
+
+    it("comes on when the player starts muted, and the player's own mute is not remembered", async () => {
+        const { frame, told } = await play();
+        from(frame, said("onPlayerReady", undefined));
+        from(frame, said("onMute", true));
+        expect(told).toHaveBeenCalledWith(
+            { type: "unMute", "x-tiktok-player": true },
+            "https://www.tiktok.com"
+        );
+        from(frame, said("onMute", false));
+        expect(window.localStorage.getItem("polaris.chat.embed-muted")).toBeNull();
+    });
+
+    it("remembers the reader muting it, and starts the next one muted", async () => {
+        const first = await play();
+        from(first.frame, said("onMute", true));
+        from(first.frame, said("onMute", false));
+        from(first.frame, said("onMute", true));
+        expect(JSON.parse(window.localStorage.getItem("polaris.chat.embed-muted")!)).toEqual({
+            "www.tiktok.com": true
+        });
+        cleanup();
+
+        const next = await play();
+        from(next.frame, said("onMute", true));
+        expect(next.told).not.toHaveBeenCalled();
+        // Unmuting it is remembered the same way.
+        from(next.frame, said("onMute", false));
+        expect(JSON.parse(window.localStorage.getItem("polaris.chat.embed-muted")!)).toEqual({
+            "www.tiktok.com": false
+        });
+    });
+
+    it("listens to no other frame or site", async () => {
+        const { frame, told } = await play();
+        from(null, said("onMute", true));
+        act(() => {
+            window.dispatchEvent(
+                new MessageEvent("message", {
+                    data: said("onMute", true),
+                    origin: "https://evil.example",
+                    source: frame?.contentWindow ?? null
+                })
+            );
+        });
+        expect(told).not.toHaveBeenCalled();
     });
 });
 

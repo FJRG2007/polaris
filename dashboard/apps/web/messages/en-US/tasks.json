@@ -451,7 +451,7 @@
         "namePlaceholder": "Form name, e.g. Bug report",
         "name": "Form name",
         "list": "Which list submissions land in",
-        "startsWith": "It starts with two questions - a title and a description - which you can change afterwards.",
+        "startsWith": "It starts with two questions - a title and a description - which you can change afterward.",
         "defaultTitle": "What is it?",
         "defaultDetail": "Tell us more",
         "create": "Create form",

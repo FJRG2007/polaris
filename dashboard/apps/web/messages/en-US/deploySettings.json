@@ -240,12 +240,12 @@
     },
     "danger": {
         "title": "Delete this project",
-        "description": "Every environment, service, volume record, variable and deploy log in it goes, and whatever it is running is stopped and removed from its server. There is no undo and no export afterwards.",
+        "description": "Every environment, service, volume record, variable and deploy log in it goes, and whatever it is running is stopped and removed from its server. There is no undo and no export afterward.",
         "counts": "{environments, plural, one {# environment} other {# environments}} - {services, plural, one {# service} other {# services}}",
         "delete": "Delete project",
         "ownerOnly": "Only {owner}, who owns this project, can delete it.",
         "singleService": "Removing a single service is done from the service itself, and is staged so it can be reviewed before it takes effect.",
-        "confirmDescription": "This is immediate. Unlike removing a service, it is not staged and there is nothing to review afterwards."
+        "confirmDescription": "This is immediate. Unlike removing a service, it is not staged and there is nothing to review afterward."
     },
     "flags": {
         "title": "Feature flags",

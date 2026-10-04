@@ -322,7 +322,7 @@
         "noProvider": "No provider connected",
         "connectProvider": "Connect a model provider under Integrations first.",
         "effort": "Reasoning effort",
-        "startsRestricted": "The agent starts on feature branches only and cannot push to the default branch. Change that, and the rules that start it, from the repository's settings afterwards.",
+        "startsRestricted": "The agent starts on feature branches only and cannot push to the default branch. Change that, and the rules that start it, from the repository's settings afterward.",
         "adding": "Adding...",
         "add": "Add",
         "suggests": "Polaris suggests {execution}: {reason}",

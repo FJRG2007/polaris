@@ -285,6 +285,19 @@ describe("the app menu", () => {
         expect(save).toHaveBeenLastCalledWith({ favorites: [], order: [] });
     });
 
+    it("draws the options under the grid as icons named by their words", async () => {
+        const user = userEvent.setup();
+        mount([], <AppLauncher apps={apps} currentAppId="drive" marketplace />);
+        await user.click(screen.getByRole("button", { name: /drive/i }));
+        const arrange = await screen.findByRole("menuitem", { name: "Arrange apps" });
+        const more = screen.getByRole("menuitem", { name: "Find more apps" });
+        expect(arrange.getAttribute("title")).toBe("Arrange apps");
+        expect(more.getAttribute("title")).toBe("Find more apps");
+        expect(more.getAttribute("href")).toBe("/apps/marketplace");
+        expect(arrange.textContent).toBe("");
+        expect(more.textContent).toBe("");
+    });
+
     it("reads in Spanish", async () => {
         const user = userEvent.setup();
         const many = Array.from({ length: 14 }, (_, at) => ({
@@ -303,7 +316,9 @@ describe("the app menu", () => {
         );
         await user.click(screen.getByRole("button", { name: /fixture 0/i }));
         expect(await screen.findByRole("menuitem", { name: "Más" })).toBeTruthy();
-        expect(screen.getByRole("menuitem", { name: "Ordenar apps" })).toBeTruthy();
+        expect(screen.getByRole("menuitem", { name: "Ordenar apps" }).getAttribute("title")).toBe(
+            "Ordenar apps"
+        );
         expect(screen.getByRole("textbox", { name: "Buscar apps" })).toBeTruthy();
     });
 });

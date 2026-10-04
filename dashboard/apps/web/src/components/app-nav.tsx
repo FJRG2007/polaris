@@ -48,6 +48,10 @@ const CATEGORY_LABEL = new Map<string, string>(
     nav.APP_CATEGORIES.map((category) => [category.id, category.label])
 );
 
+/** An option under the launcher's grid, drawn as an icon button. */
+const FOOTER_ICON =
+    "size-8 justify-center p-0 text-muted-foreground hover:text-foreground focus:text-foreground";
+
 export function AppNav({
     appIds,
     guestAppIds = [],
@@ -193,17 +197,26 @@ export function AppLauncher({
                 pinned={favorites}
                 onTogglePin={toggle}
                 onArrange={arrangeApps}
+                // Icons only, so the options take one short row under the grid;
+                // the words stay as the accessible name and the hover tooltip.
                 footer={
                     <>
-                        <DropdownMenuItem onSelect={() => setArranging(true)}>
-                            <ArrowUpDown className="text-muted-foreground" aria-hidden="true" />
-                            {t("switcher.arrange")}
+                        <DropdownMenuItem
+                            onSelect={() => setArranging(true)}
+                            aria-label={t("switcher.arrange")}
+                            title={t("switcher.arrange")}
+                            className={FOOTER_ICON}
+                        >
+                            <ArrowUpDown aria-hidden="true" />
                         </DropdownMenuItem>
                         {marketplace ? (
-                            <DropdownMenuItem asChild>
-                                <Link href="/apps/marketplace">
-                                    <Store className="text-muted-foreground" aria-hidden="true" />
-                                    {t("switcher.marketplace")}
+                            <DropdownMenuItem asChild className={FOOTER_ICON}>
+                                <Link
+                                    href="/apps/marketplace"
+                                    aria-label={t("switcher.marketplace")}
+                                    title={t("switcher.marketplace")}
+                                >
+                                    <Store aria-hidden="true" />
                                 </Link>
                             </DropdownMenuItem>
                         ) : null}

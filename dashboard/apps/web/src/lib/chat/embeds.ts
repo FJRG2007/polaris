@@ -441,14 +441,53 @@ const TIKTOK_RETRYABLE = new Set([2001, 3001]);
  * frame was built for, TikTok's own marker, the type, and a numeric code.
  */
 export function playerFailed(embed: Embed, origin: string, data: unknown): boolean {
-    if (embed.provider !== "TikTok" || origin !== new URL(embed.url).origin) return false;
-    if (typeof data !== "object" || data === null) return false;
-    const message = data as Record<string, unknown>;
-    if (message["x-tiktok-player"] !== true || message.type !== "onPlayerError") return false;
+    const message = tiktokMessage(embed, origin, data);
+    if (message?.type !== "onPlayerError") return false;
     const value = message.value;
     if (typeof value !== "object" || value === null) return false;
     const code = (value as Record<string, unknown>).errorCode;
     return typeof code === "number" && TIKTOK_RETRYABLE.has(code);
+}
+
+/**
+ * What a player's frame said about its sound: `true` when it went quiet, `false`
+ * when it got its sound back, `null` for anything else. TikTok's player reports
+ * both its own muting and the reader's press on its volume button through its
+ * documented `onMute` message, checked the same way as `playerFailed`.
+ */
+export function playerMuted(embed: Embed, origin: string, data: unknown): boolean | null {
+    const message = tiktokMessage(embed, origin, data);
+    return message?.type === "onMute" && typeof message.value === "boolean" ? message.value : null;
+}
+
+/** Whether a message from a player's frame says it has started playing. */
+export function playerPlaying(embed: Embed, origin: string, data: unknown): boolean {
+    const message = tiktokMessage(embed, origin, data);
+    return message?.type === "onStateChange" && message.value === 1;
+}
+
+/**
+ * The message that tells a player to mute or unmute, for a site whose player
+ * takes one, or null. TikTok's documented `mute` and `unMute`. Its `muted=1`
+ * address parameter is not used: it also takes the volume button away.
+ */
+export function soundMessage(embed: Embed, muted: boolean): Record<string, unknown> | null {
+    if (embed.provider !== "TikTok") return null;
+    return { type: muted ? "mute" : "unMute", "x-tiktok-player": true };
+}
+
+/** A message from TikTok's player frame, checked: the origin the frame was built
+ *  for and TikTok's own marker. Null for anything else. */
+function tiktokMessage(
+    embed: Embed,
+    origin: string,
+    data: unknown
+): { type: unknown; value: unknown } | null {
+    if (embed.provider !== "TikTok" || origin !== new URL(embed.url).origin) return null;
+    if (typeof data !== "object" || data === null) return null;
+    const message = data as Record<string, unknown>;
+    if (message["x-tiktok-player"] !== true) return null;
+    return { type: message.type, value: message.value };
 }
 
 /** Each site's oEmbed endpoint, by the host its links are posted on. */
