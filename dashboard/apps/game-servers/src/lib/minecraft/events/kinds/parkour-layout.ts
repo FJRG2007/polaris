@@ -512,7 +512,7 @@ export function walked(options: EventOptions<"parkour">, seed: string, shape: Sh
         const platforms = walk(options, draw === 0 ? seed : `${seed}#${draw}`, shape, true);
         if (platforms && keepsEveryRule(platforms, options.jumps)) return platforms;
     }
-    return staircase(options, shape);
+    return staircase(options, seed, shape);
 }
 
 /** Whether a whole course keeps the layout rules and leaves nothing to skip. */
@@ -532,15 +532,16 @@ const WALK_BUDGET = 20_000;
 /**
  * The course nothing can go wrong with, for a seed that never draws one: every
  * jump a block up, so the platform after next is always two up - out of
- * anybody's reach.
+ * anybody's reach. Laid out as design 3 did, should even that break a rule.
  */
-function staircase(options: EventOptions<"parkour">, shape: Shape): Platform[] {
+export function staircase(
+    options: EventOptions<"parkour">,
+    seed: string,
+    shape: Shape
+): Platform[] {
     const plain = { ...options, difficulty: "easy" as const };
-    return (
-        walk(plain, "staircase", shape, false, [1]) ?? [
-            { x: -6, y: 0, z: 0, size: 5, role: "start" }
-        ]
-    );
+    const stairs = walk(plain, "staircase", shape, false, [1]);
+    return stairs && keepsEveryRule(stairs, options.jumps) ? stairs : laidOut(options, seed);
 }
 
 /** The line each side of a tower runs along: z going east or west, x going south or north. */
@@ -627,7 +628,7 @@ function walk(
     const turnSteps = (current: Platform, state: WalkState, size: number, role: Role) => {
         const out: Candidate[] = [];
         const left = state.turnLeft > 0 ? state.turnLeft : 2;
-        for (const rise of once([1, 1, 0]))
+        for (const rise of once([1, 1, 0].filter((one) => rises.includes(one))))
             for (const gap of once([1, 2])) {
                 if (gap > doable(rise, options.difficulty)) continue;
                 const platform: Platform = {

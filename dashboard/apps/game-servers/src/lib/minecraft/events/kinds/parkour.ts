@@ -282,6 +282,25 @@ function laidOutBefore(
     return platforms;
 }
 
+/** How many design-4 layouts are kept: a race, its preview and a few run ids. */
+const WALKS_KEPT = 16;
+const walks = new Map<string, Platform[]>();
+
+/**
+ * A design-4 layout, searched for once per run and options: the search can
+ * take a while, and every tick and quick look asks for the course again.
+ */
+function walkedOnce(options: EventOptions<"parkour">, seed: string): Platform[] {
+    const shape = shapeFor(options, seed);
+    const key = JSON.stringify([seed, shape, options.difficulty, options.jumps]);
+    const kept = walks.get(key);
+    if (kept) return kept;
+    const platforms = layout.walked(options, seed, shape);
+    walks.set(key, platforms);
+    if (walks.size > WALKS_KEPT) walks.delete(walks.keys().next().value!);
+    return platforms;
+}
+
 /**
  * The course over a site: its middle over the column, its start at `y`. The
  * same options and run id give the same course, wherever it is put.
@@ -296,7 +315,7 @@ export function course(
     const legacy = design < 2;
     const raw =
         design >= 4
-            ? layout.walked(options, seed, shapeFor(options, seed))
+            ? walkedOnce(options, seed)
             : design >= 3
               ? layout.laidOut(options, seed)
               : laidOutBefore(options, seed, legacy);

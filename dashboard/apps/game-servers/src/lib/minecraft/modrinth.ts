@@ -20,6 +20,7 @@
 import type { GameKey } from "../../../messages";
 import { z } from "zod";
 import { modrinthLoaderOf } from "@polaris/core";
+import { fresh } from "../fresh";
 
 /** Modrinth asks API clients to identify themselves. */
 const USER_AGENT = "polaris-dashboard (https://github.com/FJRG2007/polaris)";
@@ -526,7 +527,7 @@ const answers = new Map<string, { at: number; body: Promise<unknown> }>();
 export function modrinthJson(url: string): Promise<unknown> {
     const now = Date.now();
     const kept = answers.get(url);
-    if (kept && now - kept.at < ANSWER_TTL_MS) return kept.body;
+    if (kept && fresh(kept.at, ANSWER_TTL_MS, now)) return kept.body;
     const body = askModrinth(url);
     answers.delete(url);
     answers.set(url, { at: now, body });

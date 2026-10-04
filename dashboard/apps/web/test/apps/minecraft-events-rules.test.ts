@@ -49,6 +49,22 @@ describe("a parkour saved before it had shapes", () => {
         );
         expect(catalog.optionsSchemas.parkour.safeParse(old(61)).success).toBe(false);
     });
+
+    it("keeps a race already running on the twenty jumps its course was built with", () => {
+        const preset = catalog.newPreset("parkour", "race");
+        const { shapes: _shapes, ...options } = preset.options as Record<string, unknown>;
+        const run = stored.runSchema.parse({
+            id: "run-1",
+            trigger: "manual",
+            startedBy: null,
+            preset: { ...preset, options: { ...options, jumps: 20 } },
+            phase: "running",
+            createdAt: 0,
+            startsAt: 0,
+            endsAt: 1
+        });
+        expect(run.preset.options).toMatchObject({ jumps: 20, shapes: ["rows", "tower"] });
+    });
 });
 
 describe("the stored settings", () => {

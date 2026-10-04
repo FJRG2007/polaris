@@ -17,6 +17,7 @@
 
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
+import { fresh } from "../fresh";
 import { liveContext } from "./live-values";
 import { renderSidebar } from "./sidebar-render";
 import { fillValues, readsPlayerList, readsServer, variablesIn } from "./text-vars";
@@ -231,7 +232,7 @@ const ROSTER_EVERY_MS = 10_000;
 /** Who is on and who the operators are, read at most once a period for a loop. */
 async function rosterFor(installedAppId: string, loop: Loop, now: number): Promise<Roster> {
     const held = loop.roster;
-    if (held && now - held.at < ROSTER_EVERY_MS) return held.value;
+    if (held && fresh(held.at, ROSTER_EVERY_MS, now)) return held.value;
     const value = await onlineRoster(loop.ownerId, installedAppId).catch(
         () => held?.value ?? NOBODY
     );
@@ -361,11 +362,11 @@ async function contextFor(
     loop: Loop,
     texts: readonly string[],
     now: number,
-    fresh: boolean
+    renew: boolean
 ): Promise<SendContext> {
     const key = JSON.stringify(texts);
     const cached = loop.context;
-    if (!fresh && cached && cached.key === key && now - cached.at < PANEL_EVERY_MS) {
+    if (!renew && cached && cached.key === key && fresh(cached.at, PANEL_EVERY_MS, now)) {
         return cached.value;
     }
     const needsList = texts.some((text) => readsPlayerList(text));
@@ -422,7 +423,7 @@ function releaseLease(loop: Loop): void {
 /** The server a frame is sent to, opened once a period rather than every frame. */
 async function leaseFor(installedAppId: string, loop: Loop, now: number): Promise<ServerContainer> {
     const held = loop.lease;
-    if (held && now - held.at < PANEL_EVERY_MS) return held.server;
+    if (held && fresh(held.at, PANEL_EVERY_MS, now)) return held.server;
     releaseLease(loop);
     const opened = await openServerContainer(loop.ownerId, installedAppId);
     loop.lease = { ...opened, at: now };

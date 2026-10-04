@@ -59,6 +59,36 @@ describe("a parkour course's layout", () => {
         expect(specials).toBeGreaterThan(3000);
     });
 
+    it("falls back to a course that keeps every rule, up to the longest a race can be", () => {
+        for (const shape of ["rows", "tower"] as const)
+            for (const difficulty of ["easy", "medium", "hard"] as const)
+                for (const jumps of [10, 30, 60]) {
+                    const options = {
+                        place: { mode: "players" },
+                        jumps,
+                        difficulty,
+                        height: 30,
+                        shapes: [shape]
+                    } as never;
+                    const platforms = layout.staircase(options, `stairs-${jumps}`, shape);
+                    expect(platforms).toHaveLength(jumps + 1);
+                    expect(platforms.at(-1)!.role).toBe("finish");
+                    expect(layout.layoutProblems(platforms)).toEqual([]);
+                    expect(layout.skipProblems(platforms)).toEqual([]);
+                }
+    });
+
+    it("lays out the longest courses by the rules too", () => {
+        for (const shape of ["rows", "tower"] as const)
+            for (const difficulty of ["easy", "medium", "hard"] as const)
+                for (let seed = 0; seed < 10; seed += 1) {
+                    const course = courseOf(difficulty, 60, `long-${seed}`, undefined, [shape]);
+                    expect(course.platforms).toHaveLength(61);
+                    expect(layout.layoutProblems(course.platforms)).toEqual([]);
+                    expect(layout.skipProblems(course.platforms)).toEqual([]);
+                }
+    });
+
     it("draws the shape among those the event leaves on, the same for the same run", () => {
         const drawn = new Set<string>();
         for (let seed = 0; seed < 40; seed += 1)

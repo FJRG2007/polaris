@@ -5322,6 +5322,37 @@ describe("a parkour race", () => {
         );
     });
 
+    it("counts a checkpoint crossed between two looks from the platform right after it", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        const run = state().run!;
+        const origin = run.stage!.origin!;
+        const course = parkour.course(race().options, run.id, origin, origin.y);
+        const first = course.checkpoints[0]!;
+        const one = course.platforms[first + 1]!;
+        const past: [number, number, number] = [
+            one.x + one.size / 2,
+            one.y + 1,
+            one.z + one.size / 2
+        ];
+        world.at.Ana = past;
+        const start = course.platforms[0]!;
+        world.at.Ben = [start.x + start.size / 2, start.y + 1, start.z + start.size / 2];
+        const from = world.sent.length;
+        await play(2_100);
+        expect(world.checkpoint.Ana).toBe(first);
+        expect(world.at.Ana).toEqual(past);
+        expect(
+            world.sent
+                .slice(from)
+                .some((line) => line.startsWith("tellraw Ana") && line.includes("No shortcuts"))
+        ).toBe(false);
+    });
+
     it("takes only who joins, builds in the air, sends a fall back to its checkpoint and everybody home", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         setUp([race()]);
