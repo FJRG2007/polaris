@@ -195,6 +195,8 @@ interface World {
     /** How far the nearest fighter stands from the boss, and whether blocks close it in on every side. */
     fighterGap: number;
     bossBoxed: boolean;
+    /** What the kinds played through the events service keep (`freshKinds`). */
+    kinds: WorldKinds;
 }
 
 const world: World = {
@@ -297,7 +299,8 @@ const world: World = {
     minionsLeft: 0,
     lift: [],
     fighterGap: 2,
-    bossBoxed: false
+    bossBoxed: false,
+    kinds: freshKinds()
 };
 let config: Record<string, unknown> = {};
 /** The kept-bag copies written to the database, by id. */
@@ -775,6 +778,8 @@ function answer(sent: string): string {
     } else if (/(^| run )minecraft:[a-z_]+ /.test(line)) {
         return `Unknown or incomplete command, see below for error\n...${line.slice(0, 20)}<--[HERE]`;
     }
+    const kindAnswer = worldKindsAnswer(line);
+    if (kindAnswer !== null) return kindAnswer;
     // Up to 1.21.4 a name is JSON in a string, and anything else is passed over;
     // from 1.21.5 it is a text component, which a plain string is too.
     const named = /^data merge entity @e\[tag=pe_boss,limit=1\] \{CustomName:(.*)\}$/.exec(line);
@@ -1918,6 +1923,7 @@ beforeEach(() => {
     world.lift = [];
     world.fighterGap = 2;
     world.bossBoxed = false;
+    world.kinds = freshKinds();
     speechService.forget(SERVER);
     world.stormTicks = 0;
     events.forgetPlayers();
@@ -8309,5 +8315,273 @@ describe("the list of who joined", () => {
                     line.includes("(2 joined)")
             )
         ).toBe(true);
+    });
+});
+
+// ------------------------------------------------------------------ played through the events service
+
+/** What a villager defense, a bingo rush and a boss fishing find in the world. */
+interface WorldKinds {
+    villager: {
+        alive: boolean;
+        health: number;
+        /** How many times one was summoned. */
+        summons: number;
+        /** Whether the run had it written down, not yet summoned, when it was. */
+        writtenFirst: boolean | null;
+    };
+}
+
+function freshKinds(): WorldKinds {
+    return { villager: { alive: false, health: 20, summons: 0, writtenFirst: null } };
+}
+
+/** The lines only these kinds send, as the game answers them; null for any other. */
+function worldKindsAnswer(line: string): string | null {
+    const villager = world.kinds.villager;
+    if (line === "execute if entity @e[type=minecraft:villager,tag=pe_villager]")
+        return villager.alive ? "Test passed, count: 1" : "Test failed";
+    if (line === "data get entity @e[type=minecraft:villager,tag=pe_villager,limit=1] Health")
+        return villager.alive
+            ? `Villager has the following entity data: ${villager.health.toFixed(1)}f`
+            : "No entity was found";
+    if (line.startsWith("execute in minecraft:overworld run summon minecraft:villager ")) {
+        villager.summons += 1;
+        villager.writtenFirst = state().run?.villager?.summoned === false;
+        villager.alive = true;
+        villager.health = 20;
+        return "Summoned new Villager";
+    }
+    if (line.startsWith("data merge entity @e[type=minecraft:villager,tag=pe_villager,limit=1]"))
+        return villager.alive ? "Modified entity data of Villager" : "No entity was found";
+    if (line === "kill @e[tag=pe_villager]") {
+        const was = villager.alive;
+        villager.alive = false;
+        return was ? "Killed Villager" : "No entity was found";
+    }
+    return null;
+}
+
+describe("a villager defense", () => {
+    const start = () =>
+        events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "village",
+            trigger: "manual",
+            startedBy: null
+        });
+    const preset = () => newPreset("village-defense", "village");
+    /** Every monster summoned, by id, riders and mounts included. */
+    const summonedIds = () =>
+        world.sent
+            .filter((line) => line.includes(" run summon minecraft:") && line.includes('"pe_wnew"'))
+            .flatMap((line) =>
+                [
+                    ...line.matchAll(
+                        /(?:summon minecraft:|Passengers:\[\{id:"minecraft:)([a-z_]+)/g
+                    )
+                ].map((one) => one[1]!)
+            );
+    const provoked = () =>
+        world.sent.filter((line) => / run damage @s 0\.01 minecraft:generic by /.test(line));
+    const bar = () =>
+        world.sent.filter((line) => line.startsWith("bossbar set polaris:event name")).at(-1) ?? "";
+
+    it("sets a named villager down at the point, turns every wave on it, and pays the defenders when it lives", async () => {
+        setUp([preset()]);
+        await start();
+        await play(10_100);
+        const run = state().run!;
+        expect(run.place).toEqual({ x: 300, y: 70, z: 0 });
+        // Written down before it was summoned, and summoned once.
+        expect(world.kinds.villager.writtenFirst).toBe(true);
+        expect(world.kinds.villager.summons).toBe(1);
+        expect(run.villager).toMatchObject({ summoned: true, provoke: true, lost: false });
+        const name = run.villager!.name;
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("data merge entity @e[type=minecraft:villager") &&
+                    line.includes(name)
+            )
+        ).toBe(true);
+        // Nothing lost to a death, nothing broken by what comes.
+        expect(world.sent).toContain("gamerule keepInventory true");
+        expect(world.sent).toContain("gamerule mobGriefing false");
+        expect(world.sent).toContain("time set 18000");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes(`${name} is at X 300 Y 70 Z 0`)
+            )
+        ).toBe(true);
+        // Its health is the bar.
+        await play(2_100);
+        expect(visible(bar())).toContain(`${name} 10`);
+        expect(world.sent).toContain("bossbar set polaris:event max 20");
+
+        world.defenders = ["Ana", "Ben"];
+        await play(46_000);
+        // The classic mix: zombies and vindicators, and the zombies' mounts.
+        expect(summonedIds().length).toBeGreaterThan(0);
+        for (const id of summonedIds())
+            expect(["zombie", "vindicator", "chicken", "zombie_horse"]).toContain(id);
+        expect(provoked().length).toBeGreaterThan(0);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title @a title") && visible(line).includes("Wave 1/5")
+            )
+        ).toBe(true);
+
+        world.kinds.villager.health = 9;
+        world.scores = { Ana: 9, Ben: 2 };
+        world.hits = { Ben: 30 };
+        await play(5 * 30_000);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("All 5 waves were fought");
+        expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 9 }]);
+        expect(world.sent).toContain("give Ana minecraft:diamond 5");
+        expect(world.sent).toContain("give Ben minecraft:experience_bottle 8");
+        // Warned once as it fell under half its health.
+        expect(
+            world.sent.filter(
+                (line) =>
+                    line.startsWith("title @a title") &&
+                    visible(line).includes("The villager is hurt!")
+            )
+        ).toHaveLength(1);
+        expect(world.sent.some((line) => visible(line).includes(`${name} made it.`))).toBe(true);
+        // Everything undone: the villager, what it may have turned into, the
+        // monsters, the rule.
+        expect(world.sent).toContain("kill @e[tag=pe_villager]");
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld positioned 300.5 70 0.5 run kill @e[type=minecraft:zombie_villager,distance=..1.5]"
+        );
+        expect(world.sent).toContain("kill @e[tag=pe_mob]");
+        expect(world.sent).toContain("gamerule keepInventory false");
+        expect(world.kinds.villager.alive).toBe(false);
+    });
+
+    it("ends at once with nobody winning when the villager dies, and not on one look it is missed", async () => {
+        world.defenders = ["Ana", "Ben"];
+        world.waveAlive = 3;
+        setUp([preset()]);
+        await start();
+        await play(10_100 + 46_000);
+        expect(state().run?.round).toBe(0);
+        // Missed once - loading after a restart - and back: still on.
+        world.kinds.villager.alive = false;
+        await play(2_000);
+        world.kinds.villager.alive = true;
+        await play(2_000);
+        expect(state().run).not.toBeNull();
+
+        world.scores = { Ana: 4, Ben: 2 };
+        world.hits = { Ana: 20, Ben: 30 };
+        world.kinds.villager.alive = false;
+        await play(4_000);
+        const entry = state().history[0]!;
+        expect(state().run).toBeNull();
+        expect(entry.outcome).toBe("finished");
+        expect(entry.note).toMatch(/the villager died$/);
+        expect(entry.podium).toEqual([]);
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("so nobody wins and there are no prizes")
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => visible(line).includes("Nobody scored this time"))).toBe(
+            false
+        );
+        expect(world.sent).toContain("kill @e[tag=pe_mob]");
+        expect(world.sent).toContain("gamerule keepInventory false");
+    });
+
+    it("called off, takes the villager and the wave away and pays nobody", async () => {
+        world.defenders = ["Ana"];
+        world.waveAlive = 3;
+        setUp([preset()]);
+        await start();
+        await play(10_100 + 46_000);
+        expect(world.kinds.villager.alive).toBe(true);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(world.kinds.villager.alive).toBe(false);
+        expect(world.sent).toContain("kill @e[tag=pe_mob]");
+        expect(world.sent).toContain("gamerule keepInventory false");
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+
+    it("picks its villager back up after a restart, never summoning a second one", async () => {
+        const made = preset();
+        setUp([made]);
+        const now = Date.now();
+        world.defenders = ["Ana"];
+        world.waveAlive = 2;
+        // Polaris stopped between writing the villager down and hearing it was summoned.
+        world.kinds.villager.alive = true;
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed",
+                trigger: "manual",
+                startedBy: null,
+                preset: made,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 60_000,
+                endsAt: now + 20_000,
+                participants: ["Ana"],
+                place: { x: 300, y: 70, z: 0 },
+                round: 0,
+                roundEndsAt: now + 60_000,
+                gamerules: { keepInventory: "false" },
+                chunks: [{ x: 18, z: 0 }],
+                villager: { name: "Petra", summoned: false, provoke: true }
+            }
+        };
+        await events.sweepEvents();
+        await play(4_100);
+        expect(world.kinds.villager.summons).toBe(0);
+        expect(state().run?.villager).toMatchObject({ name: "Petra", summoned: true });
+        expect(visible(bar())).toContain("Petra 10");
+        await play(20_000);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ id: "resumed", outcome: "finished" });
+        expect(world.kinds.villager.alive).toBe(false);
+        expect(world.sent).toContain("gamerule keepInventory false");
+        expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 288 0");
+    });
+
+    it("leaves the wave to vanilla's own aim on a server too old to turn it", async () => {
+        world.version = "1.19.2";
+        world.defenders = ["Ana"];
+        world.waveAlive = 3;
+        setUp([preset()]);
+        await start();
+        await play(10_100 + 46_000 + 6_100);
+        expect(state().run?.villager).toMatchObject({ summoned: true, provoke: false });
+        expect(summonedIds().length).toBeGreaterThan(0);
+        expect(provoked()).toEqual([]);
+    });
+
+    it("does not start with fewer players on than its minimum", async () => {
+        world.online = ["Ana"];
+        setUp([preset()]);
+        expect(await refusal(start())).toBe("Only 1 player is on the server; this event needs 2");
+        expect(state().run).toBeNull();
+        expect(world.kinds.villager.summons).toBe(0);
+    });
+
+    it("is refused on Peaceful", async () => {
+        world.difficulty = "Peaceful";
+        setUp([preset()]);
+        expect(await refusal(start())).toMatch(/Peaceful/);
     });
 });

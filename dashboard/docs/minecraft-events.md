@@ -101,7 +101,7 @@ Rare catch) leave the world alone.
 | -------------------------------------------------------------- | ----- | ------- |
 | Build battle, Spleef, Parkour, King of the ring, Team duel     | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
-| Horde defense, Mob hunt, Meteor shower                         | night | clear   |
+| Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
 | World boss                                                     | -     | clear   |
 | Mining rush, Fishing, Trivia, Happy hour, XP boost, Rare catch | -     | -       |
@@ -176,6 +176,33 @@ left out.
       block over its own ring block and back, inside the platform's box, never
       anything else (`hill.redrawLines`; `keptTheRules` in the run tests allows
       exactly that).
+- **Villager defense** is a horde defense (`kinds/waves`, `hordeDefense`)
+  played round a villager set down at the point: the same place search,
+  wave timing, sizes by defenders, gear and counts of who held the point.
+    - The villager is summoned with `NoAI` (it stands on its spot, is pushed
+      by nothing and is still hit by whatever reaches it - a pen would be
+      blocks built into the world to take down again), persistent, named from
+      the run's id, glowing, and tagged `pe_villager` - never `pe_mob`, which
+      counts the wave. It is written down on the run before it is summoned,
+      and a restart in between looks for it before summoning another.
+    - Only monsters that hunt villagers in vanilla come
+      (`village-defense.VILLAGE_MOBS`): zombies, husks and zombie villagers,
+      vindicators and pillagers; never a skeleton, a stray, a spider or a
+      witch, which ignore villagers. Each still goes for a player it sees
+      first, so from 1.19.4 the wave is turned on the villager: every monster
+      no defender stands next to is touched by the villager with `/damage`
+      (`generic`, which pushes nothing back), and goes for whoever hit it.
+      Striking it draws it off again. Before 1.19.4 there is no such command
+      and they go for the villager only when no player is in sight.
+    - Its health is the boss bar (red), with where the waves stand beside it;
+      everybody is told once under half and once under a quarter.
+    - Missing for two looks in a row (`LOST_AFTER`: a restarted server loads
+      entities a moment after their chunks), it is dead: the event ends there,
+      with no podium and no prizes, and the results say why. Otherwise the
+      waves play out and the podium goes to the most kills.
+    - The end, a call-off or a restart kills exactly what carries the tag, and
+      the zombie villager a zombie on Normal or Hard turns a villager into,
+      where it stood.
 - **Treasure hunt** hides one treasure, a bastion's treasure room by default,
   under a column of light, with every player's action bar giving its distance
   and direction for the whole hunt.

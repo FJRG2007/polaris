@@ -10,9 +10,19 @@ import type { GameKey } from "../../../messages";
 import { NumberField } from "./event-options-sky";
 import { SegmentedControl, Select } from "@polaris/ui";
 import * as catalog from "../../lib/minecraft/events/catalog";
-import { DIFFICULTY_LABELS, Field, PlaceField, WAVE_MIX_LABELS, options } from "./event-editor";
+import { DIFFICULTY_LABELS, Field, PlaceField, options } from "./event-editor";
 
 type Issues = readonly { path: (string | number)[]; message: string }[];
+
+/** A villager defense's mixes: only monsters that go for a villager
+ *  (`kinds/village-defense.VILLAGE_MOBS`), so not the horde defense's words. */
+const VILLAGE_MIX_LABELS: Readonly<
+    Record<(typeof catalog.WAVE_MIXES)[number], GameKey<"minecraft">>
+> = {
+    classic: "editor.labels.villageMix.classic",
+    undead: "editor.labels.villageMix.undead",
+    mixed: "editor.labels.villageMix.mixed"
+};
 
 const GOAL_LABELS: Readonly<Record<(typeof catalog.BINGO_GOALS)[number], GameKey<"minecraft">>> = {
     line: "editor.labels.bingoGoal.line",
@@ -60,11 +70,11 @@ export function VillageDefenseFields({
                     field="size"
                 />
             </div>
-            <Field label={t("editor.monsters")} hint={t("editor.neverCreepersEndermenOrAnything")}>
+            <Field label={t("editor.monsters")} hint={t("editor.onlyVillagerHunters")}>
                 <Select
                     value={value.mix}
                     onValueChange={(mix) => onChange({ ...value, mix: mix as typeof value.mix })}
-                    options={options(t, WAVE_MIX_LABELS)}
+                    options={options(t, VILLAGE_MIX_LABELS)}
                     aria-label={t("editor.monsters")}
                 />
             </Field>

@@ -2081,6 +2081,7 @@
         "firstWaveSize": "Primera oleada",
         "2To12ForOne": "De 2 a 12 para un defensor; cada oleada y cada defensor suman más.",
         "monsters": "Monstruos",
+        "onlyVillagerHunters": "Solo monstruos que van a por aldeanos, y nada que rompa bloques.",
         "neverCreepersEndermenOrAnything": "Nunca creepers, endermen ni nada que rompa bloques.",
         "between50And1000Around": "Entre 50 y 1000. Alrededor de los jugadores, o de las coordenadas.",
         "meteors": "Meteoritos",
@@ -2159,6 +2160,11 @@
                 "classic": "Zombis, esqueletos y arañas",
                 "undead": "No muertos: zombis, momias, esqueletos, vagabundos",
                 "mixed": "Todo lo anterior, y brujas"
+            },
+            "villageMix": {
+                "classic": "Zombis y vindicadores",
+                "undead": "No muertos: zombis, momias, aldeanos zombi",
+                "mixed": "Todo lo anterior, y saqueadores"
             },
             "meteorOre": {
                 "common": "Comunes: carbón, hierro, cobre (1.17+), oro, redstone, lapislázuli",

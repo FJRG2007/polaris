@@ -50,6 +50,8 @@ import * as arenaService from "./kinds/arena-service";
 import * as stashService from "./kinds/stash-service";
 import * as search from "./place-search";
 import * as hillService from "./kinds/hill-service";
+import * as village from "./kinds/village-defense";
+import * as villageMessages from "./kinds/village-defense-messages";
 import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
@@ -74,6 +76,7 @@ const english = (text: string): string => gameMessageIn("en-US", text);
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
+const villageSay = speech.spoken(villageMessages);
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -769,7 +772,8 @@ export async function startEvent(input: {
         doneOffered: false,
         done: [],
         buildEndsAt: null,
-        boss: null
+        boss: null,
+        villager: null
     } satisfies stored.EventRun;
 
     const written = await updateEventState(input.installedAppId, (state) => {
@@ -1226,7 +1230,11 @@ async function showClock(loop: Loop): Promise<void> {
                 options.roundMinutes * 60
             )
         );
-    } else if (preset.kind !== "world-boss" && preset.kind !== "waves") {
+    } else if (
+        preset.kind !== "world-boss" &&
+        preset.kind !== "waves" &&
+        preset.kind !== "village-defense"
+    ) {
         const left = (loop.run.endsAt - now) / 1000;
         if (left <= 0) return;
         const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
@@ -1397,7 +1405,7 @@ async function begin(
             ...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, seconds)
         );
     }
-    if (preset.kind === "waves") {
+    if (preset.kind === "waves" || preset.kind === "village-defense") {
         // Nobody loses what they carry to a wave: keepInventory on for
         // exactly the event. What it was is written down before it is
         // changed, so even a restart right after puts it back.
@@ -1412,7 +1420,7 @@ async function begin(
         await persist(installedAppId, loop);
         lines.push(
             ...Object.keys(before).map((rule) => commands.setRule(rule, "true")),
-            ...waves.wavesSetup((preset.options as catalog.EventOptions<"waves">).mix)
+            ...waves.wavesSetup(waveKindsOf(preset))
         );
     }
     if (preset.kind === "meteor-shower") {
@@ -1588,6 +1596,7 @@ async function play(
             break;
         }
         case "waves":
+        case "village-defense":
             decided = await hordeDefense(installedAppId, loop, server, now, lines);
             break;
         case "meteor-shower":
@@ -2994,11 +3003,35 @@ export function truthRound(
 
 // ------------------------------------------------------------------ horde defense
 
+/** The monsters a horde defense or a villager defense sends: a villager
+ *  defense only ones that go for a villager (`village.VILLAGE_MOBS`). */
+function waveKindsOf(preset: catalog.EventPreset): waves.WaveKinds {
+    const { mix } = preset.options as catalog.EventOptions<"waves" | "village-defense">;
+    return preset.kind === "village-defense" ? village.VILLAGE_MOBS[mix] : mix;
+}
+
+/** Whether a horde defense is won by damage dealt rather than kills. */
+function wavesByDamage(preset: catalog.EventPreset): boolean {
+    return (
+        preset.kind === "waves" &&
+        (preset.options as catalog.EventOptions<"waves">).winner === "damage"
+    );
+}
+
+/** A villager defense whose villager died: over, with nobody winning. */
+function villagerLost(run: stored.EventRun): boolean {
+    return run.preset.kind === "village-defense" && run.villager?.lost === true;
+}
+
 /**
  * A horde defense: the point found and marked, then wave after wave summoned
  * round it once somebody is there to meet it. A wave ends when none of its
  * monsters is left, or when its time is up (what is left of it is taken away);
  * whoever is at the point then has held it. Decided when the last wave ends.
+ *
+ * A villager defense is the same, with a villager at the point (`keepVillager`):
+ * the waves are turned on it, its health is the bar, and its death ends the
+ * event there and then, with nobody winning.
  */
 async function hordeDefense(
     installedAppId: string,
@@ -3007,7 +3040,10 @@ async function hordeDefense(
     now: number,
     lines: string[]
 ): Promise<string | null> {
-    const options = loop.run.preset.options as catalog.EventOptions<"waves">;
+    const { preset } = loop.run;
+    const options = preset.options as catalog.EventOptions<"waves" | "village-defense">;
+    const villager = preset.kind === "village-defense";
+    const kinds = waveKindsOf(preset);
     const language = loop.language;
     const timing = catalog.WAVE_TIMING;
     // Players die in this one. Without keepInventory held on, a death would
@@ -3034,9 +3070,24 @@ async function hordeDefense(
         const hold = chunks.notHeld(chunks.chunksAround(found.x, found.z, waves.LOAD_REACH), held);
         loop.run = { ...loop.run, chunks: hold, round: -1, roundEndsAt: null, closedAt: now };
         await persist(installedAppId, loop);
+        await server.sayAll([...hold.map(chunks.holdChunk), commands.CLEAR_MARK]);
+        if (villager) {
+            await keepVillager(installedAppId, loop, server, found);
+            const name = loop.run.villager?.name ?? "";
+            await server.sayAll([
+                ...commands.titleCommands(
+                    villageSay.pointTitle(language),
+                    villageSay.pointSubtitle(name, language)
+                ),
+                commands.say(
+                    messages.tag(language) +
+                        villageSay.pointAt(name, found.x, found.y, found.z, language)
+                ),
+                commands.sound(commands.SOUNDS.horn)
+            ]);
+            return null;
+        }
         await server.sayAll([
-            ...hold.map(chunks.holdChunk),
-            commands.CLEAR_MARK,
             ...commands.titleCommands(
                 messages.wavesPointTitle(language),
                 `&fX ${found.x} Y ${found.y} Z ${found.z}`
@@ -3049,12 +3100,29 @@ async function hordeDefense(
         return null;
     }
     const place = loop.run.place;
+    // The villager first: dead, and nothing else of the tick matters.
+    const health = villager ? await keepVillager(installedAppId, loop, server, place) : null;
+    if (health === "lost") {
+        const name = loop.run.villager?.name ?? "";
+        lines.push(
+            ...village.lostLines(place),
+            ...commands.titleCommands(
+                villageSay.lostTitle(name, language),
+                villageSay.lostSubtitle(language)
+            )
+        );
+        return `${name} the villager died`;
+    }
     const open = loop.run.roundEndsAt !== null;
     lines.push(
         ...waves.wavesMarks(place),
         waves.leash(place),
-        ...waves.wavesTick(place, options.mix, open, options.winner === "damage")
+        ...waves.wavesTick(place, kinds, open, wavesByDamage(preset))
     );
+    // Every few ticks the wave is turned on the villager again: whatever a
+    // defender drew off and then left alone goes back for it.
+    if (villager && open && loop.run.villager?.provoke && loop.ticks % village.PROVOKE_EVERY === 0)
+        lines.push(village.provokeLine());
     /** Monsters of the wave on now still about, as far as is known. */
     let left: number | null = null;
     if (open) {
@@ -3083,7 +3151,10 @@ async function hordeDefense(
                 ),
                 commands.sound(cleared ? commands.SOUNDS.win : commands.SOUNDS.tick)
             );
-            if (wave + 1 >= options.waves) return `All ${options.waves} waves were fought`;
+            if (wave + 1 >= options.waves) {
+                if (villager) lines.push(...village.thanksLines(place));
+                return `All ${options.waves} waves were fought`;
+            }
         }
     } else if (
         now - loop.run.closedAt >=
@@ -3102,12 +3173,14 @@ async function hordeDefense(
             lines.push(
                 ...waves.summonWave(
                     place,
-                    options.mix,
+                    kinds,
                     count,
                     wave,
                     (loop.run.endsAt - now) / 1000 + 60,
                     { waves: options.waves, defenders: at.length }
                 ),
+                // Straight for the villager, the moment it is down.
+                ...(villager && loop.run.villager?.provoke ? [village.provokeLine()] : []),
                 ...commands.titleCommands(
                     messages.waveTitle(wave + 1, options.waves, language),
                     messages.waveSubtitle(count, language)
@@ -3137,26 +3210,103 @@ async function hordeDefense(
         status = messages.waveComing(number, options.waves, seconds, language);
         bar = { value: seconds, max: wait / 1000 };
     }
-    lines.push(...commands.barUpdate(status, bar.value, bar.max));
+    const name = run.villager?.name ?? "";
+    // A villager defense's bar is the villager's health, with where the waves
+    // stand beside it.
+    if (health !== null)
+        lines.push(
+            ...commands.barUpdate(
+                villageSay.bar(name, village.hearts(health), status),
+                health,
+                village.VILLAGER_HEALTH
+            )
+        );
+    else lines.push(...commands.barUpdate(status, bar.value, bar.max));
     for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
         const center = { x: place.x + 0.5, z: place.z + 0.5 };
         const away = Math.hypot(one.x - center.x, one.z - center.z);
+        const heading = commands.headingTo(one, center);
         lines.push(
             commands.actionbarFor(
                 one.name,
                 away <= waves.AREA
                     ? status
-                    : messages.wavesGuide(
-                          Math.round(away),
-                          commands.headingTo(one, center),
-                          language
-                      )
+                    : villager
+                      ? villageSay.guide(name, Math.round(away), heading, language)
+                      : messages.wavesGuide(Math.round(away), heading, language)
             )
         );
     }
     return null;
 }
 
+/**
+ * A villager defense's villager, kept: written down before it is summoned -
+ * and, after a restart that came between the two, looked for before another
+ * is - then at each look whether it is still there, and its health. Answers
+ * its health, or `lost` once it has been missing `village.LOST_AFTER` looks in
+ * a row (written down at once).
+ */
+async function keepVillager(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    place: stored.Point
+): Promise<number | "lost"> {
+    let kept: village.Villager =
+        loop.run.villager ??
+        ({
+            name: village.villagerName(loop.run.id),
+            summoned: false,
+            provoke: await serverAtLeast(server, [1, 19, 4]),
+            warned: 0,
+            missing: 0,
+            lost: false
+        } satisfies village.Villager);
+    const change = async (next: Partial<village.Villager>, save = true): Promise<void> => {
+        kept = { ...kept, ...next };
+        loop.run = { ...loop.run, villager: kept };
+        if (save) await persist(installedAppId, loop);
+    };
+    if (!loop.run.villager) await change({});
+    if (kept.lost) return "lost";
+    const there = async () => commands.readTest(await server.say([village.VILLAGER_THERE]));
+    if (!kept.summoned) {
+        if ((await there()) !== "passed") {
+            await server.sayAll(
+                village.summonVillager(place, kept.name, await serverAtLeast(server, [1, 21, 5]))
+            );
+            if ((await there()) !== "passed")
+                throw new CannotRun("The villager could not be set down at the point");
+        }
+        await change({ summoned: true });
+        return village.VILLAGER_HEALTH;
+    }
+    const seen = await there();
+    if (seen === "failed") {
+        if (kept.missing + 1 >= village.LOST_AFTER) {
+            await change({ missing: kept.missing + 1, lost: true });
+            return "lost";
+        }
+        await change({ missing: kept.missing + 1 }, false);
+    } else if (kept.missing > 0) await change({ missing: 0 }, false);
+    const health =
+        commands.readHealth(await server.say([village.VILLAGER_HEALTH_READ])) ??
+        village.VILLAGER_HEALTH;
+    // Everybody told once as it falls under half, and once under a quarter.
+    const due = village.warningsDue(health);
+    if (due > kept.warned) {
+        await change({ warned: due });
+        await server.sayAll([
+            ...commands.titleCommands(
+                villageSay.hurtTitle(loop.language),
+                villageSay.hurtSubtitle(kept.name, village.hearts(health), loop.language)
+            ),
+            commands.sound("minecraft:entity.villager.hurt")
+        ]);
+    }
+    return health;
+}
 // ------------------------------------------------------------------ meteor shower
 
 /**
@@ -3599,6 +3749,7 @@ async function finish(
             const counted =
                 preset.kind === "blood-moon" ||
                 preset.kind === "waves" ||
+                preset.kind === "village-defense" ||
                 // A boss is fought together: any damage to it is taking part.
                 preset.kind === "world-boss"
                     ? took
@@ -3684,19 +3835,28 @@ async function finish(
             } else if (preset.kind === "treasure-hunt") {
                 const unfound = run.chests.filter((one) => !one.opened).length;
                 if (unfound > 0) lines.push(commands.say(messages.huntUnfound(unfound, language)));
-            } else if (preset.kind === "waves") {
-                const fought = run.roundEndsAt === null ? run.round + 1 : run.round;
+            } else if (villagerLost(run)) {
+                // Why there is no podium, rather than "nobody scored".
                 lines.push(
                     commands.say(
-                        messages.wavesHeld(
-                            Math.max(0, fought),
-                            (preset.options as catalog.EventOptions<"waves">).waves,
+                        villageSay.lostLine(
+                            run.villager?.name ?? "",
+                            Math.max(1, run.round + 1),
                             language
                         )
                     )
                 );
+            } else if (preset.kind === "waves" || preset.kind === "village-defense") {
+                const fought = run.roundEndsAt === null ? run.round + 1 : run.round;
+                const { waves: count } = preset.options as catalog.EventOptions<
+                    "waves" | "village-defense"
+                >;
+                if (preset.kind === "village-defense" && run.villager && fought >= count)
+                    lines.push(commands.say(villageSay.savedLine(run.villager.name, language)));
+                lines.push(commands.say(messages.wavesHeld(Math.max(0, fought), count, language)));
             }
-            if (placed.length === 0) lines.push(commands.say(messages.nobodyScored(language)));
+            if (placed.length === 0 && !villagerLost(run))
+                lines.push(commands.say(messages.nobodyScored(language)));
             for (const one of placed) {
                 lines.push(
                     commands.say(
@@ -3725,13 +3885,17 @@ async function finish(
             if (pending.length > 0) lines.push(commands.say(messages.rewardWaiting(language)));
             const winner = placed[0];
             lines.push(
-                ...commands.titleCommands(
-                    winner
-                        ? messages.winnerTitle(winner.name, language)
-                        : messages.endedTitle(language),
-                    `&e${preset.name}`
-                ),
-                commands.sound(commands.SOUNDS.win)
+                ...(villagerLost(run)
+                    ? []
+                    : [
+                          ...commands.titleCommands(
+                              winner
+                                  ? messages.winnerTitle(winner.name, language)
+                                  : messages.endedTitle(language),
+                              `&e${preset.name}`
+                          ),
+                          commands.sound(commands.SOUNDS.win)
+                      ])
             );
         } else if (server && outcome === "finished" && preset.kind === "happy-hour") {
             lines.push(commands.say(messages.tag(language) + messages.happyHourOver(language)));
@@ -3842,8 +4006,14 @@ export function cleanupOf(run: stored.EventRun): string[] {
     const after: string[] = [];
     switch (run.preset.kind) {
         case "waves":
+            before.push(...waves.wavesCleanup(waveKindsOf(run.preset)));
+            break;
+        case "village-defense":
+            // The villager, and what a zombie may have turned it into, with
+            // the waves - while the chunks round the point are still held.
             before.push(
-                ...waves.wavesCleanup((run.preset.options as catalog.EventOptions<"waves">).mix)
+                ...waves.wavesCleanup(waveKindsOf(run.preset)),
+                ...village.villagerCleanup(run.place)
             );
             break;
         case "meteor-shower": {
@@ -4056,14 +4226,15 @@ async function results(
             )
         );
     }
-    if (preset.kind === "waves" && run.place) {
-        const options = preset.options as catalog.EventOptions<"waves">;
+    // The villager died: nobody wins, and nobody is paid for taking part.
+    if (villagerLost(run)) return { scores: new Map(), took: [] };
+    if ((preset.kind === "waves" || preset.kind === "village-defense") && run.place) {
         await server.sayAll(
             waves.wavesTick(
                 run.place,
-                options.mix,
+                waveKindsOf(preset),
                 run.roundEndsAt !== null,
-                options.winner === "damage"
+                wavesByDamage(preset)
             )
         );
     }
@@ -4082,7 +4253,7 @@ async function results(
             scores.set(who, score);
         }
     }
-    if (preset.kind === "waves") {
+    if (preset.kind === "waves" || preset.kind === "village-defense") {
         // Took part: at the point when a wave ended, and fought - a kill, or
         // at least a hit - rather than only stood there.
         const hits = commands.readScores(await server.say([waves.READ_HITS]));

@@ -2081,6 +2081,7 @@
         "firstWaveSize": "First wave size",
         "2To12ForOne": "2 to 12 for one defender; each wave and each defender adds more.",
         "monsters": "Monsters",
+        "onlyVillagerHunters": "Only monsters that go for villagers, and nothing that breaks blocks.",
         "neverCreepersEndermenOrAnything": "Never creepers, endermen or anything else that breaks blocks.",
         "between50And1000Around": "Between 50 and 1000. Around the players, or around the coordinates.",
         "meteors": "Meteors",
@@ -2159,6 +2160,11 @@
                 "classic": "Zombies, skeletons and spiders",
                 "undead": "The undead: zombies, husks, skeletons, strays",
                 "mixed": "Everything above, and witches"
+            },
+            "villageMix": {
+                "classic": "Zombies and vindicators",
+                "undead": "The undead: zombies, husks, zombie villagers",
+                "mixed": "Everything above, and pillagers"
             },
             "meteorOre": {
                 "common": "Common: coal, iron, copper (1.17+), gold, redstone, lapis",

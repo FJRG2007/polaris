@@ -636,7 +636,7 @@ export function circleAt(x: number, y: number, z: number, language: Language): s
         : `${WARN}The circle is at ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}: look for the column of light. Your action bar shows the way.`;
 }
 
-const HEADING_ES: Readonly<Record<Heading, string>> = {
+export const HEADING_ES: Readonly<Record<Heading, string>> = {
     north: "norte",
     "north-east": "noreste",
     east: "este",

@@ -18,6 +18,7 @@ import {
 } from "./catalog";
 import { stashSchema } from "./kinds/stash";
 import { bossStateSchema } from "./kinds/boss";
+import { villagerSchema } from "./kinds/village-defense";
 import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { placeFromSchema, placeTrySchema, searchSummarySchema } from "./place-search";
 
@@ -269,7 +270,9 @@ export const runSchema = z.object({
      *  time otherwise (`readyAt` and the minutes). */
     buildEndsAt: z.number().nullable().default(null),
     /** A world boss: which one was drawn, and how its fight stands. */
-    boss: bossStateSchema.nullable().default(null)
+    boss: bossStateSchema.nullable().default(null),
+    /** A villager defense: its villager, written down before it is summoned. */
+    villager: villagerSchema.nullable().default(null)
 });
 
 export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };
