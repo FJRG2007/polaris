@@ -1247,6 +1247,90 @@ describe("a rare catch", () => {
         );
     });
 
+    /**
+     * One player's looks, played through the lines the way the game runs
+     * them: each look the game's own counts of the treasure picked up and
+     * dropped and of the rod used, and whether the look reads a catch.
+     */
+    function looks(steps: readonly { picked: number; dropped: number; rod: number }[]): boolean[] {
+        const options = { treasure: "saddle" as const };
+        const scores = new Map<string, number>();
+        const matches = (selector: string) =>
+            (/scores=\{(.+)\}/.exec(selector)?.[1] ?? "").split(",").every((part) => {
+                if (part === "") return true;
+                const [objective, bounds] = part.split("=") as [string, string];
+                const value = scores.get(objective);
+                return value !== undefined && value >= Number(bounds.replace("..", ""));
+            });
+        const run = (line: string) => {
+            let m = /^scoreboard players (set|add|remove) (\S+) (\S+) (-?\d+)$/.exec(line);
+            if (m) {
+                if (!matches(m[2]!)) return;
+                const now = scores.get(m[3]!) ?? 0;
+                const by = Number(m[4]);
+                scores.set(m[3]!, m[1] === "set" ? by : m[1] === "add" ? now + by : now - by);
+                return;
+            }
+            m = /^execute as @a run scoreboard players operation @s (\S+) (\S+) @s (\S+)$/.exec(
+                line
+            );
+            if (!m) throw new Error(`not played: ${line}`);
+            const [, target, op, source] = m as unknown as [string, string, string, string];
+            const right = scores.get(source) ?? 0;
+            const left = scores.get(target) ?? 0;
+            const value = {
+                "=": right,
+                "+=": left + right,
+                "-=": left - right,
+                ">": Math.max(left, right),
+                "<": Math.min(left, right)
+            }[op];
+            if (value === undefined) throw new Error(`no operation ${op}`);
+            scores.set(target, value);
+        };
+        return steps.map((step) => {
+            scores.set("pe_rp1", step.picked);
+            scores.set("pe_rd1", step.dropped);
+            scores.set("pe_rod", step.rod);
+            for (const line of rareCatch.catchLook(options)) run(line);
+            const caught = (scores.get("pe_rdc") ?? 0) >= 1 && (scores.get("pe_rfr") ?? 0) >= 1;
+            for (const line of rareCatch.catchCommit()) run(line);
+            return caught;
+        });
+    }
+
+    it("reads a treasure reeled in as a catch, and one dropped and picked up again as none", () => {
+        // Reeled in: the rod used, the treasure picked up on the next look.
+        expect(
+            looks([
+                { picked: 0, dropped: 0, rod: 0 },
+                { picked: 0, dropped: 0, rod: 2 },
+                { picked: 1, dropped: 0, rod: 2 }
+            ])
+        ).toEqual([false, false, true]);
+        // One brought from before the start - or the one just caught - thrown
+        // down on one look and picked up after a cast on another: no catch.
+        expect(
+            looks([
+                { picked: 0, dropped: 0, rod: 0 },
+                { picked: 0, dropped: 1, rod: 0 },
+                { picked: 0, dropped: 1, rod: 1 },
+                { picked: 1, dropped: 1, rod: 2 },
+                { picked: 1, dropped: 2, rod: 3 },
+                { picked: 2, dropped: 2, rod: 4 }
+            ])
+        ).toEqual([false, false, false, false, false, false]);
+        // A real second catch after that still counts.
+        expect(
+            looks([
+                { picked: 0, dropped: 0, rod: 0 },
+                { picked: 0, dropped: 1, rod: 1 },
+                { picked: 1, dropped: 1, rod: 2 },
+                { picked: 2, dropped: 1, rod: 4 }
+            ])
+        ).toEqual([false, false, false, true]);
+    });
+
     it("takes every objective it makes back out", () => {
         const removed = new Set(objectives(rareCatch.catchCleanup(), "remove"));
         for (const objective of objectives(rareCatch.catchSetup({ treasure: "any" }), "add")) {
