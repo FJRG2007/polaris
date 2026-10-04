@@ -6847,6 +6847,32 @@ describe("an ice boat race", () => {
         expect(after.stageLeftovers).toEqual([]);
     });
 
+    it("gives two racers who join together after Go their own grid spots, not one shared", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const track = trackNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_boat 1");
+        world.online = [...world.online, "Cy", "Dan"];
+        world.sent = [];
+        chat(["Cy", "join"], ["Dan", "join"]);
+        await play(2_100);
+        const tpLine = (name: string) =>
+            world.sent.find((line) => line.startsWith(`execute in minecraft:overworld run tp ${name} `));
+        const cy = tpLine("Cy");
+        const dan = tpLine("Dan");
+        expect(cy).toBeDefined();
+        expect(dan).toBeDefined();
+        const coords = (line: string, name: string) => line.slice(`execute in minecraft:overworld run tp ${name} `.length);
+        // Each joined the race already on, in the same tick: one grid spot apiece,
+        // not both dropped on the same one (stage-service.ts admits one name at a
+        // time, so `fresh.length` is 1 per call - `grid(track, fresh.length)` then
+        // always gives back grid index 0, the same spot every time).
+        expect(coords(cy!, "Cy")).not.toBe(coords(dan!, "Dan"));
+    });
+
     it("hands a marked boat to put down before 1.19.4, where nobody can be put in one", async () => {
         world.version = "1.19.2";
         setUp([race()]);

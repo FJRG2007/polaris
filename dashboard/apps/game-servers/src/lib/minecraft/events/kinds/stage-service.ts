@@ -560,8 +560,13 @@ async function admit(
                   ? dropper.spots(layout.shaft, fresh.length)
                   : fresh.map(() => dropper.spawn(layout.shaft))
               : layout.kind === "boat-race"
-                ? // On the grid, before "Go!" or after it.
-                  boatRace.grid(layout.track, fresh.length)
+                ? // On the grid, before "Go!" or after it; a late racer goes
+                  // in after whoever already has a grid spot, not back on the
+                  // same one every time (grid spots are a pure function of
+                  // index, so a late racer alone always landed on index 0).
+                  boatRace
+                      .grid(layout.track, current.racers.length + fresh.length)
+                      .slice(current.racers.length)
                 : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
     if (layout.kind === "dropper") await server.sayAll(dropper.SCORES_ADDED);
