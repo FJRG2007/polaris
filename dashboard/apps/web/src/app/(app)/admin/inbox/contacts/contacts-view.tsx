@@ -132,7 +132,9 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxContacts.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("inboxContacts.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("inboxContacts.intro")}</p>
                 </div>
                 <Button onClick={() => setCreating((value) => !value)}>
@@ -168,7 +170,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
             )}
 
             <div className="grid min-h-0 gap-4 lg:grid-cols-[20rem_1fr]">
-                <Card className="flex max-h-[calc(100vh-16rem)] flex-col overflow-hidden">
+                <Card className="flex max-h-[calc(100dvh-16rem)] flex-col overflow-hidden">
                     <div className="border-b border-border p-2">
                         <div className="flex items-center gap-2 rounded-md border border-border px-2">
                             <Search className="size-4 text-muted-foreground" />
@@ -183,7 +185,9 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                         {filtered.length === 0 ? (
                             <p className="p-4 text-sm text-muted-foreground">
-                                {contacts.length === 0 ? t("inboxContacts.noContacts") : t("inboxContacts.noMatches")}
+                                {contacts.length === 0
+                                    ? t("inboxContacts.noContacts")
+                                    : t("inboxContacts.noMatches")}
                             </p>
                         ) : (
                             <ul className="divide-y divide-border">

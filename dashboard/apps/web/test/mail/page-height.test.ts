@@ -27,7 +27,7 @@ const SHELL = fileURLToPath(new URL("../../src/app/(app)/mail/mail-shell.tsx", i
 describe("what the shell's class list actually resolves to", () => {
     it("keeps the height PAGE_BLEED sets", () => {
         const merged = cn(PAGE_BLEED, "flex min-h-0 overflow-hidden");
-        expect(merged).toContain("h-[calc(100vh-var(--header-height))]");
+        expect(merged).toContain("h-[calc(100dvh-var(--header-height))]");
     });
 
     it("loses it to anything that also sets a height", () => {
@@ -47,7 +47,9 @@ describe("the window under a screen like this", () => {
         // and the root rule stops the window scrolling while it is on the page.
         expect(cn(PAGE_BLEED, "flex min-h-0 overflow-hidden").split(" ")).toContain("page-bleed");
         const tokens = await readFile(
-            fileURLToPath(new URL("../../../../packages/ui/src/styles/tokens.css", import.meta.url)),
+            fileURLToPath(
+                new URL("../../../../packages/ui/src/styles/tokens.css", import.meta.url)
+            ),
             "utf8"
         );
         expect(tokens).toMatch(/html:has\(\.page-bleed\) \{\s*overflow: hidden;/);

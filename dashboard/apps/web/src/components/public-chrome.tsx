@@ -27,10 +27,16 @@ import { PUBLIC_PATHS } from "@/lib/legal/service";
 import { Button, PolarisMark, cn } from "@polaris/ui";
 import { readerWords } from "@/lib/i18n/reader-words";
 
-export async function PublicChrome({ children, className }: { children: ReactNode; className?: string }) {
+export async function PublicChrome({
+    children,
+    className
+}: {
+    children: ReactNode;
+    className?: string;
+}) {
     const t = await readerWords("components");
     return (
-        <div className="flex min-h-screen flex-col bg-background">
+        <div className="flex min-h-dvh flex-col bg-background">
             {/* Deliberately the signed-in header's own measurements. A public
                 page an inch shorter in the bar is the kind of difference nobody
                 can name and everybody notices. */}
@@ -62,7 +68,12 @@ export async function PublicChrome({ children, className }: { children: ReactNod
                 </div>
             </header>
 
-            <main className={cn("mx-auto w-full max-w-2xl flex-1 px-4 py-6 sm:px-6 sm:py-10", className)}>
+            <main
+                className={cn(
+                    "mx-auto w-full max-w-2xl flex-1 px-4 py-6 sm:px-6 sm:py-10",
+                    className
+                )}
+            >
                 {children}
             </main>
 
@@ -70,7 +81,10 @@ export async function PublicChrome({ children, className }: { children: ReactNod
                 <Link href={PUBLIC_PATHS.home} className="transition-colors hover:text-foreground">
                     {t("publicChrome.about")}
                 </Link>
-                <Link href={PUBLIC_PATHS.privacy} className="transition-colors hover:text-foreground">
+                <Link
+                    href={PUBLIC_PATHS.privacy}
+                    className="transition-colors hover:text-foreground"
+                >
                     {t("publicChrome.privacy")}
                 </Link>
                 <Link href={PUBLIC_PATHS.terms} className="transition-colors hover:text-foreground">

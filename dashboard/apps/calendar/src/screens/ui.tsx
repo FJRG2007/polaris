@@ -74,7 +74,7 @@ export function Linkified({ text, className }: { text: string; className?: strin
 /** Where a panel opened beside something is drawn, kept inside the window. */
 function placement(anchor: DOMRect | null, width: number): CSSProperties {
     if (typeof window === "undefined")
-        return { left: 16, right: 16, top: 80, maxHeight: "calc(100vh - 96px)" };
+        return { left: 16, right: 16, top: 80, maxHeight: "calc(100dvh - 96px)" };
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     // A phone has no room beside anything: the panel sits along the bottom.
     if (viewport.width < 640) return { left: 8, right: 8, bottom: 8, maxHeight: "80vh" };
@@ -85,7 +85,7 @@ function placement(anchor: DOMRect | null, width: number): CSSProperties {
             left: Math.max(8, (viewport.width - width) / 2),
             width,
             top: 80,
-            maxHeight: "calc(100vh - 96px)"
+            maxHeight: "calc(100dvh - 96px)"
         };
     const left = Math.max(8, Math.min(anchor.left, viewport.width - width - 8));
     const below = viewport.height - anchor.bottom;

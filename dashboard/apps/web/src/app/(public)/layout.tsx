@@ -19,7 +19,7 @@ import { getTranslations } from "@/lib/i18n/request";
 export default async function PublicLayout({ children }: { children: ReactNode }) {
     const t = await getTranslations("publicPages");
     return (
-        <div className="mx-auto flex min-h-screen max-w-2xl flex-col px-6 py-10 sm:py-16">
+        <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-6 py-10 sm:py-16">
             {/* Drives the document that is already here, and renders nothing - so the
                 first paint is exactly what the server sent. */}
             <SmoothScroll />
@@ -56,7 +56,10 @@ export default async function PublicLayout({ children }: { children: ReactNode }
                 <Link href={PUBLIC_PATHS.home} className="transition-colors hover:text-foreground">
                     {t("layout.about")}
                 </Link>
-                <Link href={PUBLIC_PATHS.privacy} className="transition-colors hover:text-foreground">
+                <Link
+                    href={PUBLIC_PATHS.privacy}
+                    className="transition-colors hover:text-foreground"
+                >
                     {t("layout.privacy")}
                 </Link>
                 <Link href={PUBLIC_PATHS.terms} className="transition-colors hover:text-foreground">

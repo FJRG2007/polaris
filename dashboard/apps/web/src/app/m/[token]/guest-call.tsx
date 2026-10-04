@@ -97,7 +97,7 @@ export function GuestCall({
 
     if (seat?.admission === "admitted") {
         return (
-            <div className="flex h-screen flex-col overflow-hidden">
+            <div className="flex h-dvh flex-col overflow-hidden">
                 <GuestRoom
                     title={title}
                     meetingId={seat.meetingId}
@@ -125,9 +125,7 @@ export function GuestCall({
                     ) : (
                         <div className="flex flex-col gap-3">
                             <p className="text-sm text-muted-foreground">
-                                {asAccount
-                                    ? t("guestCall.asAccount")
-                                    : t("guestCall.asGuest")}
+                                {asAccount ? t("guestCall.asAccount") : t("guestCall.asGuest")}
                             </p>
                             {!asAccount && (
                                 <Input

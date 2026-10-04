@@ -202,7 +202,10 @@ export function LoginForm({
             setError(t("login.invalid"));
             return;
         }
-        const { data, error: signInError } = await signIn.email({ email, password: parsed.password });
+        const { data, error: signInError } = await signIn.email({
+            email,
+            password: parsed.password
+        });
         setPending(false);
         if (signInError) {
             setError(t("login.invalid"));
@@ -252,7 +255,7 @@ export function LoginForm({
     }
 
     return (
-        <main className="grid min-h-screen place-items-center p-4">
+        <main className="grid min-h-dvh place-items-center p-4">
             <Card className="w-full max-w-sm sm:max-w-2xl">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
@@ -262,104 +265,116 @@ export function LoginForm({
                     left out below it - a phone cannot scan its own screen. */}
                 <CardBody className="grid gap-6 sm:grid-cols-2">
                     <div>
-                    {notice ? (
-                        <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                            {t(notice)}
-                        </p>
-                    ) : null}
-                    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
-                        <div className="flex flex-col gap-1">
-                            <Input
-                                placeholder={t("login.identifier")}
-                                autoComplete="username"
-                                value={values.identifier}
-                                onChange={(event) => update("identifier", event.target.value)}
-                                onBlur={() => form.markTouched("identifier")}
-                                aria-invalid={Boolean(form.error("identifier"))}
-                            />
-                            {form.error("identifier") ? (
-                                <p className="text-xs text-danger">{validationMessage(tv, form.error("identifier"))}</p>
-                            ) : null}
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <Input
-                                type="password"
-                                placeholder={t("login.password")}
-                                autoComplete="current-password"
-                                value={values.password}
-                                onChange={(event) => update("password", event.target.value)}
-                                onBlur={() => form.markTouched("password")}
-                                aria-invalid={Boolean(form.error("password"))}
-                            />
-                            {form.error("password") ? (
-                                <p className="text-xs text-danger">{validationMessage(tv, form.error("password"))}</p>
-                            ) : null}
-                        </div>
-                        {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending}>
-                            {pending ? t("login.submitting") : t("login.submit")}
-                        </Button>
-                        {hasPasskey ? (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                disabled={pending}
-                                onClick={() => void signInWithPasskey()}
-                            >
-                                <KeyRound className="size-4" />
-                                {t("login.passkey")}
-                            </Button>
+                        {notice ? (
+                            <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                                {t(notice)}
+                            </p>
                         ) : null}
-                        {providers.length > 0 ? (
-                            <div className="flex flex-col gap-2">
-                                <span className="text-center text-xs text-muted-foreground">{t("login.or")}</span>
-                                {providers.map((provider) => (
-                                    <Button
-                                        key={provider.slug}
-                                        type="button"
-                                        variant="secondary"
-                                        disabled={pending}
-                                        onClick={() => signInWithProvider(provider.slug)}
-                                    >
-                                        <IntegrationLogo slug={provider.slug} className="size-4" />
-                                        {t("login.continueWith", { provider: provider.name })}
-                                    </Button>
-                                ))}
+                        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-1">
+                                <Input
+                                    placeholder={t("login.identifier")}
+                                    autoComplete="username"
+                                    value={values.identifier}
+                                    onChange={(event) => update("identifier", event.target.value)}
+                                    onBlur={() => form.markTouched("identifier")}
+                                    aria-invalid={Boolean(form.error("identifier"))}
+                                />
+                                {form.error("identifier") ? (
+                                    <p className="text-xs text-danger">
+                                        {validationMessage(tv, form.error("identifier"))}
+                                    </p>
+                                ) : null}
                             </div>
-                        ) : null}
-                        {canEmailLink ? (
-                            linkSent ? (
-                                <p className="text-center text-xs text-muted-foreground">
-                                    {t("login.linkSent")}
-                                </p>
-                            ) : (
+                            <div className="flex flex-col gap-1">
+                                <Input
+                                    type="password"
+                                    placeholder={t("login.password")}
+                                    autoComplete="current-password"
+                                    value={values.password}
+                                    onChange={(event) => update("password", event.target.value)}
+                                    onBlur={() => form.markTouched("password")}
+                                    aria-invalid={Boolean(form.error("password"))}
+                                />
+                                {form.error("password") ? (
+                                    <p className="text-xs text-danger">
+                                        {validationMessage(tv, form.error("password"))}
+                                    </p>
+                                ) : null}
+                            </div>
+                            {error ? <p className="text-sm text-danger">{error}</p> : null}
+                            <Button type="submit" disabled={pending}>
+                                {pending ? t("login.submitting") : t("login.submit")}
+                            </Button>
+                            {hasPasskey ? (
                                 <Button
                                     type="button"
-                                    variant="ghost"
+                                    variant="secondary"
                                     disabled={pending}
-                                    onClick={() => void sendLink()}
+                                    onClick={() => void signInWithPasskey()}
                                 >
-                                    {t("login.emailLink")}
+                                    <KeyRound className="size-4" />
+                                    {t("login.passkey")}
                                 </Button>
-                            )
-                        ) : null}
-                    </form>
-                    <p className="mt-4 text-center text-xs text-muted-foreground">
-                        <Link href="/oauth/recover" className="underline underline-offset-2 hover:text-foreground">
-                            {t("login.forgot")}
-                        </Link>
-                    </p>
-                    {awaitingSetup ? (
-                        <p className="mt-2 text-center text-xs text-muted-foreground">
-                            {t.rich("login.awaitingSetup", {
-                                code: (chunks) => (
-                                    <code key="code" className="rounded bg-muted px-1">
-                                        {chunks}
-                                    </code>
+                            ) : null}
+                            {providers.length > 0 ? (
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-center text-xs text-muted-foreground">
+                                        {t("login.or")}
+                                    </span>
+                                    {providers.map((provider) => (
+                                        <Button
+                                            key={provider.slug}
+                                            type="button"
+                                            variant="secondary"
+                                            disabled={pending}
+                                            onClick={() => signInWithProvider(provider.slug)}
+                                        >
+                                            <IntegrationLogo
+                                                slug={provider.slug}
+                                                className="size-4"
+                                            />
+                                            {t("login.continueWith", { provider: provider.name })}
+                                        </Button>
+                                    ))}
+                                </div>
+                            ) : null}
+                            {canEmailLink ? (
+                                linkSent ? (
+                                    <p className="text-center text-xs text-muted-foreground">
+                                        {t("login.linkSent")}
+                                    </p>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        disabled={pending}
+                                        onClick={() => void sendLink()}
+                                    >
+                                        {t("login.emailLink")}
+                                    </Button>
                                 )
-                            })}
+                            ) : null}
+                        </form>
+                        <p className="mt-4 text-center text-xs text-muted-foreground">
+                            <Link
+                                href="/oauth/recover"
+                                className="underline underline-offset-2 hover:text-foreground"
+                            >
+                                {t("login.forgot")}
+                            </Link>
                         </p>
-                    ) : null}
+                        {awaitingSetup ? (
+                            <p className="mt-2 text-center text-xs text-muted-foreground">
+                                {t.rich("login.awaitingSetup", {
+                                    code: (chunks) => (
+                                        <code key="code" className="rounded bg-muted px-1">
+                                            {chunks}
+                                        </code>
+                                    )
+                                })}
+                            </p>
+                        ) : null}
                     </div>
                     <QrSignInPanel />
                 </CardBody>

@@ -78,7 +78,7 @@ export function PublicFrame({
     wide?: boolean;
 }) {
     return (
-        <main className="min-h-screen bg-background px-4 py-8 text-foreground sm:py-12">
+        <main className="min-h-dvh bg-background px-4 py-8 text-foreground sm:py-12">
             <div
                 className={cn(
                     "mx-auto flex w-full flex-col gap-5",

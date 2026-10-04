@@ -82,7 +82,9 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
             return;
         }
         setCooldown(RESEND_COOLDOWN_SECONDS);
-        setSent(entry?.target ? t("twoFactor.sentTo", { target: entry.target }) : t("twoFactor.sent"));
+        setSent(
+            entry?.target ? t("twoFactor.sentTo", { target: entry.target }) : t("twoFactor.sent")
+        );
     }
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -112,7 +114,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
     }
 
     return (
-        <main className="grid min-h-screen place-items-center p-4">
+        <main className="grid min-h-dvh place-items-center p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
@@ -138,9 +140,14 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                                     >
                                         <Icon className="size-4 shrink-0 text-muted-foreground" />
                                         <span className="min-w-0">
-                                            <span className="block">{t(`twoFactor.methods.${option.method}.label`)}</span>
+                                            <span className="block">
+                                                {t(`twoFactor.methods.${option.method}.label`)}
+                                            </span>
                                             <span className="block truncate text-xs text-muted-foreground">
-                                                {option.target ?? t(`twoFactor.methods.${option.method}.description`)}
+                                                {option.target ??
+                                                    t(
+                                                        `twoFactor.methods.${option.method}.description`
+                                                    )}
                                             </span>
                                         </span>
                                     </button>

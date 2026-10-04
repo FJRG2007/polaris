@@ -250,7 +250,7 @@ export function PublicCalendar({
 
     if (embed) {
         return (
-            <div className="flex h-screen flex-col gap-2 bg-background p-2 text-foreground">
+            <div className="flex h-dvh flex-col gap-2 bg-background p-2 text-foreground">
                 {toolbar}
                 {zonePicker}
                 {problem}
@@ -260,7 +260,7 @@ export function PublicCalendar({
     }
 
     return (
-        <main className="min-h-screen bg-background px-4 py-6 text-foreground sm:py-10">
+        <main className="min-h-dvh bg-background px-4 py-6 text-foreground sm:py-10">
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
                 <header className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-col gap-1">

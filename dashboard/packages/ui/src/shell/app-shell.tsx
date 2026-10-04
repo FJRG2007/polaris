@@ -34,7 +34,7 @@ export function AppShell({
     children: ReactNode;
 }) {
     return (
-        <div className="relative flex min-h-screen flex-col bg-background">
+        <div className="relative flex min-h-dvh flex-col bg-background">
             <header className="sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
@@ -107,7 +107,7 @@ export function AppShell({
  * written in the attribute - they resolve by stylesheet order, so the override
  * silently loses and a two-column screen comes out stacked.
  */
-export const PAGE_FILL = "h-[calc(100vh-var(--header-height)-var(--page-inset))] overflow-hidden";
+export const PAGE_FILL = "h-[calc(100dvh-var(--header-height)-var(--page-inset))] overflow-hidden";
 
 /**
  * A screen that fills what is left of the window edge to edge, with no margin
@@ -132,7 +132,7 @@ export const PAGE_FILL = "h-[calc(100vh-var(--header-height)-var(--page-inset))]
  * scrollbar in it and a second one on the window moves all of its panes at once.
  */
 export const PAGE_BLEED =
-    "page-bleed -m-3 h-[calc(100vh-var(--header-height))] overflow-hidden sm:-m-4 md:-mx-6 md:-my-5";
+    "page-bleed -m-3 h-[calc(100dvh-var(--header-height))] overflow-hidden sm:-m-4 md:-mx-6 md:-my-5";
 
 /** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
  *  cramped bar drop the name and keep the glyph.

@@ -52,7 +52,7 @@ type Step = "identify" | "prove" | "waiting" | "reset" | "done";
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <main className="grid min-h-screen place-items-center p-4">
+        <main className="grid min-h-dvh place-items-center p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
@@ -260,7 +260,9 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                                 value={answers[index] ?? ""}
                                 onChange={(event) =>
                                     setAnswers((previous) =>
-                                        previous.map((answer, at) => (at === index ? event.target.value : answer))
+                                        previous.map((answer, at) =>
+                                            at === index ? event.target.value : answer
+                                        )
                                     )
                                 }
                             />
@@ -303,7 +305,9 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                             <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                             {t("recover.waiting")}
                         </p>
-                        <p className="mt-3 text-xs text-muted-foreground">{t("recover.bookmark")}</p>
+                        <p className="mt-3 text-xs text-muted-foreground">
+                            {t("recover.bookmark")}
+                        </p>
                     </>
                 )}
                 <Link
@@ -326,7 +330,13 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                         the page was opened straight from the ticket link, which is the one
                         case where the browser knows the account and this page does not. */}
                     {identifier ? (
-                        <input type="text" autoComplete="username" value={identifier} readOnly hidden />
+                        <input
+                            type="text"
+                            autoComplete="username"
+                            value={identifier}
+                            readOnly
+                            hidden
+                        />
                     ) : null}
                     {/* enigma:allow-identity-password - this page is unauthenticated and is
                         deliberately never told whose account it is recovering, so there is no
@@ -340,7 +350,9 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
                         onChange={(event) => setPassword(event.target.value)}
                         aria-invalid={breached}
                     />
-                    {breached ? <p className="text-sm text-danger">{tv("passwordBreached")}</p> : null}
+                    {breached ? (
+                        <p className="text-sm text-danger">{tv("passwordBreached")}</p>
+                    ) : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <Button type="submit" disabled={pending || breached}>
                         {pending ? t("recover.saving") : t("recover.setPassword")}

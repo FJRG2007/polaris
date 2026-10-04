@@ -44,7 +44,7 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
     return (
         // The whole window white, not only the column: on a dark theme the page
         // around a white column is what the preview shows before printing.
-        <div className="min-h-screen bg-white">
+        <div className="min-h-dvh bg-white">
             <main className="mx-auto max-w-3xl bg-white px-6 py-8 text-[#111111] print:max-w-none print:p-0">
                 <header className="mb-6 flex items-start gap-4 border-b border-[#dddddd] pb-4">
                     <h1 className="min-w-0 flex-1 text-[20px] font-semibold leading-tight">
@@ -91,7 +91,11 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
                             </dl>
                             {message.html.trim() || message.text.trim() ? (
                                 <SandboxedHtml
-                                    html={message.html.trim() ? message.html : core.textToHtml(message.text)}
+                                    html={
+                                        message.html.trim()
+                                            ? message.html
+                                            : core.textToHtml(message.text)
+                                    }
                                     showRemote={message.remoteAllowed}
                                     paper="own"
                                 />

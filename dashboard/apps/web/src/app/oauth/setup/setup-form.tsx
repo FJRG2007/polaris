@@ -54,7 +54,8 @@ export function SetupForm({
     // setupSchema and the action refuse both again on the server, which is the copy
     // that decides.
     const identity = [values.name, values.username, values.email];
-    const passwordError = validationMessage(tv, usePasswordSafety(values.password, identity) ?? undefined) ?? null;
+    const passwordError =
+        validationMessage(tv, usePasswordSafety(values.password, identity) ?? undefined) ?? null;
 
     function update(field: Field, value: string) {
         const next = { ...values, [field]: value };
@@ -110,7 +111,7 @@ export function SetupForm({
     // is missing, guide the operator to generate one rather than showing a field.
     if (!initialToken) {
         return (
-            <main className="grid min-h-screen place-items-center p-4">
+            <main className="grid min-h-dvh place-items-center p-4">
                 <Card className="w-full max-w-sm">
                     <CardHeader className="items-center">
                         <PolarisMark className="mb-1" />
@@ -123,9 +124,7 @@ export function SetupForm({
                             polaris setup
                         </pre>
                         {tokenConfigured ? null : (
-                            <p className="mt-3 text-xs text-warning">
-                                {t("setup.noToken")}
-                            </p>
+                            <p className="mt-3 text-xs text-warning">{t("setup.noToken")}</p>
                         )}
                     </CardBody>
                 </Card>
@@ -133,8 +132,19 @@ export function SetupForm({
         );
     }
 
-    const fields: Array<{ name: Field; label: string; type?: string; autoComplete?: string; placeholder?: string }> = [
-        { name: "name", label: t("setup.fields.name"), autoComplete: "name", placeholder: t("setup.fields.namePlaceholder") },
+    const fields: Array<{
+        name: Field;
+        label: string;
+        type?: string;
+        autoComplete?: string;
+        placeholder?: string;
+    }> = [
+        {
+            name: "name",
+            label: t("setup.fields.name"),
+            autoComplete: "name",
+            placeholder: t("setup.fields.namePlaceholder")
+        },
         {
             name: "username",
             label: t("setup.fields.username"),
@@ -158,7 +168,7 @@ export function SetupForm({
     ];
 
     return (
-        <main className="grid min-h-screen place-items-center p-4">
+        <main className="grid min-h-dvh place-items-center p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
@@ -182,7 +192,11 @@ export function SetupForm({
                                         autoComplete={field.autoComplete}
                                         placeholder={field.placeholder}
                                         {...(isName
-                                            ? { autoCapitalize: "words", autoCorrect: "off", spellCheck: false }
+                                            ? {
+                                                  autoCapitalize: "words",
+                                                  autoCorrect: "off",
+                                                  spellCheck: false
+                                              }
                                             : {})}
                                         value={values[field.name]}
                                         onChange={(event) => update(field.name, event.target.value)}
@@ -191,12 +205,18 @@ export function SetupForm({
                                         // caret and breaks composing a name on an
                                         // IME. The server normalizes it again.
                                         onBlur={() => {
-                                            if (isName) update(field.name, normalizePersonName(values.name));
+                                            if (isName)
+                                                update(
+                                                    field.name,
+                                                    normalizePersonName(values.name)
+                                                );
                                             form.markTouched(field.name);
                                         }}
                                         aria-invalid={Boolean(fieldError)}
                                     />
-                                    {fieldError ? <p className="text-xs text-danger">{fieldError}</p> : null}
+                                    {fieldError ? (
+                                        <p className="text-xs text-danger">{fieldError}</p>
+                                    ) : null}
                                 </div>
                             );
                         })}

@@ -26,7 +26,7 @@ export default async function AcceptInvitePage({
         const t = await getTranslations("auth");
         const tv = await getTranslations("validation");
         return (
-            <main className="grid min-h-screen place-items-center p-4">
+            <main className="grid min-h-dvh place-items-center p-4">
                 <Card className="w-full max-w-sm">
                     <CardHeader className="items-center">
                         <PolarisMark className="mb-1" />
@@ -36,7 +36,10 @@ export default async function AcceptInvitePage({
                         <p className="text-sm text-muted-foreground">
                             {validationMessage(tv, INVITE_REFUSALS[refusal ?? "unavailable"])}
                         </p>
-                        <a href="/oauth/login" className="mt-4 block text-center text-sm text-primary hover:underline">
+                        <a
+                            href="/oauth/login"
+                            className="mt-4 block text-center text-sm text-primary hover:underline"
+                        >
                             {t("invite.goToSignIn")}
                         </a>
                     </CardBody>

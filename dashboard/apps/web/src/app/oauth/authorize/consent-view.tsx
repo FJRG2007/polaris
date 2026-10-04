@@ -87,7 +87,7 @@ export function ConsentView({
     }
 
     return (
-        <main className="grid min-h-screen place-items-center p-4">
+        <main className="grid min-h-dvh place-items-center p-4">
             <Card className="w-full max-w-md">
                 <CardHeader className="items-center text-center">
                     <PolarisMark className="mb-1" />

@@ -44,7 +44,9 @@ export function LogsView({
 }) {
     const t = useTranslations("deploy");
     const [selected, setSelected] = useState<string>(() =>
-        initialService && services.some((service) => service.id === initialService) ? initialService : ALL
+        initialService && services.some((service) => service.id === initialService)
+            ? initialService
+            : ALL
     );
 
     const watched = useMemo(() => {
@@ -70,8 +72,12 @@ export function LogsView({
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("logs.title")}</h1>
-                    <p className="text-sm text-muted-foreground">{t("logs.intro", { environment: environmentName })}</p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("logs.title")}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        {t("logs.intro", { environment: environmentName })}
+                    </p>
                 </div>
                 <Select
                     value={selected}
@@ -95,7 +101,7 @@ export function LogsView({
                     serviceIds={serviceIds}
                     historyIds={historyIds}
                     name={`${environmentName}-logs`}
-                    className="h-[calc(100vh-21rem)] min-h-[24rem]"
+                    className="h-[calc(100dvh-21rem)] min-h-[24rem]"
                     followNote={
                         watched.length > followed.length
                             ? t("logs.capped", { count: MAX_FOLLOWED })
