@@ -425,8 +425,10 @@ export function FilesView({
     onSetFavorite: (entry: DriveEntry, favorite: boolean) => void;
     onSetIcon: (entry: DriveEntry, icon: string | null, color: string | null) => void;
     onSetNote: (entry: DriveEntry, note: string | null) => void;
-    onMove: (entry: DriveEntry, destFolderPath: string) => void;
-    onCopy: (entry: DriveEntry, destFolderPath: string) => void;
+    /** Move these items into a folder, asking about any name already taken there. */
+    onMove: (entries: DriveEntry[], destFolderPath: string) => void;
+    /** Copy these items into a folder, asking about any name already taken there. */
+    onCopy: (entries: DriveEntry[], destFolderPath: string) => void;
     /** Manage per-path access (ACL grants and the password lock). Owner/admin only. */
     onManageAccess?: (entry: DriveEntry) => void;
     /** Delete items for good, bypassing the recycle bin. */
@@ -588,7 +590,7 @@ export function FilesView({
 
     /** Copy an item into its own folder (a duplicate gets a " copy" suffix). */
     function duplicate(entry: DriveEntry) {
-        onCopy(entry, parentOf(entry.path));
+        onCopy([entry], parentOf(entry.path));
     }
 
     function openMove(entries: DriveEntry[]) {
@@ -614,7 +616,7 @@ export function FilesView({
     function submitMove(event: React.FormEvent) {
         event.preventDefault();
         if (!moveTargets || moveError) return;
-        for (const entry of moveTargets) onMove(entry, normalizedMoveDest);
+        onMove(moveTargets, normalizedMoveDest);
         setMoveTargets(null);
     }
     const [dragUpload, setDragUpload] = useState(false);
@@ -1034,11 +1036,13 @@ export function FilesView({
         setDropSegment(null);
         setDropFolder(null);
         if (source === null) return;
-        for (const item of draggedGroup(source)) {
-            if (parentOf(item.path) === targetPath) continue;
-            if (movesIntoSelf(item.path, targetPath)) continue;
-            onMove(item, targetPath);
-        }
+        onMove(
+            draggedGroup(source).filter(
+                (item) =>
+                    parentOf(item.path) !== targetPath && !movesIntoSelf(item.path, targetPath)
+            ),
+            targetPath
+        );
     }
 
     /** Drag-and-drop handlers that turn a breadcrumb segment into a move target. */
@@ -1131,11 +1135,9 @@ export function FilesView({
     /** Paste the clipboard into a folder in the listing rather than the open one. */
     function pasteInto(destFolder: string) {
         if (!clipboard) return;
-        for (const item of clipboard.entries) {
-            if (movesIntoSelf(item.path, destFolder)) continue;
-            if (clipboard.mode === "cut") onMove(item, destFolder);
-            else onCopy(item, destFolder);
-        }
+        const items = clipboard.entries.filter((item) => !movesIntoSelf(item.path, destFolder));
+        if (clipboard.mode === "cut") onMove(items, destFolder);
+        else onCopy(items, destFolder);
         if (clipboard.mode === "cut") setClipboard(null);
     }
 

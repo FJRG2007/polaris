@@ -9,6 +9,7 @@
  * are pinned here against the path the write really touches.
  */
 
+import { StorageError } from "@polaris/storage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const CONNECTION = "018f2b7a-0000-7000-8000-0000000000e1";
@@ -17,7 +18,7 @@ const writeStream = vi.fn(async () => undefined);
 const mkdir = vi.fn(async () => undefined);
 const move = vi.fn(async () => undefined);
 const stat = vi.fn(async (): Promise<unknown> => {
-    throw new Error("missing");
+    throw new StorageError("not_found", "missing");
 });
 const dispose = vi.fn(async () => undefined);
 
@@ -74,7 +75,11 @@ describe("creating", () => {
     it("still clears a plain name on the folder it was made in", async () => {
         await actions.createFileAction(CONNECTION, "shared", "notes.txt");
         expect(requireDriveDriver).toHaveBeenCalledWith("u1", CONNECTION, "shared", "write");
-        expect(writeStream).toHaveBeenCalledWith("shared/notes.txt", expect.anything(), {});
+        expect(writeStream).toHaveBeenCalledWith(
+            "shared/notes.txt",
+            expect.anything(),
+            expect.anything()
+        );
     });
 
     it("writes nothing when the folder it lands in is refused", async () => {

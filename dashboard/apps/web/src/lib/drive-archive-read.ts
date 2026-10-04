@@ -22,6 +22,8 @@ import StreamZip from "node-stream-zip";
 import { createExtractorFromData } from "node-unrar-js";
 import { normalizeRelPath } from "@polaris/core";
 import type { StorageDriver } from "@polaris/storage";
+import { pathExists } from "@/lib/upload-naming";
+import { claimFileName } from "@/lib/drive/name-conflicts";
 
 export type ArchiveFormat = "zip" | "rar";
 
@@ -80,7 +82,11 @@ export async function listArchiveEntries(
         const list = extractor.getFileList();
         const out: ArchiveEntry[] = [];
         for (const header of list.fileHeaders) {
-            out.push({ name: header.name, size: header.unpSize, isDirectory: header.flags.directory });
+            out.push({
+                name: header.name,
+                size: header.unpSize,
+                isDirectory: header.flags.directory
+            });
         }
         return out;
     } finally {
@@ -119,6 +125,10 @@ export async function extractArchiveTo(
         if (relDir) await driver.mkdir(relDir);
     };
     const parentOf = (rel: string) => rel.split("/").slice(0, -1).join("/");
+    // A file already in the destination is never written over: the extracted
+    // one is kept beside it as "name (1).ext", the way "Keep both" names it.
+    const freeTarget = async (target: string) =>
+        (await pathExists(driver, target)) ? claimFileName(driver, target, "keepBoth") : target;
 
     try {
         if (format === "zip") {
@@ -138,7 +148,10 @@ export async function extractArchiveTo(
                     }
                     await ensureDir(parentOf(target));
                     const stream = await zip.stream(entry.name);
-                    await driver.writeStream(target, Readable.toWeb(stream as unknown as Readable) as never);
+                    await driver.writeStream(
+                        await freeTarget(target),
+                        Readable.toWeb(stream as unknown as Readable) as never
+                    );
                 }
             } finally {
                 await zip.close();
@@ -163,7 +176,10 @@ export async function extractArchiveTo(
             await ensureDir(parentOf(target));
             const content = extractedFile.extraction;
             if (!content) continue; // header-only pass yields no bytes for this entry
-            await driver.writeStream(target, Readable.toWeb(Readable.from(Buffer.from(content))) as never);
+            await driver.writeStream(
+                await freeTarget(target),
+                Readable.toWeb(Readable.from(Buffer.from(content))) as never
+            );
         }
         return written;
     } finally {

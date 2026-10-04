@@ -21,6 +21,21 @@
 
 import Link from "next/link";
 import { FilesView } from "./files-view";
+import { ConflictDialog } from "./conflict-dialog";
+import * as conflictActions from "./conflict-actions";
+import type { UploadItem } from "@/lib/drop-items";
+import { useConflictPrompt } from "./use-conflict-prompt";
+import { MAX_CLASH_ENTRIES, type ClashView, type ConflictChoice } from "@/lib/drive/conflict-types";
+import {
+    chunked,
+    conflictIn,
+    planUploads,
+    topLevelEntries,
+    topOf,
+    uploadConflictFor,
+    type PlannedUpload,
+    type UploadConflict
+} from "./upload-plan";
 import * as driveActions from "./actions";
 import { SendDialog } from "./send-dialog";
 import { useRouter } from "next/navigation";
@@ -159,6 +174,8 @@ export function DriveExplorer({
     const listing = useRef<AbortController | null>(null);
     const [pending, startTransition] = useTransition();
     const [uploading, setUploading] = useState(false);
+    /** The "this name is already taken" question, as something an upload or a move can await. */
+    const conflicts = useConflictPrompt();
 
     const [entries, setEntries] = useState<DriveEntry[]>([]);
     const [loading, setLoading] = useState(false);
@@ -450,33 +467,149 @@ export function DriveExplorer({
         return `/drive?${query.toString()}`;
     }
 
-    async function onUpload(items: { file: File; relPath: string }[]) {
+    /**
+     * The clashes among `entries` in `folder`, asked in pieces the server takes.
+     * Null when the check itself failed, which is said in the banner: nothing is
+     * written into a folder that could not be checked.
+     */
+    async function clashesIn(
+        folder: string,
+        entries: { path: string; kind: "file" | "dir" }[],
+        merge: boolean
+    ): Promise<ClashView[] | null> {
+        if (!connectionId) return null;
+        const found: ClashView[] = [];
+        for (const piece of chunked(entries, MAX_CLASH_ENTRIES)) {
+            const answer = await conflictActions.nameClashesAction({
+                connectionId,
+                folder,
+                entries: piece,
+                merge
+            });
+            if (answer.error !== undefined) {
+                setOpError(answer.error);
+                return null;
+            }
+            found.push(...answer.clashes);
+        }
+        return found;
+    }
+
+    /**
+     * Ask about every name an upload would take that is already taken - the items
+     * landing in the folder, then the files inside any folder being merged - and
+     * work out what to send. Null when the person cancelled or a check failed.
+     */
+    async function planUpload(items: UploadItem[]): Promise<PlannedUpload[] | null> {
+        if (!connectionId) return null;
+        const tops = topLevelEntries(items);
+        const batch = items.length > 1;
+        const decisions = new Map<string, ConflictChoice>();
+        const clashes = await clashesIn(path, tops, true);
+        if (!clashes) return null;
+        if (clashes.length > 0) {
+            const answers = await conflicts.ask({ clashes, batch });
+            if (!answers) return null;
+            for (const [key, choice] of answers) decisions.set(key, choice);
+        }
+        // "Merge": what is inside both folders is a question of its own.
+        const merged = new Set(
+            clashes
+                .filter(
+                    (clash) => clash.incomingKind === "dir" && decisions.get(clash.path) === "merge"
+                )
+                .map((clash) => clash.path)
+        );
+        if (merged.size > 0) {
+            const inner = items
+                .filter(({ relPath }) => merged.has(topOf(relPath)))
+                .map(({ relPath }) => ({ path: relPath, kind: "file" as const }));
+            const innerClashes = await clashesIn(path, inner, true);
+            if (!innerClashes) return null;
+            if (innerClashes.length > 0) {
+                const answers = await conflicts.ask({ clashes: innerClashes, batch });
+                if (!answers) return null;
+                for (const [key, choice] of answers) decisions.set(key, choice);
+            }
+        }
+        // "Keep both" on a folder: the folder is made under its new name, so
+        // every file of it goes there instead of into the one already here.
+        const renamed = new Map<string, string>();
+        for (const clash of clashes) {
+            if (clash.incomingKind !== "dir" || decisions.get(clash.path) !== "keepBoth") continue;
+            const made = await conflictActions.reserveFolderAction({
+                connectionId,
+                folder: path,
+                name: clash.path
+            });
+            if (made.error !== undefined) {
+                setOpError(made.error);
+                return null;
+            }
+            renamed.set(clash.path, made.name);
+        }
+        return planUploads(items, decisions, renamed);
+    }
+
+    async function onUpload(items: UploadItem[]) {
         if (!connectionId || items.length === 0) return;
         setUploading(true);
-        // relPath may be nested (a/b/file.txt) for a folder upload; the route
-        // creates the parent directories before writing.
-        for (const { file, relPath } of items) {
-            const query = new URLSearchParams({ c: connectionId, name: relPath });
+        setOpError(null);
+        try {
+            const plan = await planUpload(items);
+            if (!plan) return;
+            // relPath may be nested (a/b/file.txt) for a folder upload; the route
+            // creates the parent directories before writing.
+            for (const step of plan) {
+                if (!(await sendUpload(step, plan.length > 1))) return;
+            }
+        } finally {
+            setUploading(false);
+            if (fileInput.current) fileInput.current.value = "";
+            void load();
+        }
+    }
+
+    /**
+     * Send one planned upload. A 409 is a name somebody took after the check -
+     * the person is asked again and the file re-sent their way. False when they
+     * cancelled, which stops the rest of the upload too.
+     */
+    async function sendUpload(step: PlannedUpload, batch: boolean): Promise<boolean> {
+        if (!connectionId) return false;
+        let conflict = step.conflict;
+        // Bounded: each round is a person answering a dialog, and three clashes
+        // in a row on one file means something else is writing there.
+        for (let round = 0; round < 3; round++) {
+            const query = new URLSearchParams({ c: connectionId, name: step.relPath, conflict });
             if (path) query.set("p", path);
             // Through the shared sender, so the file gets a bar in the corner and
             // can be stopped - a folder of holiday video through `fetch` was a
             // spinner that knew nothing for twenty minutes.
-            const sent = await sendFile(`/api/drive/upload?${query.toString()}`, file, {
-                name: relPath
+            const sent = await sendFile(`/api/drive/upload?${query.toString()}`, step.file, {
+                name: step.relPath
             });
-            if (sent.ok || sent.problem === "stopped") continue;
+            if (sent.ok || sent.problem === "stopped") return true;
+            const clash = sent.status === 409 ? conflictIn(sent.body) : null;
+            if (clash) {
+                const answers = await conflicts.ask({ clashes: [clash], batch, late: true });
+                if (!answers) return false;
+                const choice = answers.get(clash.path);
+                if (choice === "skip") return true;
+                conflict = uploadConflictFor(choice);
+                continue;
+            }
             // No answer to read a reason from: the connection dropped, or every
             // byte went and the server never said what became of them. Said here
             // too, not only in the corner, because this is where the folder is.
             if (sent.problem === "noAnswer")
-                setOpError(t("explorer.uploadNoAnswer", { name: relPath }));
+                setOpError(t("explorer.uploadNoAnswer", { name: step.relPath }));
             else if (sent.problem === "dropped")
-                setOpError(t("explorer.uploadDropped", { name: relPath }));
+                setOpError(t("explorer.uploadDropped", { name: step.relPath }));
             else setOpError(sent.body || t("explorer.refused"));
+            return true;
         }
-        setUploading(false);
-        if (fileInput.current) fileInput.current.value = "";
-        void load();
+        return true;
     }
 
     function submitNewFolder(event: React.FormEvent) {
@@ -561,23 +694,83 @@ export function DriveExplorer({
         });
     }
 
-    function onMove(entry: DriveEntry, destFolderPath: string) {
-        if (!connectionId) return;
-        const to = destFolderPath ? `${destFolderPath}/${entry.name}` : entry.name;
-        // Already in that folder: nothing to do (dropping onto the current folder
-        // or its own parent would otherwise flash the row out and back).
-        if (to === entry.path) return;
-        setEntries((prev) => prev.filter((row) => row.path !== entry.path));
-        runOp(t("explorer.ops.moving", { name: entry.name }), () =>
-            driveActions.moveIntoAction(connectionId, entry.path, destFolderPath)
-        );
+    function onMove(list: DriveEntry[], destFolderPath: string) {
+        void transferInto("move", list, destFolderPath);
     }
 
-    function onCopy(entry: DriveEntry, destFolderPath: string) {
+    function onCopy(list: DriveEntry[], destFolderPath: string) {
+        void transferInto("copy", list, destFolderPath);
+    }
+
+    /**
+     * Move or copy items into a folder, asking first about any name already
+     * taken there. A copy into the folder it is already in is a duplicate and
+     * gets its " copy" suffix without a question; a move there is nothing to do.
+     */
+    async function transferInto(kind: "move" | "copy", list: DriveEntry[], dest: string) {
         if (!connectionId) return;
-        runOp(t("explorer.ops.copying", { name: entry.name }), () =>
-            driveActions.copyAction(connectionId, entry.path, destFolderPath)
+        const intoSelf = (entry: DriveEntry) =>
+            dest === entry.path || dest.startsWith(`${entry.path}/`);
+        const duplicates =
+            kind === "copy" ? list.filter((entry) => parentOf(entry.path) === dest) : [];
+        for (const entry of duplicates) {
+            runOp(t("explorer.ops.copying", { name: entry.name }), () =>
+                driveActions.copyAction(connectionId, entry.path, dest)
+            );
+        }
+        const arriving = list.filter((entry) => parentOf(entry.path) !== dest && !intoSelf(entry));
+        if (arriving.length === 0) return;
+        const clashes = await clashesIn(
+            dest,
+            arriving.map((entry) => ({
+                path: entry.name,
+                kind: entry.kind === "dir" ? "dir" : "file"
+            })),
+            false
         );
+        if (!clashes) return;
+        let decisions = new Map<string, ConflictChoice>();
+        if (clashes.length > 0) {
+            const answers = await conflicts.ask({ clashes, batch: arriving.length > 1 });
+            if (!answers) return;
+            decisions = answers;
+        }
+        for (const entry of arriving) {
+            const choice = decisions.get(entry.name);
+            if (choice === "skip") continue;
+            if (kind === "move")
+                setEntries((prev) => prev.filter((row) => row.path !== entry.path));
+            runOp(
+                t(kind === "move" ? "explorer.ops.moving" : "explorer.ops.copying", {
+                    name: entry.name
+                }),
+                () => transferOne(kind, entry, dest, uploadConflictFor(choice), arriving.length > 1)
+            );
+        }
+    }
+
+    /** One move or copy, asking again if the name was taken after the check. */
+    async function transferOne(
+        kind: "move" | "copy",
+        entry: DriveEntry,
+        dest: string,
+        first: UploadConflict,
+        batch: boolean
+    ): Promise<{ error?: string }> {
+        if (!connectionId) return {};
+        let mode = first;
+        for (let round = 0; round < 3; round++) {
+            const result =
+                kind === "move"
+                    ? await driveActions.moveIntoAction(connectionId, entry.path, dest, mode)
+                    : await driveActions.copyAction(connectionId, entry.path, dest, mode);
+            if (!result.conflict) return result;
+            const answers = await conflicts.ask({ clashes: [result.conflict], batch, late: true });
+            const choice = answers?.get(result.conflict.path);
+            if (!answers || choice === "skip") return {};
+            mode = uploadConflictFor(choice);
+        }
+        return {};
     }
 
     function confirmDelete() {
@@ -1046,6 +1239,7 @@ export function DriveExplorer({
                 </div>
             ) : null}
 
+            <ConflictDialog request={conflicts.request} onDone={conflicts.respond} />
             <ShareDialog
                 targets={shareTargets}
                 onOpenChange={(open) => !open && setShareTargets(null)}

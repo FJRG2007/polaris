@@ -21,7 +21,26 @@ import { detectHost, type NasDetection } from "@/lib/nas-detect";
 import { deletableChildren, deleteDriveEntry } from "@/lib/drive-delete";
 import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
 import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
-import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
+import type { ClashView } from "@/lib/drive/conflict-types";
+import { assertMayReplace, clashView } from "@/lib/drive/clash-view";
+import {
+    claimFileName,
+    claimFolderName,
+    conflictModeSchema,
+    moveToName,
+    NameConflictError,
+    replaceWith,
+    stagingPath,
+    type ConflictMode
+} from "@/lib/drive/name-conflicts";
+import {
+    deleteTrashForever,
+    emptyTrash,
+    hasTrash,
+    moveToTrash,
+    restoreTrash,
+    trashWithDriver
+} from "@/lib/trash-service";
 import {
     AlreadyGoingError,
     cancelDriveJob,
@@ -418,13 +437,17 @@ export async function createFileAction(
         };
     }
     try {
-        const empty = new ReadableStream<Uint8Array>({
-            start(controller) {
-                controller.close();
-            }
-        });
-        await driver.writeStream(target, empty, {});
+        // A new file never empties one that is already there: the name is taken
+        // only if it is free, in the same step that checks it.
+        await claimFileName(driver, target, "fail");
     } catch (caught) {
+        if (caught instanceof NameConflictError) {
+            return {
+                error: (await getTranslations("drive"))("errors.nameTaken", {
+                    name: caught.clash.existingName
+                })
+            };
+        }
         return {
             error: await driveErrorMessage(
                 caught,
@@ -518,9 +541,14 @@ export async function generateZipAction(
     const destPath = normalizeRelPath(destFolder ? `${destFolder}/${fileName}` : fileName);
 
     const driver = await getDriver(connectionId, user.id);
+    let claimed = false;
     try {
         const parent = destPath.split("/").slice(0, -1).join("/");
         if (parent) await driver.mkdir(parent);
+        // The archive never lands on a file that is already there: its name is
+        // taken first, or refused, and given back if the archive fails.
+        await claimFileName(driver, destPath, "fail");
+        claimed = true;
         const lockedRoots = new Set(
             (await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean)
         );
@@ -533,6 +561,14 @@ export async function generateZipAction(
             }
         );
     } catch (caught) {
+        if (claimed) await driver.delete(destPath).catch(() => undefined);
+        if (caught instanceof NameConflictError) {
+            return {
+                error: (await getTranslations("drive"))("errors.nameTaken", {
+                    name: caught.clash.existingName
+                })
+            };
+        }
         return {
             error:
                 caught instanceof Error
@@ -1114,6 +1150,23 @@ async function freeName(driver: Driver, to: string): Promise<string> {
     return withSuffix(to, ` copy ${Date.now()}`);
 }
 
+/**
+ * The clash a move or copy ran into, for the screen to ask about again. A
+ * folder moved or copied onto a folder keeps both - merging is an upload's
+ * choice only.
+ */
+async function transferClash(
+    userId: string,
+    connectionId: string,
+    driver: Driver,
+    source: string,
+    destParent: string,
+    conflict: NameConflictError
+): Promise<ClashView> {
+    const kind = (await driver.stat(source).catch(() => null))?.kind === "dir" ? "dir" : "file";
+    return clashView(userId, connectionId, destParent, conflict.clash, kind, false);
+}
+
 /** Copy a file or a folder (recursively) from one path to another on a driver. */
 async function copyRecursive(driver: Driver, from: string, to: string): Promise<void> {
     const stat = await driver.stat(from);
@@ -1136,13 +1189,22 @@ async function copyRecursive(driver: Driver, from: string, to: string): Promise<
  * " copy" suffix a copy would get, instead of refusing the move and leaving the
  * item behind. Both ends are authorized: the item leaves one folder and is
  * written into another.
+ *
+ * `onConflict` is the person's answer once Drive has asked them about a name
+ * already taken there: `fail` (it was free when they looked - if it is not any
+ * more, the clash comes back to ask about again), `keepBoth` ("name (1)") or
+ * `replace` (a file only: the one there goes to the bin). Left out, the old
+ * " copy" suffix applies, for callers that never ask.
  */
 export async function moveIntoAction(
     connectionId: string,
     from: string,
-    destFolder: string
-): Promise<{ error?: string }> {
+    destFolder: string,
+    onConflict?: ConflictMode
+): Promise<{ error?: string; conflict?: ClashView }> {
     const user = await requireUser();
+    const mode = conflictModeSchema.optional().safeParse(onConflict);
+    if (!mode.success) return { error: (await getTranslations("drive"))("errors.moveFailed") };
     const source = normalizeRelPath(from);
     const destParent = normalizeRelPath(destFolder);
     if (destParent === source || destParent.startsWith(`${source}/`)) {
@@ -1166,9 +1228,32 @@ export async function moveIntoAction(
         // Already where it was asked to go: nothing to do, and a free name would
         // otherwise turn a no-op into a pointless " copy".
         if (destination === source) return {};
-        destination = await freeName(driver, destination);
-        await driver.move(source, destination);
+        if (mode.data === "replace") {
+            await replaceWith(driver, source, destination, {
+                guard: (clash) => assertMayReplace(user.id, connectionId, clash),
+                trash: hasTrash(connectionId)
+                    ? (existing) => trashWithDriver(driver, user.id, connectionId, existing)
+                    : null
+            });
+        } else if (mode.data) {
+            destination = await moveToName(driver, source, destination, mode.data);
+        } else {
+            destination = await freeName(driver, destination);
+            await driver.move(source, destination);
+        }
     } catch (caught) {
+        if (caught instanceof NameConflictError) {
+            return {
+                conflict: await transferClash(
+                    user.id,
+                    connectionId,
+                    driver,
+                    source,
+                    destParent,
+                    caught
+                )
+            };
+        }
         return {
             error: await driveErrorMessage(
                 caught,
@@ -1197,14 +1282,19 @@ export async function moveIntoAction(
 /**
  * Copy an item into a destination folder within the same connection. The driver
  * has a native move but no copy, so this streams file bytes and walks folders.
- * Collisions get a " copy" suffix so pasting into the source folder is safe.
+ * Collisions get a " copy" suffix so pasting into the source folder is safe -
+ * unless `onConflict` carries the person's answer to a clash Drive asked them
+ * about, which works as it does for `moveIntoAction`.
  */
 export async function copyAction(
     connectionId: string,
     from: string,
-    destFolder: string
-): Promise<{ error?: string }> {
+    destFolder: string,
+    onConflict?: ConflictMode
+): Promise<{ error?: string; conflict?: ClashView }> {
     const user = await requireUser();
+    const mode = conflictModeSchema.optional().safeParse(onConflict);
+    if (!mode.success) return { error: (await getTranslations("drive"))("errors.copyFailed") };
     const source = normalizeRelPath(from);
     const base = baseName(source);
     // Refuse to copy a folder into itself or a descendant: copyRecursive would walk
@@ -1227,14 +1317,54 @@ export async function copyAction(
             )
         };
     }
-    let destination = "";
+    let destination = normalizeRelPath(destFolder ? `${destFolder}/${base}` : base);
     try {
-        destination = await freeName(
-            driver,
-            normalizeRelPath(destFolder ? `${destFolder}/${base}` : base)
-        );
-        await copyRecursive(driver, source, destination);
+        if (mode.data === "replace") {
+            // Copied to a hidden name first, so a copy that fails partway has
+            // not already put the file it was replacing in the bin.
+            const staged = stagingPath(destination);
+            try {
+                await copyRecursive(driver, source, staged);
+                await replaceWith(driver, staged, destination, {
+                    guard: (clash) => assertMayReplace(user.id, connectionId, clash),
+                    trash: hasTrash(connectionId)
+                        ? (existing) => trashWithDriver(driver, user.id, connectionId, existing)
+                        : null
+                });
+            } catch (error) {
+                await driver.delete(staged).catch(() => undefined);
+                throw error;
+            }
+        } else if (mode.data) {
+            // The name is taken before the copy starts, so nothing that arrives
+            // meanwhile is copied over; a file copy that fails gives it back.
+            const isDir = (await driver.stat(source)).kind === "dir";
+            destination = isDir
+                ? await claimFolderName(driver, destination, mode.data)
+                : await claimFileName(driver, destination, mode.data);
+            try {
+                await copyRecursive(driver, source, destination);
+            } catch (error) {
+                if (!isDir) await driver.delete(destination).catch(() => undefined);
+                throw error;
+            }
+        } else {
+            destination = await freeName(driver, destination);
+            await copyRecursive(driver, source, destination);
+        }
     } catch (caught) {
+        if (caught instanceof NameConflictError) {
+            return {
+                conflict: await transferClash(
+                    user.id,
+                    connectionId,
+                    driver,
+                    source,
+                    destParent,
+                    caught
+                )
+            };
+        }
         return {
             error: await driveErrorMessage(
                 caught,

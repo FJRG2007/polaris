@@ -1107,5 +1107,30 @@
         "storageUsage": "Storage usage",
         "theDiskYourFilesSit": "The disk your files sit on, not what your own drive takes up.",
         "thisBackendDoesNotReport": "This backend does not report storage usage."
+    },
+    "conflicts": {
+        "checkFailed": "Could not check this folder for items with the same names. Try again.",
+        "titleOne": "This name is already taken",
+        "title": "{count, plural, one {# name is} other {# names are}} already taken here",
+        "existsFile": "A file named \"{name}\" is already in this folder.",
+        "existsFolder": "A folder named \"{name}\" is already in this folder.",
+        "late": "\"{name}\" was added to this folder while yours was on its way.",
+        "position": "{current} of {total}",
+        "replace": "Replace",
+        "merge": "Merge folders",
+        "keepBoth": "Keep both",
+        "skip": "Skip",
+        "replaceToBin": "Replace: the current file moves to the trash, where you can restore it.",
+        "replaceForGood": "Replace: this location has no trash, so the current file is overwritten for good.",
+        "mergeHint": "Merge: the contents end up in one folder. You're asked about any file that is in both.",
+        "keepBothHint": "Keep both: the new one gets a number after its name.",
+        "alsoTaken": "Also taken ({count}):",
+        "applyToAll": "Do this for all {count} items",
+        "blocked": {
+            "permission": "You can't replace it: you don't have permission to change the existing {kind, select, dir {folder} other {file}}.",
+            "locked": "You can't replace it: the existing {kind, select, dir {folder} other {file}} is locked.",
+            "kind": "You can't replace it: one is a file and the other is a folder.",
+            "merge": "Moving or copying a folder onto one with the same name keeps both."
+        }
     }
 }

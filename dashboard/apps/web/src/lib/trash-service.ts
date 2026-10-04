@@ -173,34 +173,61 @@ export async function moveToTrash(
     }
     const driver = await getDriver(connectionId, ownerId);
     try {
-        // Something that is not there any more is already in the state the caller
-        // asked for. Two people pressing Delete on the same row, or a stale
-        // listing, should not produce an error about a file nobody has.
-        if (!(await exists(driver, source))) return;
-        const stat = await driver.stat(source);
-        const name = baseName(source) || source;
-        const trashPath = `${TRASH_DIR}/${randomBytes(6).toString("hex")}-${name}`;
-        try {
-            await driver.mkdir(TRASH_DIR);
-        } catch {
-            // Trash folder already exists (or the driver made it implicitly).
-        }
-        await driver.move(source, trashPath);
-        await prisma.trashItem.create({
-            data: {
-                ownerId,
-                connectionId,
-                name,
-                originalPath: source,
-                trashPath,
-                kind: stat.kind,
-                size: stat.size
-            }
-        });
+        await trashWithDriver(driver, ownerId, connectionId, source);
     } finally {
         await driver.dispose();
     }
     await invalidateFolderSizes(connectionId, source);
+}
+
+/** Whether replacing a file on this source can put the old one in the bin. */
+export function hasTrash(connectionId: string): boolean {
+    return trackable(connectionId);
+}
+
+/**
+ * `moveToTrash` over a driver the caller already holds and has authorized - for
+ * a write that retires a file as one step of its own, such as an upload that
+ * replaces one. The bin row is recorded against `ownerId`, the person whose
+ * action put it there, so it is in their bin to restore.
+ */
+export async function trashWithDriver(
+    driver: Driver,
+    ownerId: string,
+    connectionId: string,
+    path: string
+): Promise<void> {
+    const source = normalizeRelPath(path);
+    if (!source || source === POLARIS_DIR || source.startsWith(`${POLARIS_DIR}/`)) return;
+    if (!trackable(connectionId)) {
+        throw new TrashUnavailableError(
+            "This source has no recycle bin. Use Delete permanently instead."
+        );
+    }
+    // Something that is not there any more is already in the state the caller
+    // asked for. Two people pressing Delete on the same row, or a stale
+    // listing, should not produce an error about a file nobody has.
+    if (!(await exists(driver, source))) return;
+    const stat = await driver.stat(source);
+    const name = baseName(source) || source;
+    const trashPath = `${TRASH_DIR}/${randomBytes(6).toString("hex")}-${name}`;
+    try {
+        await driver.mkdir(TRASH_DIR);
+    } catch {
+        // Trash folder already exists (or the driver made it implicitly).
+    }
+    await driver.move(source, trashPath);
+    await prisma.trashItem.create({
+        data: {
+            ownerId,
+            connectionId,
+            name,
+            originalPath: source,
+            trashPath,
+            kind: stat.kind,
+            size: stat.size
+        }
+    });
 }
 
 /** Every trashed item owned by the user, newest first, with its connection name. */

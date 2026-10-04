@@ -35,6 +35,19 @@ const MAX_ATTEMPTS = 200;
 /** Serializes name claims per destination folder. */
 const claims = new Map<string, Promise<unknown>>();
 
+/**
+ * Run `job` while no other name claim in `folder` of this storage is running.
+ * For any writer that has to decide a name and take it as one step - the
+ * visitors' uploads here, and Drive's own conflict-aware ones.
+ */
+export function withNameLock<T>(
+    driver: StorageDriver,
+    folder: string,
+    job: () => Promise<T>
+): Promise<T> {
+    return serialized(`${driver.id}:${folder}`, job);
+}
+
 /** Run `job` after any prior job for the same folder has finished. */
 async function serialized<T>(key: string, job: () => Promise<T>): Promise<T> {
     const prior = claims.get(key) ?? Promise.resolve();

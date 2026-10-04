@@ -81,11 +81,31 @@ export function extName(name: string): string {
  */
 export function numberedName(name: string, attempt: number): string {
     const base = baseName(name);
-    if (attempt <= 1) return base;
+    return attempt <= 1 ? base : withCopyNumber(base, attempt);
+}
+
+/**
+ * A name with " (n)" before its extension: "report.pdf" and 1 give
+ * "report (1).pdf". What "Keep both" names the arrival in Drive, the way every
+ * desktop file manager does; the extension rules are `numberedName`'s.
+ */
+export function withCopyNumber(name: string, copy: number): string {
+    const base = baseName(name);
     const dot = base.lastIndexOf(".");
     // idx <= 0 is a dotfile or a name with no extension: nothing to preserve.
-    if (dot <= 0) return `${base} (${attempt})`;
-    return `${base.slice(0, dot)} (${attempt})${base.slice(dot)}`;
+    if (dot <= 0) return `${base} (${copy})`;
+    return `${base.slice(0, dot)} (${copy})${base.slice(dot)}`;
+}
+
+/**
+ * The form two Drive names are compared in. Drive treats "Report.pdf" and
+ * "report.pdf" as the same name - most of the storages behind it (SMB, a NAS
+ * share, a Windows or macOS disk) do - so a clash is decided on this key and
+ * never on the raw strings. NFC first, so the same accented name typed on two
+ * systems is not two names.
+ */
+export function driveNameKey(name: string): string {
+    return name.normalize("NFC").toLowerCase();
 }
 
 /** Join a normalized relative path onto a root, returning a safe POSIX join. */

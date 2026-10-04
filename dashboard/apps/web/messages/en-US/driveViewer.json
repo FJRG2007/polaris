@@ -154,7 +154,19 @@
         "aFileWithThisName": "A file with this name already exists here and will be replaced.",
         "cancel": "Cancel",
         "replace": "Replace",
-        "saveCopy": "Save copy"
+        "saveCopy": "Save copy",
+        "problems": {
+            "unavailable": "This file cannot be saved from here.",
+            "denied": "Could not save - you may not have write access here.",
+            "locked": "This file is locked.",
+            "nameTaken": "A file with that name was just added here. Pick another name.",
+            "failed": "Could not save this file.",
+            "prepareFailed": "Could not prepare this file.",
+            "nameEmpty": "Enter a file name",
+            "nameTooLong": "That name is too long",
+            "nameIllegalChars": "A name cannot contain \\ / : * ? \" < > |",
+            "nameInvalid": "That name is not valid"
+        }
     },
     "find": {
         "findInThisFile": "Find in this file",

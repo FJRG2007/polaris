@@ -64,6 +64,11 @@ Drive explorer (interaction):
       aggregate bytes), reading the archive via a private temp file
 - [x] Preview/analyze a zip/rar (list entries + sizes) without extracting; rar is
       read-only (node-unrar-js WASM), zip via node-stream-zip
+- [x] Name-clash prompt: an upload, paste or move that meets a name already
+      taken asks Replace/Merge, Keep both, or Skip, with "Apply to all" for a
+      batch; decided on `driveNameKey` (NFC-normalized, case-insensitive) and
+      enforced server-side under the folder's name lock so two uploads racing
+      for the same name cannot both win
 - [ ] Live end-to-end run against a real NAS/SFTP backend (built + typechecked;
       archive read/write paths not exercised on this dev machine)
 
