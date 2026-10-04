@@ -31,7 +31,7 @@ export const MCP_PROTOCOL_VERSION = "2025-06-18";
 
 /** Revisions whose request shapes this handles. A client asking for one of these
  *  is answered in the one it asked for. */
-const SPOKEN_VERSIONS = new Set(["2025-06-18", "2025-03-26", "2024-11-05"]);
+const SPOKEN_VERSIONS = new Set(["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]);
 
 // ---------------------------------------------------------------------------
 // Tools
@@ -50,6 +50,10 @@ export interface McpCaller {
     /** Set on a token minted from a Deploy project: the deploy tools reach that
      *  project and no other. */
     readonly projectId?: string | null;
+    /** The connected app (an OAuth grant) that is calling, when the credential
+     *  is an access token rather than a key. Exactly one of this and `keyId` is
+     *  set for a person's own client; neither for a session's token. */
+    readonly grantId?: string | null;
 }
 
 /** What a tool gives back. Text because that is what a model reads; `structured`
@@ -94,16 +98,36 @@ export interface McpTool<Input = never> {
     /** Whether calling it can change anything. Advertised to the client, which is
      *  what lets an agent be run in a mode that may look but not touch. */
     readonly readOnly: boolean;
+    /** For a tool that changes something: whether the change can destroy or
+     *  overwrite what was there (true, the default) or only adds (false). A
+     *  client asks before a destructive call, so marking an additive one as
+     *  destructive costs a confirmation and marking a destructive one additive
+     *  costs the confirmation that mattered. */
+    readonly destructive?: boolean;
+    /** Calling it twice with the same arguments does nothing the first call did
+     *  not. */
+    readonly idempotent?: boolean;
+    /** What a client shows a person in place of the name. */
+    readonly title?: string;
     run(input: Input, caller: McpCaller): Promise<McpToolResult>;
 }
 
 /** A tool as MCP describes it on the wire. */
 export function describeTool(tool: McpTool<never>): Record<string, unknown> {
+    const destructive = !tool.readOnly && (tool.destructive ?? true);
     return {
         name: tool.name,
+        ...(tool.title ? { title: tool.title } : {}),
         description: tool.description,
         inputSchema: toJsonSchema(tool.input as z.ZodTypeAny),
-        annotations: { readOnlyHint: tool.readOnly, destructiveHint: !tool.readOnly }
+        annotations: {
+            ...(tool.title ? { title: tool.title } : {}),
+            readOnlyHint: tool.readOnly,
+            destructiveHint: destructive,
+            idempotentHint: tool.readOnly || (tool.idempotent ?? false),
+            // Everything these tools reach is this Polaris and nothing past it.
+            openWorldHint: false
+        }
     };
 }
 
@@ -242,7 +266,7 @@ async function callTool(
     // Scope before shape. A caller who may not use the tool at all should not
     // learn its argument names by being told which of them they got wrong.
     if (tool.scope && !caller.scopes.includes(tool.scope)) {
-        return toolFailure(id, `This key cannot ${tool.name}. It needs the ${tool.scope} scope.`);
+        return toolFailure(id, `This connection cannot ${tool.name}. It needs the ${tool.scope} scope.`);
     }
 
     const args = tool.input.safeParse(params.arguments ?? {});

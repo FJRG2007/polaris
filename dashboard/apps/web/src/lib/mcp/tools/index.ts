@@ -8,11 +8,15 @@
  */
 
 import { z } from "zod";
+import { CHAT_TOOLS } from "./chat";
 import { prisma } from "@polaris/db";
+import { NOTE_TOOLS } from "./notes";
 import { TASK_TOOLS } from "./tasks";
+import { DRIVE_TOOLS } from "./drive";
 import { DEPLOY_TOOLS } from "./deploy";
 import { SESSION_TOOLS } from "./sessions";
 import type { McpTool } from "../protocol";
+import { CALENDAR_TOOLS } from "./calendar";
 
 const whoamiInput = z.object({});
 
@@ -26,6 +30,8 @@ const whoamiInput = z.object({});
  */
 const whoami: McpTool<z.infer<typeof whoamiInput>> = {
     name: "polaris_whoami",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Who am I",
     // i18n-ignore read by the calling model, not shown to a person
     description: "Who this key acts as on this Polaris, and what it is allowed to do.",
     input: whoamiInput,
@@ -55,5 +61,9 @@ export const MCP_TOOLS: readonly McpTool<never>[] = [
     whoami as unknown as McpTool<never>,
     ...TASK_TOOLS,
     ...SESSION_TOOLS,
-    ...DEPLOY_TOOLS
+    ...DEPLOY_TOOLS,
+    ...NOTE_TOOLS,
+    ...CHAT_TOOLS,
+    ...DRIVE_TOOLS,
+    ...CALENDAR_TOOLS
 ];

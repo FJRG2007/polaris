@@ -62,6 +62,8 @@ const projectsInput = z.object({});
 
 const projectsTool: McpTool<z.infer<typeof projectsInput>> = {
     name: "deploy_projects",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List Deploy projects",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Every Deploy project this key can reach, with each environment's services and what they are doing. Start here to find the name of a service.",
@@ -89,6 +91,8 @@ const projectsTool: McpTool<z.infer<typeof projectsInput>> = {
 
 const serviceTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_service",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Read a service",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "One service: where its code or image comes from, whether it is running, and the hostnames it answers on.",
@@ -115,6 +119,8 @@ const serviceTool: McpTool<z.infer<typeof serviceInput>> = {
 
 const startTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_start",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Deploy a service",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Deploy a service from its configured source. Returns at once with the deployment id; read its progress with deploy_deployment. Does not change how the service is built.",
@@ -134,6 +140,8 @@ const startTool: McpTool<z.infer<typeof serviceInput>> = {
 
 const deploymentsTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_deployments",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List deployments",
     // i18n-ignore read by the calling model, not shown to a person
     description: "A service's recent deployments, newest first, with status and commit.",
     input: serviceInput,
@@ -173,6 +181,8 @@ const deploymentInput = z.object({
 
 const deploymentTool: McpTool<z.infer<typeof deploymentInput>> = {
     name: "deploy_deployment",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Read a deployment",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "A deployment's status and the end of its build log - what to read when a deploy failed, or to see whether it has finished.",
@@ -201,6 +211,8 @@ const logsInput = serviceInput.extend({
 
 const logsTool: McpTool<z.infer<typeof logsInput>> = {
     name: "deploy_logs",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Read a service's logs",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "What a service's running container has printed recently. For a failed build use deploy_deployment instead - this is the app's own output.",
@@ -217,6 +229,8 @@ const logsTool: McpTool<z.infer<typeof logsInput>> = {
 
 const variablesTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_variables",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List variables",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "A service's environment variables by name. Secret values are never shown - only that the variable exists.",
@@ -241,12 +255,15 @@ const setVariableInput = serviceInput.merge(setVariableSchema);
 
 const setVariableTool: McpTool<z.infer<typeof setVariableInput>> = {
     name: "deploy_set_variable",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Set a variable",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Set one environment variable on a service (secret by default). The running service keeps its old value until it is redeployed: pass redeploy to do that now, or deploy once after setting several.",
     input: setVariableInput,
     scope: "deploy.manage",
     readOnly: false,
+    // Not idempotent: with redeploy set, every call starts another deployment.
     async run(input, caller) {
         const { redeployed } = await attempt("save the variable", () =>
             surface.setVariable(
@@ -266,6 +283,8 @@ const setVariableTool: McpTool<z.infer<typeof setVariableInput>> = {
 
 const domainsTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_domains",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List domains",
     // i18n-ignore read by the calling model, not shown to a person
     description: "The hostnames a service answers on, with whether each is enabled and reachable.",
     input: serviceInput,
@@ -292,12 +311,15 @@ const addDomainInput = serviceInput.merge(addDomainSchema);
 
 const addDomainTool: McpTool<z.infer<typeof addDomainInput>> = {
     name: "deploy_add_domain",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Attach a domain",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Attach a hostname to a service, or its free subdomain when no hostname is given. Does not buy or register a domain.",
     input: addDomainInput,
     scope: "deploy.manage",
     readOnly: false,
+    destructive: false,
     async run(input, caller) {
         const added = await attempt("add the domain", () =>
             surface.addDomain(deployCaller(caller), input.service, {
@@ -312,6 +334,8 @@ const addDomainTool: McpTool<z.infer<typeof addDomainInput>> = {
 
 const restartTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_restart",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Restart a service",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Restart a service's running container from its current configuration. Does not rebuild it.",
@@ -332,6 +356,8 @@ const rollbackInput = z.object({
 
 const rollbackTool: McpTool<z.infer<typeof rollbackInput>> = {
     name: "deploy_rollback",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Roll back a service",
     description:
         // i18n-ignore read by the calling model, not shown to a person
         "Make an earlier deployment of a service its running release again, from its kept image - nothing is rebuilt. Only releases deploy_deployments marks as able to roll back qualify.",
@@ -352,13 +378,13 @@ const rollbackTool: McpTool<z.infer<typeof rollbackInput>> = {
 export const DEPLOY_TOOLS: readonly McpTool<never>[] = [
     projectsTool,
     serviceTool,
-    startTool,
     deploymentsTool,
     deploymentTool,
     logsTool,
     variablesTool,
-    setVariableTool,
     domainsTool,
+    startTool,
+    setVariableTool,
     addDomainTool,
     restartTool,
     rollbackTool

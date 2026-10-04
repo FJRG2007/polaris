@@ -35,6 +35,10 @@ describe("the catalogue", () => {
         }
     });
 
+    it("gives every tool a title a client can show a person in place of its name", () => {
+        for (const tool of MCP_TOOLS) expect(tool.title, tool.name).toBeTruthy();
+    });
+
     it("has no two tools sharing a name", () => {
         const names = MCP_TOOLS.map((tool) => tool.name);
         expect(new Set(names).size).toBe(names.length);
