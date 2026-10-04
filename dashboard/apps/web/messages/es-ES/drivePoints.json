@@ -222,7 +222,11 @@
         "couldNotDeleteIt": "No se pudo borrar",
         "noTextDropPointsYet": "Aún no hay buzones de texto. Usa \"Pedir texto\" para obtener un enlace donde alguien pueda pegar un .env o una clave.",
         "copyTheLink": "Copiar el enlace",
-        "reopen": "Reabrir"
+        "reopen": "Reabrir",
+        "tableLabel": "Entregas de texto",
+        "answers": "Respuestas",
+        "deleteMany": "¿Eliminar {count, plural, one {# punto de entrega de texto} other {# puntos de entrega de texto}}?",
+        "theLinksStopWorking": "Sus enlaces dejan de funcionar. Lo que recogieron se queda en tus fragmentos."
     },
     "list": {
         "closeThisDropPoint": "¿Cerrar este buzón?",
@@ -243,7 +247,24 @@
         "reopenNamed": "Reabrir {name}",
         "closeNamed": "Cerrar {name}",
         "deleteNamed": "Borrar {name}",
-        "noMatch": "Ningún buzón coincide con «{query}»."
+        "noMatch": "Ningún buzón coincide con «{query}».",
+        "tableLabel": "Entregas de archivos",
+        "selectAll": "Todos",
+        "selectNamed": "Seleccionar {name}",
+        "name": "Nombre",
+        "destination": "Guarda en",
+        "files": "Archivos",
+        "state": "Estado",
+        "window": "Abierto",
+        "actions": "Acciones",
+        "signInRequired": "Requiere sesión",
+        "opensOn": "Abre el {date}",
+        "untilOn": "Hasta el {date}",
+        "someNotDeleted": "{count, plural, one {# no se eliminó} other {# no se eliminaron}}",
+        "selectionLabel": "Puntos seleccionados",
+        "selected": "{count} seleccionados",
+        "deleteSelected": "Eliminar {count}",
+        "clearSelection": "Quitar la selección"
     },
     "deleteDialog": {
         "theLinkStopsWorkingAnd": "El enlace deja de funcionar y el registro de lo recogido se va con él.",
@@ -253,7 +274,12 @@
         "delete": "Borrar",
         "title": "¿Borrar {name}?",
         "files": "{count, plural, =0 { - vacía} one { - 1 archivo recogido} other { - {count} archivos recogidos}}",
-        "noFolder": "Este recoge directamente en {name}, así que no tiene carpeta propia. Lo recogido se queda donde está."
+        "noFolder": "Este recoge directamente en {name}, así que no tiene carpeta propia. Lo recogido se queda donde está.",
+        "titleMany": "¿Eliminar {count, plural, one {# punto de entrega} other {# puntos de entrega}}?",
+        "theLinksStopWorking": "Sus enlaces dejan de funcionar y el registro de lo que recogió cada uno desaparece con ellos.",
+        "deleteTheirFoldersToo": "Eliminar también sus carpetas",
+        "foldersSummary": "{folders, plural, one {# carpeta} other {# carpetas}} - {files, plural, =0 {vacías} one {1 archivo recogido} other {# archivos recogidos}}",
+        "noFolderMany": "Ninguno tiene carpeta propia. Lo que recogieron se queda donde está."
     },
     "newButton": {
         "newDropPoint": "Nuevo buzón",

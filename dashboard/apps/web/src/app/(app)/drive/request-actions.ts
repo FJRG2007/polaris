@@ -330,8 +330,66 @@ export async function deleteFileRequestAction(
     deleteFolder: boolean
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
-    const request = await dropPoints.getFileRequestForOwner(user.id, requestId);
+    const result = await removeFileRequest(user.id, String(requestId), Boolean(deleteFolder), false);
+    if (!result.error) revalidatePath("/drive/drop-points");
+    return result;
+}
+
+/** The most drop points one bulk delete takes. More than anybody selects by
+ *  hand, and a bound on how long one request may hold the server. */
+const BULK_DELETE_MAX = 500;
+
+const bulkDeleteSchema = z.object({
+    requestIds: z.array(z.string().uuid()).min(1).max(BULK_DELETE_MAX),
+    deleteFolders: z.boolean()
+});
+
+/**
+ * Delete several drop points at once, with or without their folders.
+ *
+ * One at a time on the server, each with exactly the rules a single delete
+ * has: the folder goes first and a refusal keeps that drop point, a folder
+ * already gone is not a refusal. A drop point that collects into the
+ * connection's own root has no folder of its own, so for those the choice is
+ * simply not applied rather than refused - the dialog says as much. What could
+ * not be deleted comes back by id with its reason, and the rest are gone.
+ */
+export async function deleteFileRequestsAction(
+    requestIds: string[],
+    deleteFolders: boolean
+): Promise<{ deleted: string[]; failed: { id: string; error: string }[]; error?: string }> {
+    const user = await requirePermission("requests.create");
+    const parsed = bulkDeleteSchema.safeParse({ requestIds, deleteFolders });
+    if (!parsed.success) {
+        return { deleted: [], failed: [], error: (await getTranslations("drive"))("errors.dropPointGone") };
+    }
+    const deleted: string[] = [];
+    const failed: { id: string; error: string }[] = [];
+    for (const id of new Set(parsed.data.requestIds)) {
+        const result = await removeFileRequest(user.id, id, parsed.data.deleteFolders, true);
+        if (result.error) failed.push({ id, error: result.error });
+        else deleted.push(id);
+    }
+    if (deleted.length > 0) revalidatePath("/drive/drop-points");
+    return { deleted, failed };
+}
+
+/**
+ * Delete one drop point the user owns, and its folder when asked.
+ *
+ * @param skipRootFolder - For a bulk delete: a drop point with no folder of its
+ *     own is deleted without one instead of being refused.
+ */
+async function removeFileRequest(
+    userId: string,
+    requestId: string,
+    deleteFolder: boolean,
+    skipRootFolder: boolean
+): Promise<{ error?: string }> {
+    const request = await dropPoints.getFileRequestForOwner(userId, requestId);
     if (!request) return { error: (await getTranslations("drive"))("errors.dropPointGone") };
+    const ownFolder = normalizeRelPath(request.destinationPath) !== "";
+    if (skipRootFolder && !ownFolder) deleteFolder = false;
 
     if (deleteFolder) {
         // The drop point collects into the connection's own root, so there is no
@@ -345,7 +403,7 @@ export async function deleteFileRequestAction(
         }
         try {
             await authorizeDrive(
-                user.id,
+                userId,
                 request.destinationConnectionId,
                 request.destinationPath,
                 "write"
@@ -374,11 +432,11 @@ export async function deleteFileRequestAction(
         }
     }
 
-    if (!(await dropPoints.deleteFileRequestForOwner(user.id, requestId))) {
+    if (!(await dropPoints.deleteFileRequestForOwner(userId, requestId))) {
         return { error: (await getTranslations("drive"))("errors.dropPointGone") };
     }
     await recordAudit({
-        actorId: user.id,
+        actorId: userId,
         action: "request.delete",
         targetType: "fileRequest",
         targetId: requestId,
@@ -388,7 +446,6 @@ export async function deleteFileRequestAction(
             folderDeleted: deleteFolder
         }
     });
-    revalidatePath("/drive/drop-points");
     return {};
 }
 

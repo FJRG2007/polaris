@@ -11,6 +11,7 @@
  * sender's control.
  */
 
+import { z } from "zod";
 import { cookies } from "next/headers";
 import { getTranslations } from "@/lib/i18n/request";
 import { loadEnv } from "@polaris/config";
@@ -139,6 +140,38 @@ export async function deleteTextRequestAction(requestId: string): Promise<{ erro
     });
     revalidateDropPoints();
     return {};
+}
+
+const bulkTextDeleteSchema = z.array(z.string().uuid()).min(1).max(500);
+
+/**
+ * Delete several text drop points at once. What each collected stays in the
+ * owner's snippets, as it does for one. Answers which went and which did not.
+ */
+export async function deleteTextRequestsAction(
+    requestIds: string[]
+): Promise<{ deleted: string[]; failed: { id: string; error: string }[]; error?: string }> {
+    const user = await requirePermission("requests.create");
+    const t = await getTranslations("drive");
+    const parsed = bulkTextDeleteSchema.safeParse(requestIds);
+    if (!parsed.success) return { deleted: [], failed: [], error: t("errors.dropPointNotYours") };
+    const deleted: string[] = [];
+    const failed: { id: string; error: string }[] = [];
+    for (const id of new Set(parsed.data)) {
+        if (!(await textRequests.deleteTextRequest(user.id, id))) {
+            failed.push({ id, error: t("errors.dropPointNotYours") });
+            continue;
+        }
+        deleted.push(id);
+        await recordAudit({
+            actorId: user.id,
+            action: "text-request.delete",
+            targetType: "text-request",
+            targetId: id
+        });
+    }
+    if (deleted.length > 0) revalidateDropPoints();
+    return { deleted, failed };
 }
 
 /**

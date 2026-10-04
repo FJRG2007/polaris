@@ -222,7 +222,11 @@
         "couldNotDeleteIt": "Could not delete it",
         "noTextDropPointsYet": "No text drop points yet. Use \"Ask for text\" to get a link somebody can paste an .env or a key into.",
         "copyTheLink": "Copy the link",
-        "reopen": "Reopen"
+        "reopen": "Reopen",
+        "tableLabel": "Text drop points",
+        "answers": "Answers",
+        "deleteMany": "Delete {count, plural, one {# text drop point} other {# text drop points}}?",
+        "theLinksStopWorking": "Their links stop working. What they collected stays in your snippets."
     },
     "list": {
         "closeThisDropPoint": "Close this drop point?",
@@ -243,7 +247,24 @@
         "reopenNamed": "Reopen {name}",
         "closeNamed": "Close {name}",
         "deleteNamed": "Delete {name}",
-        "noMatch": "No drop points match \"{query}\"."
+        "noMatch": "No drop points match \"{query}\".",
+        "tableLabel": "File drop points",
+        "selectAll": "Select all",
+        "selectNamed": "Select {name}",
+        "name": "Name",
+        "destination": "Collects into",
+        "files": "Files",
+        "state": "Status",
+        "window": "Open window",
+        "actions": "Actions",
+        "signInRequired": "Sign-in required",
+        "opensOn": "Opens {date}",
+        "untilOn": "Until {date}",
+        "someNotDeleted": "{count, plural, one {# was not deleted} other {# were not deleted}}",
+        "selectionLabel": "Selected drop points",
+        "selected": "{count} selected",
+        "deleteSelected": "Delete {count}",
+        "clearSelection": "Clear the selection"
     },
     "deleteDialog": {
         "theLinkStopsWorkingAnd": "The link stops working and the record of what was collected goes with it.",
@@ -253,7 +274,12 @@
         "delete": "Delete",
         "title": "Delete {name}?",
         "files": "{count, plural, =0 { - empty} one { - 1 collected file} other { - {count} collected files}}",
-        "noFolder": "This one collects straight into {name}, so it has no folder of its own. Whatever was collected stays where it is."
+        "noFolder": "This one collects straight into {name}, so it has no folder of its own. Whatever was collected stays where it is.",
+        "titleMany": "Delete {count, plural, one {# drop point} other {# drop points}}?",
+        "theLinksStopWorking": "Their links stop working and the record of what each collected goes with them.",
+        "deleteTheirFoldersToo": "Delete their folders too",
+        "foldersSummary": "{folders, plural, one {# folder} other {# folders}} - {files, plural, =0 {empty} one {1 collected file} other {# collected files}}",
+        "noFolderMany": "None of these has a folder of its own. Whatever they collected stays where it is."
     },
     "newButton": {
         "newDropPoint": "New drop point",

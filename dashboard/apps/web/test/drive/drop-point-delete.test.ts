@@ -55,7 +55,9 @@ vi.mock("@/lib/file-request-service", () => ({
     deleteFileRequestForOwner: deleteForOwner
 }));
 
-const { deleteFileRequestAction } = await import("../../src/app/(app)/drive/request-actions");
+const { deleteFileRequestAction, deleteFileRequestsAction } = await import(
+    "../../src/app/(app)/drive/request-actions"
+);
 
 beforeEach(() => {
     // clearAllMocks forgets the calls, not the one-off outcomes a case installed,
@@ -200,5 +202,60 @@ describe("a drop point that collects into the connection itself", () => {
         expect(await deleteFileRequestAction(REQUEST, false)).toEqual({});
         expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
         expect(driverDelete).not.toHaveBeenCalled();
+    });
+});
+
+describe("deleting several drop points at once", () => {
+    const A = "018f2b7a-0000-7000-8000-0000000000c1";
+    const B = "018f2b7a-0000-7000-8000-0000000000c2";
+    const ROOT = "018f2b7a-0000-7000-8000-0000000000c3";
+
+    beforeEach(() => {
+        getForOwner.mockImplementation(async (_owner: string, id: string) => ({
+            id,
+            destinationConnectionId: CONNECTION,
+            destinationPath: id === ROOT ? "" : `Drop Points/${id}`
+        }));
+    });
+
+    it("deletes each with its folder, and keeps the one whose folder would not go", async () => {
+        driverDelete.mockImplementation(async (path: string) => {
+            if (path === `Drop Points/${B}`) throw new StorageError("io_error", "share offline");
+        });
+
+        const result = await deleteFileRequestsAction([A, B, ROOT], true);
+
+        expect(result.deleted).toEqual([A, ROOT]);
+        expect(result.failed).toHaveLength(1);
+        expect(result.failed[0]?.id).toBe(B);
+        expect(result.failed[0]?.error).toContain("could not be deleted");
+        // One with no folder of its own is deleted without one, not refused, and
+        // the connection itself is never touched.
+        expect(driverDelete).not.toHaveBeenCalledWith("", expect.anything());
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, ROOT);
+        expect(deleteForOwner).not.toHaveBeenCalledWith(OWNER, B);
+    });
+
+    it("leaves every folder alone when the choice is off", async () => {
+        const result = await deleteFileRequestsAction([A, B], false);
+        expect(result.deleted).toEqual([A, B]);
+        expect(driverDelete).not.toHaveBeenCalled();
+    });
+
+    it("treats folders that are already gone as done", async () => {
+        driverDelete.mockRejectedValue(
+            Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" })
+        );
+        const result = await deleteFileRequestsAction([A, B], true);
+        expect(result.deleted).toEqual([A, B]);
+        expect(result.failed).toEqual([]);
+    });
+
+    it("refuses a list that is not a list of drop point ids", async () => {
+        const result = await deleteFileRequestsAction(["../etc"], true);
+        expect(result.deleted).toEqual([]);
+        expect(result.error).toBeTruthy();
+        expect(getForOwner).not.toHaveBeenCalled();
+        expect((await deleteFileRequestsAction([], true)).error).toBeTruthy();
     });
 });
