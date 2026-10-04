@@ -33,20 +33,51 @@ const snapshotKey = (installedAppId: string) => `minecraft-login:${installedAppI
 /** The login state to hand a component that would otherwise read its own. */
 export type LoginStateHandle = ReturnType<typeof useLoginState>;
 
+/** How soon Polaris login's state is read again while somebody is on the server
+ *  without a password - at the prompt to set one, which is the change a screen
+ *  showing them is waiting for. */
+export const LOGIN_LIVE_MS = 5_000;
+/** And otherwise: a password reset elsewhere, a server checking in after a
+ *  restart. The mod itself checks in every minute. */
+export const LOGIN_IDLE_MS = 30_000;
+
+/** Whether somebody on the server has no password yet, with the mod on: what
+ *  the quicker of the two cadences above is for. Names are compared folded,
+ *  because the game and the mod may not spell one the same way. */
+export function awaitingPassword(
+    state: LoginState | null,
+    online: readonly string[] | undefined
+): boolean {
+    if (state?.on !== true || !online?.length) return false;
+    const set = new Set(state.players.map((player) => player.name.toLowerCase()));
+    return online.some((name) => !set.has(name.toLowerCase()));
+}
+
+/** The shortest gap between two reads that coming back to the tab starts: a
+ *  window that regains focus and becomes visible fires both events at once. */
+const RETURN_GAP_MS = 2_000;
+
 /**
  * The mod's state on one server, read when `enabled`.
  *
  * `initial` is what the page was rendered with, so the first paint already has
  * it; without one, the last answer this tab kept is used, read after hydration
  * so the server's markup and the browser's first render agree. `refreshMs` reads
- * it again on that interval, for a screen that has to notice the server checking
- * in after a restart.
+ * it again that long after each read finishes, for a screen that has to notice a
+ * player setting their password or the server checking in after a restart; given
+ * as a function of what is held, it can quicken while something is happening.
+ *
+ * Read the way the server's own poll is: a hidden tab asks nothing, and coming
+ * back to it - visible again, or focused again from the game's window, which is
+ * where a password is set - reads at once rather than an interval late. An answer
+ * equal to what is held is not swapped in, so nothing that draws it re-renders,
+ * and an answer older than one already applied is dropped.
  */
 export function useLoginState(
     installedAppId: string,
     initial: LoginState | null,
     enabled: boolean,
-    refreshMs?: number
+    refreshMs?: number | ((state: LoginState | null) => number)
 ) {
     const [state, setState] = useState<LoginState | null>(enabled ? initial : null);
     const [loaded, setLoaded] = useState(state !== null);
@@ -56,6 +87,13 @@ export function useLoginState(
     // Minecraft tabs that one call headed the queue every other action waits in.
     const t = useGameText("minecraft");
     const seeded = useRef(enabled && initial !== null);
+    // Which read was asked for last, and which one's answer is on screen.
+    const asked = useRef(0);
+    const shown = useRef(0);
+    // When the beat last asked (or took the page's answer), for which server.
+    const lastRead = useRef<{ id: string; at: number } | null>(null);
+    // A number, so the beat restarts only when the cadence itself changes.
+    const every = typeof refreshMs === "function" ? refreshMs(state) : refreshMs;
 
     useEffect(() => {
         if (!enabled || initial) return;
@@ -66,10 +104,23 @@ export function useLoginState(
     }, [enabled, initial, installedAppId]);
 
     const reload = useCallback(async () => {
-        const result = await loginStateAction(installedAppId);
-        if (result.state) {
-            writeSnapshot(snapshotKey(installedAppId), result.state);
-            setState(result.state);
+        const ticket = ++asked.current;
+        let result: Awaited<ReturnType<typeof loginStateAction>>;
+        try {
+            result = await loginStateAction(installedAppId);
+        } catch {
+            // A read that did not come back - a restart, a dropped connection -
+            // is tried again on the next beat, over what is already on screen.
+            return;
+        }
+        if (ticket < shown.current) return;
+        shown.current = ticket;
+        const next = result.state;
+        if (next) {
+            writeSnapshot(snapshotKey(installedAppId), next);
+            setState((current) =>
+                current && JSON.stringify(current) === JSON.stringify(next) ? current : next
+            );
             setError(null);
         } else {
             setError(result.error ?? t("login.readFailed"));
@@ -79,12 +130,50 @@ export function useLoginState(
 
     useEffect(() => {
         if (!enabled) return;
-        if (seeded.current) seeded.current = false;
-        else void reload();
-        if (!refreshMs) return;
-        const timer = setInterval(() => void reload(), refreshMs);
-        return () => clearInterval(timer);
-    }, [enabled, reload, refreshMs]);
+        let live = true;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let inFlight = false;
+        const sinceRead = (): number =>
+            lastRead.current?.id === installedAppId
+                ? Date.now() - lastRead.current.at
+                : Number.POSITIVE_INFINITY;
+        // Scheduled from the end of a read rather than on a fixed interval, so a
+        // slow answer never has the next question queued up behind it.
+        const cycle = async (): Promise<void> => {
+            if (timer) clearTimeout(timer);
+            timer = undefined;
+            if (!document.hidden && !inFlight) {
+                lastRead.current = { id: installedAppId, at: Date.now() };
+                if (seeded.current) seeded.current = false;
+                else {
+                    inFlight = true;
+                    await reload();
+                    inFlight = false;
+                }
+            }
+            if (live && every && !document.hidden) timer = setTimeout(() => void cycle(), every);
+        };
+        const onReturn = (): void => {
+            if (!live || document.hidden || inFlight) return;
+            const since = sinceRead();
+            if (since >= RETURN_GAP_MS) void cycle();
+            else if (every && !timer) timer = setTimeout(() => void cycle(), RETURN_GAP_MS - since);
+        };
+        // A cadence that changed because of the answer just read waits out the
+        // rest of the new one rather than asking the same question again at once.
+        const since = sinceRead();
+        if (every && since < every && !document.hidden)
+            timer = setTimeout(() => void cycle(), every - since);
+        else void cycle();
+        document.addEventListener("visibilitychange", onReturn);
+        window.addEventListener("focus", onReturn);
+        return () => {
+            live = false;
+            document.removeEventListener("visibilitychange", onReturn);
+            window.removeEventListener("focus", onReturn);
+            if (timer) clearTimeout(timer);
+        };
+    }, [enabled, installedAppId, reload, every]);
 
     const invalidate = useCallback(() => {
         dropSnapshots(snapshotKey(installedAppId));

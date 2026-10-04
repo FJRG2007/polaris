@@ -53,7 +53,12 @@ import type { PlayerTimeout } from "../../lib/player-timeout";
 import { useGamePresence } from "../../components/use-game-presence";
 import { RestartPlanner } from "./restart-planner";
 import { MinecraftModeration } from "./minecraft-moderation";
-import { useLoginState } from "./minecraft-polaris-login";
+import {
+    awaitingPassword,
+    LOGIN_IDLE_MS,
+    LOGIN_LIVE_MS,
+    useLoginState
+} from "./minecraft-polaris-login";
 import { hasBuildFor } from "../../lib/minecraft/polaris-login";
 import { MinecraftJoinPassword } from "./minecraft-join-password";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
@@ -128,8 +133,6 @@ const KEPT_READING_MS = 24 * 3_600_000;
 /** What of a reading is kept between visits: only what the card and the overview
  *  draw. The roster and everything a verb acts on come from the page and the poll. */
 type KeptReading = Pick<ServerReading, "status" | "reach">;
-/** How often Polaris login's state is read again. The mod checks in every minute. */
-const LOGIN_REFRESH_MS = 60_000;
 
 /** How old a streamed reading may be before the screen stops preferring it to what
  *  the poll last returned. Several times the stream's own cadence, so a frame that
@@ -470,15 +473,19 @@ export function MinecraftPanel({
 
     // Polaris login, read once for every screen that shows it: the players table
     // carries who has a password, and the overview says when the server runs an
-    // older build than this dashboard serves. Read again every minute, because
-    // that notice ends when the restarted server checks in.
+    // older build than this dashboard serves. Read again every few seconds while
+    // somebody on the server has no password yet - they are at the prompt to set
+    // one, and the row saying so is what the operator is watching - and every
+    // half minute otherwise, which also ends that notice once the restarted
+    // server checks in.
     const software = settings.find((setting) => setting.key === SOFTWARE_KEY)?.value ?? "";
     const edition = game?.edition ?? status?.edition ?? "java";
+    const onlineNames = status?.players.players;
     const login = useLoginState(
         installedAppId,
         game?.login ?? null,
         edition === "java" && hasBuildFor(software),
-        LOGIN_REFRESH_MS
+        (held) => (awaitingPassword(held, onlineNames) ? LOGIN_LIVE_MS : LOGIN_IDLE_MS)
     );
     const loginOn = login.state?.on === true;
     const canManage = held.includes("games.manage");
