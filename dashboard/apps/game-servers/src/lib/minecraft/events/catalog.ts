@@ -1808,6 +1808,20 @@ export function playsInArena(preset: EventPreset): boolean {
 
 /** Played with loot found in the arena, which must never sit beside what a
  *  player brought: only from 1.17, where their own things are put away first. */
+/** A race's finish is scored above this, so any finish beats any progress:
+ *  `FINISH_BASE` less the seconds it took (`kinds/parkour` `finishScore`). */
+export const FINISH_BASE = 100_000;
+
+/** The races scored that way: a finish as its time, short of it as progress. */
+const RACES: readonly EventKind[] = ["parkour", "boat-race", "dropper"];
+
+/** How long a race took, in seconds, when the score is a finish; null for a
+ *  score that is progress, or a kind that is not a race. */
+export function finishedIn(kind: EventKind, score: number): number | null {
+    if (!RACES.includes(kind) || score <= FINISH_BASE / 2) return null;
+    return FINISH_BASE - score;
+}
+
 export function stashesFirst(preset: EventPreset): boolean {
     return preset.kind === "sky-wars";
 }

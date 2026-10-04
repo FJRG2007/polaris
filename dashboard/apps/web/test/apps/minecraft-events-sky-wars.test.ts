@@ -184,7 +184,7 @@ describe("SkyWars' arena in the world", () => {
         expect(sw.reachOf(layout) * 2 + 1).toBeGreaterThanOrEqual(box.x2 - box.x1 + 1 - 1);
     });
 
-    it("starts each player in a glass cage on their island, facing the middle, which comes down by its glass alone", () => {
+    it("starts each player in an invisible cage on their island, facing the middle, which comes down by its barrier alone", () => {
         const downs = sw.cagesDown(layout, at);
         expect(downs).toHaveLength(6);
         for (let index = 0; index < 6; index += 1) {
@@ -194,7 +194,7 @@ describe("SkyWars' arena in the world", () => {
             expect(spot.x).toBe(cage.x1 + 1);
             expect(spot.y).toBe(cage.y1);
             expect(downs[index]).toBe(
-                `execute in minecraft:overworld run fill ${cage.x1} ${cage.y1} ${cage.z1} ${cage.x2} ${cage.y2} ${cage.z2} minecraft:air replace minecraft:glass`
+                `execute in minecraft:overworld run fill ${cage.x1} ${cage.y1} ${cage.z1} ${cage.x2} ${cage.y2} ${cage.z2} minecraft:air replace minecraft:barrier`
             );
             // Facing the middle: a step that way is a step nearer it.
             const step = {

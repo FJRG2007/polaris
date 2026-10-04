@@ -193,6 +193,10 @@ function DrawStatus({
 /** A score's figure: time held as a duration, anything else as a count (`figures`). */
 function scoreFigure(kind: catalog.EventKind, score: number, locale: string): string {
     const language = figureLanguage(locale);
+    // A race's finish is kept as a number far above any progress (so it sorts
+    // first): shown as the time it took, never as that number.
+    const took = catalog.finishedIn(kind, score);
+    if (took !== null) return formatDuration(took * 1000, language);
     return catalog.KIND_INFO[kind].unit === "seconds"
         ? formatDuration(score * 1000, language)
         : formatCount(score, language);
@@ -206,7 +210,10 @@ function scoreText(
     locale: string
 ): string {
     const figure = scoreFigure(kind, score, locale);
-    const unit = catalog.KIND_INFO[kind].unit === "seconds" ? "" : kindUnit(t, kind);
+    const unit =
+        catalog.KIND_INFO[kind].unit === "seconds" || catalog.finishedIn(kind, score) !== null
+            ? ""
+            : kindUnit(t, kind);
     return unit ? `${figure} ${unit}` : figure;
 }
 
@@ -2022,7 +2029,7 @@ export function MinecraftEvents({
                                             ? entry.podium
                                                   .map(
                                                       (one) =>
-                                                          `${one.place}. ${one.name} (${entry.kind === "parkour" ? one.score : scoreFigure(entry.kind, one.score, locale)})`
+                                                          `${one.place}. ${one.name} (${scoreFigure(entry.kind, one.score, locale)})`
                                                   )
                                                   .join("  ")
                                             : entry.note}
@@ -2086,6 +2093,7 @@ export function MinecraftEvents({
                 <EventEditor
                     key={editing.preset.id}
                     preset={editing.preset}
+                    isNew={editing.isNew}
                     version={view?.version ?? null}
                     open
                     onOpenChange={(open) => !open && setEditing(null)}

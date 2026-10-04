@@ -1173,12 +1173,15 @@ function OptionsFields({
 
 export function EventEditor({
     preset: saved,
+    isNew = false,
     version = null,
     open,
     onOpenChange,
     onSave
 }: {
     preset: catalog.EventPreset;
+    /** Being added, not edited: Done takes it as it is. */
+    isNew?: boolean;
     /** The version the server runs, when known: an option this server cannot
      *  play is said beside the fields, and nothing is said otherwise. */
     version?: string | null;
@@ -1381,7 +1384,9 @@ export function EventEditor({
                             {t("editor.cancel")}
                         </Button>
                         <Button
-                            disabled={!checked.success || !dirty}
+                            // A new event is saved as it opens: its defaults are
+                            // a choice too, and nothing has to be changed first.
+                            disabled={!checked.success || (!dirty && !isNew)}
                             onClick={() => {
                                 if (checked.success) onSave(checked.data);
                             }}
