@@ -32,7 +32,8 @@ export function CustomizeDialog({
     onToggle,
     onResize,
     onGreetingChange,
-    onReset
+    onReset,
+    extra
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -45,6 +46,9 @@ export function CustomizeDialog({
     onResize: (id: OverviewWidgetId, size: OverviewWidgetSize) => void;
     onGreetingChange: (greeting: boolean) => void;
     onReset: () => void;
+    /** More to choose from under the Overview's own cards - the installed
+     *  apps' cards. */
+    extra?: React.ReactNode;
 }) {
     const t = useTranslations("home");
     const [dragged, setDragged] = useState<OverviewWidgetId | null>(null);
@@ -151,6 +155,8 @@ export function CustomizeDialog({
                         );
                     })}
                 </ul>
+
+                {extra}
 
                 <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
                     <label className="flex items-center gap-2 text-sm">

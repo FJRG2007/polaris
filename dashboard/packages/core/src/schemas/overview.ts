@@ -81,11 +81,44 @@ export const overviewShortcutSchema = z.object({
 
 export type OverviewShortcut = z.infer<typeof overviewShortcutSchema>;
 
+/** Cards an installed app can add, per account. Past this the Overview is a
+ *  second app rather than a landing screen. */
+export const MAX_APP_WIDGETS = 12;
+
+/** Things one app card watches - devices, servers. A card for twenty of them is
+ *  a list screen, which the app already has. */
+export const MAX_APP_WIDGET_TARGETS = 12;
+
+/** An app's id or a widget kind: what the catalogue and the app spell them as. */
+const appSlug = z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/);
+
+/**
+ * A card an installed app contributes, as somebody added it.
+ *
+ * Which app and which of its kinds, how wide, and what it watches - the ids of
+ * the things the reader picked, in the app's own terms. Only ids: what each one
+ * shows, and whether the reader may still see or operate it, is the app's to
+ * answer every time the card is drawn, never something stored here.
+ */
+export const appWidgetSchema = z.object({
+    id: z.string().regex(/^[a-z0-9]{8,32}$/),
+    app: appSlug,
+    kind: appSlug,
+    size: z.enum(OVERVIEW_WIDGET_SIZES).default("md"),
+    targets: z.array(z.string().trim().min(1).max(64)).max(MAX_APP_WIDGET_TARGETS).default([])
+});
+
+export type AppWidgetPreference = z.infer<typeof appWidgetSchema>;
+
 export const overviewPreferencesSchema = z.object({
     widgets: z
         .array(overviewWidgetSchema)
         .max(OVERVIEW_WIDGET_IDS.length * 2)
         .default([]),
+    /** The installed apps' cards, in the order they are drawn after the
+     *  Overview's own. Absent from every layout saved before apps could add
+     *  cards, which reads as none. */
+    appWidgets: z.array(appWidgetSchema).max(MAX_APP_WIDGETS).default([]),
     shortcuts: z.array(overviewShortcutSchema).max(MAX_OVERVIEW_SHORTCUTS).default([]),
     /** The line above the grid. Off for somebody who would rather not be greeted
      *  by their own software every morning. */
@@ -96,6 +129,7 @@ export type OverviewPreferences = z.infer<typeof overviewPreferencesSchema>;
 
 export const EMPTY_OVERVIEW_PREFERENCES: OverviewPreferences = {
     widgets: [],
+    appWidgets: [],
     shortcuts: [],
     greeting: true
 };

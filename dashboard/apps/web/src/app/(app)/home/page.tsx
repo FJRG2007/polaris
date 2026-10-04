@@ -15,6 +15,7 @@ import { resolveOverviewLayout } from "@polaris/core";
 import { accessFor, requireUser } from "@/lib/session";
 import { overviewFeatures } from "@/lib/overview/features";
 import { availableOverviewWidgets } from "@/lib/overview/catalog";
+import { availableAppWidgetKinds } from "@/lib/overview/app-widgets";
 import { getOverviewPreferences } from "@/lib/overview/prefs-service";
 import { heldSectionPermissions, installedSectionApps, reachableApps } from "@/lib/app-access";
 
@@ -24,12 +25,15 @@ export default async function OverviewPage() {
     const user = await requireUser();
     const access = accessFor(user);
     const features = await overviewFeatures(user.id);
-    const [preferences, available, apps, held, installed] = await Promise.all([
+    const [preferences, available, apps, held, installed, appKinds] = await Promise.all([
         getOverviewPreferences(user.id),
         availableOverviewWidgets({ ...access, features }),
         reachableApps(access),
         heldSectionPermissions(access),
-        installedSectionApps(access)
+        installedSectionApps(access),
+        // The cards the installed apps offer. Their names only: what each card
+        // shows is read once the grid is on screen.
+        availableAppWidgetKinds().catch(() => [])
     ]);
 
     return (
@@ -47,6 +51,7 @@ export default async function OverviewPage() {
                 href: app.href
             }))}
             gate={{ held, installed }}
+            appKinds={appKinds}
         />
         </Messages>
     );
