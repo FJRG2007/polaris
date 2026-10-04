@@ -606,6 +606,15 @@ A new kind follows all of them. A change to an old kind must not undo one.
   One RCON packet cuts a long answer (a shulker of enchanted gear was misread
   as a different item), so a stack is read whole through command storage
   (`stack-storage.ts`) (`f2dfeabcb`, `a875f0080`).
+- **An arena's teardown goes a few dozen fills to a trip, not one at a time
+  and not all in one trip.** Every kind of block in every slice of a SkyWars
+  arena's box is hundreds of fills; asked one by one over RCON they held the
+  podium back for seconds after the winner was already known. They now go
+  `FILLS_PER_TRIP` (25) to a `sayEach` trip, in order; a fill whose answer did
+  not come back is asked again on its own. A trip that fails outright is not
+  retried fill by fill - it may still be running in the container - so the
+  arena is left loaded and tried again whole on a later tick
+  (`7125df850`, `d4f209a69`).
 - **Read answers the way a real server writes them.** That includes a team
   prefix, Bedrock's leading dot, several answers run together, and a crowd
   too big for one answer, which is read in pages (`replies.ts`). Scores read
