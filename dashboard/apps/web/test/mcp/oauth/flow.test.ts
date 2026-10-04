@@ -81,6 +81,12 @@ vi.mock("@/lib/session", () => ({ requireUser: async () => state.user }));
 vi.mock("@/lib/device-grace", () => ({ newDeviceRefusal: async () => null }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/app/(app)/account/security/action-messages", () => ({ localized: async (result: unknown) => result }));
+vi.mock("@/lib/notes/access", () => ({
+    NoteAccessError: class extends Error {},
+    requirePlacement: async () => undefined
+}));
+vi.mock("@/lib/notes/note-service", () => ({ createNote: async () => "33333333-3333-4333-8333-333333333333" }));
+vi.mock("@/lib/notes/shelf-service", () => ({}));
 
 const { createFakeDb: makeDb } = await import("./fake-db");
 const register = await import("@/app/api/oauth/register/route");
@@ -411,6 +417,27 @@ describe("calling /api/mcp with the token", () => {
         expect(answer.body?.result.structuredContent.scopes).toEqual(["tasks.read"]);
     });
 
+    it("narrows tokens already issued when the person connects the app again with less", async () => {
+        const { client, tokens } = await connect();
+        const again = await answerAuthorizationAction({
+            query: authorizeQuery(client.client_id!, pkce().challenge, { scope: "tasks.read deploy.read" }),
+            allow: true,
+            scopes: ["tasks.read"]
+        });
+        expect(again.redirectTo).toContain("code=");
+        const whoami = await mcpCall(String(tokens.body.access_token), {
+            method: "tools/call",
+            params: { name: "polaris_whoami", arguments: {} }
+        });
+        expect(whoami.body?.result.structuredContent.scopes).toEqual(["tasks.read"]);
+        const refreshed = await tokenCall({
+            grant_type: "refresh_token",
+            refresh_token: String(tokens.body.refresh_token),
+            client_id: client.client_id!
+        });
+        expect(refreshed.body.scope).toBe("tasks.read");
+    });
+
     it("is refused on another origin of the same instance (audience binding)", async () => {
         const { tokens } = await connect();
         state.origin = "https://other-name.example.test";
@@ -563,6 +590,17 @@ describe("revocation and the connected-apps list", () => {
     });
 
     it("audits a change made through a tool, naming the connection", async () => {
+        state.permissions = new Set(["tasks.read", "notes.use"]);
+        const written = await connect(["notes.use"], "notes.use");
+        const created = await mcpCall(String(written.tokens.body.access_token), {
+            method: "tools/call",
+            params: { name: "notes_create", arguments: { title: "From an assistant", body: "Hello" } }
+        });
+        expect(created.body?.result.isError).toBeUndefined();
+        expect(state.audit.filter((entry) => entry.action === "mcp.tool.called")).toEqual([
+            { action: "mcp.tool.called", actorId: ADA.id }
+        ]);
+        state.audit = [];
         const { tokens } = await connect(["tasks.read"]);
         await mcpCall(String(tokens.body.access_token), {
             method: "tools/call",

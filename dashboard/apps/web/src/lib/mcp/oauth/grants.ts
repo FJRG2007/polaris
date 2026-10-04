@@ -250,7 +250,7 @@ export async function refresh(input: {
 
     const row = await prisma.oAuthToken.findUnique({
         where: { tokenHash: hashToken(input.refreshToken) },
-        include: { grant: { select: { id: true, clientId: true, revokedAt: true, user: { select: { bannedAt: true } } } } }
+        include: { grant: { select: { id: true, clientId: true, revokedAt: true, scopes: true, user: { select: { bannedAt: true } } } } }
     });
     if (!row || row.kind !== "refresh" || row.grant.clientId !== input.client.id) return invalid;
     if (row.usedAt) {
@@ -264,8 +264,11 @@ export async function refresh(input: {
         return refused("invalid_target", "resource does not match the one that was authorized");
     }
 
-    // A refresh may ask for less than the grant, never for more.
-    const held = parseStringList(row.scopes);
+    // A refresh may ask for less than the grant, never for more - and never for
+    // more than the person approved most recently, which is narrower than this
+    // token when they connected the app again and ticked fewer boxes.
+    const approved = new Set(parseStringList(row.grant.scopes));
+    const held = parseStringList(row.scopes).filter((scope) => approved.has(scope));
     let scopes = held;
     if (input.scope?.trim()) {
         const asked = [...new Set(input.scope.trim().split(/\s+/))];
@@ -333,6 +336,7 @@ export async function verifyAccessToken(token: string, resource: string): Promis
                     id: true,
                     userId: true,
                     revokedAt: true,
+                    scopes: true,
                     lastUsedAt: true,
                     user: { select: { bannedAt: true, isAdmin: true } }
                 }
@@ -344,7 +348,11 @@ export async function verifyAccessToken(token: string, resource: string): Promis
     if (row.grant.revokedAt || row.grant.user.bannedAt) return null;
     if (!sameResource(row.resource, resource)) return null;
 
-    const requested = parseStringList(row.scopes) as Permission[];
+    // What this token was issued with, cut to the grant as it stands now (the
+    // person may have connected the app again with fewer boxes ticked) and then
+    // to what the person holds right now.
+    const approved = new Set(parseStringList(row.grant.scopes));
+    const requested = (parseStringList(row.scopes) as Permission[]).filter((scope) => approved.has(scope));
     const granted = await getUserPermissions(row.grant.userId);
     const scopes = row.grant.user.isAdmin
         ? requested
