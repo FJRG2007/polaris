@@ -6665,6 +6665,39 @@ describe("a dropper", () => {
         expect(after.stageLeftovers).toEqual([]);
     });
 
+    it("names the places of two who reach the water in one look by the game's tick", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const shaft = shaftNow();
+        const spawn = dropperKind.spawn(shaft);
+        expect(state().run!.readyAt).not.toBeNull();
+        // Both in the water by the next look: Ben, who joined second, first.
+        const tick = Math.floor(Date.now() / 50) % 2147483647;
+        world.at.Ana = [spawn.x, shaft.water, spawn.z];
+        world.at.Ben = [spawn.x, shaft.water, spawn.z];
+        scores("pe_drop").Ana = tick;
+        scores("pe_drop").Ben = tick - 10;
+        await play(2_100);
+        const said = (text: string) =>
+            world.sent.some(
+                (line) => line.startsWith("tellraw @a") && visible(line).includes(text)
+            );
+        expect(said("Ben reached the finish")).toBe(true);
+        const line = (name: string) =>
+            visible(
+                world.sent.find(
+                    (one) =>
+                        one.startsWith("tellraw @a") &&
+                        visible(one).includes(`${name} reached the finish`)
+                )!
+            );
+        expect(line("Ben")).toContain("(place 1)");
+        expect(line("Ana")).toContain("(place 2)");
+    });
+
     it("is called off before anything is built when too few join", async () => {
         setUp([run()]);
         await startArena("drop");

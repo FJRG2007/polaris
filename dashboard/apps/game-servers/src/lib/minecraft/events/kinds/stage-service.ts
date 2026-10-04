@@ -1095,6 +1095,19 @@ function lowered(scores: ReadonlyMap<string, number>): Map<string, number> {
 }
 
 /**
+ * The racers in the order they finished by the game's own tick, the rest after
+ * in their own order: two who finish within one look are told their places
+ * the way they reached the line, not the way they joined.
+ */
+export function byFinish<T extends { name: string }>(
+    racers: readonly T[],
+    finished: ReadonlyMap<string, number>
+): T[] {
+    const tick = (one: T) => finished.get(one.name.toLowerCase()) ?? Number.POSITIVE_INFINITY;
+    return [...racers].sort((a, b) => tick(a) - tick(b));
+}
+
+/**
  * The quick look at a parkour race, run far oftener than the tick: whoever fell
  * is sent back to their checkpoint, and whoever stepped onto a checkpoint or
  * the finish is told and has it marked - with selectors over the checkpoints the
@@ -1218,7 +1231,7 @@ async function dropperTick(
     // The game's own tick, asked only when somebody has reached the water.
     let gameNow: number | null | undefined;
     const levels = shaft.floors.length;
-    for (const racer of state(loop).racers) {
+    for (const racer of byFinish(state(loop).racers, finished)) {
         if (racer.outAt !== null) continue;
         const at = where.find((one) => same(one.name, racer.name));
         if (!at) continue;
@@ -1347,7 +1360,7 @@ async function boatTick(
     let gameNow: number | null | undefined;
     const gates = track.gates.length;
     const total = track.laps * gates + 1;
-    for (const racer of state(loop).racers) {
+    for (const racer of byFinish(state(loop).racers, finished)) {
         if (racer.outAt !== null) continue;
         const at = where.find((one) => same(one.name, racer.name));
         if (!at) continue;
