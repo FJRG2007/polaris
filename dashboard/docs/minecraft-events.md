@@ -102,6 +102,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Build battle, Spleef, Parkour, King of the ring, Team duel     | day   | clear   |
 | Capture the flag                                               | day   | clear   |
 | Hot potato                                                     | day   | clear   |
+| Hide and seek                                                  | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -325,6 +326,24 @@ left out.
   fuse's end are clock times in the run, so a restart picks the fuse up where
   it was. The last one left wins; everybody else is ranked by when they went
   out, the same moment the same place.
+- **Hide and seek** is played in a closed hall 25 by 25 inside, stone walls
+  under a glass roof, with a gallery four deep round two of its sides,
+  reached by a staircase and a ladder and railed in spruce fence (see
+  "Building a map" for how it is laid out). The seekers (`seekers`, never
+  everybody) are drawn from the run's id and wait in a barrier cage in the
+  middle, blind and unable to walk, for `hideSeconds`; the hiders start round
+  it. Then the cage's barrier comes down, only inside its own box, and that
+  it did is written into the run, so a restart neither lets them out early
+  nor builds it again. Two teams hide each side's names from the other
+  (`nametagVisibility hideForOtherTeams`), friendly fire off; hiders are
+  under Weakness 101, so only a seeker can strike, and a hider whose
+  `damage_taken` rose within five blocks of a seeker whose `damage_dealt`
+  rose was found by them. Whoever is found joins the seekers. Nobody is hurt
+  (Resistance IV, Regeneration, Saturation every tick). Scoring: a hider
+  scores a point for every second hidden while on the server, from "Go!" to
+  being found; a seeker scores 30 a find (`FIND_POINTS`: half a minute of
+  hiding, so a seeker who finds most of a group early keeps up with a hider
+  who lasts). It ends when every hider is found, or when time is up.
 
 ## Building a map
 
@@ -379,22 +398,36 @@ new map:
   wall or on a base, and every floor block can be walked to from both bases
   (a flood fill: no sealed corner). Over 3,000 seeds: no rule broken, 10 to
   16 pieces a field.
+- **Every hiding place can be walked to**: hide and seek's hall is drawn
+  from the run's id (`hide-and-seek.layoutFor`) - the gallery mirrored into
+  one of four corners, its stairs and ladder at one of seven places each, and
+  twenty hiding places: walls, hedges of leaves that never wither, crates and
+  stacks of barrels, on the floor, under the gallery and on it. Each piece
+  keeps a block of air from every other and from the posts, the stairs, the
+  ladder, the cage and the ring the hiders start on, fits under what is over
+  it, and `layoutProblems` walks the hall from the hiders' start the way a
+  player moves - level, a block up with room to jump it, down at most three,
+  up and down the ladder - and fails it if a single block of either floor
+  cannot be reached (no sealed cell). Over 3,000 seeds: no rule broken, never
+  the bare fallback, twenty places every time (on average 4.8 walls, 6.1
+  hedges, 6.3 crates, 2.8 stacks).
 
 ## How the floating maps look
 
 Everything below is part of the arena's own boxes: built into air with
 `keep`, and taken out with the rest.
 
-| Arena            | Look                                                                                                                      |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                    |
-| Parkour          | the course's theme, a light under every checkpoint                                                                        |
-| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                              |
-| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                             |
-| Team duel        | a stone rim round the floor and a post of light at each corner                                                            |
-| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery            |
-| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone |
-| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                        |
+| Arena            | Look                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                              |
+| Parkour          | the course's theme, a light under every checkpoint                                                                                  |
+| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                        |
+| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                       |
+| Team duel        | a stone rim round the floor and a post of light at each corner                                                                      |
+| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                      |
+| Hide and seek    | stone brick walls under a glass roof, sea lanterns in the floor and up the corners, a spruce gallery on log posts with a fence rail |
+| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone           |
+| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                  |
 
 ## Lessons from real servers
 

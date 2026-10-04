@@ -1,0 +1,282 @@
+/**
+ * Playing hide and seek (`hide-and-seek.ts`): the arena's own steps are
+ * `arena-service`'s; this is its part of them.
+ *
+ * At "Go!" the seekers drawn from the run's id are put in the cage, blinded and
+ * unable to walk, and everybody else round it to run and hide. Each tick then
+ * adds the time since the last to every hider on the server, lets the seekers
+ * out once `hideSeconds` are up - the cage's barrier taken down, only in its own
+ * box - and after that reads who struck and who was hurt: a hider hurt beside a
+ * seeker who struck is found, and seeks from then on. Everything is written into
+ * the run as it happens, the release included, so a restart neither lets the
+ * seekers out early nor builds the cage again.
+ */
+
+import * as arena from "./arena";
+import * as hs from "./hide-and-seek";
+import * as catalog from "../catalog";
+import * as speech from "../../speech";
+import * as written from "../messages";
+import * as commands from "../commands";
+import type * as stored from "../state";
+import * as said from "./hide-and-seek-messages";
+import type { ArenaGame, KindContext } from "./arena-game";
+
+const messages = speech.spoken(written);
+const seekMessages = speech.spoken(said);
+
+const lower = (name: string) => name.toLowerCase();
+
+function optionsOf(run: stored.EventRun): catalog.EventOptions<"hide-and-seek"> {
+    return run.preset.options as catalog.EventOptions<"hide-and-seek">;
+}
+
+/** A run's hall, drawn once and kept: the search is not repeated every tick. */
+const layouts = new Map<string, hs.Layout>();
+
+function layoutOf(runId: string): hs.Layout {
+    let layout = layouts.get(runId);
+    if (!layout) {
+        if (layouts.size >= 16) layouts.delete(layouts.keys().next().value!);
+        layout = hs.layoutFor(runId);
+        layouts.set(runId, layout);
+    }
+    return layout;
+}
+
+/** What one run keeps between ticks: nothing that must survive a restart. */
+interface Memory {
+    dealt: Map<string, number>;
+    taken: Map<string, number>;
+}
+
+const memories = new Map<string, Memory>();
+
+function memoryOf(runId: string): Memory {
+    let memory = memories.get(runId);
+    if (!memory) {
+        if (memories.size >= 16) memories.delete(memories.keys().next().value!);
+        memory = { dealt: new Map(), taken: new Map() };
+        memories.set(runId, memory);
+    }
+    return memory;
+}
+
+/** Who seeks from the start: drawn from the run's id among who was brought in. */
+function firstSeekers(run: stored.EventRun): string[] {
+    return hs.seekersFor(
+        run.id,
+        run.entrants.map((one) => one.name),
+        optionsOf(run).seekers
+    );
+}
+
+function spotOf(run: stored.EventRun, entrant: stored.Entrant): arena.Spot {
+    const box = run.arena!.box;
+    const layout = layoutOf(run.id);
+    const seekers = firstSeekers(run).map(lower);
+    const at = seekers.indexOf(lower(entrant.name));
+    if (at >= 0) return hs.seekerSpot(box, layout, at);
+    const hiders = run.entrants.filter((one) => !seekers.includes(lower(one.name)));
+    return hs.hiderSpot(
+        box,
+        layout,
+        Math.max(
+            0,
+            hiders.findIndex((one) => one.name === entrant.name)
+        )
+    );
+}
+
+async function goLines(ctx: KindContext): Promise<string[]> {
+    const run = ctx.run;
+    const language = ctx.language;
+    const seconds = optionsOf(run).hideSeconds;
+    const seekers = firstSeekers(run).map(lower);
+    const out: string[] = [];
+    for (const one of run.entrants) {
+        const seeking = seekers.includes(lower(one.name));
+        out.push(
+            arena.moveTo(one.name, spotOf(run, one)),
+            ...hs.joinSide(one.name, seeking),
+            ...(seeking
+                ? [
+                      ...hs.waitingLines(one.name),
+                      ...arena.titleTo(
+                          one.name,
+                          seekMessages.seekTitle(language),
+                          seekMessages.seekSubtitle(seconds, language)
+                      )
+                  ]
+                : arena.titleTo(
+                      one.name,
+                      seekMessages.hideTitle(language),
+                      seekMessages.hideSubtitle(seconds, language)
+                  ))
+        );
+    }
+    return out;
+}
+
+async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
+    const run = ctx.run;
+    const language = ctx.language;
+    const options = optionsOf(run);
+    const box = run.arena!.box;
+    const layout = layoutOf(run.id);
+    const now = ctx.now;
+    const memory = memoryOf(run.id);
+    const say = (line: string) => ctx.server.say([line]);
+    const dealt = commands.readScores(await say(hs.READ_DEALT));
+    const taken = commands.readScores(await say(hs.READ_TAKEN));
+    const here = new Map(
+        commands.readWhere(await say(commands.IN_OVERWORLD)).map((one) => [lower(one.name), one])
+    );
+    // Who struck and who was hurt since the last look; nothing on the first.
+    const since = (scores: Map<string, number>, kept: Map<string, number>) => {
+        const fresh = new Set<string>();
+        for (const [name, value] of scores) {
+            const before = kept.get(name);
+            if (before !== undefined && value > before) fresh.add(lower(name));
+            kept.set(name, value);
+        }
+        return fresh;
+    };
+    const struck = since(dealt, memory.dealt);
+    const hurt = since(taken, memory.taken);
+
+    const before = hs.stateOf(run.game);
+    const start = run.readyAt ?? now;
+    const state: hs.SeekState = structuredClone(
+        before ??
+            hs.stateSchema.parse({
+                ...(run.game ?? {}),
+                seekers: firstSeekers(run),
+                countedAt: start
+            })
+    );
+    const releaseAt = start + options.hideSeconds * 1000;
+
+    // The seekers let out: the cage down, their sight and legs back.
+    if (!state.released && now >= releaseAt) {
+        state.released = true;
+        lines.push(
+            hs.cageDown(box, layout),
+            ...state.seekers.flatMap(hs.releasedLines),
+            ...arena.titleTo(`@a[tag=${arena.IN_ARENA}]`, seekMessages.releasedTitle(language), ""),
+            commands.sound(commands.SOUNDS.horn)
+        );
+    }
+
+    // Every hider on the server hidden for the time since the last look - at
+    // most two ticks' worth, so a stall is not counted as hiding.
+    const elapsed = Math.max(
+        0,
+        Math.min(now - (state.countedAt ?? start), 2 * ctx.tickSeconds * 1000)
+    );
+    state.countedAt = now;
+    for (const one of run.entrants)
+        if (!hs.seeks(state, one.name) && here.has(lower(one.name)))
+            state.hidden[one.name] = (state.hidden[one.name] ?? 0) + elapsed;
+
+    // Found: a hider hurt beside a seeker who struck.
+    if (state.released) {
+        const strikers = run.entrants
+            .filter(
+                (one) =>
+                    hs.seeks(state, one.name) &&
+                    struck.has(lower(one.name)) &&
+                    here.has(lower(one.name))
+            )
+            .map((one) => ({ ...here.get(lower(one.name))!, name: one.name }));
+        for (const one of run.entrants) {
+            const at = here.get(lower(one.name));
+            if (!at || hs.seeks(state, one.name) || !hurt.has(lower(one.name))) continue;
+            const by = hs.foundBy(at, strikers);
+            if (!by) continue;
+            state.finds.push({ hider: one.name, by, at: now });
+            const left = run.entrants.filter((each) => !hs.seeks(state, each.name)).length;
+            lines.push(
+                ...hs.joinSide(one.name, true),
+                `effect clear ${one.name} minecraft:weakness`,
+                ...arena.titleTo(
+                    one.name,
+                    seekMessages.foundTitle(language),
+                    seekMessages.foundSubtitle(language)
+                ),
+                commands.say(
+                    messages.tag(language) + seekMessages.found(one.name, by, left, language)
+                ),
+                commands.sound(commands.SOUNDS.tick)
+            );
+        }
+    }
+
+    // Nobody hurt; hiders unable to strike; seekers waiting kept in the cage,
+    // blind; anybody out of the hall back on their spot.
+    const hiders = run.entrants.filter((one) => !hs.seeks(state, one.name));
+    for (const one of run.entrants) {
+        const at = here.get(lower(one.name));
+        if (!at) continue;
+        const seeking = hs.seeks(state, one.name);
+        lines.push(...hs.unhurtLines(one.name));
+        if (!arena.contains(box, at)) lines.push(arena.moveTo(one.name, spotOf(run, one)));
+        if (!seeking) lines.push(hs.hiderLine(one.name));
+        else if (!state.released) lines.push(...hs.waitingLines(one.name));
+        lines.push(
+            arena.actionbarTo(
+                one.name,
+                !seeking
+                    ? seekMessages.hiddenBar(
+                          (state.hidden[one.name] ?? 0) / 1000,
+                          hiders.length,
+                          language
+                      )
+                    : state.released
+                      ? seekMessages.seekBar(hiders.length, language)
+                      : seekMessages.waitBar((releaseAt - now) / 1000, language)
+            )
+        );
+    }
+    lines.push(
+        `bossbar set ${commands.BAR} name ${commands.text(
+            seekMessages.bar(hiders.length, messages.clock((run.endsAt - now) / 1000), language)
+        )}`,
+        ...arena.keepThrown(box)
+    );
+    const scores = hs.scoresOf(
+        state,
+        run.entrants.map((one) => one.name)
+    );
+    ctx.run = { ...ctx.run, game: state, points: Object.fromEntries(scores) };
+    await ctx.persist();
+    return hiders.length === 0 ? said.ALL_FOUND : null;
+}
+
+export const hideAndSeek: ArenaGame = {
+    most: () => hs.MOST,
+    reach: () => hs.REACH,
+    box: (_run, place) => hs.hallBox(place, place.y + arena.ALTITUDE),
+    built: () => ({ design: hs.DESIGN }),
+    fills: (run, box) => hs.hallFills(box, layoutOf(run.id)),
+    blocks: () => [...hs.HALL_BLOCKS],
+    kit: () => [],
+    side: (_run, index) => index,
+    spot: spotOf,
+    beginLines: (_preset, language) => hs.setupLines(said.teamNames(language)),
+    goLines,
+    tick,
+    results: (run) =>
+        hs.scoresOf(
+            hs.stateOf(run.game),
+            run.entrants.map((one) => one.name)
+        ),
+    resultLines: (run, language) => {
+        const state = hs.stateOf(run.game);
+        if (!state) return [];
+        const seekers = new Set(state.seekers.map(lower));
+        const hiders = run.entrants.filter((one) => !seekers.has(lower(one.name))).length;
+        return [commands.say(seekMessages.summary(state.finds.length, hiders, language))];
+    },
+    endLines: () => [...hs.TEARDOWN]
+};

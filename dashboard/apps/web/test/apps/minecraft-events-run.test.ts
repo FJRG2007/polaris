@@ -9385,3 +9385,140 @@ describe("hot potato", () => {
         expect(fills()).toEqual([]);
     });
 });
+
+describe("hide and seek", () => {
+    const hideOf = (hideSeconds = 15, minutes = 5) => {
+        const preset = newPreset("hide-and-seek", "hide");
+        return { ...preset, minutes, options: { ...preset.options, hideSeconds, seekers: 1 } };
+    };
+    const kind = () =>
+        import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek");
+    const names = ["Ana", "Ben", "Cy"];
+
+    it("lets the seeker out after the hiding time, finds hiders with a hit and ends when all are found", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        world.board = {
+            pe_hsd: { Ana: 0, Ben: 0, Cy: 0 },
+            pe_hst: { Ana: 0, Ben: 0, Cy: 0 }
+        };
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(Date.now() - run.readyAt!).toBeLessThan(30_000);
+        const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
+        const hiders = names.filter((name) => name !== seeker) as [string, string];
+        // The sides set up, names hidden from the other, the seeker blind in the cage.
+        expect(world.sent).toContain("team modify pe_hs_seek nametagVisibility hideForOtherTeams");
+        expect(world.sent).toContain(
+            `execute if entity @a[name=${seeker},team=] run team join pe_hs_seek ${seeker}`
+        );
+        expect(world.sent).toContain(`effect give ${seeker} minecraft:blindness 3 0 true`);
+        expect(world.sent).toContain(`effect give ${hiders[0]} minecraft:weakness 3 100 true`);
+        expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
+        const layout = hs.layoutFor(run.id);
+        const cageDown = hs.cageDown(run.arena!.box, layout);
+        expect(world.sent).not.toContain(cageDown);
+        expect(hs.stateOf(state().run!.game)?.seekers).toEqual([seeker]);
+
+        // Let out once the hiding time is up, the cage down by its barrier alone.
+        await play(run.readyAt! + 60_000 - Date.now() + 2_100);
+        expect(world.sent).toContain(cageDown);
+        expect(hs.stateOf(state().run!.game)?.released).toBe(true);
+
+        // The seeker strikes beside a hider who was hurt: found, and seeking now.
+        const at = world.at[hiders[0]]!;
+        world.at[seeker] = [at[0] + 1, at[1], at[2]];
+        world.board.pe_hsd![seeker] = 2;
+        world.board.pe_hst![hiders[0]] = 2;
+        await play(2_100);
+        const game = hs.stateOf(state().run!.game)!;
+        expect(game.finds.map((one) => [one.hider, one.by])).toEqual([[hiders[0], seeker]]);
+        expect(world.sent).toContain(
+            `execute if entity @a[name=${hiders[0]},team=pe_hs_hide] run team join pe_hs_seek ${hiders[0]}`
+        );
+        expect(saidToAll(`${seeker} found ${hiders[0]}`)).toBe(true);
+        // A hider hurt with no seeker striking near: nobody found.
+        world.board.pe_hst![hiders[1]] = 2;
+        await play(2_100);
+        expect(hs.stateOf(state().run!.game)!.finds).toHaveLength(1);
+
+        // The one found finds the last: every hider found, and it ends.
+        const last = world.at[hiders[1]]!;
+        world.at[hiders[0]] = [last[0], last[1], last[2] + 1];
+        world.board.pe_hsd![hiders[0]] = 2;
+        world.board.pe_hst![hiders[1]] = 4;
+        await play(2_100);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Every hider was found"
+        });
+        // A point a second hidden, and the finds: the first found hid a
+        // minute and found the last; the last hid a few seconds longer; the
+        // seeker found one.
+        const score = (name: string) =>
+            done.history[0]!.podium.find((one) => one.name === name)?.score ?? 0;
+        expect(score(hiders[1])).toBeGreaterThanOrEqual(60);
+        expect(score(hiders[1])).toBeLessThan(80);
+        expect(score(hiders[0])).toBeGreaterThanOrEqual(60 + hs.FIND_POINTS);
+        expect(score(seeker)).toBe(hs.FIND_POINTS);
+        expect(world.sent).toContain("team remove pe_hs_hide");
+        expect(world.sent).toContain("scoreboard objectives remove pe_hsd");
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("picked up after a restart, neither lets the seekers out early nor builds the cage again", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        await play(2_100);
+        const saved = state().run!;
+        const at = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = at;
+        await play(2_100);
+        const game = hs.stateOf(state().run!.game)!;
+        expect(game.released).toBe(false);
+        expect(game.seekers).toEqual(hs.stateOf(saved.game)!.seekers);
+        expect(fills()).toEqual([]);
+        // The hiding time already counted is kept, and added to.
+        const before = hs.stateOf(saved.game)!.hidden;
+        for (const [name, ms] of Object.entries(before))
+            expect(game.hidden[name]).toBeGreaterThan(ms);
+        const releaseAt = saved.readyAt! + 60_000;
+        await play(releaseAt - Date.now() + 2_100);
+        expect(hs.stateOf(state().run!.game)!.released).toBe(true);
+        expect(world.sent).toContain(hs.cageDown(saved.arena!.box, hs.layoutFor(saved.id)));
+    });
+
+    it("called off while the seekers wait, takes everything down and the sides away", async () => {
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain("team remove pe_hs_seek");
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([hideOf()]);
+        await startArena("hide");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
+    });
+});

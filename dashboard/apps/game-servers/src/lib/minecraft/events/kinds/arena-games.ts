@@ -8,9 +8,11 @@ import type { EventKind } from "../catalog";
 import type { ArenaGame } from "./arena-game";
 import { captureTheFlag } from "./capture-the-flag-service";
 import { hotPotato } from "./hot-potato-service";
+import { hideAndSeek } from "./hide-and-seek-service";
 
 const GAMES: Partial<Record<EventKind, ArenaGame>> = {
     "capture-the-flag": captureTheFlag,
+    "hide-and-seek": hideAndSeek,
     "hot-potato": hotPotato
 };
 
