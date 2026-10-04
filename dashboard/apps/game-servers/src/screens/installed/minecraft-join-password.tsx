@@ -62,6 +62,7 @@ import {
     PROJECTS_KEY
 } from "../../lib/minecraft/join-guard";
 import {
+    LOGIN_IDLE_MS,
     LoginDetails,
     LoginSkeleton,
     useLoginState,
@@ -118,7 +119,7 @@ export function MinecraftJoinPassword({
     const listed = guard === null ? null : listedSlug(projects, joinGuardSlugs(guard));
     // Only software Polaris login has a build for is asked about it.
     const modCapable = java && polarisLogin.hasBuildFor(software);
-    const own = useLoginState(installedAppId, null, modCapable && !shared);
+    const own = useLoginState(installedAppId, null, modCapable && !shared, LOGIN_IDLE_MS);
     const login = shared ?? own;
     const modOn = login.state?.on === true;
     const foreign = java ? foreignLogin(projects) : null;
