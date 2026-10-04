@@ -146,7 +146,8 @@ packages/ui/src/styles/tokens.css   every token, and the rules that apply to eve
 packages/ui/src/tailwind-preset.ts  the tokens as Tailwind scales
 packages/ui/src/components/         the primitives built on them
 packages/ui/src/shell/              the application chrome
-apps/web/src/app/globals.css        the webfonts, the Overview grid, syntax highlighting
+apps/web/src/app/globals.css        the webfonts, the Overview grid, syntax highlighting,
+                                     React Flow's base styles for apps that draw diagrams
 apps/web/src/fonts/                 the typeface, and its licence
 ```
 
