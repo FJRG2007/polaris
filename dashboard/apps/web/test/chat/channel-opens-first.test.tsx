@@ -112,6 +112,7 @@ vi.mock("@/app/(app)/account/report-actions", () => ({ reportPersonAction: async
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         blocked: new Set<string>(),
+        friends: new Set<string>(),
         viewerId: "ada",
         viewerName: "Ada",
         may: { spaces: true, groups: true, attach: true, call: true, meetings: true },

@@ -32,7 +32,7 @@ import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { listBlocked } from "@/lib/blocks";
 import { allowedBy } from "@/lib/privacy-service";
-import { FriendError, requestFriend } from "@/lib/friends-service";
+import { FriendError, friendIds, requestFriend } from "@/lib/friends-service";
 import { groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
@@ -127,6 +127,7 @@ export async function chatListsAction(): Promise<{
     spaces: ChatSpaceView[] | null;
     categories: ChatCategoryView[] | null;
     blocked: string[] | null;
+    friends: string[] | null;
 }> {
     const me = await actor();
     const part = <T>(read: Promise<T>): Promise<T | null> =>
@@ -134,13 +135,16 @@ export async function chatListsAction(): Promise<{
             console.error("[chat] a part of the conversation list could not be read", caught);
             return null;
         });
-    const [channels, spaces, categories, blocked] = await Promise.all([
+    const [channels, spaces, categories, blocked, friends] = await Promise.all([
         part(chat.listChannels(me)),
         part(chat.listSpaces(me)),
         part(chat.listCategories(me)),
-        part(listBlocked(me.id).then((people) => people.map((person) => person.id)))
+        part(listBlocked(me.id).then((people) => people.map((person) => person.id))),
+        // Ids only, from one indexed read: what decides whether a person's menu
+        // offers "Remove friend".
+        part(friendIds(me.id).then((ids) => [...ids]))
     ]);
-    return { channels, spaces, categories, blocked };
+    return { channels, spaces, categories, blocked, friends };
 }
 
 /**

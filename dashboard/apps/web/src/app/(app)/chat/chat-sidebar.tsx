@@ -50,6 +50,7 @@ import { MuteOptions, type MenuParts } from "./mute-menu";
 import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
 import { NicknameDialog } from "./nickname-dialog";
+import { useRemoveFriend } from "./remove-friend";
 import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import { DuplicateChannelDialog } from "./duplicate-channel-dialog";
 import { InviteDialog } from "./invite-dialog";
@@ -82,6 +83,7 @@ import {
     ShieldOff,
     Star,
     Trash2,
+    UserMinus,
     UserPlus,
     Video,
     Volume2,
@@ -111,7 +113,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
-    Skeleton
+    Skeleton,
+    useToast
 } from "@polaris/ui";
 
 /** How the shared mute list draws itself inside a right-click menu. */
@@ -1274,8 +1277,12 @@ function RowMenu({
     const baseUrl = useAppUrl();
     const router = useRouter();
     const here = usePathname();
-    const { blocked, refresh, spaces } = useChat();
+    const { blocked, friends, refresh, spaces } = useChat();
     const t = useTranslations("chat");
+    const toast = useToast();
+    const [removeFriend, removeFriendDialog] = useRemoveFriend((message) =>
+        toast.show({ title: message })
+    );
     const [naming, setNaming] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [inviting, setInviting] = useState(false);
@@ -1427,6 +1434,18 @@ function RowMenu({
                     {person && (
                         <>
                             <ContextMenuSeparator />
+                            {/* Lighter than blocking, and above it: only for a
+                                friend, and asked first. */}
+                            {friends.has(person.id) && (
+                                <ContextMenuItem
+                                    onSelect={() =>
+                                        void removeFriend({ id: person.id, name: person.name })
+                                    }
+                                >
+                                    <UserMinus className="size-3.5" />
+                                    {t("removeFriend.menu")}
+                                </ContextMenuItem>
+                            )}
                             <ContextMenuItem
                                 variant={blocked.has(person.id) ? undefined : "danger"}
                                 onSelect={async () => {
@@ -1502,6 +1521,7 @@ function RowMenu({
             </ContextMenu>
             {/* Outside the menu, which closes on the item that opens this: a dialog
             mounted inside one is unmounted the moment it is asked for. */}
+            {removeFriendDialog}
             <NicknameDialog
                 open={naming}
                 onOpenChange={setNaming}

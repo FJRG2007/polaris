@@ -53,6 +53,7 @@ import { usePersonPress } from "@/components/person-press";
 import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
 import { useOpenDirect } from "./use-open-direct";
+import { useRemoveFriend } from "./remove-friend";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { ReportPersonDialog } from "@/components/report-person-dialog";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
@@ -238,7 +239,8 @@ export function MemberMenu({
     // State rather than a ref: the menu's items are drawn from this render, and
     // a ref set by the right-click would not draw them again.
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-    const { spaces, blocked, refresh } = useChat();
+    const { spaces, blocked, friends, refresh } = useChat();
+    const [removeFriend, removeFriendDialog] = useRemoveFriend(onError);
     const [busy, setBusy] = useState(false);
     const direct = useOpenDirect(onError);
     // Read once, when the menu is built. A volume is not something that changes
@@ -477,6 +479,19 @@ export function MemberMenu({
                         )}
 
                         <menu.Separator />
+                        {/* Only for a friend, and lighter than blocking, so
+                            above it. Asked first, in the app's own dialog. */}
+                        {friends.has(member.userId) && (
+                            <menu.Item
+                                disabled={working}
+                                onSelect={() =>
+                                    void removeFriend({ id: member.userId, name: member.name })
+                                }
+                            >
+                                <UserMinus className="size-3.5" />
+                                {t("removeFriend.menu")}
+                            </menu.Item>
+                        )}
                         {/* Last in the group of things you do about a person,
                             because it is the heaviest of them and because it is
                             the one that should not be next to Message. Not in
@@ -633,6 +648,7 @@ export function MemberMenu({
                 person={{ id: member.userId, name: member.name }}
                 onOpenChange={setReporting}
             />
+            {removeFriendDialog}
         </menu.Root>
     );
 }

@@ -98,7 +98,8 @@ function buildChat(): Record<string, unknown> {
         setActiveSpaceId: () => undefined,
         refresh: () => undefined,
         loaded: true,
-        blocked: new Set<string>()
+        blocked: new Set<string>(),
+        friends: new Set<string>()
     };
 }
 

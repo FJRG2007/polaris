@@ -86,6 +86,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         viewerId: ADA,
         blocked: new Set<string>(),
+        friends: new Set<string>(),
         spaces: [],
         channels: [CHANNEL],
         refresh: () => undefined

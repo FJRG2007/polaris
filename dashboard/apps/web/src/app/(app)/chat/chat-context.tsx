@@ -75,6 +75,9 @@ interface ChatContextValue {
      * told it.
      */
     readonly blocked: ReadonlySet<string>;
+    /** Everybody this reader is friends with, by id - for the same reason as
+     *  `blocked`: a person's menu asks about one person at a time. */
+    readonly friends: ReadonlySet<string>;
     /** The space the rail is standing in, or null for direct messages. Held here
      *  rather than in the rail because two components read it: the column of
      *  spaces and the list beside it. */
@@ -146,6 +149,7 @@ export function ChatProvider({
     const [spaces, setSpaces] = useState<readonly ChatSpaceView[]>([]);
     const [categories, setCategories] = useState<readonly ChatCategoryView[]>([]);
     const [blocked, setBlocked] = useState<ReadonlySet<string>>(() => new Set());
+    const [friends, setFriends] = useState<ReadonlySet<string>>(() => new Set());
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
     const refresh = useCallback(() => {
@@ -165,6 +169,7 @@ export function ChatProvider({
                 if (result.spaces) setSpaces(result.spaces);
                 if (result.categories) setCategories(result.categories);
                 if (result.blocked) setBlocked(new Set(result.blocked));
+                if (result.friends) setFriends(new Set(result.friends));
             })
             .catch(() => undefined)
             .finally(() => setLoaded(true));
@@ -263,6 +268,7 @@ export function ChatProvider({
             spaces,
             categories,
             blocked,
+            friends,
             activeSpaceId,
             setActiveSpaceId,
             loaded,
@@ -281,6 +287,7 @@ export function ChatProvider({
             spaces,
             categories,
             blocked,
+            friends,
             activeSpaceId,
             loaded,
             refresh,
