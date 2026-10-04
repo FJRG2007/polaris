@@ -54,6 +54,8 @@ import * as village from "./kinds/village-defense";
 import * as villageMessages from "./kinds/village-defense-messages";
 import * as bingo from "./kinds/bingo";
 import * as bingoMessages from "./kinds/bingo-messages";
+import * as fishing from "./kinds/boss-fishing";
+import * as fishingMessages from "./kinds/boss-fishing-messages";
 import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
@@ -80,6 +82,7 @@ const english = (text: string): string => gameMessageIn("en-US", text);
 const messages = speech.spoken(written);
 const villageSay = speech.spoken(villageMessages);
 const bingoSay = speech.spoken(bingoMessages);
+const fishSay = speech.spoken(fishingMessages);
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -777,7 +780,8 @@ export async function startEvent(input: {
         buildEndsAt: null,
         boss: null,
         villager: null,
-        bingo: null
+        bingo: null,
+        fish: null
     } satisfies stored.EventRun;
 
     const written = await updateEventState(input.installedAppId, (state) => {
@@ -931,7 +935,7 @@ function startLoop(
         homes: null
     };
     loop.timer.unref?.();
-    loop.clock = setInterval(() => void showClock(loop), CLOCK_MS);
+    loop.clock = setInterval(() => void showClock(installedAppId, loop), CLOCK_MS);
     loop.clock.unref?.();
     if (run.preset.kind === "parkour" || run.preset.kind === "team-duel") {
         loop.quick = setInterval(() => void quickLook(loop), QUICK_MS);
@@ -1184,7 +1188,7 @@ async function quickLook(loop: Loop): Promise<void> {
     }
 }
 
-async function showClock(loop: Loop): Promise<void> {
+async function showClock(installedAppId: string, loop: Loop): Promise<void> {
     const server = loop.link?.server;
     if (!server || loop.finishing || !loop.announced) return;
     const { preset } = loop.run;
@@ -1232,6 +1236,19 @@ async function showClock(loop: Loop): Promise<void> {
                 ),
                 left / 1000,
                 options.roundMinutes * 60
+            )
+        );
+    } else if (preset.kind === "boss-fishing" && loop.run.fish) {
+        // The fish's strength, with the time beside it.
+        const left = (loop.run.endsAt - now) / 1000;
+        if (left <= 0) return;
+        const { max } = loop.run.fish;
+        const strength = fishLeft(installedAppId, loop.run);
+        lines.push(
+            ...commands.barUpdate(
+                fishSay.bar(strength, max, messages.clock(left), loop.language),
+                strength,
+                max
             )
         );
     } else if (
@@ -1358,6 +1375,8 @@ async function begin(
         lines.push(...boost.boostSetup(preset.options as catalog.EventOptions<"xp-boost">));
     }
     if (preset.kind === "bingo") lines.push(...(await bingoBegin(installedAppId, loop, server)));
+    if (preset.kind === "boss-fishing")
+        lines.push(...(await fishBegin(installedAppId, loop, server, now)));
     if (preset.kind === "world-boss") {
         // The boss drawn, and the rules its fight holds written down before
         // they are changed, so whatever ends it - a restart included - puts
@@ -1592,6 +1611,9 @@ async function play(
             break;
         case "bingo":
             decided = await bingoRush(installedAppId, loop, server, now, lines);
+            break;
+        case "boss-fishing":
+            decided = await bossFishing(installedAppId, loop, server, lines);
             break;
         case "xp-boost": {
             const options = preset.options as catalog.EventOptions<"xp-boost">;
@@ -2834,6 +2856,143 @@ async function bingoResults(
     return { scores, took: [...scores].filter(([, count]) => count > 0).map(([name]) => name) };
 }
 
+// ------------------------------------------------------------------ boss fishing
+
+/** Whose catches wear the fish down for nothing (lowercased): anybody seen in
+ *  creative or spectator, and anybody AFK since it began. */
+function fishExcluded(installedAppId: string, run: stored.EventRun): Set<string> {
+    const idle = plan.idleThroughout(playing.seenOn(installedAppId), run.startsAt);
+    return new Set([...run.offMode, ...idle].map((name) => name.toLowerCase()));
+}
+
+/** How much of the fish's strength is left. */
+function fishLeft(installedAppId: string, run: stored.EventRun): number {
+    return run.fish ? fishing.strengthLeft(run.fish, fishExcluded(installedAppId, run)) : 0;
+}
+
+/** A boss fishing whose fish was still fighting when the time ran out. */
+function fishEscaped(run: stored.EventRun): boolean {
+    return run.preset.kind === "boss-fishing" && run.fish?.landed !== true;
+}
+
+/** How often, in ticks, it looks for players who have started fishing since. */
+const FISHERS_EVERY = 8;
+
+/**
+ * A boss fishing begun: the fish sized for everybody playing now - written
+ * down before it is said, so a restart keeps the same fish - its catches
+ * counted from now, and the news told.
+ */
+async function fishBegin(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): Promise<string[]> {
+    const { catches } = loop.run.preset.options as catalog.EventOptions<"boss-fishing">;
+    if (!loop.run.fish) {
+        const seen = await playing.lookAt(installedAppId, server);
+        const fishers = seen
+            ? plan
+                  .playersFor(loop.run.preset, seen, await afkMinutesFor(installedAppId), now)
+                  .map((one) => one.name)
+            : [];
+        loop.run = { ...loop.run, fish: fishing.hooked(catches, fishers) };
+        await persist(installedAppId, loop);
+    }
+    const { max } = loop.run.fish!;
+    return [
+        ...fishing.fishSetup(),
+        ...commands.titleCommands(
+            fishSay.hookedTitle(loop.language),
+            `&f${fishSay.fishName(loop.language)}`
+        ),
+        commands.say(
+            messages.tag(loop.language) +
+                fishSay.hookedLine(max, fishing.TREASURE_WORTH, loop.language)
+        ),
+        commands.sound("minecraft:entity.fishing_bobber.splash")
+    ];
+}
+
+/**
+ * A boss fishing's tick: treasures off anybody's line counted, everybody's
+ * catches added up and read in one batch, the fish grown for whoever started
+ * fishing since, and its strength told as it falls. Answers once it is landed.
+ */
+async function bossFishing(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    lines: string[]
+): Promise<string | null> {
+    let state = loop.run.fish;
+    if (!state) return null;
+    const { catches } = loop.run.preset.options as catalog.EventOptions<"boss-fishing">;
+    const language = loop.language;
+    await server.sayAll(fishing.treasureLook());
+    const treasures = commands
+        .readWhere(await server.say([fishing.READ_TREASURES]))
+        .map((one) => one.name)
+        .filter((name) => catalog.PLAYER_NAME.test(name));
+    await server.sayAll([
+        ...fishing.treasureCommit(),
+        ...treasures.map(fishing.treasureLine),
+        ...fishing.fishTick()
+    ]);
+    for (const name of treasures)
+        lines.push(
+            commands.say(
+                messages.tag(language) +
+                    fishSay.treasureLine(name, fishing.TREASURE_WORTH, language)
+            )
+        );
+    const read = new Map(
+        [...commands.readScores(await server.say([fishing.READ_CATCHES]))].filter(([name]) =>
+            catalog.PLAYER_NAME.test(name)
+        )
+    );
+    const before = state;
+    state = fishing.withCatches(state, read);
+    // Somebody who has started playing since it began makes it bigger.
+    if (loop.ticks % FISHERS_EVERY === 0) {
+        const seen = playing.seenOn(installedAppId);
+        if (seen) {
+            const active = plan
+                .playersFor(loop.run.preset, seen, await afkMinutesFor(installedAppId), Date.now())
+                .map((one) => one.name);
+            const { state: next, added } = fishing.grown(state, catches, active);
+            const more = next.max - state.max;
+            state = next;
+            if (added.length > 0 && more > 0)
+                lines.push(
+                    commands.say(messages.tag(language) + fishSay.strongerLine(more, language))
+                );
+        }
+    }
+    const left = fishing.strengthLeft(state, fishExcluded(installedAppId, loop.run));
+    const due = fishing.stagesDue(left, state.max);
+    if (left > 0 && due > state.told) {
+        const share = fishing.STAGES[due - 1] ?? 0;
+        lines.push(
+            commands.say(
+                messages.tag(language) + fishSay.tiringLine(Math.round(share * 100), language)
+            ),
+            commands.sound("minecraft:entity.fishing_bobber.retrieve")
+        );
+        state = { ...state, told: due };
+    }
+    if (left <= 0) state = { ...state, landed: true };
+    loop.run = { ...loop.run, fish: state };
+    if (JSON.stringify(state) !== JSON.stringify(before)) await persist(installedAppId, loop);
+    if (!state.landed) return null;
+    lines.push(
+        ...commands.titleCommands(fishSay.landedTitle(language), fishSay.landedSubtitle(language)),
+        ...fishing.landedLines()
+    );
+    return "The legendary fish was landed";
+}
+
 // ------------------------------------------------------------------ rare catch
 
 /** A rare catch's tick: whoever landed the treasure off a line since the last look wins. */
@@ -3994,6 +4153,14 @@ async function finish(
                             : bingoSay.timeUpLine(line, language)
                     )
                 );
+            } else if (preset.kind === "boss-fishing") {
+                lines.push(
+                    commands.say(
+                        run.fish?.landed
+                            ? fishSay.landedLine(language)
+                            : fishSay.escapedLine(fishLeft(installedAppId, run), language)
+                    )
+                );
             } else if (villagerLost(run)) {
                 // Why there is no podium, rather than "nobody scored".
                 lines.push(
@@ -4014,7 +4181,7 @@ async function finish(
                     lines.push(commands.say(villageSay.savedLine(run.villager.name, language)));
                 lines.push(commands.say(messages.wavesHeld(Math.max(0, fought), count, language)));
             }
-            if (placed.length === 0 && !villagerLost(run))
+            if (placed.length === 0 && !villagerLost(run) && !fishEscaped(run))
                 lines.push(commands.say(messages.nobodyScored(language)));
             for (const one of placed) {
                 lines.push(
@@ -4046,15 +4213,17 @@ async function finish(
             lines.push(
                 ...(villagerLost(run)
                     ? []
-                    : [
-                          ...commands.titleCommands(
-                              winner
-                                  ? messages.winnerTitle(winner.name, language)
-                                  : messages.endedTitle(language),
-                              `&e${preset.name}`
-                          ),
-                          commands.sound(commands.SOUNDS.win)
-                      ])
+                    : fishEscaped(run)
+                      ? commands.titleCommands(fishSay.escapedTitle(language), `&e${preset.name}`)
+                      : [
+                            ...commands.titleCommands(
+                                winner
+                                    ? messages.winnerTitle(winner.name, language)
+                                    : messages.endedTitle(language),
+                                `&e${preset.name}`
+                            ),
+                            commands.sound(commands.SOUNDS.win)
+                        ])
             );
         } else if (server && outcome === "finished" && preset.kind === "happy-hour") {
             lines.push(commands.say(messages.tag(language) + messages.happyHourOver(language)));
@@ -4208,6 +4377,9 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "bingo":
             after.push(...bingo.bingoCleanup());
+            break;
+        case "boss-fishing":
+            after.push(...fishing.fishCleanup());
             break;
     }
     // Operators' chat is given back last, so the tidying up does not fill it either.
@@ -4379,6 +4551,9 @@ async function results(
     }
     if (preset.kind === "world-boss" && !run.decidedBy) return { scores: new Map(), took: [] };
     if (preset.kind === "bingo") return bingoResults(server, run);
+    // It got away: nobody wins, and nobody is paid for taking part.
+    if (fishEscaped(run)) return { scores: new Map(), took: [] };
+    if (preset.kind === "boss-fishing") await server.sayAll(fishing.fishTick());
     if (catalog.takesJoiners(preset)) return stageService.results(run);
     // One last count first, so the final seconds are in it.
     await server.sayAll(commands.scoreTick(preset));

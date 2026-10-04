@@ -20,6 +20,7 @@ import { stashSchema } from "./kinds/stash";
 import { bossStateSchema } from "./kinds/boss";
 import { villagerSchema } from "./kinds/village-defense";
 import { bingoSchema } from "./kinds/bingo";
+import { fishSchema } from "./kinds/boss-fishing";
 import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { placeFromSchema, placeTrySchema, searchSummarySchema } from "./place-search";
 
@@ -275,7 +276,9 @@ export const runSchema = z.object({
     /** A villager defense: its villager, written down before it is summoned. */
     villager: villagerSchema.nullable().default(null),
     /** A bingo rush: its card, drawn as it began, and who has marked what. */
-    bingo: bingoSchema.nullable().default(null)
+    bingo: bingoSchema.nullable().default(null),
+    /** A boss fishing: the fish's strength, who it was sized for, and the catches. */
+    fish: fishSchema.nullable().default(null)
 });
 
 export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };

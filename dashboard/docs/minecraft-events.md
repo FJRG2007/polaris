@@ -95,7 +95,7 @@ Each kind declares the time of day and the weather it needs in
 When the event ends the rules go back to what they were and the time of day is
 set back to what it was when it started; the weather turns again from there.
 Kinds that need neither (Mining rush, Fishing, Trivia, Happy hour, XP boost,
-Rare catch, Bingo rush) leave the world alone.
+Rare catch, Bingo rush, Boss fishing) leave the world alone.
 
 | Kind                                                           | Time  | Weather |
 | -------------------------------------------------------------- | ----- | ------- |
@@ -105,7 +105,7 @@ Rare catch, Bingo rush) leave the world alone.
 | Blood moon                                                     | night | rain    |
 | World boss                                                     | -     | clear   |
 | Mining rush, Fishing, Trivia, Happy hour, XP boost, Rare catch | -     | -       |
-| Bingo rush                                                     | -     | -       |
+| Bingo rush, Boss fishing                                       | -     | -       |
 
 ## The random draw
 
@@ -230,6 +230,25 @@ left out.
       nobody seen in creative or spectator can. Two in the same look: the
       most marked, then the name. With time up, the most marked win (the
       least to be ranked applies), a tie to whoever got there first.
+- **Boss fishing** is a legendary fish on everybody's line, its strength on
+  the boss bar (blue): `catches` for each active player as it starts
+  (`boss-fishing.hooked`), and as many more for each one who starts playing
+  later, keeping what was already taken off it (`grown`, as a boss's
+  `toppedUp`). A player AFK from the start is not one it is sized for.
+    - A fish takes one off: the fishing contest's own `fish_caught`, which the
+      game counts only for fish. A treasure takes `TREASURE_WORTH` (3): read
+      the way a rare catch reads one (a fishing treasure picked up, less any
+      dropped, within a few looks of reeling in), since no statistic has it.
+      Junk counts for nothing. Each player's catches are the side panel.
+    - Catches by anybody AFK from the start or seen in creative or spectator
+      take nothing off it, and keep them off the podium (`afkCounts`). What a
+      player caught is kept on the run, so logging off loses none of it.
+    - It is said to tire at three quarters, half and a quarter. Landed before
+      the time is up, the most catches win, with a closing line and a display
+      of firework sparks and sounds - particles, never rockets, which hurt
+      whoever is near one when it bursts. Still fighting when time is up, it
+      gets away: no podium and no prizes, and the results say how much
+      strength it had left.
 - **Treasure hunt** hides one treasure, a bastion's treasure room by default,
   under a column of light, with every player's action bar giving its distance
   and direction for the whole hunt.

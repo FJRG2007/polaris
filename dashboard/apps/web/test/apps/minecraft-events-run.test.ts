@@ -8333,12 +8333,15 @@ interface WorldKinds {
     };
     /** A bingo rush: each player's marks as the game adds them up, one bit a cell. */
     bingo: { masks: Record<string, number> };
+    /** A boss fishing: fish each player caught, and treasures counted onto them. */
+    fish: { caught: Record<string, number>; treasure: Record<string, number> };
 }
 
 function freshKinds(): WorldKinds {
     return {
         villager: { alive: false, health: 20, summons: 0, writtenFirst: null },
-        bingo: { masks: {} }
+        bingo: { masks: {} },
+        fish: { caught: {}, treasure: {} }
     };
 }
 
@@ -8347,6 +8350,19 @@ function worldKindsAnswer(line: string): string | null {
     if (line === "execute as @a run scoreboard players get @s pe_bgk")
         return world.online
             .map((name) => `${name} has ${world.kinds.bingo.masks[name] ?? 0} [pe_bgk]`)
+            .join("\n");
+    const fish = world.kinds.fish;
+    const treasure = /^scoreboard players add (\w+) pe_fbt (\d+)$/.exec(line);
+    if (treasure) {
+        fish.treasure[treasure[1]!] = (fish.treasure[treasure[1]!] ?? 0) + Number(treasure[2]);
+        return `Added ${treasure[2]} to [pe_fbt] for ${treasure[1]}`;
+    }
+    if (line === "execute as @a run scoreboard players get @s pe_fbs")
+        return world.online
+            .map(
+                (name) =>
+                    `${name} has ${(fish.caught[name] ?? 0) + (fish.treasure[name] ?? 0)} [pe_fbs]`
+            )
             .join("\n");
     const villager = world.kinds.villager;
     if (line === "execute if entity @e[type=minecraft:villager,tag=pe_villager]")
@@ -8771,6 +8787,176 @@ describe("a bingo rush", () => {
     it("does not start with fewer players on than its minimum", async () => {
         world.online = ["Ana"];
         setUp([made("line")]);
+        expect(await refusal(start())).toBe("Only 1 player is on the server; this event needs 2");
+        expect(state().run).toBeNull();
+    });
+});
+
+describe("a boss fishing", () => {
+    const start = () =>
+        events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
+    const made = (minutes = 10) => ({ ...newPreset("boss-fishing", "fish"), minutes });
+    const bar = () =>
+        visible(
+            world.sent.filter((line) => line.startsWith("bossbar set polaris:event name")).at(-1) ??
+                ""
+        );
+    const said = (text: string) =>
+        world.sent.some((line) => line.startsWith("tellraw @a") && visible(line).includes(text));
+
+    it("is as strong as everybody fishing, is worn down by every catch and more by a treasure, and is landed", async () => {
+        setUp([made()]);
+        await start();
+        await play(2_100);
+        expect(state().run?.fish).toMatchObject({ max: 20, fishers: ["Ana", "Ben"] });
+        expect(said("has a strength of 20")).toBe(true);
+        expect(world.sent).toContain(
+            "scoreboard objectives add pe_fbf minecraft.custom:minecraft.fish_caught"
+        );
+        await play(1_000);
+        expect(bar()).toContain("The legendary fish 20/20");
+
+        world.kinds.fish.caught = { Ana: 6, Ben: 4 };
+        await play(2_100);
+        expect(said("of its strength is left")).toBe(true);
+        await play(1_000);
+        expect(bar()).toContain("10/20");
+
+        // Ben reels in a treasure: three off the fish, and three on his count.
+        world.caught = ["Ben"];
+        world.kinds.fish.caught = { Ana: 9, Ben: 4 };
+        await play(2_100);
+        expect(said("Ben fished up a treasure: the fish loses 3.")).toBe(true);
+        await play(1_000);
+        expect(bar()).toContain("4/20");
+
+        world.kinds.fish.caught = { Ana: 13, Ben: 4 };
+        world.scores = { Ana: 13, Ben: 7 };
+        await play(2_100);
+        const entry = state().history[0]!;
+        expect(state().run).toBeNull();
+        expect(entry.note).toBe("The legendary fish was landed");
+        expect(entry.podium).toEqual([
+            { place: 1, name: "Ana", score: 13 },
+            { place: 2, name: "Ben", score: 7 }
+        ]);
+        expect(world.sent).toContain("give Ana minecraft:diamond 5");
+        expect(said("Together you landed the legendary fish.")).toBe(true);
+        expect(world.sent.some((line) => line.includes("particle minecraft:firework"))).toBe(true);
+        expect(world.sent.some((line) => line.includes(" summon minecraft:firework"))).toBe(false);
+        expect(world.sent).toContain("scoreboard objectives remove pe_fbs");
+        expect(world.sent).toContain("scoreboard objectives remove pe_rod");
+    });
+
+    it("gets away when the time runs out first, and nobody wins", async () => {
+        setUp([made(3)]);
+        await start();
+        await play(2_100);
+        world.kinds.fish.caught = { Ana: 2 };
+        world.scores = { Ana: 2 };
+        await play(3 * 60_000 + 2_000);
+        const entry = state().history[0]!;
+        expect(entry).toMatchObject({ outcome: "finished", note: "Ran its full time", podium: [] });
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+        expect(said("got away with 18 strength left. Nobody wins this time.")).toBe(true);
+        expect(said("Nobody scored this time")).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title @a title") && visible(line).includes("The fish got away")
+            )
+        ).toBe(true);
+    });
+
+    it("is not worn down by an AFK farm, which stays off the podium", async () => {
+        world.still = ["Ben"];
+        setUp([made(3)]);
+        await start();
+        await play(2_100);
+        world.kinds.fish.caught = { Ana: 3, Ben: 30 };
+        world.scores = { Ana: 3, Ben: 30 };
+        await play(20_000);
+        expect(state().run).not.toBeNull();
+        // Ben was never playing: the fish was not sized for him either.
+        expect(state().run?.fish).toMatchObject({ max: 10, fishers: ["Ana"] });
+        expect(bar()).toContain("7/10");
+        await play(3 * 60_000);
+        const entry = state().history[0]!;
+        expect(entry.podium).toEqual([]);
+        expect(said("got away with 7 strength left")).toBe(true);
+    });
+
+    it("grows for a player who starts fishing later, keeping what was already taken off it", async () => {
+        setUp([made()]);
+        await start();
+        // Only Ana is on as it starts.
+        world.online = ["Ana"];
+        await play(2_100);
+        expect(state().run?.fish).toMatchObject({ max: 10, fishers: ["Ana"] });
+        world.kinds.fish.caught = { Ana: 4 };
+        await play(2_100);
+        world.online = ["Ana", "Ben"];
+        await play(60_000);
+        expect(state().run?.fish).toMatchObject({ max: 20, fishers: ["Ana", "Ben"] });
+        expect(said("More players fishing: the fish holds out for 10 more catches.")).toBe(true);
+        await play(1_000);
+        expect(bar()).toContain("16/20");
+    });
+
+    it("called off, takes its counts away and pays nobody", async () => {
+        setUp([made()]);
+        await start();
+        await play(2_100);
+        world.kinds.fish.caught = { Ana: 5 };
+        await play(2_100);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain("scoreboard objectives remove pe_fbf");
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+
+    it("keeps its fish and every catch across a restart", async () => {
+        const preset = made();
+        setUp([preset]);
+        const now = Date.now();
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 60_000,
+                endsAt: now + 5 * 60_000,
+                readyAt: now - 60_000,
+                participants: ["Ana", "Ben"],
+                fish: { max: 20, fishers: ["Ana", "Ben"], caught: { Ana: 15 }, told: 2 }
+            }
+        };
+        // The game's count of Ana's reads lower now; Ben's five land it.
+        world.kinds.fish.caught = { Ana: 1, Ben: 5 };
+        world.scores = { Ana: 15, Ben: 5 };
+        await events.sweepEvents();
+        await play(4_100);
+        expect(world.sent.some((line) => line.startsWith("scoreboard objectives add pe_fb"))).toBe(
+            false
+        );
+        const entry = state().history[0]!;
+        expect(entry).toMatchObject({ id: "resumed", note: "The legendary fish was landed" });
+        expect(entry.podium[0]).toEqual({ place: 1, name: "Ana", score: 15 });
+    });
+
+    it("does not start with fewer players on than its minimum", async () => {
+        world.online = ["Ana"];
+        setUp([made()]);
         expect(await refusal(start())).toBe("Only 1 player is on the server; this event needs 2");
         expect(state().run).toBeNull();
     });
