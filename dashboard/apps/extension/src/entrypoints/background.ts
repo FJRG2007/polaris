@@ -596,6 +596,25 @@ async function token(base: string): Promise<string | null> {
 
     const refreshToken = await REFRESH.getValue();
     if (!refreshToken) return null;
+    if (refreshing?.spends !== refreshToken) {
+        const answer = renew(base, refreshToken);
+        refreshing = { spends: refreshToken, answer };
+        answer.catch(() => {
+            if (refreshing?.answer === answer) refreshing = null;
+        });
+    }
+    return refreshing.answer;
+}
+
+/**
+ * The last refresh asked for, and the refresh token it spends. The server
+ * rotates refresh tokens, so every caller that read the same one shares this
+ * answer, even one that arrives after it: asking again would present a token
+ * already spent and be refused, which ends the session.
+ */
+let refreshing: { readonly spends: string; readonly answer: Promise<string | null> } | null = null;
+
+async function renew(base: string, refreshToken: string): Promise<string | null> {
     const outcome = await protocol.refresh(base, refreshToken, (await device()).name);
     if (outcome.kind === "rejected") {
         // The server rotates refresh tokens, so a refusal is the end of this
@@ -610,6 +629,7 @@ async function token(base: string): Promise<string | null> {
     if (outcome.kind === "unreachable") {
         // Kept: the server did not say the session is over, only that it could
         // not be asked. The time of the first failure is kept, not the latest.
+        if (refreshing?.spends === refreshToken) refreshing = null;
         if ((await UNREACHABLE.getValue()) === null) await UNREACHABLE.setValue(Date.now());
         return null;
     }
@@ -3856,7 +3876,7 @@ export default defineBackground(() => {
             void freshen();
             // A session kept through a refresh that could not reach Polaris is
             // asked about again, open or locked, until it gets an answer.
-            if (await UNREACHABLE.getValue()) void sync(false);
+            if (await UNREACHABLE.getValue()) void inTurn(() => sync(false));
             // The accounts set aside keep their own deadlines, and nothing else
             // ever looks at them: a switch that never comes refuses an expired
             // vault it is not holding, which is not the same as not holding it.
