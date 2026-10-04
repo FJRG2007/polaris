@@ -1243,7 +1243,16 @@ export async function moveIntoAction(
         }
     } catch (caught) {
         if (caught instanceof NameConflictError) {
-            return { conflict: await transferClash(user.id, connectionId, driver, source, destParent, caught) };
+            return {
+                conflict: await transferClash(
+                    user.id,
+                    connectionId,
+                    driver,
+                    source,
+                    destParent,
+                    caught
+                )
+            };
         }
         return {
             error: await driveErrorMessage(
@@ -1345,7 +1354,16 @@ export async function copyAction(
         }
     } catch (caught) {
         if (caught instanceof NameConflictError) {
-            return { conflict: await transferClash(user.id, connectionId, driver, source, destParent, caught) };
+            return {
+                conflict: await transferClash(
+                    user.id,
+                    connectionId,
+                    driver,
+                    source,
+                    destParent,
+                    caught
+                )
+            };
         }
         return {
             error: await driveErrorMessage(

@@ -515,7 +515,9 @@ export function DriveExplorer({
         // "Merge": what is inside both folders is a question of its own.
         const merged = new Set(
             clashes
-                .filter((clash) => clash.incomingKind === "dir" && decisions.get(clash.path) === "merge")
+                .filter(
+                    (clash) => clash.incomingKind === "dir" && decisions.get(clash.path) === "merge"
+                )
                 .map((clash) => clash.path)
         );
         if (merged.size > 0) {
@@ -709,7 +711,8 @@ export function DriveExplorer({
         if (!connectionId) return;
         const intoSelf = (entry: DriveEntry) =>
             dest === entry.path || dest.startsWith(`${entry.path}/`);
-        const duplicates = kind === "copy" ? list.filter((entry) => parentOf(entry.path) === dest) : [];
+        const duplicates =
+            kind === "copy" ? list.filter((entry) => parentOf(entry.path) === dest) : [];
         for (const entry of duplicates) {
             runOp(t("explorer.ops.copying", { name: entry.name }), () =>
                 driveActions.copyAction(connectionId, entry.path, dest)
@@ -735,7 +738,8 @@ export function DriveExplorer({
         for (const entry of arriving) {
             const choice = decisions.get(entry.name);
             if (choice === "skip") continue;
-            if (kind === "move") setEntries((prev) => prev.filter((row) => row.path !== entry.path));
+            if (kind === "move")
+                setEntries((prev) => prev.filter((row) => row.path !== entry.path));
             runOp(
                 t(kind === "move" ? "explorer.ops.moving" : "explorer.ops.copying", {
                     name: entry.name

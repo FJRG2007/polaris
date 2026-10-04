@@ -82,7 +82,11 @@ export async function listArchiveEntries(
         const list = extractor.getFileList();
         const out: ArchiveEntry[] = [];
         for (const header of list.fileHeaders) {
-            out.push({ name: header.name, size: header.unpSize, isDirectory: header.flags.directory });
+            out.push({
+                name: header.name,
+                size: header.unpSize,
+                isDirectory: header.flags.directory
+            });
         }
         return out;
     } finally {
@@ -144,7 +148,10 @@ export async function extractArchiveTo(
                     }
                     await ensureDir(parentOf(target));
                     const stream = await zip.stream(entry.name);
-                    await driver.writeStream(await freeTarget(target), Readable.toWeb(stream as unknown as Readable) as never);
+                    await driver.writeStream(
+                        await freeTarget(target),
+                        Readable.toWeb(stream as unknown as Readable) as never
+                    );
                 }
             } finally {
                 await zip.close();
@@ -169,7 +176,10 @@ export async function extractArchiveTo(
             await ensureDir(parentOf(target));
             const content = extractedFile.extraction;
             if (!content) continue; // header-only pass yields no bytes for this entry
-            await driver.writeStream(await freeTarget(target), Readable.toWeb(Readable.from(Buffer.from(content))) as never);
+            await driver.writeStream(
+                await freeTarget(target),
+                Readable.toWeb(Readable.from(Buffer.from(content))) as never
+            );
         }
         return written;
     } finally {

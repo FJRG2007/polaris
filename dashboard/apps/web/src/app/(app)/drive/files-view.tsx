@@ -1038,7 +1038,8 @@ export function FilesView({
         if (source === null) return;
         onMove(
             draggedGroup(source).filter(
-                (item) => parentOf(item.path) !== targetPath && !movesIntoSelf(item.path, targetPath)
+                (item) =>
+                    parentOf(item.path) !== targetPath && !movesIntoSelf(item.path, targetPath)
             ),
             targetPath
         );

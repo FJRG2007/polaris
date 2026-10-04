@@ -144,7 +144,11 @@ describe("authz engine", () => {
     });
 
     it("denies by default, allows on match, and lets an explicit deny win", () => {
-        const allowRead: PolicyStatement = { effect: "allow", actions: ["drive.read"], resources: ["drive:cxx:*"] };
+        const allowRead: PolicyStatement = {
+            effect: "allow",
+            actions: ["drive.read"],
+            resources: ["drive:cxx:*"]
+        };
         const denyOne: PolicyStatement = {
             effect: "deny",
             actions: ["drive.read"],
@@ -154,13 +158,20 @@ describe("authz engine", () => {
         expect(evaluateStatements([allowRead], "drive.read", "drive:cxx:a")).toBe("allow");
         expect(evaluateStatements([allowRead], "drive.write", "drive:cxx:a")).toBe("implicit-deny");
         // Deny overrides the broad allow regardless of statement order.
-        expect(evaluateStatements([allowRead, denyOne], "drive.read", "drive:cxx:secret/x")).toBe("deny");
-        expect(evaluateStatements([denyOne, allowRead], "drive.read", "drive:cxx:secret/x")).toBe("deny");
+        expect(evaluateStatements([allowRead, denyOne], "drive.read", "drive:cxx:secret/x")).toBe(
+            "deny"
+        );
+        expect(evaluateStatements([denyOne, allowRead], "drive.read", "drive:cxx:secret/x")).toBe(
+            "deny"
+        );
     });
 
     it("builds subtree resource patterns covering the item and its descendants", () => {
         expect(driveResourcePatterns("cxx", "")).toEqual(["drive:cxx:*"]);
-        expect(driveResourcePatterns("cxx", "docs")).toEqual(["drive:cxx:docs", "drive:cxx:docs/*"]);
+        expect(driveResourcePatterns("cxx", "docs")).toEqual([
+            "drive:cxx:docs",
+            "drive:cxx:docs/*"
+        ]);
     });
 });
 
@@ -173,22 +184,50 @@ describe("upload constraints", () => {
     };
 
     it("passes an allowed file and rejects by size, extension, and mime", () => {
-        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 50 }, constraints).ok).toBe(true);
-        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 200 }, constraints).reason).toBe("size");
-        expect(checkUploadCandidate({ extension: "exe", mimeType: "image/png", size: 10 }, constraints).reason).toBe("extension");
-        expect(checkUploadCandidate({ extension: "jpg", mimeType: "image/gif", size: 10 }, constraints).reason).toBe("mime");
+        expect(
+            checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 50 }, constraints)
+                .ok
+        ).toBe(true);
+        expect(
+            checkUploadCandidate(
+                { extension: "png", mimeType: "image/png", size: 200 },
+                constraints
+            ).reason
+        ).toBe("size");
+        expect(
+            checkUploadCandidate({ extension: "exe", mimeType: "image/png", size: 10 }, constraints)
+                .reason
+        ).toBe("extension");
+        expect(
+            checkUploadCandidate({ extension: "jpg", mimeType: "image/gif", size: 10 }, constraints)
+                .reason
+        ).toBe("mime");
     });
 
     it("rejects a file under the minimum size", () => {
         const withMin = { ...constraints, minSizeBytes: 20 };
-        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 10 }, withMin).reason).toBe("too_small");
-        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 20 }, withMin).ok).toBe(true);
+        expect(
+            checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 10 }, withMin)
+                .reason
+        ).toBe("too_small");
+        expect(
+            checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 20 }, withMin).ok
+        ).toBe(true);
     });
 
     it("blocks a denied extension even when it is also allowlisted", () => {
-        const denied = { ...constraints, allowedExtensions: ["png", "svg"], deniedExtensions: ["svg"] };
-        expect(checkUploadCandidate({ extension: "svg", mimeType: "image/png", size: 10 }, denied).reason).toBe("denied");
-        expect(checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 10 }, denied).ok).toBe(true);
+        const denied = {
+            ...constraints,
+            allowedExtensions: ["png", "svg"],
+            deniedExtensions: ["svg"]
+        };
+        expect(
+            checkUploadCandidate({ extension: "svg", mimeType: "image/png", size: 10 }, denied)
+                .reason
+        ).toBe("denied");
+        expect(
+            checkUploadCandidate({ extension: "png", mimeType: "image/png", size: 10 }, denied).ok
+        ).toBe(true);
     });
 });
 
@@ -209,7 +248,11 @@ describe("drop-point create schema", () => {
     });
 
     it("rejects a minimum size larger than the maximum", () => {
-        const result = createFileRequestSchema.safeParse({ ...base, minSizeBytes: 500, maxSizeBytes: 100 });
+        const result = createFileRequestSchema.safeParse({
+            ...base,
+            minSizeBytes: 500,
+            maxSizeBytes: 100
+        });
         expect(result.success).toBe(false);
         expect(result.error?.issues[0]?.path).toEqual(["minSizeBytes"]);
     });
@@ -228,9 +271,15 @@ describe("drop-point create schema", () => {
 describe("per-user allowlist", () => {
     it("allows anyone when empty, and matches email or username case-insensitively", () => {
         expect(userAllowedForRequest({ email: "x@y.com" }, [])).toBe(true);
-        expect(userAllowedForRequest({ email: "Alice@Example.com", username: null }, ["alice@example.com"])).toBe(true);
+        expect(
+            userAllowedForRequest({ email: "Alice@Example.com", username: null }, [
+                "alice@example.com"
+            ])
+        ).toBe(true);
         expect(userAllowedForRequest({ email: null, username: "Bob" }, ["@bob"])).toBe(true);
-        expect(userAllowedForRequest({ email: "eve@evil.com", username: "eve" }, ["alice", "bob"])).toBe(false);
+        expect(
+            userAllowedForRequest({ email: "eve@evil.com", username: "eve" }, ["alice", "bob"])
+        ).toBe(false);
     });
 });
 
@@ -238,12 +287,18 @@ describe("uploader self-delete policy", () => {
     const uploadedAt = new Date("2026-01-01T00:00:00Z");
 
     it("blocks when deletes are disabled and honors the time window", () => {
-        expect(uploaderDeleteAllowed({ allow: false, windowSeconds: null, uploadedAt })).toBe(false);
+        expect(uploaderDeleteAllowed({ allow: false, windowSeconds: null, uploadedAt })).toBe(
+            false
+        );
         expect(uploaderDeleteAllowed({ allow: true, windowSeconds: null, uploadedAt })).toBe(true);
         const within = new Date("2026-01-01T00:00:30Z");
         const after = new Date("2026-01-01T00:02:00Z");
-        expect(uploaderDeleteAllowed({ allow: true, windowSeconds: 60, uploadedAt, now: within })).toBe(true);
-        expect(uploaderDeleteAllowed({ allow: true, windowSeconds: 60, uploadedAt, now: after })).toBe(false);
+        expect(
+            uploaderDeleteAllowed({ allow: true, windowSeconds: 60, uploadedAt, now: within })
+        ).toBe(true);
+        expect(
+            uploaderDeleteAllowed({ allow: true, windowSeconds: 60, uploadedAt, now: after })
+        ).toBe(false);
     });
 });
 

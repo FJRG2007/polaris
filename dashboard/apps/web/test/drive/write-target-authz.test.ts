@@ -75,7 +75,11 @@ describe("creating", () => {
     it("still clears a plain name on the folder it was made in", async () => {
         await actions.createFileAction(CONNECTION, "shared", "notes.txt");
         expect(requireDriveDriver).toHaveBeenCalledWith("u1", CONNECTION, "shared", "write");
-        expect(writeStream).toHaveBeenCalledWith("shared/notes.txt", expect.anything(), expect.anything());
+        expect(writeStream).toHaveBeenCalledWith(
+            "shared/notes.txt",
+            expect.anything(),
+            expect.anything()
+        );
     });
 
     it("writes nothing when the folder it lands in is refused", async () => {
