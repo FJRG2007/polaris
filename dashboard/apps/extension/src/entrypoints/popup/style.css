@@ -37,8 +37,13 @@
     --primary: 258 82% 62%;
     --primary-foreground: 0 0% 100%;
 
+    /* A status is four parts, as in the tokens file: the bare colour for an icon
+       or a ring, `ink` for text on the panel, and `solid` with its `foreground`
+       for a filled button. Text is never drawn in one of them over another. */
     --danger: 356 68% 57%;
     --danger-ink: 356 86% 72%;
+    --danger-solid: 356 52% 52%;
+    --danger-foreground: 0 0% 100%;
 
     /* The countdown ring walks these as a code runs out, the same three the
        dashboard's does. Copied from the same tokens file as everything above. */
@@ -69,6 +74,11 @@
         --ring: 258 78% 56%;
 
         --primary: 258 78% 55%;
+
+        --danger: 356 64% 48%;
+        --danger-ink: 356 70% 40%;
+        --danger-solid: 356 64% 48%;
+        --danger-foreground: 0 0% 100%;
 
         --success: 152 50% 34%;
         --warning: 34 88% 44%;
@@ -199,7 +209,11 @@ h2 {
 }
 
 .notice a {
-    color: hsl(var(--primary));
+    /* The violet alone is under 4.5:1 on the dark panel, so the words keep the
+       text colour and the brand marks them as a link. */
+    color: hsl(var(--foreground));
+    text-decoration-color: hsl(var(--primary));
+    text-underline-offset: 2px;
 }
 
 input {
@@ -954,8 +968,21 @@ button.copied {
     background: hsl(var(--card));
 }
 
+/*
+ * "Disconnect this browser": red words on the menu, never on a red fill.
+ *
+ * It is a button with the `danger` class, so `button.danger` below - the filled
+ * confirmation button - matched it too and painted its background red under red
+ * text. The background is set here on purpose so that rule can never reach it.
+ */
 .menu-item.danger {
+    background: transparent;
     color: hsl(var(--danger-ink));
+}
+
+.menu-item.danger:hover,
+.menu-item.danger:focus-visible {
+    background: hsl(var(--danger) / 0.14);
 }
 
 .menu-text {
@@ -1003,7 +1030,9 @@ button.copied {
     height: 32px;
     flex: none;
     border-radius: var(--radius);
-    background: hsl(var(--primary) / 0.14);
+    /* A lighter tint than a chip's: at 0.14 the violet mark fell under the 3:1 a
+       graphic needs once its row is hovered in the dark theme. */
+    background: hsl(var(--primary) / 0.1);
     color: hsl(var(--primary));
 }
 
@@ -1126,8 +1155,10 @@ button.copied {
     flex: none;
     padding: 1px 6px;
     border-radius: 999px;
-    background: hsl(var(--primary) / 0.14);
-    color: hsl(var(--primary));
+    background: hsl(var(--primary) / 0.16);
+    /* The text colour on the tint, as a pressed chip has it: violet on violet is
+       under 3:1 on the dark menu. */
+    color: hsl(var(--foreground));
     font-size: 11px;
 }
 
@@ -1175,8 +1206,10 @@ button[aria-disabled="true"] {
     cursor: default;
 }
 
+/* A filled destructive button: the solid fill with its own foreground. */
 button.danger {
-    background: hsl(var(--danger));
+    background: hsl(var(--danger-solid));
+    color: hsl(var(--danger-foreground));
 }
 
 /* The question before a server is removed: over the popup, not a page of its own. */
