@@ -11,8 +11,9 @@
 
 A player who joined and ran `/register` still showed "no password yet" on
 the players table, though the same row - fed by the five-second roster poll
+
 - already said they were online. The row only caught up after the page was
-reloaded, or after up to a minute passed on its own.
+  reloaded, or after up to a minute passed on its own.
 
 ## What it actually was
 
