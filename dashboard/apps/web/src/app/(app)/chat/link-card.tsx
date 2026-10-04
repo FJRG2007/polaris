@@ -13,8 +13,17 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Play } from "lucide-react";
 import { usableAccent } from "@/lib/chat/accent";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { embedFor, playerAddress, playerFailed, type EmbedShape } from "@/lib/chat/embeds";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { SOUND_START, embedMuted, setEmbedMuted, soundStep } from "./embed-sound";
+import {
+    embedFor,
+    playerAddress,
+    playerFailed,
+    playerMuted,
+    playerPlaying,
+    soundMessage,
+    type EmbedShape
+} from "@/lib/chat/embeds";
 
 /**
  * The room each kind of player takes, the same before and after play is
@@ -85,8 +94,13 @@ export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["pr
     const secure = useSyncExternalStore(neverChanges, isSecure, assumeSecure);
     // A share link is played from where it led, which the server followed for
     // it; the card itself still opens what was posted.
-    const playable = embedFor(preview.target ?? preview.url);
-    const embed = playable && (!playable.needsParent || secure) ? playable : null;
+    // Kept between renders: the players' listeners below are tied to it, and a
+    // new message arriving must not start them over mid-video.
+    const address = preview.target ?? preview.url;
+    const embed = useMemo(() => {
+        const playable = embedFor(address);
+        return playable && (!playable.needsParent || secure) ? playable : null;
+    }, [address, secure]);
 
     // The edge takes the site's own colour when it has published a usable one,
     // so a video reads as YouTube at a glance. Everything else keeps Polaris'
@@ -105,6 +119,36 @@ export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["pr
         window.addEventListener("message", listen);
         return () => window.removeEventListener("message", listen);
     }, [attempt, embed, playing]);
+
+    // The sound, for a player that can be told about it: on, unless the reader
+    // muted this site before - and whatever they do with the player's own
+    // volume button from here is remembered for the next one. See
+    // `embed-sound.ts`. Each load of the frame starts over.
+    const soundOf = embed && soundMessage(embed, false) ? new URL(embed.url).host : null;
+    useEffect(() => {
+        if (!playing || !embed || !soundOf) return;
+        const wanted = embedMuted(soundOf);
+        let state = SOUND_START;
+        const listen = (event: MessageEvent) => {
+            const player = frame.current?.contentWindow;
+            if (!player || event.source !== player) return;
+            const muted = playerMuted(embed, event.origin, event.data);
+            const heard =
+                muted !== null
+                    ? { muted }
+                    : playerPlaying(embed, event.origin, event.data)
+                      ? ("playing" as const)
+                      : null;
+            if (!heard) return;
+            const step = soundStep(state, wanted, heard);
+            state = step.state;
+            if (step.ask)
+                player.postMessage(soundMessage(embed, wanted), new URL(embed.url).origin);
+            if (step.remember !== null) setEmbedMuted(soundOf, step.remember);
+        };
+        window.addEventListener("message", listen);
+        return () => window.removeEventListener("message", listen);
+    }, [attempt, embed, playing, soundOf]);
 
     const details = (
         <span className="flex min-w-0 flex-col gap-0.5">

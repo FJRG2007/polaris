@@ -15,7 +15,10 @@ import {
     landingOf,
     oembedFor,
     playerAddress,
-    playerFailed
+    playerFailed,
+    playerMuted,
+    playerPlaying,
+    soundMessage
 } from "../../src/lib/chat/embeds";
 
 /** Every address in a list frames the same player. */
@@ -657,5 +660,47 @@ describe("a player saying it could not play", () => {
     it("is only ever TikTok's - no other player is reloaded", () => {
         const youtube = embedFor("https://youtu.be/dQw4w9WgXcQ")!;
         expect(playerFailed(youtube, "https://www.youtube-nocookie.com", failed(3001))).toBe(false);
+    });
+});
+
+describe("a player's sound", () => {
+    const tiktok = embedFor("https://www.tiktok.com/@someone/video/7232918429372394779")!;
+    const said = (type: string, value: unknown) => ({ type, value, "x-tiktok-player": true });
+
+    it("reads TikTok's mute reports and its start of play", () => {
+        // What TikTok's player posts: `onMute` on load and on a press of its
+        // volume button, `onStateChange` 1 once it is playing.
+        expect(playerMuted(tiktok, "https://www.tiktok.com", said("onMute", true))).toBe(true);
+        expect(playerMuted(tiktok, "https://www.tiktok.com", said("onMute", false))).toBe(false);
+        expect(playerPlaying(tiktok, "https://www.tiktok.com", said("onStateChange", 1))).toBe(
+            true
+        );
+        expect(playerPlaying(tiktok, "https://www.tiktok.com", said("onStateChange", 3))).toBe(
+            false
+        );
+    });
+
+    it("is nothing from anywhere else, or shaped any other way", () => {
+        expect(playerMuted(tiktok, "https://evil.example", said("onMute", true))).toBeNull();
+        expect(playerMuted(tiktok, "https://www.tiktok.com", said("onMute", "true"))).toBeNull();
+        expect(playerMuted(tiktok, "https://www.tiktok.com", said("onVolumeChange", 0))).toBeNull();
+        expect(
+            playerMuted(tiktok, "https://www.tiktok.com", {
+                ...said("onMute", true),
+                "x-tiktok-player": false
+            })
+        ).toBeNull();
+        expect(playerMuted(tiktok, "https://www.tiktok.com", null)).toBeNull();
+        expect(playerPlaying(tiktok, "https://evil.example", said("onStateChange", 1))).toBe(false);
+    });
+
+    it("is told with TikTok's own messages, and only TikTok's player is", () => {
+        expect(soundMessage(tiktok, true)).toEqual({ type: "mute", "x-tiktok-player": true });
+        expect(soundMessage(tiktok, false)).toEqual({ type: "unMute", "x-tiktok-player": true });
+        const youtube = embedFor("https://youtu.be/dQw4w9WgXcQ")!;
+        expect(soundMessage(youtube, false)).toBeNull();
+        expect(
+            playerMuted(youtube, "https://www.youtube-nocookie.com", said("onMute", true))
+        ).toBeNull();
     });
 });
