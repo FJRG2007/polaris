@@ -17,12 +17,17 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button, cn } from "@polaris/ui";
 import { dbEngineLabel } from "@polaris/core";
-import { dbTone, StatusPill } from "./deploy-view";
+import { dbTone, StatusPill } from "./status-pill";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { Activity, ChevronDown, Layers } from "lucide-react";
-import { CONSUMPTION_METRICS, MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
+import {
+    CONSUMPTION_METRICS,
+    MetricsHistory,
+    percent,
+    type MetricSpec
+} from "@/components/metrics-history";
 
 interface ServiceRef {
     id: string;
@@ -104,14 +109,20 @@ export function ObservabilityView({
     // The first running service starts open, because a screen of ten collapsed
     // rows answers nothing - and a stopped one has no chart to show.
     const t = useTranslations("deploy");
-    const [open, setOpen] = useState<string | null>(services.find((service) => service.running)?.id ?? null);
+    const [open, setOpen] = useState<string | null>(
+        services.find((service) => service.running)?.id ?? null
+    );
 
     return (
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("observability.title")}</h1>
-                    <p className="text-sm text-muted-foreground">{t("observability.intro", { environment: environmentName })}</p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("observability.title")}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        {t("observability.intro", { environment: environmentName })}
+                    </p>
                 </div>
                 <Button asChild variant="ghost" size="sm">
                     <Link href="/watch">
@@ -122,9 +133,7 @@ export function ObservabilityView({
 
             {services.length === 0 && databases.length === 0 ? (
                 <div className="rounded-lg border border-border/60 px-4 py-16 text-center">
-                    <p className="text-sm text-muted-foreground">
-                        {t("observability.empty")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("observability.empty")}</p>
                 </div>
             ) : (
                 <div className="flex flex-col gap-3">
@@ -140,7 +149,9 @@ export function ObservabilityView({
                     {databases.length > 0 && (
                         <section className="rounded-lg border border-border/60 p-4">
                             <h2 className="text-sm font-medium">{t("observability.databases")}</h2>
-                            <p className="mb-2 text-xs text-muted-foreground">{t("observability.databasesHint")}</p>
+                            <p className="mb-2 text-xs text-muted-foreground">
+                                {t("observability.databasesHint")}
+                            </p>
                             <div className="overflow-hidden rounded-md border border-border/60">
                                 {databases.map((database) => (
                                     <div
@@ -148,13 +159,21 @@ export function ObservabilityView({
                                         className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2 last:border-0"
                                     >
                                         <span className="flex min-w-0 items-center gap-2">
-                                            <DbEngineIcon engine={database.engine} className="size-5" />
-                                            <span className="truncate text-sm">{database.name}</span>
+                                            <DbEngineIcon
+                                                engine={database.engine}
+                                                className="size-5"
+                                            />
+                                            <span className="truncate text-sm">
+                                                {database.name}
+                                            </span>
                                             <span className="shrink-0 text-xs text-muted-foreground">
                                                 {dbEngineLabel(database.engine)}
                                             </span>
                                         </span>
-                                        <StatusPill tone={dbTone(database.status)} label={database.status} />
+                                        <StatusPill
+                                            tone={dbTone(database.status)}
+                                            label={database.status}
+                                        />
                                     </div>
                                 ))}
                             </div>
@@ -187,10 +206,17 @@ function ServicePanel({
                 <Layers className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{service.name}</span>
                 <span
-                    className={cn("size-1.5 shrink-0 rounded-full", service.running ? "bg-success-solid" : "bg-muted-foreground")}
-                    title={service.running ? t("observability.running") : t("observability.notRunning")}
+                    className={cn(
+                        "size-1.5 shrink-0 rounded-full",
+                        service.running ? "bg-success-solid" : "bg-muted-foreground"
+                    )}
+                    title={
+                        service.running ? t("observability.running") : t("observability.notRunning")
+                    }
                 />
-                <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />
+                <ChevronDown
+                    className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")}
+                />
             </button>
 
             {open && (

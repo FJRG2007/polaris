@@ -300,9 +300,16 @@
         "browseFiles": "Browse files",
         "viewInDrive": "View in Drive",
         "editMount": "Edit mount",
-        "hint": "Drag nodes to arrange them. Drag from a node's right handle onto another service to link them. Right-click the board to add a service, or a service for more.",
+        "hint": "Drag nodes to arrange them. Drag from a node's right handle onto another service to link them. Right-click the board to add a service, or a service for more. Hold Ctrl and scroll to zoom.",
         "removeService": "This removes the service, its container, domains, and variables.",
-        "deleteServiceTitle": "Delete service"
+        "deleteServiceTitle": "Delete service",
+        "zoomControls": "Zoom",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "resetZoom": "Reset to 100%",
+        "fitView": "Fit to screen",
+        "openNode": "Open {name} ({status})",
+        "removeLinkBetween": "Remove the link between {source} and {target}"
     },
     "projects": {
         "title": "Projects",
