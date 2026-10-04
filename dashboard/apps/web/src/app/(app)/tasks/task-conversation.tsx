@@ -264,6 +264,7 @@ export function ActivityStream({
                     <div className="mt-2 flex flex-col gap-1">
                         <Composer
                             channelId={null}
+                            divided={false}
                             rules={COMMENT_RULES}
                             disabled={busy}
                             placeholder={t("conversation.replyPlaceholder")}
@@ -332,7 +333,9 @@ export function ActivityStream({
                 )}
             </div>
 
-            <div className="border-t border-border p-4">
+            {/* The box draws the rule above itself; a bordered wrapper here
+                drew a second one right on top of it. */}
+            <div>
                 {/* Files, pictures, voice notes and screen clips, which is the
                     same composer the chat uses and therefore the same set of
                     affordances - a task thread is a conversation, and the one
