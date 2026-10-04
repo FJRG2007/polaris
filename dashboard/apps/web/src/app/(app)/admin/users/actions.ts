@@ -46,7 +46,9 @@ import {
  *  is refused here rather than sent to the database. */
 const idSchema = z.string().uuid();
 
-export async function createInviteAction(input: unknown): Promise<CreatedInvite & { error?: string }> {
+export async function createInviteAction(
+    input: unknown
+): Promise<CreatedInvite & { error?: string }> {
     const admin = await requireAdmin();
     const parsed = createInviteSchema.safeParse(input);
     if (!parsed.success) {
@@ -83,7 +85,10 @@ export async function createInviteAction(input: unknown): Promise<CreatedInvite 
  * its own - it lets the person holding the ticket choose their own password, so
  * an administrator never learns what they picked.
  */
-export async function decideRecoveryRequestAction(id: string, approve: boolean): Promise<{ error?: string }> {
+export async function decideRecoveryRequestAction(
+    id: string,
+    approve: boolean
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const result = await decideRecoveryRequest(admin.id, String(id), approve === true);
     revalidatePath("/admin/users");
@@ -93,7 +98,12 @@ export async function decideRecoveryRequestAction(id: string, approve: boolean):
 export async function revokeInviteAction(id: string): Promise<void> {
     const admin = await requireAdmin();
     await revokeInvite(id);
-    await recordAudit({ actorId: admin.id, action: "invite.revoke", targetType: "invite", targetId: id });
+    await recordAudit({
+        actorId: admin.id,
+        action: "invite.revoke",
+        targetType: "invite",
+        targetId: id
+    });
     revalidatePath("/admin/users");
 }
 
@@ -124,7 +134,10 @@ export async function unbanUserAction(userId: string): Promise<{ error?: string 
     return result;
 }
 
-export async function setAdminAccessAction(userId: string, isAdmin: boolean): Promise<{ error?: string }> {
+export async function setAdminAccessAction(
+    userId: string,
+    isAdmin: boolean
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const result = await setAdminAccess(admin.id, userId, isAdmin);
     // An administrator reaches every app there is, so this is the largest change
@@ -159,7 +172,10 @@ export async function setUserRoleAction(userId: string, role: string): Promise<{
     return result;
 }
 
-export async function setUserLimitsAction(userId: string, input: unknown): Promise<{ error?: string }> {
+export async function setUserLimitsAction(
+    userId: string,
+    input: unknown
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = accessRulesSchema.safeParse(input);
     if (!parsed.success) {
@@ -183,17 +199,25 @@ export async function revokeUserSessionsAction(userId: string): Promise<{ error?
  * the directory: most rows are never expanded, and the list is the one part of a
  * person's record that changes while you are looking at it.
  *
- * Nothing here is the caller's own session, so none is flagged as current.
+ * The caller's own session is the one flagged as current, which only ever
+ * matches when the account being read is the caller's own - and there it is the
+ * row an administrator must not sign out by mistake.
  */
-export async function userSessionsAction(userId: unknown): Promise<{ sessions?: SessionView[]; error?: string }> {
-    await requireAdmin();
+export async function userSessionsAction(
+    userId: unknown
+): Promise<{ sessions?: SessionView[]; error?: string }> {
+    const admin = await requireAdmin();
     const parsed = idSchema.safeParse(userId);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("users.errors.unknownAccount") };
-    return { sessions: await listUserSessions(parsed.data, "") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("users.errors.unknownAccount") };
+    return { sessions: await listUserSessions(parsed.data, admin.sessionId) };
 }
 
 /** End one session of somebody else's without ending the rest. */
-export async function revokeUserSessionAction(userId: unknown, sessionId: unknown): Promise<{ error?: string }> {
+export async function revokeUserSessionAction(
+    userId: unknown,
+    sessionId: unknown
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const target = idSchema.safeParse(userId);
     const session = idSchema.safeParse(sessionId);
@@ -227,9 +251,13 @@ export async function setUsernameCooldownAction(days: unknown): Promise<{ error?
         .number()
         .int(t("users.errors.wholeDays"))
         .min(0, t("users.errors.zeroForNoWait"))
-        .max(USERNAME_COOLDOWN_MAX_DAYS, t("users.errors.tooLong", { max: USERNAME_COOLDOWN_MAX_DAYS }))
+        .max(
+            USERNAME_COOLDOWN_MAX_DAYS,
+            t("users.errors.tooLong", { max: USERNAME_COOLDOWN_MAX_DAYS })
+        )
         .safeParse(days);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("users.errors.checkDays") };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? t("users.errors.checkDays") };
 
     await setSetting(USERNAME_COOLDOWN_KEY, String(parsed.data));
     await recordAudit({
@@ -276,7 +304,8 @@ export async function setPublicProfilesAction(allowed: unknown): Promise<{ error
 export async function setFollowerDefaultAction(audience: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.enum(["everyone", "friends", "nobody"]).safeParse(audience);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("users.errors.audience") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("users.errors.audience") };
     await setDefaultFollowerAudience(parsed.data);
     await recordAudit({
         actorId: admin.id,

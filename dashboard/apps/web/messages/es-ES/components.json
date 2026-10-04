@@ -23,18 +23,18 @@
         }
     },
     "activityTable": {
-        "when": "CuÃ¡ndo",
-        "action": "AcciÃ³n",
+        "when": "Cuándo",
+        "action": "Acción",
         "details": "Detalles"
     },
     "appBundles": {
-        "partFailed": "Una parte de esta pÃ¡gina no se ha cargado. Recarga la pÃ¡gina para volver a intentarlo.",
-        "unavailable": "{name} no estÃ¡ disponible ahora mismo",
+        "partFailed": "Una parte de esta página no se ha cargado. Recarga la página para volver a intentarlo.",
+        "unavailable": "{name} no está disponible ahora mismo",
         "thisApp": "Esta app",
         "stillDownloading": "Polaris aún la está descargando. Inténtalo en un momento."
     },
     "presence": {
-        "online": "En lÃ­nea",
+        "online": "En línea",
         "idle": "Ausente",
         "busy": "No molestar",
         "offline": "Desconectado"
@@ -46,15 +46,15 @@
         "onCall": "En una llamada abierta"
     },
     "denied": {
-        "notice": "Esa pÃ¡gina no estÃ¡ abierta para tu rol. Tu acceso empieza aquÃ­."
+        "notice": "Esa página no está abierta para tu rol. Tu acceso empieza aquí."
     },
     "json": {
-        "invalid": "Esto no es un JSON vÃ¡lido."
+        "invalid": "Esto no es un JSON válido."
     },
     "linkPassword": {
         "title": "Contraseña necesaria",
-        "description": "Este enlace estÃ¡ protegido. Escribe su contraseÃ±a para continuar.",
-        "label": "ContraseÃ±a",
+        "description": "Este enlace está protegido. Escribe su contraseña para continuar.",
+        "label": "Contraseña",
         "cooldown": "Demasiados intentos. Vuelve a intentarlo en {seconds} s.",
         "checking": "Comprobando...",
         "unlock": "Abrir"
@@ -66,12 +66,12 @@
         "inChannel": "{author} en {channel}",
         "messageChannel": "Mensaje en #{channel}",
         "replyTo": "Responder a {author}",
-        "markReadFailed": "No se ha podido marcar como leÃ­do",
+        "markReadFailed": "No se ha podido marcar como leído",
         "noticeGone": "Ya no se puede responder a ese aviso"
     },
     "mailUnread": {
         "title": "Correo nuevo",
-        "more": "{count, plural, one {# mensaje mÃ¡s} other {# mensajes mÃ¡s}} en tu bandeja de entrada"
+        "more": "{count, plural, one {# mensaje más} other {# mensajes más}} en tu bandeja de entrada"
     },
     "picture": {
         "saveFailed": "No se ha podido guardar",
@@ -668,6 +668,8 @@
         "scannedBy": "Escaneado por",
         "allowedBy": "Permitido por",
         "thisDevice": "Este equipo",
+        "activeNow": "Activo ahora",
+        "activeNowHint": "Usado en los últimos minutos",
         "signedOutSince": "Ya cerrada",
         "device": "Equipo",
         "app": "App",

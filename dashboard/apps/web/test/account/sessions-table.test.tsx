@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SessionView } from "@/lib/session-directory";
-import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
+import { inUseFirst, inUseNow, SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import { withMessages } from "../setup/i18n";
 
 function session(overrides: Partial<SessionView> = {}): SessionView {
@@ -398,5 +398,146 @@ describe("a browser extension's connection", () => {
 
     it("offers no lock to a reader who is not its owner", () => {
         expect(renderWithExtension()).not.toContain("Address lock for");
+    });
+
+    it("says where and when it was last seen, without the message's markup", () => {
+        const markup = renderWithExtension();
+        expect(markup).not.toContain("&lt;time&gt;");
+        expect(markup).toMatch(
+            /10\.0\.1\.131 - last active <time dateTime="2026-09-17T10:00:00.000Z">/
+        );
+    });
+});
+
+describe("when each row was last active", () => {
+    /** The compact table, as an administrator's dialog and the device dialog draw
+     *  it: the time folds into the device cell as a sentence. */
+    function renderCompact(rows: SessionView[], locale: "en-US" | "es-ES" = "en-US"): string {
+        return renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    compact
+                    sessions={rows}
+                    busyId={null}
+                    emptyLabel="Nothing is signed in."
+                    onRevoke={() => {}}
+                />,
+                locale
+            )
+        );
+    }
+
+    it("says it with a real time, not the message's markup", () => {
+        // What an administrator read on somebody's sessions: "Last active <time></time>".
+        const markup = renderCompact([session()]);
+        expect(markup).not.toContain("&lt;time&gt;");
+        expect(markup).toMatch(
+            /Last active <time dateTime="2026-08-03T10:00:00.000Z"><relative-time/
+        );
+    });
+
+    it("says it in Spanish too", () => {
+        const markup = renderCompact([session()], "es-ES");
+        expect(markup).not.toContain("&lt;time&gt;");
+        expect(markup).toMatch(/Última actividad <time dateTime="2026-08-03T10:00:00.000Z">/);
+    });
+
+    it("carries the instant in the full table's column as well", () => {
+        expect(render([session()])).toContain('<time dateTime="2026-08-03T10:00:00.000Z">');
+    });
+});
+
+describe("the sessions in use right now", () => {
+    const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+
+    it("counts a session as in use within the window presence uses, and the reader's own always", () => {
+        const now = Date.now();
+        expect(inUseNow({ lastSeenAt: minutesAgo(1) }, now)).toBe(true);
+        expect(inUseNow({ lastSeenAt: minutesAgo(10) }, now)).toBe(false);
+        expect(inUseNow({ lastSeenAt: minutesAgo(600), current: true }, now)).toBe(true);
+    });
+
+    it("puts the reader's own first, then the ones in use, and keeps the rest in order", () => {
+        const rows = [
+            { id: "old-1", lastSeenAt: minutesAgo(30) },
+            { id: "live", lastSeenAt: minutesAgo(1) },
+            { id: "old-2", lastSeenAt: minutesAgo(60) },
+            { id: "mine", lastSeenAt: minutesAgo(2), current: true }
+        ];
+        expect(inUseFirst(rows, Date.now()).map((row) => row.id)).toEqual([
+            "mine",
+            "live",
+            "old-1",
+            "old-2"
+        ]);
+    });
+
+    it("marks a session in use and lists it before an idle one", () => {
+        const markup = renderForAdmin([
+            session({ id: "idle", name: "Onyx", lastSeenAt: minutesAgo(45) }),
+            session({ id: "live", name: "Pegasus", lastSeenAt: minutesAgo(1) })
+        ]);
+        expect(markup.match(/Active now/g)).toHaveLength(1);
+        expect(markup.indexOf("Pegasus")).toBeLessThan(markup.indexOf("Onyx"));
+        expect(markup).toContain("bg-success");
+    });
+
+    it("marks nothing when nothing is in use", () => {
+        expect(renderForAdmin([session()])).not.toContain("Active now");
+    });
+
+    it("names the reader's own device and puts it at the top", () => {
+        const markup = render([
+            session({ id: "other", name: "Onyx", lastSeenAt: minutesAgo(1) }),
+            session({ id: "mine", name: "Pegasus", current: true, lastSeenAt: minutesAgo(2) })
+        ]);
+        expect(markup).toContain("This device");
+        expect(markup.match(/Active now/g)).toHaveLength(2);
+        expect(markup.indexOf("Pegasus")).toBeLessThan(markup.indexOf("Onyx"));
+    });
+
+    it("says it in Spanish", () => {
+        const markup = renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    compact
+                    sessions={[session({ lastSeenAt: minutesAgo(1) })]}
+                    busyId={null}
+                    emptyLabel="-"
+                    onRevoke={() => {}}
+                />,
+                "es-ES"
+            )
+        );
+        expect(markup).toContain("Activo ahora");
+    });
+
+    it("marks an extension in use as well", () => {
+        const markup = renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    sessions={[]}
+                    extensions={[
+                        {
+                            id: "33333333-3333-4333-8333-333333333333",
+                            name: "Chrome on Windows",
+                            browser: "Chrome",
+                            os: "Windows",
+                            ip: "10.0.1.131",
+                            host: "polaris.local",
+                            createdAt: "2026-09-01T10:00:00.000Z",
+                            lastSeenAt: minutesAgo(1),
+                            vaultClients: 1,
+                            pinToAddress: null,
+                            pinnedByRule: false
+                        }
+                    ]}
+                    busyId={null}
+                    emptyLabel="-"
+                    onRevoke={() => {}}
+                />
+            )
+        );
+        expect(markup).toContain("Active now");
     });
 });

@@ -62,7 +62,9 @@ describe("the catalogs", () => {
         const namespaces = namespacesIn(root, SOURCE_LOCALE);
 
         it("has a folder for every locale and nothing else", () => {
-            const folders = readdirSync(root).filter((entry) => statSync(join(root, entry)).isDirectory());
+            const folders = readdirSync(root).filter((entry) =>
+                statSync(join(root, entry)).isDirectory()
+            );
             expect(folders.sort()).toEqual([...LOCALES].sort());
         });
 
@@ -74,7 +76,9 @@ describe("the catalogs", () => {
         // screen can reach, and one listed but never written fails the build.
         it.each(LOCALES)("%s lists every namespace it has, and only those", (locale) => {
             const index = readFileSync(join(root, locale, "index.ts"), "utf8");
-            const imported = [...index.matchAll(/from\s+"\.\/([\w-]+)\.json"/g)].map((match) => match[1]).sort();
+            const imported = [...index.matchAll(/from\s+"\.\/([\w-]+)\.json"/g)]
+                .map((match) => match[1])
+                .sort();
             expect(imported).toEqual(namespaces);
         });
 
@@ -98,10 +102,17 @@ describe("the catalogs", () => {
                     const original = inspectMessage(SOURCE_LOCALE, source.get(key) ?? "");
                     if (!original.ok) continue;
                     if (inspected.args.join() !== original.args.join())
-                        problems.push(`${namespace}.${key}: arguments ${inspected.args} vs ${original.args}`);
+                        problems.push(
+                            `${namespace}.${key}: arguments ${inspected.args} vs ${original.args}`
+                        );
                     if (inspected.tags.join() !== original.tags.join())
-                        problems.push(`${namespace}.${key}: tags ${inspected.tags} vs ${original.tags}`);
+                        problems.push(
+                            `${namespace}.${key}: tags ${inspected.tags} vs ${original.tags}`
+                        );
                     if (message.trim() === "") problems.push(`${namespace}.${key}: empty`);
+                    // UTF-8 read back as Latin-1 somewhere on its way in: "pÃ¡gina" for "página".
+                    if (/[ÂÃ][\u0080-¿]/.test(message))
+                        problems.push(`${namespace}.${key}: mis-encoded text`);
                 }
                 expect(problems).toEqual([]);
             });
@@ -129,7 +140,9 @@ describe("the navigation catalog", () => {
     });
 
     it("describes every app exactly as the catalogue does", () => {
-        const apps = english.apps as Readonly<Record<string, { description: string; guestDescription?: string }>>;
+        const apps = english.apps as Readonly<
+            Record<string, { description: string; guestDescription?: string }>
+        >;
         for (const app of nav.POLARIS_APPS) {
             expect(apps[app.id]?.description, app.id).toBe(app.description);
             expect(apps[app.id]?.guestDescription, app.id).toBe(app.guest?.description);
@@ -140,17 +153,33 @@ describe("the navigation catalog", () => {
     it("has words for every length a status or a presence can be set for", () => {
         const t = webCatalogs.translator("en-US", "nav");
         for (const { minutes } of PRESENCE_DURATIONS) {
-            if (minutes !== null) expect(t.has(`account.presenceFor.m${minutes}`), `presence ${minutes}`).toBe(true);
+            if (minutes !== null)
+                expect(t.has(`account.presenceFor.m${minutes}`), `presence ${minutes}`).toBe(true);
         }
         for (const { minutes } of STATUS_DURATIONS) {
-            if (minutes !== null) expect(t.has(`account.status.clearsIn.m${minutes}`), `status ${minutes}`).toBe(true);
+            if (minutes !== null)
+                expect(t.has(`account.status.clearsIn.m${minutes}`), `status ${minutes}`).toBe(
+                    true
+                );
         }
         // And the English is core's, word for word.
         for (const { minutes, label } of PRESENCE_DURATIONS) {
-            expect(t((minutes === null ? "account.presenceFor.untilChanged" : `account.presenceFor.m${minutes}`) as never)).toBe(label);
+            expect(
+                t(
+                    (minutes === null
+                        ? "account.presenceFor.untilChanged"
+                        : `account.presenceFor.m${minutes}`) as never
+                )
+            ).toBe(label);
         }
         for (const { minutes, label } of STATUS_DURATIONS) {
-            expect(t((minutes === null ? "account.status.clearsIn.never" : `account.status.clearsIn.m${minutes}`) as never)).toBe(label);
+            expect(
+                t(
+                    (minutes === null
+                        ? "account.status.clearsIn.never"
+                        : `account.status.clearsIn.m${minutes}`) as never
+                )
+            ).toBe(label);
         }
     });
 });
@@ -158,7 +187,11 @@ describe("the navigation catalog", () => {
 describe("the catalogs in the browser", () => {
     /** Modules that hold every catalog, or reach the database. A client
      *  component that imported one would ship all of it to every page. */
-    const SERVER_ONLY = [/messages["']$/, /\/messages\/index["']$/, /lib\/i18n\/(translate|request|locale-service)["']$/];
+    const SERVER_ONLY = [
+        /messages["']$/,
+        /\/messages\/index["']$/,
+        /lib\/i18n\/(translate|request|locale-service)["']$/
+    ];
 
     it("are never imported by a client component", () => {
         const src = resolve(__dirname, "../../src");
@@ -170,8 +203,11 @@ describe("the catalogs in the browser", () => {
                 else if (/\.tsx?$/.test(entry)) {
                     const text = readFileSync(full, "utf8");
                     if (!/^\s*["']use client["']/m.test(text)) continue;
-                    for (const match of text.matchAll(/^import\s+(?!type\b)[^;]*?from\s+(["'][^"']+["'])/gm)) {
-                        if (SERVER_ONLY.some((pattern) => pattern.test(match[1] ?? ""))) offenders.push(`${full}: ${match[1]}`);
+                    for (const match of text.matchAll(
+                        /^import\s+(?!type\b)[^;]*?from\s+(["'][^"']+["'])/gm
+                    )) {
+                        if (SERVER_ONLY.some((pattern) => pattern.test(match[1] ?? "")))
+                            offenders.push(`${full}: ${match[1]}`);
                     }
                 }
             }
