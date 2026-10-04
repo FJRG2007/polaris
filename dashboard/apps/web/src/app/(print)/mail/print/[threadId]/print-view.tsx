@@ -91,7 +91,11 @@ export function PrintView({ thread }: { thread: PrintableThread }) {
                             </dl>
                             {message.html.trim() || message.text.trim() ? (
                                 <SandboxedHtml
-                                    html={message.html.trim() ? message.html : core.textToHtml(message.text)}
+                                    html={
+                                        message.html.trim()
+                                            ? message.html
+                                            : core.textToHtml(message.text)
+                                    }
                                     showRemote={message.remoteAllowed}
                                     paper="own"
                                 />

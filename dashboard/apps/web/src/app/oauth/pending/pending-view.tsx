@@ -43,7 +43,9 @@ export function PendingView({ requestedAt }: { requestedAt: string }) {
                     <ShieldQuestion className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">{t("pending.body")}</p>
                     <p className="text-xs text-muted-foreground">
-                        {t.rich("pending.requested", { time: <RelativeTime key="time" iso={requestedAt} /> })}
+                        {t.rich("pending.requested", {
+                            time: <RelativeTime key="time" iso={requestedAt} />
+                        })}
                     </p>
                     <button
                         type="button"

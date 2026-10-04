@@ -394,7 +394,9 @@ export function VaultApp() {
             description: permanent
                 ? t("app.confirmDelete.description")
                 : t("app.confirmTrash.description"),
-            confirmLabel: permanent ? t("app.confirmDelete.confirm") : t("app.confirmTrash.confirm"),
+            confirmLabel: permanent
+                ? t("app.confirmDelete.confirm")
+                : t("app.confirmTrash.confirm"),
             danger: true
         });
         if (!confirmed || !key) return;
@@ -460,7 +462,9 @@ export function VaultApp() {
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("app.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("app.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">
                         {t("app.count", { count: items.filter((item) => !item.deleted).length })}
                     </p>
@@ -627,7 +631,9 @@ export function VaultApp() {
                                                                 }
                                                             >
                                                                 <Copy className="size-4" />
-                                                                {core.looksLikeEmail(item.login.username)
+                                                                {core.looksLikeEmail(
+                                                                    item.login.username
+                                                                )
                                                                     ? t("app.menu.copyEmail")
                                                                     : t("app.menu.copyUsername")}
                                                                 <MenuShortcut keys="Mod+Shift+C" />
@@ -835,7 +841,9 @@ export function VaultApp() {
                                             size="sm"
                                             variant="ghost"
                                             title={t("app.restore")}
-                                            aria-label={t("app.restoreNamed", { name: current.name })}
+                                            aria-label={t("app.restoreNamed", {
+                                                name: current.name
+                                            })}
                                             onClick={() => onRestore(current)}
                                         >
                                             <RotateCcw className="size-4" />
@@ -950,7 +958,10 @@ export function VaultApp() {
                                         ) : null}
                                     </Section>
 
-                                    <Section title={t("app.sections.websites")} when={current.login.uris.length > 0}>
+                                    <Section
+                                        title={t("app.sections.websites")}
+                                        when={current.login.uris.length > 0}
+                                    >
                                         {current.login.uris.map((entry) => (
                                             <Row
                                                 key={entry.uri}
@@ -986,7 +997,10 @@ export function VaultApp() {
                                             </span>
                                         </div>
                                     ) : null}
-                                    <Row label={t("app.fields.name")} value={current.card.cardholderName} />
+                                    <Row
+                                        label={t("app.fields.name")}
+                                        value={current.card.cardholderName}
+                                    />
                                     <Row
                                         label={t("app.fields.number")}
                                         // Grouped the way the card prints it, so
@@ -1181,7 +1195,10 @@ export function VaultApp() {
                                                     </span>
                                                 ),
                                                 what: (chunks) => (
-                                                    <span key="what" className="text-muted-foreground">
+                                                    <span
+                                                        key="what"
+                                                        className="text-muted-foreground"
+                                                    >
                                                         {chunks}
                                                     </span>
                                                 )

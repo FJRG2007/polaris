@@ -65,8 +65,10 @@ export function AcceptInviteForm({
     // passwordMatchesIdentity over these and asks the breach corpus; claimInviteSchema
     // refuses both again on the server, which is the copy that decides.
     const identity = [values.name, values.username, email];
-    const passwordError = validationMessage(tv, usePasswordSafety(values.password, identity) ?? undefined) ?? null;
-    const fieldError = (field: "name" | "username" | "password") => validationMessage(tv, form.error(field));
+    const passwordError =
+        validationMessage(tv, usePasswordSafety(values.password, identity) ?? undefined) ?? null;
+    const fieldError = (field: "name" | "username" | "password") =>
+        validationMessage(tv, form.error(field));
 
     function update(field: "name" | "username" | "password", value: string) {
         const next = { ...values, [field]: value };
@@ -134,7 +136,11 @@ export function AcceptInviteForm({
                 <CardBody>
                     <p className="mb-3 text-sm text-muted-foreground">
                         {orgName
-                            ? t.rich("invite.joiningAsOrg", { email, org: orgName, strong: emphasis })
+                            ? t.rich("invite.joiningAsOrg", {
+                                  email,
+                                  org: orgName,
+                                  strong: emphasis
+                              })
                             : t.rich("invite.joiningAs", { email, strong: emphasis })}
                     </p>
                     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
@@ -157,7 +163,9 @@ export function AcceptInviteForm({
                                 }}
                                 aria-invalid={Boolean(form.error("name"))}
                             />
-                            {fieldError("name") ? <p className="text-xs text-danger">{fieldError("name")}</p> : null}
+                            {fieldError("name") ? (
+                                <p className="text-xs text-danger">{fieldError("name")}</p>
+                            ) : null}
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">{t("invite.username")}</label>
@@ -188,8 +196,10 @@ export function AcceptInviteForm({
                                 onBlur={() => form.markTouched("password")}
                                 aria-invalid={Boolean(form.error("password") ?? passwordError)}
                             />
-                            {fieldError("password") ?? passwordError ? (
-                                <p className="text-xs text-danger">{fieldError("password") ?? passwordError}</p>
+                            {(fieldError("password") ?? passwordError) ? (
+                                <p className="text-xs text-danger">
+                                    {fieldError("password") ?? passwordError}
+                                </p>
                             ) : null}
                             {/* And what is true about it either way. The refusal
                                 above only appears once the password is long

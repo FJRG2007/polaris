@@ -28,7 +28,10 @@ const COMMON = { "en-US": enUS, "es-ES": esES } as const satisfies Record<Locale
 function useReaderLocale(): Locale {
     const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
     useEffect(() => {
-        const chosen = readLocaleCookie(document.cookie) ?? negotiateLocale(navigator.languages) ?? DEFAULT_LOCALE;
+        const chosen =
+            readLocaleCookie(document.cookie) ??
+            negotiateLocale(navigator.languages) ??
+            DEFAULT_LOCALE;
         setLocale(chosen);
         document.documentElement.lang = chosen;
     }, []);

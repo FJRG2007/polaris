@@ -36,7 +36,13 @@ export function InviteCodeForm() {
     }
 
     if (invite) {
-        return <AcceptInviteForm code={normalized} email={invite.email} needsPassword={invite.needsPassword} />;
+        return (
+            <AcceptInviteForm
+                code={normalized}
+                email={invite.email}
+                needsPassword={invite.needsPassword}
+            />
+        );
     }
 
     return (
@@ -60,11 +66,17 @@ export function InviteCodeForm() {
                             onChange={(event) => setCode(normalizeInviteCode(event.target.value))}
                         />
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending || normalized.length !== INVITE_CODE_LENGTH}>
+                        <Button
+                            type="submit"
+                            disabled={pending || normalized.length !== INVITE_CODE_LENGTH}
+                        >
                             {pending ? t("invite.checking") : t("invite.continue")}
                         </Button>
                     </form>
-                    <a href="/oauth/login" className="mt-4 block text-center text-sm text-primary hover:underline">
+                    <a
+                        href="/oauth/login"
+                        className="mt-4 block text-center text-sm text-primary hover:underline"
+                    >
                         {t("invite.goToSignIn")}
                     </a>
                 </CardBody>

@@ -15,13 +15,7 @@ import { ConnectChannelDialog } from "./connect-channel-dialog";
 import { ChevronLeft, Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import {
-    PLATFORM_LOGO,
-    editablePeer,
-    humanPeerId,
-    peerHint,
-    platformLabel
-} from "./platform-meta";
+import { PLATFORM_LOGO, editablePeer, humanPeerId, peerHint, platformLabel } from "./platform-meta";
 import type {
     AgentView,
     ChannelView,
@@ -108,7 +102,9 @@ export function InboxView({
     return (
         <div className="flex h-[calc(100dvh-8rem)] flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inbox.view.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("inbox.view.title")}
+                </h1>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         size="sm"
@@ -787,9 +783,7 @@ function NewChatDialog({
                         </p>
                     )}
                     {telegramInvalid && (
-                        <p className="text-xs text-danger">
-                            {t("inbox.newChat.telegramInvalid")}
-                        </p>
+                        <p className="text-xs text-danger">{t("inbox.newChat.telegramInvalid")}</p>
                     )}
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("inbox.newChat.name")}</span>

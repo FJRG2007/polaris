@@ -125,9 +125,7 @@ export function GuestCall({
                     ) : (
                         <div className="flex flex-col gap-3">
                             <p className="text-sm text-muted-foreground">
-                                {asAccount
-                                    ? t("guestCall.asAccount")
-                                    : t("guestCall.asGuest")}
+                                {asAccount ? t("guestCall.asAccount") : t("guestCall.asGuest")}
                             </p>
                             {!asAccount && (
                                 <Input

@@ -36,7 +36,9 @@ export default function NotFound() {
                 <div className="flex flex-col gap-1">
                     <p className="font-mono text-xs text-muted-foreground">404</p>
                     <h1 className="text-sm font-medium">{t("pages.notFound.title")}</h1>
-                    <p className="text-sm text-muted-foreground">{t("pages.notFound.description")}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {t("pages.notFound.description")}
+                    </p>
                 </div>
 
                 {pathname ? (

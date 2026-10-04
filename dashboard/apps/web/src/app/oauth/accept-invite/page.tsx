@@ -36,7 +36,10 @@ export default async function AcceptInvitePage({
                         <p className="text-sm text-muted-foreground">
                             {validationMessage(tv, INVITE_REFUSALS[refusal ?? "unavailable"])}
                         </p>
-                        <a href="/oauth/login" className="mt-4 block text-center text-sm text-primary hover:underline">
+                        <a
+                            href="/oauth/login"
+                            className="mt-4 block text-center text-sm text-primary hover:underline"
+                        >
                             {t("invite.goToSignIn")}
                         </a>
                     </CardBody>

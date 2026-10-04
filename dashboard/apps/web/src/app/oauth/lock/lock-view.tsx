@@ -13,7 +13,15 @@ import { signOut } from "@/lib/auth-client";
 import { unlockSessionAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-export function LockView({ name, email, hasPin }: { name: string; email: string; hasPin: boolean }) {
+export function LockView({
+    name,
+    email,
+    hasPin
+}: {
+    name: string;
+    email: string;
+    hasPin: boolean;
+}) {
     const router = useRouter();
     const t = useTranslations("auth");
     const [method, setMethod] = useState<"pin" | "password">(hasPin ? "pin" : "password");

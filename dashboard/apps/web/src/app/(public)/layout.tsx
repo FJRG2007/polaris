@@ -56,7 +56,10 @@ export default async function PublicLayout({ children }: { children: ReactNode }
                 <Link href={PUBLIC_PATHS.home} className="transition-colors hover:text-foreground">
                     {t("layout.about")}
                 </Link>
-                <Link href={PUBLIC_PATHS.privacy} className="transition-colors hover:text-foreground">
+                <Link
+                    href={PUBLIC_PATHS.privacy}
+                    className="transition-colors hover:text-foreground"
+                >
                     {t("layout.privacy")}
                 </Link>
                 <Link href={PUBLIC_PATHS.terms} className="transition-colors hover:text-foreground">
