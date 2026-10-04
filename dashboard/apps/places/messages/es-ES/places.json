@@ -915,12 +915,38 @@
                 "prompt": "Philips ha enviado un código de un solo uso a ese email. Puede tardar un minuto; mira también en spam.",
                 "file": {
                     "title": "Sube el archivo de la app Philips Air+ (.apk)",
-                    "why": "Polaris preguntó a los servidores de Philips de {country} ({area}) y de las demás regiones que conoce, y ninguna lista Air+ o HomeID tiene un aparato de aire ({summary}). Ventiladores, calefactores y algunos purificadores están en una tercera nube de Philips, que solo acepta accesos firmados con un valor que Philips guarda en su app Air+. Polaris lee ese valor del archivo sin ejecutarlo, lo guarda cifrado con esta conexión y borra el archivo.",
+                    "why": "Ninguno de estos sitios tiene un aparato de aire para {country} ({area}). Ventiladores, calefactores y algunos purificadores están en una tercera nube de Philips, que solo acepta accesos firmados con un valor que Philips guarda en su app Air+, así que este es el único paso que queda. Polaris lee ese valor del archivo sin ejecutarlo, lo guarda cifrado con esta conexión y borra el archivo.",
                     "homeid": "El servicio HomeID de Philips falló en esta cuenta. Si el aparato está en la app HomeID, quitarlo y volver a añadirlo suele arreglarlo.",
                     "where": "Descárgala (com.philips.ph.homecare) desde APKMirror en el navegador; vale cualquier versión.",
                     "link": "APKMirror",
                     "field": "Archivo app Philips Air+",
                     "skip": "Conectar sin él"
+                },
+                "tried": {
+                    "heading": "Dónde ha buscado Polaris",
+                    "places": {
+                        "airplus": "Lista de aparatos de la app Air+ ({area})",
+                        "homeid": "Lista de aparatos de la app HomeID ({area})",
+                        "homeidApp": "Aparatos de HomeID",
+                        "homeidAppSignIn": "Aparatos de HomeID, accediendo como lo hace la app HomeID",
+                        "account": "Comprobación de la cuenta ({area})",
+                        "philipsAir": "Nube de Philips para ventiladores y calefactores",
+                        "local": "Esta red"
+                    },
+                    "found": "{count, plural, =0 {Ningún aparato} one {1 aparato ({models})} other {# aparatos ({models})}}",
+                    "noneHere": "Ningún purificador respondió",
+                    "refused": "Rechazó el acceso",
+                    "silent": "No respondió",
+                    "garbled": "Respondió de una forma que Polaris no pudo leer",
+                    "serverError": "Falló el servidor de Philips (HTTP {status})",
+                    "status": "Falló (HTTP {status})"
+                },
+                "local": {
+                    "title": "Encontrados en esta red",
+                    "why": "Polaris puede conectarlos directamente, sin el archivo de la app y sin la nube de Philips.",
+                    "use": "Conectar por esta red",
+                    "reconnect": "Para usar uno de estos, cierra esto y añade Philips por la red local.",
+                    "notListed": "¿No es ninguno de estos?"
                 }
             },
             "foundIn": "Encontrado en los servidores de Philips en {found}, no en {asked}, donde suelen estar las cuentas de {country}. Polaris seguirá con {found}.",

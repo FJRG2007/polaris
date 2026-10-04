@@ -915,12 +915,38 @@
                 "prompt": "Philips has emailed a one-time code to that address. It can take a minute to arrive; check spam too.",
                 "file": {
                     "title": "Upload the Philips Air+ app file (.apk)",
-                    "why": "Polaris asked Philips' servers for {country} ({area}) and every other region it knows, and no Air+ or HomeID list holds an air device ({summary}). Fans, heaters and some purifiers are on a third Philips cloud, which only accepts sign-ins signed with a value Philips keeps inside its Air+ app. Polaris reads that value from the file without running it, keeps it encrypted with this connection and deletes the file.",
+                    "why": "None of these places holds an air device for {country} ({area}). Fans, heaters and some purifiers are on a third Philips cloud, which only accepts sign-ins signed with a value Philips keeps inside its Air+ app, so this is the one step left. Polaris reads that value from the file without running it, keeps it encrypted with this connection and deletes the file.",
                     "homeid": "Philips' HomeID service failed on this account. If the device is in the HomeID app, removing it there and adding it again usually fixes that.",
                     "where": "Download it (com.philips.ph.homecare) from APKMirror in your browser; any version works.",
                     "link": "APKMirror",
                     "field": "Philips Air+ app file",
                     "skip": "Connect without it"
+                },
+                "tried": {
+                    "heading": "Where Polaris looked",
+                    "places": {
+                        "airplus": "Air+ app's device list ({area})",
+                        "homeid": "HomeID app's device list ({area})",
+                        "homeidApp": "HomeID appliances",
+                        "homeidAppSignIn": "HomeID appliances, signed in the way the HomeID app does",
+                        "account": "Account check ({area})",
+                        "philipsAir": "Philips cloud for fans and heaters",
+                        "local": "This network"
+                    },
+                    "found": "{count, plural, =0 {No devices} one {1 device ({models})} other {# devices ({models})}}",
+                    "noneHere": "No Philips purifier answered",
+                    "refused": "Refused the sign-in",
+                    "silent": "No answer",
+                    "garbled": "Answered in a way Polaris could not read",
+                    "serverError": "Philips' server failed (HTTP {status})",
+                    "status": "Failed (HTTP {status})"
+                },
+                "local": {
+                    "title": "Found on this network",
+                    "why": "Polaris can connect these directly, without the app file and without Philips' cloud.",
+                    "use": "Connect over this network",
+                    "reconnect": "To use one of these, close this and add Philips over the local network.",
+                    "notListed": "Not one of these?"
                 }
             },
             "foundIn": "Found on Philips' servers in {found}, not in {asked}, where accounts from {country} usually are. Polaris will keep using {found}.",

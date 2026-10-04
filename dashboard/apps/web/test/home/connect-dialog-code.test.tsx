@@ -29,6 +29,14 @@ let pollAnswer: {
         summary: string;
         skippable: boolean;
         asked?: { country: string; region: string; homeIdBroken: boolean };
+        lookups?: {
+            where: string;
+            region?: string;
+            count: number | null;
+            models: string[];
+            failure?: string;
+        }[];
+        local?: { name: string; model: string; mac: string | null; address: string }[];
     };
     devices?: unknown[];
     accounts?: unknown[];
@@ -46,6 +54,7 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
         return pollAnswer;
     },
     connectDeviceAccountAction: async () => ({}),
+    discoverDeviceUnitsAction: async () => ({ units: [] }),
     reconnectDeviceAccountAction: async () => ({})
 }));
 
@@ -309,35 +318,103 @@ describe("the Philips account's country", () => {
         });
     });
 
-    it("says, before the app file, which region was asked and that every other one was too", async () => {
-        drawn();
+    /** The code typed and sent, with the next poll answering `next`. */
+    async function codeAnswered(next: NonNullable<typeof pollAnswer.next>) {
         fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
             target: { value: "owner@example.com" }
         });
         fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
         const box = await screen.findByRole("textbox", { name: "Code from the email" });
-        pollAnswer = {
-            waiting: true,
-            next: {
-                state: { ticket: "handle-1" },
-                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: HTTP 500",
-                skippable: false,
-                asked: { country: "ES", region: "eu-west-1", homeIdBroken: true }
-            }
-        };
+        pollAnswer = { waiting: true, next };
         fireEvent.change(box, { target: { value: "123456" } });
         fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    }
+
+    /** What the reported Spanish account saw, place by place. */
+    const SPAIN_LOOKUPS = [
+        { where: "Air+", region: "eu-west-1", count: 0, models: [] },
+        { where: "HomeID", region: "eu-west-1", count: 0, models: [] },
+        { where: "HomeID app", count: null, models: [], failure: "HTTP 500" },
+        { where: "HomeID app sign-in", count: null, models: [], failure: "HTTP 500" },
+        { where: "Local network", count: 0, models: [] }
+    ];
+
+    it("says, before the app file, every place it looked and what each answered", async () => {
+        drawn();
+        await codeAnswered({
+            state: { ticket: "handle-1" },
+            summary:
+                "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: HTTP 500; HomeID app sign-in: HTTP 500; Local network: 0",
+            skippable: false,
+            asked: { country: "ES", region: "eu-west-1", homeIdBroken: true },
+            lookups: SPAIN_LOOKUPS
+        });
         await screen.findByText("Upload the Philips Air+ app file (.apk)");
+        const tried = screen.getByRole("list", { name: "Where Polaris looked" });
+        expect([...tried.querySelectorAll("li")].map((item) => item.textContent)).toEqual([
+            "Air+ app's device list (Europe):No devices",
+            "HomeID app's device list (Europe):No devices",
+            "HomeID appliances:Philips' server failed (HTTP 500)",
+            "HomeID appliances, signed in the way the HomeID app does:Philips' server failed (HTTP 500)",
+            "This network:No Philips purifier answered"
+        ]);
         expect(
-            screen.getByText(
-                /^Polaris asked Philips' servers for Spain \(Europe\) and every other region it knows, and no Air\+ or HomeID list holds an air device \(Air\+ \(eu-west-1\): 0; HomeID \(eu-west-1\): 0; HomeID app: HTTP 500\)\./
-            )
+            screen.getByText(/^None of these places holds an air device for Spain \(Europe\)\./)
         ).toBeTruthy();
         expect(
             screen.getByText(
                 "Philips' HomeID service failed on this account. If the device is in the HomeID app, removing it there and adding it again usually fixes that."
             )
         ).toBeTruthy();
+        expect(screen.queryByText("Found on this network")).toBeNull();
+    });
+
+    it("offers a unit found on this network before the app file, and connects it locally", async () => {
+        drawn();
+        await codeAnswered({
+            state: { ticket: "handle-1" },
+            summary: "Air+ (eu-west-1): 0; Local network: 1 (AC2889/10)",
+            skippable: false,
+            asked: { country: "ES", region: "eu-west-1", homeIdBroken: false },
+            lookups: [
+                { where: "Air+", region: "eu-west-1", count: 0, models: [] },
+                { where: "Local network", count: 1, models: ["AC2889/10"] }
+            ],
+            local: [
+                {
+                    name: "Living room",
+                    model: "AC2889/10",
+                    mac: "AA:BB:CC:DD:EE:01",
+                    address: "192.168.1.40"
+                }
+            ]
+        });
+        const found = await screen.findByText("Found on this network");
+        const upload = screen.getByText("Upload the Philips Air+ app file (.apk)");
+        // The network comes first; the file is what is left if it is not there.
+        expect(
+            found.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+        expect(screen.getByText("Not one of these?")).toBeTruthy();
+        expect(screen.getByText("This network:")).toBeTruthy();
+        expect(screen.getByText("1 device (AC2889/10)")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Connect over this network" }));
+        // The local connection, with the unit's MAC filled in and its name.
+        await waitFor(() =>
+            expect(screen.queryByText("Upload the Philips Air+ app file (.apk)")).toBeNull()
+        );
+        expect(
+            (screen.getByRole("textbox", { name: "Name for this connection" }) as HTMLInputElement)
+                .value
+        ).toBe("Living room");
+        expect(screen.getByDisplayValue("AA:BB:CC:DD:EE:01")).toBeTruthy();
+        expect(
+            screen
+                .getAllByRole("button")
+                .find((button) => /^Philips Air\+ \(local network\)/.test(button.textContent ?? ""))
+                ?.getAttribute("aria-pressed")
+        ).toBe("true");
     });
 
     it("says where the devices were found when it was another region, before it closes", async () => {

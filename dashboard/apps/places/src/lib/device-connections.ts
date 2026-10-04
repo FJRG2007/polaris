@@ -64,7 +64,7 @@ import { macIssue, parseMac } from "@polaris/core";
 import { TUYA_REGIONS } from "./integrations/tuya-regions";
 import * as philipsRegions from "./integrations/philips-regions";
 import { englishPlaces as en, type PlacesKey } from "../../messages";
-import type { PairingAsked, PairingFoundIn } from "./drivers/contract";
+import type { PairingAsked, PairingFoundIn, PairingLookup } from "./drivers/contract";
 
 /** One thing a connection has to be told. */
 export interface ConnectionField {
@@ -1148,6 +1148,71 @@ export function foundInWords(
     });
 }
 
+/** Each place a Philips sign-in looks, by the name the server gives it. */
+const LOOKUP_PLACES: Readonly<Record<string, string>> = {
+    "Air+": "airplus",
+    HomeID: "homeid",
+    "HomeID app": "homeidApp",
+    "HomeID app sign-in": "homeidAppSignIn",
+    "Air+ account": "account",
+    "HomeID account": "account",
+    "Philips Air": "philipsAir",
+    "Local network": "local"
+};
+
+/**
+ * One place a pairing looked and what it answered, in the reader's words: the
+ * place (with its region, where it has one) and the answer - how many it
+ * listed and their models, or why it could not be read. A place or a failure
+ * with no words of its own is shown as the server named it.
+ */
+export function lookupWords(
+    t: PlacesTranslator,
+    connection: DeviceConnection,
+    lookup: PairingLookup
+): { place: string; result: string; failed: boolean } {
+    const base = `connections.${connection.id}.pairing.tried`;
+    const slug = LOOKUP_PLACES[lookup.where];
+    const area = lookup.region ? philipsRegions.philipsRegionWords(t, lookup.region) : "";
+    const placeKey = `${base}.places.${slug}`;
+    const place =
+        slug && t.has(placeKey)
+            ? t(placeKey as PlacesKey, { area })
+            : area
+              ? `${lookup.where} (${area})`
+              : lookup.where;
+    if (lookup.count !== null) {
+        const models = lookup.models.slice(0, 8).join(", ");
+        const key = lookup.count === 0 && slug === "local" ? `${base}.noneHere` : `${base}.found`;
+        return {
+            place,
+            result: t.has(key)
+                ? t(key as PlacesKey, { count: lookup.count, models })
+                : String(lookup.count),
+            failed: false
+        };
+    }
+    const failure = lookup.failure ?? "";
+    const status = /^HTTP (\d{3})$/.exec(failure)?.[1];
+    const key =
+        failure === "HTTP 401/403"
+            ? `${base}.refused`
+            : failure === "network"
+              ? `${base}.silent`
+              : failure === "format"
+                ? `${base}.garbled`
+                : status && (Number(status) >= 500 || status === "429")
+                  ? `${base}.serverError`
+                  : status
+                    ? `${base}.status`
+                    : "";
+    return {
+        place,
+        result: key && t.has(key) ? t(key as PlacesKey, { status: status ?? "" }) : failure || "-",
+        failed: true
+    };
+}
+
 /**
  * A connection's words in the reader's language. The data above carries the
  * English, for the server and for search; a screen draws these.
@@ -1184,6 +1249,16 @@ export function connectionWords(t: PlacesTranslator, connection: DeviceConnectio
                   /** Said under `why` when the maker's own service failed on
                    *  the account, with what fixes that on their side. */
                   homeid: say(`${base}.pairing.file.homeid`) ?? "",
+                  /** The heading over every place looked. */
+                  tried: say(`${base}.pairing.tried.heading`) ?? "",
+                  /** Units found on this network, offered before the file. */
+                  local: {
+                      title: say(`${base}.pairing.local.title`) ?? "",
+                      why: say(`${base}.pairing.local.why`) ?? "",
+                      use: say(`${base}.pairing.local.use`) ?? "",
+                      reconnect: say(`${base}.pairing.local.reconnect`) ?? "",
+                      notListed: say(`${base}.pairing.local.notListed`) ?? ""
+                  },
                   where: say(`${base}.pairing.file.where`) ?? "",
                   link: say(`${base}.pairing.file.link`) ?? "",
                   field: say(`${base}.pairing.file.field`) ?? "",

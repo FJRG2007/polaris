@@ -39,7 +39,7 @@ import { z } from "zod";
 import * as kinds from "../device-kinds";
 import { HomeError } from "../home-error";
 import * as kitchen from "./philips-kitchen";
-import { philipsMeasures } from "./philips-coap";
+import { philipsCoapDriver, philipsMeasures } from "./philips-coap";
 import { englishPlaces } from "../../../messages";
 import * as air from "../integrations/air-matters";
 import * as airMatters from "./philips-air-matters";
@@ -55,6 +55,7 @@ import {
     type Credentials,
     type DeviceDriver,
     type DeviceSnapshot,
+    type DiscoveredUnit,
     type PairingAsked
 } from "./contract";
 
@@ -255,13 +256,22 @@ function hasAirMatters(credentials: Credentials): boolean {
     );
 }
 
+/** Who the account is to the HomeID backend's own sign-in, where the
+ *  connection kept the country its list was read for. */
+function homeIdAccountOf(credentials: Credentials): cloud.HomeIdAccount | undefined {
+    const country = (credentials.homeIdCountry ?? "").trim().toUpperCase();
+    if (!regions.isPhilipsCountry(country) || !credentials.email) return undefined;
+    return { email: credentials.email, country };
+}
+
 function versuniDevicesOf(credentials: Credentials): Promise<cloud.PhilipsCloudDevice[]> {
     const source = sourceOf(credentials);
     if (!source || !credentials.accessToken) return Promise.resolve([]);
     return cloud.listPhilipsSource(
         sessionOf(credentials).accessToken,
         source,
-        regionOf(credentials)
+        regionOf(credentials),
+        homeIdAccountOf(credentials)
     );
 }
 
@@ -604,7 +614,8 @@ function versuniCredentials(email: string, found: cloud.PhilipsFound): Credentia
         source: found.source,
         iotRegion: found.region.region,
         iotApi: found.region.api,
-        iotBroker: found.region.broker
+        iotBroker: found.region.broker,
+        ...(found.homeIdCountry ? { homeIdCountry: found.homeIdCountry } : {})
     };
 }
 
@@ -674,6 +685,36 @@ function foundElsewhere(discovery: cloud.PhilipsDiscovery, country: string) {
     return { foundIn: { country, asked: discovery.asked.region, found: found.region } };
 }
 
+/**
+ * Philips units answering on Polaris's own network, as the local connection's
+ * scan finds them, and that as one more place looked. Asked only once no cloud
+ * list holds an air device: a purifier none of Versuni's lists knows may still
+ * be one of the 62 models that answer on the network (the CoAP protocol of
+ * aioairctrl and Home Assistant's Philips integrations), and the local
+ * connection needs no file and no Philips at all. A scan that fails is a place
+ * that could not be read, never the end of the sign-in.
+ */
+export async function localPhilipsUnits(): Promise<{
+    units: DiscoveredUnit[];
+    lookup: cloud.PhilipsLookup;
+}> {
+    try {
+        const units = (await philipsCoapDriver.discover?.()) ?? [];
+        return {
+            units,
+            lookup: cloud.seenLookup(
+                "Local network",
+                units.map((unit) => unit.model || null)
+            )
+        };
+    } catch {
+        return {
+            units: [],
+            lookup: { where: "Local network", count: null, models: [], failure: "network" }
+        };
+    }
+}
+
 /** The step after the code: the sign-in held on the server, the found Versuni devices and
  *  what was seen, waiting for the app to be uploaded. */
 async function afterCode(
@@ -686,7 +727,17 @@ async function afterCode(
         cloud.signInWithCode(email, state.code, state.vToken),
         cloud.philipsRegionFor(country)
     ]);
-    const found = await cloud.discoverPhilipsDevices(gigyaSession, session, region);
+    const discovered = await cloud.discoverPhilipsDevices(gigyaSession, session, region, {
+        email,
+        country,
+        ...(uid ? { uid } : {})
+    });
+    // Nothing on any cloud list to drive: Polaris's own network is the next
+    // place, before anything is asked of the reader.
+    const local = discovered.hasAir ? null : await localPhilipsUnits();
+    const found = local
+        ? { ...discovered, lookups: [...discovered.lookups, local.lookup] }
+        : discovered;
     const summary = cloud.philipsLookupSummary(found.lookups);
     const tried = emailsTried(state.tried, email);
     const asked: PairingAsked = {
@@ -737,7 +788,9 @@ async function afterCode(
             state: { ticket },
             summary,
             skippable: found.found !== null,
-            asked
+            asked,
+            lookups: found.lookups,
+            ...(local && local.units.length > 0 ? { local: local.units } : {})
         }
     };
 }

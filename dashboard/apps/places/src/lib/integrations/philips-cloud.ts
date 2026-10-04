@@ -768,6 +768,15 @@ class HomeIdStatus extends Error {
     }
 }
 
+/** The backend's discovery document: public, and the same for everyone. */
+async function homeIdDiscovery(): Promise<Record<string, unknown>> {
+    const response = await call(`${HOMEID_BACKEND}/.well-known/tenant/oneka`);
+    if (!response.ok) throw new HomeIdStatus(response.status);
+    const discovery = await json(response);
+    if (!isRecord(discovery)) throw garbled();
+    return discovery;
+}
+
 /**
  * The appliances the HomeID backend lists for an account: its discovery
  * document names the profile, the profile embeds the appliances or links to
@@ -776,10 +785,8 @@ class HomeIdStatus extends Error {
  * integration also falls back to.
  */
 export async function listHomeIdAppliances(accessToken: string): Promise<unknown[]> {
-    const discoveryResponse = await call(`${HOMEID_BACKEND}/.well-known/tenant/oneka`);
-    if (!discoveryResponse.ok) throw new HomeIdStatus(discoveryResponse.status);
-    const discovery = await json(discoveryResponse);
-    const profileUrl = isRecord(discovery) ? discovery.profileUrl : undefined;
+    const discovery = await homeIdDiscovery();
+    const profileUrl = discovery.profileUrl;
     if (typeof profileUrl !== "string" || !profileUrl) throw garbled();
     const ts = String(Date.now());
     const profile = await homeIdGet(backendQuery(profileUrl, { ts }), accessToken);
@@ -811,6 +818,180 @@ export async function listHomeIdAppliances(accessToken: string): Promise<unknown
     return [];
 }
 
+/**
+ * Who an account is to the HomeID backend's own sign-in: the address it signs
+ * in with, the country it is set up in (which names the backend "space" its
+ * appliances live in), and its Gigya id where it is known.
+ */
+export interface HomeIdAccount {
+    readonly email: string;
+    readonly country: string;
+    readonly uid?: string;
+}
+
+/**
+ * The HomeID app's own sign-in to its backend. The discovery document names
+ * it (`authorizationUrl`, `/api/v2/auth/Consumer$login`), which answers a 308
+ * to this path; the request is the app's as TA2k/ioBroker.nutriu (MIT,
+ * `main.js`, `getConsumerLogin`) sends it from a capture of the NutriU app,
+ * which shares the backend and the HomeID client. Probed on 2026-10-04: it
+ * takes only `application/vnd.api+json`, refuses a body with no email and no
+ * space, and answers a forged token with 401 `invalid_token`.
+ *
+ * It is what signing in to the HomeID app does, so for an account that never
+ * has, it may set up its HomeID profile on Philips' side as the app would. It
+ * is only sent after the backend has failed the shortcut, and never with a
+ * name or anything the account did not already give Philips.
+ */
+const CONSUMER_LOGIN = `${HOMEID_BACKEND}/api/v2/auth/Consumer/Login`;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const spaceSchema = z
+    .object({
+        countryCode: z.string().regex(/^[A-Z]{2}$/),
+        spaceId: z.string().regex(UUID),
+        backendBaseUrl: z.string().min(1).max(500)
+    })
+    .passthrough();
+
+const consumerSchema = z.object({
+    data: z.object({
+        attributes: z.object({ token: z.string().min(1).max(8000) }).passthrough()
+    })
+});
+
+/** The space a country's accounts live in, as the discovery document lists
+ *  it, or null for a country it does not list. */
+export function homeIdSpaceOf(
+    discovery: Readonly<Record<string, unknown>>,
+    country: string
+): { spaceId: string; base: string } | null {
+    const spaces = Array.isArray(discovery.spaces) ? discovery.spaces : [];
+    const code = country.trim().toUpperCase();
+    for (const raw of spaces) {
+        const space = spaceSchema.safeParse(raw);
+        if (!space.success || space.data.countryCode !== code) continue;
+        // Only ever Philips' own backend, whatever the document says.
+        const base = backendUrl(space.data.backendBaseUrl).replace(/\/+$/, "");
+        return { spaceId: space.data.spaceId, base };
+    }
+    return null;
+}
+
+/** Backend tokens from the sign-in above, by the access token they were made
+ *  from: that token is renewed hourly, and with it this is made again. */
+const consumers = new Map<string, { token: string; at: number }>();
+const CONSUMER_TTL_MS = 30 * 60 * 1000;
+const MAX_CONSUMERS = 200;
+
+/** For tests: forget every backend token. */
+export function resetHomeIdConsumers(): void {
+    consumers.clear();
+}
+
+async function consumerToken(
+    accessToken: string,
+    account: HomeIdAccount,
+    spaceId: string
+): Promise<string> {
+    const known = consumers.get(accessToken);
+    if (known && Date.now() - known.at < CONSUMER_TTL_MS) return known.token;
+    const headers = homeIdHeaders(accessToken);
+    delete headers.authorization;
+    const response = await call(`${CONSUMER_LOGIN}?requestLocation=onboarding`, {
+        method: "POST",
+        headers: {
+            ...headers,
+            accept: "application/vnd.api+json",
+            "content-type": "application/vnd.api+json",
+            "api-version": "2.0.0"
+        },
+        body: JSON.stringify({
+            data: {
+                type: "consumerLoginRequest",
+                attributes: {
+                    identityProvider: "DI",
+                    token: accessToken,
+                    email: account.email,
+                    countryCode: account.country.trim().toUpperCase(),
+                    spaceId,
+                    ...(account.uid ? { userUUID: account.uid } : {})
+                }
+            }
+        }),
+        redirect: "manual"
+    });
+    if (response.status === 401 || response.status === 403) throw signedOut();
+    if (!response.ok) throw new HomeIdStatus(response.status);
+    const parsed = consumerSchema.safeParse(await json(response));
+    if (!parsed.success) throw garbled();
+    const token = parsed.data.data.attributes.token;
+    if (consumers.size >= MAX_CONSUMERS) {
+        for (const [key, entry] of consumers) {
+            if (Date.now() - entry.at >= CONSUMER_TTL_MS) consumers.delete(key);
+        }
+        if (consumers.size >= MAX_CONSUMERS) consumers.clear();
+    }
+    consumers.set(accessToken, { token, at: Date.now() });
+    return token;
+}
+
+/**
+ * The appliances of an account the way the HomeID app itself reads them: its
+ * sign-in to the backend first, then the country's space's own list with the
+ * token that answers (`getDeviceList` in ioBroker.nutriu).
+ *
+ * The community integrations skip the sign-in and hand the backend the Philips
+ * token directly (`get_appliances_via_homeid`), which works for most accounts.
+ * For some the backend answers that shortcut with a 500 - renaudallard/
+ * homeassistant_philips_homeid #32 and #36, cleared there by signing out of the
+ * app, in again and re-adding the device: that is, by the app's own sign-in.
+ * This is that sign-in, done here, so the reader does not have to.
+ */
+export async function listHomeIdAppliancesAsApp(
+    accessToken: string,
+    account: HomeIdAccount
+): Promise<unknown[]> {
+    const space = homeIdSpaceOf(await homeIdDiscovery(), account.country);
+    if (!space) throw new HomeIdStatus(404);
+    const token = await consumerToken(accessToken, account, space.spaceId);
+    const url = backendQuery(`${space.base}/Profile/self/Appliance`, {
+        page: "1",
+        size: "50",
+        ts: String(Date.now())
+    });
+    const body = await homeIdGet(url, token);
+    if (Array.isArray(body)) return body;
+    if (isRecord(body) && isRecord(body._embedded) && Array.isArray(body._embedded.item)) {
+        return body._embedded.item;
+    }
+    return [];
+}
+
+/** Whether a HomeID backend failure is the backend failing to build the
+ *  answer (a 5xx or a 429), rather than refusing the request. */
+function homeIdServerError(caught: unknown): boolean {
+    return caught instanceof HomeIdStatus && (caught.status >= 500 || caught.status === 429);
+}
+
+/**
+ * The HomeID backend's list, the shortcut first and the app's own sign-in
+ * after it where the shortcut fails on the backend's side and the account's
+ * country is known. Which one answered comes back with the list.
+ */
+async function homeIdAppliancesEither(
+    accessToken: string,
+    account: HomeIdAccount | undefined
+): Promise<{ items: unknown[]; viaApp: boolean }> {
+    try {
+        return { items: await listHomeIdAppliances(accessToken), viaApp: false };
+    } catch (caught) {
+        if (!account?.country || !homeIdServerError(caught)) throw caught;
+        return { items: await listHomeIdAppliancesAsApp(accessToken, account), viaApp: true };
+    }
+}
+
 /** Where a device list was read from, and how it is read again on every sync. */
 export type PhilipsSource = "iot" | "homeid-app";
 
@@ -821,9 +1002,11 @@ export interface PhilipsLookup {
         | "Air+"
         | "HomeID"
         | "HomeID app"
+        | "HomeID app sign-in"
         | "HomeID account"
         | "Air+ account"
-        | "Philips Air";
+        | "Philips Air"
+        | "Local network";
     /** The IoT region it was asked in (`eu-west-1`), for a list that lives in
      *  one. The HomeID backend and the fan and heater cloud are one for the
      *  whole world, and name none. */
@@ -887,6 +1070,9 @@ export interface PhilipsFound {
     readonly devices: PhilipsCloudDevice[];
     /** The IoT region the list was read in, which every sync and command uses. */
     readonly region: PhilipsRegion;
+    /** For a list read from the HomeID backend: the country its space is, so
+     *  a sync can sign in the way the app does when the shortcut fails. */
+    readonly homeIdCountry?: string;
 }
 
 /** A signed-in account and what was found on it. */
@@ -976,7 +1162,8 @@ async function registryLookup(
 export async function discoverPhilipsDevices(
     gigyaSession: string,
     airplus: PhilipsSession,
-    asked: PhilipsRegion = PHILIPS_EU
+    asked: PhilipsRegion = PHILIPS_EU,
+    account?: HomeIdAccount
 ): Promise<PhilipsDiscovery> {
     const lookups: PhilipsLookup[] = [];
     const tried: PhilipsRegion[] = [asked];
@@ -990,6 +1177,7 @@ export async function discoverPhilipsDevices(
         source: PhilipsSource;
         devices: PhilipsCloudDevice[];
         region: PhilipsRegion;
+        homeIdCountry?: string;
     }[] = [];
 
     const answer = (found: PhilipsFound | null, hasAir: boolean): PhilipsDiscovery => ({
@@ -998,10 +1186,19 @@ export async function discoverPhilipsDevices(
         lookups,
         asked,
         tried,
-        homeIdBroken: lookups.some(
-            (lookup) => lookup.where === "HomeID app" && /^HTTP 5\d\d$/.test(lookup.failure ?? "")
-        )
+        // Broken only while nothing on the backend answered: the app's own
+        // sign-in reading the list clears what the shortcut's failure said.
+        homeIdBroken:
+            lookups.some(
+                (lookup) =>
+                    lookup.where === "HomeID app" && /^HTTP 5\d\d$/.test(lookup.failure ?? "")
+            ) &&
+            !lookups.some(
+                (lookup) => lookup.where === "HomeID app sign-in" && lookup.count !== null
+            )
     });
+    /** The country a list read from the HomeID backend is kept with. */
+    const homeIdCountry = account?.country ? { homeIdCountry: account.country } : {};
     const air = async (
         session: PhilipsSession,
         source: PhilipsSource,
@@ -1009,7 +1206,8 @@ export async function discoverPhilipsDevices(
         region: PhilipsRegion
     ) => {
         const userId = await philipsUserId(session.accessToken, region);
-        return answer({ session, userId, source, devices, region }, true);
+        const kept = source === "homeid-app" ? homeIdCountry : {};
+        return answer({ session, userId, source, devices, region, ...kept }, true);
     };
     const registry = async (
         where: PhilipsLookup["where"],
@@ -1054,8 +1252,38 @@ export async function discoverPhilipsDevices(
                 models: [],
                 failure: failureOf(caught)
             });
+            // The backend failing on the shortcut: the app's own sign-in, which
+            // is what clears that for the community integrations' users.
+            if (account?.country && homeIdServerError(caught)) {
+                try {
+                    fromApp = unique(
+                        (await listHomeIdAppliancesAsApp(homeid.accessToken, account)).map(
+                            philipsHomeIdAppliance
+                        )
+                    );
+                    lookups.push(
+                        seenLookup(
+                            "HomeID app sign-in",
+                            fromApp.map((device) => device.model)
+                        )
+                    );
+                } catch (again) {
+                    lookups.push({
+                        where: "HomeID app sign-in",
+                        count: null,
+                        models: [],
+                        failure: failureOf(again)
+                    });
+                }
+            }
         }
-        candidates.push({ session: homeid, source: "homeid-app", devices: fromApp, region: asked });
+        candidates.push({
+            session: homeid,
+            source: "homeid-app",
+            devices: fromApp,
+            region: asked,
+            ...homeIdCountry
+        });
         if (airOf(fromApp).length > 0) {
             try {
                 return await air(homeid, "homeid-app", fromApp, asked);
@@ -1135,11 +1363,13 @@ export async function discoverPhilipsDevices(
 export async function listPhilipsSource(
     accessToken: string,
     source: PhilipsSource,
-    region: PhilipsRegion = PHILIPS_EU
+    region: PhilipsRegion = PHILIPS_EU,
+    account?: HomeIdAccount
 ): Promise<PhilipsCloudDevice[]> {
     if (source === "iot") return listPhilipsDevices(accessToken, region);
     try {
-        return unique((await listHomeIdAppliances(accessToken)).map(philipsHomeIdAppliance));
+        const { items } = await homeIdAppliancesEither(accessToken, account);
+        return unique(items.map(philipsHomeIdAppliance));
     } catch (caught) {
         if (caught instanceof HomeIdStatus) {
             throw caught.status >= 500 ? unreachable() : garbled();

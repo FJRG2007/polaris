@@ -204,3 +204,73 @@ describe("the recommended way in", () => {
         expect(registry.recommendedConnection("Nobody")).toBeNull();
     });
 });
+
+describe("what a Philips sign-in says it looked at", () => {
+    const philips = registry.deviceConnection("philips-cloud")!;
+
+    const SEEN = [
+        { where: "Air+", region: "eu-west-1", count: 0, models: [] },
+        { where: "HomeID app", count: null, models: [], failure: "HTTP 500" },
+        { where: "HomeID app sign-in", count: 1, models: ["AC1715/11"] },
+        {
+            where: "HomeID account",
+            region: "eu-west-1",
+            count: null,
+            models: [],
+            failure: "HTTP 401/403"
+        },
+        { where: "Local network", count: 0, models: [] },
+        { where: "Philips Air", count: null, models: [], failure: "network" }
+    ];
+
+    it("names each place and its answer in the reader's language", () => {
+        const said = (locale: "en-US" | "es-ES") => {
+            const t = placesCatalogs.translator(locale, "places");
+            return SEEN.map((lookup) => {
+                const words = registry.lookupWords(t, philips, lookup);
+                return [words.place, words.result];
+            });
+        };
+        expect(said("en-US")).toEqual([
+            ["Air+ app's device list (Europe)", "No devices"],
+            ["HomeID appliances", "Philips' server failed (HTTP 500)"],
+            ["HomeID appliances, signed in the way the HomeID app does", "1 device (AC1715/11)"],
+            ["Account check (Europe)", "Refused the sign-in"],
+            ["This network", "No Philips purifier answered"],
+            ["Philips cloud for fans and heaters", "No answer"]
+        ]);
+        expect(said("es-ES")).toEqual([
+            ["Lista de aparatos de la app Air+ (Europa)", "Ningún aparato"],
+            ["Aparatos de HomeID", "Falló el servidor de Philips (HTTP 500)"],
+            ["Aparatos de HomeID, accediendo como lo hace la app HomeID", "1 aparato (AC1715/11)"],
+            ["Comprobación de la cuenta (Europa)", "Rechazó el acceso"],
+            ["Esta red", "Ningún purificador respondió"],
+            ["Nube de Philips para ventiladores y calefactores", "No respondió"]
+        ]);
+    });
+
+    it("shows a place or a failure it has no words for as the server named it", () => {
+        const t = placesCatalogs.translator("en-US", "places");
+        expect(
+            registry.lookupWords(t, philips, {
+                where: "Somewhere new",
+                count: null,
+                models: [],
+                failure: "teapot"
+            })
+        ).toEqual({ place: "Somewhere new", result: "teapot", failed: true });
+        expect(
+            registry.lookupWords(t, philips, {
+                where: "HomeID",
+                region: "eu-west-1",
+                count: null,
+                models: [],
+                failure: "HTTP 404"
+            })
+        ).toEqual({
+            place: "HomeID app's device list (Europe)",
+            result: "Failed (HTTP 404)",
+            failed: true
+        });
+    });
+});
