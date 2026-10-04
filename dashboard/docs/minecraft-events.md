@@ -95,7 +95,7 @@ Each kind declares the time of day and the weather it needs in
 When the event ends the rules go back to what they were and the time of day is
 set back to what it was when it started; the weather turns again from there.
 Kinds that need neither (Mining rush, Fishing, Trivia, Happy hour, XP boost,
-Rare catch) leave the world alone.
+Rare catch, Bingo rush) leave the world alone.
 
 | Kind                                                           | Time  | Weather |
 | -------------------------------------------------------------- | ----- | ------- |
@@ -105,6 +105,7 @@ Rare catch) leave the world alone.
 | Blood moon                                                     | night | rain    |
 | World boss                                                     | -     | clear   |
 | Mining rush, Fishing, Trivia, Happy hour, XP boost, Rare catch | -     | -       |
+| Bingo rush                                                     | -     | -       |
 
 ## The random draw
 
@@ -203,6 +204,32 @@ left out.
     - The end, a call-off or a restart kills exactly what carries the tag, and
       the zombie villager a zombie on Normal or Hard turns a villager into,
       where it stood.
+- **Bingo rush** is one card of nine items (three by three) for everybody,
+  drawn from the run's id (`bingo.drawCard`), so a restart finds the same
+  card. It is drawn from pools by difficulty (`bingo.POOLS`, `MAKEUP`): an easy
+  card is nine things found in the first minutes; a medium one four of those
+  and five that take a cave or a farm; a hard one two easy, three medium and
+  four hard, at least two of them only the Nether has. Every item carries the
+  version that added it and the card skips what the server does not have (an
+  unread version gets only what every version has); nine different items,
+  never one a statistic cannot see come in (a bucket filled in the hand).
+    - An item is marked the first time it is seen in a player's inventory
+      (`clear <player> <item> 0`, as a gathering reads one) - once the game's
+      own statistics say they came by one since the start: picked up (less
+      what they dropped), crafted, smelted or traded for. A stack carried in
+      or taken out of their own chest marks nothing. It is all worked out in
+      the game, every player in one batch a look, and kept on the scoreboard
+      (`pe_bg*`), so a restart finds the marks; a mark is never taken back.
+    - The card is shown to everybody at the start, each item named by the
+      game in the reader's own language (`block.minecraft.*`,
+      `item.minecraft.*`); each mark is told to its player with their card,
+      their count and what is left are on their action bar, and the side
+      panel shows everybody's count.
+    - `goal`: the first full row, column or diagonal (`line`), or the whole
+      card (`card`), ends it and wins, whatever the least to be ranked;
+      nobody seen in creative or spectator can. Two in the same look: the
+      most marked, then the name. With time up, the most marked win (the
+      least to be ranked applies), a tie to whoever got there first.
 - **Treasure hunt** hides one treasure, a bastion's treasure room by default,
   under a column of light, with every player's action bar giving its distance
   and direction for the whole hunt.

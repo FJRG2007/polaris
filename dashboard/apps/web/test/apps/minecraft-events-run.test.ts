@@ -1767,6 +1767,7 @@ const hillService = await import(
 );
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
+const bingo = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/bingo");
 
 /** What a player reads of a command's text: the words of its JSON, without the
  *  formatting that splits them into parts (a highlighted name, a number). */
@@ -8330,14 +8331,23 @@ interface WorldKinds {
         /** Whether the run had it written down, not yet summoned, when it was. */
         writtenFirst: boolean | null;
     };
+    /** A bingo rush: each player's marks as the game adds them up, one bit a cell. */
+    bingo: { masks: Record<string, number> };
 }
 
 function freshKinds(): WorldKinds {
-    return { villager: { alive: false, health: 20, summons: 0, writtenFirst: null } };
+    return {
+        villager: { alive: false, health: 20, summons: 0, writtenFirst: null },
+        bingo: { masks: {} }
+    };
 }
 
 /** The lines only these kinds send, as the game answers them; null for any other. */
 function worldKindsAnswer(line: string): string | null {
+    if (line === "execute as @a run scoreboard players get @s pe_bgk")
+        return world.online
+            .map((name) => `${name} has ${world.kinds.bingo.masks[name] ?? 0} [pe_bgk]`)
+            .join("\n");
     const villager = world.kinds.villager;
     if (line === "execute if entity @e[type=minecraft:villager,tag=pe_villager]")
         return villager.alive ? "Test passed, count: 1" : "Test failed";
@@ -8583,5 +8593,185 @@ describe("a villager defense", () => {
         world.difficulty = "Peaceful";
         setUp([preset()]);
         expect(await refusal(start())).toMatch(/Peaceful/);
+    });
+});
+
+describe("a bingo rush", () => {
+    const start = () =>
+        events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "bingo",
+            trigger: "manual",
+            startedBy: null
+        });
+    const made = (goal: "line" | "card", minutes = 15) => ({
+        ...newPreset("bingo", "bingo"),
+        minutes,
+        options: { goal, difficulty: "medium" as const }
+    });
+    const told = (name: string, text: string) =>
+        world.sent.some((line) => line.startsWith(`tellraw ${name} [`) && line.includes(text));
+
+    it("draws one card for everybody, marks what each comes by, and ends at the first full line", async () => {
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        const run = state().run!;
+        const card = run.bingo!.card;
+        expect(card).toEqual(
+            bingo.drawCard(run.id, "medium", (since) => events.atLeast("1.21.4", since))
+        );
+        expect(world.sent).toContain(
+            `scoreboard objectives add pe_bgp0 minecraft.picked_up:minecraft.${card[0]}`
+        );
+        // Shown to everybody once, each item named by the game itself.
+        for (const id of card)
+            expect(
+                world.sent.filter(
+                    (line) =>
+                        line.startsWith("tellraw @a [") &&
+                        line.includes(`"translate":"${bingo.nameKey(id)}"`)
+                )
+            ).toHaveLength(1);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("the first full line wins")
+            )
+        ).toBe(true);
+
+        world.kinds.bingo.masks = { Ana: 0b11, Ben: 0b1 };
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players set Ana pe_score 2");
+        expect(world.sent).toContain("scoreboard players set Ben pe_score 1");
+        expect(told("Ana", " 2/9")).toBe(true);
+        expect(world.sent.some((line) => line.startsWith("title Ana actionbar "))).toBe(true);
+        expect(state().run?.bingo?.marked).toEqual({ Ana: 0b11, Ben: 0b1 });
+
+        // Ana put one away: it stays marked. Ben fills the middle row.
+        world.kinds.bingo.masks = { Ana: 0b1, Ben: 0b111001 };
+        await play(2_100);
+        expect(world.sent).not.toContain("scoreboard players set Ana pe_score 1");
+        const entry = state().history[0]!;
+        expect(state().run).toBeNull();
+        expect(entry.note).toBe("Ben completed a line");
+        // Ana's two are under the least to be ranked.
+        expect(entry.podium).toEqual([{ place: 1, name: "Ben", score: 4 }]);
+        expect(world.sent).toContain("give Ben minecraft:diamond 5");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ben completed a line first")
+            )
+        ).toBe(true);
+        // Nothing of anybody's taken, and every count taken away.
+        expect(takesItems(world.sent)).toEqual([]);
+        expect(world.sent).toContain("scoreboard objectives remove pe_bgk");
+        expect(world.sent).toContain("scoreboard objectives remove pe_bgp8");
+    });
+
+    it("ranks by items marked when the time runs out on a full card, a tie to whoever got there first", async () => {
+        setUp([made("card", 3)]);
+        await start();
+        await play(2_100);
+        world.kinds.bingo.masks = { Ana: 0b111 };
+        await play(2_100);
+        world.kinds.bingo.masks = { Ana: 0b111, Ben: 0b111000000 };
+        await play(2_100);
+        // A full line is not a full card.
+        expect(state().run).not.toBeNull();
+        await play(3 * 60_000);
+        const entry = state().history[0]!;
+        expect(entry.note).toBe("Ran its full time");
+        expect(entry.podium).toEqual([
+            { place: 1, name: "Ana", score: 3 },
+            { place: 2, name: "Ben", score: 3 }
+        ]);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Nobody filled the card: the most items marked wins.")
+            )
+        ).toBe(true);
+    });
+
+    it("never lets somebody in creative win it", async () => {
+        world.creative = ["Ben"];
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        world.kinds.bingo.masks = { Ben: 0b111 };
+        await play(2_100);
+        expect(state().run).not.toBeNull();
+        world.kinds.bingo.masks = { Ben: 0b111, Ana: 0b100010001 };
+        await play(2_100);
+        const entry = state().history[0]!;
+        expect(entry.note).toBe("Ana completed a line");
+        expect(entry.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
+        expect(entry.disqualified).toContain("Ben");
+    });
+
+    it("called off, takes its counts away and pays nobody", async () => {
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        world.kinds.bingo.masks = { Ana: 0b11 };
+        await play(2_100);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain("scoreboard objectives remove pe_bgm0");
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+
+    it("keeps its card and its marks across a restart", async () => {
+        const preset = made("line");
+        setUp([preset]);
+        const now = Date.now();
+        const card = bingo.drawCard("resumed", "medium", () => true);
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 60_000,
+                endsAt: now + 10 * 60_000,
+                readyAt: now - 60_000,
+                participants: ["Ana", "Ben"],
+                bingo: { card, marked: { Ana: 0b11 }, at: { Ana: 20_000 } }
+            }
+        };
+        // The server's own count of Ana's marks is gone; the third of her row is new.
+        world.kinds.bingo.masks = { Ana: 0b100 };
+        await events.sweepEvents();
+        await play(4_100);
+        expect(world.sent.some((line) => line.startsWith("scoreboard objectives add pe_bg"))).toBe(
+            false
+        );
+        const entry = state().history[0]!;
+        expect(entry).toMatchObject({ id: "resumed", note: "Ana completed a line" });
+        expect(entry.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
+    });
+
+    it("asks an old server only for what it has", async () => {
+        world.version = "1.13.2";
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        for (const id of state().run!.bingo!.card) expect(bingo.itemOf(id).since).toBeUndefined();
+    });
+
+    it("does not start with fewer players on than its minimum", async () => {
+        world.online = ["Ana"];
+        setUp([made("line")]);
+        expect(await refusal(start())).toBe("Only 1 player is on the server; this event needs 2");
+        expect(state().run).toBeNull();
     });
 });

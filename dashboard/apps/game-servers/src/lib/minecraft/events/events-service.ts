@@ -52,6 +52,8 @@ import * as search from "./place-search";
 import * as hillService from "./kinds/hill-service";
 import * as village from "./kinds/village-defense";
 import * as villageMessages from "./kinds/village-defense-messages";
+import * as bingo from "./kinds/bingo";
+import * as bingoMessages from "./kinds/bingo-messages";
 import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
@@ -77,6 +79,7 @@ const english = (text: string): string => gameMessageIn("en-US", text);
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
 const villageSay = speech.spoken(villageMessages);
+const bingoSay = speech.spoken(bingoMessages);
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -773,7 +776,8 @@ export async function startEvent(input: {
         done: [],
         buildEndsAt: null,
         boss: null,
-        villager: null
+        villager: null,
+        bingo: null
     } satisfies stored.EventRun;
 
     const written = await updateEventState(input.installedAppId, (state) => {
@@ -1353,6 +1357,7 @@ async function begin(
     if (preset.kind === "xp-boost") {
         lines.push(...boost.boostSetup(preset.options as catalog.EventOptions<"xp-boost">));
     }
+    if (preset.kind === "bingo") lines.push(...(await bingoBegin(installedAppId, loop, server)));
     if (preset.kind === "world-boss") {
         // The boss drawn, and the rules its fight holds written down before
         // they are changed, so whatever ends it - a restart included - puts
@@ -1584,6 +1589,9 @@ async function play(
             break;
         case "rare-catch":
             decided = await rareCatchTick(loop, server, lines);
+            break;
+        case "bingo":
+            decided = await bingoRush(installedAppId, loop, server, now, lines);
             break;
         case "xp-boost": {
             const options = preset.options as catalog.EventOptions<"xp-boost">;
@@ -2696,6 +2704,138 @@ async function gathering(
     }
 }
 
+// ------------------------------------------------------------------ bingo rush
+
+/**
+ * A bingo rush begun: its card drawn from the run's id - only items this
+ * server's version has - and written down before anything is said of it, then
+ * counted from now and shown to everybody. A restart that comes before the
+ * start was written finds the same card.
+ */
+async function bingoBegin(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer
+): Promise<string[]> {
+    const options = loop.run.preset.options as catalog.EventOptions<"bingo">;
+    if (!loop.run.bingo) {
+        const version = await versionOf(server);
+        const card = bingo.drawCard(loop.run.id, options.difficulty, (since) =>
+            atLeast(version, since)
+        );
+        loop.run = { ...loop.run, bingo: { card, marked: {}, at: {}, winner: null } };
+        await persist(installedAppId, loop);
+    }
+    const { card } = loop.run.bingo!;
+    return [
+        ...bingo.bingoSetup(card),
+        commands.say(
+            messages.tag(loop.language) +
+                bingoSay.cardHeader(options.goal === "line", loop.language)
+        ),
+        ...bingo.cardLines("@a", card)
+    ];
+}
+
+/** Every few minutes each player is shown their own card again. */
+const CARD_AGAIN_TICKS = 90;
+
+/**
+ * A bingo rush's tick: every player's inventory looked at in one batch, what
+ * each has newly marked told to them with their card, and the side panel and
+ * action bars brought up to date. Answers who completed the line or the card
+ * first - never somebody seen in creative or spectator - which ends it.
+ */
+async function bingoRush(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const state = loop.run.bingo;
+    if (!state) return null;
+    const { goal } = loop.run.preset.options as catalog.EventOptions<"bingo">;
+    const language = loop.language;
+    await server.sayAll(bingo.bingoTick(state.card));
+    const read = commands.readScores(await server.say([bingo.READ_MARKS]));
+    const marked = { ...state.marked };
+    const at = { ...state.at };
+    const lower = (name: string) => name.toLowerCase();
+    const known = new Map(Object.keys(marked).map((name) => [lower(name), name]));
+    const off = new Set(loop.run.offMode.map(lower));
+    const since = now - (loop.run.readyAt ?? loop.run.startsAt);
+    const done: { name: string; mask: number }[] = [];
+    const again = loop.ticks % CARD_AGAIN_TICKS === 0;
+    for (const [name, value] of read) {
+        if (!catalog.PLAYER_NAME.test(name)) continue;
+        const key = known.get(lower(name)) ?? name;
+        const before = marked[key] ?? 0;
+        // Marks only ever add up: a read that says less keeps what was marked.
+        const mask = before | (value & bingo.FULL);
+        const fresh = bingo.newCells(before, mask);
+        lines.push(bingo.progressBar(name, state.card, mask, bingoMessages.missing));
+        if (fresh.length === 0) {
+            if (again && mask > 0)
+                lines.push(
+                    `tellraw ${name} ${commands.text(bingoSay.yourCard(language))}`,
+                    ...bingo.cardLines(name, state.card, mask)
+                );
+            continue;
+        }
+        marked[key] = mask;
+        at[key] = since;
+        const count = bingo.countOf(mask);
+        lines.push(
+            commands.setScore(name, count),
+            ...fresh.map((cell) => bingo.markedLine(name, state.card[cell] ?? "air", count)),
+            `tellraw ${name} ${commands.text(bingoSay.yourCard(language))}`,
+            ...bingo.cardLines(name, state.card, mask),
+            bingo.markSound(name)
+        );
+        if (!bingo.completes(before, goal) && bingo.completes(mask, goal) && !off.has(lower(name)))
+            done.push({ name: key, mask });
+    }
+    const winner = state.winner ?? bingo.firstToComplete(done);
+    const changed = Object.keys(marked).some((name) => marked[name] !== state.marked[name]);
+    loop.run = { ...loop.run, bingo: { ...state, marked, at, winner } };
+    if (changed || winner !== state.winner) await persist(installedAppId, loop);
+    if (!winner) return null;
+    const line = goal === "line";
+    lines.push(
+        ...commands.titleCommands(
+            bingoSay.winTitle(winner, language),
+            bingoSay.winSubtitle(line, language)
+        ),
+        commands.sound(commands.SOUNDS.win)
+    );
+    return line ? `${winner} completed a line` : `${winner} filled the card`;
+}
+
+/** A bingo rush's scores: items marked, after one last look so the final
+ *  seconds are in it; everybody who marked one took part. */
+async function bingoResults(
+    server: ServerContainer,
+    run: stored.EventRun
+): Promise<{ scores: Map<string, number>; took: string[] }> {
+    const marked = { ...(run.bingo?.marked ?? {}) };
+    if (run.bingo && !run.bingo.winner) {
+        await server.sayAll(bingo.bingoTick(run.bingo.card));
+        const known = new Map(Object.keys(marked).map((name) => [name.toLowerCase(), name]));
+        for (const [name, value] of commands.readScores(await server.say([bingo.READ_MARKS]))) {
+            if (!catalog.PLAYER_NAME.test(name)) continue;
+            const key = known.get(name.toLowerCase()) ?? name;
+            marked[key] = (marked[key] ?? 0) | (value & bingo.FULL);
+        }
+    }
+    const scores = new Map(
+        Object.entries(marked).map(([name, mask]) => [name, bingo.countOf(mask)])
+    );
+    return { scores, took: [...scores].filter(([, count]) => count > 0).map(([name]) => name) };
+}
+
+// ------------------------------------------------------------------ rare catch
+
 /** A rare catch's tick: whoever landed the treasure off a line since the last look wins. */
 async function rareCatchTick(
     loop: Loop,
@@ -3736,13 +3876,22 @@ async function finish(
             placed =
                 preset.kind === "world-boss"
                     ? bossService.podiumOf(run, scores, disqualified, minimum)
-                    : plan.podium(
-                          scores,
-                          disqualified,
-                          minimum,
-                          // A tie on rounds won goes to whoever answered faster.
-                          preset.kind === "trivia" ? run.answerMs : undefined
-                      );
+                    : preset.kind === "bingo"
+                      ? // Whoever completed it first, whatever the least to be ranked.
+                        bingo.podiumOf(
+                            scores,
+                            disqualified,
+                            minimum,
+                            run.bingo?.winner ?? null,
+                            run.bingo?.at ?? {}
+                        )
+                      : plan.podium(
+                            scores,
+                            disqualified,
+                            minimum,
+                            // A tie on rounds won goes to whoever answered faster.
+                            preset.kind === "trivia" ? run.answerMs : undefined
+                        );
             // Taking part is reaching the minimum too - one zombie is not taking part
             // in a hunt. A blood moon's is surviving it with a kill, and a horde
             // defense's holding the point, which are their own bars.
@@ -3835,6 +3984,16 @@ async function finish(
             } else if (preset.kind === "treasure-hunt") {
                 const unfound = run.chests.filter((one) => !one.opened).length;
                 if (unfound > 0) lines.push(commands.say(messages.huntUnfound(unfound, language)));
+            } else if (preset.kind === "bingo") {
+                const line = (preset.options as catalog.EventOptions<"bingo">).goal === "line";
+                const winner = run.bingo?.winner ?? null;
+                lines.push(
+                    commands.say(
+                        winner
+                            ? bingoSay.wonLine(winner, line, language)
+                            : bingoSay.timeUpLine(line, language)
+                    )
+                );
             } else if (villagerLost(run)) {
                 // Why there is no podium, rather than "nobody scored".
                 lines.push(
@@ -4047,6 +4206,9 @@ export function cleanupOf(run: stored.EventRun): string[] {
         case "rare-catch":
             after.push(...rareCatch.catchCleanup());
             break;
+        case "bingo":
+            after.push(...bingo.bingoCleanup());
+            break;
     }
     // Operators' chat is given back last, so the tidying up does not fill it either.
     const feedback: string[] = commands.FEEDBACK_RULES.filter((rule) => rule in run.gamerules);
@@ -4216,6 +4378,7 @@ async function results(
         return { scores, took: [] };
     }
     if (preset.kind === "world-boss" && !run.decidedBy) return { scores: new Map(), took: [] };
+    if (preset.kind === "bingo") return bingoResults(server, run);
     if (catalog.takesJoiners(preset)) return stageService.results(run);
     // One last count first, so the final seconds are in it.
     await server.sayAll(commands.scoreTick(preset));
