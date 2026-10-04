@@ -496,7 +496,7 @@
             "spent": "Used up"
         },
         "stopTitle": "Stop sharing with {name}?",
-        "stopBody": "{who} loses access to {what} at once. You can share it again afterwards.",
+        "stopBody": "{who} loses access to {what} at once. You can share it again afterward.",
         "title": "Share {name}",
         "stopNamed": "Stop sharing with {name}",
         "range": "{from} to {to}",

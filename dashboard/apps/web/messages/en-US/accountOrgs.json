@@ -40,8 +40,8 @@
         },
         "create": {
             "title": "New organization",
-            "body": "You own it. Add people to its roster afterwards and put them on teams.",
-            "bodyWithLimit": "You own it. Add people to its roster afterwards and put them on teams. This Polaris allows up to {limit} members.",
+            "body": "You own it. Add people to its roster afterward and put them on teams.",
+            "bodyWithLimit": "You own it. Add people to its roster afterward and put them on teams. This Polaris allows up to {limit} members.",
             "namePlaceholder": "Acme Design",
             "handlePlaceholder": "acme-design",
             "handleHint": "Used in links. Cannot be one an account already signs in with.",

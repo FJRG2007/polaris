@@ -186,7 +186,7 @@
         "description": "A house, an office, a workshop - anywhere with cameras of its own.",
         "kind": "What it is",
         "name": "Name",
-        "namePlaceholder": "The flat"
+        "namePlaceholder": "The apartment"
     },
     "placeKinds": {
         "house": "Home",
@@ -337,7 +337,7 @@
         "sensitivityHint": "Higher notices smaller changes. Too high and every shadow is an event.",
         "sensitivityLabel": "Sensitivity",
         "settle": "Ignore anything shorter than",
-        "settleHint": "Seconds. The knob that keeps moths, gusts and passing lorries out of the log - nearly every false alarm is over within one or two. Zero reports the instant anything moves.",
+        "settleHint": "Seconds. The knob that keeps moths, gusts and passing trucks out of the log - nearly every false alarm is over within one or two. Zero reports the instant anything moves.",
         "gap": "Wait between detections",
         "gapHint": "The knob that decides what this camera costs. Seconds.",
         "hours": "Only at certain hours",
@@ -766,7 +766,7 @@
         "hue-bridge": {
             "label": "Hue Bridge",
             "summary": "Every light and smart plug on your Hue Bridge, from one press of its button. Nothing goes through the cloud.",
-            "note": "Polaris talks to the bridge on your network and checks its certificate against Hue's own, so it answers in milliseconds and keeps working without the internet. Lights and plugs arrive; scenes, rooms and colours stay in the Hue app.",
+            "note": "Polaris talks to the bridge on your network and checks its certificate against Hue's own, so it answers in milliseconds and keeps working without the internet. Lights and plugs arrive; scenes, rooms and colors stay in the Hue app.",
             "steps": {
                 "s0": "Find the bridge's IP address in your router's list of connected devices.",
                 "s1": "Press the link button on the bridge.",
@@ -787,7 +787,7 @@
         "dirigera-hub": {
             "label": "DIRIGERA hub",
             "summary": "The lights, outlets and sensors on your IKEA DIRIGERA hub, from one press of its button. Nothing goes through the cloud.",
-            "note": "Polaris talks to the hub on your network. The hub's certificate is remembered when you pair it, and Polaris refuses to talk to anything else at that address afterwards. Blinds, air purifiers and remotes are left out for now.",
+            "note": "Polaris talks to the hub on your network. The hub's certificate is remembered when you pair it, and Polaris refuses to talk to anything else at that address afterward. Blinds, air purifiers and remotes are left out for now.",
             "steps": {
                 "s0": "Find the hub's IP address in your router, and give it a fixed one if you can.",
                 "s1": "Select Connect here.",
@@ -967,8 +967,8 @@
     },
     "settings": {
         "footageBody": "Recordings and the pictures that go with events are written to <em>{storage}</em>. That is set for the whole instance under Uploads, beside where photos and attachments go - one place for one decision. A camera that wants its own disk says so on its own settings.",
-        "sensitivityBody": "Nobody guesses these right the first time, and they are not the same for a hallway and a garden facing a hedge. Set them once here, from the camera you have already tuned, and every camera added afterwards starts there. Each camera can still disagree.",
-        "settleHint": "Seconds. This is the one that stops moths, gusts and passing lorries: nearly every false alarm is over within a second or two, and a person is not.",
+        "sensitivityBody": "Nobody guesses these right the first time, and they are not the same for a hallway and a garden facing a hedge. Set them once here, from the camera you have already tuned, and every camera added afterward starts there. Each camera can still disagree.",
+        "settleHint": "Seconds. This is the one that stops moths, gusts and passing trucks: nearly every false alarm is over within a second or two, and a person is not.",
         "gapHint": "Seconds. Somebody standing at a door is one thing that happened, not sixty.",
         "facesBody": "Off unless you turn it on. It puts names to the people you have taught it under People, and only after a camera has already seen somebody - the pictures and what is learned from them stay on the machine it runs on. While it is on it holds its models in memory, so leave it off if you only want cameras to say that somebody is there.",
         "offButRunning": "Off, but still running on {server}.",
@@ -1471,7 +1471,7 @@
         "firmware": "firmware {version}",
         "battery": "battery {percent}%",
         "readAt": "read at {time}",
-        "batteryLow": "The battery is nearly flat. Once it runs out it stops answering, and whatever it does has to be done by hand.",
+        "batteryLow": "The battery is nearly empty. Once it runs out it stops answering, and whatever it does has to be done by hand.",
         "usage": "Times used, last {days} days",
         "failed": "That did not work.",
         "edit": "Edit",

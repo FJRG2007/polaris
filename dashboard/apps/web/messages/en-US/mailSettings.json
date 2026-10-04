@@ -107,7 +107,7 @@
         "explain": "Your provider filters this mailbox before Polaris ever sees it, so what this catches is what got through - and it catches it using things your provider cannot know: who you write to, what you have already called junk, and what you fished back out. It runs here, on this machine, and no message is sent anywhere to be scored. If an address-reputation service is switched on in Integrations, the sender's address and the domain behind it are checked against it - the address, never the message.",
         "judge": "Judge arriving mail",
         "judgeHint": "Anything clearly junk goes to the Junk folder. Anything only doubtful stays where it is and says so when you open it.",
-        "offHint": "Switching this off changes what happens to mail arriving afterwards. It never moves or re-reads what is already here.",
+        "offHint": "Switching this off changes what happens to mail arriving afterward. It never moves or re-reads what is already here.",
         "learned": "What it has learned",
         "nothingYet": "Nothing yet. Pressing Junk on a message teaches it, and Not junk on one in the Junk folder teaches it the other way. Until then it goes on what it can check: who the sending server says the message is from, whether the name on it belongs to the address behind it, where its links go, and whether you have written to the sender.",
         "counts": "{junk} marked as junk, {good} marked as not junk, and {words} {words, plural, one {word} other {words}} it has an opinion about.",

@@ -140,7 +140,7 @@
         },
         "planner": {
             "title": "Meeting planner",
-            "lead": "Pick an hour to line it up across your cities. Green is working hours there, amber is awake but off, grey is night or weekend.",
+            "lead": "Pick an hour to line it up across your cities. Green is working hours there, amber is awake but off, gray is night or weekend.",
             "day": "Day",
             "previousDay": "Go to previous day",
             "nextDay": "Go to next day",

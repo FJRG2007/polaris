@@ -127,7 +127,7 @@
             "onTitle": "Turn on point-in-time recovery?",
             "offTitle": "Turn off point-in-time recovery?",
             "onBody": "The instance restarts with archiving on, and takes its first base backup.",
-            "offBody": "The instance restarts without archiving and the archive is deleted. Nothing before now can be recovered afterwards.",
+            "offBody": "The instance restarts without archiving and the archive is deleted. Nothing before now can be recovered afterward.",
             "keepDays": "{count, plural, one {Keep # day} other {Keep # days}}",
             "window": "Recoverable from {from} until about a minute ago. {count, plural, one {# base backup} other {# base backups}} kept.",
             "firstBackup": "Taking the first base backup. Nothing can be recovered until it finishes.",

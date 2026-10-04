@@ -245,7 +245,7 @@
         },
         "calendarInvitation": {
             "label": "Invitation",
-            "description": "Somebody invited you to an event, or changed or cancelled one you are in."
+            "description": "Somebody invited you to an event, or changed or canceled one you are in."
         },
         "calendarReply": {
             "label": "Invitation answered",
@@ -257,7 +257,7 @@
         },
         "calendarBooking": {
             "label": "New booking",
-            "description": "Somebody booked, moved or cancelled time on one of your booking pages."
+            "description": "Somebody booked, moved or canceled time on one of your booking pages."
         },
         "calendarProposal": {
             "label": "Proposal answered",

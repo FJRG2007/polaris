@@ -351,7 +351,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "Client secret",
         apiKeyHelp:
-            "Shown once when the client is created, and downloadable from the client afterwards."
+            "Shown once when the client is created, and downloadable from the client afterward."
     },
     {
         slug: "microsoft",

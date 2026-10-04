@@ -5,7 +5,7 @@
  * Generated from the game's own en_us.json (every `death.*` key that starts
  * with the victim), taken from Minecraft 26.4 Snapshot 1 through the
  * misode/mcmeta assets mirror. A message an older server words differently is
- * not recognised, and is left alone rather than guessed at. Regenerate it the
+ * not recognized, and is left alone rather than guessed at. Regenerate it the
  * same way when a release adds a way to die.
  *
  * Generated - do not edit by hand.

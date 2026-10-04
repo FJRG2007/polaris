@@ -1,6 +1,6 @@
 /**
  * What the players read in a king of the hill played with fists only, in each
- * reader's language. Written with `&` colour codes, like the rest of the events'
+ * reader's language. Written with `&` color codes, like the rest of the events'
  * lines (`../messages.ts`).
  */
 

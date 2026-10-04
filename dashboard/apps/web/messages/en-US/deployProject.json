@@ -32,7 +32,7 @@
         "outcome": {
             "succeeded": "Succeeded",
             "failed": "Failed",
-            "cancelled": "Cancelled",
+            "cancelled": "Canceled",
             "queued": "Queued",
             "deploying": "Deploying",
             "stopped": "Stopped",

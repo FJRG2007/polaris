@@ -1,7 +1,7 @@
 /**
  * What players read about their challenges, in the language the server chose.
  *
- * Written with `&` colour codes, which the announcement writer turns into the
+ * Written with `&` color codes, which the announcement writer turns into the
  * game's own formatting. No braces anywhere: `{player}` and its kind are game
  * variables to that writer.
  */
@@ -71,7 +71,7 @@ export function header(
     return `${tag(language)}&e${name} &7- ${language === "es" ? `cambian en ${when}` : `new ones in ${when}`}`;
 }
 
-/** A text progress bar: `[||||||....]` in green and grey. */
+/** A text progress bar: `[||||||....]` in green and gray. */
 export function bar(progress: number, target: number, width = 10): string {
     const filled = target > 0 ? Math.min(width, Math.floor((progress / target) * width)) : 0;
     return `&8[&a${"|".repeat(filled)}&7${".".repeat(width - filled)}&8]`;

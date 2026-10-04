@@ -81,7 +81,7 @@
     },
     "goals": {
         "title": "Community goals",
-        "intro": "The whole server works towards one target, shown on a bar at the top of everybody's screen. Everybody who gave at least the least share gets each tier's reward.",
+        "intro": "The whole server works toward one target, shown on a bar at the top of everybody's screen. Everybody who gave at least the least share gets each tier's reward.",
         "auto": "Draw a weekly goal when none runs",
         "none": "No goal is running.",
         "add": "Add a goal",
