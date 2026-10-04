@@ -43,13 +43,32 @@ export async function writeDocx(
     blocks: readonly core.DocBlock[]
 ): Promise<Uint8Array> {
     const [
-        { buildBlankDocx, generateParagraphXml, BLANK_BULLET_NUM_ID, BLANK_ORDERED_NUM_ID },
+        {
+            buildBlankDocx,
+            generateParagraphXml,
+            generateTableXml,
+            patchTableCellTexts,
+            BLANK_BULLET_NUM_ID,
+            BLANK_ORDERED_NUM_ID
+        },
         JSZipModule
     ] = await Promise.all([import("@polaris/docx"), Promise.resolve(JSZip)]);
 
     const zip = await JSZipModule.loadAsync(await buildBlankDocx());
     const part = zip.file("word/document.xml");
     if (!part) return buildBlankDocx();
+
+    // A link in Word is a relationship to its address, declared beside the
+    // body. Allocated as the paragraphs ask for them, one per address, and
+    // written into the relationships part once the body is done.
+    const links = new Map<string, string>();
+    const allocateHyperlinkRel = (href: string): string => {
+        const held = links.get(href);
+        if (held) return held;
+        const id = `rIdPolarisLink${links.size + 1}`;
+        links.set(href, id);
+        return id;
+    };
 
     // The blank package's own numbering, which is what makes a list a list
     // rather than a paragraph beginning with a dash.
@@ -63,16 +82,15 @@ export async function writeDocx(
             [6, "Heading6"]
         ]),
         listParagraphStyleId: "ListParagraph",
-        // No hyperlinks are generated here, so nothing ever asks for one. It is
-        // required by the contract rather than by this caller.
-        allocateHyperlinkRel: () => "rId1"
+        allocateHyperlinkRel
     };
 
-    const asBlock = (kind: string, text: string) => {
-        const runs = [{ text }];
+    const asBlock = (kind: string, text: string, block?: core.DocBlock) => {
+        const runs = block?.runs && block.runs.length > 0 ? block.runs.map(asRun) : [{ text }];
+        const format = paragraphFormat(block);
         const heading = /^h([1-6])$/.exec(kind);
         if (heading) {
-            return { type: "heading" as const, level: Number(heading[1]), runs };
+            return { type: "heading" as const, level: Number(heading[1]), runs, format };
         }
         // Both numberings the blank package carries, under the ids it gave
         // them: a numbered list written against the bullet one is a procedure
@@ -90,14 +108,34 @@ export async function writeDocx(
                 runs
             };
         }
-        if (kind === "quote") return { type: "paragraph" as const, styleId: "Quote", runs };
-        return { type: "paragraph" as const, runs };
+        if (kind === "quote") {
+            return { type: "paragraph" as const, styleId: "Quote", runs, format };
+        }
+        return { type: "paragraph" as const, runs, format };
+    };
+
+    /** A table: the engine's own grid, with the header row it shades, and each
+     *  cell's text put into it. */
+    const asTable = (rows: readonly (readonly string[])[]): string => {
+        const width = Math.max(1, ...rows.map((row) => row.length));
+        const grid = generateTableXml(rows.length, width, { headerRow: true });
+        return patchTableCellTexts(
+            grid,
+            rows.map((row) =>
+                Array.from({ length: width }, (_, column) => (row[column] ?? "").split("\n"))
+            )
+        );
     };
 
     const body = [
         generateParagraphXml(asBlock("h1", title) as never, context as never),
         ...blocks.map((block) =>
-            generateParagraphXml(asBlock(block.kind, block.text) as never, context as never)
+            block.kind === "table" && block.rows && block.rows.length > 0
+                ? asTable(block.rows)
+                : generateParagraphXml(
+                      asBlock(block.kind, block.text, block) as never,
+                      context as never
+                  )
         )
     ].join("");
 
@@ -114,7 +152,67 @@ export async function writeDocx(
         "word/document.xml",
         `${document.slice(0, open + BODY_OPEN.length)}${body}${section}${document.slice(close)}`
     );
+
+    // The addresses the links point at, declared where Word looks for them.
+    const relsPart = zip.file("word/_rels/document.xml.rels");
+    if (links.size > 0 && relsPart) {
+        const declared = [...links]
+            .map(
+                ([href, id]) =>
+                    `<Relationship Id="${xmlAttribute(id)}" ` +
+                    'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" ' +
+                    `Target="${xmlAttribute(href)}" TargetMode="External"/>`
+            )
+            .join("");
+        const rels = await relsPart.async("string");
+        zip.file(
+            "word/_rels/document.xml.rels",
+            rels.replace("</Relationships>", `${declared}</Relationships>`)
+        );
+    }
     return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+}
+
+/** A value, safe inside a double-quoted XML attribute. */
+function xmlAttribute(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+/** One run, in the engine's own words. Colours lose their hash; a highlight in
+ *  any colour is a shading, because Word's highlight is a list of sixteen
+ *  named colours and the one somebody picked is rarely one of them. */
+export function asRun(run: core.DocRun): Record<string, unknown> {
+    return {
+        text: run.text,
+        ...(run.bold ? { bold: true } : {}),
+        ...(run.italic ? { italic: true } : {}),
+        ...(run.underline ? { underline: true } : {}),
+        ...(run.strike ? { strike: true } : {}),
+        ...(run.code ? { font: "Courier New", fontAscii: "Courier New" } : {}),
+        ...(run.color ? { color: run.color.replace(/^#/, "").toUpperCase() } : {}),
+        ...(run.highlight ? { shading: run.highlight.replace(/^#/, "").toUpperCase() } : {}),
+        ...(run.font ? { font: run.font, fontAscii: run.font } : {}),
+        ...(run.sizePt ? { sizeHalfPoints: Math.round(run.sizePt * 2) } : {}),
+        ...(run.href ? { link: { href: run.href } } : {})
+    };
+}
+
+/** Half an inch per step, in twips: the indent the editor draws, as Word
+ *  measures it. */
+const INDENT_TWIPS = 720;
+
+/** A paragraph's alignment and indent, as the engine's paragraph format. */
+export function paragraphFormat(block: core.DocBlock | undefined): Record<string, unknown> | undefined {
+    if (!block) return undefined;
+    const format: Record<string, unknown> = {};
+    if (block.align && block.align !== "left") format.align = block.align;
+    const indent = Math.min(8, Math.max(0, Math.trunc(Number(block.indent ?? 0)) || 0));
+    if (indent > 0) format.indentLeft = indent * INDENT_TWIPS;
+    return Object.keys(format).length > 0 ? format : undefined;
 }
 
 /**
