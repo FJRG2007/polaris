@@ -10641,6 +10641,7 @@ describe("SkyWars", () => {
         world.at.Ben = [ana[0] + 1.5, ana[1], ana[2]];
         world.dealt.Ana = 30;
         world.board.pe_swt!.Ben = 30;
+        world.attackers.Ben = "Ana";
         world.hp = { Ben: 3 };
         await play(2_100);
         const done = state();
@@ -10673,6 +10674,37 @@ describe("SkyWars", () => {
         expect(world.sent).toContain("scoreboard objectives remove pe_swb");
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("credits whoever the game says hurt a player, never a striker beside one hurt by a fall", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        // No count yet: the game makes a statistic's score only when it first moves.
+        world.board = { pe_swt: {}, pe_swb: {} };
+        world.dealt = {};
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        await play(2_100);
+        // Cy jumps off a tree beside Ana, who has just struck Ben: hurt by the
+        // fall, by nobody.
+        const ana = world.at.Ana!;
+        world.at.Cy = [ana[0] + 1, ana[1], ana[2]];
+        world.at.Ben = [ana[0] - 1, ana[1], ana[2]];
+        world.dealt.Ana = 30;
+        world.board.pe_swt!.Ben = 30;
+        world.board.pe_swt!.Cy = 20;
+        world.attackers.Ben = "Ana";
+        world.hp = { Cy: 3 };
+        await play(2_100);
+        expect(sw.stateOf(state().run!.game).out.map((one) => one.name)).toEqual(["Cy"]);
+        expect(sw.stateOf(state().run!.game).kills).toEqual({});
+        expect(saidToAll("Cy is out (Ana).")).toBe(false);
+        // Ben, struck by Ana on the first hit of the game, brought low now:
+        // Ana's, and the last one left.
+        world.hp = { Ben: 3 };
+        await play(2_100);
+        expect(saidToAll("Ben is out (Ana).")).toBe(true);
+        expect(state().history[0]).toMatchObject({ note: "Only one player was left" });
     });
 
     it("picked up after a restart, keeps who is out and does not put them out again", async () => {
