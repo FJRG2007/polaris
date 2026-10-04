@@ -18,7 +18,7 @@ import { useMemo, useState } from "react";
 import { answerAuthorizationAction } from "./actions";
 import { scopeLabelKey } from "@/lib/mcp/oauth/scope-labels";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { AlertTriangle, ExternalLink, Globe, Undo2 } from "lucide-react";
+import { AlertTriangle, Globe, Info, Undo2 } from "lucide-react";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
 import { Button, Card, CardBody, CardHeader, CardTitle, Checkbox, PolarisMark } from "@polaris/ui";
 
@@ -188,7 +188,7 @@ export function ConsentView({
                         </Button>
                     </div>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <ExternalLink className="size-3 shrink-0" aria-hidden />
+                        <Info className="size-3 shrink-0" aria-hidden />
                         {t("consent.later")}
                     </p>
                 </CardBody>

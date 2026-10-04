@@ -80,7 +80,12 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     "account.api-key.revoked": { key: "security.account_api_key_revoked", href: "/account/api-keys" },
     "account.api-key.deleted": { key: "security.account_api_key_deleted", href: "/account/api-keys" },
     "account.ai-key.added": { key: "security.account_ai_key_added", href: "/account/ai-keys" },
-    "account.ai-key.deleted": { key: "security.account_ai_key_deleted", href: "/account/ai-keys" }
+    "account.ai-key.deleted": { key: "security.account_ai_key_deleted", href: "/account/ai-keys" },
+    // An assistant connected over MCP is a credential like a key, made by a
+    // different door; one ended because its token turned up twice means
+    // somebody else held it.
+    "account.oauth.connected": { key: "security.account_oauth_connected", href: "/account/api-keys" },
+    "account.oauth.replay-detected": { key: "security.account_oauth_replay_detected", href: "/account/api-keys" }
 };
 
 /** What the alert says under the headline. The same line every time, because the

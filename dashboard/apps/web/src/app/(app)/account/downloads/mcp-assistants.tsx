@@ -189,7 +189,7 @@ export async function McpAssistants() {
                             {t.rich("assistants.other.key", {
                                 header: (
                                     <code key="header" className="text-xs">
-                                        Authorization: Bearer plk_...
+                                        {"Authorization: Bearer <key>"}
                                     </code>
                                 ),
                                 link: (chunks) => (

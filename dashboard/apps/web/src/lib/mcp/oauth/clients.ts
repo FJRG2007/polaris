@@ -156,8 +156,10 @@ export function checkRegistration(
             ok: false,
             refusal: {
                 error: onRedirects ? "invalid_redirect_uri" : "invalid_client_metadata",
+                // i18n-ignore read by the registering app, not shown to a person
                 description: onRedirects
-                    ? `redirect_uris must list 1 to ${MAX_REDIRECT_URIS} addresses`
+                    ? // i18n-ignore read by the registering app, not shown to a person
+                      `redirect_uris must list 1 to ${MAX_REDIRECT_URIS} addresses`
                     : `${issue?.path.join(".") || "body"}: ${issue?.message ?? "not valid"}`
             }
         };
@@ -170,6 +172,7 @@ export function checkRegistration(
                 ok: false,
                 refusal: {
                     error: "invalid_redirect_uri",
+                    // i18n-ignore read by the registering app, not shown to a person
                     description: "Every redirect URI must be https, or http to localhost, 127.0.0.1 or [::1], with no fragment"
                 }
             };
@@ -181,6 +184,7 @@ export function checkRegistration(
             ok: false,
             refusal: {
                 error: "invalid_client_metadata",
+                // i18n-ignore read by the registering app, not shown to a person
                 description: `token_endpoint_auth_method must be one of ${TOKEN_AUTH_METHODS.join(", ")}`
             }
         };
@@ -190,6 +194,7 @@ export function checkRegistration(
             ok: false,
             refusal: {
                 error: "invalid_client_metadata",
+                // i18n-ignore read by the registering app, not shown to a person
                 description: "grant_types may only be authorization_code and refresh_token"
             }
         };
@@ -197,7 +202,11 @@ export function checkRegistration(
     if (input.response_types?.some((type) => type !== "code")) {
         return {
             ok: false,
-            refusal: { error: "invalid_client_metadata", description: "response_types may only be code" }
+            refusal: {
+                error: "invalid_client_metadata",
+                // i18n-ignore read by the registering app, not shown to a person
+                description: "response_types may only be code"
+            }
         };
     }
     return {
