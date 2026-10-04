@@ -102,6 +102,9 @@ describe("the catalogs", () => {
                     if (inspected.tags.join() !== original.tags.join())
                         problems.push(`${namespace}.${key}: tags ${inspected.tags} vs ${original.tags}`);
                     if (message.trim() === "") problems.push(`${namespace}.${key}: empty`);
+                    // UTF-8 read back as Latin-1 somewhere on its way in: "pÃ¡gina" for "página".
+                    if (/[ÂÃ][\u0080-¿]/.test(message))
+                        problems.push(`${namespace}.${key}: mis-encoded text`);
                 }
                 expect(problems).toEqual([]);
             });
