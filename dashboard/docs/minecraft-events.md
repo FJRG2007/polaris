@@ -142,11 +142,35 @@ left out.
   Fall Guys' Hex-A-Gone), or snowballs (each one breaks the snow it hits).
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
-  platform floating `hill.LIFT` over whatever is under it. Off the circle
-  Poison wears a player down, only while they have more than three hearts; in
-  it Regeneration mends them; Resistance IV makes a punch a fifth of one and
+  platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
+  wears a player down, only while they have more than three hearts; in it
+  Regeneration mends them; Resistance IV makes a punch a fifth of one and
   keeps its knockback; a fall off the platform is slow, so nobody can die.
-  Three minutes. Walked to (fists only off), it stays on the ground.
+  Walked to (fists only off), it stays on the ground and none of what follows
+  applies.
+- **The ring** (`hill.ringAt`) is worked out from the run's id and the time
+  since "Go!" alone, so a restart puts it back where it was:
+    - The game is split into `rounds` (1-5, three by default). Each starts with
+      the ring whole, in the middle, everybody back on their spot; from the
+      second on, `RING_PAUSE_SECONDS` of nothing counted first.
+    - It shrinks a block at a time (`shrinks`) to `hill.leastRadius`: enough
+      ground for `ROOM_EACH` blocks a player, never under `LEAST_RADIUS` (2),
+      never over its own radius. Two players fight over a ring of two, sixteen
+      over one of four. It is at its smallest when the round's double points
+      start.
+    - It drifts a block every `MOVE_SECONDS` (`moves`) toward points drawn from
+      the run's id, never past `MARGIN - 1` beyond its first edge, so it stays
+      on the platform's own floor.
+    - The last `SPRINT_SECONDS` of a round (at most a third of it) count double.
+    - Only time alone in it counts (`hill.scoreLines`, counted in the game in
+      the same tick): two in it and neither scores.
+    - The one alone at the top glows and wears a golden helmet marked as the
+      event's kit (from 1.17, where their head was emptied on the way in), taken
+      back from whoever falls behind and at the end with the rest.
+    - The ring drawn on the floor is repainted as it moves: the floor's own
+      block over its own ring block and back, inside the platform's box, never
+      anything else (`hill.redrawLines`; `keptTheRules` in the run tests allows
+      exactly that).
 - **Treasure hunt** hides one treasure, a bastion's treasure room by default,
   under a column of light, with every player's action bar giving its distance
   and direction for the whole hunt.

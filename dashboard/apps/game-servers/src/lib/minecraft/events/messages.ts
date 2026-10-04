@@ -154,6 +154,8 @@ export interface RulesVariant {
     readonly finalBlow?: boolean;
     /** A horde defense won by damage dealt rather than kills. */
     readonly byDamage?: boolean;
+    /** A king of the ring with fists only: time alone in it, in rounds. */
+    readonly ring?: boolean;
 }
 
 export function rules(kind: EventKind, language: Language, variant: RulesVariant = {}): string {
@@ -173,6 +175,11 @@ export function rules(kind: EventKind, language: Language, variant: RulesVariant
               : "Bring the boss down together. The most damage wins.";
         if (!variant.arena) return goal;
         return `${goal} ${es ? "Camina hasta el haz de luz para subir a la arena." : "Walk into the beam of light to go up to the arena."}`;
+    }
+    if (kind === "king-of-the-hill" && variant.ring) {
+        return es
+            ? "Aguanta en el ring a solas: si hay dos dentro, nadie suma. Se encoge y se mueve, y el final de cada ronda puntúa doble."
+            : "Hold the ring alone: two in it and neither scores. It shrinks and moves, and the end of each round counts double.";
     }
     if (kind === "waves" && variant.byDamage) {
         return es

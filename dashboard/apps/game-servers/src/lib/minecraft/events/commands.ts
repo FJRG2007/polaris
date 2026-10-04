@@ -1825,6 +1825,14 @@ export function hillTick(
     /** Only players carrying this tag score: those an event brought to it. */
     tag?: string
 ): string[] {
+    return [
+        ...hillMarks(point, radius),
+        `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[distance=..${radius},gamemode=!spectator${tag ? `,tag=${tag}` : ""}] run scoreboard players add @s ${SCORE} ${seconds}`
+    ];
+}
+
+/** The circle's edge in flames and a tall column of light in its middle. */
+export function hillMarks(point: { x: number; y: number; z: number }, radius: number): string[] {
     const cx = point.x + 0.5;
     const cz = point.z + 0.5;
     const edge = Array.from({ length: RING_POINTS }, (_, index) => {
@@ -1835,8 +1843,7 @@ export function hillTick(
     });
     return [
         ...edge,
-        `execute in minecraft:overworld run particle minecraft:end_rod ${cx} ${point.y + 16} ${cz} 0 16 0 0.01 120 force`,
-        `execute in minecraft:overworld positioned ${cx} ${point.y} ${cz} as @a[distance=..${radius},gamemode=!spectator${tag ? `,tag=${tag}` : ""}] run scoreboard players add @s ${SCORE} ${seconds}`
+        `execute in minecraft:overworld run particle minecraft:end_rod ${cx} ${point.y + 16} ${cz} 0 16 0 0.01 120 force`
     ];
 }
 
@@ -2138,7 +2145,9 @@ export function cleanup(
         ...SHOTS.map((objective) => `scoreboard objectives remove ${objective}`),
         `scoreboard objectives remove ${JOIN_TRIGGER}`,
         `scoreboard objectives remove ${JOIN_LIST}`,
-        ...(preset.kind === "king-of-the-hill" ? ["scoreboard objectives remove pe_khp"] : []),
+        ...(preset.kind === "king-of-the-hill"
+            ? ["scoreboard objectives remove pe_khp", "scoreboard objectives remove pe_kin"]
+            : []),
         CLEAR_MARK
     ];
     for (const one of components(preset))

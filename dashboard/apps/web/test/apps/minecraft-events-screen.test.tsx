@@ -377,6 +377,33 @@ describe("setting up a horde defense", () => {
     });
 });
 
+describe("setting up a king of the ring", () => {
+    it("offers rounds, shrinking and moving with fists only, and hides them without", () => {
+        const saved: catalog.EventPreset[] = [];
+        render(
+            <EventEditor
+                preset={catalog.newPreset("king-of-the-hill", "ring")}
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+        const rounds = screen.getByLabelText(/^Rounds/) as HTMLInputElement;
+        expect(rounds.value).toBe("3");
+        for (const label of ["The ring shrinks", "The ring moves"])
+            expect(screen.getByLabelText(label).getAttribute("aria-checked")).toBe("true");
+        fireEvent.change(rounds, { target: { value: "6" } });
+        expect(screen.getAllByText("At most 5").length).toBeGreaterThan(0);
+        fireEvent.change(rounds, { target: { value: "2" } });
+        fireEvent.click(screen.getByLabelText("The ring moves"));
+        fireEvent.click(screen.getByText("Done"));
+        const options = saved.at(-1)!.options as catalog.EventOptions<"king-of-the-hill">;
+        expect([options.rounds, options.shrinks, options.moves]).toEqual([2, true, false]);
+        fireEvent.click(screen.getByLabelText("Fists only, nobody dies"));
+        expect(screen.queryByLabelText(/^Rounds/)).toBeNull();
+    });
+});
+
 describe("setting up a spleef", () => {
     it("offers every way to play switched on, and never lets the last one go", () => {
         const saved: catalog.EventPreset[] = [];

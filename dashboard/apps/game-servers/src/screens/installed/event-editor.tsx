@@ -644,6 +644,51 @@ function OptionsFields({
                             aria-label={t("editor.fistsOnly")}
                         />
                     </label>
+                    {value.fistsOnly ? (
+                        <>
+                            <Field
+                                label={t("editor.ringRounds")}
+                                hint={t("editor.ringRoundsHint")}
+                                problem={problemAt(issues, "options", "rounds")}
+                            >
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={5}
+                                    value={Number.isFinite(value.rounds) ? value.rounds : ""}
+                                    onChange={(event) =>
+                                        onChange({ ...value, rounds: numberOf(event.target.value) })
+                                    }
+                                />
+                            </Field>
+                            <label className="flex items-center justify-between gap-3 text-sm">
+                                <span className="min-w-0">
+                                    <span className="font-medium">{t("editor.ringShrinks")}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {t("editor.ringShrinksHint")}
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={value.shrinks}
+                                    onChange={(on) => onChange({ ...value, shrinks: on })}
+                                    aria-label={t("editor.ringShrinks")}
+                                />
+                            </label>
+                            <label className="flex items-center justify-between gap-3 text-sm">
+                                <span className="min-w-0">
+                                    <span className="font-medium">{t("editor.ringMoves")}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {t("editor.ringMovesHint")}
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={value.moves}
+                                    onChange={(on) => onChange({ ...value, moves: on })}
+                                    aria-label={t("editor.ringMoves")}
+                                />
+                            </label>
+                        </>
+                    ) : null}
                 </>
             );
         }

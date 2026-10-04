@@ -15,6 +15,7 @@
  */
 
 import type { Box, Point } from "../state";
+import { seeded } from "../trivia-bank";
 import { IN_ARENA, type Spot } from "./arena";
 
 /** The platform's block: plain, cheap, and nothing the sea has. */
@@ -249,4 +250,215 @@ export function catchLine(point: { x: number; y: number; z: number }, radius: nu
     const reach = radius + MARGIN + 64;
     const under = `x=${point.x - reach},y=${point.y - 128},z=${point.z - reach},dx=${2 * reach},dy=127,dz=${2 * reach}`;
     return `execute in minecraft:overworld run effect give @a[tag=${IN_ARENA},${under}] minecraft:slow_falling 3 0 true`;
+}
+// ------------------------------------------------------------------ the ring
+
+/**
+ * With fists only the circle is a ring that does not stand still. Each round
+ * starts with it whole and in the middle; then it shrinks a block at a time
+ * and drifts over the platform, so nobody can hold it by standing in one spot,
+ * and the end of every round (`SPRINT_SECONDS`) counts double. Between rounds
+ * everybody is put back on their own spot round it and nothing counts for
+ * `RING_PAUSE_SECONDS`.
+ *
+ * Where it is and how big is worked out from the run's id and the time since
+ * "Go!" alone (`ringAt`): the same after a restart, and the same for whoever
+ * asks.
+ */
+
+/** The smallest a ring ever gets, whoever plays: two blocks round the middle. */
+export const LEAST_RADIUS = 2;
+
+/** Ground each player is given in the smallest ring, in blocks. */
+const ROOM_EACH = 3;
+
+/** How often the ring takes a step, in seconds. */
+export const MOVE_SECONDS = 4;
+
+/** How far past its first edge the ring may drift: never off the platform's
+ *  floor, which reaches `MARGIN` past it. */
+const DRIFT = MARGIN - 1;
+
+/** The end of every round that counts double, at most a third of it. */
+export const SPRINT_SECONDS = 20;
+
+/** The breath between rounds, everybody back on their spot. */
+export const RING_PAUSE_SECONDS = 6;
+
+export const ROUNDS = { least: 1, most: 5 } as const;
+
+/**
+ * How small the ring may get for this many players: enough ground for each of
+ * them (`ROOM_EACH` blocks), never under `LEAST_RADIUS`, never over the ring it
+ * starts as. Two players fight over a ring of two; sixteen over one of four.
+ */
+export function leastRadius(radius: number, players: number): number {
+    const room = Math.ceil(Math.sqrt((Math.max(1, players) * ROOM_EACH) / Math.PI));
+    return Math.min(radius, Math.max(LEAST_RADIUS, room));
+}
+
+export interface RingSettings {
+    /** The run's id, which draws where the ring goes. */
+    readonly seed: string;
+    /** The ring every round starts as. */
+    readonly radius: number;
+    /** Who was brought in: how small it may get. */
+    readonly players: number;
+    readonly rounds: number;
+    readonly shrinks: boolean;
+    readonly moves: boolean;
+}
+
+export interface Ring {
+    /** From 1. */
+    readonly round: number;
+    /** Everybody back on their spot, nothing counted. */
+    readonly pause: boolean;
+    /** Counting double. */
+    readonly sprint: boolean;
+    /** Where its middle is, from the platform's middle. */
+    readonly dx: number;
+    readonly dz: number;
+    readonly radius: number;
+}
+
+/** How long each round lasts, the pause before it included. */
+export function roundMs(totalMs: number, rounds: number): number {
+    return totalMs / Math.max(1, rounds);
+}
+
+/** The ring `elapsedMs` after "Go!", in a game `totalMs` long. */
+export function ringAt(settings: RingSettings, totalMs: number, elapsedMs: number): Ring {
+    const rounds = Math.max(1, settings.rounds);
+    const length = roundMs(totalMs, rounds);
+    const round = Math.min(rounds, Math.floor(Math.max(0, elapsedMs) / length) + 1);
+    const into = Math.max(0, elapsedMs - (round - 1) * length);
+    const pauseMs = round > 1 ? RING_PAUSE_SECONDS * 1000 : 0;
+    const playMs = Math.max(1, length - pauseMs);
+    const played = Math.max(0, into - pauseMs);
+    const sprintMs = Math.min(SPRINT_SECONDS * 1000, playMs / 3);
+    const shrinkMs = playMs - sprintMs;
+    const least = settings.shrinks
+        ? leastRadius(settings.radius, settings.players)
+        : settings.radius;
+    const steps = settings.radius - least;
+    // A block at a time, the last one taken as the sprint starts.
+    const radiusAt = (ms: number) =>
+        steps <= 0
+            ? settings.radius
+            : settings.radius - Math.min(steps, Math.floor((ms * steps) / shrinkMs));
+    const pause = into < pauseMs;
+    let dx = 0;
+    let dz = 0;
+    if (settings.moves && !pause) {
+        const random = seeded(`${settings.seed}-ring-${round}`);
+        let target: { x: number; z: number } | null = null;
+        const moves = Math.floor(played / (MOVE_SECONDS * 1000));
+        for (let step = 1; step <= moves; step += 1) {
+            // The room to drift grows as the ring shrinks; it never shrinks.
+            const room = settings.radius - radiusAt(step * MOVE_SECONDS * 1000) + DRIFT;
+            if (
+                !target ||
+                (target.x === dx && target.z === dz) ||
+                Math.hypot(target.x, target.z) > room
+            )
+                target = pointWithin(random, room);
+            const ax = target.x - dx;
+            const az = target.z - dz;
+            if (ax !== 0 && Math.abs(ax) >= Math.abs(az)) dx += Math.sign(ax);
+            else if (az !== 0) dz += Math.sign(az);
+        }
+    }
+    return { round, pause, sprint: !pause && played >= shrinkMs, dx, dz, radius: radiusAt(played) };
+}
+
+/** A whole-block point no farther than `room` from the middle. */
+function pointWithin(random: () => number, room: number): { x: number; z: number } {
+    const angle = random() * Math.PI * 2;
+    const far = random() * room;
+    let x = Math.round(Math.cos(angle) * far);
+    let z = Math.round(Math.sin(angle) * far);
+    while (Math.hypot(x, z) > room) {
+        if (Math.abs(x) >= Math.abs(z)) x -= Math.sign(x);
+        else z -= Math.sign(z);
+    }
+    return { x, z };
+}
+
+/** The ring's middle: the platform's, moved by the ring's offset. */
+export function ringCenter(place: Point, ring: Pick<Ring, "dx" | "dz">): Point {
+    return { x: place.x + ring.dx, y: place.y, z: place.z + ring.dz };
+}
+
+/** Kept by the game: how many stand in the ring this look. */
+export const INSIDE_SCORE = "pe_kin";
+const INSIDE_HOLDER = "#inside";
+
+/**
+ * Time in the ring, for whoever stands in it alone: two in it and neither
+ * scores, so the other has to be pushed out. Counted inside the game, in the
+ * same tick it is seen. `seconds` is already doubled in a sprint.
+ */
+export function scoreLines(center: Point, radius: number, seconds: number): string[] {
+    const inRing = `@a[tag=${IN_ARENA},distance=..${radius},gamemode=!spectator]`;
+    const at = `in minecraft:overworld positioned ${center.x + 0.5} ${center.y} ${center.z + 0.5}`;
+    return [
+        `scoreboard objectives add ${INSIDE_SCORE} dummy`,
+        `execute ${at} store result score ${INSIDE_HOLDER} ${INSIDE_SCORE} if entity ${inRing}`,
+        `execute if score ${INSIDE_HOLDER} ${INSIDE_SCORE} matches 1 ${at} as ${inRing} run scoreboard players add @s pe_score ${seconds}`
+    ];
+}
+
+/** The count of who stands in the ring, gone with the event. */
+export const INSIDE_OFF = `scoreboard objectives remove ${INSIDE_SCORE}`;
+
+/** Every block of the drawn ring: those whose middle is within half a block of its edge. */
+export function ringBlocks(center: Point, radius: number): { x: number; z: number }[] {
+    const out: { x: number; z: number }[] = [];
+    for (let dx = -radius; dx <= radius; dx += 1)
+        for (let dz = -radius; dz <= radius; dz += 1)
+            if (Math.abs(Math.hypot(dx, dz) - radius) <= 0.5)
+                out.push({ x: center.x + dx, z: center.z + dz });
+    return out;
+}
+
+/**
+ * The ring drawn again on the platform's floor where it is now: the old one
+ * painted over in the floor's own block, the new one painted only onto that
+ * block - nothing but the platform's own floor is ever touched. `floor` is
+ * the platform's own layer, `radius` the ring it was built round.
+ */
+export function redrawLines(
+    floor: Point,
+    radius: number,
+    center: Point,
+    ringRadius: number
+): string[] {
+    const box = platformBox(floor, radius);
+    const area = `${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2}`;
+    return [
+        `execute in minecraft:overworld run fill ${area} ${PLATFORM_BLOCK} replace ${RING_BLOCK}`,
+        ...ringBlocks(center, ringRadius).map(
+            (one) =>
+                `execute in minecraft:overworld run fill ${one.x} ${floor.y} ${one.z} ${one.x} ${floor.y} ${one.z} ${RING_BLOCK} replace ${PLATFORM_BLOCK}`
+        )
+    ];
+}
+
+/** The crown the one ahead wears, marked as the event's so it is taken back. */
+export const CROWN = "minecraft:golden_helmet";
+
+/** Who is ahead: the most time, alone at the top; nobody on a tie or at nothing. */
+export function leaderOf(points: Readonly<Record<string, number>>): string | null {
+    let best: string | null = null;
+    let most = 0;
+    let tied = false;
+    for (const [name, score] of Object.entries(points)) {
+        if (score > most) {
+            best = name;
+            most = score;
+            tied = false;
+        } else if (score === most && score > 0) tied = true;
+    }
+    return tied ? null : best;
 }

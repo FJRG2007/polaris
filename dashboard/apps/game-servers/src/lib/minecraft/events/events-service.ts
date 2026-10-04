@@ -1275,6 +1275,7 @@ function rulesVariant(preset: catalog.EventPreset): written.RulesVariant {
     }
     if (preset.kind === "waves")
         return { byDamage: (preset.options as catalog.EventOptions<"waves">).winner === "damage" };
+    if (preset.kind === "king-of-the-hill") return { ring: catalog.hillFistsOnly(preset) };
     return { race: isRace(preset) };
 }
 

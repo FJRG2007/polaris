@@ -129,6 +129,19 @@ export const runSchema = z.object({
     /** A king of the hill with no untouched ground for its circle: looking over
      *  the sea now, for a platform of its own. */
     overSea: z.boolean().default(false),
+    /** King of the ring with fists only: the ring as last drawn, the round last
+     *  announced, whether its double points were, and who wears the crown. */
+    ring: z
+        .object({
+            round: z.number().int(),
+            dx: z.number().int(),
+            dz: z.number().int(),
+            radius: z.number().int(),
+            sprint: z.boolean(),
+            leader: z.string().nullable()
+        })
+        .nullable()
+        .default(null),
     /** How much of a supply drop's position has been told. */
     reveals: z.number().int().default(0),
     /** Trivia: the round being played, from 0. */

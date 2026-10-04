@@ -315,7 +315,20 @@ export const optionsSchemas = {
         /** Played by who joins, brought to it with nothing in their hands - their
          *  things kept and given back after - where nobody can die, and pushing
          *  is how the circle is won (`kinds/hill`). */
-        fistsOnly: z.boolean().default(true)
+        fistsOnly: z.boolean().default(true),
+        /** With fists only: the game split into rounds, the ring whole and in
+         *  the middle again at the start of each (`kinds/hill`, the ring). */
+        rounds: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(5, problem("atMost", { count: 5 }))
+            .default(3),
+        /** With fists only: the ring shrinks over each round, down to what the
+         *  players need (`hill.leastRadius`). */
+        shrinks: z.boolean().default(true),
+        /** With fists only: the ring drifts over the platform. */
+        moves: z.boolean().default(true)
     }),
     "treasure-hunt": z.object({
         chests: z

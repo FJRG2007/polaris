@@ -1655,7 +1655,7 @@
             },
             "king-of-the-hill": {
                 "label": "King of the ring",
-                "summary": "A marked circle appears. The longest time spent inside it wins - so it is worth defending.",
+                "summary": "Who joins is brought to a ring floating in the air, fists only, where nobody can die. Only time alone in the ring counts, so the others have to be pushed out; over each round it shrinks and moves, and the one ahead wears a crown.",
                 "unit": "seconds"
             },
             "treasure-hunt": {
@@ -2004,6 +2004,12 @@
         "circleRadiusBlocks": "Circle radius (blocks)",
         "fistsOnly": "Fists only, nobody dies",
         "fistsOnlyHint": "Players join and come with nothing: their things are kept and given back after, nobody can die, and pushing wins the circle.",
+        "ringRounds": "Rounds",
+        "ringRoundsHint": "1 to 5. The time is split between them; each starts with the ring whole, everybody back on their spot, and its last 20 seconds count double.",
+        "ringShrinks": "The ring shrinks",
+        "ringShrinksHint": "A block at a time over each round, down to what the players need: two blocks across for two, four for sixteen.",
+        "ringMoves": "The ring moves",
+        "ringMovesHint": "It drifts over the platform a block every few seconds, so nobody holds it standing still.",
         "between3And20": "Between 3 and 20.",
         "waves": "Waves",
         "3To10": "3 to 10",

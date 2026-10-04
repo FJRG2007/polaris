@@ -1655,7 +1655,7 @@
             },
             "king-of-the-hill": {
                 "label": "Rey del ring",
-                "summary": "Aparece un círculo marcado. Gana quien más tiempo pase dentro - así que vale la pena defenderlo.",
+                "summary": "Quien se apunta sube a un ring flotante, solo con los puños y sin poder morir. Solo cuenta el tiempo a solas dentro, así que hay que echar a los demás; en cada ronda se encoge y se mueve, y quien va primero lleva corona.",
                 "unit": "segundos"
             },
             "treasure-hunt": {
@@ -2004,6 +2004,12 @@
         "circleRadiusBlocks": "Radio del círculo (bloques)",
         "fistsOnly": "Solo puños, nadie muere",
         "fistsOnlyHint": "Quien se apunta entra sin nada: sus cosas se guardan y se devuelven, nadie puede morir y se gana a empujones.",
+        "ringRounds": "Rondas",
+        "ringRoundsHint": "De 1 a 5. El tiempo se reparte entre ellas; cada una empieza con el ring entero, todos en su sitio, y sus últimos 20 segundos puntúan doble.",
+        "ringShrinks": "El ring se encoge",
+        "ringShrinksHint": "Un bloque cada vez a lo largo de la ronda, hasta lo que necesitan los jugadores: dos bloques de radio para dos, cuatro para dieciséis.",
+        "ringMoves": "El ring se mueve",
+        "ringMovesHint": "Se desplaza por la plataforma un bloque cada pocos segundos, así nadie lo aguanta quieto.",
         "between3And20": "Entre 3 y 20.",
         "waves": "Oleadas",
         "3To10": "3 a 10",

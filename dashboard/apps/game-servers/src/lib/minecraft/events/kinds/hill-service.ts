@@ -308,37 +308,96 @@ export async function goLines(ctx: KindContext): Promise<string[]> {
     ];
 }
 
+/** What the ring is played with: who was brought in, and the event's options. */
+export function ringSettings(run: stored.EventRun): hill.RingSettings {
+    const options = optionsOf(run);
+    return {
+        seed: run.id,
+        radius: options.radius,
+        players: run.entrants.length,
+        rounds: options.rounds,
+        shrinks: options.shrinks,
+        moves: options.moves
+    };
+}
+
+/** The ring now, from the time since "Go!". */
+export function ringNow(run: stored.EventRun, now: number): hill.Ring {
+    return hill.ringAt(ringSettings(run), run.endsAt - run.startsAt, now - run.startsAt);
+}
+
 /**
- * One tick of the king of the hill played with fists only: nobody can be hurt,
- * whoever was knocked right off is brought back to the edge, time in the circle
- * counted for them alone, and the standings kept in the run.
+ * One tick of the king of the ring played with fists only: nobody can be hurt,
+ * whoever was knocked right off is brought back to the edge, and the ring
+ * shrunk, moved and drawn where it is now (`hill.ringAt`). Time in it counts
+ * only for whoever is in it alone - double at the end of a round - and the one
+ * ahead glows and wears the crown. Between rounds everybody goes back to their
+ * spot and nothing counts.
  */
 export async function fightTick(ctx: KindContext, seconds: number, lines: string[]): Promise<void> {
     const run = ctx.run;
-    const place = run.place!;
-    const { radius } = optionsOf(run);
+    const platform = run.place!;
+    const options = optionsOf(run);
+    const { radius } = options;
+    const ring = ringNow(run, Date.now());
+    const center = hill.ringCenter(platform, ring);
+    // As it was built: whole, in the middle, nobody ahead.
+    const was = run.ring ?? { round: 1, dx: 0, dz: 0, radius, sprint: false, leader: null };
     const spots = entrySpotsFor(run);
-    const room = hill.bounds(place, radius);
+    const room = hill.bounds(platform, radius);
+    const overGround = await ctx.atLeast([1, 19, 4]);
     lines.push(
-        ...hill.protectLines(place, radius),
-        ...commands.hillTick(place, radius, seconds, arena.IN_ARENA),
+        ...(ring.pause
+            ? [...hill.protectLines(), hill.catchLine(platform, radius)]
+            : hill.protectLines(center, ring.radius)),
+        ...commands.hillMarks(center, ring.radius),
         ...arena.keepThrown(room),
         ...commands.hostilesOut(room)
     );
-    const here = new Map(
-        commands
-            .readWhere(await ctx.server.say([commands.IN_OVERWORLD]))
-            .map((one) => [one.name.toLowerCase(), one])
-    );
-    const overGround = await ctx.atLeast([1, 19, 4]);
+    if (!ring.pause)
+        lines.push(...hill.scoreLines(center, ring.radius, seconds * (ring.sprint ? 2 : 1)));
+    if (ring.radius !== was.radius || ring.dx !== was.dx || ring.dz !== was.dz) {
+        const floor = { ...platform, y: platform.y - 1 };
+        lines.push(...hill.redrawLines(floor, radius, { ...center, y: floor.y }, ring.radius));
+    }
+    const everybody = `@a[tag=${arena.IN_ARENA}]`;
+    if (ring.round > was.round) {
+        // A new round: everybody back on their own spot, the ring whole again.
+        lines.push(
+            ...run.entrants.flatMap((one, index) =>
+                hill
+                    .enterLines(one.name, spots[index % spots.length]!, overGround)
+                    .filter((line) => line.includes(" tp "))
+            ),
+            ...arena.titleTo(
+                everybody,
+                hillMessages.roundTitle(ring.round, options.rounds, ctx.language),
+                hillMessages.roundSubtitle(options.shrinks, options.moves, ctx.language)
+            ),
+            commands.sound(commands.SOUNDS.start)
+        );
+    } else if (ring.sprint && !(was.sprint && was.round === ring.round)) {
+        lines.push(
+            ...arena.titleTo(
+                everybody,
+                hillMessages.sprintTitle(ctx.language),
+                hillMessages.sprintSubtitle(ctx.language)
+            ),
+            commands.sound(commands.SOUNDS.tick)
+        );
+    }
+    const where = commands
+        .readWhere(await ctx.server.say([commands.IN_OVERWORLD]))
+        .filter((one) => run.entrants.some((entrant) => lower(entrant.name) === lower(one.name)));
+    const here = new Map(where.map((one) => [lower(one.name), one]));
+    const inside = where.filter((one) => commands.inHill(one, center, ring.radius)).length;
     for (const [index, one] of run.entrants.entries()) {
-        const at = here.get(one.name.toLowerCase());
+        const at = here.get(lower(one.name));
         if (!at) continue;
-        if (hill.strayed(at, place, radius)) {
-            const spot = spots[index % spots.length]!;
+        if (hill.strayed(at, platform, radius)) {
             lines.push(
                 ...hill
-                    .enterLines(one.name, spot, overGround)
+                    .enterLines(one.name, spots[index % spots.length]!, overGround)
                     .filter((line) => line.includes(" tp ")),
                 arena.actionbarTo(one.name, hillMessages.backOnHill(ctx.language))
             );
@@ -347,13 +406,19 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         lines.push(
             commands.actionbarFor(
                 one.name,
-                commands.inHill(at, place, radius)
-                    ? messages.hillInside(ctx.language)
-                    : messages.hillGuide(
-                          Math.round(Math.hypot(at.x - (place.x + 0.5), at.z - (place.z + 0.5))),
-                          commands.headingTo(at, { x: place.x + 0.5, z: place.z + 0.5 }),
-                          ctx.language
-                      )
+                ring.pause
+                    ? hillMessages.nextRound(ctx.language)
+                    : commands.inHill(at, center, ring.radius)
+                      ? inside > 1
+                          ? hillMessages.contested(ctx.language)
+                          : messages.hillInside(ctx.language)
+                      : messages.hillGuide(
+                            Math.round(
+                                Math.hypot(at.x - (center.x + 0.5), at.z - (center.z + 0.5))
+                            ),
+                            commands.headingTo(at, { x: center.x + 0.5, z: center.z + 0.5 }),
+                            ctx.language
+                        )
             )
         );
     }
@@ -361,9 +426,7 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
     const scores = commands.readScores(await ctx.server.say([commands.READ_SCORES]));
     const points: Record<string, number> = {};
     for (const one of run.entrants) {
-        const score = [...scores].find(
-            ([name]) => name.toLowerCase() === one.name.toLowerCase()
-        )?.[1];
+        const score = [...scores].find(([name]) => lower(name) === lower(one.name))?.[1];
         if (score !== undefined) points[one.name] = score;
     }
     if (JSON.stringify(points) !== JSON.stringify(run.points) && Object.keys(points).length > 0) {
@@ -382,6 +445,39 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
             if (shown.length > 0) await ctx.server.sayAll(shown);
         }
         ctx.run = { ...ctx.run, points: { ...run.points, ...points } };
+    }
+    // The one ahead glows, and wears the crown where it can be put straight
+    // on: from 1.17, where their head was emptied on the way in.
+    const leader = hill.leaderOf(ctx.run.points);
+    if (leader) lines.push(`effect give ${leader} minecraft:glowing 3 0 true`);
+    if (leader !== was.leader) {
+        const crowns = run.marker !== null && (await ctx.atLeast([1, 17]));
+        if (was.leader) {
+            lines.push(`effect clear ${was.leader} minecraft:glowing`);
+            if (crowns) lines.push(arena.clearMarked(was.leader, hill.CROWN, run.marker!));
+        }
+        if (leader) {
+            if (crowns)
+                lines.push(arena.equipMarked(leader, "armor.head", hill.CROWN, run.marker!));
+            lines.push(
+                commands.say(messages.tag(ctx.language) + hillMessages.leads(leader, ctx.language))
+            );
+        }
+    }
+    const kept: NonNullable<stored.EventRun["ring"]> = {
+        round: ring.round,
+        dx: ring.dx,
+        dz: ring.dz,
+        radius: ring.radius,
+        sprint: ring.sprint,
+        leader
+    };
+    if (JSON.stringify(kept) !== JSON.stringify(run.ring) || ctx.run !== run) {
+        ctx.run = { ...ctx.run, ring: kept };
         await ctx.persist();
     }
+}
+
+function lower(name: string): string {
+    return name.toLowerCase();
 }
