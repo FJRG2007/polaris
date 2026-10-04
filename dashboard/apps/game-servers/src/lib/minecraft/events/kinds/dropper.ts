@@ -588,6 +588,15 @@ export const BACK_SCORE = "pe_back";
 export const OBJECTIVE = "polaris_drop";
 /** The invisible stand over the middle of the shaft that a landed racer is sent to. */
 export const TOP_TAG = "polaris_drop_top";
+/**
+ * A racer sent to the top whom the server has not yet seen in the air. Until
+ * the player's game answers the teleport the server keeps the `OnGround` it
+ * had on the floor, so without it the next tick sent them up again, and the
+ * next: the player hung at the top, re-teleported every tick, until the
+ * server's own check kicked them for flying ("Flying is not enabled on this
+ * server", logged as "kicked for floating too long").
+ */
+export const SENT_TAG = "polaris_drop_sent";
 const SCALE = 64;
 
 export const SCORES_ADDED = [FINISH_SCORE, LOWEST_SCORE, BACK_SCORE, OBJECTIVE].map(
@@ -603,7 +612,8 @@ export function racerScores(name: string, shaft: Shaft): string[] {
     return [
         `scoreboard players set ${name} ${FINISH_SCORE} 0`,
         `scoreboard players set ${name} ${LOWEST_SCORE} ${(shaft.top + 1) * SCALE}`,
-        `scoreboard players set ${name} ${BACK_SCORE} 0`
+        `scoreboard players set ${name} ${BACK_SCORE} 0`,
+        `tag ${name} remove ${SENT_TAG}`
     ];
 }
 
@@ -627,7 +637,8 @@ function within(box: string): string {
  * the rim of its hole, could take their time over the next hole from there.
  * So the pack, every tick, sends anybody racing who is on the ground anywhere
  * over the floors back to the top, notes the lowest each racer has been, and
- * the tick each one reached the water.
+ * the tick each one reached the water. A racer it sent up is sent once: not
+ * again until the server has seen them off the ground (`SENT_TAG`).
  */
 export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     tick: [
@@ -642,11 +653,13 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     ],
     racer: [
         `scoreboard players operation @s ${LOWEST_SCORE} < ${score("py")}`,
-        `execute if entity @s[nbt={OnGround:1b}] ${within("f")} run function polaris:dropper/back`,
+        `tag @s[tag=${SENT_TAG},nbt={OnGround:0b}] remove ${SENT_TAG}`,
+        `execute if entity @s[tag=!${SENT_TAG},nbt={OnGround:1b}] ${within("f")} run function polaris:dropper/back`,
         `execute if score ${score("py")} <= ${score("wy")} run function polaris:dropper/done`
     ],
     back: [
         `tp @s @e[type=minecraft:armor_stand,tag=${TOP_TAG},limit=1]`,
+        `tag @s add ${SENT_TAG}`,
         `scoreboard players add @s ${BACK_SCORE} 1`,
         "playsound minecraft:block.note_block.bass master @s ~ ~ ~ 1 0.5"
     ],
@@ -706,6 +719,7 @@ export function stopLines(boxes: readonly Pick<Box, "x1" | "z1" | "block">[]): s
     const ours = `if score ${score("sx1")} matches ${x * SCALE} if score ${score("sz1")} matches ${z * SCALE}`;
     return [
         `execute ${ours} run kill @e[type=minecraft:armor_stand,tag=${TOP_TAG}]`,
+        `execute ${ours} run tag @a remove ${SENT_TAG}`,
         `execute ${ours} run scoreboard players set ${score("on")} 0`
     ];
 }

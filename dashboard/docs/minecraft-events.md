@@ -202,8 +202,8 @@ left out.
   (`dropper.plan`). Everybody waits on a glass lid; at "Go!" all of them are
   put over the middle, the lid goes, and they fall. The events data pack
   catches a landing the tick it happens - anybody racing who is on the ground
-  anywhere over the floors, the rim of a hole included, goes back to the top -
-  and notes the lowest each racer has been and the tick they reach the water.
+  anywhere over the floors, the rim of a hole included, goes back to the top,
+  once (`dropper.SENT_TAG`, see "Players" under the lessons) - and notes the lowest each racer has been and the tick they reach the water.
   Ranked by finish time, then by the deepest floor. It is played under Slow
   Falling: in a free fall a player is past three blocks a tick within seven
   seconds and can steer a tenth of a block between two floors, so holes that do
@@ -402,15 +402,18 @@ left out.
   fuse's end are clock times in the run, so a restart picks the fuse up where
   it was. The last one left wins; everybody else is ranked by when they went
   out, the same moment the same place.
-- **Hide and seek** is played in a closed hall 25 by 25 inside, stone walls
-  under a glass roof, with a gallery four deep round two of its sides,
-  reached by a staircase and a ladder and railed in spruce fence (see
-  "Building a map" for how it is laid out). The seekers (`seekers`, never
-  everybody) are drawn from the run's id and wait in a barrier cage in the
-  middle, blind and unable to walk, for `hideSeconds`; the hiders start round
-  it. Then the cage's barrier comes down, only inside its own box, and that
-  it did is written into the run, so a restart neither lets them out early
-  nor builds it again. Two teams hide each side's names from the other
+- **Hide and seek** is played in a closed house in the air: nine rooms, three
+  by three, 39 by 39 inside under a solid roof, a doorway in every wall between
+  two rooms, and a loft along an outer wall of two corner rooms (see "Building
+  a map" for how it is laid out and checked). Each room has four lamps in its
+  floor and no more, so corners stay dim but never dark enough for a monster.
+  The seekers (`seekers`, never everybody) are drawn from the run's id and
+  wait in a barrier cage in the middle room, blind and unable to walk, for
+  `hideSeconds` (45 by default, up to 90: the house takes longer to cross than
+  the old hall did); the hiders start round it. Then the cage's barrier comes
+  down, only inside its own box, and that it did is written into the run, so a
+  restart neither lets them out early nor builds it again. Two teams hide each
+  side's names from the other
   (`nametagVisibility hideForOtherTeams`), friendly fire off; hiders are
   under Weakness 101, so only a seeker can strike, and a hider whose
   `damage_taken` rose within five blocks of a seeker whose `damage_dealt`
@@ -527,19 +530,38 @@ new map:
   wall or on a base, and every floor block can be walked to from both bases
   (a flood fill: no sealed corner). Over 3,000 seeds: no rule broken, 10 to
   16 pieces a field.
-- **Every hiding place can be walked to**: hide and seek's hall is drawn
-  from the run's id (`hide-and-seek.layoutFor`) - the gallery mirrored into
-  one of four corners, its stairs and ladder at one of seven places each, and
-  twenty hiding places: walls, hedges of leaves that never wither, crates and
-  stacks of barrels, on the floor, under the gallery and on it. Each piece
-  keeps a block of air from every other and from the posts, the stairs, the
-  ladder, the cage and the ring the hiders start on, fits under what is over
-  it, and `layoutProblems` walks the hall from the hiders' start the way a
-  player moves - level, a block up with room to jump it, down at most three,
-  up and down the ladder - and fails it if a single block of either floor
-  cannot be reached (no sealed cell). Over 3,000 seeds: no rule broken, never
-  the bare fallback, twenty places every time (on average 4.8 walls, 6.1
-  hedges, 6.3 crates, 2.8 stacks).
+- **Every hiding place can be walked to, and is a real one**: hide and
+  seek's house is drawn from the run's id (`hide-and-seek.layoutFor`). The
+  hiding places are the ones players use in the game, not only blocks to
+  stand behind - an open hall with a few blocks gave hiders no chance:
+
+    - **closets**: a cupboard against a wall with an oak door; step in, shut
+      it, and a seeker has to open it to look;
+    - **hatches**: a spruce trapdoor in the floor over a pit two deep with a
+      ladder in it; drop in and close it over your head;
+    - **bushes**: a hollow hedge of leaves with a way in on one side only;
+    - **lofts**: a platform under the roof reached by a ladder (seekers look
+      ahead, not up), with cover on it and under it, against the wall only, so
+      the rows in front stay a way through;
+    - **cover**: walls, hedges, crates and stacks of barrels to crouch behind.
+
+    Doorways, lofts and every piece are drawn from the run's id; the whole house
+    is mirrored into one of four ways. Each piece stays inside one room, keeps a
+    block of air from every other and from the doorways, the ladders and the
+    posts, the lamps and the cage with the ring the hiders start on, fits under
+    what is over it, and a closet stands against a wall. Everything inside the
+    house is set block by block in one grid (`blocksOf`) and built from that
+    same grid as merged boxes, so what is checked is what is built.
+    `layoutProblems` then walks the house from the hiders' start the way a
+    player moves - level, a block up with room to jump it, down at most three,
+    through doors, onto a shut hatch, up and down the loft ladders - and fails it
+    if any place to stand on the floor or a loft cannot be reached, and spreads
+    the lamps' light the way the game does (a level less a block, through air,
+    doors, hatches, ladders, fences, leaves and barrier) and fails it if anywhere
+    a mob could stand, a pit's floor included, has block light 0. Over 1,000
+    seeds: no rule broken, never the empty fallback, on average 7 closets, 6
+    hatches, 4 bushes and 26 pieces of cover; about 265 fills a house.
+
 - **No island is a jump from another**: SkyWars' islands are drawn from the
   run's id (`sky-wars.layoutFor`) - each a blob with a waving edge, grass over
   dirt over stone narrowing to a point and flecked with andesite and ore, an
@@ -586,7 +608,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                       |
 | Team duel        | a stone rim round the floor and a post of light at each corner                                                                      |
 | Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                      |
-| Hide and seek    | stone brick walls under a glass roof, sea lanterns in the floor and up the corners, a spruce gallery on log posts with a fence rail |
+| Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts   |
 | SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls   |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone           |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                  |
@@ -700,6 +722,24 @@ A new kind follows all of them. A change to an old kind must not undo one.
   survival island "in a fight" all evening. When an event ends, its own
   players are taken out of the fight count, or the next event is refused
   (`ec91d0ca2`, `fda3bddb8`).
+- **Never re-teleport on what the player's game reports.** A pack check
+  that sends a player somewhere (the dropper's landing check, every tick) must
+  not run again on `OnGround` before the player's game has answered the
+  teleport: until then the server keeps the old value, so the player was sent
+  up every tick, hung in the air at the top, and was kicked by the server's
+  own check - "Flying is not enabled on this server", logged as "kicked for
+  floating too long" after 80 ticks with `allow-flight=false`. Tag who was
+  sent and wait until the server sees them off the ground
+  (`dropper.SENT_TAG`). Read with the server's own bytecode: the check counts
+  a tick as floating when a move is less than 0.03125 down with no block
+  round the player, so a steady Slow Falling (0.49 a tick) never trips it;
+  only standing still in the air does.
+- **A game has to be winnable from both sides.** Hide and seek in an open
+  hall with a few blocks of cover was found in seconds: give hiders places
+  that need searching (doors, hatches, lofts, hollow bushes), several rooms
+  to break the line of sight, dim corners, and time to reach them
+  (`hideSeconds` scales with the map). Nametags are hidden from the other
+  side and no effect shows particles, so a hider is found by looking.
 - **Each player reads their own language** (`speech.ts`): the account's
   language when the player is linked, otherwise the server's. Lines nobody in
   particular reads (the boss bar, the boss's name) are in the server's

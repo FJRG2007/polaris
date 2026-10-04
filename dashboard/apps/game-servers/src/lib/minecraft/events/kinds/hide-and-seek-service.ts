@@ -161,7 +161,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     if (!state.released && now >= releaseAt) {
         state.released = true;
         lines.push(
-            hs.cageDown(box, layout),
+            hs.cageDown(box, layout, state.design),
             ...state.seekers.flatMap(hs.releasedLines),
             ...arena.titleTo(`@a[tag=${arena.IN_ARENA}]`, seekMessages.releasedTitle(language), ""),
             commands.sound(commands.SOUNDS.horn)

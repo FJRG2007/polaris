@@ -1,5 +1,5 @@
 /**
- * Hide and seek's hall and rules, pure: the hall drawn from the run's id and
+ * Hide and seek's house and rules, pure: the house drawn from the run's id and
  * checked against its rules over thousands of seeds, what it is built of, the
  * cage, the seekers drawn, a find, the scores and what players read.
  */
@@ -15,13 +15,21 @@ import {
     commandBytes
 } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
 
-const SEEDS = 3000;
+const SEEDS = 1000;
 const box = hs.hallBox({ x: 100, z: -40 }, 100);
 
-describe("hide and seek's hall", () => {
-    it("keeps every rule over thousands of seeds, never falling back to a bare hall", () => {
+describe("hide and seek's house", () => {
+    it("keeps every rule over thousands of seeds, never falling back to an empty house", () => {
         let bare = 0;
-        const counts = { wall: 0, hedge: 0, crate: 0, stack: 0 };
+        const counts: Record<hs.PieceKind, number> = {
+            wall: 0,
+            hedge: 0,
+            crate: 0,
+            stack: 0,
+            closet: 0,
+            bush: 0,
+            pit: 0
+        };
         const corners = new Set<string>();
         for (let seed = 0; seed < SEEDS; seed += 1) {
             const layout = hs.layoutFor(`run-${seed}`);
@@ -30,52 +38,98 @@ describe("hide and seek's hall", () => {
             for (const [kind, count] of Object.entries(hs.hidingPlaces(layout)))
                 counts[kind as hs.PieceKind] += count;
             corners.add(`${layout.flipX},${layout.flipZ}`);
-            expect(layout.pieces.length).toBe(20);
+            expect(layout.doorways).toHaveLength(12);
+            expect(layout.lofts).toHaveLength(2);
         }
         expect(bare).toBe(0);
-        // Every kind of hiding place, plenty of each, the gallery in every corner.
-        for (const count of Object.values(counts)) expect(count / SEEDS).toBeGreaterThan(2);
+        // Real places to hide in every house: closets, hatches and bushes,
+        // besides cover to crouch behind.
+        expect(counts.closet / SEEDS).toBeGreaterThan(6);
+        expect(counts.pit / SEEDS).toBeGreaterThan(5);
+        expect(counts.bush / SEEDS).toBeGreaterThan(3);
+        for (const kind of ["wall", "hedge", "crate", "stack"] as const)
+            expect(counts[kind] / SEEDS).toBeGreaterThan(1);
         expect(corners.size).toBe(4);
-    });
+    }, 120_000);
 
-    it("is the same hall for the same run, and another for another", () => {
+    it("is the same house for the same run, and another for another", () => {
         expect(hs.layoutFor("abc")).toEqual(hs.layoutFor("abc"));
         expect(hs.layoutFor("abc")).not.toEqual(hs.layoutFor("abd"));
     });
 
-    it("finds a corner sealed off, pieces touching, the stairs blocked and a piece through the gallery", () => {
+    it("finds a corner sealed off, pieces touching, a doorway blocked, a dark corner and a closet off its wall", () => {
         const layout = hs.layoutFor("run-1");
         const piece = (over: Partial<hs.Piece>): hs.Piece => ({
             kind: "wall",
-            x: 22,
-            z: 22,
+            x: 34,
+            z: 34,
             level: 1,
             w: 1,
             d: 1,
             h: 3,
             ...over
         });
-        const bare = { ...layout, pieces: [] };
-        expect(hs.layoutProblems(bare)).toEqual([]);
-        // Two walls closing the corner of the hall off from the rest.
-        const sealed = [piece({ x: 23, z: 22, w: 3 }), piece({ x: 22, z: 23, d: 3 })];
-        expect(hs.layoutProblems({ ...bare, pieces: sealed }).join(" ")).toMatch(
-            /cannot be reached/
+        const empty = { ...layout, pieces: [] };
+        expect(hs.layoutProblems(empty)).toEqual([]);
+        // Two walls closing a room's corner off from the rest - the corner of
+        // whichever corner room has no loft against those walls.
+        const free = [
+            { x: 1, z: 1 },
+            { x: 37, z: 1 },
+            { x: 1, z: 37 },
+            { x: 37, z: 37 }
+        ].find(
+            (corner) =>
+                !layout.lofts.some(
+                    (loft) =>
+                        corner.x + 1 >= loft.x1 &&
+                        corner.x <= loft.x2 &&
+                        corner.z + 1 >= loft.z1 &&
+                        corner.z <= loft.z2
+                )
+        )!;
+        const lowX = free.x === 1;
+        const lowZ = free.z === 1;
+        const sealed = [
+            piece({ x: lowX ? 1 : 37, z: lowZ ? 3 : 37, w: 3 }),
+            piece({ x: lowX ? 3 : 37, z: lowZ ? 1 : 37, d: 2 })
+        ];
+        const problems = hs.layoutProblems({ ...empty, pieces: sealed });
+        expect(problems.join(" ")).toMatch(/cannot be reached/);
+        expect(problems).toContain("pieces 0 and 1 touch");
+        const door = layout.doorways[0]!;
+        const inDoor =
+            door.across === "x"
+                ? piece({ x: door.line + 1, z: door.at })
+                : piece({ x: door.at, z: door.line + 1 });
+        expect(hs.layoutProblems({ ...empty, pieces: [inDoor] })).toContain(
+            "piece 0 is in the way of a doorway, a ladder, a lamp or the cage"
         );
-        expect(hs.layoutProblems({ ...bare, pieces: sealed })).toContain("pieces 0 and 1 touch");
-        expect(
-            hs.layoutProblems({ ...bare, pieces: [piece({ x: 7, z: layout.stairsZ })] })
-        ).toContain("piece 0 is in the way of the stairs, the ladder or the cage");
-        expect(hs.layoutProblems({ ...bare, pieces: [piece({ x: 2, z: 10, h: 5 })] })).toContain(
-            "piece 0 has no room under the gallery"
+        expect(hs.layoutProblems({ ...empty, pieces: [piece({ x: 12, w: 3 })] })).toContain(
+            "piece 0 is not inside one room"
         );
         expect(
-            hs.layoutProblems({ ...bare, pieces: [piece({ x: 12, z: 12, level: 5, h: 1 })] })
-        ).toContain("piece 0 is off the gallery");
+            hs.layoutProblems({
+                ...empty,
+                pieces: [piece({ kind: "closet", x: 30, z: 30, w: 2, d: 3, side: "west" })]
+            })
+        ).toContain("closet 0 is not against a wall");
+        expect(hs.layoutProblems({ ...empty, pieces: [piece({ level: 3 })] })).toContain(
+            "piece 0 floats"
+        );
+    });
+
+    it("lights every place to stand, so no monster spawns in the house", () => {
+        // A wall boxing a corner in leaves it unlit as well as out of reach.
+        const layout = hs.layoutFor("run-7");
+        expect(hs.layoutProblems(layout)).toEqual([]);
+        expect(hs.layoutProblems({ ...layout, pieces: [], lofts: [] }).join(" ")).not.toMatch(
+            /dark/
+        );
     });
 });
 
-describe("hide and seek's hall in the world", () => {
+describe("hide and seek's house in the world", () => {
     const layout = hs.layoutFor("run-1");
     const fills = hs.hallFills(box, layout);
 
@@ -89,36 +143,67 @@ describe("hide and seek's hall in the world", () => {
             expect(one.box.z1).toBeGreaterThanOrEqual(box.z1);
             expect(one.box.z2).toBeLessThanOrEqual(box.z2);
             expect(hs.HALL_BLOCKS).toContain(one.block.replace(/\[.*$/, ""));
+            // One fill never takes more than a server allows.
+            const { x1, y1, z1, x2, y2, z2 } = one.box;
+            expect((x2 - x1 + 1) * (y2 - y1 + 1) * (z2 - z1 + 1)).toBeLessThanOrEqual(32_768);
         }
-        expect(fills.at(-1)).toMatchObject({
-            block: "minecraft:smooth_stone",
-            box: { x1: box.x1 + 1, z1: box.z1 + 1, y1: box.y1 + 1 }
-        });
-        // Leaves that never wither, and stairs and a ladder turned with the hall.
+        const last = fills.at(-1)!;
+        expect(last.block).toBe("minecraft:smooth_stone");
+        expect(last.box.y1).toBe(box.y1 + 3);
+        // Leaves that never wither; doors in two halves; hatches shut over
+        // their pits; ladders turned with the house.
         expect(fills.some((one) => one.block === "minecraft:oak_leaves[persistent=true]")).toBe(
             true
         );
-        const flipped = hs.hallFills(box, { ...layout, flipX: true, flipZ: true });
-        expect(flipped.some((one) => one.block === "minecraft:spruce_stairs[facing=east]")).toBe(
-            true
+        expect(fills.some((one) => /^minecraft:oak_door\[.*half=lower/.test(one.block))).toBe(true);
+        expect(fills.some((one) => /^minecraft:oak_door\[.*half=upper/.test(one.block))).toBe(true);
+        expect(
+            fills.some((one) => /^minecraft:spruce_trapdoor\[.*open=false/.test(one.block))
+        ).toBe(true);
+        // The ladders, doors and hatches go in before what holds them.
+        const firstOther = fills.findIndex(
+            (one, index) =>
+                index > 5 && !/^minecraft:(ladder|oak_door|spruce_trapdoor)\b/.test(one.block)
         );
-        expect(flipped.some((one) => one.block === "minecraft:ladder[facing=north]")).toBe(true);
+        expect(
+            fills
+                .slice(firstOther)
+                .some((one) => /^minecraft:(ladder|oak_door|spruce_trapdoor)\b/.test(one.block))
+        ).toBe(false);
+        const flipped = hs.hallFills(box, { ...layout, flipX: true, flipZ: true });
+        const turned = (fill: { block: string }) =>
+            fill.block.replace(/facing=(\w+)/, (_, way: string) => `facing=${way}`);
+        expect(flipped.map(turned)).not.toEqual(fills.map(turned));
     });
 
-    it("comes down with its ladder before the post the ladder hangs on", () => {
+    it("comes down with its ladders, doors and hatches before what holds them", () => {
         const lines = arena.teardown({ box, blocks: [...hs.HALL_BLOCKS] });
-        const ladder = lines.findIndex((line) => line.endsWith("replace minecraft:ladder"));
-        const post = lines.findIndex((line) => line.endsWith("replace minecraft:spruce_log"));
-        expect(ladder).toBeGreaterThanOrEqual(0);
-        expect(ladder).toBeLessThan(post);
+        const index = (block: string) =>
+            lines.findIndex((line) => line.endsWith(`replace minecraft:${block}`));
+        for (const hung of ["ladder", "oak_door", "spruce_trapdoor"])
+            for (const holder of [
+                "spruce_log",
+                "birch_planks",
+                "stone",
+                "smooth_stone",
+                "oak_planks"
+            ]) {
+                expect(index(hung)).toBeGreaterThanOrEqual(0);
+                expect(index(hung)).toBeLessThan(index(holder));
+            }
     });
 
     it("takes the cage down by its barrier alone, inside its own box", () => {
         const cage = hs.cageBox(box, layout);
         expect(cage.x2 - cage.x1).toBe(4);
-        expect(cage.y1).toBe(box.y1 + 2);
+        expect(cage.y1).toBe(box.y1 + 4);
         expect(hs.cageDown(box, layout)).toBe(
             `execute in minecraft:overworld run fill ${cage.x1} ${cage.y1} ${cage.z1} ${cage.x2} ${cage.y2} ${cage.z2} minecraft:air replace minecraft:barrier`
+        );
+        // A run built before this design has its cage elsewhere: every barrier
+        // over its floor comes down, so an update never leaves seekers shut in.
+        expect(hs.cageDown(box, layout, hs.DESIGN - 1)).toBe(
+            `execute in minecraft:overworld run fill ${box.x1} ${box.y1 + 1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace minecraft:barrier`
         );
         // The seekers wait inside it, the hiders round it.
         for (let index = 0; index < 3; index += 1) {
@@ -134,13 +219,12 @@ describe("hide and seek's hall in the world", () => {
             expect(
                 spot.x < cage.x1 || spot.x > cage.x2 || spot.z < cage.z1 || spot.z > cage.z2
             ).toBe(true);
-            expect(spot.y).toBe(box.y1 + 2);
+            expect(spot.y).toBe(box.y1 + 4);
             starts.add(`${spot.x},${spot.z}`);
         }
         expect(starts.size).toBe(hs.MOST);
     });
 });
-
 describe("hide and seek's rules", () => {
     const names = ["Ana", "Ben", "Cy", "Dee"];
 

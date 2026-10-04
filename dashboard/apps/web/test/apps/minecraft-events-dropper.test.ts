@@ -363,15 +363,22 @@ describe("the dropper's data pack", () => {
         expect(fn("player").at(-1)).toContain("if score #pz polaris_drop <= #sz2 polaris_drop");
         const racer = fn("racer");
         expect(racer[0]).toBe("scoreboard players operation @s pe_low < #py polaris_drop");
-        expect(racer[1]).toMatch(
-            /^execute if entity @s\[nbt=\{OnGround:1b\}\] if score #px polaris_drop >= #fx1 polaris_drop .* run function polaris:dropper\/back$/
+        // Sent up once: the server's OnGround is the floor's until the player's
+        // game answers the teleport, and sending them up every tick until then
+        // held them in the air until the server kicked them for flying.
+        expect(racer[1]).toBe(
+            "tag @s[tag=polaris_drop_sent,nbt={OnGround:0b}] remove polaris_drop_sent"
         );
-        expect(racer[2]).toBe(
+        expect(racer[2]).toMatch(
+            /^execute if entity @s\[tag=!polaris_drop_sent,nbt=\{OnGround:1b\}\] if score #px polaris_drop >= #fx1 polaris_drop .* run function polaris:dropper\/back$/
+        );
+        expect(racer[3]).toBe(
             "execute if score #py polaris_drop <= #wy polaris_drop run function polaris:dropper/done"
         );
-        expect(fn("back")[0]).toBe(
-            "tp @s @e[type=minecraft:armor_stand,tag=polaris_drop_top,limit=1]"
-        );
+        expect(fn("back").slice(0, 2)).toEqual([
+            "tp @s @e[type=minecraft:armor_stand,tag=polaris_drop_top,limit=1]",
+            "tag @s add polaris_drop_sent"
+        ]);
         expect(fn("done")[0]).toBe("execute store result score @s pe_drop run time query gametime");
     });
 
@@ -401,6 +408,7 @@ describe("the dropper's data pack", () => {
         const ours = `if score #sx1 polaris_drop matches ${(x - 5) * 64} if score #sz1 polaris_drop matches ${(z - 5) * 64}`;
         expect(dropper.stopLines(shaft.boxes)).toEqual([
             `execute ${ours} run kill @e[type=minecraft:armor_stand,tag=polaris_drop_top]`,
+            `execute ${ours} run tag @a remove polaris_drop_sent`,
             `execute ${ours} run scoreboard players set #on polaris_drop 0`
         ]);
         expect(dropper.stopLines(shaft.boxes.filter((box) => box.block !== dropper.WATER))).toEqual(
@@ -414,7 +422,8 @@ describe("the dropper's data pack", () => {
         expect(dropper.racerScores("Ana", shaft)).toEqual([
             "scoreboard players set Ana pe_drop 0",
             `scoreboard players set Ana pe_low ${(shaft.top + 1) * 64}`,
-            "scoreboard players set Ana pe_back 0"
+            "scoreboard players set Ana pe_back 0",
+            "tag Ana remove polaris_drop_sent"
         ]);
         expect(dropper.backLines('"x"')).toEqual([
             'execute as @a[tag=pe_in,scores={pe_back=1..}] run tellraw @s "x"',
