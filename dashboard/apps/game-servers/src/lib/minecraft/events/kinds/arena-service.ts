@@ -17,6 +17,12 @@
  *    each player to exactly where they stood, sends after them whatever they
  *    dropped, and takes the arena down, block kind by block kind.
  *
+ * Each kind's own part of these steps - its box, what it is built of, its kit,
+ * its start spots, "Go!", its tick and its results - is an `ArenaGame`
+ * (`arena-game.ts`), looked up by kind (`arena-games.ts`). The team duel, the
+ * build battle and the king of the ring are older than that, and are still
+ * played by their own branches here.
+ *
  * A player who is offline at the end cannot be sent anywhere. They log back in
  * inside the arena, so it stays up - closed, and safe to stand in - and is
  * written down as a leftover the minute sweep keeps trying: it sends them back
@@ -37,66 +43,14 @@ import * as speech from "../../speech";
 import * as written from "../messages";
 import type * as stored from "../state";
 import type { ServerContainer } from "../../service";
+import { gameOf } from "./arena-games";
 import { NO_AIR, type PlaceRefusal } from "../place-search";
+import { EventStopped, TooFew, type ItemSyntax, type KindContext } from "./arena-game";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
 
-/** One line somebody said in the chat. */
-export interface Said {
-    readonly name: string;
-    readonly text: string;
-}
-
-/** What the loop lends one of these events for a tick. */
-export interface KindContext {
-    readonly server: ServerContainer;
-    /** Every language: each line is split for its readers on the way out. */
-    readonly language: speech.Speech;
-    /** The server's own: what is written once for everybody (the teams' names). */
-    readonly home: catalog.Language;
-    readonly now: number;
-    /** The run as the loop holds it; set to change it. */
-    run: stored.EventRun;
-    persist(): Promise<void>;
-    findPlace(
-        place: catalog.EventPlace,
-        distance: number,
-        radius: number,
-        /** `air` for what is built in the air: over anything, only its air counts. */
-        surface?: "ground" | "open" | "air",
-        /** Whether, after a few tries, it may come in closer and near a home. */
-        nearHome?: boolean,
-        /** For `air`: how far over the highest thing in its footprint. */
-        lift?: number
-    ): Promise<stored.Point | "failed" | null>;
-    /**
-     * Where the beam up to something in the sky stands (`beam-entry.ts`): open,
-     * flat ground nearest the players - or, with nobody in the Overworld,
-     * nearest `near`. `none` when there is nowhere like that, `unknown` when
-     * the ground could not be read at all.
-     */
-    findEntry(near: { x: number; z: number }): Promise<stored.Point | "none" | "unknown">;
-    /** The place given up, for the reason given, and another looked for; throws
-     *  once the tries run out. */
-    giveUpPlace(point: stored.Point, why?: PlaceRefusal): Promise<void>;
-    /** What was said since the last time this was asked; null the first time. */
-    chat(): Promise<readonly Said[] | null>;
-    atLeast(version: readonly number[]): Promise<boolean>;
-    /** Who, in lower case, is still owed a trip back from an earlier arena. */
-    owed(): Promise<ReadonlySet<string>>;
-    /** Whose run a kept bag belongs to, for its database copy. */
-    readonly stashOwner: stashService.StashOwner;
-    /** How long one tick is, in seconds: what a second in the circle is counted by. */
-    readonly tickSeconds: number;
-}
-
-/** The event cannot go on, for the reason given. */
-export class EventStopped extends Error {}
-
-/** Not enough players joined for it to go ahead: called off, which is nobody's
- *  failure - as a spleef with one player is. */
-export class TooFew extends EventStopped {}
+export { EventStopped, TooFew, type KindContext, type Said } from "./arena-game";
 
 const ONE_SIDED = "Everybody left in it was on the same team";
 /** Why it was called off, as the history keeps it (and `messages.cancelReason`
@@ -172,6 +126,8 @@ export function joinBar(run: stored.EventRun, language: speech.Speech): string {
 /** What the start adds for these events: a duel's teams and counts, named in
  *  the server's own language - a team has one name for everybody. */
 export function beginLines(preset: catalog.EventPreset, language: catalog.Language): string[] {
+    const game = gameOf(preset.kind);
+    if (game) return game.beginLines?.(preset, language) ?? [];
     if (preset.kind !== "team-duel") return [];
     return duel.duelSetup(language === "es" ? ["Rojo", "Azul"] : ["Red", "Blue"]);
 }
@@ -193,6 +149,8 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
         else await bringIn(ctx);
         return null;
     }
+    const game = gameOf(ctx.run.preset.kind);
+    if (game) return game.tick(ctx, lines);
     if (ctx.run.preset.kind === "team-duel") await duelTick(ctx, lines);
     else if (ctx.run.preset.kind === "king-of-the-hill")
         await hillService.fightTick(ctx, ctx.tickSeconds, lines);
@@ -212,12 +170,14 @@ async function enroll(ctx: KindContext, lines: string[]): Promise<void> {
         (name) =>
             catalog.PLAYER_NAME.test(name) && online.has(lower(name)) && !owed.has(lower(name))
     );
-    const most =
-        ctx.run.preset.kind === "team-duel"
-            ? duel.DUEL_MAX
-            : ctx.run.preset.kind === "king-of-the-hill"
-              ? hill.MOST
-              : build.MAX_PLOTS;
+    const game = gameOf(ctx.run.preset.kind);
+    const most = game
+        ? game.most(ctx.run)
+        : ctx.run.preset.kind === "team-duel"
+          ? duel.DUEL_MAX
+          : ctx.run.preset.kind === "king-of-the-hill"
+            ? hill.MOST
+            : build.MAX_PLOTS;
     for (const name of ready.slice(most)) {
         lines.push(arena.tellTo(name, messages.tag(language) + messages.joinFull(language)));
     }
@@ -243,6 +203,8 @@ function plotSize(run: stored.EventRun): number {
 
 /** The box the arena takes, above the ground found for it. */
 function boxFor(run: stored.EventRun, place: stored.Point): stored.Box {
+    const game = gameOf(run.preset.kind);
+    if (game) return game.box(run, place);
     const floorY = place.y + arena.ALTITUDE;
     return run.preset.kind === "team-duel"
         ? duel.duelBox(place, floorY)
@@ -250,12 +212,18 @@ function boxFor(run: stored.EventRun, place: stored.Point): stored.Box {
 }
 
 function fillsFor(run: stored.EventRun, box: stored.Box): { box: stored.Box; block: string }[] {
+    const game = gameOf(run.preset.kind);
+    if (game) return game.fills(run, box);
     return run.preset.kind === "team-duel"
         ? duel.duelFills(box)
         : build.platformFills(box, run.joined.length, plotSize(run));
 }
 
-function blocksFor(run: stored.EventRun, fills: { block: string }[]): string[] {
+function blocksFor(run: stored.EventRun, box: stored.Box, fills: { block: string }[]): string[] {
+    const game = gameOf(run.preset.kind);
+    // Bare ids: a block's state (`[facing=north]`) would keep it out of the
+    // teardown (`arena.teardown`), which takes every state of the id.
+    if (game) return [...new Set(game.blocks(run, box).map((id) => id.replace(/\[.*$/, "")))];
     const placed = run.preset.kind === "team-duel" ? [] : build.PLATFORM_BLOCKS;
     return [...new Set([...fills.map((one) => one.block), ...placed])];
 }
@@ -274,10 +242,12 @@ async function raise(ctx: KindContext): Promise<void> {
     const run = ctx.run;
     const place = run.place;
     if (!place) {
-        const reach =
-            run.preset.kind === "team-duel"
-                ? duel.DUEL_REACH
-                : build.platformReach(run.joined.length, plotSize(run));
+        const game = gameOf(run.preset.kind);
+        const reach = game
+            ? game.reach(run)
+            : run.preset.kind === "team-duel"
+              ? duel.DUEL_REACH
+              : build.platformReach(run.joined.length, plotSize(run));
         const options = run.preset.options as { place: catalog.EventPlace };
         const found = await ctx.findPlace(options.place, PLACE_DISTANCE, reach, "air", true);
         if (found === "failed") throw new EventStopped(NO_AIR);
@@ -316,11 +286,17 @@ async function raise(ctx: KindContext): Promise<void> {
     // Nothing but air: ours to build in, and written down as ours before a
     // single block goes in.
     const fills = fillsFor(run, box);
-    const built: stored.Arena = { box, blocks: blocksFor(run, fills) };
-    ctx.run = { ...ctx.run, arena: built };
+    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills) };
+    const game = gameOf(run.preset.kind);
+    // What a kind puts in its chests is marked the way the kit is, so it is
+    // read before anything is built - and kept for the kit.
+    const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
+    ctx.run = { ...ctx.run, arena: built, marker };
     await ctx.persist();
     await ctx.server.sayAll([
-        ...fills.map((one) => arena.fillKeep(one.box, one.block)),
+        ...fills.flatMap((one) =>
+            arena.slices(one.box).map((piece) => arena.fillKeep(piece, one.block))
+        ),
         commands.CLEAR_MARK
     ]);
     // A protected area refuses blocks without a word: what was asked for has
@@ -331,7 +307,15 @@ async function raise(ctx: KindContext): Promise<void> {
         await ctx.server.sayAll(arena.teardown(built));
         ctx.run = { ...ctx.run, arena: null };
         await giveUpSite(ctx, place, "refused");
+        return;
     }
+    if (game?.decorate && marker)
+        await ctx.server.sayAll(game.decorate(ctx.run, box, await syntaxOf(ctx, marker)));
+}
+
+/** How this server writes the items a kind puts somewhere itself. */
+async function syntaxOf(ctx: KindContext, marker: stored.Marker): Promise<ItemSyntax> {
+    return { marker, itemCommand: await ctx.atLeast([1, 17]) };
 }
 
 async function giveUpSite(ctx: KindContext, place: stored.Point, why: PlaceRefusal): Promise<void> {
@@ -369,16 +353,19 @@ async function bringIn(ctx: KindContext): Promise<void> {
     const run = ctx.run;
     const language = ctx.language;
     const box = run.arena!.box;
+    const game = gameOf(run.preset.kind);
     const duelling = run.preset.kind === "team-duel";
     const hillside = run.preset.kind === "king-of-the-hill";
     const marker: stored.Marker = run.marker ?? (await kitMarker(ctx));
     // Nothing in the hands on the hill: fists only. Its kit is the crown the
     // one ahead wears (`hill-service`), taken back with the rest.
-    const kit = duelling
-        ? duel.duelKit((run.preset.options as catalog.EventOptions<"team-duel">).kit)
-        : hillside
-          ? [hill.CROWN]
-          : build.KIT_IDS;
+    const kit = game
+        ? game.kit(run)
+        : duelling
+          ? duel.duelKit((run.preset.options as catalog.EventOptions<"team-duel">).kit)
+          : hillside
+            ? [hill.CROWN]
+            : build.KIT_IDS;
     const moved = new Set(
         [...run.entrants, ...(run.sentOut ?? []), ...(run.keptOut ?? [])].map((one) =>
             lower(one.name)
@@ -413,7 +400,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 yaw: turned.yaw,
                 pitch: turned.pitch,
                 gamemode,
-                side: duelling ? index % 2 : index,
+                side: game ? game.side(run, index) : duelling ? index % 2 : index,
                 away: true,
                 tagged: true,
                 stash: null
@@ -429,7 +416,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
     // Each player's lines in, once what they carry is put away.
     const options = run.preset.options;
     const theme =
-        duelling || hillside
+        game || duelling || hillside
             ? null
             : build.themeFor(options as catalog.EventOptions<"build-battle">, run.id, language);
     if (theme !== null)
@@ -449,6 +436,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
         return [
             ...arena.enter(one.name, spotsOf(ctx.run).get(lower(one.name))!),
             ...(duelling ? [duel.joinTeam(one.name, one.side)] : []),
+            ...(game?.enterLines?.(ctx.run, one) ?? []),
             arena.protect(one.name)
         ];
     };
@@ -467,7 +455,12 @@ async function bringIn(ctx: KindContext): Promise<void> {
     const needed = catalog.joinersNeeded(run.preset);
     if (ctx.run.entrants.length < needed) throw new TooFew(tooFew(ctx.run.entrants.length, needed));
     // Everybody left on the one team: nobody to play against.
-    if (duelling && [0, 1].some((side) => !ctx.run.entrants.some((one) => one.side === side)))
+    const sides = game ? (game.teams ?? 0) : duelling ? 2 : 0;
+    if (
+        Array.from({ length: sides }, (_, side) => side).some(
+            (side) => !ctx.run.entrants.some((one) => one.side === side)
+        )
+    )
         throw new TooFew(ONE_SIDED);
     // The clock, the kit and "Go!" wait for everybody to be in.
     arrival.open(ctx.run.id, ctx.now);
@@ -478,6 +471,11 @@ async function bringIn(ctx: KindContext): Promise<void> {
 function spotsOf(run: stored.EventRun): Map<string, arena.Spot> {
     const box = run.arena!.box;
     const spots = new Map<string, arena.Spot>();
+    const game = gameOf(run.preset.kind);
+    if (game) {
+        for (const one of run.entrants) spots.set(lower(one.name), game.spot(run, one));
+        return spots;
+    }
     const counts = [0, 0];
     for (const one of run.entrants) {
         if (run.preset.kind === "team-duel") {
@@ -525,7 +523,7 @@ async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
                 lines.push(arena.moveTo(one.name, spots.get(lower(one.name))!));
             lines.push(arena.protect(one.name), arena.feed(one.name));
         }
-        lines.push(...arena.keepThrown(box));
+        lines.push(...arena.keepThrown(box), ...(gameOf(run.preset.kind)?.holdLines?.(run) ?? []));
     }
     if (!seen.start) {
         lines.push(arrival.waitingLine(everybody, seen, language));
@@ -553,7 +551,12 @@ async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
         // than starting a fight with nothing in anybody's hands.
         // The shield straight into the off hand where the bag was emptied on
         // the way in (`stashOne`, from 1.17); before that, beside what they carry.
-        await ctx.server.sayAll(goLines(ctx.run, language, await ctx.atLeast([1, 17])));
+        const game = gameOf(run.preset.kind);
+        await ctx.server.sayAll(
+            game
+                ? await game.goLines(ctx, await syntaxOf(ctx, ctx.run.marker!))
+                : goLines(ctx.run, language, await ctx.atLeast([1, 17]))
+        );
         ctx.run = { ...ctx.run, ...started };
         await ctx.persist();
     }
@@ -1027,23 +1030,52 @@ export function arenaResults(run: stored.EventRun): {
     scores: Map<string, number>;
     took: string[];
 } {
-    const counted =
-        run.preset.kind === "build-battle"
-            ? build.countVotes(run.votes)
-            : new Map(Object.entries(run.points));
+    const game = gameOf(run.preset.kind);
+    const counted = game
+        ? game.results(run)
+        : run.preset.kind === "build-battle"
+          ? build.countVotes(run.votes)
+          : new Map(Object.entries(run.points));
     const scores = new Map(run.entrants.map((one) => [one.name, counted.get(one.name) ?? 0]));
     return { scores, took: [...scores.keys()] };
 }
 
 export function standings(run: stored.EventRun): { name: string; score: number }[] {
+    const after = tiebreak(run) ?? {};
+    const second = (name: string) => after[name] ?? 0;
     return [...arenaResults(run).scores.entries()]
         .map(([name, score]) => ({ name, score }))
-        .sort((left, right) => right.score - left.score);
+        .sort((left, right) => right.score - left.score || second(left.name) - second(right.name));
+}
+
+/** What breaks a tie on score, the lower the better; undefined for a kind
+ *  where a tie stays one. */
+export function tiebreak(run: stored.EventRun): Record<string, number> | undefined {
+    return gameOf(run.preset.kind)?.tiebreak?.(run);
+}
+
+/** A kind's own teams and counts, removed with the rest of the event's. */
+export function endLines(preset: catalog.EventPreset): string[] {
+    return gameOf(preset.kind)?.endLines?.() ?? [];
+}
+
+/** Whether a kind sends lines between ticks (`quickLines`). */
+export function quickens(preset: catalog.EventPreset): boolean {
+    return Boolean(gameOf(preset.kind)?.quickLines);
+}
+
+/** What a kind sends between ticks once it is under way: one batch, nothing read. */
+export function quickLines(run: stored.EventRun): string[] {
+    const game = gameOf(run.preset.kind);
+    if (!game?.quickLines || run.readyAt === null || !run.arena) return [];
+    return game.quickLines(run);
 }
 
 /** Said with the results: how the teams did, what the theme was. */
 export function resultLines(run: stored.EventRun, language: speech.Speech): string[] {
     if (run.readyAt === null) return [];
+    const game = gameOf(run.preset.kind);
+    if (game) return game.resultLines(run, language);
     if (run.preset.kind === "team-duel") {
         return [
             commands.say(messages.duelResult(run.tally["0"] ?? 0, run.tally["1"] ?? 0, language))
@@ -1111,6 +1143,8 @@ export async function closeArena(
     try {
         const box = left.arena?.box ?? null;
         if (box && left.marker) await server.sayAll([arena.killMarkedDrops(box, left.marker)]);
+        const closing = box ? (gameOf(left.kind)?.closeLines?.(box) ?? []) : [];
+        if (closing.length > 0) await server.sayAll(closing);
         for (; index < left.entrants.length; index += 1) {
             let one = left.entrants[index]!;
             if (!one.away || !arena.commandable(one)) continue;

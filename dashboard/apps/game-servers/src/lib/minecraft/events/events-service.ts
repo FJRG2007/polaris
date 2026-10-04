@@ -778,6 +778,7 @@ export async function startEvent(input: {
         doneOffered: false,
         done: [],
         buildEndsAt: null,
+        game: null,
         boss: null,
         villager: null,
         bingo: null,
@@ -937,7 +938,11 @@ function startLoop(
     loop.timer.unref?.();
     loop.clock = setInterval(() => void showClock(installedAppId, loop), CLOCK_MS);
     loop.clock.unref?.();
-    if (run.preset.kind === "parkour" || run.preset.kind === "team-duel") {
+    if (
+        run.preset.kind === "parkour" ||
+        run.preset.kind === "team-duel" ||
+        arenaService.quickens(run.preset)
+    ) {
         loop.quick = setInterval(() => void quickLook(loop), QUICK_MS);
         loop.quick.unref?.();
     }
@@ -1176,7 +1181,9 @@ async function quickLook(loop: Loop): Promise<void> {
                           (loop.run.preset.options as catalog.EventOptions<"team-duel">).downHearts
                       )
                   ]
-            : stageService.quickLines(loop);
+            : catalog.playsInArena(loop.run.preset)
+              ? arenaService.quickLines(loop.run)
+              : stageService.quickLines(loop);
     if (lines.length === 0) return;
     loop.quickBusy = true;
     try {
@@ -1644,6 +1651,10 @@ async function play(
             break;
         case "team-duel":
         case "build-battle":
+        case "capture-the-flag":
+        case "hide-and-seek":
+        case "hot-potato":
+        case "sky-wars":
             decided = await arenaService.arenaTick(
                 kindContext(installedAppId, loop, server, now),
                 lines
@@ -4048,8 +4059,13 @@ async function finish(
                             scores,
                             disqualified,
                             minimum,
-                            // A tie on rounds won goes to whoever answered faster.
-                            preset.kind === "trivia" ? run.answerMs : undefined
+                            // A tie on rounds won goes to whoever answered faster;
+                            // in an arena, to what the kind ranks next.
+                            preset.kind === "trivia"
+                                ? run.answerMs
+                                : catalog.playsInArena(preset)
+                                  ? arenaService.tiebreak(run)
+                                  : undefined
                         );
             // Taking part is reaching the minimum too - one zombie is not taking part
             // in a hunt. A blood moon's is surviving it with a kill, and a horde
@@ -4382,6 +4398,8 @@ export function cleanupOf(run: stored.EventRun): string[] {
             after.push(...fishing.fishCleanup());
             break;
     }
+    // An arena kind's own teams and counts (`ArenaGame.endLines`).
+    after.push(...arenaService.endLines(run.preset));
     // Operators' chat is given back last, so the tidying up does not fill it either.
     const feedback: string[] = commands.FEEDBACK_RULES.filter((rule) => rule in run.gamerules);
     const rules = Object.fromEntries(
