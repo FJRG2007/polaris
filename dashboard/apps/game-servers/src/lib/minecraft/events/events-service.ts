@@ -54,6 +54,7 @@ import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
+import { fresh } from "../../fresh";
 
 type RefusalKey =
     GameKey<"minecraft"> extends infer K
@@ -94,7 +95,7 @@ const bukkitServers = new Map<string, { at: number; bukkit: boolean }>();
 function eventServer(server: ServerContainer, installedAppId: string): ServerContainer {
     const bukkit = async (): Promise<boolean> => {
         const known = bukkitServers.get(server.installedAppId);
-        if (known && Date.now() - known.at < KIND_KNOWN_MS) return known.bukkit;
+        if (known && fresh(known.at, KIND_KNOWN_MS)) return known.bukkit;
         if (server.edition !== "java") return false;
         const said = await server.say([commands.BUKKIT_PROBE]).catch(() => "");
         if (said.trim().length > 0)
@@ -1881,7 +1882,7 @@ async function canWalk(
 /** Where players online sleep, as `commands.readHomes` reads them: asked once a
  *  search, and kept that long - nobody moves their bed between two tries. */
 async function homesOf(loop: Loop, server: ServerContainer): Promise<{ x: number; z: number }[]> {
-    if (loop.homes && Date.now() - loop.homes.at < HOMES_KEPT_MS) return loop.homes.list;
+    if (loop.homes && fresh(loop.homes.at, HOMES_KEPT_MS)) return loop.homes.list;
     const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld] = await Promise.all(
         commands.HOMES.map((line) => server.say([line]).catch(() => ""))
     );
@@ -2006,7 +2007,7 @@ const GROUND_NAMES_MS = 30 * 60_000;
 function knownGroundNames(installedAppId: string): commands.GroundNames | "none" | null {
     const known = groundNamesOf.get(installedAppId);
     if (!known) return null;
-    if (Date.now() - known.at < GROUND_NAMES_MS) return known.names;
+    if (fresh(known.at, GROUND_NAMES_MS)) return known.names;
     groundNamesOf.delete(installedAppId);
     return null;
 }

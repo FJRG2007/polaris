@@ -20,6 +20,7 @@ import { pingJava } from "./slp";
 import { pingBedrock } from "./raknet";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
+import { fresh } from "../fresh";
 
 const { getLocalEnvironment } = host.networkService;
 const { getHostLanIp, isLanAddress } = host.hostAddress;
@@ -203,7 +204,7 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
     const reached: string[] = [];
     for (const entry of pending) {
         const last = probedAt.get(entry.installedAppId) ?? 0;
-        if (Date.now() - last < PROBE_EVERY_MS) continue;
+        if (fresh(last, PROBE_EVERY_MS)) continue;
         probedAt.set(entry.installedAppId, Date.now());
         // Every port of one server at once. Only one of them tends to answer - a
         // game's own port says nothing to a stranger, while the query port beside

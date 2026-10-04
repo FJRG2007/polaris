@@ -33,6 +33,7 @@ import {
     type CatalogItem,
     type ItemPicture
 } from "../../lib/minecraft/items";
+import { fresh } from "../../lib/fresh";
 
 /** The words the line under the grid is written in. */
 type ModItemsText = Translator<GameKey<"games">>;
@@ -99,7 +100,7 @@ export function loadModItems(
     t: ModItemsText = ENGLISH
 ): Promise<ModItemsLoad> {
     const held = loads.get(installedAppId);
-    if (held && Date.now() - held.at < TTL_MS) return held.load;
+    if (held && fresh(held.at, TTL_MS)) return held.load;
     const load = fetchModItems(installedAppId, t).catch(() => {
         // Not kept as a failure, for the reason the vanilla loader does not keep
         // one either: the next open should be allowed to try rather than inherit

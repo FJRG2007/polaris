@@ -18,6 +18,7 @@
 
 import { z } from "zod";
 import { admitsBuild, entryReleaseType, modrinthApi, modrinthJson, projectSlug, type ReleaseType } from "./modrinth";
+import { fresh } from "../fresh";
 
 /** Modrinth's own answers move about as often as Minecraft is released, so one
  *  lookup covers every dialog opened for the rest of the day. */
@@ -46,7 +47,7 @@ const cache = new Map<string, { at: number; versions: string[] }>();
  *  as "nothing is known about this" rather than as "this supports nothing". */
 async function cached(key: string, load: () => Promise<string[]>): Promise<string[]> {
     const hit = cache.get(key);
-    if (hit && Date.now() - hit.at < CACHE_MS) return hit.versions;
+    if (hit && fresh(hit.at, CACHE_MS)) return hit.versions;
     const versions = await load().catch(() => []);
     // A failed lookup is not cached: the next caller should get to try again
     // rather than inherit six hours of an outage that has since ended.

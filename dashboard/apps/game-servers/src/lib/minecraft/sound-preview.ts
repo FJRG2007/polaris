@@ -15,6 +15,7 @@
 
 import { gameMessage } from "../game-message";
 import { ANNOUNCE_SOUNDS } from "./announcement";
+import { fresh } from "../fresh";
 
 const MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 const RESOURCES = "https://resources.download.minecraft.net";
@@ -64,7 +65,7 @@ async function loadIndex(): Promise<SoundIndex> {
 
 async function soundIndex(): Promise<SoundIndex> {
     const held = index ? await index.catch(() => null) : null;
-    if (held && Date.now() - held.at < INDEX_TTL_MS) return held;
+    if (held && fresh(held.at, INDEX_TTL_MS)) return held;
     index = loadIndex();
     // A failed fetch is not remembered: the next press asks again.
     index.catch(() => {
