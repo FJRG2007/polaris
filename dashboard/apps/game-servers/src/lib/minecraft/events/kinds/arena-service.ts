@@ -60,6 +60,12 @@ const tooFew = (joined: number, needed: number) => `Only ${joined} joined; it ne
 const PLACE_DISTANCE = 32;
 /** Ticks an arena's chunks are waited for before its site is given up. */
 const LOAD_WAITS = 5;
+/**
+ * How many teardown fills go in one trip. A fill's answer is one short line, so
+ * the 16 KiB a trip hands back is never the limit; the trip's time is, since
+ * each fill is a console call of its own inside it.
+ */
+const FILLS_PER_TRIP = 25;
 
 /** What one run keeps in memory between ticks: nothing that must survive a restart. */
 interface Memory {
@@ -1217,16 +1223,31 @@ export async function closeArena(
             let whole = true;
             // Every kind of block in every slice of the box: hundreds of fills
             // for a SkyWars arena. Asked one at a time they held the podium back
-            // for many seconds after the winner was known, so they go in one
-            // trip, in order (`sayEach`); a fill whose answer did not come back
-            // is asked again on its own, never taken for done.
+            // for many seconds after the winner was known, so they go a few
+            // dozen to a trip, in order (`sayEach`); a fill whose answer did not
+            // come back is asked again on its own, never taken for done. A trip
+            // that failed outright may still be running in the container, so
+            // nothing is asked over it: the arena is tried again later.
             const lines = arena.teardown(left.arena);
-            const replies = server.sayEach
-                ? await server.sayEach(lines.map((line) => [line])).catch(() => null)
-                : null;
-            for (const [at, line] of lines.entries()) {
-                const answer = replies?.[at] ?? (await server.say([line]));
-                if (arena.notLoaded(answer)) whole = false;
+            for (let start = 0; start < lines.length; start += FILLS_PER_TRIP) {
+                const trip = lines.slice(start, start + FILLS_PER_TRIP);
+                let replies: (string | null)[] = [];
+                if (server.sayEach) {
+                    try {
+                        replies = await server.sayEach(trip.map((line) => [line]));
+                    } catch (error) {
+                        console.warn(
+                            "polaris: an arena's teardown trip failed",
+                            left.id,
+                            String(error)
+                        );
+                        return { ...left, entrants: [], gamerules: {} };
+                    }
+                }
+                for (const [at, line] of trip.entries()) {
+                    const answer = replies[at] ?? (await server.say([line]));
+                    if (arena.notLoaded(answer)) whole = false;
+                }
             }
             // Its chunks were not in yet: kept loaded, and tried again.
             if (!whole) return { ...left, entrants: [], gamerules: {} };
