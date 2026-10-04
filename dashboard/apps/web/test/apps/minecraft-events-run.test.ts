@@ -64,6 +64,11 @@ interface World {
     pickUp: boolean;
     /** Parkour: each racer's checkpoint as the game keeps it, and the tick they finished at. */
     checkpoint: Record<string, number>;
+    /** The dropper's and the boat race's own scores, by objective then player:
+     *  what their data pack keeps in the game. */
+    stageScores: Record<string, Record<string, number>>;
+    /** A block whose taking out finds its chunk not loaded. */
+    unloadedBlock: string | null;
     finishTick: Record<string, number>;
     /** A version that knows the game rules by their new names only. */
     renamedRules: boolean;
@@ -231,6 +236,8 @@ const world: World = {
     drops: new Map(),
     pickUp: false,
     checkpoint: {},
+    stageScores: {},
+    unloadedBlock: null,
     finishTick: {},
     renamedRules: false,
     built: false,
@@ -327,6 +334,7 @@ function fillAnswer(line: string): string | null {
     const [x1, y1, z1, x2, y2, z2] = fill.slice(1, 7).map(Number) as number[];
     const volume =
         (Math.abs(x2! - x1!) + 1) * (Math.abs(y2! - y1!) + 1) * (Math.abs(z2! - z1!) + 1);
+    if (fill[8] && fill[8] === world.unloadedBlock) return "That position is not loaded";
     if (fill[8]) return "Successfully filled 1 block(s)";
     if (fill[7] === "minecraft:structure_void" && world.skyTaken)
         return `Successfully filled ${volume - 7} block(s)`;
@@ -451,6 +459,57 @@ function quickAnswer(line: string): string | null {
             world.finishTick[name] = Math.floor(Date.now() / 50) % 2147483647;
     }
     return found.map((name) => `${command.split(" ")[0]} ${name}`).join("\n");
+}
+
+/**
+ * The scores a stage kind's data pack keeps for each racer (`pe_drop`, `pe_low`,
+ * `pe_back` for a dropper), as the game answers: set one by one, read with a
+ * score range for everybody inside, and set for everybody in a range.
+ */
+function stageScoreAnswer(line: string): string | null {
+    const objectives = /^pe_(drop|low|back|gate|lap|race)$/;
+    const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
+    if (set && objectives.test(set[2]!)) {
+        (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
+        return `Set [${set[2]}] for ${set[1]} to ${set[3]}`;
+    }
+    const inRange = (score: number | undefined, range: string) => {
+        if (score === undefined) return false;
+        const [low, high] = range.includes("..") ? range.split("..") : [range, range];
+        return (low === "" || score >= Number(low)) && (high === "" || score <= Number(high));
+    };
+    const inside = world.online.filter((name) => world.inside.has(name));
+    const read =
+        /^execute as @a\[tag=pe_in,scores=\{(\w+)=([-\d.]+)\}\] run scoreboard players get @s (\w+)$/.exec(
+            line
+        );
+    if (read && objectives.test(read[1]!)) {
+        const scores = world.stageScores[read[1]!] ?? {};
+        return inside
+            .filter((name) => inRange(scores[name], read[2]!))
+            .map((name) => `${name} has ${world.stageScores[read[3]!]?.[name]} [${read[3]}]`)
+            .join("\n");
+    }
+    const each = /^execute as @a\[tag=pe_in,scores=\{(\w+)=([-\d.]+)\}\] run (.+)$/.exec(line);
+    if (each && objectives.test(each[1]!)) {
+        const scores = world.stageScores[each[1]!] ?? {};
+        return inside
+            .filter((name) => inRange(scores[name], each[2]!))
+            .map((name) => `${each[3]!.split(" ")[0]} ${name}`)
+            .join("\n");
+    }
+    const setAll =
+        /^scoreboard players set @a\[tag=pe_in,scores=\{(\w+)=([-\d.]+)\}\] (\w+) (-?\d+)$/.exec(
+            line
+        );
+    if (setAll && objectives.test(setAll[1]!)) {
+        const scores = (world.stageScores[setAll[3]!] ??= {});
+        for (const name of inside)
+            if (inRange(world.stageScores[setAll[1]!]?.[name], setAll[2]!))
+                scores[name] = Number(setAll[4]);
+        return "";
+    }
+    return null;
 }
 
 /** One stack as the game keeps it: its data is the components compound, raw. */
@@ -878,6 +937,8 @@ function answer(sent: string): string {
     }
     const quick = quickAnswer(line);
     if (quick !== null) return quick;
+    const kept = stageScoreAnswer(line);
+    if (kept !== null) return kept;
     const item = itemAnswer(line);
     if (item !== null) return item;
     // Several tests in one line: every one must pass.
@@ -1878,6 +1939,8 @@ beforeEach(() => {
     world.drops = new Map();
     world.pickUp = false;
     world.checkpoint = {};
+    world.stageScores = {};
+    world.unloadedBlock = null;
     world.finishTick = {};
     world.renamedRules = false;
     world.built = false;
@@ -6437,6 +6500,241 @@ describe("a TNT run", () => {
         for (const line of tntRun.stopLines(arena.boxes)) expect(world.sent).toContain(line);
         expect(world.sent).toContain(
             "execute in minecraft:overworld run tp Ben 5.000 64.000 2.000 0.0 0.0"
+        );
+        expect(after.stageLeftovers).toEqual([]);
+    });
+});
+
+const dropperKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper"
+);
+
+describe("a dropper", () => {
+    const run = () => ({
+        ...newPreset("dropper", "drop"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, levels: 6, difficulty: "medium" as const }
+    });
+    const shaftNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return dropperKind.shaft(run().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("lets everybody fall at once from the middle at Go, and ranks the finish, then the deepest floor", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const shaft = shaftNow();
+        // The pack went on before anything was built; the water went in last.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        const firstFill = world.sent.findIndex(
+            (line) =>
+                line.includes(" fill ") &&
+                line.endsWith(" keep") &&
+                !line.includes("structure_void")
+        );
+        expect(enabled).toBeGreaterThan(-1);
+        expect(firstFill).toBeGreaterThan(enabled);
+        const builds = world.sent.filter(
+            (line) =>
+                line.includes(" fill ") &&
+                line.endsWith(" keep") &&
+                !line.includes("structure_void")
+        );
+        expect(builds.at(-1)).toContain(" minecraft:water keep");
+        // On the lid under Slow Falling and Resistance; armed only after the countdown.
+        expect(world.sent).toContain(dropperKind.SLOW_INSIDE);
+        await play(8_000);
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        expect(one).toBeGreaterThan(-1);
+        expect(world.sent.indexOf("scoreboard players set #on polaris_drop 1")).toBeGreaterThan(
+            one
+        );
+        // At Go: over the middle, the lid gone, the pack on.
+        const spawn = dropperKind.spawn(shaft);
+        expect(world.at.Ana).toEqual([spawn.x, spawn.y, spawn.z]);
+        expect(world.at.Ben).toEqual([spawn.x, spawn.y, spawn.z]);
+        expect(world.sent).toContain(dropperKind.lidGone(shaft));
+        for (const line of dropperKind.armLines(shaft)) expect(world.sent).toContain(line);
+        expect(world.sent.indexOf(dropperKind.lidGone(shaft))).toBeLessThan(
+            world.sent.indexOf("scoreboard players set #on polaris_drop 1")
+        );
+        expect(state().run!.readyAt).not.toBeNull();
+
+        // The pack sends Ben back up: the quick look tells him, once.
+        scores("pe_back").Ben = 1;
+        await play(500);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith(
+                        "execute as @a[tag=pe_in,scores={pe_back=1..}] run tellraw @s"
+                    ) && visible(line).includes("back to the top")
+            )
+        ).toBe(true);
+        expect(scores("pe_back").Ben).toBe(0);
+
+        // Ben got through three floors; Ana through all of them, into the water.
+        world.at.Ben = [spawn.x, shaft.floors[2]! - 2, spawn.z];
+        scores("pe_low").Ben = (shaft.floors[2]! - 2) * 64;
+        world.at.Ana = [spawn.x, shaft.water, spawn.z];
+        scores("pe_low").Ana = shaft.water * 64;
+        scores("pe_drop").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(2_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ana reached the finish")
+            )
+        ).toBe(true);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        chat(["Ben", "leave"]);
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Everybody finished or dropped out");
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: 3 });
+        for (const line of dropperKind.stopLines(shaft.boxes)) expect(world.sent).toContain(line);
+        for (const line of dropperKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["water"]);
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("is called off before anything is built when too few join", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(34_000);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(state().history[0]?.note).toMatch(/^Only 1 joined; it needs \d$/);
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+    });
+
+    it("called off mid-fall, takes the water out before anything that holds it, and switches its pack off", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const shaft = shaftNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_drop 1");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of dropperKind.stopLines(shaft.boxes)) expect(world.sent).toContain(line);
+        const removed = (block: string) =>
+            world.sent.findIndex(
+                (line) => line.endsWith(`minecraft:air replace ${block}`) && !line.includes(" ~ ")
+            );
+        const water = removed("minecraft:water");
+        expect(water).toBeGreaterThan(-1);
+        expect(water).toBeLessThan(removed("minecraft:white_concrete"));
+        expect(water).toBeLessThan(removed("minecraft:light_blue_concrete"));
+        for (const box of shaft.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["water"]);
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("never takes the walls down from round water that would not come out, and finishes it on a later sweep", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const shaft = shaftNow();
+        world.unloadedBlock = "minecraft:water";
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        // The water stood, so nothing that holds it in was touched.
+        expect(
+            world.sent.some((line) =>
+                line.endsWith("minecraft:air replace minecraft:white_concrete")
+            )
+        ).toBe(false);
+        expect(state().stageLeftovers[0]?.boxes).toHaveLength(shaft.boxes.length);
+        world.unloadedBlock = null;
+        await events.sweepEvents();
+        for (const box of shaft.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("picked up after a restart mid-fall, still counts a finish and ends", async () => {
+        const preset = run();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 70, z: 0 };
+        const shaft = dropperKind.shaft(preset.options, "resumed-drop", site, site.y);
+        world.inside = new Set(["Ana"]);
+        world.at = { Ana: [300.5, shaft.floors[1]! + 3, 0.5] };
+        scores("pe_drop").Ana = 0;
+        scores("pe_low").Ana = (shaft.floors[1]! + 3) * 64;
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-drop",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 120_000,
+                readyAt: now - 20_000,
+                participants: ["Ana"],
+                place: { x: 300, y: 64, z: 0 },
+                stage: {
+                    origin: site,
+                    area: stageKit.areaOf(shaft.volume),
+                    boxes: shaft.boxes,
+                    built: true,
+                    goAt: now - 20_000,
+                    saved: [
+                        {
+                            name: "Ana",
+                            dimension: "minecraft:overworld",
+                            x: 1,
+                            y: 64,
+                            z: 2,
+                            yaw: 0,
+                            pitch: 0,
+                            mode: "survival"
+                        }
+                    ],
+                    racers: [{ name: "Ana", since: now - 20_000, best: 1 }]
+                }
+            }
+        };
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        // Nothing built again, nobody let go again.
+        expect(world.sent.some((line) => line.endsWith(" keep"))).toBe(false);
+        expect(world.sent).not.toContain(dropperKind.lidGone(shaft));
+        world.at.Ana = [300.5, shaft.water, 0.5];
+        scores("pe_drop").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ana 1.000 64.000 2.000 0.0 0.0"
         );
         expect(after.stageLeftovers).toEqual([]);
     });

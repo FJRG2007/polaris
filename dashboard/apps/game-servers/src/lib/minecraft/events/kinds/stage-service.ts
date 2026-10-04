@@ -16,6 +16,8 @@ import * as snowballPackService from "./snowball-pack-service";
 import * as parkour from "./parkour";
 import * as tntRun from "./tnt-run";
 import * as tntRunSaid from "./tnt-run-messages";
+import * as dropper from "./dropper";
+import * as dropperSaid from "./dropper-messages";
 import * as stash from "./stash";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
@@ -30,6 +32,7 @@ import type { PlaceRefusal } from "../place-search";
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
 const tntRunMessages = speech.spoken(tntRunSaid);
+const dropperMessages = speech.spoken(dropperSaid);
 
 /** The event cannot go ahead - too few joined, the structure would not stand -
  *  and ends as called off, with everything undone. */
@@ -109,6 +112,13 @@ type Layout =
           readonly boxes: readonly stage.Box[];
           readonly volume: stage.Volume;
           readonly reach: number;
+      }
+    | {
+          readonly kind: "dropper";
+          readonly shaft: dropper.Shaft;
+          readonly boxes: readonly stage.Box[];
+          readonly volume: stage.Volume;
+          readonly reach: number;
       };
 
 function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Layout {
@@ -126,6 +136,21 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             boxes: course.boxes,
             volume: course.volume,
             reach: course.reach
+        };
+    }
+    if (run.preset.kind === "dropper") {
+        const shaft = dropper.shaft(
+            run.preset.options as catalog.EventOptions<"dropper">,
+            run.id,
+            site,
+            y
+        );
+        return {
+            kind: "dropper",
+            shaft,
+            boxes: shaft.boxes,
+            volume: shaft.volume,
+            reach: shaft.reach
         };
     }
     const floor =
@@ -223,12 +248,28 @@ export async function stageTick(
     if (Math.floor(now / 2_000) % 5 === 0) lines.push(stage.FEED_INSIDE);
     const layout = built(loop.run);
     if (!layout) return null;
+    // A dropper is played under Slow Falling, given again like Resistance.
+    if (layout.kind === "dropper") lines.push(dropper.SLOW_INSIDE);
     lines.push(stage.floatDown(layout.volume, 10), ...commands.hostilesOut(layout.volume));
     // Nothing starts until everybody brought in is there (`arrival`).
     if (holding(loop)) return holdTick(loop, server, tools, layout, heard, now, lines);
-    return layout.kind === "parkour"
-        ? parkourTick(loop, server, tools, layout.course, layout.volume, heard, now, lines)
-        : spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
+    switch (layout.kind) {
+        case "parkour":
+            return parkourTick(
+                loop,
+                server,
+                tools,
+                layout.course,
+                layout.volume,
+                heard,
+                now,
+                lines
+            );
+        case "dropper":
+            return dropperTick(loop, server, tools, layout.shaft, layout.volume, heard, now, lines);
+        default:
+            return spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
+    }
 }
 
 /**
@@ -259,10 +300,10 @@ async function raise(
 
     const origin = state(loop).origin;
     // A TNT run's floor is taken from under its players by the data pack
-    // (`tnt-run.ts`), so the pack is put on before anything is built or anybody
-    // moved: taking it in pauses the game for a moment, and without it the
-    // floor would never go.
-    if (!origin && preset.kind === "tnt-run" && loop.snowballPack !== true) {
+    // (`tnt-run.ts`), and a dropper's landings are caught by it (`dropper.ts`),
+    // so the pack is put on before anything is built or anybody moved: taking
+    // it in pauses the game for a moment, and without it neither can be played.
+    if (!origin && needsPack(preset.kind) && loop.snowballPack !== true) {
         loop.snowballPack = await snowballPackService.ensurePack(server).catch((error) => {
             console.warn("polaris: the event pack could not be put on", String(error));
             return false;
@@ -271,7 +312,12 @@ async function raise(
             // Said now: a call-off drops whatever this tick had still to say.
             await server.sayAll([
                 ...lines.splice(0, lines.length),
-                commands.say(messages.tag(language) + tntRunMessages.cannotPlay(language))
+                commands.say(
+                    messages.tag(language) +
+                        (preset.kind === "dropper"
+                            ? dropperMessages.cannotPlay(language)
+                            : tntRunMessages.cannotPlay(language))
+                )
             ]);
             throw new CalledOff("Its data pack could not be put on");
         }
@@ -281,11 +327,14 @@ async function raise(
         const ground = await tools.findSite(options.place, reach);
         if (!ground) return;
         const { top } = await tools.flavour();
-        // As high as asked, or as high as the build limit leaves room for.
-        let y = ground.y + options.height;
+        // As high as asked, or as high as the build limit leaves room for. A
+        // dropper's shaft stands on its own pool, a little over the ground.
+        const lift = preset.kind === "dropper" ? dropper.LIFT : options.height;
+        const least = preset.kind === "dropper" ? dropper.LIFT : LEAST_HEIGHT;
+        let y = ground.y + lift;
         const over = layoutAt(loop.run, ground, y).volume.y2 - (top - 1);
         if (over > 0) y -= over;
-        if (y - ground.y < LEAST_HEIGHT) {
+        if (y - ground.y < least) {
             await tools.giveUpSite(ground, "tooHigh");
             return;
         }
@@ -294,7 +343,7 @@ async function raise(
         // lets go of it.
         change(loop, {
             origin: { x: ground.x, y, z: ground.z },
-            design: parkour.DESIGN,
+            design: preset.kind === "dropper" ? dropper.DESIGN : parkour.DESIGN,
             area,
             waits: 0
         });
@@ -388,6 +437,8 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
             return messages.parkourSubtitle(language);
         case "tnt-run":
             return tntRunMessages.readySubtitle(language);
+        case "dropper":
+            return dropperMessages.readySubtitle(language);
         case "spleef":
             return messages.spleefReadySubtitle(
                 spleef.variantFor(
@@ -463,8 +514,14 @@ async function admit(
     const places =
         layout.kind === "spleef" || layout.kind === "tnt-run"
             ? spleef.spots(layout.arena, fresh.length)
-            : [];
+            : layout.kind === "dropper"
+              ? // On the lid before "Go!"; a late racer is let go from the top.
+                holding(loop)
+                  ? dropper.spots(layout.shaft, fresh.length)
+                  : fresh.map(() => dropper.spawn(layout.shaft))
+              : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
+    if (layout.kind === "dropper") await server.sayAll(dropper.SCORES_ADDED);
     const brought: string[] = [];
     for (const [index, one] of fresh.entries()) {
         if (stashing && !(await stashSaved(loop, server, tools, one.name, false))) continue;
@@ -480,12 +537,14 @@ async function admit(
             // "Go!" only to a late racer joining a race already on; everybody
             // else waits for the rest, and the countdown.
             `title ${one.name} title ${commands.text(
-                layout.kind === "parkour" && !holding(loop)
+                (layout.kind === "parkour" || layout.kind === "dropper") && !holding(loop)
                     ? messages.goTitle(loop.language)
                     : messages.spleefReadyTitle(loop.language)
             )}`,
-            // Their checkpoint, once they are on it, for the quick look.
-            ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : [])
+            // Their checkpoint, once they are on it, for the quick look; a
+            // dropper's racer, nowhere yet.
+            ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : []),
+            ...(layout.kind === "dropper" ? dropper.racerScores(one.name, layout.shaft) : [])
         ]);
         brought.push(one.name);
     }
@@ -644,6 +703,7 @@ function holding(loop: StageLoop): boolean {
  *  the spleef's top floor. */
 function inPlace(layout: Layout, at: { x: number; y: number; z: number }): boolean {
     if (layout.kind === "parkour") return parkour.onStart(layout.course, at);
+    if (layout.kind === "dropper") return dropper.onLid(layout.shaft, at);
     const { center, size, floor } = layout.arena;
     return (
         at.y >= floor + 0.5 &&
@@ -742,6 +802,25 @@ async function holdTick(
         change(loop, {
             racers: state(loop).racers.map((one) =>
                 one.outAt === null ? { ...one, since: go, best: 0, checkpoint: 0 } : one
+            )
+        });
+    } else if (layout.kind === "dropper") {
+        // Everybody over the middle, the lid gone, the pack watching for a
+        // landing: they all fall from the one spot the shaft was laid out from.
+        const spawn = dropper.spawn(layout.shaft);
+        for (const racer of racing)
+            lines.push(
+                stage.moveLine(racer.name, spawn),
+                ...dropper.racerScores(racer.name, layout.shaft),
+                `title ${racer.name} times 5 40 10`,
+                `title ${racer.name} subtitle ${commands.text(dropperMessages.goSubtitle(language))}`,
+                `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
+                soundFor(racer.name, commands.SOUNDS.start)
+            );
+        lines.push(dropper.lidGone(layout.shaft), ...dropper.armLines(layout.shaft));
+        change(loop, {
+            racers: state(loop).racers.map((one) =>
+                one.outAt === null ? { ...one, since: go, best: 0 } : one
             )
         });
     } else {
@@ -936,11 +1015,22 @@ function lowered(scores: ReadonlyMap<string, number>): Map<string, number> {
  * the finish is told and has it marked - with selectors over the checkpoints the
  * game keeps (`parkour.CHECKPOINT_SCORE`), so it reads nothing and is one batch
  * whatever the number of racers. The tick picks up what it marked. Nothing
- * while no racer is still going.
+ * while no racer is still going. In a dropper, only the word to whoever the
+ * data pack sent back up: the pack itself is quicker than any look.
  */
 export function quickLines(loop: StageLoop): string[] {
     const layout = built(loop.run);
-    if (!layout || layout.kind !== "parkour" || !state(loop).built) return [];
+    if (!layout || !state(loop).built) return [];
+    // A dropper: whoever the pack sent back up is told so.
+    if (layout.kind === "dropper")
+        return holding(loop)
+            ? []
+            : dropper.backLines(
+                  commands.text(
+                      messages.tag(loop.language) + dropperMessages.backToTop(loop.language)
+                  )
+              );
+    if (layout.kind !== "parkour") return [];
     // Before the start: nobody off the start pad.
     if (holding(loop)) return parkour.holdLines(layout.course);
     if (!state(loop).racers.some((one) => one.outAt === null && one.finishedAt === null)) return [];
@@ -977,6 +1067,138 @@ export function quickLines(loop: StageLoop): string[] {
     return lines;
 }
 
+// ------------------------------------------------------------------ dropper
+
+/** The kinds the events data pack plays a part of (`snowball-pack.ts`). */
+function needsPack(kind: catalog.EventKind): boolean {
+    return kind === "tnt-run" || kind === "dropper";
+}
+
+/**
+ * One tick of a dropper. The pack does the play - it sends a racer who lands on
+ * a floor back to the top, and notes how low each has been and when they
+ * reached the water - and this reads what it noted: each racer's deepest floor,
+ * their finish to the tick, and who strayed. A late joiner is let go from the
+ * top, their time counted from then.
+ */
+async function dropperTick(
+    loop: StageLoop,
+    server: ServerContainer,
+    tools: StageTools,
+    shaft: dropper.Shaft,
+    volume: stage.Volume,
+    heard: readonly { name: string; call: stage.Call }[],
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const language = loop.language;
+    let dirty = false;
+    for (const { name, call } of heard) {
+        const racer = state(loop).racers.find((one) => same(one.name, name));
+        const inside = racer !== undefined && racer.outAt === null;
+        if (call === "join" && !inside) {
+            if (racer?.finishedAt) continue;
+            await admit(loop, server, tools, [name], now, lines);
+        } else if (call === "leave" && inside) {
+            await sendHome(loop, server, tools, name);
+            markOut(loop, name, now, 0);
+            lines.push(tell(name, messages.tag(language) + messages.leftYou(language)));
+            dirty = true;
+        }
+    }
+    const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
+    const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
+    const lowest = lowered(commands.readScores(await server.say([dropper.READ_LOWEST])));
+    const finished = lowered(commands.readScores(await server.say([dropper.READ_FINISHED])));
+    // The game's own tick, asked only when somebody has reached the water.
+    let gameNow: number | null | undefined;
+    const levels = shaft.floors.length;
+    for (const racer of state(loop).racers) {
+        if (racer.outAt !== null) continue;
+        const at = where.find((one) => same(one.name, racer.name));
+        if (!at) continue;
+        if (strayed(at, dimensions.get(at.name), volume)) {
+            await sendHome(loop, server, tools, racer.name);
+            markOut(loop, racer.name, now, 0);
+            dirty = true;
+            continue;
+        }
+        if (racer.finishedAt !== null) {
+            lines.push(
+                commands.actionbarFor(
+                    racer.name,
+                    messages.finishedBar(
+                        messages.clock((racer.finishedAt - racer.since) / 1000),
+                        language
+                    )
+                )
+            );
+            continue;
+        }
+        let next = racer;
+        // The deepest they have been: from the pack, and from where they are.
+        const low = lowest.get(racer.name.toLowerCase());
+        const deepest = Math.max(
+            dropper.floorsPassed(shaft, low === undefined ? at.y : dropper.lowestOf(low)),
+            dropper.floorsPassed(shaft, at.y)
+        );
+        if (deepest > next.best) next = { ...next, best: deepest };
+        const tick = finished.get(racer.name.toLowerCase());
+        if (tick !== undefined) {
+            if (gameNow === undefined)
+                gameNow = commands.readDaytime(await server.say([parkour.READ_GAME_TIME]));
+            const when =
+                gameNow === null
+                    ? now
+                    : Math.max(racer.since, Math.min(now, now - Math.max(0, gameNow - tick) * 50));
+            next = { ...next, best: levels, finishedAt: when };
+            const place = state(loop).racers.filter((one) => one.finishedAt !== null).length + 1;
+            lines.push(
+                commands.say(
+                    messages.tag(language) +
+                        messages.finishedLine(
+                            racer.name,
+                            messages.clock((when - racer.since) / 1000),
+                            place,
+                            language
+                        )
+                ),
+                `title ${racer.name} times 5 40 10`,
+                `title ${racer.name} subtitle ${commands.text(" ")}`,
+                `title ${racer.name} title ${commands.text(messages.checkpointTitle(levels, levels, language))}`,
+                soundFor(racer.name, commands.SOUNDS.win)
+            );
+        } else {
+            lines.push(
+                commands.actionbarFor(
+                    racer.name,
+                    dropperMessages.bar(
+                        Math.min(levels, dropper.floorsPassed(shaft, at.y) + 1),
+                        next.best,
+                        levels,
+                        language
+                    )
+                )
+            );
+        }
+        if (next !== racer) {
+            change(loop, {
+                racers: state(loop).racers.map((one) => (same(one.name, racer.name) ? next : one))
+            });
+            lines.push(commands.setScore(racer.name, next.best));
+            dirty = true;
+        }
+    }
+    if (dirty) await tools.persist();
+    const racers = state(loop).racers;
+    if (racers.length > 0 && racers.every((one) => one.finishedAt !== null || one.outAt !== null)) {
+        // Nothing left for the pack to watch.
+        lines.push(...dropper.stopLines(shaft.boxes));
+        lines.push(commands.say(messages.tag(language) + messages.everybodyDone(language)));
+        return "Everybody finished or dropped out";
+    }
+    return null;
+}
 function markOut(loop: StageLoop, name: string, now: number, points: number): void {
     change(loop, {
         racers: state(loop).racers.map((one) =>
@@ -1181,7 +1403,11 @@ export async function settle(
         // Snowballs stop breaking a spleef floor, and a TNT run's fuses go out,
         // before it goes: nothing for any other arena, or for a game that
         // already ended.
-        const stop = [...snowballPack.stopLines(boxes), ...tntRun.stopLines(boxes)];
+        const stop = [
+            ...snowballPack.stopLines(boxes),
+            ...tntRun.stopLines(boxes),
+            ...dropper.stopLines(boxes)
+        ];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
         // Whatever is still standing on it - a pet, a mob - floats down
@@ -1189,12 +1415,15 @@ export async function settle(
         const bounds = stage.boundsOf(boxes);
         if (bounds)
             await server.sayAll([stage.floatDown(bounds, 60), ...stage.fallProofOver(bounds)]);
-        const standing: stage.Box[] = [];
+        // Latest first, and nothing after a box that would not come out: what
+        // is built later can rest on - or, a dropper's water, be held in by -
+        // what was built before it, so nothing goes before what it needs.
+        let standing = boxes.length;
         for (const box of [...boxes].reverse()) {
-            if (stage.fillCount(await server.say([stage.removeLine(box)])) === null)
-                standing.unshift(box);
+            if (stage.fillCount(await server.say([stage.removeLine(box)])) === null) break;
+            standing -= 1;
         }
-        boxes = standing;
+        boxes = boxes.slice(0, standing);
     }
     if (boxes.length === 0 && area) {
         await server.sayAll([stage.releaseArea(area)]);
@@ -1210,7 +1439,8 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
     const racers = run.stage?.racers ?? [];
     const scores = new Map<string, number>();
     for (const one of racers) {
-        if (run.preset.kind === "parkour") {
+        if (run.preset.kind === "parkour" || run.preset.kind === "dropper") {
+            // A time to the finish, then how far they got: jumps, or floors.
             scores.set(
                 one.name,
                 one.finishedAt !== null
@@ -1227,12 +1457,17 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
 /** The standings for the screen while it runs: jumps made, or points so far. */
 export function standings(run: EventRun): { name: string; score: number }[] {
     const course = run.preset.kind === "parkour" ? built(run) : null;
-    const jumps = course?.kind === "parkour" ? course.course.platforms.length - 1 : 0;
+    const jumps =
+        course?.kind === "parkour"
+            ? course.course.platforms.length - 1
+            : run.preset.kind === "dropper"
+              ? (run.preset.options as catalog.EventOptions<"dropper">).levels
+              : 0;
     return (run.stage?.racers ?? [])
         .map((one) => ({
             name: one.name,
             score:
-                run.preset.kind === "parkour"
+                run.preset.kind === "parkour" || run.preset.kind === "dropper"
                     ? one.finishedAt !== null
                         ? jumps
                         : one.best
@@ -1252,6 +1487,16 @@ export function scoreText(
     if (kind === "parkour") {
         if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
         return speech.pickIn({ en: `${score} jumps`, es: `${score} saltos` }, language);
+    }
+    if (kind === "dropper") {
+        if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
+        return speech.pickIn(
+            {
+                en: `${score} ${score === 1 ? "floor" : "floors"}`,
+                es: `${score} ${score === 1 ? "piso" : "pisos"}`
+            },
+            language
+        );
     }
     if (kind === "spleef" || kind === "tnt-run")
         return speech.pickIn(

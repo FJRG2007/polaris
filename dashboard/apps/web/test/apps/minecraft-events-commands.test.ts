@@ -2065,7 +2065,7 @@ describe("a spleef floor", () => {
         // Both spellings of the function folders, the same functions in each.
         for (const folder of ["functions", "function"]) {
             expect(JSON.parse(files.get(`data/minecraft/tags/${folder}/tick.json`)!)).toEqual({
-                values: ["polaris:spleef/tick", "polaris:tntrun/tick"]
+                values: ["polaris:spleef/tick", "polaris:tntrun/tick", "polaris:dropper/tick"]
             });
             for (const name of ["tick", "ball", "near", "step", "probe", "hit"])
                 expect(files.get(`data/polaris/${folder}/spleef/${name}.mcfunction`)).toBe(

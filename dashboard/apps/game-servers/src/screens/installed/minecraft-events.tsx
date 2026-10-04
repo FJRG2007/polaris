@@ -376,6 +376,17 @@ function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): stri
                 })
             ];
         }
+        case "dropper": {
+            const options = preset.options as catalog.EventOptions<"dropper">;
+            return [
+                t("events.facts.dropper", {
+                    levels: options.levels,
+                    difficulty: t(
+                        `events.difficulties.${options.difficulty}` as GameKey<"minecraft">
+                    )
+                })
+            ];
+        }
         case "tnt-run": {
             const options = preset.options as catalog.EventOptions<"tnt-run">;
             return [
@@ -402,6 +413,8 @@ function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): 
             return t("events.facts.spleefShovel");
         case "tnt-run":
             return t("events.facts.tntRunSafe");
+        case "dropper":
+            return t("events.facts.dropperSafe");
         default:
             return t("events.facts.parkourItems");
     }

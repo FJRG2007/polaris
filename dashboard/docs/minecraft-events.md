@@ -104,7 +104,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hot potato                                                     | day   | clear   |
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
-| TNT run                                                        | day   | clear   |
+| TNT run, Dropper                                               | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -166,6 +166,20 @@ left out.
   every tick as well. The pack goes on before anything is built; a server
   where it cannot is called off, never left with a floor that does not go.
   Scored as spleef: by the order players went out.
+- **Dropper** is a shaft 11 blocks across, walled all round, `levels` floors
+  (5-20) each with one hole, a pool at the bottom, laid out from the run's id
+  (`dropper.plan`). Everybody waits on a glass lid; at "Go!" all of them are
+  put over the middle, the lid goes, and they fall. The events data pack
+  catches a landing the tick it happens - anybody racing who is on the ground
+  anywhere over the floors, the rim of a hole included, goes back to the top -
+  and notes the lowest each racer has been and the tick they reach the water.
+  Ranked by finish time, then by the deepest floor. It is played under Slow
+  Falling: in a free fall a player is past three blocks a tick within seven
+  seconds and can steer a tenth of a block between two floors, so holes that do
+  not line up could not be reached in any shaft that fits under the build limit
+  (twenty floors would need over five hundred blocks). Its water is built last
+  and taken out first, and nothing built before a box that would not come out
+  is taken out after it, so the walls never go from round the water.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -427,6 +441,20 @@ new map:
   `walkedOnce` keeps the last `WALKS_KEPT` (16) courses by run id, shape,
   difficulty and jump count - enough for a race, its preview, and a few
   other runs asked about meanwhile.
+- **A fall is a move too.** A map a player falls through (the dropper) is
+  checked the same way: every hole is reached from where the one above was
+  passed by a cautious player - walking, never sprinting, setting off still
+  only once their head is clear of the floor above, and stopping over the hole
+    - with a quarter of a block to spare (`dropper.planProblems`), and no hole
+      lines up with the next, so a straight drop always lands on a floor. The
+      physics is the game's own, in blocks and ticks (Minecraft Wiki, "Entity" and
+      "Slow Falling"; Minecraft Parkour Wiki, "Horizontal Movement Formulas"): move,
+      then gravity (0.08, or 0.01 with Slow Falling) and drag (0.98 down, 0.91
+      sideways); in the air a held direction adds 0.0196 a tick walking; a player is
+      0.6 wide and 1.8 tall. A player simulated tick by tick with that physics,
+      steering for each hole, makes every floor of thousands of shafts in the
+      tests, and the heights are measured: twenty hard floors stay under 250
+      blocks, so they fit over the sea under a 1.18 world's build limit.
 - **Enforced in the game too**: a checkpoint is reached only from the one
   before it (`quickSelectors`), and a racer seen past their next checkpoint
   (an ender pearl, a push) is sent back to their own with "No shortcuts".
@@ -493,6 +521,7 @@ Everything below is part of the arena's own boxes: built into air with
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                              |
 | TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                        |
+| Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                          |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                  |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                        |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                       |

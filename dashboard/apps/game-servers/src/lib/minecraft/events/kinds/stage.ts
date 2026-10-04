@@ -75,7 +75,13 @@ export const ARENA_BLOCKS = [
     "minecraft:vine[west=true]",
     "minecraft:snow_block",
     "minecraft:tnt",
-    "minecraft:glass"
+    "minecraft:glass",
+    "minecraft:green_concrete",
+    "minecraft:cyan_concrete",
+    "minecraft:blue_concrete",
+    "minecraft:purple_concrete",
+    "minecraft:pink_concrete",
+    "minecraft:water"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];

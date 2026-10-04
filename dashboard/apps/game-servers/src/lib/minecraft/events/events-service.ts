@@ -37,6 +37,7 @@ import * as boost from "./kinds/xp-boost";
 import { parseProperties } from "../parse";
 import { readSchedule } from "../schedule";
 import * as parkour from "./kinds/parkour";
+import * as dropper from "./kinds/dropper";
 import { withTimeout } from "@polaris/core";
 import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
@@ -954,6 +955,7 @@ function startLoop(
     loop.clock.unref?.();
     if (
         run.preset.kind === "parkour" ||
+        run.preset.kind === "dropper" ||
         run.preset.kind === "team-duel" ||
         arenaService.quickens(run.preset)
     ) {
@@ -1656,6 +1658,7 @@ async function play(
         case "parkour":
         case "spleef":
         case "tnt-run":
+        case "dropper":
             decided = await stageService.stageTick(
                 loop,
                 server,
@@ -4402,6 +4405,9 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "parkour":
             after.push(...parkour.SCORES_REMOVED);
+            break;
+        case "dropper":
+            after.push(...dropper.SCORES_REMOVED);
             break;
         case "rare-catch":
             after.push(...rareCatch.catchCleanup());
