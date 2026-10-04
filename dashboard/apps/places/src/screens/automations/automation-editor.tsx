@@ -38,6 +38,8 @@ import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
+import { within } from "../../lib/automation-graph";
+import { AutomationCanvas, type CanvasSelection, type NodeState } from "./automation-canvas";
 
 const { runAction } = hostUi.runAction;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -46,6 +48,29 @@ const { useDisplayFormat } = hostUi.displayFormat;
 export type Draft = auto.AutomationInput;
 
 type Tab = "flow" | "runs";
+
+/** The flow as a column of cards, or as a diagram. */
+type Layout = "form" | "visual";
+
+/** Where the reader's choice of layout is kept, in this browser only: a
+ *  preference about how to look at the screen, not about the automation. */
+const LAYOUT_KEY = "polaris.places.automationLayout";
+
+function storedLayout(): Layout {
+    try {
+        return window.localStorage.getItem(LAYOUT_KEY) === "visual" ? "visual" : "form";
+    } catch {
+        return "form";
+    }
+}
+
+function storeLayout(layout: Layout): void {
+    try {
+        window.localStorage.setItem(LAYOUT_KEY, layout);
+    } catch {
+        // No storage here: the choice lasts as long as the page does.
+    }
+}
 
 /** Messages that mean "not filled in yet" rather than "wrong", which wait for a
  *  press of Save before they are said. */
@@ -160,7 +185,17 @@ export function AutomationEditor({
     const [running, setRunning] = useState(false);
     const [tab, setTab] = useState<Tab>(automationId ? initialTab : "flow");
     const [refreshKey, setRefreshKey] = useState(0);
+    const [layout, setLayout] = useState<Layout>("form");
     const readOnly = !canManage;
+
+    // Read after the first paint: the server has no storage to ask, and the two
+    // must draw the same thing first.
+    useEffect(() => setLayout(storedLayout()), []);
+
+    const chooseLayout = (next: Layout) => {
+        setLayout(next);
+        storeLayout(next);
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -250,6 +285,21 @@ export function AutomationEditor({
         return (path) => found.get(pathKey(path));
     }, [issues, serverIssues, attempted, t]);
 
+    /** How a node stands, for the canvas to mark it: wrong as soon as it is,
+     *  merely unfinished until Save is pressed - the same split the fields make. */
+    const stateOf = useCallback(
+        (path: readonly (string | number)[]): NodeState => {
+            let state: NodeState = "ok";
+            for (const issue of [...issues, ...serverIssues]) {
+                if (!within(issue.path, path)) continue;
+                if (attempted || !UNFINISHED.has(issue.message)) return "invalid";
+                state = "incomplete";
+            }
+            return state;
+        },
+        [issues, serverIssues, attempted]
+    );
+
     useEffect(() => {
         if (!dirty || readOnly) return;
         const warn = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -328,6 +378,18 @@ export function AutomationEditor({
                 </Link>
             </Button>
             <span className="flex-1" />
+            {loaded && tab === "flow" && (
+                <SegmentedControl<Layout>
+                    size="sm"
+                    value={layout}
+                    onValueChange={chooseLayout}
+                    aria-label={t("automations.canvas.layout")}
+                    options={[
+                        { value: "form", label: t("automations.canvas.form") },
+                        { value: "visual", label: t("automations.canvas.visual") }
+                    ]}
+                />
+            )}
             {automationId && loaded && (
                 <SegmentedControl<Tab>
                     size="sm"
@@ -372,6 +434,188 @@ export function AutomationEditor({
     const sensors = devices.filter((device) => auto.measures(device.kind));
     const operableDevices = canControl ? devices.filter(fields.operable) : [];
     const blocked = issues.length > 0 || !dirty;
+
+    // One card per node, drawn in the form's column and in the canvas's
+    // inspector alike, so both edit with the same fields and the same checks.
+    const triggerCard = (trigger: auto.Trigger, index: number) => (
+        <TriggerCard
+            key={trigger.id}
+            trigger={trigger}
+            path={["definition", "triggers", index]}
+            devices={watchedDevices}
+            sensors={sensors}
+            byId={byId}
+            disabled={readOnly}
+            onChange={(next) =>
+                editDefinition((current) => ({
+                    ...current,
+                    triggers: current.triggers.map((entry, at) => (at === index ? next : entry))
+                }))
+            }
+            onRemove={() =>
+                editDefinition((current) => ({
+                    ...current,
+                    triggers: current.triggers.filter((_, at) => at !== index)
+                }))
+            }
+            onUp={
+                index > 0
+                    ? () =>
+                          editDefinition((current) => ({
+                              ...current,
+                              triggers: move(current.triggers, index, -1)
+                          }))
+                    : undefined
+            }
+            onDown={
+                index < definition.triggers.length - 1
+                    ? () =>
+                          editDefinition((current) => ({
+                              ...current,
+                              triggers: move(current.triggers, index, 1)
+                          }))
+                    : undefined
+            }
+        />
+    );
+
+    const groupCard = (group: auto.ConditionGroup, groupIndex: number) => (
+        <ConditionGroupCard
+            key={group.id}
+            group={group}
+            path={["definition", "conditions", "groups", groupIndex]}
+            devices={watchedDevices}
+            sensors={sensors}
+            byId={byId}
+            disabled={readOnly}
+            attempted={attempted}
+            onChange={(next) =>
+                editDefinition((current) => ({
+                    ...current,
+                    conditions: {
+                        ...current.conditions,
+                        groups: current.conditions.groups.map((entry, at) =>
+                            at === groupIndex ? next : entry
+                        )
+                    }
+                }))
+            }
+            onRemove={() =>
+                editDefinition((current) => ({
+                    ...current,
+                    conditions: {
+                        ...current.conditions,
+                        groups: current.conditions.groups.filter((_, at) => at !== groupIndex)
+                    }
+                }))
+            }
+        />
+    );
+
+    const stepCard = (step: auto.Step, index: number) => (
+        <StepCard
+            key={step.id}
+            number={index + 1}
+            step={step}
+            path={["definition", "actions", index]}
+            watched={watchedDevices}
+            operable={operableDevices}
+            canControl={canControl}
+            byId={byId}
+            siblings={siblings}
+            disabled={readOnly}
+            onChange={(next) =>
+                editDefinition((current) => ({
+                    ...current,
+                    actions: current.actions.map((entry, at) => (at === index ? next : entry))
+                }))
+            }
+            onRemove={() =>
+                editDefinition((current) => ({
+                    ...current,
+                    actions: current.actions.filter((_, at) => at !== index)
+                }))
+            }
+            onUp={
+                index > 0
+                    ? () =>
+                          editDefinition((current) => ({
+                              ...current,
+                              actions: move(current.actions, index, -1)
+                          }))
+                    : undefined
+            }
+            onDown={
+                index < definition.actions.length - 1
+                    ? () =>
+                          editDefinition((current) => ({
+                              ...current,
+                              actions: move(current.actions, index, 1)
+                          }))
+                    : undefined
+            }
+        />
+    );
+
+    const groupsMatch = definition.conditions.groups.length > 1 && (
+        <MatchPicker
+            value={definition.conditions.match}
+            disabled={readOnly}
+            label={t("automations.editor.groupsMatch")}
+            onChange={(match) =>
+                editDefinition((current) => ({
+                    ...current,
+                    conditions: { ...current.conditions, match }
+                }))
+            }
+            allLabel={t("automations.editor.allGroups")}
+            anyLabel={t("automations.editor.anyGroup")}
+        />
+    );
+
+    /** What the canvas opens for its selected node: the form's own card. */
+    const inspect = (selection: CanvasSelection): ReactNode => {
+        switch (selection.role) {
+            case "trigger": {
+                const trigger = definition.triggers[selection.index];
+                return trigger ? triggerCard(trigger, selection.index) : null;
+            }
+            case "group": {
+                const group = definition.conditions.groups[selection.index];
+                return group ? groupCard(group, selection.index) : null;
+            }
+            case "step": {
+                const step = definition.actions[selection.index];
+                return step ? stepCard(step, selection.index) : null;
+            }
+            case "gate":
+                return (
+                    <div className="flex flex-col gap-2">
+                        <p className="text-xs text-muted-foreground">
+                            {definition.conditions.groups.length === 0
+                                ? t("automations.editor.ifEmpty")
+                                : t("automations.editor.ifHint")}
+                        </p>
+                        {groupsMatch}
+                    </div>
+                );
+        }
+    };
+
+    const stageIssues = attempted
+        ? [issueLookup(["definition", "triggers"]), issueLookup(["definition", "actions"])].filter(
+              (issue): issue is string => issue !== undefined
+          )
+        : [];
+
+    const footnote = (
+        <>
+            {t("automations.editor.zone", { zone: definition.timeZone })}
+            {loaded.automation?.ownerName
+                ? ` ${t("automations.editor.runsAs", { name: loaded.automation.ownerName })}`
+                : ""}
+        </>
+    );
 
     return (
         <fields.IssueProvider value={issueLookup}>
@@ -466,6 +710,20 @@ export function AutomationEditor({
                         automationName={automationName}
                         refreshKey={refreshKey}
                     />
+                ) : layout === "visual" ? (
+                    <div className="flex flex-col gap-2">
+                        <AutomationCanvas
+                            definition={definition}
+                            readOnly={readOnly}
+                            onChange={editDefinition}
+                            stateOf={stateOf}
+                            lookup={lookup}
+                            automationName={automationName}
+                            renderInspector={inspect}
+                            stageIssues={stageIssues}
+                        />
+                        <p className="text-[0.6875rem] text-foreground-subtle">{footnote}</p>
+                    </div>
                 ) : (
                     <ol className="flex flex-col">
                         <Stage
@@ -474,51 +732,7 @@ export function AutomationEditor({
                             hint={t("automations.editor.whenHint")}
                             issue={attempted ? issueLookup(["definition", "triggers"]) : undefined}
                         >
-                            {definition.triggers.map((trigger, index) => (
-                                <TriggerCard
-                                    key={trigger.id}
-                                    trigger={trigger}
-                                    path={["definition", "triggers", index]}
-                                    devices={watchedDevices}
-                                    sensors={sensors}
-                                    byId={byId}
-                                    disabled={readOnly}
-                                    onChange={(next) =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            triggers: current.triggers.map((entry, at) =>
-                                                at === index ? next : entry
-                                            )
-                                        }))
-                                    }
-                                    onRemove={() =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            triggers: current.triggers.filter(
-                                                (_, at) => at !== index
-                                            )
-                                        }))
-                                    }
-                                    onUp={
-                                        index > 0
-                                            ? () =>
-                                                  editDefinition((current) => ({
-                                                      ...current,
-                                                      triggers: move(current.triggers, index, -1)
-                                                  }))
-                                            : undefined
-                                    }
-                                    onDown={
-                                        index < definition.triggers.length - 1
-                                            ? () =>
-                                                  editDefinition((current) => ({
-                                                      ...current,
-                                                      triggers: move(current.triggers, index, 1)
-                                                  }))
-                                            : undefined
-                                    }
-                                />
-                            ))}
+                            {definition.triggers.map(triggerCard)}
                             {!readOnly && definition.triggers.length < auto.LIMITS.triggers && (
                                 <AddMenu
                                     label={t("automations.editor.addTrigger")}
@@ -548,56 +762,8 @@ export function AutomationEditor({
                                     : t("automations.editor.ifHint")
                             }
                         >
-                            {definition.conditions.groups.length > 1 && (
-                                <MatchPicker
-                                    value={definition.conditions.match}
-                                    disabled={readOnly}
-                                    label={t("automations.editor.groupsMatch")}
-                                    onChange={(match) =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            conditions: { ...current.conditions, match }
-                                        }))
-                                    }
-                                    allLabel={t("automations.editor.allGroups")}
-                                    anyLabel={t("automations.editor.anyGroup")}
-                                />
-                            )}
-                            {definition.conditions.groups.map((group, groupIndex) => (
-                                <ConditionGroupCard
-                                    key={group.id}
-                                    group={group}
-                                    path={["definition", "conditions", "groups", groupIndex]}
-                                    devices={watchedDevices}
-                                    sensors={sensors}
-                                    byId={byId}
-                                    disabled={readOnly}
-                                    attempted={attempted}
-                                    onChange={(next) =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            conditions: {
-                                                ...current.conditions,
-                                                groups: current.conditions.groups.map(
-                                                    (entry, at) =>
-                                                        at === groupIndex ? next : entry
-                                                )
-                                            }
-                                        }))
-                                    }
-                                    onRemove={() =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            conditions: {
-                                                ...current.conditions,
-                                                groups: current.conditions.groups.filter(
-                                                    (_, at) => at !== groupIndex
-                                                )
-                                            }
-                                        }))
-                                    }
-                                />
-                            ))}
+                            {groupsMatch}
+                            {definition.conditions.groups.map(groupCard)}
                             {!readOnly &&
                                 definition.conditions.groups.length < auto.LIMITS.groups && (
                                     <AddMenu
@@ -637,52 +803,7 @@ export function AutomationEditor({
                             issue={attempted ? issueLookup(["definition", "actions"]) : undefined}
                             last
                         >
-                            {definition.actions.map((step, index) => (
-                                <StepCard
-                                    key={step.id}
-                                    number={index + 1}
-                                    step={step}
-                                    path={["definition", "actions", index]}
-                                    watched={watchedDevices}
-                                    operable={operableDevices}
-                                    canControl={canControl}
-                                    byId={byId}
-                                    siblings={siblings}
-                                    disabled={readOnly}
-                                    onChange={(next) =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            actions: current.actions.map((entry, at) =>
-                                                at === index ? next : entry
-                                            )
-                                        }))
-                                    }
-                                    onRemove={() =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            actions: current.actions.filter((_, at) => at !== index)
-                                        }))
-                                    }
-                                    onUp={
-                                        index > 0
-                                            ? () =>
-                                                  editDefinition((current) => ({
-                                                      ...current,
-                                                      actions: move(current.actions, index, -1)
-                                                  }))
-                                            : undefined
-                                    }
-                                    onDown={
-                                        index < definition.actions.length - 1
-                                            ? () =>
-                                                  editDefinition((current) => ({
-                                                      ...current,
-                                                      actions: move(current.actions, index, 1)
-                                                  }))
-                                            : undefined
-                                    }
-                                />
-                            ))}
+                            {definition.actions.map(stepCard)}
                             {!readOnly && definition.actions.length < auto.LIMITS.steps && (
                                 <AddMenu
                                     label={t("automations.editor.addStep")}
@@ -702,12 +823,7 @@ export function AutomationEditor({
                                 />
                             )}
                         </Stage>
-                        <li className="pt-2 text-[0.6875rem] text-foreground-subtle">
-                            {t("automations.editor.zone", { zone: definition.timeZone })}
-                            {loaded.automation?.ownerName
-                                ? ` ${t("automations.editor.runsAs", { name: loaded.automation.ownerName })}`
-                                : ""}
-                        </li>
+                        <li className="pt-2 text-[0.6875rem] text-foreground-subtle">{footnote}</li>
                     </ol>
                 )}
             </div>
