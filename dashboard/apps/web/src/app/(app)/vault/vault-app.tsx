@@ -557,7 +557,7 @@ export function VaultApp() {
                                 {items.length === 0 ? t("app.empty") : t("app.noMatch")}
                             </p>
                         ) : (
-                            <ul className="-mr-1 flex max-h-[calc(100vh-16rem)] flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1">
+                            <ul className="-mr-1 flex max-h-[calc(100dvh-16rem)] flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1">
                                 {visible.map((item) => {
                                     const Icon = TYPE_ICON[item.type] ?? KeyRound;
                                     return (

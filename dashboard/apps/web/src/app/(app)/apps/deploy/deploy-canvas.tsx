@@ -810,7 +810,7 @@ export function DeployCanvas({
             <>
                 {boardMenu(
                     <div
-                        className="relative flex h-[calc(100vh-11rem)] min-h-[460px] flex-col items-center justify-center overflow-hidden rounded-lg border border-border/60"
+                        className="relative flex h-[calc(100dvh-11rem)] min-h-[460px] flex-col items-center justify-center overflow-hidden rounded-lg border border-border/60"
                         style={DOT_BG}
                     >
                         <div className="pointer-events-none absolute inset-0" style={VIGNETTE} />
@@ -851,7 +851,7 @@ export function DeployCanvas({
                 </span>
             )}
             {boardMenu(
-                <div className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
+                <div className="relative h-[calc(100dvh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
                     <div
                         ref={containerRef}
                         className="absolute inset-0 overflow-auto overscroll-contain"

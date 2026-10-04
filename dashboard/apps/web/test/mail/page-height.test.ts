@@ -27,7 +27,7 @@ const SHELL = fileURLToPath(new URL("../../src/app/(app)/mail/mail-shell.tsx", i
 describe("what the shell's class list actually resolves to", () => {
     it("keeps the height PAGE_BLEED sets", () => {
         const merged = cn(PAGE_BLEED, "flex min-h-0 overflow-hidden");
-        expect(merged).toContain("h-[calc(100vh-var(--header-height))]");
+        expect(merged).toContain("h-[calc(100dvh-var(--header-height))]");
     });
 
     it("loses it to anything that also sets a height", () => {

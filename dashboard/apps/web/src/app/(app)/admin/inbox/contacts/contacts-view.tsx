@@ -168,7 +168,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
             )}
 
             <div className="grid min-h-0 gap-4 lg:grid-cols-[20rem_1fr]">
-                <Card className="flex max-h-[calc(100vh-16rem)] flex-col overflow-hidden">
+                <Card className="flex max-h-[calc(100dvh-16rem)] flex-col overflow-hidden">
                     <div className="border-b border-border p-2">
                         <div className="flex items-center gap-2 rounded-md border border-border px-2">
                             <Search className="size-4 text-muted-foreground" />

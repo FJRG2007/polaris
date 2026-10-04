@@ -96,7 +96,7 @@ const preset: Omit<Config, "content"> = {
                 header: "var(--header-height)"
             },
             height: {
-                "below-header": "calc(100vh - var(--header-height))"
+                "below-header": "calc(100dvh - var(--header-height))"
             }
         }
     },
