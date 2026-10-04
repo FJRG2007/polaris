@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { claimCliSignIn } from "@/lib/cli/sign-in";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { clientIp, hashForLog } from "@/lib/request-context";
 
 export const runtime = "nodejs";
@@ -28,7 +29,7 @@ export async function POST(request: Request): Promise<Response> {
     );
     if (!throttle.ok) {
         return Response.json(
-            { error: "Too many requests. Wait a minute and run plr login again." },
+            { error: (await readerWords("api"))("errors.cliClaimsThrottled") },
             { status: 429 }
         );
     }
@@ -36,7 +37,10 @@ export async function POST(request: Request): Promise<Response> {
     const body = await request.json().catch(() => null);
     const asked = claimSchema.safeParse(body);
     if (!asked.success)
-        return Response.json({ error: "A device code is required." }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.deviceCodeRequired") },
+            { status: 400 }
+        );
 
     const claim = await claimCliSignIn(asked.data.deviceCode);
     if (claim.status !== "approved") return Response.json({ status: claim.status });

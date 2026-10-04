@@ -60,7 +60,7 @@ export function CliSection() {
             <CardBody className="flex flex-col gap-4 text-sm">
                 <p className="text-muted-foreground">{t("downloads.cli.description")}</p>
 
-                <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3">
+                <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="font-medium">{t("downloads.cli.install")}</p>
                         <PlatformSelect

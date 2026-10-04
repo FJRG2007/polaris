@@ -182,6 +182,36 @@ describe("after signing in", () => {
         );
     });
 
+    it("signing in again ends the old key once the new one is saved", async () => {
+        const keychain = fakeKeychain();
+        const { fetch, seen } = server(APPROVED, 0);
+        const { context } = await testContext({ fetch, run: keychain.run });
+        await run(["login", "--url", URL], context, clean);
+        expect(seen.some((request) => request.method === "DELETE")).toBe(false);
+
+        const NEXT = "plk_TESTONLY.fixture-secret-value-next-0123456789";
+        const again = server({ ...APPROVED, token: NEXT, keyId: "key-2" }, 0);
+        await run(["login", "--url", URL], { ...context, fetch: again.fetch }, clean);
+        const revoked = again.seen.find((request) => request.method === "DELETE");
+        expect(revoked?.headers.get("authorization")).toBe(`Bearer ${TOKEN}`);
+        expect(keychain.entries.get("polaris.example.com")).toBe(NEXT);
+    });
+
+    it("keeps the old key working when the new one cannot be saved", async () => {
+        const keychain = fakeKeychain();
+        const { fetch } = server(APPROVED, 0);
+        const { context, dir } = await testContext({ fetch, run: keychain.run });
+        await run(["login", "--url", URL], context, clean);
+
+        const again = server({ ...APPROVED, token: "not a token", keyId: "key-2" }, 0);
+        await failure(run(["login", "--url", URL], { ...context, fetch: again.fetch }, clean));
+        expect(again.seen.some((request) => request.method === "DELETE")).toBe(false);
+        expect(keychain.entries.get("polaris.example.com")).toBe(TOKEN);
+        expect((await loadConfig(`${dir}/config`)).profiles["polaris.example.com"]?.keyId).toBe(
+            "key-1"
+        );
+    });
+
     it("logout revokes the key on the server and forgets it here", async () => {
         const keychain = fakeKeychain();
         const { fetch, seen } = server(APPROVED);

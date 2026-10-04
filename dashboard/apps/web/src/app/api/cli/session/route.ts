@@ -9,6 +9,7 @@
 
 import { endCliSignIn } from "@/lib/cli/sign-in";
 import { recordAudit } from "@/lib/audit-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 
 export const runtime = "nodejs";
@@ -19,14 +20,15 @@ export async function DELETE(request: Request): Promise<Response> {
     // Already revoked, expired or never valid: there is nothing left to end, which
     // is what the CLI wanted.
     if (!principal)
-        return Response.json({ error: "This sign-in is no longer valid." }, { status: 401 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.cliSignInInvalid") },
+            { status: 401 }
+        );
 
     const ended = await endCliSignIn(principal);
     if (!ended) {
         return Response.json(
-            {
-                error: "This is an API key, not a CLI sign-in. Revoke it on the API keys screen if you want it to stop working."
-            },
+            { error: (await readerWords("api"))("errors.cliNotASignIn") },
             { status: 409 }
         );
     }

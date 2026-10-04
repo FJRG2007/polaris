@@ -148,10 +148,7 @@ export async function login(context: Context, flags: Flags): Promise<void> {
         // Signing a profile in again replaces its key, so the old one is ended
         // rather than left working on a machine that no longer uses it.
         const previous = config.profiles[name];
-        if (previous) {
-            const oldToken = await context.secrets.read(name, previous.storage);
-            if (oldToken) await revokeRemotely(context, { url: previous.url, token: oldToken });
-        }
+        const oldToken = previous ? await context.secrets.read(name, previous.storage) : null;
 
         const storage = await context.secrets.save(name, claim.token);
         const next: Config = {
@@ -169,6 +166,8 @@ export async function login(context: Context, flags: Flags): Promise<void> {
             }
         };
         await saveConfig(context.configDir, next);
+        if (previous && oldToken && oldToken !== claim.token)
+            await revokeRemotely(context, { url: previous.url, token: oldToken });
 
         const who = claim.account.name
             ? `${claim.account.name} <${claim.account.email}>`

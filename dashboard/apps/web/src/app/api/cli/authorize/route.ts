@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { openCliSignIn } from "@/lib/cli/sign-in";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { CLI_SCOPES, cliApprovePath } from "@/lib/cli/scopes";
 import { clientHost, clientIp, clientUserAgent, hashForLog } from "@/lib/request-context";
 
@@ -52,16 +53,11 @@ export async function POST(request: Request): Promise<Response> {
         LIMIT,
         WINDOW_MS
     );
-    if (!throttle.ok)
-        return refusal(
-            "Too many sign-in requests from here. Wait a few minutes and try again.",
-            429
-        );
+    if (!throttle.ok) return refusal((await readerWords("api"))("errors.cliSignInsThrottled"), 429);
 
     const body = await request.json().catch(() => null);
     const asked = askSchema.safeParse(body);
-    if (!asked.success)
-        return refusal("A device name is required, and only deploy scopes can be asked for.");
+    if (!asked.success) return refusal((await readerWords("api"))("errors.cliSignInAsk"));
 
     const opened = await openCliSignIn(
         {
@@ -74,7 +70,7 @@ export async function POST(request: Request): Promise<Response> {
         },
         (size) => crypto.getRandomValues(new Uint8Array(size))
     );
-    if (!opened) return refusal("Could not start a sign-in just now. Try again.", 503);
+    if (!opened) return refusal((await readerWords("api"))("errors.cliSignInUnavailable"), 503);
 
     return Response.json({
         userCode: opened.userCode,
