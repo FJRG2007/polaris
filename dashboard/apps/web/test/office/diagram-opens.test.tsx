@@ -44,7 +44,10 @@ beforeAll(() => {
         removeEventListener(): void {}
     }
     vi.stubGlobal("EventSource", Quiet);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 204 }))
+    );
     if (!window.matchMedia) {
         window.matchMedia = ((query: string) => ({
             matches: false,

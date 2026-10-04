@@ -14,7 +14,15 @@
  * exporting the first.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 
 /** What an editor can hand back: the bytes of one format, or null when it
  *  cannot. */
