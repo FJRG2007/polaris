@@ -16,7 +16,8 @@ import { secrets, type RunResult, type Runner } from "../../src/secrets.js";
 /** Every temporary folder a test made, removed when its file is done. */
 const made: string[] = [];
 afterAll(async () => {
-    await Promise.all(made.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+    // One at a time: a test file makes a handful, and there is no hurry.
+    for (const dir of made.splice(0)) await rm(dir, { recursive: true, force: true });
 });
 
 /** A temporary folder that is removed when the test file finishes. */

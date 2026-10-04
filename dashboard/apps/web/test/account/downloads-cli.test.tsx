@@ -12,7 +12,7 @@
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MessagesWrapper, withMessages } from "../setup/i18n";
 import { PlatformSelect } from "@/components/platform-select";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -22,6 +22,9 @@ import { CliSection } from "@/app/(app)/account/downloads/cli-section";
 import { ExtensionSteps } from "@/app/(app)/account/downloads/extension-steps";
 
 afterEach(cleanup);
+
+/** What the picker reports a choice to; these tests only read what it draws. */
+const picked = vi.fn();
 
 const SRC = `${join(__dirname, "..", "..", "src")}/`;
 
@@ -80,17 +83,17 @@ describe("the CLI card", () => {
 describe("the marks on the pickers", () => {
     it("draws each system's official mark beside its name", () => {
         const windows = renderToStaticMarkup(
-            <PlatformSelect value="windows" onChange={() => undefined} label="System" />
+            <PlatformSelect value="windows" onChange={picked} label="System" />
         );
         expect(windows).toContain("Windows");
         expect(windows).toContain('fill="#0078D4"');
         const mac = renderToStaticMarkup(
-            <PlatformSelect value="macos" onChange={() => undefined} label="System" />
+            <PlatformSelect value="macos" onChange={picked} label="System" />
         );
         expect(mac).toContain("macOS");
         expect(mac).toContain("<svg");
         const linux = renderToStaticMarkup(
-            <PlatformSelect value="linux" onChange={() => undefined} label="System" />
+            <PlatformSelect value="linux" onChange={picked} label="System" />
         );
         expect(linux).toContain("Linux");
         expect(linux).toContain("<svg");
