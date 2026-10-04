@@ -31,6 +31,26 @@ import { addressLine, DeviceAddress } from "@/components/device-address";
 import { BrowserMark, ClientKindMark, SystemMark } from "@/components/client-marks";
 import { History, KeyRound, Lock, LockOpen, LogOut, PanelRightOpen } from "lucide-react";
 
+/**
+ * When a row was last active: the reader's own phrase for it ("3 minutes ago",
+ * the date past a month), inside a real `<time>` so the instant is in the markup
+ * and not only in words.
+ */
+function LastActive({ iso }: { iso: string }) {
+    return (
+        <time dateTime={iso}>
+            <RelativeTime iso={iso} />
+        </time>
+    );
+}
+
+/**
+ * The same, for a message's `<time></time>` tag. A tag is filled by a function -
+ * handed an element instead, the formatter refuses the message and the row read
+ * "Last active <time></time>", markup and all.
+ */
+const timeTag = (iso: string) => () => <LastActive key="time" iso={iso} />;
+
 /** Where a session came from, as one line, for the surfaces too narrow to hold
  *  the columns - and for the approval card, which is not a table at all. */
 export function sessionOrigin(
@@ -283,7 +303,7 @@ export function SessionsTable({
                                             {compact ? (
                                                 <p className="truncate text-xs text-muted-foreground">
                                                     {t.rich("sessionsTable.lastActiveAt", {
-                                                        time: <RelativeTime key="time" iso={session.lastSeenAt} />
+                                                        time: timeTag(session.lastSeenAt)
                                                     })}
                                                 </p>
                                             ) : null}
@@ -322,7 +342,7 @@ export function SessionsTable({
                                             </span>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                            <RelativeTime iso={session.lastSeenAt} />
+                                            <LastActive iso={session.lastSeenAt} />
                                         </td>
                                     </>
                                 )}
@@ -400,7 +420,7 @@ export function SessionsTable({
                                         >
                                             {t.rich("sessionsTable.whereAndWhen", {
                                                 where: extension.ip ?? t("sessionsTable.addressNotRecorded"),
-                                                time: <RelativeTime key="time" iso={extension.lastSeenAt} />
+                                                time: timeTag(extension.lastSeenAt)
                                             })}
                                         </p>
                                     </div>
@@ -431,7 +451,7 @@ export function SessionsTable({
                                         </span>
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                        <RelativeTime iso={extension.lastSeenAt} />
+                                        <LastActive iso={extension.lastSeenAt} />
                                     </td>
                                 </>
                             )}
@@ -511,7 +531,7 @@ export function SessionsTable({
                                             >
                                                 {t.rich("sessionsTable.whereAndWhen", {
                                                     where: client.label,
-                                                    time: <RelativeTime key="time" iso={client.lastSeenAt} />
+                                                    time: timeTag(client.lastSeenAt)
                                                 })}
                                             </p>
                                         </div>
@@ -546,7 +566,7 @@ export function SessionsTable({
                                             <span className="block truncate">{t("sessionsTable.notRecorded")}</span>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                            <RelativeTime iso={client.lastSeenAt} />
+                                            <LastActive iso={client.lastSeenAt} />
                                         </td>
                                     </>
                                 )}

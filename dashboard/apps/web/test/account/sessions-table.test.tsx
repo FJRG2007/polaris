@@ -399,4 +399,46 @@ describe("a browser extension's connection", () => {
     it("offers no lock to a reader who is not its owner", () => {
         expect(renderWithExtension()).not.toContain("Address lock for");
     });
+
+    it("says where and when it was last seen, without the message's markup", () => {
+        const markup = renderWithExtension();
+        expect(markup).not.toContain("&lt;time&gt;");
+        expect(markup).toMatch(/10\.0\.1\.131 - last active <time dateTime="2026-09-17T10:00:00.000Z">/);
+    });
+});
+
+describe("when each row was last active", () => {
+    /** The compact table, as an administrator's dialog and the device dialog draw
+     *  it: the time folds into the device cell as a sentence. */
+    function renderCompact(rows: SessionView[], locale: "en-US" | "es-ES" = "en-US"): string {
+        return renderToStaticMarkup(
+            withMessages(
+                <SessionsTable
+                    compact
+                    sessions={rows}
+                    busyId={null}
+                    emptyLabel="Nothing is signed in."
+                    onRevoke={() => {}}
+                />,
+                locale
+            )
+        );
+    }
+
+    it("says it with a real time, not the message's markup", () => {
+        // What an administrator read on somebody's sessions: "Last active <time></time>".
+        const markup = renderCompact([session()]);
+        expect(markup).not.toContain("&lt;time&gt;");
+        expect(markup).toMatch(/Last active <time dateTime="2026-08-03T10:00:00.000Z"><relative-time/);
+    });
+
+    it("says it in Spanish too", () => {
+        const markup = renderCompact([session()], "es-ES");
+        expect(markup).not.toContain("&lt;time&gt;");
+        expect(markup).toMatch(/Última actividad <time dateTime="2026-08-03T10:00:00.000Z">/);
+    });
+
+    it("carries the instant in the full table's column as well", () => {
+        expect(render([session()])).toContain('<time dateTime="2026-08-03T10:00:00.000Z">');
+    });
 });
