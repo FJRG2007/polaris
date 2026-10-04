@@ -2036,8 +2036,8 @@
         },
         "incompatible": {
             "badge": "Incompatible",
-            "arena": "Needs Minecraft {needs} or later to read the kit it hands out; this server runs {version}.",
-            "items": "Needs Minecraft {needs} or later, where what players carry is put away before they play; this server runs {version}.",
+            "arena": "Needs Minecraft {needs} or later; this server runs {version}.",
+            "items": "Needs Minecraft {needs} or later; this server runs {version}.",
             "loot": "The chosen loot only exists from Minecraft {needs}; this server runs {version}.",
             "ores": "The chosen ore only exists from Minecraft {needs}; this server runs {version}.",
             "material": "The chosen material only exists from Minecraft {needs}; this server runs {version}."

@@ -90,8 +90,9 @@ const KINDS_BY_PLACE = catalog.HELD_WHERE.map((where) => ({
 }));
 
 /** "Incompatible", with why in its tooltip and for screen readers. */
-function IncompatibleBadge({ reason }: { reason: string }) {
+function IncompatibleBadge({ reason }: { reason: string | null }) {
     const t = useGameText("minecraft");
+    if (reason === null) return null;
     return (
         <ui.Badge variant="warning" title={reason} className="shrink-0">
             {t("events.incompatible.badge")}
@@ -1120,24 +1121,11 @@ export function MinecraftEvents({
                                                 >
                                                     <span className="flex items-center gap-2 text-sm">
                                                         {kindLabel(t, kind)}
-                                                        {incompatibleText(
-                                                            t,
-                                                            catalog.newPreset(kind, "kind"),
-                                                            view?.version ?? null
-                                                        ) && (
-                                                            <IncompatibleBadge
-                                                                reason={
-                                                                    incompatibleText(
-                                                                        t,
-                                                                        catalog.newPreset(
-                                                                            kind,
-                                                                            "kind"
-                                                                        ),
-                                                                        view?.version ?? null
-                                                                    )!
-                                                                }
-                                                            />
-                                                        )}
+                                                        <IncompatibleBadge
+                                                            reason={cannotOn(
+                                                                catalog.newPreset(kind, "kind")
+                                                            )}
+                                                        />
                                                     </span>
                                                     <span className="line-clamp-2 text-xs text-muted-foreground">
                                                         {kindSummary(t, kind)}
@@ -1170,170 +1158,185 @@ export function MinecraftEvents({
                                 >
                                     <HeldHeading where={where} id={`held-${where}`} />
                                     <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-                                        {list.map((preset) => (
-                                            <li key={preset.id} className="flex flex-col px-3 py-2">
-                                                <div className="flex flex-wrap items-center gap-3">
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex min-w-0 items-center gap-2">
-                                                            <p
-                                                                className="truncate text-sm font-medium"
-                                                                title={preset.name}
-                                                            >
-                                                                {preset.name}
-                                                            </p>
-                                                            {cannotOn(preset) && (
-                                                                <IncompatibleBadge
-                                                                    reason={cannotOn(preset)!}
-                                                                />
+                                        {list.map((preset) => {
+                                            const why = cannotOn(preset);
+                                            return (
+                                                <li
+                                                    key={preset.id}
+                                                    className="flex flex-col px-3 py-2"
+                                                >
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex min-w-0 items-center gap-2">
+                                                                <p
+                                                                    className="truncate text-sm font-medium"
+                                                                    title={preset.name}
+                                                                >
+                                                                    {preset.name}
+                                                                </p>
+                                                                <IncompatibleBadge reason={why} />
+                                                            </div>
+                                                            <PresetDetail preset={preset} />
+                                                            {why && (
+                                                                <p className="text-xs text-warning">
+                                                                    {why}
+                                                                </p>
                                                             )}
                                                         </div>
-                                                        <PresetDetail preset={preset} />
-                                                        {cannotOn(preset) && (
-                                                            <p className="text-xs text-warning">
-                                                                {cannotOn(preset)}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <ui.Switch
-                                                        checked={preset.enabled}
-                                                        disabled={locked}
-                                                        aria-label={t("events.canComeRound", {
-                                                            name: preset.name
-                                                        })}
-                                                        onChange={(enabled) =>
-                                                            change({
-                                                                presets: presets.map((one) =>
-                                                                    one.id === preset.id
-                                                                        ? { ...one, enabled }
-                                                                        : one
-                                                                )
-                                                            })
-                                                        }
-                                                    />
-                                                    <div className="flex items-center gap-1">
-                                                        <ui.Button
-                                                            variant="ghost"
-                                                            size="icon-sm"
-                                                            aria-label={t("events.whatIs", {
-                                                                name: preset.name
-                                                            })}
-                                                            title={t("events.whatIs", {
-                                                                name: preset.name
-                                                            })}
-                                                            aria-expanded={explained.has(preset.id)}
-                                                            onClick={() => explain(preset.id)}
-                                                        >
-                                                            <Info className="size-4" />
-                                                        </ui.Button>
-                                                        <ui.Button
-                                                            variant="ghost"
-                                                            size="icon-sm"
-                                                            aria-label={t("events.runNow", {
-                                                                name: preset.name
-                                                            })}
-                                                            title={
-                                                                dirty
-                                                                    ? t("events.saveFirst")
-                                                                    : cannotOn(preset)
-                                                                      ? cannotOn(preset)!
-                                                                      : tooFewOn(preset)
-                                                                        ? t(
-                                                                              "events.errors.tooFewPlayers",
-                                                                              {
-                                                                                  count:
-                                                                                      view?.players
-                                                                                          ?.online ??
-                                                                                      0,
-                                                                                  needed: neededOn(
-                                                                                      preset
-                                                                                  )
-                                                                              }
-                                                                          )
-                                                                        : t("events.runNow", {
-                                                                              name: preset.name
-                                                                          })
-                                                            }
-                                                            disabled={
-                                                                locked ||
-                                                                pending ||
-                                                                running ||
-                                                                dirty ||
-                                                                cannotOn(preset) !== null ||
-                                                                tooFewOn(preset) ||
-                                                                !view?.config.presets.some(
-                                                                    (one) => one.id === preset.id
-                                                                )
-                                                            }
-                                                            onClick={() => run(preset)}
-                                                        >
-                                                            <Play className="size-4" />
-                                                        </ui.Button>
-                                                        <ui.Button
-                                                            variant="ghost"
-                                                            size="icon-sm"
-                                                            aria-label={t("events.editNamed", {
-                                                                name: preset.name
-                                                            })}
-                                                            title={t("events.editNamed", {
-                                                                name: preset.name
-                                                            })}
+                                                        <ui.Switch
+                                                            checked={preset.enabled}
                                                             disabled={locked}
-                                                            onClick={() =>
-                                                                setEditing({ preset, isNew: false })
-                                                            }
-                                                        >
-                                                            <Pencil className="size-4" />
-                                                        </ui.Button>
-                                                        <ui.Button
-                                                            variant="ghost"
-                                                            size="icon-sm"
-                                                            aria-label={t("events.duplicateNamed", {
+                                                            aria-label={t("events.canComeRound", {
                                                                 name: preset.name
                                                             })}
-                                                            title={t("events.duplicateNamed", {
-                                                                name: preset.name
-                                                            })}
-                                                            disabled={locked}
-                                                            onClick={() =>
-                                                                setEditing({
-                                                                    preset: {
-                                                                        ...preset,
-                                                                        id: newId(),
-                                                                        name: `${preset.name} 2`.slice(
-                                                                            0,
-                                                                            40
-                                                                        )
-                                                                    },
-                                                                    isNew: true
+                                                            onChange={(enabled) =>
+                                                                change({
+                                                                    presets: presets.map((one) =>
+                                                                        one.id === preset.id
+                                                                            ? { ...one, enabled }
+                                                                            : one
+                                                                    )
                                                                 })
                                                             }
-                                                        >
-                                                            <Copy className="size-4" />
-                                                        </ui.Button>
-                                                        <ui.Button
-                                                            variant="ghost"
-                                                            size="icon-sm"
-                                                            aria-label={t("events.deleteNamed", {
-                                                                name: preset.name
-                                                            })}
-                                                            title={t("events.deleteNamed", {
-                                                                name: preset.name
-                                                            })}
-                                                            disabled={locked}
-                                                            onClick={() => void remove(preset)}
-                                                        >
-                                                            <Trash2 className="size-4" />
-                                                        </ui.Button>
+                                                        />
+                                                        <div className="flex items-center gap-1">
+                                                            <ui.Button
+                                                                variant="ghost"
+                                                                size="icon-sm"
+                                                                aria-label={t("events.whatIs", {
+                                                                    name: preset.name
+                                                                })}
+                                                                title={t("events.whatIs", {
+                                                                    name: preset.name
+                                                                })}
+                                                                aria-expanded={explained.has(
+                                                                    preset.id
+                                                                )}
+                                                                onClick={() => explain(preset.id)}
+                                                            >
+                                                                <Info className="size-4" />
+                                                            </ui.Button>
+                                                            <ui.Button
+                                                                variant="ghost"
+                                                                size="icon-sm"
+                                                                aria-label={t("events.runNow", {
+                                                                    name: preset.name
+                                                                })}
+                                                                title={
+                                                                    dirty
+                                                                        ? t("events.saveFirst")
+                                                                        : why
+                                                                          ? why
+                                                                          : tooFewOn(preset)
+                                                                            ? t(
+                                                                                  "events.errors.tooFewPlayers",
+                                                                                  {
+                                                                                      count:
+                                                                                          view
+                                                                                              ?.players
+                                                                                              ?.online ??
+                                                                                          0,
+                                                                                      needed: neededOn(
+                                                                                          preset
+                                                                                      )
+                                                                                  }
+                                                                              )
+                                                                            : t("events.runNow", {
+                                                                                  name: preset.name
+                                                                              })
+                                                                }
+                                                                disabled={
+                                                                    locked ||
+                                                                    pending ||
+                                                                    running ||
+                                                                    dirty ||
+                                                                    why !== null ||
+                                                                    tooFewOn(preset) ||
+                                                                    !view?.config.presets.some(
+                                                                        (one) =>
+                                                                            one.id === preset.id
+                                                                    )
+                                                                }
+                                                                onClick={() => run(preset)}
+                                                            >
+                                                                <Play className="size-4" />
+                                                            </ui.Button>
+                                                            <ui.Button
+                                                                variant="ghost"
+                                                                size="icon-sm"
+                                                                aria-label={t("events.editNamed", {
+                                                                    name: preset.name
+                                                                })}
+                                                                title={t("events.editNamed", {
+                                                                    name: preset.name
+                                                                })}
+                                                                disabled={locked}
+                                                                onClick={() =>
+                                                                    setEditing({
+                                                                        preset,
+                                                                        isNew: false
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Pencil className="size-4" />
+                                                            </ui.Button>
+                                                            <ui.Button
+                                                                variant="ghost"
+                                                                size="icon-sm"
+                                                                aria-label={t(
+                                                                    "events.duplicateNamed",
+                                                                    {
+                                                                        name: preset.name
+                                                                    }
+                                                                )}
+                                                                title={t("events.duplicateNamed", {
+                                                                    name: preset.name
+                                                                })}
+                                                                disabled={locked}
+                                                                onClick={() =>
+                                                                    setEditing({
+                                                                        preset: {
+                                                                            ...preset,
+                                                                            id: newId(),
+                                                                            name: `${preset.name} 2`.slice(
+                                                                                0,
+                                                                                40
+                                                                            )
+                                                                        },
+                                                                        isNew: true
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Copy className="size-4" />
+                                                            </ui.Button>
+                                                            <ui.Button
+                                                                variant="ghost"
+                                                                size="icon-sm"
+                                                                aria-label={t(
+                                                                    "events.deleteNamed",
+                                                                    {
+                                                                        name: preset.name
+                                                                    }
+                                                                )}
+                                                                title={t("events.deleteNamed", {
+                                                                    name: preset.name
+                                                                })}
+                                                                disabled={locked}
+                                                                onClick={() => void remove(preset)}
+                                                            >
+                                                                <Trash2 className="size-4" />
+                                                            </ui.Button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                {explained.has(preset.id) && (
-                                                    <EventExplained
-                                                        preset={preset}
-                                                        settings={settings ?? null}
-                                                    />
-                                                )}
-                                            </li>
-                                        ))}
+                                                    {explained.has(preset.id) && (
+                                                        <EventExplained
+                                                            preset={preset}
+                                                            settings={settings ?? null}
+                                                        />
+                                                    )}
+                                                </li>
+                                            );
+                                        })}
                                     </ul>
                                 </section>
                             ))}

@@ -4789,24 +4789,33 @@ async function serverAtLeast(server: ServerContainer, wanted: readonly number[])
  *  that cannot be read at all as unknown, which is not at least anything. */
 export const atLeast = catalog.versionAtLeast;
 
-/** The version each server's log last said it runs, kept a while: the Events
- *  screen asks every few seconds, and the version only changes with a restart. */
+/** What each server's log last said it runs, or that it did not say, kept a
+ *  minute: the Events screen asks every few seconds, and a restart onto another
+ *  version is seen within that minute. */
 const versions = new Map<string, { version: string | null; at: number }>();
-const VERSION_TTL_MS = 10 * 60_000;
+const VERSION_TTL_MS = 60_000;
+
+/** Reads of the version still out, one per server: a read slower than the
+ *  screen's polling is joined, not started again. */
+const versionReads = new Map<string, Promise<string | null>>();
 
 /** The version this server runs, as far as its log says - or null when it is
  *  off, slow, or the log does not say. Never waited on for long. */
 async function knownVersion(ownerId: string, installedAppId: string): Promise<string | null> {
     const kept = versions.get(installedAppId);
     if (kept && fresh(kept.at, VERSION_TTL_MS)) return kept.version;
-    const version = await withTimeout(
-        withServerContainer(ownerId, installedAppId, (server) => versionOf(server)),
-        3_000,
-        "slow"
-    ).catch(() => null);
-    // An answer is kept; a server that did not give one is asked again next time.
-    if (version !== null) versions.set(installedAppId, { version, at: Date.now() });
-    return version ?? kept?.version ?? null;
+    let read = versionReads.get(installedAppId);
+    if (!read) {
+        read = withServerContainer(ownerId, installedAppId, (server) => versionOf(server))
+            .catch(() => null)
+            .then((version) => {
+                versions.set(installedAppId, { version, at: Date.now() });
+                return version;
+            })
+            .finally(() => versionReads.delete(installedAppId));
+        versionReads.set(installedAppId, read);
+    }
+    return withTimeout(read, 3_000, "slow").catch(() => kept?.version ?? null);
 }
 
 // ------------------------------------------------------------------ who is playing

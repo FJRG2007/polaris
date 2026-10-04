@@ -122,7 +122,7 @@ describe("the Events tab", () => {
             }
         });
         const why = await screen.findByText(
-            "Needs Minecraft 1.17 or later, where what players carry is put away before they play; this server runs 1.16.5."
+            "Needs Minecraft 1.17 or later; this server runs 1.16.5."
         );
         expect(why).toBeTruthy();
         expect(screen.getAllByText("Incompatible")).toHaveLength(1);

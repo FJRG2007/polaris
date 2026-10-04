@@ -2036,8 +2036,8 @@
         },
         "incompatible": {
             "badge": "Incompatible",
-            "arena": "Necesita Minecraft {needs} o posterior para leer el kit que reparte; este servidor tiene la {version}.",
-            "items": "Necesita Minecraft {needs} o posterior, donde lo que llevan los jugadores se guarda antes de jugar; este servidor tiene la {version}.",
+            "arena": "Necesita Minecraft {needs} o posterior; este servidor tiene la {version}.",
+            "items": "Necesita Minecraft {needs} o posterior; este servidor tiene la {version}.",
             "loot": "El botín elegido solo existe desde Minecraft {needs}; este servidor tiene la {version}.",
             "ores": "La mena elegida solo existe desde Minecraft {needs}; este servidor tiene la {version}.",
             "material": "El material elegido solo existe desde Minecraft {needs}; este servidor tiene la {version}."

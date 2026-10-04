@@ -1192,6 +1192,7 @@ export function EventEditor({
     const issues = checked.success ? [] : checked.error.issues;
     const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
     const info = catalog.KIND_INFO[draft.kind];
+    const incompatible = incompatibleText(t, draft, version);
     const change = (patch: Partial<catalog.EventPreset>) =>
         setDraft((current) => ({ ...current, ...patch }) as catalog.EventPreset);
     const rewards = draft.rewards;
@@ -1299,9 +1300,9 @@ export function EventEditor({
                             change({ options: next } as Partial<catalog.EventPreset>)
                         }
                     />
-                    {incompatibleText(t, draft, version) && (
+                    {incompatible && (
                         <p role="status" className="text-xs text-warning">
-                            {t("events.incompatible.badge")}: {incompatibleText(t, draft, version)}
+                            {t("events.incompatible.badge")}: {incompatible}
                         </p>
                     )}
 
