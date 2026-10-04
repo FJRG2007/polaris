@@ -9663,6 +9663,22 @@ describe("a bingo rush", () => {
         expect(entry.disqualified).toContain("Ben");
     });
 
+    it("never lets somebody win who went into creative between two of the run's samples", async () => {
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        // Ben switches to creative for one look - crafting there counts as
+        // much as anywhere - and back before the fifteen-second sample.
+        world.creative = ["Ben"];
+        await play(2_100);
+        world.creative = [];
+        world.kinds.bingo.masks = { Ben: 0b111 };
+        await play(2_100);
+        expect(state().run).not.toBeNull();
+        expect(state().run!.offMode).toContain("Ben");
+        expect(state().run!.bingo!.winner).toBeNull();
+    });
+
     it("called off, takes its counts away and pays nobody", async () => {
         setUp([made("line")]);
         await start();

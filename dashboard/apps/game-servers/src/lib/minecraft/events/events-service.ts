@@ -1039,12 +1039,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         // Creative and spectator are noted as they are seen, not only at the
         // end: switching back for the last minute does not undo a rush mined
         // in creative.
-        const offMode = commands
-            .readWhere(await server.say([commands.NOT_SURVIVAL]))
-            .map((one) => one.name);
-        const noted = new Set(loop.run.offMode.map((name) => name.toLowerCase()));
-        const fresh = offMode.filter((name) => !noted.has(name.toLowerCase()));
-        if (fresh.length > 0) loop.run = { ...loop.run, offMode: [...loop.run.offMode, ...fresh] };
+        await noteOffMode(loop, server);
         const known = new Set(loop.run.participants.map((name) => name.toLowerCase()));
         const joined = [...seen.values()].filter((one) => !known.has(one.name.toLowerCase()));
         if (joined.length > 0) {
@@ -2799,6 +2794,18 @@ async function bingoBegin(
 /** Every few minutes each player is shown their own card again. */
 const CARD_AGAIN_TICKS = 90;
 
+/** Whoever is in creative or spectator now, added to those the run has seen
+ *  so (`offMode`), for good. Answers whether anybody new was. */
+async function noteOffMode(loop: Loop, server: ServerContainer): Promise<boolean> {
+    const offMode = commands
+        .readWhere(await server.say([commands.NOT_SURVIVAL]))
+        .map((one) => one.name);
+    const noted = new Set(loop.run.offMode.map((name) => name.toLowerCase()));
+    const fresh = offMode.filter((name) => !noted.has(name.toLowerCase()));
+    if (fresh.length > 0) loop.run = { ...loop.run, offMode: [...loop.run.offMode, ...fresh] };
+    return fresh.length > 0;
+}
+
 /**
  * A bingo rush's tick: every player's inventory looked at in one batch, what
  * each has newly marked told to them with their card, and the side panel and
@@ -2816,6 +2823,10 @@ async function bingoRush(
     if (!state) return null;
     const { goal } = loop.run.preset.options as catalog.EventOptions<"bingo">;
     const language = loop.language;
+    // Looked at every tick here, not every fifteen seconds: a card can be
+    // finished by crafting in creative and switching back in between, and
+    // crafting there counts as much as anywhere.
+    const newlyOff = await noteOffMode(loop, server);
     await server.sayAll(bingo.bingoTick(state.card));
     const read = commands.readScores(await server.say([bingo.READ_MARKS]));
     const marked = { ...state.marked };
@@ -2858,7 +2869,7 @@ async function bingoRush(
     const winner = state.winner ?? bingo.firstToComplete(done);
     const changed = Object.keys(marked).some((name) => marked[name] !== state.marked[name]);
     loop.run = { ...loop.run, bingo: { ...state, marked, at, winner } };
-    if (changed || winner !== state.winner) await persist(installedAppId, loop);
+    if (changed || winner !== state.winner || newlyOff) await persist(installedAppId, loop);
     if (!winner) return null;
     const line = goal === "line";
     lines.push(
