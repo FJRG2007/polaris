@@ -296,17 +296,24 @@ describe("boats", () => {
         const track = trackOf("quick", 2);
         const told = { fell: '"fell"', cut: '"cut"', lost: '"lost"' };
         const lines = boatRace.quickLines(track, "oak_boat", told);
-        // Boats nobody is in are taken away first.
-        expect(lines[0]).toBe(
-            "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,nbt=!{Passengers:[{}]}]"
-        );
+        // Who sits in which boat is asked of the boats (`execute on`), never
+        // their saved data, which leaves a player out of `Passengers`: read
+        // that way every boat with a racer in it was empty, was taken away,
+        // and its racer put back in a new one, look after look.
+        expect(lines.slice(0, 5)).toEqual([
+            "tag @a[tag=pe_in,scores={pe_fin=0}] add pe_afoot",
+            "execute in minecraft:overworld as @e[type=minecraft:oak_boat,tag=polaris_boat] on passengers run tag @s remove pe_afoot",
+            "execute in minecraft:overworld as @e[type=minecraft:oak_boat,tag=polaris_boat] on passengers on vehicle run tag @s add pe_held",
+            "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,tag=!pe_held]",
+            "execute in minecraft:overworld run tag @e[type=minecraft:oak_boat,tag=pe_held] remove pe_held"
+        ]);
+        expect(lines.some((line) => line.includes("Passengers"))).toBe(false);
         expect(
             lines.some((line) => line.includes("pe_cut=1") && line.endsWith('tellraw @s "cut"'))
         ).toBe(true);
         expect(
             lines.some(
-                (line) =>
-                    line.includes("nbt=!{RootVehicle:{}}") && line.endsWith('tellraw @s "lost"')
+                (line) => line.includes("tag=pe_afoot") && line.endsWith('tellraw @s "lost"')
             )
         ).toBe(true);
         // Back to the start before the line, to each gate after.
@@ -327,7 +334,7 @@ describe("boats", () => {
         expect(lines.at(-1)).toBe("tag @a remove pe_reset");
         // Before 1.19.4: nobody is put back for being out of a boat, only handed one.
         const old = boatRace.quickLines(track, "item", told);
-        expect(old.some((line) => line.includes("RootVehicle") && line.includes("tellraw"))).toBe(
+        expect(old.some((line) => line.includes("pe_afoot") && line.includes("tellraw"))).toBe(
             false
         );
         expect(old.at(-1)).toBe(

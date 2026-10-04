@@ -6797,7 +6797,7 @@ describe("an ice boat race", () => {
         expect(
             world.sent.some((line) =>
                 line.startsWith(
-                    "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,nbt=!{Passengers:[{}]}]"
+                    "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,tag=!pe_held]"
                 )
             )
         ).toBe(true);
